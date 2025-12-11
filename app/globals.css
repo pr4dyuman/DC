@@ -1,26 +1,149 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Base - Rich Black Theme */
+  --background: #050505;
+  --foreground: #fafafa;
+
+  /* Primary - Vivid Gold */
+  --primary: #ffd60a;
+  --primary-foreground: #000000;
+
+  /* Secondary - Zinc 900 */
+  --secondary: #18181b;
+  --secondary-foreground: #fafafa;
+
+  /* Muted - Zinc 800 */
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+
+  /* Accent - Zinc 800 */
+  --accent: #27272a;
+  --accent-foreground: #fafafa;
+
+  /* Destructive */
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  /* Borders & Inputs */
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #ffd60a;
+
+  /* Card & Popovers */
+  --card: #121212;
+  --card-foreground: #fafafa;
+  --popover: #121212;
+  --popover-foreground: #fafafa;
+
+  /* Radius */
+  --radius: 0.5rem;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Harmonized Zinc Scale */
+    --background: #050505;
+    /* Deep Black */
+    --foreground: #fafafa;
+    /* Zinc 50 */
+
+    --primary: #ffd60a;
+    /* Vivid Gold */
+    --primary-foreground: #09090b;
+    /* Zinc 950 */
+
+    --secondary: #27272a;
+    /* Zinc 800 */
+    --secondary-foreground: #fafafa;
+
+    --muted: #27272a;
+    /* Zinc 800 */
+    --muted-foreground: #d4d4d8;
+    /* Zinc 300 - Brighter for better legibility */
+
+    --accent: #27272a;
+    /* Zinc 800 */
+    --accent-foreground: #fafafa;
+
+    --destructive: #7f1d1d;
+    /* Red 900 */
+    --destructive-foreground: #fef2f2;
+    /* Red 50 */
+
+    --border: #27272a;
+    /* Zinc 800 */
+    --input: #27272a;
+    /* Zinc 800 */
+    --ring: #ffd60a;
+
+    --card: #141415;
+    /* Custom Dark Zinc - Distinct from bg #050505 */
+    --card-foreground: #fafafa;
+    --popover: #141415;
+    --popover-foreground: #fafafa;
   }
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Premium Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--input);
 }
