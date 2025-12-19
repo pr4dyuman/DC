@@ -50,8 +50,8 @@ export function TransactionList({ transactions, title = "Recent Transactions" }:
                                     </p>
                                 </div>
                                 <div className="ml-auto font-medium">
-                                    <span className={transaction.type === 'income' ? 'text-emerald-600' : 'text-zinc-900 dark:text-zinc-100'}>
-                                        {transaction.type === 'income' ? '+' : ''}{formatter.format(transaction.amount)}
+                                    <span className={transaction.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
+                                        {transaction.type === 'income' ? '+' : '-'}{formatter.format(transaction.amount)}
                                     </span>
                                 </div>
                             </div>

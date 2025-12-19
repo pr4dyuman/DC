@@ -117,55 +117,87 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [] }: ViewT
                 <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
 
                     {/* Metadata Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-secondary/30 p-4 rounded-xl border border-border">
+                    {/* Metadata Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-secondary/20 p-5 rounded-xl border border-border/50">
                         {/* Assignee Section */}
-                        <div className="flex items-start gap-4">
-                            <div className="p-2.5 bg-card rounded-lg border border-border shadow-sm">
-                                <User className="w-5 h-5 text-zinc-400" />
+                        <div className="flex flex-col space-y-3">
+                            <div className="flex items-center gap-2 mb-1">
+                                <div className="p-1.5 bg-background rounded-md border border-border shadow-sm">
+                                    <User className="w-3.5 h-3.5 text-muted-foreground" />
+                                </div>
+                                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Assignee</label>
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Assignee</label>
-                                <div className="flex items-center gap-2.5">
-                                    <Avatar className="h-8 w-8 border border-zinc-200 dark:border-zinc-700">
-                                        <AvatarImage src={assignee?.avatar} />
-                                        <AvatarFallback className="bg-indigo-100 text-indigo-600 text-xs font-bold">
-                                            {assignee?.name?.substring(0, 2).toUpperCase() || "?"}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-semibold text-foreground">
-                                            {assignee ? assignee.name : "Unassigned"}
-                                        </span>
-                                        <span className="text-xs text-zinc-500">
-                                            {assignee?.email || "No email"}
-                                        </span>
-                                    </div>
+                            <div className="flex items-center gap-3 pl-1">
+                                <Avatar className="h-9 w-9 border-2 border-background shadow-sm">
+                                    <AvatarImage src={assignee?.avatar} />
+                                    <AvatarFallback className="bg-indigo-100 text-indigo-600 text-xs font-bold">
+                                        {assignee?.name?.substring(0, 2).toUpperCase() || "?"}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-semibold text-foreground leading-none mb-1">
+                                        {assignee ? assignee.name : "Unassigned"}
+                                    </span>
+                                    <span className="text-[11px] text-muted-foreground truncate max-w-[120px]">
+                                        {assignee?.email || "No email"}
+                                    </span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Dates Section */}
-                        <div className="flex items-start gap-4">
-                            <div className="p-2.5 bg-card rounded-lg border border-border shadow-sm">
-                                <Calendar className="w-5 h-5 text-zinc-400" />
+                        {/* Due Date Section */}
+                        <div className="flex flex-col space-y-3 md:border-l md:border-border/50 md:pl-6">
+                            <div className="flex items-center gap-2 mb-1">
+                                <div className="p-1.5 bg-background rounded-md border border-border shadow-sm">
+                                    <Calendar className="w-3.5 h-3.5 text-yellow-500" />
+                                </div>
+                                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Due Date</label>
                             </div>
-                            <div className="space-y-3 w-full">
-                                <div className="flex flex-col space-y-1">
-                                    <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Due Date</label>
-                                    <div className="flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                                        {task.dueDate ? (
+                            <div className="flex flex-col pl-1">
+                                {task.dueDate ? (
+                                    <>
+                                        <span className="text-sm font-semibold text-foreground leading-none mb-1">
+                                            {format(new Date(task.dueDate), "MMMM do, yyyy")}
+                                        </span>
+                                        <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                                            <Clock className="w-3 h-3" />
+                                            {format(new Date(task.dueDate), "h:mm a")}
+                                        </span>
+                                    </>
+                                ) : (
+                                    <span className="text-sm text-muted-foreground italic">No due date set</span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Created On Section */}
+                        <div className="flex flex-col space-y-3 md:border-l md:border-border/50 md:pl-6">
+                            <div className="flex items-center gap-2 mb-1">
+                                <div className="p-1.5 bg-background rounded-md border border-border shadow-sm">
+                                    <Timer className="w-3.5 h-3.5 text-muted-foreground" />
+                                </div>
+                                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Created On</label>
+                            </div>
+                            {task.createdAt ? (
+                                <div className="flex flex-col pl-1">
+                                    <span className="text-sm font-semibold text-foreground leading-none mb-1">
+                                        {format(new Date(task.createdAt), "MMMM do, yyyy")}
+                                    </span>
+                                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                                        <span>{format(new Date(task.createdAt), "h:mm a")}</span>
+                                        {task.createdBy && (
                                             <>
-                                                <span>{format(new Date(task.dueDate), "PPP")}</span>
-                                                <span className="text-zinc-300 px-1">•</span>
-                                                <span className="text-zinc-500 text-xs flex items-center gap-1">
-                                                    <Clock className="w-3 h-3" />
-                                                    {format(new Date(task.dueDate), "p")}
+                                                <span className="w-1 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+                                                <span className="text-muted-foreground">
+                                                    by <span className="text-foreground font-medium">{users.find(u => u.id === task.createdBy)?.name || "Unknown"}</span>
                                                 </span>
                                             </>
-                                        ) : "No due date"}
+                                        )}
                                     </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <span className="text-sm text-muted-foreground italic">Unknown</span>
+                            )}
                         </div>
                     </div>
 
@@ -173,11 +205,11 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [] }: ViewT
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 pb-2 border-b border-zinc-100 dark:border-zinc-800">
                             <AlignLeft className="w-5 h-5 text-indigo-500" />
-                            <h3 className="text-lg font-semibold text-foreground">Description</h3>
+                            <h3 className="text-lg font-semibold text-muted-foreground">Description</h3>
                         </div>
                         <div className="prose prose-sm prose-zinc dark:prose-invert max-w-none">
                             {task.description ? (
-                                <div className="text-base leading-7 text-zinc-700 dark:text-zinc-200 break-words whitespace-pre-wrap rounded-lg">
+                                <div className="text-base leading-7 text-foreground break-words whitespace-pre-wrap rounded-lg">
                                     {task.description}
                                 </div>
                             ) : (

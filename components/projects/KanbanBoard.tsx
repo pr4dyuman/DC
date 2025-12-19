@@ -30,13 +30,14 @@ interface KanbanBoardProps {
     users?: any[];
     currentUserId?: string;
     aiEnabled?: boolean;
+    selectedCategory?: string;
 }
 
-export function KanbanBoard({ initialTasks, projectId, users, categories = [], currentUserId, aiEnabled }: KanbanBoardProps) {
+export function KanbanBoard({ initialTasks, projectId, users, categories = [], currentUserId, aiEnabled, selectedCategory = "All" }: KanbanBoardProps) {
     const [mounted, setMounted] = useState(false);
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [activeTask, setActiveTask] = useState<Task | null>(null);
-    const [selectedCategory, setSelectedCategory] = useState<string>("All");
+    // const [selectedCategory, setSelectedCategory] = useState<string>("All"); // Lifted to parent
 
     // Use IDs to track open modals so we always get the latest task data from 'tasks' state
     const [viewTaskId, setViewTaskId] = useState<string | null>(null);
@@ -122,26 +123,7 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
 
     return (
         <div className="flex flex-col h-full">
-            <div className="mb-4 flex gap-2 items-center">
-                <span className="text-sm font-medium text-muted-foreground mr-2">Services:</span>
-                <div className="flex bg-muted p-1 rounded-md">
-                    <button
-                        onClick={() => setSelectedCategory("All")}
-                        className={`px-3 py-1 text-sm font-medium rounded-sm transition-all ${selectedCategory === "All" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                    >
-                        All
-                    </button>
-                    {categories.map(cat => (
-                        <button
-                            key={cat.id}
-                            onClick={() => setSelectedCategory(cat.name)}
-                            className={`px-3 py-1 text-sm font-medium rounded-sm transition-all ${selectedCategory === cat.name ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                        >
-                            {cat.name}
-                        </button>
-                    ))}
-                </div>
-            </div>
+            {/* Filter UI removed - handled by parent ProjectView */}
 
             <DndContext
                 sensors={sensors}

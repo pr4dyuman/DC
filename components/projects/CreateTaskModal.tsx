@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createTask, getCategories, getUsers, enhanceTaskDescription } from "@/lib/actions";
+import { createTask, getServices, getUsers, enhanceTaskDescription } from "@/lib/actions";
 import { AIChatBox } from "./AIChatBox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Loader2, Sparkles } from "lucide-react";
+import { Plus, Loader2, Sparkles, Calendar } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface CreateTaskModalProps {
@@ -31,14 +31,14 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
 
     // Data State
     const [users, setUsers] = useState<any[]>([]);
-    const [categories, setCategories] = useState<any[]>([]);
+    const [services, setServices] = useState<any[]>([]);
 
     useEffect(() => {
         if (open) {
-            Promise.all([getUsers(), getCategories()]).then(([u, c]) => {
+            Promise.all([getUsers(), getServices()]).then(([u, s]) => {
                 setUsers(u);
-                setCategories(c);
-                if (c.length > 0 && !category) setCategory(c[0].name);
+                setServices(s);
+                if (s.length > 0 && !category) setCategory(s[0].name);
                 if (u.length > 0 && !assigneeId) setAssigneeId(u[0].id);
             });
         }
@@ -104,8 +104,8 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                                 >
                                     <option value="" disabled>Select Category</option>
-                                    {categories.map(c => (
-                                        <option key={c.id} value={c.name}>{c.name}</option>
+                                    {services.map(s => (
+                                        <option key={s.id} value={s.name}>{s.name}</option>
                                     ))}
                                 </select>
                             </div>
@@ -135,8 +135,8 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                                     type="button" // Prevent form submit
                                     disabled={!title}
                                     className={`text-xs flex items-center gap-1.5 px-2 py-1 rounded-md transition-all font-medium border ${showChat
-                                            ? "bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-200"
-                                            : "text-muted-foreground border-transparent hover:bg-muted"
+                                        ? "bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-200"
+                                        : "text-muted-foreground border-transparent hover:bg-muted"
                                         }`}
                                 >
                                     <Sparkles className={`h-3 w-3 ${showChat ? "fill-indigo-300" : ""}`} />
@@ -157,7 +157,7 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                                 type="datetime-local"
                                 value={dueDate}
                                 onChange={e => setDueDate(e.target.value)}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm [&::-webkit-calendar-picker-indicator]:filter-[invert(82%)_sepia(38%)_saturate(1324%)_hue-rotate(358deg)_brightness(103%)_contrast(106%)] cursor-pointer"
                             />
                         </div>
 

@@ -1,5 +1,6 @@
-import { getTasks, getUsers, getTransactions, getCategories, getProject, getProjectAssets } from "@/lib/actions";
+import { getTasks, getUsers, getTransactions, getServices, getProject, getProjectAssets, getUser } from "@/lib/actions";
 import { ProjectView } from "@/components/projects/ProjectView";
+import { getSessionId } from "@/lib/auth";
 
 export default async function ProjectDetailPage({ params }: { params: { id: string } }) {
     const { id } = await params;
@@ -8,7 +9,10 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
     const users = await getUsers();
     // const transactions = await getTransactions(id); // Removed
     const assets = await getProjectAssets(id);
-    const allCategories = await getCategories();
+    const allCategories = await getServices();
+
+    const userId = await getSessionId();
+    const currentUser = userId ? await getUser(userId) : undefined;
 
     if (!project) return <div>Project not found</div>;
 
@@ -20,6 +24,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
             // transactions={transactions} // Removed
             assets={assets}
             categories={allCategories}
+            currentUser={currentUser}
         />
     );
 }

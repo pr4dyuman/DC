@@ -3,12 +3,57 @@ import path from 'path';
 
 const DB_PATH = path.join(process.cwd(), 'data', 'db.json');
 
-export type User = { id: string; name: string; email: string; role: 'admin' | 'specialist' | 'manager' | 'employee'; jobTitle?: string; salary?: number; avatar?: string; password?: string; geminiApiKey?: string };
-export type Client = { id: string; name: string; email: string; companyName: string; logo?: string; phone?: string; address?: string; password?: string };
-export type Project = { id: string; client: string; clientId?: string; services: string[]; status: 'Active' | 'Completed' | 'On Hold'; budget: number; dueDate: string; aiEnabled?: boolean };
+export type User = {
+    id: string;
+    name: string;
+    email: string;
+    role: 'admin' | 'specialist' | 'manager' | 'employee';
+    jobTitle?: string;
+    salary?: number;
+    avatar?: string;
+    password?: string;
+    geminiApiKey?: string;
+    lastActiveAt?: string; // ISO Date string for presence
+};
+export type Client = {
+    id: string;
+    name: string;
+    email: string;
+    companyName: string;
+    logo?: string;
+    phone?: string;
+    address?: string;
+    password?: string;
+    lastActiveAt?: string;
+};
+export type PaymentType = 'installment' | 'monthly';
+
+export type PaymentConfig = {
+    type: PaymentType;
+    // For Installment
+    installments?: number;
+    installmentAmount?: number; // total / installments
+    firstPaymentDate?: string;
+    installmentDates?: string[]; // New: Specific dates for each installment
+
+    // For Monthly
+    monthlyAmount?: number;
+    billingStartDate?: string;
+
+    // Common
+    paymentDetailsLater: boolean;
+};
+
+export type ProjectServiceConfig = {
+    serviceId: string; // matches Category.name or Category.id
+    name: string;
+    paymentConfig?: PaymentConfig;
+};
+
+export type Project = { id: string; name: string; client?: string; clientId?: string; services: string[]; serviceConfigs?: ProjectServiceConfig[]; status: 'Active' | 'Completed' | 'On Hold'; budget: number; dueDate: string; createdAt?: string; aiEnabled?: boolean };
 export type Invoice = { id: string; projectId: string; amount: number; status: 'Paid' | 'Pending' | 'Overdue'; date: string };
 export type Comment = { id: string; userId: string; text: string; timestamp: string };
-export type Task = { id: string; projectId: string; title: string; description?: string; status: 'Todo' | 'In Progress' | 'Review' | 'Done'; priority?: 'Low' | 'Medium' | 'High'; assigneeId: string; dueDate: string; startDate?: string; category?: string; createdAt?: string; comments?: Comment[] };
+export type Task = { id: string; projectId: string; title: string; description?: string; status: 'Todo' | 'In Progress' | 'Review' | 'Done'; priority?: 'Low' | 'Medium' | 'High'; assigneeId: string; dueDate: string; startDate?: string; category?: string; createdAt?: string; createdBy?: string; comments?: Comment[] };
 export type Notification = { id: string; userId: string; message: string; read: boolean; timestamp: string; link?: string };
 export type Activity = { id: string; user: string; action: string; target: string; timestamp: string };
 
@@ -27,8 +72,19 @@ export type Asset = {
     aiEnabled?: boolean;
 };
 
+export type Message = {
+    id: string;
+    senderId: string;
+    receiverId: string; // Can be user ID, but for now assuming direct messages. Group chat would need 'groupId'
+    content: string;
+    timestamp: string;
+    read: boolean;
+    type: 'text' | 'image';
+};
+
 export type TransactionType = 'income' | 'expense';
 export type TransactionCategory = 'Project' | 'Salary' | 'Software' | 'Marketing' | 'Office' | 'Hosting' | 'Domain' | 'Equipment' | 'Internal Transfer' | 'Investor' | 'Other';
+
 
 export type Transaction = {
     id: string;
@@ -40,9 +96,11 @@ export type Transaction = {
     status: 'completed' | 'pending';
     projectId?: string;
     relatedInvoiceId?: string;
+    userId?: string; // Linked user (e.g. for Salary)
 };
 
-export type Category = { id: string; name: string };
+export type Job = { title: string; count: number };
+export type Service = { id: string; name: string; jobs: Job[] };
 export type Settings = { systemName: string; logo: string };
 export type DB = {
     users: User[];
@@ -52,9 +110,10 @@ export type DB = {
     tasks: Task[];
     notifications: Notification[];
     activities: Activity[];
-    categories: Category[];
+    services: Service[];
     transactions: Transaction[];
     assets: Asset[];
+    messages: Message[];
     settings: Settings;
 };
 
@@ -79,22 +138,36 @@ async function writeDb(data: DB): Promise<void> {
 
 export const db = {
     get: async () => {
-        await delay(300); // Small 300ms latency
+        // await delay(300); // Delay removed for performance
         const data = await readDb();
 
         // Data Migration Helpers
-        if (!data.categories) {
-            data.categories = [
-                { id: "c1", name: "Web Dev" },
-                { id: "c2", name: "SEO" },
-                { id: "c3", name: "Video Production" },
-                { id: "c4", name: "Amazon E-com" },
-                { id: "c5", name: "Design" }
-            ];
+        if (!data.services) {
+            // Migration check: if categories exist, migrate them to services
+            if ((data as any).categories) {
+                data.services = (data as any).categories.map((c: any) => ({
+                    id: c.id,
+                    name: c.name,
+                    jobs: []
+                }));
+                delete (data as any).categories; // Cleanup old key
+            } else {
+                data.services = [
+                    { id: "c1", name: "Web Dev", jobs: [] },
+                    { id: "c2", name: "SEO", jobs: [] },
+                    { id: "c3", name: "Video Production", jobs: [] },
+                    { id: "c4", name: "Amazon E-com", jobs: [] },
+                    { id: "c5", name: "Design", jobs: [] }
+                ];
+            }
+
         }
 
         if (data.projects) {
             data.projects = data.projects.map((p: any) => {
+                // Migration: Ensure 'name' exists (fallback to client)
+                if (!p.name) p.name = p.client || "Untitled Project";
+
                 // Migrate 'department' or 'departments' to 'services'
                 if (p.departments && !p.services) {
                     return { ...p, services: p.departments, departments: undefined };
@@ -129,6 +202,7 @@ export const db = {
         if (!data.notifications) data.notifications = [];
         if (!data.activities) data.activities = [];
         if (!data.assets) data.assets = [];
+        if (!data.messages) data.messages = [];
         if (!data.settings) {
             data.settings = { systemName: 'AgencyOS', logo: '' };
         }
@@ -136,11 +210,11 @@ export const db = {
         return data;
     },
     update: async (callback: (data: DB) => DB) => {
-        await delay(300);
+        // await delay(300);
         const data = await readDb();
 
         // Ensure properties exist before update
-        if (!data.categories) data.categories = [];
+        if (!data.services) data.services = [];
         if (!data.clients) data.clients = [];
         if (!data.transactions) data.transactions = [];
         if (!data.invoices) data.invoices = [];
@@ -148,7 +222,9 @@ export const db = {
         if (!data.users) data.users = [];
         if (!data.notifications) data.notifications = [];
         if (!data.activities) data.activities = [];
+        if (!data.activities) data.activities = [];
         if (!data.assets) data.assets = [];
+        if (!data.messages) data.messages = [];
         if (!data.settings) data.settings = { systemName: 'AgencyOS', logo: '' };
 
         const newData = callback(data);

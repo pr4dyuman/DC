@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { updateTask, getUsers, getCategories, deleteTask } from "@/lib/actions";
+import { updateTask, getUsers, getServices, deleteTask } from "@/lib/actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
+import { Loader2, Calendar } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Task } from "@/lib/db";
 
@@ -27,13 +27,13 @@ export function EditTaskModal({ task, open, setOpen }: EditTaskModalProps) {
 
     // Data State
     const [users, setUsers] = useState<any[]>([]);
-    const [categories, setCategories] = useState<any[]>([]);
+    const [services, setServices] = useState<any[]>([]);
 
     useEffect(() => {
         if (open) {
-            Promise.all([getUsers(), getCategories()]).then(([u, c]) => {
+            Promise.all([getUsers(), getServices()]).then(([u, s]) => {
                 setUsers(u);
-                setCategories(c);
+                setServices(s);
             });
         }
     }, [open]);
@@ -91,8 +91,8 @@ export function EditTaskModal({ task, open, setOpen }: EditTaskModalProps) {
                                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                             >
                                 <option value="" disabled>Select Category</option>
-                                {categories.map(c => (
-                                    <option key={c.id} value={c.name}>{c.name}</option>
+                                {services.map(s => (
+                                    <option key={s.id} value={s.name}>{s.name}</option>
                                 ))}
                             </select>
                         </div>
@@ -143,7 +143,7 @@ export function EditTaskModal({ task, open, setOpen }: EditTaskModalProps) {
                                 type="datetime-local"
                                 value={dueDate}
                                 onChange={e => setDueDate(e.target.value)}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm [&::-webkit-calendar-picker-indicator]:filter-[invert(82%)_sepia(38%)_saturate(1324%)_hue-rotate(358deg)_brightness(103%)_contrast(106%)] cursor-pointer"
                             />
                         </div>
                     </div>

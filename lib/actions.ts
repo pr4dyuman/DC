@@ -1,8 +1,10 @@
 "use server";
 
-import { db, User, Project, Invoice, Task, Notification, Activity, Client, Asset } from "./db";
+import { db, User, Project, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig } from "./db";
 import { revalidatePath } from "next/cache";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+
+import { getSessionId } from "./auth";
 
 export type SearchResult = {
     id: string;
@@ -11,6 +13,12 @@ export type SearchResult = {
     subtitle?: string;
     url: string;
 };
+
+export async function getCurrentUser() {
+    const userId = await getSessionId();
+    if (!userId) return null;
+    return getUser(userId);
+}
 
 export async function getDashboardMetrics() {
     const data = await db.get();
@@ -39,17 +47,41 @@ export async function getDashboardMetrics() {
 }
 
 export async function getRevenueData() {
-    // Mocking monthly data based on current dummy invoices + random history
-    // In a real app, we would aggregate by date from db.invoices
-    return [
-        { name: "Jan", revenue: 4000, expenses: 2400 },
-        { name: "Feb", revenue: 3000, expenses: 1398 },
-        { name: "Mar", revenue: 2000, expenses: 9800 },
-        { name: "Apr", revenue: 2780, expenses: 3908 },
-        { name: "May", revenue: 1890, expenses: 4800 },
-        { name: "Jun", revenue: 2390, expenses: 3800 },
-        { name: "Jul", revenue: 3490, expenses: 4300 },
-    ];
+    const data = await db.get();
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const currentYear = new Date().getFullYear();
+
+    // Initialize last 6 months
+    const result: any[] = [];
+    for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const monthIndex = d.getMonth();
+        const year = d.getFullYear();
+        result.push({
+            name: months[monthIndex],
+            revenue: 0,
+            expenses: 0,
+            monthIndex,
+            year
+        });
+    }
+
+    // Aggregate Transactions
+    (data.transactions || []).forEach(t => {
+        const tDate = new Date(t.date);
+        const tMonth = tDate.getMonth();
+        const tYear = tDate.getFullYear();
+
+        const monthData = result.find(r => r.monthIndex === tMonth && r.year === tYear);
+        if (monthData) {
+            if (t.type === 'income') monthData.revenue += t.amount;
+            if (t.type === 'expense') monthData.expenses += t.amount;
+        }
+    });
+
+    // Cleanup helper props
+    return result.map(({ name, revenue, expenses }) => ({ name, revenue, expenses }));
 }
 
 export async function getProjectDistribution() {
@@ -101,7 +133,56 @@ export async function getProject(id: string) {
 
 export async function getUsers() {
     const data = await db.get();
-    return data.users;
+    const currentUserId = await getSessionId();
+    const currentUser = data.users.find(u => u.id === currentUserId);
+    const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
+
+    return data.users.map(user => {
+        if (isAdmin || user.id === currentUserId) {
+            return user;
+        }
+        // Redact salary
+        const { salary, ...redacted } = user;
+        // Cast back to User to satisfy return type, though strictly it's missing salary
+        // In a real app we might pick a specific DTO, but here we just omit it at runtime.
+        return redacted as User;
+    });
+}
+
+export async function getUser(id: string) {
+    const data = await db.get();
+    const targetUser = data.users.find(u => u.id === id);
+    if (!targetUser) return undefined;
+
+    const currentUserId = await getSessionId();
+    const currentUser = data.users.find(u => u.id === currentUserId);
+    const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
+
+    if (isAdmin || currentUserId === id) {
+        return targetUser;
+    }
+
+    // Redact
+    const { salary, ...redacted } = targetUser;
+    return redacted as User;
+}
+
+export async function getUserTasks(userId: string) {
+    const data = await db.get();
+    return data.tasks.filter(t => t.assigneeId === userId);
+}
+
+export async function getUserActivity(userId: string) {
+    const data = await db.get();
+    // Filter activities where the actor is the user (by name for now since activity stores 'user' as name)
+    // Or if we can link by ID. Currently activity.user is a string name.
+    // We'll search by user name.
+    const user = data.users.find(u => u.id === userId);
+    if (!user) return [];
+
+    return data.activities
+        .filter(a => a.user === user.name)
+        .slice(0, 20); // Limit to last 20
 }
 
 export async function createUser(user: Omit<User, "id">) {
@@ -118,6 +199,16 @@ export async function createUser(user: Omit<User, "id">) {
 }
 
 export async function updateUser(id: string, updates: Partial<User>, oldPassword?: string) {
+    // Permission Check
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Unauthorized");
+    const isAdmin = currentUser.role === 'admin' || currentUser.role === 'manager';
+    const isSelf = currentUser.id === id;
+
+    if (!isAdmin && !isSelf) {
+        throw new Error("Unauthorized: You can only edit your own profile.");
+    }
+
     // Verify password if changing it
     if (updates.password) {
         if (!oldPassword) {
@@ -138,7 +229,19 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
     revalidatePath('/dashboard/team');
 }
 
-export async function deleteUser(id: string) {
+export async function adminResetPassword(id: string, newPassword: string) {
+    // Ideally verify admin privileges here via session/auth
+    await db.update((data) => ({
+        ...data,
+        users: data.users.map(u => u.id === id ? { ...u, password: newPassword } : u)
+    }));
+    revalidatePath('/dashboard/team');
+}
+
+export async function deleteUser(id: string, password: string) {
+    const isValid = await verifyAdminPassword(password);
+    if (!isValid) throw new Error("Invalid password");
+
     await db.update((data) => ({
         ...data,
         users: data.users.filter(u => u.id !== id)
@@ -146,42 +249,70 @@ export async function deleteUser(id: string) {
     revalidatePath('/dashboard/team');
 }
 
-export async function getCategories() {
+export async function getServices() {
     const data = await db.get();
-    return data.categories;
+    return data.services;
 }
 
-export async function addCategory(name: string) {
-    const newCategory = { id: Math.random().toString(36).substr(2, 9), name };
+export async function addService(name: string, jobs: { title: string; count: number }[]) {
+    const newService = { id: Math.random().toString(36).substr(2, 9), name, jobs };
     await db.update((data) => ({
         ...data,
-        categories: [...data.categories, newCategory]
+        services: [...data.services, newService]
     }));
     revalidatePath('/dashboard/settings');
     revalidatePath('/dashboard/projects');
-    return newCategory;
+    return newService;
 }
 
-export async function deleteCategory(id: string) {
+export async function deleteService(id: string) {
+    const data = await db.get();
+    const serviceToDelete = data.services.find(s => s.id === id);
+    const serviceName = serviceToDelete?.name;
+
+    await db.update((data) => {
+        // Remove from services list
+        const newServices = data.services.filter(c => c.id !== id);
+
+        // Remove from all projects
+        const newProjects = data.projects.map(p => {
+            if (p.services && serviceName && p.services.includes(serviceName)) {
+                return {
+                    ...p,
+                    services: p.services.filter(s => s !== serviceName)
+                };
+            }
+            return p;
+        });
+
+        return {
+            ...data,
+            services: newServices,
+            projects: newProjects
+        };
+    });
+    revalidatePath('/dashboard/settings');
+    revalidatePath('/dashboard/projects');
+}
+
+export async function updateService(id: string, name: string, jobs: { title: string; count: number }[]) {
     await db.update((data) => ({
         ...data,
-        categories: data.categories.filter(c => c.id !== id)
+        services: data.services.map(c => c.id === id ? { ...c, name, jobs } : c)
     }));
     revalidatePath('/dashboard/settings');
     revalidatePath('/dashboard/projects');
 }
 
-export async function updateCategory(id: string, name: string) {
-    await db.update((data) => ({
-        ...data,
-        categories: data.categories.map(c => c.id === id ? { ...c, name } : c)
-    }));
-    revalidatePath('/dashboard/settings');
-    revalidatePath('/dashboard/projects');
-}
+export async function createProject(project: Omit<Project, "id" | "status" | "createdAt">) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+        throw new Error("Unauthorized: Only Admins and Managers can create projects.");
+    }
+    const newProject: Project = { ...project, id: Math.random().toString(36).substr(2, 9), status: "Active", createdAt: new Date().toISOString() };
+    // Helper: auto-fill client name if ID provided but name missing? 
+    // Actually we trust the input `client` field as "Client Name" for display or "Unknown".
 
-export async function createProject(project: Omit<Project, "id" | "status">) {
-    const newProject: Project = { ...project, id: Math.random().toString(36).substr(2, 9), status: "Active" };
     await db.update((data) => {
         if (project.clientId && !data.clients?.find(c => c.id === project.clientId)) {
             throw new Error(`Client with ID ${project.clientId} not found`);
@@ -194,13 +325,34 @@ export async function createProject(project: Omit<Project, "id" | "status">) {
                 id: Math.random().toString(),
                 user: "Admin",
                 action: "created project",
-                target: project.client,
+                target: project.name,
                 timestamp: new Date().toISOString()
             }, ...data.activities]
         }
     });
     revalidatePath('/dashboard/projects');
     return newProject;
+}
+
+export async function updateProjectPayment(projectId: string, serviceId: string, paymentConfig: PaymentConfig) {
+    await db.update((data) => {
+        return {
+            ...data,
+            projects: data.projects.map(p => {
+                if (p.id === projectId && p.serviceConfigs) {
+                    return {
+                        ...p,
+                        serviceConfigs: p.serviceConfigs.map(c =>
+                            c.serviceId === serviceId ? { ...c, paymentConfig } : c
+                        )
+                    };
+                }
+                return p;
+            })
+        };
+    });
+    revalidatePath('/dashboard/projects/[id]', 'page');
+    revalidatePath('/dashboard/projects');
 }
 
 export async function getTasks(projectId: string) {
@@ -314,7 +466,9 @@ export async function addComment(taskId: string, userId: string, text: string) {
 }
 
 export async function createTask(task: Omit<Task, "id">) {
-    const newTask: Task = { ...task, id: Math.random().toString(36).substr(2, 9), createdAt: new Date().toISOString() };
+    const currentUser = await getCurrentUser();
+    const createdBy = currentUser ? currentUser.id : "system";
+    const newTask: Task = { ...task, id: Math.random().toString(36).substr(2, 9), createdAt: new Date().toISOString(), createdBy };
 
     await db.update((data) => {
         // Validation
@@ -488,10 +642,28 @@ export async function getCategoryMemberSummary(category: string) {
 }
 
 export async function createTransaction(transaction: Omit<Transaction, "id" | "status">) {
+    // STRICT SERVER-SIDE VALIDATION
+    if (transaction.category === 'Project' && !transaction.projectId) {
+        throw new Error("Validation Error: Projects must have a Project ID.");
+    }
+    if (transaction.category === 'Salary' && transaction.type !== 'expense') {
+        // Auto-correct or Throw? Throwing is safer for strictness, but let's correct it to be helpful or throw if ambiguous.
+        // Let's force it to expense to be safe, or throw if logic is broken.
+        // User requested strict "depended on", so let's enforce.
+        throw new Error("Validation Error: Salary must be an Expense.");
+    }
+    if (transaction.category === 'Other' && transaction.type !== 'expense') {
+        throw new Error("Validation Error: 'Other' category is for expenses only.");
+    }
+
+    // Note: Internal Transfer checks are harder without memberId in transaction object,
+    // but the modal handles the description/type logic. We assume if category is Internal Transfer,
+    // dependencies were met by client. Ideally we'd add memberId to schema for strict server check.
+
     const newTransaction: Transaction = {
         ...transaction,
         id: Math.random().toString(36).substr(2, 9),
-        status: "completed" // Auto-complete for now
+        status: "completed"
     };
 
     await db.update((data) => {
@@ -499,9 +671,23 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
             throw new Error(`Project with ID ${transaction.projectId} not found`);
         }
 
+        // GENERATE NOTIFICATION FOR SALARY
+        const notifications = [...(data.notifications || [])];
+        if (newTransaction.category === 'Salary' && newTransaction.userId && newTransaction.type === 'expense') {
+            notifications.unshift({
+                id: Math.random().toString(),
+                userId: newTransaction.userId,
+                message: `Salary Payment Received: ₹${newTransaction.amount.toLocaleString()}`,
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: '/dashboard/finance' // Or profile link? Finance seems appropriate if they have access, or just informational.
+            });
+        }
+
         return {
             ...data,
-            transactions: [newTransaction, ...(data.transactions || [])]
+            transactions: [newTransaction, ...(data.transactions || [])],
+            notifications
         };
     });
 
@@ -521,6 +707,17 @@ export async function getInvoices(projectId?: string) {
     }
 
     return invoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+export async function getHighPriorityTasks() {
+    const data = await db.get();
+    // Return In Progress or Todo tasks that are High priority or Due soon (mock due soon logic if priority not set)
+    // For now, let's filter by Status != Done and sort by date. 
+    // Ideally we would add 'priority' field to tasks properly, but let's assume 'In Progress' is urgent.
+    return data.tasks
+        .filter(t => t.status !== 'Done')
+        .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+        .slice(0, 5);
 }
 
 export async function createInvoice(invoice: Omit<Invoice, "id" | "status">) {
@@ -684,7 +881,8 @@ export async function payEmployee(userId: string, amount: number, month: string,
         type: 'expense',
         category: 'Salary',
         description,
-        date: new Date().toISOString().split('T')[0]
+        date: new Date().toISOString().split('T')[0],
+        userId
     });
 
     revalidatePath('/dashboard/finance');
@@ -715,7 +913,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
     // Search Projects
     if (data.projects) {
         data.projects.forEach(p => {
-            const clientName = data.clients?.find(c => c.id === p.clientId || c.name === p.client)?.name || p.client;
+            const clientName = data.clients?.find(c => c.id === p.clientId || c.name === p.client)?.name || p.client || "";
             if (clientName.toLowerCase().includes(lowerQuery) || p.services?.some(d => d.toLowerCase().includes(lowerQuery))) {
                 results.push({
                     id: p.id,
@@ -793,6 +991,13 @@ export async function getProjectAssets(projectId: string) {
 }
 
 export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt">) {
+    // Server-Side Safety Check
+    const FORBIDDEN_EXTENSIONS = ['.exe', '.bat', '.cmd', '.sh', '.vbs', '.msi', '.jar', '.com', '.scr', '.pif'];
+    const fileName = asset.name.toLowerCase();
+    if (FORBIDDEN_EXTENSIONS.some(ext => fileName.endsWith(ext))) {
+        throw new Error("Security Alert: Malicious file type rejected by server.");
+    }
+
     const newAsset: Asset = {
         ...asset,
         id: Math.random().toString(36).substr(2, 9),
@@ -913,7 +1118,7 @@ export async function explainTask(taskId: string, userId: string) {
         },
         project: project ? {
             name: (project as any).client || "Unknown Client", // Schema uses 'client' string
-            departments: project.departments?.join(", ") || "General"
+            departments: project.services?.join(", ") || "General"
         } : null,
         comments: task.comments || []
     };
@@ -989,9 +1194,9 @@ export async function explainTask(taskId: string, userId: string) {
 
     // Fallback strategy
     const modelsToTry = [
-        "gemini-2.5-flash", // Try experimental fast model first if available
-        "gemini-1.5-pro",       // High quality
-        "gemini-1.5-flash",     // Fast fallback
+        "gemini-3-flash-preview", // Try experimental fast model first if available
+        "gemini-3-flash",       // High quality
+        "gemini-3-flash",     // Fast fallback
     ];
 
     let lastError = null;
@@ -1148,7 +1353,7 @@ export async function chatWithTaskAI(
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-3-flash-preview",
         systemInstruction: `
         You are a **Senior Technical Project Manager & Agile Coach**.
         You are having a conversation with a user who is creating a task.

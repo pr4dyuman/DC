@@ -14,6 +14,7 @@ import { TeamFinanceSummary } from "@/components/finance/TeamFinanceSummary";
 import { CategoryMemberSummary } from "@/components/finance/CategoryMemberSummary";
 import { getCategoryMemberSummary } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
+import { TotalBalance } from "@/components/finance/TotalBalance";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
@@ -55,7 +56,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
         return {
             id: p.id,
             title: `${clientName} Project`,
-            client: clientName
+            client: clientName || ""
         };
     });
 
@@ -98,10 +99,13 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
 
     return (
         <div className="flex-1 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between space-y-4 sm:space-y-0">
                 <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Finance</h2>
-                <div className="flex items-center space-x-2">
-                    <AddTransactionModal users={users} />
+                <div className="flex flex-col items-end">
+                    <div className="flex items-center space-x-2">
+                        <AddTransactionModal users={users} projects={rawProjects} />
+                    </div>
+                    <TotalBalance amount={stats.netProfit} />
                 </div>
             </div>
 
