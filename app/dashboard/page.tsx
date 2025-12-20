@@ -8,7 +8,10 @@ import {
     getUserTasks,
     getUser,
     getUserActivity,
-    getProjects
+    getProjects,
+    getInvoices,
+    getNotifications,
+    getCurrentUser
 } from "@/lib/actions";
 import { getSessionId } from "@/lib/auth";
 
@@ -19,15 +22,31 @@ import { IndianRupee, Briefcase, FileText, Activity as ActivityIcon, CheckCircle
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { ClientDashboard } from "@/components/dashboard/ClientDashboard"; // Named import
 
 export default async function DashboardPage() {
-    const userId = await getSessionId();
-    if (!userId) redirect('/login');
-
-    const currentUser = await getUser(userId);
+    const currentUser = await getCurrentUser();
     if (!currentUser) redirect('/login');
 
+    // Client Dashboard View
+    if (currentUser.role === 'client') {
+        const projects = await getProjects(); // Assuming getProjects is now filtered for client if called by client
+        const invoices = await getInvoices(); // Assuming getInvoices is now filtered for client
+        const notifications = await getNotifications(currentUser.id);
+
+        return (
+            <ClientDashboard
+                projects={projects}
+                invoices={invoices}
+                notifications={notifications}
+                clientName={currentUser.name}
+            />
+        );
+    }
+
+    // Admin/Employee Dashboard View
     const isAdmin = currentUser.role === 'admin' || currentUser.role === 'manager';
+    const userId = currentUser.id;
 
     // Parallel Data Fetching based on Role
     let metrics: any = {}, revenueData, projectDist, activities, urgentTasks: any[] = [];

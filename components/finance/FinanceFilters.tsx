@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 interface FinanceFiltersProps {
     projects: { id: string; title: string; client: string }[];
-    users: { id: string; name: string }[];
+    users: { id: string; name: string; jobTitle?: string }[];
 }
 
 export function FinanceFilters({ projects, users }: FinanceFiltersProps) {
@@ -40,8 +40,8 @@ export function FinanceFilters({ projects, users }: FinanceFiltersProps) {
                     <Select value={currentProject} onValueChange={(val) => updateFilter("projectId", val)}>
                         <SelectItem value="all">Select Project</SelectItem>
                         {projects.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                                {p.title}
+                            <SelectItem key={p.id} value={p.id} title={`${p.title} (${p.client})`}>
+                                {p.title} ({p.client})
                             </SelectItem>
                         ))}
                     </Select>
@@ -54,8 +54,8 @@ export function FinanceFilters({ projects, users }: FinanceFiltersProps) {
                     <Select value={currentUser} onValueChange={(val) => updateFilter("userId", val)}>
                         <SelectItem value="all">Select Team Member</SelectItem>
                         {users.map((u) => (
-                            <SelectItem key={u.id} value={u.id}>
-                                {u.name}
+                            <SelectItem key={u.id} value={u.id} title={`${u.name} (${u.jobTitle || 'Team Member'})`}>
+                                {u.name} ({u.jobTitle || 'Team Member'})
                             </SelectItem>
                         ))}
                     </Select>

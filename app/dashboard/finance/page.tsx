@@ -1,4 +1,4 @@
-import { getFinanceChartData, getFinanceStats, getInvoices, getTransactions, getPayrollStatus, getProjects, getUsers, getClients } from "@/lib/actions";
+import { getFinanceChartData, getFinanceStats, getInvoices, getTransactions, getPayrollStatus, getProjects, getUsers, getUser, getClients } from "@/lib/actions";
 import { Transaction } from "@/lib/db";
 import { StatsCards } from "@/components/finance/StatsCards";
 import { RevenueChart } from "@/components/finance/RevenueChart";
@@ -17,14 +17,58 @@ import { Button } from "@/components/ui/button";
 import { TotalBalance } from "@/components/finance/TotalBalance";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { getSessionId } from "@/lib/auth";
 
 export default async function FinancePage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
     const params = await searchParams;
     const projectId = typeof params.projectId === 'string' ? params.projectId : undefined;
-    const userId = typeof params.userId === 'string' ? params.userId : undefined;
+    let userId = typeof params.userId === 'string' ? params.userId : undefined;
     const category = typeof params.category === 'string' ? params.category : undefined;
     const memberId = typeof params.memberId === 'string' ? params.memberId : undefined;
 
+    // STRICT CLIENT CHECK: Perform this FIRST
+    const currentUserId = await getSessionId();
+    // Optimization: Use getUser which handles both Users and Clients tables
+    // getUsers() ONLY returns employees, which is why the previous check failed for clients.
+    const currentUser = currentUserId ? await getUser(currentUserId) : null;
+    const isUserAdmin = currentUser?.role === 'admin';
+
+    if (currentUser?.role === 'client') {
+        // Force Client View immediately - Do not execute Admin logic
+        const clientInvoices = await getInvoices(); // internally filters for client
+        const clientTransactions = await getTransactions(); // internally filters for client
+
+        const pendingTotal = clientInvoices.filter(i => i.status === 'Pending').reduce((acc, curr) => acc + curr.amount, 0);
+
+        return (
+            <div className="flex-1 space-y-4">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">My Invoices</h2>
+                    <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Total Due</p>
+                        <p className="text-2xl font-bold text-emerald-500">₹{pendingTotal.toLocaleString()}</p>
+                    </div>
+                </div>
+
+                <Tabs defaultValue="invoices" className="space-y-4">
+                    <TabsList>
+                        <TabsTrigger value="invoices">Invoices</TabsTrigger>
+                        <TabsTrigger value="history">Payment History</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="invoices" className="space-y-4">
+                        <InvoiceManager invoices={clientInvoices} isClient={true} />
+                    </TabsContent>
+                    <TabsContent value="history" className="space-y-4">
+                        <TransactionList transactions={clientTransactions} title="Payments Made" />
+                    </TabsContent>
+                </Tabs>
+            </div>
+        );
+    }
+
+    // --- ADMIN / EMPLOYEE LOGIC BELOW (Only runs if NOT client) ---
+
+    // ... existing admin logic ...
     const stats = await getFinanceStats(projectId, userId, category);
     const chartData = await getFinanceChartData(projectId, userId, category);
     const transactions = await getTransactions(projectId, userId, category);
@@ -55,8 +99,8 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
         const clientName = clients.find(c => c.id === p.clientId || c.name === p.client)?.name || p.client;
         return {
             id: p.id,
-            title: `${clientName} Project`,
-            client: clientName || ""
+            title: p.name,
+            client: clientName || 'Unknown'
         };
     });
 
@@ -254,13 +298,13 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
                                 <RevenueChart data={chartData} />
                             </div>
                             <div className="col-span-3">
-                                <TransactionList transactions={transactions.slice(0, 5)} title="Recent Activity" />
+                                <TransactionList transactions={transactions.slice(0, 5)} title="Recent Activity" isAdmin={isUserAdmin} projects={rawProjects} users={users} />
                             </div>
                         </div>
                     </TabsContent>
 
                     <TabsContent value="transactions" className="space-y-4">
-                        <TransactionList transactions={transactions} />
+                        <TransactionList transactions={transactions} isAdmin={isUserAdmin} projects={rawProjects} users={users} />
                     </TabsContent>
 
                     <TabsContent value="invoices" className="space-y-4">

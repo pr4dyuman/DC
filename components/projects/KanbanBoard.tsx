@@ -31,9 +31,10 @@ interface KanbanBoardProps {
     currentUserId?: string;
     aiEnabled?: boolean;
     selectedCategory?: string;
+    readOnly?: boolean;
 }
 
-export function KanbanBoard({ initialTasks, projectId, users, categories = [], currentUserId, aiEnabled, selectedCategory = "All" }: KanbanBoardProps) {
+export function KanbanBoard({ initialTasks, projectId, users, categories = [], currentUserId, aiEnabled, selectedCategory = "All", readOnly = false }: KanbanBoardProps) {
     const [mounted, setMounted] = useState(false);
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -54,12 +55,19 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
         setTasks(initialTasks);
     }, [initialTasks]);
 
-    const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), // Prevent accidental drags
-        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-    );
+    const pointerSensor = useSensor(PointerSensor, {
+        activationConstraint: { distance: 5 },
+        disabled: readOnly
+    });
+    const keyboardSensor = useSensor(KeyboardSensor, {
+        coordinateGetter: sortableKeyboardCoordinates,
+        disabled: readOnly
+    });
+
+    const sensors = useSensors(pointerSensor, keyboardSensor);
 
     const handleDragStart = (event: DragStartEvent) => {
+        if (readOnly) return;
         setActiveTask(event.active.data.current?.task);
     };
 
@@ -68,6 +76,7 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
     };
 
     const handleDragEnd = async (event: DragEndEvent) => {
+        if (readOnly) return;
         const { active, over } = event;
 
         if (!over) return;
@@ -141,9 +150,10 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                             tasks={filteredTasks.filter(t => t.status === col)}
                             users={users || []}
                             onViewTask={(task) => setViewTaskId(task.id)}
-                            onEditTask={(task) => setEditTaskId(task.id)}
+                            onEditTask={(task) => !readOnly && setEditTaskId(task.id)}
                             currentUserId={currentUserId}
                             aiEnabled={aiEnabled}
+                            readOnly={readOnly}
                         />
                     ))}
                 </div>
@@ -172,6 +182,7 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                         setViewTaskId(null);
                     }}
                     users={users}
+                    readOnly={readOnly}
                 />
             )}
 

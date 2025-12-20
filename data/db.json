@@ -8,27 +8,122 @@
       "jobTitle": "CEO",
       "salary": 120000,
       "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Pradyuman",
-      "lastActiveAt": "2025-12-19T06:39:36.300Z"
+      "lastActiveAt": "2025-12-20T07:00:40.617Z"
     },
     {
       "id": "u4",
       "name": "Emily Chen",
       "email": "emily@agency.com",
       "role": "employee",
-      "jobTitle": "UI/UX Designer",
+      "jobTitle": "developer",
       "salary": 75000,
       "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Emily",
-      "lastActiveAt": "2024-05-23T10:15:00Z"
+      "lastActiveAt": "2025-12-19T09:36:20.918Z",
+      "password": ""
     }
   ],
-  "clients": [],
-  "projects": [],
-  "tasks": [],
+  "clients": [
+    {
+      "name": "shobhit",
+      "email": "testclient@digitalcorevids.com",
+      "companyName": "film stage",
+      "password": "123",
+      "id": "fh3eczvpc",
+      "lastActiveAt": "2025-12-20T06:57:40.252Z"
+    }
+  ],
+  "projects": [
+    {
+      "name": "test",
+      "client": "shobhit",
+      "clientId": "fh3eczvpc",
+      "services": [
+        "Web Development"
+      ],
+      "serviceConfigs": [
+        {
+          "serviceId": "Web Development",
+          "name": "Web Development",
+          "paymentConfig": {
+            "type": "installment",
+            "paymentDetailsLater": true,
+            "installments": 1,
+            "installmentAmount": 0,
+            "monthlyAmount": 0
+          }
+        }
+      ],
+      "budget": 50000,
+      "dueDate": "2025-12-31",
+      "aiEnabled": false,
+      "id": "cf50z7tpp",
+      "status": "Active",
+      "createdAt": "2025-12-19T16:29:29.513Z"
+    },
+    {
+      "name": "2nd projects",
+      "client": "shobhit",
+      "clientId": "fh3eczvpc",
+      "services": [
+        "Design"
+      ],
+      "serviceConfigs": [
+        {
+          "serviceId": "Design",
+          "name": "Design",
+          "paymentConfig": {
+            "type": "installment",
+            "paymentDetailsLater": true,
+            "installments": 1,
+            "installmentAmount": 0,
+            "monthlyAmount": 0
+          }
+        }
+      ],
+      "budget": 10000,
+      "dueDate": "2025-12-26",
+      "aiEnabled": false,
+      "id": "90okcw6pt",
+      "status": "Active",
+      "createdAt": "2025-12-19T20:11:27.863Z"
+    }
+  ],
+  "tasks": [
+    {
+      "projectId": "ri0l8vusu",
+      "title": "1st test task",
+      "description": "do nothing",
+      "status": "Todo",
+      "assigneeId": "u4",
+      "category": "Web Development",
+      "dueDate": "2025-12-20T15:05",
+      "id": "140adrphv",
+      "createdAt": "2025-12-19T09:35:05.013Z",
+      "createdBy": "u1"
+    },
+    {
+      "projectId": "cf50z7tpp",
+      "title": "1st task",
+      "description": "do nothing",
+      "status": "Todo",
+      "assigneeId": "u4",
+      "category": "Web Development",
+      "dueDate": "2025-12-27T00:47",
+      "id": "j8mhrq6wv",
+      "createdAt": "2025-12-19T19:17:56.023Z",
+      "createdBy": "fh3eczvpc"
+    }
+  ],
   "services": [
     {
       "id": "s1",
-      "name": "Web Dev",
-      "jobs": []
+      "name": "Web Development",
+      "jobs": [
+        {
+          "title": "developer",
+          "count": 1
+        }
+      ]
     },
     {
       "id": "s2",
@@ -47,9 +142,89 @@
     }
   ],
   "invoices": [],
-  "notifications": [],
-  "activities": [],
-  "transactions": [],
+  "notifications": [
+    {
+      "id": "0.6645464991944718",
+      "userId": "u4",
+      "message": "New task assigned: 1st task",
+      "read": false,
+      "timestamp": "2025-12-19T19:17:56.028Z",
+      "link": "/dashboard/projects/cf50z7tpp?task=j8mhrq6wv"
+    },
+    {
+      "id": "0.35351408828054787",
+      "userId": "u4",
+      "message": "New task assigned: 1st test task",
+      "read": false,
+      "timestamp": "2025-12-19T09:35:05.017Z",
+      "link": "/dashboard/projects/ri0l8vusu?task=140adrphv"
+    }
+  ],
+  "activities": [
+    {
+      "id": "0.5434045892968353",
+      "user": "Admin",
+      "action": "created project",
+      "target": "2nd projects",
+      "timestamp": "2025-12-19T20:11:27.867Z"
+    },
+    {
+      "id": "0.8356319521887157",
+      "user": "Admin",
+      "action": "created project",
+      "target": "test",
+      "timestamp": "2025-12-19T16:29:29.516Z"
+    },
+    {
+      "id": "0.27519738660094206",
+      "user": "Admin",
+      "action": "created project",
+      "target": "filmstage",
+      "timestamp": "2025-12-19T09:34:29.794Z"
+    }
+  ],
+  "transactions": [
+    {
+      "description": "nononono",
+      "amount": 1000,
+      "type": "income",
+      "category": "Project",
+      "date": "2025-12-19",
+      "projectId": "90okcw6pt",
+      "id": "sr2yxgac3",
+      "status": "completed"
+    },
+    {
+      "description": "2nd install",
+      "amount": 2000,
+      "type": "income",
+      "category": "Project",
+      "date": "2025-12-19",
+      "projectId": "90okcw6pt",
+      "id": "d8lbtuy7n",
+      "status": "completed"
+    },
+    {
+      "description": "pay 1",
+      "amount": 5000,
+      "type": "income",
+      "category": "Project",
+      "date": "2025-12-19",
+      "projectId": "90okcw6pt",
+      "id": "4l659r0tw",
+      "status": "completed"
+    },
+    {
+      "description": "yiu",
+      "amount": 6000,
+      "type": "income",
+      "category": "Project",
+      "date": "2025-12-19",
+      "projectId": "cf50z7tpp",
+      "id": "vrvjbjko0",
+      "status": "completed"
+    }
+  ],
   "assets": [],
   "messages": [
     {

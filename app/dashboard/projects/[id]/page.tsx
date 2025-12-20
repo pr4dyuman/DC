@@ -7,7 +7,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
     const project = await getProject(id);
     const tasks = await getTasks(id);
     const users = await getUsers();
-    // const transactions = await getTransactions(id); // Removed
+    const transactions = await getTransactions(id);
     const assets = await getProjectAssets(id);
     const allCategories = await getServices();
 
@@ -21,7 +21,7 @@ export default async function ProjectDetailPage({ params }: { params: { id: stri
             project={project}
             tasks={tasks}
             users={users}
-            // transactions={transactions} // Removed
+            transactions={transactions}
             assets={assets}
             categories={allCategories}
             currentUser={currentUser}

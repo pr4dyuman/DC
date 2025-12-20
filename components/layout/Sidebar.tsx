@@ -78,6 +78,14 @@ export function Sidebar({ currentUserId, currentUserRole = 'admin' }: SidebarPro
     if (currentUserRole === 'employee') {
         const allowedLabels = ['Dashboard', 'Projects', 'Team']; // Employee Access
         visibleRoutes = baseRoutes.filter(r => allowedLabels.includes(r.label));
+    } else if (currentUserRole === 'client') {
+        // Client Access - simplified text
+        const allowedLabels = ['Dashboard', 'Projects', 'Finance'];
+        visibleRoutes = baseRoutes.filter(r => allowedLabels.includes(r.label)).map(r => {
+            if (r.label === 'Projects') return { ...r, label: 'My Projects' };
+            if (r.label === 'Finance') return { ...r, label: 'My Invoices', href: `/dashboard/finance?userId=${currentUserId}` };
+            return r;
+        });
     }
 
     const routes = [

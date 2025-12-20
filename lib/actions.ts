@@ -123,6 +123,15 @@ export async function getNotifications(userId: string): Promise<Notification[]> 
 
 export async function getProjects() {
     const data = await db.get();
+    const currentUserId = await getSessionId();
+    if (!currentUserId) return []; // Require auth
+
+    const currentUser = await getUser(currentUserId);
+    if (currentUser?.role === 'client') {
+        // STRICT: Only return projects owned by this client
+        return data.projects.filter(p => p.clientId === currentUserId);
+    }
+
     return data.projects;
 }
 
@@ -134,8 +143,18 @@ export async function getProject(id: string) {
 export async function getUsers() {
     const data = await db.get();
     const currentUserId = await getSessionId();
-    const currentUser = data.users.find(u => u.id === currentUserId);
+    const currentUser = await getUser(currentUserId!); // Use enhanced getUser
     const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
+
+    // If client, arguably they shouldn't see users at all, or only those assigned to their projects?
+    // For now, let's return [] for clients to be safe/strict, unless we need them for chat.
+    if (currentUser?.role === 'client') {
+        // Allow clients to see all users so they can assign tasks, but redact sensitive info
+        return data.users.map(user => {
+            const { salary, password, ...redacted } = user;
+            return redacted as User;
+        });
+    }
 
     return data.users.map(user => {
         if (isAdmin || user.id === currentUserId) {
@@ -144,27 +163,54 @@ export async function getUsers() {
         // Redact salary
         const { salary, ...redacted } = user;
         // Cast back to User to satisfy return type, though strictly it's missing salary
-        // In a real app we might pick a specific DTO, but here we just omit it at runtime.
         return redacted as User;
     });
 }
 
 export async function getUser(id: string) {
     const data = await db.get();
+
+    // 1. Check Standard Users
     const targetUser = data.users.find(u => u.id === id);
-    if (!targetUser) return undefined;
+    if (targetUser) {
+        const currentUserId = await getSessionId();
+        // Prevent infinite recursion if called from within getUser (unlikely but safe)
+        // Access Check
+        if (!currentUserId) return undefined; // Should satisfy middleware eventually
 
-    const currentUserId = await getSessionId();
-    const currentUser = data.users.find(u => u.id === currentUserId);
-    const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
+        // Use raw data for role check to avoid recursion
+        const rawCurrentUser = data.users.find(u => u.id === currentUserId) ||
+            (data.clients && data.clients.find(c => c.id === currentUserId) ? { role: 'client' } as User : null);
 
-    if (isAdmin || currentUserId === id) {
-        return targetUser;
+        const isAdmin = rawCurrentUser && (rawCurrentUser.role === 'admin' || rawCurrentUser.role === 'manager');
+
+        if (isAdmin || currentUserId === id) {
+            return targetUser;
+        }
+
+        // Redact
+        const { salary, ...redacted } = targetUser;
+        return redacted as User;
     }
 
-    // Redact
-    const { salary, ...redacted } = targetUser;
-    return redacted as User;
+    // 2. Check Clients (Treat as User with role 'client')
+    if (data.clients) {
+        const targetClient = data.clients.find(c => c.id === id);
+        if (targetClient) {
+            const clientAsUser: User = {
+                id: targetClient.id,
+                name: targetClient.name, // Link person name
+                email: targetClient.email,
+                role: 'client' as any, // Cast to match User role type
+                jobTitle: targetClient.companyName, // Reuse field
+                avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${targetClient.companyName}`,
+                lastActiveAt: targetClient.lastActiveAt
+            };
+            return clientAsUser;
+        }
+    }
+
+    return undefined;
 }
 
 export async function getUserTasks(userId: string) {
@@ -530,12 +576,35 @@ export async function createClient(client: Omit<Client, "id">) {
     return newClient;
 }
 
+
+
 // Project Actions
 export async function updateProject(id: string, updates: Partial<Project>) {
-    await db.update((data) => ({
-        ...data,
-        projects: data.projects.map(p => p.id === id ? { ...p, ...updates } : p)
-    }));
+    const data = await db.get();
+    const oldProject = data.projects.find(p => p.id === id);
+
+    await db.update((data) => {
+        let notifications = data.notifications || [];
+
+        // Notify Client on Status Change
+        if (updates.status && oldProject && oldProject.status !== updates.status && oldProject.clientId) {
+            // Check if client exists (optional but good) or just push
+            notifications = [{
+                id: Math.random().toString(),
+                userId: oldProject.clientId,
+                message: `Project "${oldProject.name}" status updated to ${updates.status}`,
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: `/dashboard/projects/${id}`
+            }, ...notifications];
+        }
+
+        return {
+            ...data,
+            projects: data.projects.map(p => p.id === id ? { ...p, ...updates } : p),
+            notifications
+        };
+    });
     revalidatePath('/dashboard/projects');
     revalidatePath(`/dashboard/projects/${id}`);
 }
@@ -582,6 +651,29 @@ export async function getTransactions(projectId?: string, userId?: string, categ
     // Let's filter by description containing user name if we can match it, or if there's a related task?
     // Actually, let's keep it simple: filter by 'Salary' category and user name in description if available.
     // Category filter for "Others"
+    const currentUserId = await getSessionId();
+    if (currentUserId) {
+        const currentUser = await getUser(currentUserId);
+        if (currentUser?.role === 'client') {
+            // STRICT: Clients can only see transactions related to THEIR projects
+            // They cannot see "Salary" or internal expenses unless linked to their project (usually Income for us, Expense for them)
+            // Ideally we only show them:
+            // 1. Incomes (Payments they made) where projectId is theirs.
+            // 2. Maybe Project expenses if Transparency is enabled? For now, let's stick to "Payments from Client".
+
+            // Get all projects owned by this client
+            const clientProjectIds = data.projects.filter(p => p.clientId === currentUserId).map(p => p.id);
+
+            // Filter transactions: Must be in one of their projects AND usually type 'income' (Money from them)
+            // Or 'expense' if we bill them for specific items?
+            // Let's show ALL transactions linked to their projects for maximum transparency, 
+            // BUT maybe filter out sensitive internal categories unless specifically "Project" category?
+            transactions = transactions.filter(t =>
+                t.projectId && clientProjectIds.includes(t.projectId)
+            );
+        }
+    }
+
     if (category) {
         transactions = transactions.filter(t => t.category === category);
     }
@@ -702,11 +794,52 @@ export async function getInvoices(projectId?: string) {
     const data = await db.get();
     let invoices = data.invoices || [];
 
+    const currentUserId = await getSessionId();
+    if (currentUserId) {
+        const currentUser = await getUser(currentUserId);
+        if (currentUser?.role === 'client') {
+            // STRICT: Filter projects owned by client first, then invoices
+            const clientProjectIds = data.projects.filter(p => p.clientId === currentUserId).map(p => p.id);
+            invoices = invoices.filter(i => clientProjectIds.includes(i.projectId));
+        }
+    }
+
     if (projectId) {
         invoices = invoices.filter(i => i.projectId === projectId);
     }
 
     return invoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+export async function updateInvoiceStatus(invoiceId: string, status: 'Paid' | 'Pending' | 'Overdue' | 'Processing') {
+    await db.update((data) => {
+        const invoice = data.invoices.find(i => i.id === invoiceId);
+        if (invoice) {
+            invoice.status = status;
+        }
+        return data; // Return updated DB data
+    });
+}
+
+export async function deleteTransaction(transactionId: string, password: string) {
+    const currentUserId = await getSessionId();
+    if (!currentUserId) throw new Error("Unauthorized");
+
+    const user = await getUser(currentUserId);
+    if (!user) throw new Error("User not found");
+
+    // Simple password check (In real app, hash check)
+    // Assuming user.password is stored in plain text for this mock environment
+    if (user.password !== password) {
+        throw new Error("Invalid Password");
+    }
+
+    await db.update((data) => {
+        data.transactions = data.transactions.filter(t => t.id !== transactionId);
+        return data;
+    });
+
+    return { success: true };
 }
 
 export async function getHighPriorityTasks() {
@@ -728,13 +861,28 @@ export async function createInvoice(invoice: Omit<Invoice, "id" | "status">) {
     };
 
     await db.update((data) => {
+        const project = data.projects.find(p => p.id === invoice.projectId);
+        let notifications = data.notifications || [];
+
+        if (project && project.clientId) {
+            notifications = [{
+                id: Math.random().toString(),
+                userId: project.clientId,
+                message: `New Invoice Generated: ₹${invoice.amount.toLocaleString()}`,
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: `/dashboard/finance`
+            }, ...notifications];
+        }
+
         if (!data.projects?.find(p => p.id === invoice.projectId)) {
             throw new Error(`Project with ID ${invoice.projectId} not found`);
         }
 
         return {
             ...data,
-            invoices: [newInvoice, ...(data.invoices || [])]
+            invoices: [newInvoice, ...(data.invoices || [])],
+            notifications
         };
     });
 

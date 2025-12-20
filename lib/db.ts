@@ -7,7 +7,7 @@ export type User = {
     id: string;
     name: string;
     email: string;
-    role: 'admin' | 'specialist' | 'manager' | 'employee';
+    role: 'admin' | 'specialist' | 'manager' | 'employee' | 'client';
     jobTitle?: string;
     salary?: number;
     avatar?: string;
@@ -51,7 +51,7 @@ export type ProjectServiceConfig = {
 };
 
 export type Project = { id: string; name: string; client?: string; clientId?: string; services: string[]; serviceConfigs?: ProjectServiceConfig[]; status: 'Active' | 'Completed' | 'On Hold'; budget: number; dueDate: string; createdAt?: string; aiEnabled?: boolean };
-export type Invoice = { id: string; projectId: string; amount: number; status: 'Paid' | 'Pending' | 'Overdue'; date: string };
+export type Invoice = { id: string; projectId: string; amount: number; status: 'Paid' | 'Pending' | 'Overdue' | 'Processing'; date: string };
 export type Comment = { id: string; userId: string; text: string; timestamp: string };
 export type Task = { id: string; projectId: string; title: string; description?: string; status: 'Todo' | 'In Progress' | 'Review' | 'Done'; priority?: 'Low' | 'Medium' | 'High'; assigneeId: string; dueDate: string; startDate?: string; category?: string; createdAt?: string; createdBy?: string; comments?: Comment[] };
 export type Notification = { id: string; userId: string; message: string; read: boolean; timestamp: string; link?: string };

@@ -15,9 +15,10 @@ interface TaskCardProps {
     task: Task;
     aiEnabled?: boolean;
     users?: any[];
+    readOnly?: boolean;
 }
 
-export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEnabled }: TaskCardProps & { onView: (task: Task) => void; onEdit: (task: Task) => void; currentUserId?: string; aiEnabled?: boolean }) {
+export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEnabled, readOnly }: TaskCardProps & { onView: (task: Task) => void; onEdit: (task: Task) => void; currentUserId?: string; aiEnabled?: boolean }) {
 
     const {
         attributes,
@@ -99,12 +100,14 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
                                 <h4 className="font-medium text-sm text-foreground leading-tight break-words">
                                     {task.title}
                                 </h4>
-                                <button
-                                    onClick={handleEditClick}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground shrink-0"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
-                                </button>
+                                {!readOnly && (
+                                    <button
+                                        onClick={handleEditClick}
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground shrink-0"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
+                                    </button>
+                                )}
                             </div>
 
                             <div className="flex items-center gap-2">

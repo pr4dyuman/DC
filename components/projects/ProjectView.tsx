@@ -7,6 +7,7 @@ import { CreateTaskModal } from "@/components/projects/CreateTaskModal";
 import { ProjectSettingsModal } from "@/components/projects/ProjectSettingsModal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { ProjectFinanceSummary } from "@/components/finance/ProjectFinanceSummary";
 // import { TransactionList } from "@/components/finance/TransactionList";
 // import { AddTransactionModal } from "@/components/finance/AddTransactionModal";
 import { AssetList } from "@/components/projects/AssetList";
@@ -17,12 +18,12 @@ type ProjectViewProps = {
     project: Project;
     tasks: Task[];
     users: User[];
-    // transactions: Transaction[]; // Removed
+    transactions: Transaction[];
     assets: Asset[];
     categories: Service[];
 };
 
-export function ProjectView({ project, tasks, users, assets, categories, currentUser }: ProjectViewProps & { currentUser?: User }) {
+export function ProjectView({ project, tasks, users, transactions, assets, categories, currentUser }: ProjectViewProps & { currentUser?: User }) {
     const projectServices = project.services || [];
     const filteredCategories = categories.filter(c => projectServices.includes(c.name));
     const [selectedCategory, setSelectedCategory] = useState<string>("All");
@@ -93,13 +94,15 @@ export function ProjectView({ project, tasks, users, assets, categories, current
                             currentUserId={currentUser?.id}
                             aiEnabled={project.aiEnabled}
                             selectedCategory={selectedCategory}
+                            readOnly={false}
                         />
                     </div>
                 </TabsContent>
 
                 {isAdmin && (
                     <TabsContent value="finance" className="flex-1 overflow-auto data-[state=inactive]:hidden text-left">
-                        <div className="container max-w-4xl py-6">
+                        <div className="container max-w-4xl py-6 space-y-6">
+                            <ProjectFinanceSummary project={project} transactions={transactions} />
                             <PaymentSettingsCard project={project} />
                         </div>
                     </TabsContent>

@@ -229,15 +229,12 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
 
             <div className="space-y-2">
                 <Label>Target Due Date</Label>
-                <div className="relative">
-                    <Calendar className="absolute left-2 top-2.5 h-4 w-4 text-yellow-500" />
-                    <Input
-                        type="date"
-                        className="pl-8"
-                        value={formData.dueDate}
-                        onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    />
-                </div>
+                <Input
+                    type="date"
+                    className="[&::-webkit-calendar-picker-indicator]:filter-[invert(82%)_sepia(38%)_saturate(1324%)_hue-rotate(358deg)_brightness(103%)_contrast(106%)] cursor-pointer"
+                    value={formData.dueDate}
+                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                />
             </div>
         </div>
     );

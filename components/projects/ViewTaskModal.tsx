@@ -36,9 +36,10 @@ interface ViewTaskModalProps {
     setOpen: (open: boolean) => void;
     onEdit: () => void;
     users?: any[];
+    readOnly?: boolean;
 }
 
-export function ViewTaskModal({ task, open, setOpen, onEdit, users = [] }: ViewTaskModalProps) {
+export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnly }: ViewTaskModalProps) {
     const assignee = users.find(u => u.id === task.assigneeId);
     const [commentText, setCommentText] = useState("");
     const [isPending, startTransition] = useTransition();
@@ -297,15 +298,17 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [] }: ViewT
                 </div>
 
                 {/* Fixed Footer */}
-                <div className="p-4 border-t border-border bg-secondary/30 flex justify-end shrink-0">
-                    <Button
-                        onClick={() => { setOpen(false); onEdit(); }}
-                        className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
-                    >
-                        <Pencil className="h-4 w-4" />
-                        Edit Task
-                    </Button>
-                </div>
+                {!readOnly && (
+                    <div className="p-4 border-t border-border bg-secondary/30 flex justify-end shrink-0">
+                        <Button
+                            onClick={() => { setOpen(false); onEdit(); }}
+                            className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                        >
+                            <Pencil className="h-4 w-4" />
+                            Edit Task
+                        </Button>
+                    </div>
+                )}
 
             </DialogContent>
         </Dialog>
