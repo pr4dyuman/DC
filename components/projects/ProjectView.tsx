@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Project, Task, User, Transaction, Asset, Service } from "@/lib/db";
+import { Project, Task, User, Transaction, Asset, Service, UserPermissions } from "@/lib/db";
 import { KanbanBoard } from "@/components/projects/KanbanBoard";
 import { CreateTaskModal } from "@/components/projects/CreateTaskModal";
 import { ProjectSettingsModal } from "@/components/projects/ProjectSettingsModal";
@@ -21,9 +21,10 @@ type ProjectViewProps = {
     transactions: Transaction[];
     assets: Asset[];
     categories: Service[];
+    permissions?: UserPermissions;
 };
 
-export function ProjectView({ project, tasks, users, transactions, assets, categories, currentUser }: ProjectViewProps & { currentUser?: User }) {
+export function ProjectView({ project, tasks, users, transactions, assets, categories, currentUser, permissions }: ProjectViewProps & { currentUser?: User }) {
     const projectServices = project.services || [];
     const filteredCategories = categories.filter(c => projectServices.includes(c.name));
     const [selectedCategory, setSelectedCategory] = useState<string>("All");
@@ -68,10 +69,11 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                     <div className="flex items-center gap-2 min-h-[32px]">
                         <TabsContent value="board" className="mt-0">
                             <div className="flex items-center gap-2">
-                                <CreateTaskModal projectId={project.id} />
+                                {(permissions?.canManageTasks ?? true) && <CreateTaskModal projectId={project.id} />}
                                 {isAdmin && (
                                     <ProjectSettingsModal
                                         projectId={project.id}
+                                        currentSlug={project.slug}
                                         currentClientId={project.clientId}
                                         currentUserId={currentUser?.id}
                                     />
@@ -95,6 +97,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                             aiEnabled={project.aiEnabled}
                             selectedCategory={selectedCategory}
                             readOnly={false}
+                            permissions={permissions}
                         />
                     </div>
                 </TabsContent>

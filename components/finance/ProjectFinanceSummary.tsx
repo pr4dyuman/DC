@@ -9,6 +9,8 @@ interface ProjectFinanceSummaryProps {
 }
 
 export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceSummaryProps) {
+    if (!project || !transactions) return null;
+
     // 1. Calculate Actuals (From Transactions)
     const projectTransactions = transactions.filter(t => t.projectId === project.id);
     const totalPaid = projectTransactions

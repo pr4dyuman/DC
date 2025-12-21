@@ -5,6 +5,7 @@ const DB_PATH = path.join(process.cwd(), 'data', 'db.json');
 
 export type User = {
     id: string;
+    username?: string; // New: Unique handle for URLs
     name: string;
     email: string;
     role: 'admin' | 'specialist' | 'manager' | 'employee' | 'client';
@@ -17,6 +18,7 @@ export type User = {
 };
 export type Client = {
     id: string;
+    username?: string; // New: Unique handle for URLs
     name: string;
     email: string;
     companyName: string;
@@ -50,7 +52,7 @@ export type ProjectServiceConfig = {
     paymentConfig?: PaymentConfig;
 };
 
-export type Project = { id: string; name: string; client?: string; clientId?: string; services: string[]; serviceConfigs?: ProjectServiceConfig[]; status: 'Active' | 'Completed' | 'On Hold'; budget: number; dueDate: string; createdAt?: string; aiEnabled?: boolean };
+export type Project = { id: string; slug?: string; name: string; client?: string; clientId?: string; services: string[]; serviceConfigs?: ProjectServiceConfig[]; status: 'Active' | 'Completed' | 'On Hold'; budget: number; dueDate: string; createdAt?: string; aiEnabled?: boolean };
 export type Invoice = { id: string; projectId: string; amount: number; status: 'Paid' | 'Pending' | 'Overdue' | 'Processing'; date: string };
 export type Comment = { id: string; userId: string; text: string; timestamp: string };
 export type Task = { id: string; projectId: string; title: string; description?: string; status: 'Todo' | 'In Progress' | 'Review' | 'Done'; priority?: 'Low' | 'Medium' | 'High'; assigneeId: string; dueDate: string; startDate?: string; category?: string; createdAt?: string; createdBy?: string; comments?: Comment[] };
@@ -99,6 +101,22 @@ export type Transaction = {
     userId?: string; // Linked user (e.g. for Salary)
 };
 
+export type LeaveType = 'Casual' | 'Emergency';
+export type LeaveStatus = 'Pending' | 'Approved' | 'Rejected';
+
+export type LeaveRequest = {
+    id: string;
+    userId: string;
+    startDate: string; // ISO Date
+    endDate: string;   // ISO Date
+    type: LeaveType;
+    reason: string;
+    status: LeaveStatus;
+    createdAt: string;
+    reviewedBy?: string; // Admin ID
+    reviewedAt?: string;
+};
+
 export type Job = { title: string; count: number };
 export type Service = { id: string; name: string; jobs: Job[] };
 export type Settings = { systemName: string; logo: string };
@@ -114,7 +132,20 @@ export type DB = {
     transactions: Transaction[];
     assets: Asset[];
     messages: Message[];
+    leaveRequests: LeaveRequest[];
     settings: Settings;
+};
+
+export type UserPermissions = {
+    canManageTasks: boolean;
+    canMarkDone: boolean;
+    deleteAccess: 'none' | 'own' | 'any';
+};
+
+export type Settings = {
+    systemName: string;
+    logo: string;
+    userPermissions?: Record<string, UserPermissions>;
 };
 
 // Simulate network delay for "Realism"
@@ -203,6 +234,7 @@ export const db = {
         if (!data.activities) data.activities = [];
         if (!data.assets) data.assets = [];
         if (!data.messages) data.messages = [];
+        if (!data.leaveRequests) data.leaveRequests = [];
         if (!data.settings) {
             data.settings = { systemName: 'AgencyOS', logo: '' };
         }
@@ -225,6 +257,7 @@ export const db = {
         if (!data.activities) data.activities = [];
         if (!data.assets) data.assets = [];
         if (!data.messages) data.messages = [];
+        if (!data.leaveRequests) data.leaveRequests = [];
         if (!data.settings) data.settings = { systemName: 'AgencyOS', logo: '' };
 
         const newData = callback(data);

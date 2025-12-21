@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useState, useMemo } from "react";
 import { User, Task, Activity } from "@/lib/db";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -9,35 +9,105 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Mail, Briefcase, Phone, MapPin, Calendar, IndianRupee,
     CheckCircle2, Clock, Activity as ActivityIcon, ArrowLeft,
-    PieChart, Zap, Trash2, Pencil
+    PieChart as PieChartIcon, Zap, Trash2, Pencil, MessageCircle,
+    Eye, ListTodo
 } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { getUser, getUserTasks, getUserActivity } from "@/lib/actions";
+import { getUser, getUserTasks, getUserActivity, getUserByUsername, getUserProjects, getSessionId, getClientProjects, getClientCreatedTasks } from "@/lib/actions";
 import { EditUserDialog } from "@/components/team/EditUserDialog";
 import { useChat } from "@/context/ChatContext";
-import { MessageCircle } from "lucide-react";
-import { getSessionId } from "@/lib/auth"; // Ensure this is imported
+import { getLeaveRequests } from "@/lib/actions";
+import { LeaveRequest } from "@/lib/db";
+import { LeaveRequestDialog } from "@/components/leave-request-dialog";
+import { LeaveRequestsList } from "@/components/leave-requests-list";
+import { getUserContributionHistory } from "@/lib/actions";
+import { ContributionHeatmap, DailyStats } from "@/components/team/ContributionHeatmap";
 
-export default function EmployeeProfilePage({ params }: { params: Promise<{ id: string }> }) {
+export default function EmployeeProfilePage({ params }: { params: Promise<{ username: string }> }) {
     // Correctly unwrap params using React.use()
-    const { id } = use(params);
+    const { username } = use(params);
 
     const [user, setUser] = useState<User | null>(null);
-    const [tasks, setTasks] = useState<Task[]>([]);
+    const [tasks, setTasks] = useState<Task[]>([]); // Tasks list assigned TO user
+    const [clientCreatedTasks, setClientCreatedTasks] = useState<Task[]>([]); // Tasks created BY user (Client)
+    const [userProjects, setUserProjects] = useState<any[]>([]);
     const [activities, setActivities] = useState<Activity[]>([]);
+    const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+    const [leaveDates, setLeaveDates] = useState<string[]>([]);
+    const [contributionHistory, setContributionHistory] = useState<Activity[]>([]);
     const [loading, setLoading] = useState(true);
 
     const router = useRouter();
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const { openChat } = useChat();
     const [isSelf, setIsSelf] = useState(false);
-
     const [currentUserRole, setCurrentUserRole] = useState<string>("");
+
+    const contributionStats = useMemo(() => {
+        const stats: Record<string, DailyStats> = {};
+
+        const getDay = (dateStr: string) => {
+            if (!stats[dateStr]) {
+                stats[dateStr] = { date: dateStr, count: 0 };
+            }
+            return stats[dateStr];
+        };
+
+        if (user?.role === 'client') {
+            // Client View: Heatmap based on TASKS CREATED (Assigned)
+            clientCreatedTasks.forEach(task => {
+                if (task.createdAt) {
+                    const dateStr = task.createdAt.split('T')[0];
+                    const day = getDay(dateStr);
+                    day.count++;
+                }
+            });
+        } else {
+            // Employee View: Heatmap based on COMPLETED TASKS
+            // 1. Identify Valid Done Tasks (Current State)
+            const currentDoneTitles = new Set(
+                tasks
+                    .filter(t => t.status === 'Done')
+                    .map(t => t.title.toLowerCase().trim())
+            );
+
+            // 2. Map Tasks to LATEST Done Timestamp
+            const taskCompletionTimes = new Map<string, string>();
+
+            if (Array.isArray(contributionHistory)) {
+                contributionHistory.forEach(activity => {
+                    const action = activity.action.toLowerCase();
+                    const title = activity.target.toLowerCase().trim();
+
+                    // Only consider if task is CURRENTLY Done
+                    if (currentDoneTitles.has(title)) {
+                        if (action.includes('done') || action.includes('completed') || action.includes('fixed') || action.includes('finished')) {
+                            const currentStored = taskCompletionTimes.get(title);
+                            if (!currentStored || activity.timestamp > currentStored) {
+                                taskCompletionTimes.set(title, activity.timestamp);
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 3. Populate Heatmap with UNIQUE completions
+            taskCompletionTimes.forEach((timestamp) => {
+                const dateStr = timestamp.split('T')[0];
+                const day = getDay(dateStr);
+                day.count++;
+            });
+        }
+
+        return stats;
+    }, [contributionHistory, tasks, clientCreatedTasks, user]);
+
 
     // Function to re-fetch data after edit
     const loadData = async () => {
-        if (!id) return;
+        if (!username) return;
         setLoading(true);
         try {
             // Who is looking?
@@ -46,18 +116,59 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                 const currentUser = await getUser(currentSessionId);
                 if (currentUser) {
                     setCurrentUserRole(currentUser.role);
-                    setIsSelf(currentUser.id === id);
                 }
             }
 
             // Who are we looking at?
-            const userData = await getUser(id);
+            const userData = await getUserByUsername(decodeURIComponent(username));
             if (userData) {
                 setUser(userData);
-                const userTasks = await getUserTasks(id);
-                setTasks(userTasks);
-                const userActivities = await getUserActivity(id);
+
+                // Check self AFTER we have the user object
+                setIsSelf(currentSessionId === userData.id);
+
+                let userTasks: Task[] = [];
+                let projects: any[] = [];
+
+                if (userData.role === 'client') {
+                    // Fetch Client specific data
+                    projects = await getClientProjects(userData.id);
+                    const createdTasks = await getClientCreatedTasks(userData.id);
+                    setClientCreatedTasks(createdTasks);
+
+                    // Clients don't have assigned tasks or leaves in the same way
+                    setTasks([]);
+                    setLeaveRequests([]);
+                    setContributionHistory([]);
+                } else {
+                    // Standard Employee Data
+                    userTasks = await getUserTasks(userData.id);
+                    setTasks(userTasks);
+                    projects = await getUserProjects(userData.id);
+
+                    const leaves = await getLeaveRequests(userData.id);
+                    setLeaveRequests(leaves);
+
+                    // Calculate approved leave dates for heatmap
+                    const approvedLeaves = leaves.filter(l => l.status === 'Approved');
+                    const dates: string[] = [];
+                    approvedLeaves.forEach(leave => {
+                        let current = new Date(leave.startDate);
+                        const end = new Date(leave.endDate);
+                        while (current <= end) {
+                            dates.push(current.toISOString().split('T')[0]);
+                            current.setDate(current.getDate() + 1);
+                        }
+                    });
+
+                    const history = await getUserContributionHistory(userData.id);
+                    setContributionHistory(history);
+                    setLeaveDates(dates);
+                }
+
+                const userActivities = await getUserActivity(userData.id);
                 setActivities(userActivities);
+                setUserProjects(projects);
             }
         } catch (error) {
             console.error("Failed to load profile", error);
@@ -68,7 +179,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
 
     useEffect(() => {
         loadData();
-    }, [id]);
+    }, [username]);
 
     if (loading) {
         return (
@@ -93,6 +204,8 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
     const pendingTasks = tasks.filter(t => t.status !== 'Done').length;
     const efficiency = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 100;
 
+
+
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-10">
             {/* Header / Nav */}
@@ -100,7 +213,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                 <Link href="/dashboard/team" className="p-2 hover:bg-muted rounded-full transition-colors">
                     <ArrowLeft className="h-5 w-5" />
                 </Link>
-                <h1 className="text-2xl font-bold">Employee Profile</h1>
+                <h1 className="text-2xl font-bold">{user.role === 'client' ? 'Client Profile' : 'Team Member Profile'}</h1>
 
                 <div className="ml-auto">
                     {(isSelf || currentUserRole === 'admin' || currentUserRole === 'manager') && (
@@ -111,6 +224,11 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                             <Pencil className="h-4 w-4" />
                             Edit Profile
                         </button>
+                    )}
+                    {isSelf && user.role !== 'client' && (
+                        <div className="ml-2 inline-block">
+                            <LeaveRequestDialog userId={user.id} />
+                        </div>
                     )}
                 </div>
             </div>
@@ -139,6 +257,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                     <div className="flex-1 space-y-4">
                         <div>
                             <h2 className="text-3xl font-bold text-white tracking-tight">{user.name}</h2>
+                            {user.username && <p className="text-neutral-400 font-medium text-lg">@{user.username}</p>}
                             <p className="text-yellow-500 font-medium text-lg mt-1 flex items-center justify-center md:justify-start gap-2">
                                 <Briefcase className="h-4 w-4" />
                                 {user.jobTitle || "Team Member"}
@@ -193,16 +312,21 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
 
             {/* Content Tabs */}
             <Tabs defaultValue="overview" className="space-y-6">
-                <TabsList className="w-full sm:w-auto grid grid-cols-3 h-12 bg-neutral-900 border border-neutral-800 p-1 rounded-lg">
-                    <TabsTrigger value="overview" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black text-sm">
+                <TabsList className="w-full h-auto grid grid-cols-2 lg:grid-cols-4 gap-2 bg-neutral-900 border border-neutral-800 p-2 rounded-lg">
+                    <TabsTrigger value="overview" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black text-sm py-2">
                         Overview
                     </TabsTrigger>
-                    <TabsTrigger value="tasks" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black text-sm">
-                        Assigned Tasks ({tasks.length})
+                    <TabsTrigger value="tasks" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black text-sm py-2">
+                        Tasks ({tasks.length})
                     </TabsTrigger>
-                    <TabsTrigger value="activity" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black text-sm">
-                        Recent Activity
+                    <TabsTrigger value="activity" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black text-sm py-2">
+                        Activity
                     </TabsTrigger>
+                    {user.role !== 'client' && (
+                        <TabsTrigger value="leaves" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black text-sm py-2">
+                            Leaves
+                        </TabsTrigger>
+                    )}
                 </TabsList>
 
                 {/* OVERVIEW TAB */}
@@ -211,14 +335,16 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                         <Card className="col-span-1 md:col-span-2 bg-neutral-900 border-neutral-800">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <PieChart className="h-5 w-5 text-yellow-500" />
-                                    Work Distribution
+                                    <ActivityIcon className="h-5 w-5 text-yellow-500" />
+                                    Contribution Activity
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="h-[200px] flex items-center justify-center text-muted-foreground border-2 border-dashed border-neutral-800 rounded-lg">
-                                    Activity Chart Placeholder
-                                </div>
+                                <ContributionHeatmap
+                                    data={contributionStats}
+                                    leaveDates={leaveDates}
+                                    tooltipLabel={user.role === 'client' ? 'assigned' : 'completed'}
+                                />
                             </CardContent>
                         </Card>
 
@@ -230,17 +356,62 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <div className="flex justify-between items-center pb-3 border-b border-neutral-800">
-                                    <span className="text-muted-foreground">Projects</span>
-                                    <span className="font-bold">4 Active</span>
+                                {/* Projects Row */}
+                                <div className="bg-neutral-800/40 border border-neutral-700/50 p-4 rounded-xl flex items-center justify-between group hover:border-neutral-600 transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-neutral-800 rounded-lg text-white group-hover:bg-neutral-700 transition-colors">
+                                            <Briefcase className="h-4 w-4" />
+                                        </div>
+                                        <span className="text-neutral-300 font-medium">Active Projects</span>
+                                    </div>
+                                    <span className="text-2xl font-bold text-white">{userProjects.filter(p => p.status === 'Active').length}</span>
                                 </div>
-                                <div className="flex justify-between items-center pb-3 border-b border-neutral-800">
-                                    <span className="text-muted-foreground">Pending Tasks</span>
-                                    <span className="font-bold text-orange-400">{pendingTasks}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-muted-foreground">Last Active</span>
-                                    <span className="font-bold text-green-400">Now</span>
+
+                                {/* Task Grid */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    {/* Done */}
+                                    <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-xl flex flex-col gap-2 hover:bg-green-500/20 transition-colors">
+                                        <div className="flex justify-between items-start">
+                                            <div className="p-1.5 bg-green-500/20 text-green-500 rounded-lg">
+                                                <CheckCircle2 className="h-4 w-4" />
+                                            </div>
+                                            <span className="text-2xl font-bold text-green-500">{tasks.filter(t => t.status === 'Done').length}</span>
+                                        </div>
+                                        <span className="text-xs font-medium text-green-400/80 uppercase tracking-wider">Done</span>
+                                    </div>
+
+                                    {/* In Progress */}
+                                    <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl flex flex-col gap-2 hover:bg-blue-500/20 transition-colors">
+                                        <div className="flex justify-between items-start">
+                                            <div className="p-1.5 bg-blue-500/20 text-blue-500 rounded-lg">
+                                                <Clock className="h-4 w-4 animate-pulse" />
+                                            </div>
+                                            <span className="text-2xl font-bold text-blue-500">{tasks.filter(t => t.status === 'In Progress').length}</span>
+                                        </div>
+                                        <span className="text-xs font-medium text-blue-400/80 uppercase tracking-wider">In Progress</span>
+                                    </div>
+
+                                    {/* Review */}
+                                    <div className="bg-purple-500/10 border border-purple-500/20 p-4 rounded-xl flex flex-col gap-2 hover:bg-purple-500/20 transition-colors">
+                                        <div className="flex justify-between items-start">
+                                            <div className="p-1.5 bg-purple-500/20 text-purple-500 rounded-lg">
+                                                <Eye className="h-4 w-4" />
+                                            </div>
+                                            <span className="text-2xl font-bold text-purple-500">{tasks.filter(t => t.status === 'Review').length}</span>
+                                        </div>
+                                        <span className="text-xs font-medium text-purple-400/80 uppercase tracking-wider">Review</span>
+                                    </div>
+
+                                    {/* Todo */}
+                                    <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex flex-col gap-2 hover:bg-amber-500/20 transition-colors">
+                                        <div className="flex justify-between items-start">
+                                            <div className="p-1.5 bg-amber-500/20 text-amber-500 rounded-lg">
+                                                <ListTodo className="h-4 w-4" />
+                                            </div>
+                                            <span className="text-2xl font-bold text-amber-500">{tasks.filter(t => t.status === 'Todo').length}</span>
+                                        </div>
+                                        <span className="text-xs font-medium text-amber-400/80 uppercase tracking-wider">Todo</span>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
@@ -348,6 +519,21 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                         </CardContent>
                     </Card>
                 </TabsContent>
+
+                {/* LEAVES TAB */}
+                {user.role !== 'client' && (
+                    <TabsContent value="leaves" className="animate-in slide-in-from-bottom-2 duration-300">
+                        <Card className="bg-neutral-900 border-neutral-800">
+                            <CardHeader>
+                                <CardTitle>Leave History</CardTitle>
+                                <CardDescription>View your leave requests and status</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <LeaveRequestsList requests={leaveRequests} mode="user" />
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                )}
             </Tabs>
         </div>
     );

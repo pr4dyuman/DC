@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getUsers, createUser, updateUser, deleteUser, getUser } from "@/lib/actions"; // Added getUser
-import { User } from "@/lib/db";
+import { getUsers, createUser, updateUser, deleteUser, getUser, getLeaveRequests } from "@/lib/actions"; // Added getUser
+import { User, LeaveRequest } from "@/lib/db";
 import { getSessionId } from "@/lib/auth"; // Added getSessionId
+import { LeaveRequestsList } from "@/components/leave-requests-list";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Link from "next/link";
 import { Loader2, Plus, Mail, IndianRupee, Briefcase } from "lucide-react";
@@ -16,6 +17,7 @@ export default function TeamPage() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [currentUserRole, setCurrentUserRole] = useState<string>("");
     const [currentUserId, setCurrentUserId] = useState<string>("");
+    const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
 
     // Form State
     const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -36,6 +38,15 @@ export default function TeamPage() {
                 if (currentUser) {
                     setCurrentUserRole(currentUser.role);
                     setCurrentUserId(currentUser.id);
+
+                    if (currentUser.role === 'admin' || currentUser.role === 'manager') {
+                        const requests = await getLeaveRequests();
+                        // Filter logic if needed, getLeaveRequests defaults to all if no ID passed (simulating admin view)
+                        // But strictly in action we implemented it to return all if no ID arg. 
+                        // Let's filter client-side just in case or rely on action.
+                        // Strictly status === 'Pending' for Admin Dashboard
+                        setLeaveRequests(requests.filter(r => r.status === 'Pending'));
+                    }
                 }
             }
         } catch (e) {
@@ -62,12 +73,16 @@ export default function TeamPage() {
                 </button>
             </div>
 
+            {(currentUserRole === 'admin' || currentUserRole === 'manager') && (
+                <LeaveRequestsList requests={leaveRequests} mode="admin" users={users} />
+            )}
+
             {loading ? (
                 <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
             ) : (
                 <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                     {users.map(user => (
-                        <Link href={`/dashboard/team/${user.id}`} key={user.id} className="block h-full">
+                        <Link href={`/dashboard/team/${user.username || user.id}`} key={user.id} className="block h-full">
                             <Card className="group relative overflow-hidden transition-all hover:shadow-lg h-full border-neutral-800 hover:border-yellow-500/50 hover:bg-neutral-900 cursor-pointer">
                                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
                                     {(currentUserRole === 'admin' || currentUserRole === 'manager' || currentUserId === user.id) && (
@@ -85,6 +100,9 @@ export default function TeamPage() {
                                     </Avatar>
                                     <div>
                                         <CardTitle className="text-lg group-hover:text-yellow-500 transition-colors">{user.name}</CardTitle>
+                                        {user.username && (
+                                            <p className="text-xs text-muted-foreground mb-0.5">@{user.username}</p>
+                                        )}
                                         <CardDescription className="capitalize text-primary font-medium">{user.jobTitle || user.role}</CardDescription>
                                     </div>
                                 </CardHeader>

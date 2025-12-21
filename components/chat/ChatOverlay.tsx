@@ -315,7 +315,15 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                             </div>
                         </>
                     ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-zinc-500">
+                        <div className="h-full flex flex-col items-center justify-center text-zinc-500 relative">
+                            <div className="absolute top-4 right-4">
+                                <button
+                                    onClick={onClose}
+                                    className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
                             <div className="w-20 h-20 bg-zinc-900 rounded-3xl flex items-center justify-center mb-6 shadow-2xl border border-zinc-800 rotate-12">
                                 <Send className="w-10 h-10 text-primary" />
                             </div>

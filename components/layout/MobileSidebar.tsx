@@ -6,14 +6,27 @@ import { Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 
-export function MobileSidebar() {
+interface MobileSidebarProps {
+    currentUserId?: string;
+    currentUserUsername?: string;
+    currentUserRole?: string;
+}
+
+export function MobileSidebar({ currentUserId, currentUserUsername, currentUserRole }: MobileSidebarProps) {
     const [open, setOpen] = useState(false);
     const pathname = usePathname();
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // Close sidebar when route changes
     useEffect(() => {
         setOpen(false);
     }, [pathname]);
+
+    if (!mounted) return null; // Avoid hydration mismatch
 
     return (
         <Sheet open={open} onOpenChange={setOpen}>
@@ -24,7 +37,7 @@ export function MobileSidebar() {
             </SheetTrigger>
             <SheetContent side="left" className="p-0 w-72">
                 <div className="h-full">
-                    <Sidebar />
+                    <Sidebar currentUserId={currentUserId} currentUserUsername={currentUserUsername} currentUserRole={currentUserRole} />
                 </div>
             </SheetContent>
         </Sheet>

@@ -31,6 +31,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
 
     const [formData, setFormData] = useState<Omit<User, "id">>({
         name: "",
+        username: "",
         email: "",
         role: "employee",
         jobTitle: "",
@@ -45,6 +46,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
             if (user) {
                 setFormData({
                     name: user.name,
+                    username: user.username || "",
                     email: user.email,
                     role: user.role,
                     jobTitle: user.jobTitle || "",
@@ -55,6 +57,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
             } else {
                 setFormData({
                     name: "",
+                    username: "",
                     email: "",
                     role: "employee",
                     jobTitle: "",
@@ -93,6 +96,21 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                     await updateUser(user.id, updateData);
                 } else {
                     await updateUser(user.id, formData);
+                }
+
+                // Redirect if username changed and we are likely on the profile page
+                if (formData.username && user.username && formData.username !== user.username) {
+                    const currentPath = window.location.pathname;
+                    if (currentPath.includes(user.username) || currentPath.includes(user.id)) {
+                        // We are viewing the profile, so redirect
+                        router.push(`/dashboard/team/${formData.username}`);
+                        router.refresh();
+                        // Don't call onSuccess immediately to avoid stale data fetch, the redirect will handle it.
+                        // But we should close dialog.
+                        onOpenChange(false);
+                        setSubmitting(false);
+                        return;
+                    }
                 }
             } else {
                 await createUser(formData as any);
@@ -177,6 +195,11 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20" placeholder="John Doe" />
                                     </div>
                                     <div className="space-y-2">
+                                        <label className="text-sm font-medium">Username</label>
+                                        <input required value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })}
+                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20" placeholder="johndoe" />
+                                    </div>
+                                    <div className="col-span-2 space-y-2">
                                         <label className="text-sm font-medium">Email</label>
                                         <input required type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })}
                                             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20" placeholder="john@agency.com" />

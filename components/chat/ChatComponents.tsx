@@ -79,6 +79,7 @@ export function ContactItem({ contact, isActive, onClick }: ContactItemProps) {
                     <div className="flex items-center overflow-hidden">
                         <h4 className={cn("text-sm font-semibold truncate", isActive ? "text-primary" : "text-zinc-200 group-hover:text-white")}>
                             {contact.name}
+                            {contact.username && <span className="ml-1 text-xs text-zinc-500 font-normal">@{contact.username}</span>}
                         </h4>
                         {contact.jobTitle && (
                             <span className="ml-2 text-[10px] text-zinc-500 truncate hidden sm:inline-block border border-zinc-700 rounded px-1 py-0.5">

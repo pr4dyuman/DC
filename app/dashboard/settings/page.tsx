@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Loader2, Plus, Trash2, Edit2, Users, Briefcase, ChevronDown, ChevronRight, Settings } from "lucide-react";
 import { X } from "lucide-react";
+import PermissionSettings from "@/components/settings/PermissionSettings";
 
 type Job = { title: string; count: number };
 type Service = { id: string; name: string; jobs: Job[] };
@@ -213,6 +214,11 @@ export default function SettingsPage() {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* Permission Management Section */}
+            <div className="border rounded-lg bg-card text-card-foreground shadow-sm">
+                <PermissionSettings />
             </div>
 
             {/* General Settings Section */}

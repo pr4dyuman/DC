@@ -53,6 +53,7 @@ export default async function DashboardPage() {
     let myTasks: any[] = [];
     let myProjects: any[] = [];
     let myActivity: any[] = [];
+    let allProjects: any[] = [];
 
     if (isAdmin) {
         [metrics, revenueData, projectDist, activities, urgentTasks] = await Promise.all([
@@ -64,7 +65,7 @@ export default async function DashboardPage() {
         ]);
     } else {
         // Employee Data
-        const allProjects = await getProjects(); // Filter in memory or fetch specifically
+        allProjects = await getProjects(); // Filter in memory or fetch specifically
         myTasks = await getUserTasks(userId);
         myActivity = await getUserActivity(userId);
 
@@ -204,20 +205,24 @@ export default async function DashboardPage() {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
-                                {myTasks?.filter((t: any) => t.status === 'In Progress' || t.status === 'Todo').slice(0, 5).map((task: any) => (
-                                    <Link key={task.id} href={`/dashboard/projects/${task.projectId}?task=${task.id}`} className="flex items-center p-3 rounded-lg hover:bg-slate-800/50 transition border border-transparent hover:border-slate-700 cursor-pointer">
-                                        <div className={`w-2 h-2 rounded-full mr-4 ${task.status === 'In Progress' ? 'bg-amber-500' : 'bg-slate-500'}`} />
-                                        <div className="flex-1 space-y-1">
-                                            <p className="text-sm font-medium leading-none text-white">{task.title}</p>
-                                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                                <Calendar className="w-3 h-3 text-yellow-500" /> Due {new Date(task.dueDate).toLocaleDateString()}
-                                            </p>
-                                        </div>
-                                        <div className={`px-2 py-1 rounded text-xs font-medium ${task.priority === 'High' ? 'bg-red-500/10 text-red-500' : 'bg-slate-500/10 text-slate-500'}`}>
-                                            {task.priority || 'Normal'}
-                                        </div>
-                                    </Link>
-                                ))}
+                                {myTasks?.filter((t: any) => t.status === 'In Progress' || t.status === 'Todo').slice(0, 5).map((task: any) => {
+                                    const project = allProjects.find((p: any) => p.id === task.projectId);
+                                    const projectSlug = project?.slug || task.projectId;
+                                    return (
+                                        <Link key={task.id} href={`/dashboard/projects/${projectSlug}?task=${task.id}`} className="flex items-center p-3 rounded-lg hover:bg-slate-800/50 transition border border-transparent hover:border-slate-700 cursor-pointer">
+                                            <div className={`w-2 h-2 rounded-full mr-4 ${task.status === 'In Progress' ? 'bg-amber-500' : 'bg-slate-500'}`} />
+                                            <div className="flex-1 space-y-1">
+                                                <p className="text-sm font-medium leading-none text-white">{task.title}</p>
+                                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                                    <Calendar className="w-3 h-3 text-yellow-500" /> Due {new Date(task.dueDate).toLocaleDateString()}
+                                                </p>
+                                            </div>
+                                            <div className={`px-2 py-1 rounded text-xs font-medium ${task.priority === 'High' ? 'bg-red-500/10 text-red-500' : 'bg-slate-500/10 text-slate-500'}`}>
+                                                {task.priority || 'Normal'}
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
                                 {(!myTasks || myTasks.length === 0) && (
                                     <div className="text-center py-8 text-muted-foreground">
                                         No tasks assigned correctly.

@@ -21,11 +21,12 @@ export default async function DashboardLayout({
         redirect("/login");
     }
 
+
     return (
         <ChatProvider>
             <div className="flex h-screen bg-background text-foreground overflow-hidden">
                 <div className="hidden md:flex w-64 flex-col fixed inset-y-0 z-50">
-                    <Sidebar currentUserId={currentUser?.id} currentUserRole={currentUser?.role} />
+                    <Sidebar currentUserId={currentUser?.id} currentUserUsername={currentUser?.username} currentUserRole={currentUser?.role} />
                 </div>
 
                 <main className="flex-1 flex flex-col md:pl-64 h-full overflow-hidden">

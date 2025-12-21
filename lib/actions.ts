@@ -1,10 +1,11 @@
 "use server";
 
-import { db, User, Project, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig } from "./db";
+import { db, User, Project, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig, LeaveRequest, LeaveType, LeaveStatus, UserPermissions } from "./db";
 import { revalidatePath } from "next/cache";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import { getSessionId } from "./auth";
+export { getSessionId };
 
 export type SearchResult = {
     id: string;
@@ -135,9 +136,35 @@ export async function getProjects() {
     return data.projects;
 }
 
+export async function getUserProjects(userId: string) {
+    const data = await db.get();
+    const user = data.users.find(u => u.id === userId) ||
+        (data.clients && data.clients.find(c => c.id === userId) ? { role: 'client' } : null);
+
+    if (!user) return [];
+
+    if ((user as any).role === 'client') {
+        return data.projects.filter(p => p.clientId === userId);
+    } else {
+        // For employees, find projects where they have assigned tasks
+        // Or could be explicit members if we had that.
+        // Let's use Task-based inferrence for now.
+        const userTaskProjectIds = new Set(
+            data.tasks.filter(t => t.assigneeId === userId).map(t => t.projectId)
+        );
+        return data.projects.filter(p => userTaskProjectIds.has(p.id));
+    }
+}
+
 export async function getProject(id: string) {
     const data = await db.get();
     return data.projects.find(p => p.id === id);
+}
+
+export async function getProjectBySlug(slug: string) {
+    const data = await db.get();
+    // Support lookup by Slug OR ID for robustness during migration/mixed states
+    return data.projects.find(p => p.slug === slug || p.id === slug);
 }
 
 export async function getUsers() {
@@ -204,7 +231,8 @@ export async function getUser(id: string) {
                 role: 'client' as any, // Cast to match User role type
                 jobTitle: targetClient.companyName, // Reuse field
                 avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${targetClient.companyName}`,
-                lastActiveAt: targetClient.lastActiveAt
+                lastActiveAt: targetClient.lastActiveAt,
+                username: targetClient.username || targetClient.id
             };
             return clientAsUser;
         }
@@ -213,9 +241,78 @@ export async function getUser(id: string) {
     return undefined;
 }
 
+
+export async function getUserByUsername(username: string) {
+    const data = await db.get();
+
+    // 1. Try finding by username in Users
+    let user = data.users.find(u => u.username === username);
+
+    // 2. If not found, try finding by ID in Users (Fallback)
+    if (!user) {
+        user = data.users.find(u => u.id === username);
+    }
+
+    // 3. If still not found, check Clients (by ID or potential future username)
+    if (!user && data.clients) {
+        const client = data.clients.find(c => c.id === username || (c as any).username === username);
+        if (client) {
+            // Adapt Client to User type
+            user = {
+                id: client.id,
+                name: client.name,
+                email: client.email,
+                role: 'client' as any,
+                jobTitle: client.companyName,
+                avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${client.companyName}`,
+                lastActiveAt: client.lastActiveAt,
+                username: client.username || client.id
+            } as User;
+        }
+    }
+
+    if (!user) return undefined;
+
+    // Access control:
+    const currentUserId = await getSessionId();
+    if (!currentUserId) return undefined; // Require auth
+
+    // Allow viewing public profile info of anyone? Yes, usually.
+    // Redact sensitive info
+    const { salary, password, ...redacted } = user;
+
+    // If Admin or Self, show full (but this needs logic). 
+    // For now, let's just return redacted unless we verify identity.
+    const currentUser = await getUser(currentUserId);
+    if (currentUser?.role === 'admin' || currentUser?.role === 'manager' || currentUser?.id === user.id) {
+        return user;
+    }
+
+    return redacted as User;
+}
+
 export async function getUserTasks(userId: string) {
     const data = await db.get();
-    return data.tasks.filter(t => t.assigneeId === userId);
+    // Create a set of valid project IDs for O(1) lookup
+    const validProjectIds = new Set(data.projects.map(p => p.id));
+
+    return data.tasks.filter(t => t.assigneeId === userId && validProjectIds.has(t.projectId));
+}
+
+// For Client Profile: Get projects they OWN
+export async function getClientProjects(clientId: string) {
+    const data = await db.get();
+    // Match by clientId OR client name (legacy)
+    const client = data.clients.find(c => c.id === clientId) || data.users.find(u => u.id === clientId);
+    const clientName = client ? client.name : null;
+
+    return data.projects.filter(p => p.clientId === clientId || (clientName && p.client === clientName));
+}
+
+// For Client Profile: Get tasks they CREATED (Assigned to others)
+export async function getClientCreatedTasks(userId: string) {
+    const data = await db.get();
+    return data.tasks.filter(t => t.createdBy === userId).sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
 }
 
 export async function getUserActivity(userId: string) {
@@ -226,13 +323,44 @@ export async function getUserActivity(userId: string) {
     const user = data.users.find(u => u.id === userId);
     if (!user) return [];
 
+    // Limit to last 20 for dashboard
     return data.activities
         .filter(a => a.user === user.name)
-        .slice(0, 20); // Limit to last 20
+        .slice(0, 20);
+}
+
+export async function getUserContributionHistory(userId: string) {
+    const data = await db.get();
+    const user = data.users.find(u => u.id === userId);
+    if (!user) return [];
+
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const isoOneYearAgo = oneYearAgo.toISOString();
+
+    return data.activities
+        .filter(a => a.user === user.name && a.timestamp >= isoOneYearAgo);
 }
 
 export async function createUser(user: Omit<User, "id">) {
-    const newUser = { ...user, id: Math.random().toString(36).substr(2, 9) };
+    // Generate/Validate username
+    let username = user.username;
+    if (!username) {
+        // Auto-generate: lowercase, no spaces, random suffix if needed?
+        // Let's try name-based.
+        username = user.name.toLowerCase().replace(/\s+/g, '');
+    }
+
+    // Ensure uniqueness (simple check)
+    const data = await db.get();
+    let uniqueUsername = username;
+    let counter = 1;
+    while (data.users.find(u => u.username === uniqueUsername)) {
+        uniqueUsername = `${username}${counter}`;
+        counter++;
+    }
+
+    const newUser = { ...user, id: Math.random().toString(36).substr(2, 9), username: uniqueUsername };
     if (!newUser.avatar) {
         newUser.avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${newUser.name}`;
     }
@@ -268,10 +396,38 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
         }
     }
 
-    await db.update((data) => ({
-        ...data,
-        users: data.users.map(u => u.id === id ? { ...u, ...updates } : u)
-    }));
+    // Uniqueness Check for Username
+    if (updates.username) {
+        const data = await db.get();
+        // Check both users and clients for username collision
+        const existingUser = data.users.find(u => u.username === updates.username && u.id !== id);
+        const existingClient = data.clients?.find(c => (c as any).username === updates.username && c.id !== id);
+
+        if (existingUser || existingClient) {
+            throw new Error(`Username "${updates.username}" is already taken.`);
+        }
+    }
+
+    await db.update((data) => {
+        // Try updating in Users
+        const userExists = data.users.some(u => u.id === id);
+        if (userExists) {
+            return {
+                ...data,
+                users: data.users.map(u => u.id === id ? { ...u, ...updates } : u)
+            };
+        }
+
+        // Try updating in Clients
+        if (data.clients && data.clients.some(c => c.id === id)) {
+            return {
+                ...data,
+                clients: data.clients.map(c => c.id === id ? { ...c, ...updates } : c)
+            };
+        }
+
+        return data;
+    });
     revalidatePath('/dashboard/team');
 }
 
@@ -355,7 +511,23 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
         throw new Error("Unauthorized: Only Admins and Managers can create projects.");
     }
-    const newProject: Project = { ...project, id: Math.random().toString(36).substr(2, 9), status: "Active", createdAt: new Date().toISOString() };
+
+    // Slug Generation
+    let slug = project.slug;
+    if (!slug) {
+        slug = project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    }
+
+    // Unique Slug Check
+    const data = await db.get();
+    let uniqueSlug = slug;
+    let counter = 1;
+    while (data.projects.find(p => p.slug === uniqueSlug)) {
+        uniqueSlug = `${slug}-${counter}`;
+        counter++;
+    }
+
+    const newProject: Project = { ...project, id: Math.random().toString(36).substr(2, 9), slug: uniqueSlug, status: "Active", createdAt: new Date().toISOString() };
     // Helper: auto-fill client name if ID provided but name missing? 
     // Actually we trust the input `client` field as "Client Name" for display or "Unknown".
 
@@ -369,7 +541,7 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
             projects: [...data.projects, newProject],
             activities: [{
                 id: Math.random().toString(),
-                user: "Admin",
+                user: currentUser.name,
                 action: "created project",
                 target: project.name,
                 timestamp: new Date().toISOString()
@@ -406,15 +578,74 @@ export async function getTasks(projectId: string) {
     return data.tasks.filter(t => t.projectId === projectId);
 }
 
+export async function getUserPermissions(userId: string): Promise<UserPermissions> {
+    const data = await db.get();
+    const settings = data.settings;
+
+    // Default to full permissions if not defined (Backward compatibility)
+    const defaultPermissions: UserPermissions = {
+        canManageTasks: true,
+        canMarkDone: true,
+        deleteAccess: 'any'
+    };
+
+    if (!settings.userPermissions) {
+        return defaultPermissions;
+    }
+
+    return settings.userPermissions[userId] || defaultPermissions;
+}
+
+export async function updateUserPermissions(targetUserId: string, permissions: UserPermissions) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+        throw new Error("Unauthorized: Only Admins can manage permissions.");
+    }
+
+    await db.update((data) => ({
+        ...data,
+        settings: {
+            ...data.settings,
+            userPermissions: {
+                ...(data.settings.userPermissions || {}),
+                [targetUserId]: permissions
+            }
+        }
+    }));
+    revalidatePath('/dashboard/settings');
+}
+
 export async function deleteTask(taskId: string) {
+    const currentUser = await getCurrentUser();
+    const userName = currentUser ? currentUser.name : "System";
+    const userId = currentUser ? currentUser.id : "system";
+
+    const permissions = await getUserPermissions(userId);
+
+    const data = await db.get();
+    const task = data.tasks.find(t => t.id === taskId);
+    if (!task) throw new Error("Task not found");
+
+    if (permissions.deleteAccess === 'none') {
+        throw new Error("Unauthorized: You do not have permission to delete tasks.");
+    }
+
+    if (permissions.deleteAccess === 'own') {
+        if (task.createdBy !== userId) {
+            throw new Error("Unauthorized: You can only delete your own tasks.");
+        }
+    }
+
+    // If 'any', proceed.
+
     await db.update((data) => ({
         ...data,
         tasks: data.tasks.filter(t => t.id !== taskId),
         activities: [{
             id: Math.random().toString(),
-            user: "Admin",
+            user: userName,
             action: "deleted task",
-            target: data.tasks.find(t => t.id === taskId)?.title || "Task",
+            target: task.title,
             timestamp: new Date().toISOString()
         }, ...data.activities]
     }));
@@ -423,12 +654,28 @@ export async function deleteTask(taskId: string) {
 }
 
 export async function updateTaskStatus(taskId: string, status: Task['status']) {
+    const currentUser = await getCurrentUser();
+    const userName = currentUser ? currentUser.name : "System";
+    const userId = currentUser ? currentUser.id : "system";
+
+    const permissions = await getUserPermissions(userId);
+
+    if (status === 'Done') {
+        if (!permissions.canMarkDone) {
+            throw new Error("Unauthorized: You do not have permission to mark tasks as Done.");
+        }
+    } else {
+        if (!permissions.canManageTasks) {
+            throw new Error("Unauthorized: You do not have permission to manage tasks.");
+        }
+    }
+
     await db.update((data) => ({
         ...data,
         tasks: data.tasks.map(t => t.id === taskId ? { ...t, status } : t),
         activities: [{
             id: Math.random().toString(),
-            user: "Admin",
+            user: userName,
             action: "moved task to " + status,
             target: data.tasks.find(t => t.id === taskId)?.title || "Task",
             timestamp: new Date().toISOString()
@@ -438,6 +685,34 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
 }
 
 export async function updateTask(taskId: string, updates: Partial<Task>) {
+    const currentUser = await getCurrentUser();
+    const userName = currentUser ? currentUser.name : "System";
+    const userId = currentUser ? currentUser.id : "system";
+
+    const permissions = await getUserPermissions(userId);
+
+    // If updating status to Done
+    if (updates.status === 'Done') {
+        if (!permissions.canMarkDone) {
+            throw new Error("Unauthorized: You do not have permission to mark tasks as Done.");
+        }
+    }
+
+    // If updating anything else (including moving to other statuses)
+    // Technically if ONLY moving to Done, we might allow it if canMarkDone is true?
+    // But usually updateTask implies editing. 
+    // Let's enforce canManageTasks for any update that isn't JUST status=Done check above.
+    // If user has canMarkDone but !canManageTasks, they should use updateTaskStatus theoretically, 
+    // or we check if OTHER fields are being updated.
+
+    // For simplicity: If updating fields other than status, require canManageTasks.
+    const isStatusOnly = Object.keys(updates).length === 1 && updates.status;
+    if (!isStatusOnly || (updates.status && updates.status !== 'Done')) {
+        if (!permissions.canManageTasks) {
+            throw new Error("Unauthorized: You do not have permission to edit tasks.");
+        }
+    }
+
     await db.update((data) => {
         let updatedProjects = data.projects;
 
@@ -471,7 +746,7 @@ export async function updateTask(taskId: string, updates: Partial<Task>) {
             tasks: data.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t),
             activities: [{
                 id: Math.random().toString(),
-                user: "Admin",
+                user: userName,
                 action: "updated task",
                 target: updates.title || data.tasks.find(t => t.id === taskId)?.title || "Task",
                 timestamp: new Date().toISOString()
@@ -514,6 +789,12 @@ export async function addComment(taskId: string, userId: string, text: string) {
 export async function createTask(task: Omit<Task, "id">) {
     const currentUser = await getCurrentUser();
     const createdBy = currentUser ? currentUser.id : "system";
+
+    const permissions = await getUserPermissions(createdBy);
+    if (!permissions.canManageTasks) {
+        throw new Error("Unauthorized: You do not have permission to create tasks.");
+    }
+
     const newTask: Task = { ...task, id: Math.random().toString(36).substr(2, 9), createdAt: new Date().toISOString(), createdBy };
 
     await db.update((data) => {
@@ -621,8 +902,8 @@ export async function deleteProject(id: string, password: string) {
     await db.update((data) => ({
         ...data,
         projects: data.projects.filter(p => p.id !== id),
-        // Ideally verify if we should delete tasks too, for now keeping it simple/safe
-        // tasks: data.tasks.filter(t => t.projectId !== id) 
+        // Delete associated tasks
+        tasks: data.tasks.filter(t => t.projectId !== id)
     }));
 
     revalidatePath('/dashboard/projects');
@@ -1113,7 +1394,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
                     type: 'user',
                     title: u.name,
                     subtitle: u.role,
-                    url: `/dashboard/team`
+                    url: `/dashboard/team/${u.username || u.id}`
                 });
             }
         });
@@ -1169,6 +1450,9 @@ export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt">) {
 }
 
 export async function deleteProjectAsset(assetId: string) {
+    const currentUser = await getCurrentUser();
+    const userName = currentUser ? currentUser.name : "System";
+
     await db.update((data) => {
         const asset = data.assets.find(a => a.id === assetId);
         return {
@@ -1176,7 +1460,7 @@ export async function deleteProjectAsset(assetId: string) {
             assets: data.assets.filter(a => a.id !== assetId),
             activities: asset ? [{
                 id: Math.random().toString(),
-                user: "Admin", // Should be actual user
+                user: userName,
                 action: `deleted asset`,
                 target: asset.name,
                 timestamp: new Date().toISOString()
@@ -1191,12 +1475,15 @@ export async function deleteProjectAsset(assetId: string) {
 }
 
 export async function updateProjectAsset(assetId: string, updates: Partial<Asset>) {
+    const currentUser = await getCurrentUser();
+    const userName = currentUser ? currentUser.name : "System";
+
     await db.update((data) => ({
         ...data,
         assets: data.assets.map(a => a.id === assetId ? { ...a, ...updates } : a),
         activities: [{
             id: Math.random().toString(),
-            user: "Admin", // Should be actual user
+            user: userName,
             action: `updated asset`,
             target: data.assets.find(a => a.id === assetId)?.name || "Asset",
             timestamp: new Date().toISOString()
@@ -1546,4 +1833,105 @@ export async function chatWithTaskAI(
         console.error("AI Chat Error:", error);
         return "I encountered an error. Please try again.";
     }
+}
+
+// ----------------------------------------------------------------------
+// Leave Management Actions
+// ----------------------------------------------------------------------
+
+export async function requestLeave(data: Omit<LeaveRequest, "id" | "status" | "createdAt">) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) throw new Error("Unauthorized");
+
+    // validation
+    const startDate = new Date(data.startDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Parse date as midnight UTC to avoid timezone issues or just use string comparison if ISO
+    // For simplicity ensuring we compare dates correctly.
+    const startCheck = new Date(startDate);
+    startCheck.setHours(0, 0, 0, 0);
+
+    // 2 days rule: Must be >= today + 2
+    if (data.type === 'Casual') {
+        const minDate = new Date(today);
+        minDate.setDate(today.getDate() + 2); // e.g. if today is 20th, min is 22nd.
+
+        if (startCheck < minDate) {
+            throw new Error("Casual leave must be applied at least 2 days in advance.");
+        }
+    }
+
+    const newRequest: LeaveRequest = {
+        ...data,
+        id: Math.random().toString(36).substr(2, 9),
+        status: 'Pending',
+        createdAt: new Date().toISOString(),
+        userId: currentUser.id
+    };
+
+    await db.update((dbData) => {
+        // Broadcast notification to ALL admins
+        const admins = (dbData.users || []).filter(u => u.role === 'admin' || u.role === 'manager');
+        const adminNotifications = admins.map(admin => ({
+            id: Math.random().toString(),
+            userId: admin.id,
+            message: `New Leave Request from ${currentUser.name}: ${data.type} (${new Date(data.startDate).toLocaleDateString()} - ${new Date(data.endDate).toLocaleDateString()})`,
+            read: false,
+            timestamp: new Date().toISOString(),
+            link: '/dashboard/team' // Admins go to Team page to approve
+        }));
+
+        return {
+            ...dbData,
+            leaveRequests: [newRequest, ...(dbData.leaveRequests || [])],
+            notifications: [...adminNotifications, ...(dbData.notifications || [])]
+        };
+    });
+
+    revalidatePath('/dashboard/team');
+    return newRequest;
+}
+
+export async function getLeaveRequests(userId?: string) {
+    const data = await db.get();
+    let requests = data.leaveRequests || [];
+
+    // sorting: Pending first, then by date desc
+    requests = requests.sort((a, b) => {
+        if (a.status === 'Pending' && b.status !== 'Pending') return -1;
+        if (a.status !== 'Pending' && b.status === 'Pending') return 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    if (userId) {
+        return requests.filter(r => r.userId === userId);
+    }
+
+    // If no userId, return all (Admin view)
+    return requests;
+}
+
+export async function updateLeaveStatus(requestId: string, status: LeaveStatus) {
+    const currentUser = await getCurrentUser();
+
+    const data = await db.get();
+    const request = data.leaveRequests?.find(r => r.id === requestId);
+    if (!request) throw new Error("Request not found");
+
+    await db.update((dbData) => ({
+        ...dbData,
+        leaveRequests: dbData.leaveRequests.map(r => r.id === requestId ? { ...r, status, reviewedBy: currentUser?.id, reviewedAt: new Date().toISOString() } : r),
+        notifications: [{
+            id: Math.random().toString(),
+            userId: request.userId,
+            message: `Your leave request for ${new Date(request.startDate).toLocaleDateString()} has been ${status}`,
+            read: false,
+            timestamp: new Date().toISOString(),
+            link: `/dashboard/team/${data.users.find(u => u.id === request.userId)?.username || request.userId}?tab=leaves`
+        }, ...(dbData.notifications || [])]
+    }));
+
+    revalidatePath('/dashboard/team');
 }

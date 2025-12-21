@@ -14,7 +14,7 @@ import {
     DragEndEvent,
 } from "@dnd-kit/core";
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { Task } from "@/lib/db";
+import { Task, UserPermissions } from "@/lib/db";
 import { updateTaskStatus } from "@/lib/actions"; // Server Action
 import { TaskCard } from "./TaskCard";
 import { DroppableColumn } from "./DroppableColumn";
@@ -32,9 +32,10 @@ interface KanbanBoardProps {
     aiEnabled?: boolean;
     selectedCategory?: string;
     readOnly?: boolean;
+    permissions?: UserPermissions;
 }
 
-export function KanbanBoard({ initialTasks, projectId, users, categories = [], currentUserId, aiEnabled, selectedCategory = "All", readOnly = false }: KanbanBoardProps) {
+export function KanbanBoard({ initialTasks, projectId, users, categories = [], currentUserId, aiEnabled, selectedCategory = "All", readOnly = false, permissions }: KanbanBoardProps) {
     const [mounted, setMounted] = useState(false);
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -68,6 +69,11 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
 
     const handleDragStart = (event: DragStartEvent) => {
         if (readOnly) return;
+        // View Only Mode check
+        if (permissions && !permissions.canManageTasks && !permissions.canMarkDone) {
+            return; // Cannot drag anything
+        }
+
         setActiveTask(event.active.data.current?.task);
     };
 
@@ -84,14 +90,33 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
         const taskId = active.id as string;
         const overId = over.id as string;
 
-        // Find the task and the column it was dropped into
-        // If dropped on a column container
+        // Determine New Status
         let newStatus = overId;
-
-        // If dropped on another task, find that task's status
         if (!COLUMNS.includes(overId)) {
             const overTask = tasks.find(t => t.id === overId);
             if (overTask) newStatus = overTask.status;
+        }
+
+        // --- PERMISSION CHECKS ---
+        if (permissions) {
+            // 1. Moving to Done?
+            if (newStatus === 'Done') {
+                if (!permissions.canMarkDone) {
+                    // Revert visual
+                    setActiveTask(null);
+                    alert("You do not have permission to mark tasks as Done.");
+                    return;
+                }
+            } else {
+                // 2. Moving to/between other columns (Manage Tasks)
+                // If moving FROM Done to Todo? That counts as Manage Tasks (undoing done)
+                // If moving Todo -> In Progress? Manage Tasks.
+                if (!permissions.canManageTasks) {
+                    setActiveTask(null);
+                    alert("You do not have permission to manage task status.");
+                    return;
+                }
+            }
         }
 
         // Update Local State
@@ -105,7 +130,12 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
 
         // Persist to Server
         if (COLUMNS.includes(newStatus) || tasks.find(t => t.id === overId)) {
-            await updateTaskStatus(taskId, newStatus as Task['status']);
+            try {
+                await updateTaskStatus(taskId, newStatus as Task['status']);
+            } catch (e) {
+                // Revert on error?
+                console.error("Move failed", e);
+            }
         }
     };
 
@@ -154,6 +184,7 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                             currentUserId={currentUserId}
                             aiEnabled={aiEnabled}
                             readOnly={readOnly}
+                            permissions={permissions}
                         />
                     ))}
                 </div>
@@ -167,6 +198,7 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                             onEdit={() => { }}
                             aiEnabled={aiEnabled}
                             currentUserId={currentUserId}
+                            permissions={permissions}
                         />
                     ) : null}
                 </DragOverlay>
@@ -182,7 +214,10 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                         setViewTaskId(null);
                     }}
                     users={users}
+                    users={users}
                     readOnly={readOnly}
+                    permissions={permissions}
+                    currentUserId={currentUserId}
                 />
             )}
 
@@ -191,6 +226,8 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                     task={editingTask}
                     open={!!editingTask}
                     setOpen={(open) => !open && setEditTaskId(null)}
+                    permissions={permissions}
+                    currentUserId={currentUserId}
                 />
             )}
         </div>

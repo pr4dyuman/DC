@@ -64,6 +64,14 @@ export function Topbar({ currentUser: propUser }: TopbarProps) {
         }
     }, [user]);
 
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    // ... other code
+
     // Handle Search Debounce
     useEffect(() => {
         const timer = setTimeout(async () => {
@@ -123,7 +131,7 @@ export function Topbar({ currentUser: propUser }: TopbarProps) {
             <div className="h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 flex items-center justify-between z-10">
                 <div className="flex items-center gap-4">
                     <div className="md:hidden mr-2">
-                        <MobileSidebar />
+                        {mounted && <MobileSidebar currentUserId={user.id} currentUserUsername={user.username} currentUserRole={user.role} />}
                     </div>
                     <h2 className="text-lg font-semibold">Dashboard</h2>
                 </div>
@@ -184,98 +192,114 @@ export function Topbar({ currentUser: propUser }: TopbarProps) {
                     </div>
 
                     {/* Notifications */}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="relative p-2 rounded-full hover:bg-accent transition-colors outline-none">
-                                <Bell className="h-5 w-5 text-muted-foreground" />
-                                {unreadCount > 0 && (
-                                    <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-600 border border-background" />
-                                )}
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-80">
-                            <DropdownMenuLabel className="flex items-center justify-between">
-                                <span>Notifications</span>
-                                {unreadCount > 0 && (
-                                    <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">
-                                        {unreadCount} New
-                                    </span>
-                                )}
-                            </DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <ScrollArea className="h-[300px]">
-                                {notifications.length === 0 ? (
-                                    <div className="p-4 text-center text-sm text-muted-foreground">
-                                        No notifications yet.
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col">
-                                        {notifications.map((notification) => (
-                                            <div
-                                                key={notification.id}
-                                                className={`p-4 border-b last:border-0 hover:bg-muted/50 transition-colors cursor-pointer ${!notification.read ? 'bg-muted/20' : ''}`}
-                                                onClick={() => {
-                                                    if (!notification.read) handleNotificationRead(notification.id);
-                                                    if (notification.link) {
-                                                        router.push(notification.link);
-                                                    }
-                                                }}
-                                            >
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <p className={`text-sm ${!notification.read ? 'font-medium' : 'text-muted-foreground'}`}>
-                                                        {notification.message}
+                    {/* Notifications */}
+                    {mounted ? (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="relative p-2 rounded-full hover:bg-accent transition-colors outline-none">
+                                    <Bell className="h-5 w-5 text-muted-foreground" />
+                                    {unreadCount > 0 && (
+                                        <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-600 border border-background" />
+                                    )}
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-80">
+                                <DropdownMenuLabel className="flex items-center justify-between">
+                                    <span>Notifications</span>
+                                    {unreadCount > 0 && (
+                                        <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">
+                                            {unreadCount} New
+                                        </span>
+                                    )}
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <ScrollArea className="h-[300px]">
+                                    {notifications.length === 0 ? (
+                                        <div className="p-4 text-center text-sm text-muted-foreground">
+                                            No notifications yet.
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col">
+                                            {notifications.map((notification) => (
+                                                <div
+                                                    key={notification.id}
+                                                    className={`p-4 border-b last:border-0 hover:bg-muted/50 transition-colors cursor-pointer ${!notification.read ? 'bg-muted/20' : ''}`}
+                                                    onClick={() => {
+                                                        if (!notification.read) handleNotificationRead(notification.id);
+                                                        if (notification.link) {
+                                                            router.push(notification.link);
+                                                        }
+                                                    }}
+                                                >
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <p className={`text-sm ${!notification.read ? 'font-medium' : 'text-muted-foreground'}`}>
+                                                            {notification.message}
+                                                        </p>
+                                                        {!notification.read && (
+                                                            <div className="h-2 w-2 shrink-0 rounded-full bg-blue-500 mt-1.5" />
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        {new Date(notification.timestamp).toLocaleString()}
                                                     </p>
-                                                    {!notification.read && (
-                                                        <div className="h-2 w-2 shrink-0 rounded-full bg-blue-500 mt-1.5" />
-                                                    )}
                                                 </div>
-                                                <p className="text-xs text-muted-foreground mt-1">
-                                                    {new Date(notification.timestamp).toLocaleString()}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </ScrollArea>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                                            ))}
+                                        </div>
+                                    )}
+                                </ScrollArea>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : (
+                        <button className="relative p-2 rounded-full hover:bg-accent transition-colors outline-none">
+                            <Bell className="h-5 w-5 text-muted-foreground" />
+                        </button>
+                    )}
 
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Avatar className="h-9 w-9 cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-indigo-600 transition-all">
-                                <AvatarImage src={user.avatar} className="object-cover" />
-                                <AvatarFallback className="bg-indigo-600 text-white text-sm font-medium">
-                                    {user.name?.substring(0, 2).toUpperCase()}
-                                </AvatarFallback>
-                            </Avatar>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuLabel className="font-normal">
-                                <div className="flex flex-col space-y-1">
-                                    <p className="text-sm font-medium leading-none">{user.name}</p>
-                                    <p className="text-xs leading-none text-muted-foreground">
-                                        {user.email}
-                                    </p>
-                                </div>
-                            </DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
-                                <UserIcon className="mr-2 h-4 w-4" />
-                                <span>Edit Profile</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                                <Link href="/dashboard/settings" className="cursor-pointer">
-                                    <Settings className="mr-2 h-4 w-4" />
-                                    <span>Settings</span>
-                                </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600">
-                                <LogOut className="mr-2 h-4 w-4" />
-                                <span>Log out</span>
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    {mounted ? (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Avatar className="h-9 w-9 cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-indigo-600 transition-all">
+                                    <AvatarImage src={user.avatar} className="object-cover" />
+                                    <AvatarFallback className="bg-indigo-600 text-white text-sm font-medium">
+                                        {user.name?.substring(0, 2).toUpperCase()}
+                                    </AvatarFallback>
+                                </Avatar>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuLabel className="font-normal">
+                                    <div className="flex flex-col space-y-1">
+                                        <p className="text-sm font-medium leading-none">{user.name}</p>
+                                        <p className="text-xs leading-none text-muted-foreground">
+                                            {user.email}
+                                        </p>
+                                    </div>
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
+                                    <UserIcon className="mr-2 h-4 w-4" />
+                                    <span>Edit Profile</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <Link href="/dashboard/settings" className="cursor-pointer">
+                                        <Settings className="mr-2 h-4 w-4" />
+                                        <span>Settings</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-red-600">
+                                    <LogOut className="mr-2 h-4 w-4" />
+                                    <span>Log out</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : (
+                        <Avatar className="h-9 w-9 cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-indigo-600 transition-all">
+                            <AvatarImage src={user.avatar} className="object-cover" />
+                            <AvatarFallback className="bg-indigo-600 text-white text-sm font-medium">
+                                {user.name?.substring(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                        </Avatar>
+                    )}
                 </div>
             </div>
 

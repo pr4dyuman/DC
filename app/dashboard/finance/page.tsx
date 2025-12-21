@@ -22,9 +22,27 @@ import { getSessionId } from "@/lib/auth";
 export default async function FinancePage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
     const params = await searchParams;
     const projectId = typeof params.projectId === 'string' ? params.projectId : undefined;
+    const username = typeof params.username === 'string' ? params.username : undefined;
     let userId = typeof params.userId === 'string' ? params.userId : undefined;
     const category = typeof params.category === 'string' ? params.category : undefined;
     const memberId = typeof params.memberId === 'string' ? params.memberId : undefined;
+
+    // Resolve username to userId if provided
+    if (username && !userId) {
+        const users = await getUsers();
+        // Check users first
+        const user = users.find(u => u.username === username);
+        if (user) {
+            userId = user.id;
+        } else {
+            // If not in users, check clients (since clients might have usernames too)
+            const clients = await getClients();
+            const client = clients.find(c => c.username === username);
+            if (client) {
+                userId = client.id;
+            }
+        }
+    }
 
     // STRICT CLIENT CHECK: Perform this FIRST
     const currentUserId = await getSessionId();
@@ -191,7 +209,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
                 </div>
             ) : projectId && selectedProjectName ? (
                 <div className="space-y-6">
-                    <ProjectFinanceSummary stats={stats} projectName={selectedProjectName} />
+                    <ProjectFinanceSummary project={rawProjects.find(p => p.id === projectId)!} transactions={transactions} />
 
                     <div className="grid gap-6 md:grid-cols-2">
                         <Card>

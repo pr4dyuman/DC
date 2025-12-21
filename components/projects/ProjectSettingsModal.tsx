@@ -14,18 +14,20 @@ import { Badge } from "@/components/ui/badge";
 
 interface ProjectSettingsModalProps {
     projectId: string;
+    currentSlug?: string;
     currentClientId?: string;
     currentUserId?: string;
     aiEnabled?: boolean;
 }
 
-export function ProjectSettingsModal({ projectId, currentClientId, currentUserId, aiEnabled }: ProjectSettingsModalProps) {
+export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, currentUserId, aiEnabled }: ProjectSettingsModalProps) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
 
     // Client State
     const [clients, setClients] = useState<Client[]>([]);
     const [selectedClientId, setSelectedClientId] = useState(currentClientId || "");
+    const [slug, setSlug] = useState(currentSlug || "");
     const [isCreatingClient, setIsCreatingClient] = useState(false);
     const [isEditingSelection, setIsEditingSelection] = useState(!currentClientId);
     const [newClient, setNewClient] = useState({ name: "", email: "", companyName: "", password: "" });
@@ -86,6 +88,12 @@ export function ProjectSettingsModal({ projectId, currentClientId, currentUserId
         setIsEditingSelection(false);
         setClientLoading(false);
         router.refresh();
+    };
+
+    const handleUpdateSlug = async () => {
+        if (!slug || slug === currentSlug) return;
+        await updateProject(projectId, { slug });
+        router.push(`/dashboard/projects/${slug}`); // Navigate to new URL
     };
 
     const handleCreateClient = async (e: React.FormEvent) => {
@@ -195,6 +203,23 @@ export function ProjectSettingsModal({ projectId, currentClientId, currentUserId
 
                     {/* GENERAL TAB */}
                     <TabsContent value="general" className="flex-1 overflow-y-auto p-6 space-y-6 mt-0">
+                        {/* Slug Editor */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">URL Slug</label>
+                            <div className="flex gap-2">
+                                <input
+                                    className="flex h-9 w-full rounded-md border border-input px-3 py-1 text-sm bg-muted/50"
+                                    value={slug}
+                                    onChange={e => setSlug(e.target.value)}
+                                    placeholder="project-slug"
+                                />
+                                <Button size="sm" onClick={handleUpdateSlug} disabled={!slug || slug === currentSlug}>
+                                    Save
+                                </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Changes project URL. You will be redirected.</p>
+                        </div>
+
                         {/* Current Client Display logic (Existing) */}
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">

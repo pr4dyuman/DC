@@ -32,10 +32,11 @@ import { useChat } from "@/context/ChatContext";
 
 interface SidebarProps {
     currentUserId?: string;
+    currentUserUsername?: string;
     currentUserRole?: string; // Passed from layout
 }
 
-export function Sidebar({ currentUserId, currentUserRole = 'admin' }: SidebarProps) {
+export function Sidebar({ currentUserId, currentUserUsername, currentUserRole = 'admin' }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
     const [mounted, setMounted] = useState(false);
@@ -83,17 +84,35 @@ export function Sidebar({ currentUserId, currentUserRole = 'admin' }: SidebarPro
         const allowedLabels = ['Dashboard', 'Projects', 'Finance'];
         visibleRoutes = baseRoutes.filter(r => allowedLabels.includes(r.label)).map(r => {
             if (r.label === 'Projects') return { ...r, label: 'My Projects' };
-            if (r.label === 'Finance') return { ...r, label: 'My Invoices', href: `/dashboard/finance?userId=${currentUserId}` };
+            if (r.label === 'Finance') return { ...r, label: 'My Invoices', href: `/dashboard/finance?username=${currentUserUsername || currentUserId}` };
             return r;
         });
     }
 
     const routes = [
         visibleRoutes[0], // Dashboard
-        ...(currentUserId ? [{ label: "Profile", icon: User, href: `/dashboard/team/${currentUserId}`, color: "text-amber-500" }] : []),
+        ...(currentUserId ? [{ label: "Profile", icon: User, href: `/dashboard/team/${currentUserUsername || currentUserId}`, color: "text-amber-500" }] : []),
         { label: "Messages", icon: MessageCircle, href: "#", color: "text-blue-500", onClick: () => openChat() },
         ...visibleRoutes.slice(1)
     ];
+
+    const profileHref = currentUserId ? `/dashboard/team/${currentUserUsername || currentUserId}` : "";
+
+    const isActive = (route: Route) => {
+        if (!mounted || !pathname) return false;
+
+        // Exact match
+        if (pathname === route.href) return true;
+
+        // Dashboard only matches exact (already handled)
+        if (route.href === '/dashboard') return false;
+
+        // Special case: Team should not be active if we are on the Profile page
+        if (route.label === "Team" && pathname === profileHref) return false;
+
+        // Prefix match for others (e.g. Projects -> /dashboard/projects/123)
+        return pathname.startsWith(route.href);
+    };
 
     return (
         <>
@@ -137,7 +156,7 @@ export function Sidebar({ currentUserId, currentUserRole = 'admin' }: SidebarPro
                                         href={route.href}
                                         className={cn(
                                             "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-white/10 rounded-lg transition",
-                                            (mounted && pathname === route.href) ? "text-white bg-white/10" : "text-zinc-300"
+                                            isActive(route) ? "text-white bg-white/10" : "text-zinc-300"
                                         )}
                                     >
                                         <div className="flex items-center flex-1">

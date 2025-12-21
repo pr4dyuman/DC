@@ -251,6 +251,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                                             <SelectValue placeholder="Select Project" />
                                         </SelectTrigger>
                                         <SelectContent>
+                                            <SelectItem value="" disabled>Select Project</SelectItem>
                                             {projects.map(p => (
                                                 <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                                             ))}
@@ -306,6 +307,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                                             <SelectValue placeholder="Select Employee" />
                                         </SelectTrigger>
                                         <SelectContent>
+                                            <SelectItem value="" disabled>Select Employee</SelectItem>
                                             {users.map(u => (
                                                 <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                                             ))}
@@ -388,6 +390,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                                             <SelectValue placeholder="Select Employee" />
                                         </SelectTrigger>
                                         <SelectContent>
+                                            <SelectItem value="" disabled>Select Employee</SelectItem>
                                             {users.map(u => (
                                                 <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                                             ))}

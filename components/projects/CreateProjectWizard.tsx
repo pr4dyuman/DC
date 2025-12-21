@@ -31,6 +31,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
     // Form State
     const [formData, setFormData] = useState({
         name: "",
+        slug: "", // Helper for URL
         clientId: "",
         clientName: "", // Derived for display
         services: [] as string[], // Helper for legacy support and selection
@@ -163,6 +164,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
 
             await createProject({
                 name: formData.name,
+                slug: formData.slug || undefined, // Send if present
                 client: client?.name, // Optional: might be undefined
                 clientId: formData.clientId || undefined,
                 services: formData.services,
@@ -193,9 +195,34 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
                         placeholder="e.g. Website Redesign"
                         className="pl-8"
                         value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        onChange={(e) => {
+                            const name = e.target.value;
+                            // Auto-generate slug if not manually edited (simplistic check: if empty or matches old)
+                            // Ideally assume auto-gen unless user focused slug input.
+                            // Let's just always suggest one if name is typed and slug is empty or "dirty".
+                            // Simple approach: Set slug = kebab-case of name
+                            setFormData(prev => ({
+                                ...prev,
+                                name,
+                                slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+                            }));
+                        }}
                     />
                 </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label>URL Slug (Optional)</Label>
+                <div className="relative">
+                    <Layers className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="e.g. website-redesign"
+                        className="pl-8 text-muted-foreground"
+                        value={formData.slug}
+                        onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                    />
+                </div>
+                <p className="text-xs text-muted-foreground">Example: /projects/{formData.slug || 'your-project'}</p>
             </div>
 
             <div className="space-y-2">

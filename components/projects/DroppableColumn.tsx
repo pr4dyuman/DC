@@ -15,9 +15,10 @@ interface DroppableColumnProps {
     currentUserId?: string;
     aiEnabled?: boolean;
     readOnly?: boolean;
+    permissions?: any; // Avoiding circular dependency/type import issues for now, or import UserPermissions
 }
 
-export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTask, currentUserId, aiEnabled, readOnly }: DroppableColumnProps) {
+export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTask, currentUserId, aiEnabled, readOnly, permissions }: DroppableColumnProps) {
     const { setNodeRef } = useDroppable({ id });
 
     return (
@@ -41,6 +42,7 @@ export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTas
                             currentUserId={currentUserId}
                             aiEnabled={aiEnabled}
                             readOnly={readOnly}
+                            permissions={permissions}
                         />
                     ))}
                 </div>

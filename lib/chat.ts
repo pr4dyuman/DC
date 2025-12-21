@@ -7,6 +7,7 @@ export type { Message };
 
 export type Contact = {
     id: string;
+    username?: string;
     name: string;
     email: string;
     avatar?: string;
@@ -68,6 +69,7 @@ export async function getContacts(currentUserId: string): Promise<Contact[]> {
 
         contacts.push({
             id: user.id,
+            username: user.username,
             name: user.name,
             email: user.email,
             avatar: user.avatar,
@@ -87,6 +89,7 @@ export async function getContacts(currentUserId: string): Promise<Contact[]> {
 
         contacts.push({
             id: client.id,
+            username: client.username,
             name: client.name,
             email: client.email,
             companyName: client.companyName,

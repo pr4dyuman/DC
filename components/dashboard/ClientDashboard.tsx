@@ -79,7 +79,7 @@ export function ClientDashboard({ projects, invoices, notifications, clientName 
                         ) : (
                             <div className="space-y-4">
                                 {projects.map(project => (
-                                    <Link key={project.id} href={`/dashboard/projects/${project.id}`}>
+                                    <Link key={project.id} href={`/dashboard/projects/${project.slug || project.id}`}>
                                         <div className="flex items-center justify-between p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors cursor-pointer group">
                                             <div>
                                                 <h3 className="font-semibold group-hover:text-indigo-400 transition-colors">{project.name}</h3>
@@ -88,8 +88,8 @@ export function ClientDashboard({ projects, invoices, notifications, clientName 
                                                 </div>
                                             </div>
                                             <div className={`px-2 py-1 rounded-full text-xs font-medium ${project.status === 'Active' ? 'bg-green-500/10 text-green-500' :
-                                                    project.status === 'Completed' ? 'bg-blue-500/10 text-blue-500' :
-                                                        'bg-zinc-800 text-zinc-400'
+                                                project.status === 'Completed' ? 'bg-blue-500/10 text-blue-500' :
+                                                    'bg-zinc-800 text-zinc-400'
                                                 }`}>
                                                 {project.status}
                                             </div>
