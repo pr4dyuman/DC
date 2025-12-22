@@ -8,7 +8,7 @@
       "jobTitle": "CEO",
       "salary": 120000,
       "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Pradyuman",
-      "lastActiveAt": "2025-12-21T07:01:26.695Z",
+      "lastActiveAt": "2025-12-22T06:40:36.670Z",
       "username": "pradyumansharma"
     },
     {
@@ -19,7 +19,7 @@
       "jobTitle": "developer",
       "salary": 75000,
       "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Emily",
-      "lastActiveAt": "2025-12-21T07:01:51.892Z",
+      "lastActiveAt": "2025-12-22T06:50:34.490Z",
       "password": "",
       "username": "emilychen"
     }
@@ -31,7 +31,7 @@
       "companyName": "film stage",
       "password": "",
       "id": "fh3eczvpc",
-      "lastActiveAt": "2025-12-20T21:46:13.817Z",
+      "lastActiveAt": "2025-12-22T06:56:12.923Z",
       "username": "shobhit1",
       "role": "client",
       "jobTitle": "film stage",
@@ -172,84 +172,20 @@
   "invoices": [],
   "notifications": [
     {
-      "id": "0.1808921093951057",
-      "userId": "u4",
-      "message": "Your leave request for 31/12/2025 has been Rejected",
-      "read": true,
-      "timestamp": "2025-12-20T21:48:03.193Z",
-      "link": "/dashboard/team/emilychen?tab=leaves"
-    },
-    {
-      "id": "0.37684346044509387",
-      "userId": "u1",
-      "message": "New Leave Request from Emily Chen: Emergency (31/12/2025 - 31/12/2025)",
-      "read": true,
-      "timestamp": "2025-12-20T21:45:53.244Z",
-      "link": "/dashboard/team"
-    },
-    {
-      "id": "0.7563105657866735",
-      "userId": "u4",
-      "message": "New task assigned: jine mera dill lutia",
+      "id": "0.04895792055889481",
+      "userId": "fh3eczvpc",
+      "message": "Project \"test\" status updated to Active",
       "read": false,
-      "timestamp": "2025-12-20T21:10:19.483Z",
-      "link": "/dashboard/projects/cf50z7tpp?task=j53z5ib8h"
+      "timestamp": "2025-12-22T05:48:56.406Z",
+      "link": "/dashboard/projects/cf50z7tpp"
     },
     {
-      "id": "0.7356141876071622",
-      "userId": "u4",
-      "message": "New task assigned: do somthing",
+      "id": "0.6455900385816102",
+      "userId": "fh3eczvpc",
+      "message": "Project \"test\" status updated to On Hold",
       "read": false,
-      "timestamp": "2025-12-20T21:01:59.041Z",
-      "link": "/dashboard/projects/cf50z7tpp?task=qgjpwjzw6"
-    },
-    {
-      "id": "0.060160750183547274",
-      "userId": "u4",
-      "message": "Your leave request for 21/12/2025 has been Approved",
-      "read": false,
-      "timestamp": "2025-12-20T20:53:10.334Z",
-      "link": "/dashboard/team/emilychen?tab=leaves"
-    },
-    {
-      "id": "0.014295820264484282",
-      "userId": "u4",
-      "message": "Your leave request for 21/12/2025 has been Approved",
-      "read": false,
-      "timestamp": "2025-12-20T20:53:08.630Z",
-      "link": "/dashboard/team/emilychen?tab=leaves"
-    },
-    {
-      "id": "0.9982213485034344",
-      "userId": "u4",
-      "message": "Your leave request for 21/12/2025 has been Approved",
-      "read": false,
-      "timestamp": "2025-12-20T20:53:06.125Z",
-      "link": "/dashboard/team/emilychen?tab=leaves"
-    },
-    {
-      "id": "0.17768830962502435",
-      "userId": "u1",
-      "message": "New Leave Request from Emily Chen: Emergency (21/12/2025 - 21/12/2025)",
-      "read": true,
-      "timestamp": "2025-12-20T20:47:04.229Z",
-      "link": "/dashboard/team"
-    },
-    {
-      "id": "0.04700209301433267",
-      "userId": "u4",
-      "message": "Your leave request for 23/12/2025 has been Approved",
-      "read": true,
-      "timestamp": "2025-12-20T20:34:11.243Z",
-      "link": "/dashboard/team"
-    },
-    {
-      "id": "0.08247803087385908",
-      "userId": "admin",
-      "message": "New Leave Request from Emily Chen: Casual",
-      "read": false,
-      "timestamp": "2025-12-20T10:44:46.132Z",
-      "link": "/dashboard/team"
+      "timestamp": "2025-12-22T05:48:42.141Z",
+      "link": "/dashboard/projects/cf50z7tpp"
     }
   ],
   "activities": [

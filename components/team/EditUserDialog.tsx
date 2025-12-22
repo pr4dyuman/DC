@@ -37,7 +37,8 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
         jobTitle: "",
         salary: 0,
         avatar: "",
-        password: ""
+        password: "",
+        employmentType: "Salary" as 'Salary' | 'Project Based'
     });
 
     useEffect(() => {
@@ -52,6 +53,8 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                     jobTitle: user.jobTitle || "",
                     salary: user.salary || 0,
                     avatar: user.avatar || "",
+
+                    employmentType: user.employmentType || "Salary",
                     password: "" // Don't show existing hash
                 });
             } else {
@@ -63,6 +66,8 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                     jobTitle: "",
                     salary: 0,
                     avatar: "",
+
+                    employmentType: "Salary",
                     password: ""
                 });
             }
@@ -206,44 +211,60 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Role</label>
-                                        <select
-                                            value={formData.role}
-                                            onChange={e => setFormData({ ...formData, role: e.target.value as any })}
-                                            disabled={!isAdmin}
-                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed">
-                                            <option value="employee">Employee</option>
-                                            <option value="manager">Manager</option>
-                                            <option value="specialist">Specialist</option>
-                                            <option value="admin">Admin</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Job Title</label>
-                                        <div className="relative">
-                                            <input
-                                                list="job-titles"
-                                                value={formData.jobTitle}
-                                                onChange={e => setFormData({ ...formData, jobTitle: e.target.value })}
-                                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20"
-                                                placeholder={loadingRoles ? "Loading roles..." : "Select or type role"}
-                                            />
-                                            <datalist id="job-titles">
-                                                {services.map(service => (
-                                                    service.jobs.map((job: any, idx: number) => (
-                                                        <option key={`${service.id}-${idx}`} value={job.title}>{service.name} - {job.title}</option>
-                                                    ))
-                                                ))}
-                                            </datalist>
+                                {formData.role !== 'client' && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Role</label>
+                                            <select
+                                                value={formData.role}
+                                                onChange={e => setFormData({ ...formData, role: e.target.value as any })}
+                                                disabled={!isAdmin}
+                                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <option value="employee">Employee</option>
+                                                <option value="manager">Manager</option>
+                                                <option value="specialist">Specialist</option>
+                                                <option value="admin">Admin</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Job Title</label>
+                                            <div className="relative">
+                                                <input
+                                                    list="job-titles"
+                                                    value={formData.jobTitle}
+                                                    onChange={e => setFormData({ ...formData, jobTitle: e.target.value })}
+                                                    disabled={!canManageFinances}
+                                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    placeholder={loadingRoles ? "Loading roles..." : "Select or type role"}
+                                                />
+                                                <datalist id="job-titles">
+                                                    {services.map(service => (
+                                                        service.jobs.map((job: any, idx: number) => (
+                                                            <option key={`${service.id}-${idx}`} value={job.title}>{service.name} - {job.title}</option>
+                                                        ))
+                                                    ))}
+                                                </datalist>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                )}
 
                                 <div className="grid grid-cols-2 gap-4">
-                                    {canManageFinances && (
+                                    {formData.role !== 'client' && (
                                         <div className="space-y-2">
+                                            <label className="text-sm font-medium">Employment Type</label>
+                                            <select
+                                                value={formData.employmentType}
+                                                onChange={e => setFormData({ ...formData, employmentType: e.target.value as any })}
+                                                disabled={!canManageFinances}
+                                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <option value="Salary">On Salary</option>
+                                                <option value="Project Based">Project Based</option>
+                                            </select>
+                                        </div>
+                                    )}
+                                    {canManageFinances && formData.employmentType === 'Salary' && formData.role !== 'client' && (
+                                        <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
                                             <label className="text-sm font-medium">Salary (Monthly)</label>
                                             <input type="number" value={formData.salary} onChange={e => setFormData({ ...formData, salary: parseInt(e.target.value) || 0 })}
                                                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20" />

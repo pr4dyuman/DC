@@ -1,29 +1,32 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, CreditCard, FolderKanban, MessageSquare } from "lucide-react";
-import Link from "next/link";
-import { Project, Invoice, Notification } from "@/lib/db";
+import { FolderKanban, CreditCard, MessageSquare } from "lucide-react";
+import { Project, Notification } from "@/lib/db";
+import { ClientProjectsList } from "./ClientProjectsList";
+import { ClientNotificationsList } from "./ClientNotificationsList";
 
 interface ClientDashboardProps {
-    projects: Project[];
-    invoices: Invoice[];
-    notifications: Notification[];
+    initialProjects: Project[];
+    initialNotifications: Notification[];
     clientName: string;
+    clientId: string;
+    metrics: {
+        activeProjects: number;
+        pendingInvoicesCount: number;
+        totalDue: number;
+        unreadNotificationsCount: number;
+    }
 }
 
-export function ClientDashboard({ projects, invoices, notifications, clientName }: ClientDashboardProps) {
-    const activeProjects = projects.filter(p => p.status === 'Active').length;
-    const pendingInvoices = invoices.filter(i => i.status === 'Pending');
-    const totalDue = pendingInvoices.reduce((acc, inv) => acc + inv.amount, 0);
-
+export function ClientDashboard({ initialProjects, initialNotifications, clientName, clientId, metrics }: ClientDashboardProps) {
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             {/* Welcome Banner */}
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900 to-purple-900 p-8 text-white shadow-2xl">
                 <div className="relative z-10">
                     <h1 className="text-3xl font-bold mb-2">Welcome back, {clientName}</h1>
-                    <p className="text-indigo-200">Here's what's happening with your projects today.</p>
+                    <p className="text-indigo-200">Here&#39;s what&#39;s happening with your projects today.</p>
                 </div>
                 {/* Abstract Shapes */}
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
@@ -38,7 +41,7 @@ export function ClientDashboard({ projects, invoices, notifications, clientName 
                         <FolderKanban className="h-4 w-4 text-indigo-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{activeProjects}</div>
+                        <div className="text-2xl font-bold">{metrics.activeProjects}</div>
                         <p className="text-xs text-muted-foreground">In progress</p>
                     </CardContent>
                 </Card>
@@ -48,9 +51,9 @@ export function ClientDashboard({ projects, invoices, notifications, clientName 
                         <CreditCard className="h-4 w-4 text-emerald-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{pendingInvoices.length} Pending</div>
+                        <div className="text-2xl font-bold">{metrics.pendingInvoicesCount} Pending</div>
                         <p className="text-xs text-muted-foreground">
-                            {totalDue > 0 ? `Total Due: ₹${totalDue.toLocaleString()}` : "All catch up!"}
+                            {metrics.totalDue > 0 ? `Total Due: ₹${metrics.totalDue.toLocaleString()}` : "All catch up!"}
                         </p>
                     </CardContent>
                 </Card>
@@ -60,7 +63,7 @@ export function ClientDashboard({ projects, invoices, notifications, clientName 
                         <MessageSquare className="h-4 w-4 text-amber-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{notifications.filter(n => !n.read).length}</div>
+                        <div className="text-2xl font-bold">{metrics.unreadNotificationsCount}</div>
                         <p className="text-xs text-muted-foreground">Unread notifications</p>
                     </CardContent>
                 </Card>
@@ -69,66 +72,12 @@ export function ClientDashboard({ projects, invoices, notifications, clientName 
             {/* Main Content Area */}
             <div className="grid gap-6 md:grid-cols-2">
                 {/* Active Projects List */}
-                <Card className="col-span-1 h-full">
-                    <CardHeader>
-                        <CardTitle>Your Projects</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {projects.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground">No active projects.</div>
-                        ) : (
-                            <div className="space-y-4">
-                                {projects.map(project => (
-                                    <Link key={project.id} href={`/dashboard/projects/${project.slug || project.id}`}>
-                                        <div className="flex items-center justify-between p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors cursor-pointer group">
-                                            <div>
-                                                <h3 className="font-semibold group-hover:text-indigo-400 transition-colors">{project.name}</h3>
-                                                <div className="flex gap-2 text-xs text-muted-foreground mt-1">
-                                                    {project.services.slice(0, 2).map(s => <span key={s}>{s}</span>)}
-                                                </div>
-                                            </div>
-                                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${project.status === 'Active' ? 'bg-green-500/10 text-green-500' :
-                                                project.status === 'Completed' ? 'bg-blue-500/10 text-blue-500' :
-                                                    'bg-zinc-800 text-zinc-400'
-                                                }`}>
-                                                {project.status}
-                                            </div>
-                                        </div>
-                                    </Link>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                <ClientProjectsList initialProjects={initialProjects} />
 
                 {/* Notifications / Activity */}
-                <Card className="col-span-1 h-full">
-                    <CardHeader>
-                        <CardTitle>Recent Updates</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {notifications.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground">No new notifications.</div>
-                        ) : (
-                            <div className="space-y-4">
-                                {notifications.slice(0, 5).map((n, i) => (
-                                    <div key={i} className="flex gap-4 items-start p-3 rounded-lg hover:bg-white/5 transition">
-                                        <div className="bg-indigo-500/10 p-2 rounded-full mt-1">
-                                            <Activity className="w-4 h-4 text-indigo-400" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-zinc-200">{n.message}</p>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                {new Date(n.timestamp).toLocaleDateString()}
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                <ClientNotificationsList initialNotifications={initialNotifications} userId={clientId} />
             </div>
         </div>
     );
 }
+

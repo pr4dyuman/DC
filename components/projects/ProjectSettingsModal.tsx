@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Settings, ShieldAlert, Plus, Users, Mail, Phone, Pencil, Sparkles, Lock, Check, FileText, Code, ImageIcon, FileJson, X } from "lucide-react";
-import { getClients, createClient, updateProject, deleteProject, getProjectAssets, toggleAssetAI, updateUser, getUsers } from "@/lib/actions";
+import { getClients, createClient, updateProject, deleteProject, getProjectAssets, toggleAssetAI, updateUser, getUsers, getProject } from "@/lib/actions";
 import { Client, Asset } from "@/lib/db";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -23,10 +23,14 @@ interface ProjectSettingsModalProps {
 export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, currentUserId, aiEnabled }: ProjectSettingsModalProps) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
+    const [status, setStatus] = useState<string>("");
+    const [statusLoading, setStatusLoading] = useState(false);
+    const [statusError, setStatusError] = useState("");
 
     // Client State
     const [clients, setClients] = useState<Client[]>([]);
     const [selectedClientId, setSelectedClientId] = useState(currentClientId || "");
+    const [name, setName] = useState("");
     const [slug, setSlug] = useState(currentSlug || "");
     const [isCreatingClient, setIsCreatingClient] = useState(false);
     const [isEditingSelection, setIsEditingSelection] = useState(!currentClientId);
@@ -62,13 +66,18 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
     }, [currentClientId]);
 
     const loadData = async () => {
-        const [clientsData, assetsData, usersData] = await Promise.all([
+        const [clientsData, assetsData, usersData, projectData] = await Promise.all([
             getClients(),
             getProjectAssets(projectId),
-            getUsers()
+            getUsers(),
+            getProject(projectId)
         ]);
         setClients(clientsData);
         setAssets(assetsData);
+        if (projectData) {
+            setStatus(projectData.status);
+            setName(projectData.name);
+        }
 
         // Check if user has key
         if (currentUserId) {
@@ -90,10 +99,34 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
         router.refresh();
     };
 
-    const handleUpdateSlug = async () => {
-        if (!slug || slug === currentSlug) return;
-        await updateProject(projectId, { slug });
-        router.push(`/dashboard/projects/${slug}`); // Navigate to new URL
+    const handleUpdateName = async () => {
+        if (!name) return;
+
+        // Auto-generate safe slug
+        const newSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+        // If name hasn't meaningfully changed, don't update
+        if (newSlug === currentSlug) return; // Optional check
+
+        // Update both name and slug
+        await updateProject(projectId, { name, slug: newSlug });
+        router.push(`/dashboard/projects/${newSlug}`);
+    };
+
+
+    const handleUpdateStatus = async (newStatus: string) => {
+        setStatusError("");
+        setStatusLoading(true);
+        try {
+            await updateProject(projectId, { status: newStatus as any });
+            setStatus(newStatus);
+            router.refresh();
+        } catch (err: any) {
+            console.error(err);
+            setStatusError(err.message || "Failed to update status");
+        } finally {
+            setStatusLoading(false);
+        }
     };
 
     const handleCreateClient = async (e: React.FormEvent) => {
@@ -203,21 +236,53 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
 
                     {/* GENERAL TAB */}
                     <TabsContent value="general" className="flex-1 overflow-y-auto p-6 space-y-6 mt-0">
-                        {/* Slug Editor */}
+                        {/* Status Selector */}
+                        <div className="space-y-3 p-4 rounded-lg bg-muted/30 border border-border/50">
+                            <label className="text-sm font-medium">Project Status</label>
+                            <div className="flex flex-col gap-2">
+                                <div className="flex gap-2">
+                                    {['Active', 'On Hold', 'Completed'].map((s) => (
+                                        <Button
+                                            key={s}
+                                            type="button"
+                                            size="sm"
+                                            variant={status === s ? "default" : "outline"}
+                                            onClick={() => handleUpdateStatus(s)}
+                                            disabled={statusLoading}
+                                            className={status === s ? "bg-indigo-600 hover:bg-indigo-700" : ""}
+                                        >
+                                            {status === s && <Check className="w-3 h-3 mr-1" />}
+                                            {s}
+                                        </Button>
+                                    ))}
+                                </div>
+                                {statusError && (
+                                    <p className="text-xs text-red-600 flex items-center gap-1">
+                                        <ShieldAlert className="w-3 h-3" />
+                                        {statusError}
+                                    </p>
+                                )}
+                                <p className="text-xs text-muted-foreground">
+                                    Marking as <strong>Completed</strong> requires all tasks to be finished.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Name Editor (Auto-Updates Slug) */}
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">URL Slug</label>
+                            <label className="text-sm font-medium">Project Name</label>
                             <div className="flex gap-2">
                                 <input
                                     className="flex h-9 w-full rounded-md border border-input px-3 py-1 text-sm bg-muted/50"
-                                    value={slug}
-                                    onChange={e => setSlug(e.target.value)}
-                                    placeholder="project-slug"
+                                    value={name}
+                                    onChange={e => setName(e.target.value)}
+                                    placeholder="Project Name"
                                 />
-                                <Button size="sm" onClick={handleUpdateSlug} disabled={!slug || slug === currentSlug}>
+                                <Button size="sm" onClick={handleUpdateName} disabled={!name}>
                                     Save
                                 </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground">Changes project URL. You will be redirected.</p>
+                            <p className="text-xs text-muted-foreground">Changes project name and URL. You will be redirected.</p>
                         </div>
 
                         {/* Current Client Display logic (Existing) */}

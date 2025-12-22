@@ -7,6 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
     Mail, Briefcase, Phone, MapPin, Calendar, IndianRupee,
     CheckCircle2, Clock, Activity as ActivityIcon, ArrowLeft,
     PieChart as PieChartIcon, Zap, Trash2, Pencil, MessageCircle,
@@ -15,7 +22,7 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { getUser, getUserTasks, getUserActivity, getUserByUsername, getUserProjects, getSessionId, getClientProjects, getClientCreatedTasks } from "@/lib/actions";
+import { getUser, getUserTasks, getUserActivity, getUserByUsername, getUserProjects, getSessionId, getClientProjects, getClientCreatedTasks, getProjectTasks } from "@/lib/actions";
 import { EditUserDialog } from "@/components/team/EditUserDialog";
 import { useChat } from "@/context/ChatContext";
 import { getLeaveRequests } from "@/lib/actions";
@@ -38,6 +45,19 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
     const [leaveDates, setLeaveDates] = useState<string[]>([]);
     const [contributionHistory, setContributionHistory] = useState<Activity[]>([]);
     const [loading, setLoading] = useState(true);
+    const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+
+    const availableYears = useMemo(() => {
+        const years = new Set<number>();
+        years.add(new Date().getFullYear());
+        if (contributionHistory) {
+            contributionHistory.forEach(act => {
+                const y = new Date(act.timestamp).getFullYear();
+                years.add(y);
+            });
+        }
+        return Array.from(years).sort((a, b) => b - a);
+    }, [contributionHistory]);
 
     const router = useRouter();
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -136,8 +156,17 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                     const createdTasks = await getClientCreatedTasks(userData.id);
                     setClientCreatedTasks(createdTasks);
 
-                    // Clients don't have assigned tasks or leaves in the same way
-                    setTasks([]);
+                    setClientCreatedTasks(createdTasks);
+
+                    // NEW: Fetch all tasks for these projects to populate stats
+                    if (projects.length > 0) {
+                        const projectIds = projects.map(p => p.id);
+                        const allProjectTasks = await getProjectTasks(projectIds);
+                        setTasks(allProjectTasks);
+                    } else {
+                        setTasks([]);
+                    }
+
                     setLeaveRequests([]);
                     setContributionHistory([]);
                 } else {
@@ -303,7 +332,9 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                             </Card>
                             <Card className="bg-neutral-800/50 border-neutral-700 p-4 text-center">
                                 <div className="text-2xl font-bold text-yellow-500">{efficiency}%</div>
-                                <div className="text-xs text-neutral-400 uppercase tracking-wider font-medium">Efficiency</div>
+                                <div className="text-xs text-neutral-400 uppercase tracking-wider font-medium">
+                                    {user.role === 'client' ? 'Progress' : 'Efficiency'}
+                                </div>
                             </Card>
                         </div>
                     </div>
@@ -332,18 +363,35 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                 {/* OVERVIEW TAB */}
                 <TabsContent value="overview" className="space-y-6 animate-in slide-in-from-bottom-2 duration-300" >
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+
                         <Card className="col-span-1 md:col-span-2 bg-neutral-900 border-neutral-800">
-                            <CardHeader>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="flex items-center gap-2">
                                     <ActivityIcon className="h-5 w-5 text-yellow-500" />
                                     Contribution Activity
                                 </CardTitle>
+                                <Select
+                                    value={selectedYear.toString()}
+                                    onValueChange={(val) => setSelectedYear(parseInt(val))}
+                                >
+                                    <SelectTrigger className="w-[100px] h-8 bg-neutral-800 border-neutral-700 text-xs">
+                                        <SelectValue placeholder="Year" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-neutral-800 border-neutral-700">
+                                        {availableYears.map(y => (
+                                            <SelectItem key={y} value={y.toString()} className="text-xs focus:bg-neutral-700 focus:text-white">
+                                                {y}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </CardHeader>
                             <CardContent>
                                 <ContributionHeatmap
                                     data={contributionStats}
                                     leaveDates={leaveDates}
                                     tooltipLabel={user.role === 'client' ? 'assigned' : 'completed'}
+                                    year={selectedYear}
                                 />
                             </CardContent>
                         </Card>

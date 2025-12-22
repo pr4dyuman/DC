@@ -15,6 +15,7 @@ export type User = {
     password?: string;
     geminiApiKey?: string;
     lastActiveAt?: string; // ISO Date string for presence
+    employmentType?: 'Salary' | 'Project Based';
 };
 export type Client = {
     id: string;

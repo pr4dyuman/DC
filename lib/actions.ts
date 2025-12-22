@@ -98,13 +98,13 @@ export async function getProjectDistribution() {
     return Object.entries(distribution).map(([name, value]) => ({ name, value }));
 }
 
-export async function getRecentActivity(): Promise<Activity[]> {
+export async function getRecentActivity(offset = 0, limit = 5): Promise<Activity[]> {
     const data = await db.get();
-    return data.activities.slice(0, 5); // Return last 5
+    return data.activities.slice(offset, offset + limit);
 }
 
 // Auto-clear notifications older than 24 hours
-export async function getNotifications(userId: string): Promise<Notification[]> {
+export async function getNotifications(userId: string, offset = 0, limit = 1000): Promise<Notification[]> {
     const data = await db.get();
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
@@ -119,10 +119,10 @@ export async function getNotifications(userId: string): Promise<Notification[]> 
         }));
     }
 
-    return validNotifications.filter(n => n.userId === userId);
+    return validNotifications.filter(n => n.userId === userId).slice(offset, offset + limit);
 }
 
-export async function getProjects() {
+export async function getProjects(offset = 0, limit = 1000) {
     const data = await db.get();
     const currentUserId = await getSessionId();
     if (!currentUserId) return []; // Require auth
@@ -130,10 +130,10 @@ export async function getProjects() {
     const currentUser = await getUser(currentUserId);
     if (currentUser?.role === 'client') {
         // STRICT: Only return projects owned by this client
-        return data.projects.filter(p => p.clientId === currentUserId);
+        return data.projects.filter(p => p.clientId === currentUserId).slice(offset, offset + limit);
     }
 
-    return data.projects;
+    return data.projects.slice(offset, offset + limit);
 }
 
 export async function getUserProjects(userId: string) {
@@ -291,12 +291,14 @@ export async function getUserByUsername(username: string) {
     return redacted as User;
 }
 
-export async function getUserTasks(userId: string) {
+export async function getUserTasks(userId: string, offset = 0, limit = 1000) {
     const data = await db.get();
     // Create a set of valid project IDs for O(1) lookup
     const validProjectIds = new Set(data.projects.map(p => p.id));
 
-    return data.tasks.filter(t => t.assigneeId === userId && validProjectIds.has(t.projectId));
+    return data.tasks
+        .filter(t => t.assigneeId === userId && validProjectIds.has(t.projectId))
+        .slice(offset, offset + limit);
 }
 
 // For Client Profile: Get projects they OWN
@@ -307,6 +309,12 @@ export async function getClientProjects(clientId: string) {
     const clientName = client ? client.name : null;
 
     return data.projects.filter(p => p.clientId === clientId || (clientName && p.client === clientName));
+}
+
+export async function getProjectTasks(projectIds: string[]) {
+    const data = await db.get();
+    const idSet = new Set(projectIds);
+    return data.tasks.filter(t => idSet.has(t.projectId));
 }
 
 // For Client Profile: Get tasks they CREATED (Assigned to others)
@@ -861,6 +869,28 @@ export async function createClient(client: Omit<Client, "id">) {
 
 // Project Actions
 export async function updateProject(id: string, updates: Partial<Project>) {
+    const currentUser = await getCurrentUser();
+
+    // Status Change Validation
+    if (updates.status) {
+        // 1. Permission Check
+        if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+            throw new Error("Unauthorized: Only Admins can change project status.");
+        }
+
+        const data = await db.get();
+        // 2. Completion Logic
+        if (updates.status === 'Completed') {
+            const projectTasks = data.tasks.filter(t => t.projectId === id);
+            const hasOpenTasks = projectTasks.some(t => t.status !== 'Done');
+
+            if (hasOpenTasks) {
+                const openCount = projectTasks.filter(t => t.status !== 'Done').length;
+                throw new Error(`Cannot mark as Completed. There are ${openCount} unfinished tasks remaining.`);
+            }
+        }
+    }
+
     const data = await db.get();
     const oldProject = data.projects.find(p => p.id === id);
 
@@ -1123,7 +1153,7 @@ export async function deleteTransaction(transactionId: string, password: string)
     return { success: true };
 }
 
-export async function getHighPriorityTasks() {
+export async function getHighPriorityTasks(offset = 0, limit = 5) {
     const data = await db.get();
     // Return In Progress or Todo tasks that are High priority or Due soon (mock due soon logic if priority not set)
     // For now, let's filter by Status != Done and sort by date. 
@@ -1131,7 +1161,7 @@ export async function getHighPriorityTasks() {
     return data.tasks
         .filter(t => t.status !== 'Done')
         .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-        .slice(0, 5);
+        .slice(offset, offset + limit);
 }
 
 export async function createInvoice(invoice: Omit<Invoice, "id" | "status">) {
