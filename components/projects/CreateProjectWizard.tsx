@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, ArrowRight, Check, Calendar, CreditCard, Layers, User, Banknote } from "lucide-react";
 import { format } from "date-fns";
 import { getClients, getServices, createProject } from "@/lib/actions";
-import { ProjectServiceConfig, PaymentConfig } from "@/lib/db";
+import { ProjectServiceConfig, PaymentConfig } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface CreateProjectWizardProps {
@@ -68,7 +68,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
                 const existing = formData.serviceConfigs.find(c => c.serviceId === svc);
                 return existing || {
                     serviceId: svc,
-                    name: svc,
+                    name: services.find((s: any) => s.id === svc)?.name || svc, // Lookup name if possible
                     paymentConfig: {
                         type: 'installment',
                         paymentDetailsLater: false,
@@ -85,16 +85,16 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
 
     const handleBack = () => setStep(prev => prev - 1);
 
-    const toggleService = (svcName: string) => {
+    const toggleService = (svcId: string, svcName: string) => {
         setFormData(prev => {
-            const exists = prev.services.includes(svcName);
+            const exists = prev.services.includes(svcId);
             const newServices = exists
-                ? prev.services.filter(s => s !== svcName)
-                : [...prev.services, svcName];
+                ? prev.services.filter(s => s !== svcId)
+                : [...prev.services, svcId];
 
             // Sync configs if removing
             const newConfigs = exists
-                ? prev.serviceConfigs.filter(c => c.serviceId !== svcName)
+                ? prev.serviceConfigs.filter(c => c.serviceId !== svcId)
                 : prev.serviceConfigs;
 
             return { ...prev, services: newServices, serviceConfigs: newConfigs };
@@ -256,12 +256,14 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
 
             <div className="space-y-2">
                 <Label>Target Due Date</Label>
-                <Input
-                    type="date"
-                    className="[&::-webkit-calendar-picker-indicator]:filter-[invert(82%)_sepia(38%)_saturate(1324%)_hue-rotate(358deg)_brightness(103%)_contrast(106%)] cursor-pointer"
-                    value={formData.dueDate}
-                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                />
+                <div className="relative">
+                    <input
+                        type="date"
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&::-webkit-calendar-picker-indicator]:filter-[invert(82%)_sepia(38%)_saturate(1324%)_hue-rotate(358deg)_brightness(103%)_contrast(106%)] cursor-pointer"
+                        value={formData.dueDate}
+                        onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                    />
+                </div>
             </div>
         </div>
     );
@@ -271,11 +273,12 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
             <Label>Select Services</Label>
             <div className="grid grid-cols-2 gap-3">
                 {services.map(svc => {
-                    const selected = formData.services.includes(svc.name);
+                    // Check ID or Name for backward compatibility/during transition, but form uses ID
+                    const selected = formData.services.includes(svc.id) || formData.services.includes(svc.name);
                     return (
                         <div
                             key={svc.id}
-                            onClick={() => toggleService(svc.name)}
+                            onClick={() => toggleService(svc.id, svc.name)}
                             className={cn(
                                 "cursor-pointer rounded-lg border p-4 transition-all hover:bg-accent hover:text-accent-foreground hover:border-yellow-500/50 flex items-center justify-between",
                                 selected ? "border-yellow-500 bg-yellow-500/10 ring-1 ring-yellow-500" : "bg-card"

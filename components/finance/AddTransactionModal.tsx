@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createTransaction } from "@/lib/actions";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { TransactionCategory, TransactionType, User, Project } from "@/lib/db";
+import { TransactionCategory, TransactionType, User, Project, TRANSACTION_CATEGORIES } from "@/lib/types";
 
 interface AddTransactionModalProps {
     projectId?: string; // Pre-selected project context if any
@@ -23,7 +23,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
     const router = useRouter();
 
     // Main Category State
-    const [selectedCategory, setSelectedCategory] = useState<"Project" | "Employee" | "Internal Transfer" | "Other">("Project");
+    const [selectedCategory, setSelectedCategory] = useState<TransactionCategory>("Project");
 
     // Form States
     const [formData, setFormData] = useState({
@@ -46,7 +46,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
 
     // Auto-calculate amount for Employee category
     useEffect(() => {
-        if (selectedCategory === "Employee") {
+        if (selectedCategory === "Salary") {
             const base = formData.baseSalary || 0;
             const bonus = parseFloat(formData.bonus) || 0;
             const deduction = parseFloat(formData.deduction) || 0;
@@ -56,25 +56,20 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
     }, [formData.baseSalary, formData.bonus, formData.deduction, selectedCategory]);
 
     const handleCategoryChange = (val: string) => {
-        const cat = val as any;
+        const cat = val as TransactionCategory;
         if (cat === selectedCategory) return; // Prevent reset if same category is selected
         setSelectedCategory(cat);
         // Reset defaults based on category
-        if (cat === "Employee") {
+        if (cat === "Salary") {
             setFormData(prev => ({ ...prev, type: "expense", projectId: "", description: "" }));
         } else if (cat === "Internal Transfer") {
             setFormData(prev => ({ ...prev, type: "expense", projectId: "", transferDirection: "to_member", description: "" })); // Default to to_member (expense)
-        } else if (cat === "Other") {
-            setFormData(prev => ({ ...prev, type: "expense", projectId: "", description: "" }));
-        } else {
-            // Project selected
-            // Only reset if we are switching TO Project from something else, OR if we want to clear it. 
-            // Better: Preserve existing projectId if it exists (e.g. from prop or previous selection), otherwise default.
-            // Actually, if switching TO Project, we might want to default to prop if available.
-            // But if we are ALREADY in Project (handled by guard above), we won't reach here.
-
+        } else if (cat === "Project") {
             // Just to be safe: If switching TO Project, act like init.
             setFormData(prev => ({ ...prev, projectId: projectId || prev.projectId || "", description: "" }));
+        } else {
+            // Generic Categories (Software, Marketing, Other, etc.)
+            setFormData(prev => ({ ...prev, type: "expense", projectId: "", description: "" }));
         }
     };
 
@@ -86,7 +81,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                 memberId,
                 baseSalary: member.salary || 0,
                 // Auto-generate description for Employee
-                description: selectedCategory === "Employee"
+                description: selectedCategory === "Salary"
                     ? `Salary - ${member.name} - ${new Date().toLocaleString('default', { month: 'long' })}`
                     : prev.description
             }));
@@ -131,7 +126,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                 newErrors.projectId = "Please select a Project.";
                 hasError = true;
             }
-            if (selectedCategory === "Employee" && !formData.memberId) {
+            if (selectedCategory === "Salary" && !formData.memberId) {
                 newErrors.memberId = "Please select an Employee.";
                 hasError = true;
             }
@@ -154,7 +149,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                 dbCategory = "Project";
                 // Type comes from user selection (Income/Expense)
             }
-            else if (selectedCategory === "Employee") {
+            else if (selectedCategory === "Salary") {
                 dbCategory = "Salary";
                 dbType = "expense"; // STRICT: Salary is always expense
             }
@@ -166,7 +161,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                 else dbType = "income";
             }
             else {
-                dbCategory = "Other";
+                dbCategory = selectedCategory;
                 dbType = "expense"; // STRICT: Other expenses are expenses
             }
 
@@ -228,10 +223,11 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                                     <SelectValue placeholder="Select Category" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="Project">Project</SelectItem>
-                                    <SelectItem value="Employee">Employee (Salary)</SelectItem>
-                                    <SelectItem value="Internal Transfer">Internal Transfer</SelectItem>
-                                    <SelectItem value="Other">Other Expenses</SelectItem>
+                                    {TRANSACTION_CATEGORIES.map(cat => (
+                                        <SelectItem key={cat} value={cat}>
+                                            {cat === 'Salary' ? 'Salary (Employee)' : cat}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -298,7 +294,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                         )}
 
                         {/* --- EMPLOYEE CATEGORY --- */}
-                        {selectedCategory === "Employee" && (
+                        {selectedCategory === "Salary" && (
                             <>
                                 <div className="grid grid-cols-4 items-center gap-4">
                                     <Label className="text-right">Employee</Label>
@@ -420,8 +416,8 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                             </>
                         )}
 
-                        {/* --- OTHER CATEGORY --- */}
-                        {selectedCategory === "Other" && (
+                        {/* --- GENERIC CATEGORY (Other, Marketing, Software, etc.) --- */}
+                        {selectedCategory !== "Project" && selectedCategory !== "Salary" && selectedCategory !== "Internal Transfer" && (
                             <>
                                 <div className="grid grid-cols-4 items-center gap-4">
                                     <Label className="text-right">Description</Label>

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import { getSessionId } from "./auth";
+import { generateId, resolveUserOrClient } from "./utils-server";
 export { getSessionId };
 
 export type SearchResult = {
@@ -23,27 +24,74 @@ export async function getCurrentUser() {
 
 export async function getDashboardMetrics() {
     const data = await db.get();
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth(); // 0-11
 
-    const totalRevenue = data.invoices
-        .filter(i => i.status === 'Paid')
+    // 1. Revenue & Growth
+    const paidInvoices = data.invoices.filter(i => i.status === 'Paid');
+    const totalRevenue = paidInvoices.reduce((acc, curr) => acc + curr.amount, 0);
+
+    // Calculate generic "Growth" (Current Month vs Previous Month)
+    const currentMonthRevenue = paidInvoices
+        .filter(i => {
+            const d = new Date(i.date);
+            return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+        })
         .reduce((acc, curr) => acc + curr.amount, 0);
 
-    const pendingInvoices = data.invoices
-        .filter(i => i.status === 'Pending')
+    const prevMonthDate = new Date();
+    prevMonthDate.setMonth(currentMonth - 1);
+    const prevMonth = prevMonthDate.getMonth();
+    const prevMonthYear = prevMonthDate.getFullYear();
+
+    const prevMonthRevenue = paidInvoices
+        .filter(i => {
+            const d = new Date(i.date);
+            return d.getFullYear() === prevMonthYear && d.getMonth() === prevMonth;
+        })
         .reduce((acc, curr) => acc + curr.amount, 0);
 
-    const activeProjects = data.projects.filter(p => p.status === 'Active').length;
+    let growthPercentage = 0;
+    if (prevMonthRevenue > 0) {
+        growthPercentage = Math.round(((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100);
+    } else if (currentMonthRevenue > 0) {
+        growthPercentage = 100; // 100% growth if started from 0
+    }
 
-    // Mock utilization calculation
+    // 2. Pending Invoices & Overdue
+    const pendingInvoicesList = data.invoices.filter(i => i.status === 'Pending' || i.status === 'Overdue');
+    const pendingInvoicesAmount = pendingInvoicesList.reduce((acc, curr) => acc + curr.amount, 0);
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const overdueCount = pendingInvoicesList.filter(i => (i.date < todayStr && i.status !== 'Paid') || i.status === 'Overdue').length;
+
+    // 3. Active Projects & High Priority
+    const activeProjectsList = data.projects.filter(p => p.status === 'Active');
+    const activeProjects = activeProjectsList.length;
+
+    // Deduce "High Priority" projects as those with "High" priority active tasks.
+    const activeProjectIds = new Set(activeProjectsList.map(p => p.id));
+    const highPriorityTaskProjects = new Set(
+        data.tasks
+            .filter(t => t.status !== 'Done' && t.priority === 'High' && activeProjectIds.has(t.projectId))
+            .map(t => t.projectId)
+    );
+    const highPriorityCount = highPriorityTaskProjects.size;
+
+    // 4. Team Utilization
     const totalTasks = data.tasks.length;
     const activeTasks = data.tasks.filter(t => t.status === 'In Progress').length;
     const utilization = totalTasks > 0 ? Math.round((activeTasks / totalTasks) * 100) : 0;
 
     return {
         revenue: totalRevenue,
-        pending: pendingInvoices,
+        growth: growthPercentage,
+        pending: pendingInvoicesAmount,
+        overdueCount: overdueCount,
         activeProjects,
-        utilization
+        highPriorityCount,
+        utilization,
+        activeTasksCount: activeTasks
     };
 }
 
@@ -91,7 +139,10 @@ export async function getProjectDistribution() {
 
     data.projects.forEach(p => {
         p.services.forEach(svc => {
-            distribution[svc] = (distribution[svc] || 0) + 1;
+            // Resolve ID to Name for display
+            const serviceObj = data.services.find(s => s.id === svc || s.name === svc);
+            const name = serviceObj ? serviceObj.name : svc;
+            distribution[name] = (distribution[name] || 0) + 1;
         });
     });
 
@@ -195,99 +246,43 @@ export async function getUsers() {
 }
 
 export async function getUser(id: string) {
-    const data = await db.get();
+    // 1. Resolve User
+    const targetUser = await resolveUserOrClient(id);
+    if (!targetUser) return undefined;
 
-    // 1. Check Standard Users
-    const targetUser = data.users.find(u => u.id === id);
-    if (targetUser) {
-        const currentUserId = await getSessionId();
-        // Prevent infinite recursion if called from within getUser (unlikely but safe)
-        // Access Check
-        if (!currentUserId) return undefined; // Should satisfy middleware eventually
+    // 2. Access Control
+    const currentUserId = await getSessionId();
+    if (!currentUserId) return undefined; // Require auth
 
-        // Use raw data for role check to avoid recursion
-        const rawCurrentUser = data.users.find(u => u.id === currentUserId) ||
-            (data.clients && data.clients.find(c => c.id === currentUserId) ? { role: 'client' } as User : null);
+    const currentUser = await resolveUserOrClient(currentUserId);
+    const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
 
-        const isAdmin = rawCurrentUser && (rawCurrentUser.role === 'admin' || rawCurrentUser.role === 'manager');
-
-        if (isAdmin || currentUserId === id) {
-            return targetUser;
-        }
-
-        // Redact
-        const { salary, ...redacted } = targetUser;
-        return redacted as User;
+    if (isAdmin || currentUserId === id) {
+        return targetUser;
     }
 
-    // 2. Check Clients (Treat as User with role 'client')
-    if (data.clients) {
-        const targetClient = data.clients.find(c => c.id === id);
-        if (targetClient) {
-            const clientAsUser: User = {
-                id: targetClient.id,
-                name: targetClient.name, // Link person name
-                email: targetClient.email,
-                role: 'client' as any, // Cast to match User role type
-                jobTitle: targetClient.companyName, // Reuse field
-                avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${targetClient.companyName}`,
-                lastActiveAt: targetClient.lastActiveAt,
-                username: targetClient.username || targetClient.id
-            };
-            return clientAsUser;
-        }
-    }
-
-    return undefined;
+    // 3. Redact
+    const { salary, ...redacted } = targetUser;
+    return redacted as User;
 }
 
 
 export async function getUserByUsername(username: string) {
-    const data = await db.get();
-
-    // 1. Try finding by username in Users
-    let user = data.users.find(u => u.username === username);
-
-    // 2. If not found, try finding by ID in Users (Fallback)
-    if (!user) {
-        user = data.users.find(u => u.id === username);
-    }
-
-    // 3. If still not found, check Clients (by ID or potential future username)
-    if (!user && data.clients) {
-        const client = data.clients.find(c => c.id === username || (c as any).username === username);
-        if (client) {
-            // Adapt Client to User type
-            user = {
-                id: client.id,
-                name: client.name,
-                email: client.email,
-                role: 'client' as any,
-                jobTitle: client.companyName,
-                avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${client.companyName}`,
-                lastActiveAt: client.lastActiveAt,
-                username: client.username || client.id
-            } as User;
-        }
-    }
-
+    // 1. Resolve
+    const user = await resolveUserOrClient(username);
     if (!user) return undefined;
 
-    // Access control:
+    // 2. Access Control
     const currentUserId = await getSessionId();
     if (!currentUserId) return undefined; // Require auth
 
-    // Allow viewing public profile info of anyone? Yes, usually.
-    // Redact sensitive info
-    const { salary, password, ...redacted } = user;
-
-    // If Admin or Self, show full (but this needs logic). 
-    // For now, let's just return redacted unless we verify identity.
     const currentUser = await getUser(currentUserId);
     if (currentUser?.role === 'admin' || currentUser?.role === 'manager' || currentUser?.id === user.id) {
         return user;
     }
 
+    // 3. Redact
+    const { salary, password, ...redacted } = user;
     return redacted as User;
 }
 
@@ -305,7 +300,7 @@ export async function getUserTasks(userId: string, offset = 0, limit = 1000) {
 export async function getClientProjects(clientId: string) {
     const data = await db.get();
     // Match by clientId OR client name (legacy)
-    const client = data.clients.find(c => c.id === clientId) || data.users.find(u => u.id === clientId);
+    const client = await resolveUserOrClient(clientId);
     const clientName = client ? client.name : null;
 
     return data.projects.filter(p => p.clientId === clientId || (clientName && p.client === clientName));
@@ -368,7 +363,7 @@ export async function createUser(user: Omit<User, "id">) {
         counter++;
     }
 
-    const newUser = { ...user, id: Math.random().toString(36).substr(2, 9), username: uniqueUsername };
+    const newUser = { ...user, id: generateId(), username: uniqueUsername };
     if (!newUser.avatar) {
         newUser.avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${newUser.name}`;
     }
@@ -416,25 +411,127 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
         }
     }
 
+    // Approval Logic for Documents
+    let finalUpdates = { ...updates };
+    let notifyAdmin = false;
+
+
+    if (!isAdmin && (updates.adharCardImage || updates.panCardImage || updates.contracts || updates.otherDocuments)) {
+        // Move doc updates to pending fields
+        if (updates.adharCardImage) {
+            finalUpdates.pendingAdharCardImage = updates.adharCardImage;
+            delete finalUpdates.adharCardImage;
+        }
+        if (updates.panCardImage) {
+            finalUpdates.pendingPanCardImage = updates.panCardImage;
+            delete finalUpdates.panCardImage;
+        }
+        if (updates.contracts) {
+            finalUpdates.pendingContracts = updates.contracts;
+            delete finalUpdates.contracts;
+        }
+        if (updates.otherDocuments) {
+            finalUpdates.pendingOtherDocuments = updates.otherDocuments;
+            delete finalUpdates.otherDocuments;
+        }
+        notifyAdmin = true;
+    }
+
     await db.update((data) => {
+        let newData = { ...data };
+
         // Try updating in Users
-        const userExists = data.users.some(u => u.id === id);
+        const userExists = newData.users.some(u => u.id === id);
         if (userExists) {
-            return {
-                ...data,
-                users: data.users.map(u => u.id === id ? { ...u, ...updates } : u)
-            };
+            newData.users = newData.users.map(u => u.id === id ? { ...u, ...finalUpdates } : u);
+        } else if (newData.clients && newData.clients.some(c => c.id === id)) {
+            // Try updating in Clients
+            newData.clients = newData.clients.map(c => c.id === id ? { ...c, ...finalUpdates as Partial<Client> } : c);
+        } else {
+            return data; // No user/client found
         }
 
-        // Try updating in Clients
-        if (data.clients && data.clients.some(c => c.id === id)) {
-            return {
-                ...data,
-                clients: data.clients.map(c => c.id === id ? { ...c, ...updates } : c)
-            };
+        // Notify Admins
+        if (notifyAdmin) {
+            const adminUsers = newData.users.filter(u => u.role === 'admin' || u.role === 'manager');
+            const newNotifications = adminUsers.map(admin => ({
+                id: generateId(),
+                userId: admin.id,
+                message: `${currentUser.name} has requested to update their identity documents.`,
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: `/dashboard/team?edit=${id}` // Link to open edit dialog (needs implementation on page)
+            }));
+            newData.notifications = [...newData.notifications, ...newNotifications];
         }
 
-        return data;
+        return newData;
+    });
+    revalidatePath('/dashboard/team');
+}
+
+export async function approveDocumentUpdate(userId: string, type: 'adhar' | 'pan' | 'contracts' | 'other' | 'both', approve: boolean) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+        throw new Error("Unauthorized");
+    }
+
+    await db.update(data => {
+        const user = data.users.find(u => u.id === userId);
+        if (!user) return data;
+
+        let updates: any = {};
+        if (approve) {
+            if (type === 'adhar' || type === 'both') {
+                if (user.pendingAdharCardImage) {
+                    updates.adharCardImage = user.pendingAdharCardImage;
+                    updates.pendingAdharCardImage = undefined;
+                }
+            }
+            if (type === 'pan' || type === 'both') {
+                if (user.pendingPanCardImage) {
+                    updates.panCardImage = user.pendingPanCardImage;
+                    updates.pendingPanCardImage = undefined;
+                }
+            }
+            if (type === 'contracts') {
+                if (user.pendingContracts) {
+                    updates.contracts = user.pendingContracts;
+                    updates.pendingContracts = undefined;
+                }
+            }
+            if (type === 'other') {
+                if (user.pendingOtherDocuments) {
+                    updates.otherDocuments = user.pendingOtherDocuments;
+                    updates.pendingOtherDocuments = undefined;
+                }
+            }
+        } else {
+            // Reject - just clear pending
+            if (type === 'adhar' || type === 'both') updates.pendingAdharCardImage = undefined;
+            if (type === 'pan' || type === 'both') updates.pendingPanCardImage = undefined;
+            if (type === 'contracts') updates.pendingContracts = undefined;
+            if (type === 'other') updates.pendingOtherDocuments = undefined;
+        }
+
+        // Notify User
+        const message = approve
+            ? `Your document update request for ${type === 'both' ? 'documents' : type.toUpperCase()} has been APPROVED.`
+            : `Your document update request for ${type === 'both' ? 'documents' : type.toUpperCase()} has been REJECTED.`;
+
+        const notification = {
+            id: generateId(),
+            userId: userId,
+            message: message,
+            read: false,
+            timestamp: new Date().toISOString()
+        };
+
+        return {
+            ...data,
+            users: data.users.map(u => u.id === userId ? { ...u, ...updates } : u),
+            notifications: [...data.notifications, notification]
+        };
     });
     revalidatePath('/dashboard/team');
 }
@@ -465,7 +562,7 @@ export async function getServices() {
 }
 
 export async function addService(name: string, jobs: { title: string; count: number }[]) {
-    const newService = { id: Math.random().toString(36).substr(2, 9), name, jobs };
+    const newService = { id: generateId(), name, jobs };
     await db.update((data) => ({
         ...data,
         services: [...data.services, newService]
@@ -486,11 +583,15 @@ export async function deleteService(id: string) {
 
         // Remove from all projects
         const newProjects = data.projects.map(p => {
-            if (p.services && serviceName && p.services.includes(serviceName)) {
-                return {
-                    ...p,
-                    services: p.services.filter(s => s !== serviceName)
-                };
+            if (p.services) {
+                // Filter out both ID and Name (for robustness during migration)
+                const newProjectServices = p.services.filter(s => s !== id && s !== serviceName);
+                if (newProjectServices.length !== p.services.length) {
+                    return {
+                        ...p,
+                        services: newProjectServices
+                    };
+                }
             }
             return p;
         });
@@ -535,7 +636,7 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
         counter++;
     }
 
-    const newProject: Project = { ...project, id: Math.random().toString(36).substr(2, 9), slug: uniqueSlug, status: "Active", createdAt: new Date().toISOString() };
+    const newProject: Project = { ...project, id: generateId(), slug: uniqueSlug, status: "Active", createdAt: new Date().toISOString() };
     // Helper: auto-fill client name if ID provided but name missing? 
     // Actually we trust the input `client` field as "Client Name" for display or "Unknown".
 
@@ -548,7 +649,7 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
             ...data,
             projects: [...data.projects, newProject],
             activities: [{
-                id: Math.random().toString(),
+                id: generateId(),
                 user: currentUser.name,
                 action: "created project",
                 target: project.name,
@@ -594,7 +695,9 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
     const defaultPermissions: UserPermissions = {
         canManageTasks: true,
         canMarkDone: true,
-        deleteAccess: 'any'
+        deleteAccess: 'any',
+        canCreateProject: false,
+        canUseAI: false
     };
 
     if (!settings.userPermissions) {
@@ -650,7 +753,7 @@ export async function deleteTask(taskId: string) {
         ...data,
         tasks: data.tasks.filter(t => t.id !== taskId),
         activities: [{
-            id: Math.random().toString(),
+            id: generateId(),
             user: userName,
             action: "deleted task",
             target: task.title,
@@ -682,7 +785,7 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
         ...data,
         tasks: data.tasks.map(t => t.id === taskId ? { ...t, status } : t),
         activities: [{
-            id: Math.random().toString(),
+            id: generateId(),
             user: userName,
             action: "moved task to " + status,
             target: data.tasks.find(t => t.id === taskId)?.title || "Task",
@@ -739,8 +842,13 @@ export async function updateTask(taskId: string, updates: Partial<Task>) {
                 updatedProjects = data.projects.map(p => {
                     if (p.id === task.projectId) {
                         const currentServices = p.services || ((p as any).departments ? (p as any).departments : []);
-                        if (!currentServices.includes(updates.category!)) {
-                            return { ...p, services: [...currentServices, updates.category!] };
+
+                        // Resolve category to ID if possible
+                        const service = data.services?.find(s => s.name === updates.category || s.id === updates.category);
+                        const categoryIdOrName = service ? service.id : updates.category;
+
+                        if (!currentServices.includes(categoryIdOrName!)) {
+                            return { ...p, services: [...currentServices, categoryIdOrName!] };
                         }
                     }
                     return p;
@@ -753,7 +861,7 @@ export async function updateTask(taskId: string, updates: Partial<Task>) {
             projects: updatedProjects,
             tasks: data.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t),
             activities: [{
-                id: Math.random().toString(),
+                id: generateId(),
                 user: userName,
                 action: "updated task",
                 target: updates.title || data.tasks.find(t => t.id === taskId)?.title || "Task",
@@ -767,7 +875,7 @@ export async function updateTask(taskId: string, updates: Partial<Task>) {
 
 export async function addComment(taskId: string, userId: string, text: string) {
     const newComment = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: generateId(),
         userId,
         text,
         timestamp: new Date().toISOString()
@@ -781,7 +889,7 @@ export async function addComment(taskId: string, userId: string, text: string) {
                 : t
         ),
         activities: [{
-            id: Math.random().toString(),
+            id: generateId(),
             user: "User", // Ideally fetch user name
             action: "commented on task",
             target: data.tasks.find(t => t.id === taskId)?.title || "Task",
@@ -794,76 +902,113 @@ export async function addComment(taskId: string, userId: string, text: string) {
     return newComment;
 }
 
+
 export async function createTask(task: Omit<Task, "id">) {
     const currentUser = await getCurrentUser();
     const createdBy = currentUser ? currentUser.id : "system";
 
-    const permissions = await getUserPermissions(createdBy);
-    if (!permissions.canManageTasks) {
-        throw new Error("Unauthorized: You do not have permission to create tasks.");
-    }
+    const newTask = {
+        ...task,
+        id: generateId(),
+        createdAt: new Date().toISOString(),
+        createdBy,
+        comments: []
+    };
 
-    const newTask: Task = { ...task, id: Math.random().toString(36).substr(2, 9), createdAt: new Date().toISOString(), createdBy };
-
-    await db.update((data) => {
-        // Validation
-        if (!data.projects.find(p => p.id === task.projectId)) {
-            throw new Error(`Project with ID ${task.projectId} not found`);
-        }
-        if (!data.users.find(u => u.id === task.assigneeId)) {
-            throw new Error(`User with ID ${task.assigneeId} not found`);
-        }
-
-        // Auto-assign department to project if not exists
-        let updatedProjects = data.projects;
-        if (task.category) {
-            updatedProjects = data.projects.map(p => {
-                if (p.id === task.projectId) {
-                    const currentServices = p.services || ((p as any).departments ? (p as any).departments : []);
-                    if (!currentServices.includes(task.category!)) {
-                        return { ...p, services: [...currentServices, task.category!] };
-                    }
-                }
-                return p;
-            });
-        }
-
-        return {
-            ...data,
-            projects: updatedProjects,
-            tasks: [...data.tasks, newTask],
-            notifications: [{
-                id: Math.random().toString(),
-                userId: task.assigneeId,
-                message: `New task assigned: ${task.title}`,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: `/dashboard/projects/${task.projectId}?task=${newTask.id}`
-            }, ...data.notifications]
-        };
-    });
-
-    revalidatePath('/dashboard/projects');
+    await db.update((data) => ({
+        ...data,
+        tasks: [...data.tasks, newTask],
+        activities: [{
+            id: generateId(),
+            user: currentUser ? currentUser.name : "System",
+            action: "created task",
+            target: task.title,
+            timestamp: new Date().toISOString()
+        }, ...data.activities]
+    }));
     revalidatePath('/dashboard/projects/[id]', 'page');
+    revalidatePath('/dashboard/projects');
     return newTask;
 }
 
 
+// --- Client Actions ---
 
 export async function getClients() {
     const data = await db.get();
     return data.clients || [];
 }
 
+export async function getClientByUsername(username: string) {
+    const data = await db.get();
+    // Return by username (preferred) or ID (fallback)
+    return data.clients.find(c => c.username === username || c.id === username);
+}
+
+export async function getClientById(id: string) {
+    const data = await db.get();
+    return data.clients?.find(c => c.id === id);
+}
+
 export async function createClient(client: Omit<Client, "id">) {
-    const newClient = { ...client, id: Math.random().toString(36).substr(2, 9) };
+    const currentUser = await getCurrentUser();
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+        throw new Error("Unauthorized: Only Admins can create clients.");
+    }
+
+    // Generate username if not provided
+    let username = client.username;
+    if (!username) {
+        username = client.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    }
+
+    // Ensure uniqueness
+    const data = await db.get();
+    let uniqueUsername = username;
+    let counter = 1;
+    // Check collision with Users OR Clients
+    while (
+        data.users.find(u => u.username === uniqueUsername) ||
+        data.clients.find(c => c.username === uniqueUsername)
+    ) {
+        uniqueUsername = `${username}${counter}`;
+        counter++;
+    }
+
+    const newClient: Client = {
+        ...client,
+        id: generateId(),
+        username: uniqueUsername,
+        lastActiveAt: new Date().toISOString()
+    };
+
+    if (!newClient.logo) {
+        newClient.logo = `https://api.dicebear.com/7.x/initials/svg?seed=${newClient.companyName}`;
+    }
+
     await db.update((data) => ({
         ...data,
         clients: [...(data.clients || []), newClient]
     }));
-    revalidatePath('/dashboard/projects');
+    revalidatePath('/dashboard/clients');
+    revalidatePath('/dashboard/team'); // In case they appear there too
     return newClient;
 }
+
+export async function updateClient(id: string, updates: Partial<Client>) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+        throw new Error("Unauthorized");
+    }
+
+    await db.update((data) => ({
+        ...data,
+        clients: data.clients.map(c => c.id === id ? { ...c, ...updates } : c)
+    }));
+    revalidatePath('/dashboard/clients');
+    revalidatePath(`/dashboard/clients/${id}`);
+}
+
 
 
 
@@ -901,7 +1046,7 @@ export async function updateProject(id: string, updates: Partial<Project>) {
         if (updates.status && oldProject && oldProject.status !== updates.status && oldProject.clientId) {
             // Check if client exists (optional but good) or just push
             notifications = [{
-                id: Math.random().toString(),
+                id: generateId(),
                 userId: oldProject.clientId,
                 message: `Project "${oldProject.name}" status updated to ${updates.status}`,
                 read: false,
@@ -1003,6 +1148,67 @@ export async function getTransactions(projectId?: string, userId?: string, categ
     return transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
+export async function getClientFinanceData(clientId: string) {
+    const data = await db.get();
+    const clientProjects = data.projects.filter(p => p.clientId === clientId).map(p => p.id);
+
+    // Invoices for all client projects
+    const invoices = (data.invoices || []).filter(i => clientProjects.includes(i.projectId));
+
+    // Transactions for all client projects
+    const transactions = (data.transactions || []).filter(t => t.projectId && clientProjects.includes(t.projectId));
+
+    const totalInvoiced = invoices.reduce((acc, curr) => acc + curr.amount, 0);
+    const totalPaidInvoices = invoices.filter(i => i.status === 'Paid').reduce((acc, curr) => acc + curr.amount, 0);
+    const pendingAmount = invoices.filter(i => i.status === 'Pending').reduce((acc, curr) => acc + curr.amount, 0);
+
+    // Calculate generic "Income" from transactions
+    const totalTransactionsIncome = transactions
+        .filter(t => t.type?.toLowerCase() === 'income')
+        .reduce((acc, curr) => acc + curr.amount, 0);
+
+    // Calculate "Refunds" (Project Expenses -> Company to Client)
+    const totalTransactionsRefunds = transactions
+        .filter(t => t.type?.toLowerCase() === 'expense')
+        .reduce((acc, curr) => acc + curr.amount, 0);
+
+    // Hybrid approach: 
+    // Base Income = Invoices (if tracked) OR Transactions (if manual)
+    const baseIncome = totalPaidInvoices > 0 ? totalPaidInvoices : totalTransactionsIncome;
+
+    // Net Value = Base Income - Refunds
+    const effectiveTotalPaid = baseIncome - totalTransactionsRefunds;
+
+    return {
+        invoices: invoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        transactions: transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        stats: {
+            totalInvoiced,
+            totalPaid: effectiveTotalPaid, // Use effective total (Net)
+            pendingAmount,
+            ltv: effectiveTotalPaid // Lifetime Value (Net)
+        }
+    };
+}
+
+export async function getClientActivityLogs(clientId: string, limit = 20) {
+    const data = await db.get();
+    const clientProjects = new Set(data.projects.filter(p => p.clientId === clientId).map(p => p.name));
+
+    return data.activities.filter(a => {
+        // Activity BY the client
+        if (a.user === clientId) return true;
+        // Activity ON client's project (Target matches Project Name)
+        // Note: Target is usually a human readable string. This is a heuristic.
+        // Ideally we'd store entityId and entityType. 
+        // For now, if target includes project name?
+        // Let's stick to actions BY the client or strictly matching target if we can.
+        // Or just return actions BY the client for now to be safe.
+        // Actually, let's include actions where the user is the client.
+        return a.user === clientId;
+    }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, limit);
+}
+
 export async function getCategoryMemberSummary(category: string) {
     const data = await db.get();
     const transactions = (data.transactions || []).filter(t => t.category === category);
@@ -1065,7 +1271,7 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
 
     const newTransaction: Transaction = {
         ...transaction,
-        id: Math.random().toString(36).substr(2, 9),
+        id: generateId(),
         status: "completed"
     };
 
@@ -1078,7 +1284,7 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
         const notifications = [...(data.notifications || [])];
         if (newTransaction.category === 'Salary' && newTransaction.userId && newTransaction.type === 'expense') {
             notifications.unshift({
-                id: Math.random().toString(),
+                id: generateId(),
                 userId: newTransaction.userId,
                 message: `Salary Payment Received: ₹${newTransaction.amount.toLocaleString()}`,
                 read: false,
@@ -1167,7 +1373,7 @@ export async function getHighPriorityTasks(offset = 0, limit = 5) {
 export async function createInvoice(invoice: Omit<Invoice, "id" | "status">) {
     const newInvoice: Invoice = {
         ...invoice,
-        id: Math.random().toString(36).substr(2, 9),
+        id: generateId(),
         status: "Pending"
     };
 
@@ -1177,7 +1383,7 @@ export async function createInvoice(invoice: Omit<Invoice, "id" | "status">) {
 
         if (project && project.clientId) {
             notifications = [{
-                id: Math.random().toString(),
+                id: generateId(),
                 userId: project.clientId,
                 message: `New Invoice Generated: ₹${invoice.amount.toLocaleString()}`,
                 read: false,
@@ -1373,12 +1579,15 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
     if (data.projects) {
         data.projects.forEach(p => {
             const clientName = data.clients?.find(c => c.id === p.clientId || c.name === p.client)?.name || p.client || "";
-            if (clientName.toLowerCase().includes(lowerQuery) || p.services?.some(d => d.toLowerCase().includes(lowerQuery))) {
+            // Resolve Service IDs to Names for search
+            const serviceNames = p.services?.map(s => data.services?.find(dSvc => dSvc.id === s || dSvc.name === s)?.name || s) || [];
+
+            if (clientName.toLowerCase().includes(lowerQuery) || serviceNames.some(d => d.toLowerCase().includes(lowerQuery))) {
                 results.push({
                     id: p.id,
                     type: 'project',
                     title: `${clientName} Project`,
-                    subtitle: p.services?.join(', ') || '',
+                    subtitle: serviceNames.join(', ') || '',
                     url: `/dashboard/projects/${p.id}`
                 });
             }
@@ -1459,7 +1668,7 @@ export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt">) {
 
     const newAsset: Asset = {
         ...asset,
-        id: Math.random().toString(36).substr(2, 9),
+        id: generateId(),
         uploadedAt: new Date().toISOString()
     };
 
@@ -1467,7 +1676,7 @@ export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt">) {
         ...data,
         assets: [newAsset, ...(data.assets || [])],
         activities: [{
-            id: Math.random().toString(),
+            id: generateId(),
             user: asset.uploadedBy,
             action: `uploaded asset`,
             target: asset.name,
@@ -1489,7 +1698,7 @@ export async function deleteProjectAsset(assetId: string) {
             ...data,
             assets: data.assets.filter(a => a.id !== assetId),
             activities: asset ? [{
-                id: Math.random().toString(),
+                id: generateId(),
                 user: userName,
                 action: `deleted asset`,
                 target: asset.name,
@@ -1512,7 +1721,7 @@ export async function updateProjectAsset(assetId: string, updates: Partial<Asset
         ...data,
         assets: data.assets.map(a => a.id === assetId ? { ...a, ...updates } : a),
         activities: [{
-            id: Math.random().toString(),
+            id: generateId(),
             user: userName,
             action: `updated asset`,
             target: data.assets.find(a => a.id === assetId)?.name || "Asset",
@@ -1895,7 +2104,7 @@ export async function requestLeave(data: Omit<LeaveRequest, "id" | "status" | "c
 
     const newRequest: LeaveRequest = {
         ...data,
-        id: Math.random().toString(36).substr(2, 9),
+        id: generateId(),
         status: 'Pending',
         createdAt: new Date().toISOString(),
         userId: currentUser.id
@@ -1905,7 +2114,7 @@ export async function requestLeave(data: Omit<LeaveRequest, "id" | "status" | "c
         // Broadcast notification to ALL admins
         const admins = (dbData.users || []).filter(u => u.role === 'admin' || u.role === 'manager');
         const adminNotifications = admins.map(admin => ({
-            id: Math.random().toString(),
+            id: generateId(),
             userId: admin.id,
             message: `New Leave Request from ${currentUser.name}: ${data.type} (${new Date(data.startDate).toLocaleDateString()} - ${new Date(data.endDate).toLocaleDateString()})`,
             read: false,
@@ -1954,7 +2163,7 @@ export async function updateLeaveStatus(requestId: string, status: LeaveStatus) 
         ...dbData,
         leaveRequests: dbData.leaveRequests.map(r => r.id === requestId ? { ...r, status, reviewedBy: currentUser?.id, reviewedAt: new Date().toISOString() } : r),
         notifications: [{
-            id: Math.random().toString(),
+            id: generateId(),
             userId: request.userId,
             message: `Your leave request for ${new Date(request.startDate).toLocaleDateString()} has been ${status}`,
             read: false,

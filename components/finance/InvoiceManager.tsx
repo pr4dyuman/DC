@@ -1,6 +1,6 @@
 "use client";
 
-import { Invoice } from "@/lib/db";
+import { Invoice } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";

@@ -8,7 +8,7 @@ import { useInView } from "react-intersection-observer";
 import { getRecentActivity } from "@/lib/actions";
 import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import { Activity } from "@/lib/db";
+import { Activity } from "@/lib/types";
 
 interface RecentActivityListProps {
     initialActivities: Activity[];

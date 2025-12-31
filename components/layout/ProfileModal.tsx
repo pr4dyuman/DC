@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { User } from "@/lib/db";
+import { User } from "@/lib/types";
 import { updateUser, getSystemSettings, updateSystemSettings } from "@/lib/actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, Upload, Lock, User as UserIcon, Shield, Camera, Building2 } from "lucide-react";

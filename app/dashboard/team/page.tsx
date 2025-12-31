@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getUsers, createUser, updateUser, deleteUser, getUser, getLeaveRequests } from "@/lib/actions"; // Added getUser
-import { User, LeaveRequest } from "@/lib/db";
+import { User, LeaveRequest } from "@/lib/types";
 import { getSessionId } from "@/lib/auth"; // Added getSessionId
 import { LeaveRequestsList } from "@/components/leave-requests-list";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";

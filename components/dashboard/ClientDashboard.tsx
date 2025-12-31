@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FolderKanban, CreditCard, MessageSquare } from "lucide-react";
-import { Project, Notification } from "@/lib/db";
+import { Project, Notification } from "@/lib/types";
 import { ClientProjectsList } from "./ClientProjectsList";
 import { ClientNotificationsList } from "./ClientNotificationsList";
 

@@ -117,26 +117,26 @@ export default async function DashboardPage() {
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                     <MetricCard
                         title="Total Revenue"
-                        value={`₹${metrics?.revenue.toLocaleString()}`}
-                        description="+20.1% from last month"
+                        value={`₹${metrics?.revenue?.toLocaleString() ?? 0}`}
+                        description={`${(metrics?.growth ?? 0) > 0 ? '+' : ''}${metrics?.growth ?? 0}% from last month`}
                         icon={IndianRupee}
                     />
                     <MetricCard
                         title="Active Projects"
-                        value={metrics?.activeProjects}
-                        description="High priority: 2"
+                        value={metrics?.activeProjects ?? 0}
+                        description={`High priority: ${metrics?.highPriorityCount ?? 0}`}
                         icon={Briefcase}
                     />
                     <MetricCard
                         title="Pending Invoices"
-                        value={`₹${metrics?.pending.toLocaleString()}`}
-                        description="2 invoices overdue"
+                        value={`₹${metrics?.pending?.toLocaleString() ?? 0}`}
+                        description={`${metrics?.overdueCount ?? 0} invoices overdue`}
                         icon={FileText}
                     />
                     <MetricCard
                         title="Team Utilization"
-                        value={`${metrics?.utilization}%`}
-                        description="4 active tasks"
+                        value={`${metrics?.utilization ?? 0}%`}
+                        description={`${metrics?.activeTasksCount ?? 0} active tasks`}
                         icon={ActivityIcon}
                     />
                 </div>

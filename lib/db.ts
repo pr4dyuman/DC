@@ -1,154 +1,16 @@
 import fs from 'fs/promises';
 import path from 'path';
+import {
+    User, Client, PaymentType, PaymentConfig, ProjectServiceConfig, Project,
+    Invoice, Comment, Task, Notification, Activity, AssetType, Asset, Message,
+    TransactionType, TransactionCategory, Transaction, Service,
+    TRANSACTION_CATEGORIES, UserPermissions, DEFAULT_USER_PERMISSIONS,
+    LeaveType, LeaveStatus, LeaveRequest, Job, Settings, DB
+} from './types';
+
+export * from './types';
 
 const DB_PATH = path.join(process.cwd(), 'data', 'db.json');
-
-export type User = {
-    id: string;
-    username?: string; // New: Unique handle for URLs
-    name: string;
-    email: string;
-    role: 'admin' | 'specialist' | 'manager' | 'employee' | 'client';
-    jobTitle?: string;
-    salary?: number;
-    avatar?: string;
-    password?: string;
-    geminiApiKey?: string;
-    lastActiveAt?: string; // ISO Date string for presence
-    employmentType?: 'Salary' | 'Project Based';
-};
-export type Client = {
-    id: string;
-    username?: string; // New: Unique handle for URLs
-    name: string;
-    email: string;
-    companyName: string;
-    logo?: string;
-    phone?: string;
-    address?: string;
-    password?: string;
-    lastActiveAt?: string;
-};
-export type PaymentType = 'installment' | 'monthly';
-
-export type PaymentConfig = {
-    type: PaymentType;
-    // For Installment
-    installments?: number;
-    installmentAmount?: number; // total / installments
-    firstPaymentDate?: string;
-    installmentDates?: string[]; // New: Specific dates for each installment
-
-    // For Monthly
-    monthlyAmount?: number;
-    billingStartDate?: string;
-
-    // Common
-    paymentDetailsLater: boolean;
-};
-
-export type ProjectServiceConfig = {
-    serviceId: string; // matches Category.name or Category.id
-    name: string;
-    paymentConfig?: PaymentConfig;
-};
-
-export type Project = { id: string; slug?: string; name: string; client?: string; clientId?: string; services: string[]; serviceConfigs?: ProjectServiceConfig[]; status: 'Active' | 'Completed' | 'On Hold'; budget: number; dueDate: string; createdAt?: string; aiEnabled?: boolean };
-export type Invoice = { id: string; projectId: string; amount: number; status: 'Paid' | 'Pending' | 'Overdue' | 'Processing'; date: string };
-export type Comment = { id: string; userId: string; text: string; timestamp: string };
-export type Task = { id: string; projectId: string; title: string; description?: string; status: 'Todo' | 'In Progress' | 'Review' | 'Done'; priority?: 'Low' | 'Medium' | 'High'; assigneeId: string; dueDate: string; startDate?: string; category?: string; createdAt?: string; createdBy?: string; comments?: Comment[] };
-export type Notification = { id: string; userId: string; message: string; read: boolean; timestamp: string; link?: string };
-export type Activity = { id: string; user: string; action: string; target: string; timestamp: string };
-
-export type AssetType = 'image' | 'file' | 'code' | 'zip' | 'folder' | 'link';
-export type Asset = {
-    id: string;
-    projectId: string;
-    name: string;
-    type: AssetType;
-    url: string;
-    description?: string;
-    size?: string; // e.g. "2MB", "4KB"
-    uploadedAt: string;
-    uploadedBy: string;
-    content?: string; // For text/code files
-    aiEnabled?: boolean;
-};
-
-export type Message = {
-    id: string;
-    senderId: string;
-    receiverId: string; // Can be user ID, but for now assuming direct messages. Group chat would need 'groupId'
-    content: string;
-    timestamp: string;
-    read: boolean;
-    type: 'text' | 'image';
-};
-
-export type TransactionType = 'income' | 'expense';
-export type TransactionCategory = 'Project' | 'Salary' | 'Software' | 'Marketing' | 'Office' | 'Hosting' | 'Domain' | 'Equipment' | 'Internal Transfer' | 'Investor' | 'Other';
-
-
-export type Transaction = {
-    id: string;
-    date: string;
-    amount: number;
-    type: TransactionType;
-    category: TransactionCategory;
-    description: string;
-    status: 'completed' | 'pending';
-    projectId?: string;
-    relatedInvoiceId?: string;
-    userId?: string; // Linked user (e.g. for Salary)
-};
-
-export type LeaveType = 'Casual' | 'Emergency';
-export type LeaveStatus = 'Pending' | 'Approved' | 'Rejected';
-
-export type LeaveRequest = {
-    id: string;
-    userId: string;
-    startDate: string; // ISO Date
-    endDate: string;   // ISO Date
-    type: LeaveType;
-    reason: string;
-    status: LeaveStatus;
-    createdAt: string;
-    reviewedBy?: string; // Admin ID
-    reviewedAt?: string;
-};
-
-export type Job = { title: string; count: number };
-export type Service = { id: string; name: string; jobs: Job[] };
-export type Settings = { systemName: string; logo: string };
-export type DB = {
-    users: User[];
-    clients: Client[];
-    projects: Project[];
-    invoices: Invoice[];
-    tasks: Task[];
-    notifications: Notification[];
-    activities: Activity[];
-    services: Service[];
-    transactions: Transaction[];
-    assets: Asset[];
-    messages: Message[];
-    leaveRequests: LeaveRequest[];
-    settings: Settings;
-};
-
-export type UserPermissions = {
-    canManageTasks: boolean;
-    canMarkDone: boolean;
-    deleteAccess: 'none' | 'own' | 'any';
-};
-
-export type Settings = {
-    systemName: string;
-    logo: string;
-    userPermissions?: Record<string, UserPermissions>;
-};
-
 // Simulate network delay for "Realism"
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -202,11 +64,26 @@ export const db = {
 
                 // Migrate 'department' or 'departments' to 'services'
                 if (p.departments && !p.services) {
-                    return { ...p, services: p.departments, departments: undefined };
+                    p.services = p.departments;
+                    delete p.departments;
                 }
                 if (p.department && !p.services) {
-                    return { ...p, services: [p.department], department: undefined };
+                    p.services = [p.department];
+                    delete p.department;
                 }
+
+                // DATA INTEGRITY MIGRATION: Service Names -> Service IDs
+                if (p.services && data.services) {
+                    p.services = p.services.map((svc: string) => {
+                        // Check if it's already an ID
+                        if (data.services.some((s: Service) => s.id === svc)) return svc;
+
+                        // If not, find by Name
+                        const match = data.services.find((s: Service) => s.name === svc);
+                        return match ? match.id : svc; // Return ID if found, else keep original (legacy/unknown)
+                    });
+                }
+
                 return p;
             });
         }

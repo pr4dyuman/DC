@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useInView } from "react-intersection-observer";
 import { getNotifications } from "@/lib/actions";
 import { Loader2, Activity } from "lucide-react";
-import { Notification } from "@/lib/db";
+import { Notification } from "@/lib/types";
 
 interface ClientNotificationsListProps {
     initialNotifications: Notification[];

@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState, useMemo } from "react";
-import { User, Task, Activity } from "@/lib/db";
+import { User, Task, Activity } from "@/lib/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +26,7 @@ import { getUser, getUserTasks, getUserActivity, getUserByUsername, getUserProje
 import { EditUserDialog } from "@/components/team/EditUserDialog";
 import { useChat } from "@/context/ChatContext";
 import { getLeaveRequests } from "@/lib/actions";
-import { LeaveRequest } from "@/lib/db";
+import { LeaveRequest } from "@/lib/types";
 import { LeaveRequestDialog } from "@/components/leave-request-dialog";
 import { LeaveRequestsList } from "@/components/leave-requests-list";
 import { getUserContributionHistory } from "@/lib/actions";

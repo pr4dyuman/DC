@@ -1,6 +1,6 @@
 "use client";
 
-import { Asset } from "@/lib/db";
+import { Asset } from "@/lib/types";
 import { AssetCard } from "./AssetCard";
 import { deleteProjectAsset } from "@/lib/actions";
 import { FileQuestionIcon } from "lucide-react";

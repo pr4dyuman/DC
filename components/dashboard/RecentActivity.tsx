@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Activity } from "@/lib/db";
+import { Activity } from "@/lib/types";
 
 export function RecentActivity({ activities }: { activities: Activity[] }) {
     return (

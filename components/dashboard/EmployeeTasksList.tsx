@@ -7,7 +7,7 @@ import { useInView } from "react-intersection-observer";
 import { getUserTasks } from "@/lib/actions";
 import { Loader2, Calendar } from "lucide-react";
 import Link from 'next/link';
-import { Project } from "@/lib/db";
+import { Project } from "@/lib/types";
 
 interface Task {
     id: string;

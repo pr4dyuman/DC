@@ -1,7 +1,7 @@
 import { getTasks, getUsers, getTransactions, getServices, getProjectBySlug, getProjectAssets, getUser, getClients, getUserPermissions } from "@/lib/actions";
 import { ProjectView } from "@/components/projects/ProjectView";
 import { getSessionId } from "@/lib/auth";
-import { User } from "@/lib/db";
+import { User } from "@/lib/types";
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params;

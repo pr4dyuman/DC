@@ -1,0 +1,217 @@
+AgencyOS - Comprehensive Project Test Documentation
+===================================================
+
+This document outlines every feature, user role, and testable action within the AgencyOS application. Use this as a master checklist for QA testing (e.g., using Comet browser).
+
+> NOTE: Authentication (Login/Logout) is NOT implemented in this project.  
+> Testing should start from a pre-logged-in state. Skip all auth-related test cases.
+
+================================================================================
+1. USER ROLES & ACCOUNT TYPES
+================================================================================
+
+A. Admin (Superuser)
+   - Full access to all modules.
+   - Can manage users, settings, finances, and sensitive data.
+   - Can approve/reject leave requests and document updates.
+
+B. Manager
+   - Similar to Admin.
+   - Can manage projects and teams.
+
+C. Employee / Specialist
+   - "Worker" role.
+   - Access: Personal Dashboard, My Tasks, Team Chat, Leave Requests, Profile.
+   - Restricted from: Global Financial Stats, Client-sensitive Data.
+
+D. Client
+   - External user.
+   - Access: Client Dashboard, My Projects, My Invoices, Notifications.
+   - Restricted from: Internal team data, internal chat (only with assigned reps).
+
+================================================================================
+2. FEATURE MODULES & TESTABLE ACTIONS
+================================================================================
+
+### I. DASHBOARD (Role-Specific)
+1. Admin/Manager Dashboard
+   - Widgets: Revenue Chart, Growth %, Active Projects, Pending Invoices, Team Utilization.
+   - Action: Verify all widgets load data correctly.
+   - Action: Click "Recent Activity" items to navigate.
+
+2. Employee Dashboard
+   - Features: "My Tasks" (Urgent/Recent), Activity Feed.
+   - Action: Verify task counts match assigned tasks.
+
+3. Client Dashboard
+   - Features: Active Projects, Unpaid Invoices, Notifications.
+   - Action: Verify NO internal data is visible.
+
+---
+
+### II. GLOBAL SEARCH (Topbar)
+   - Location: Top navigation bar.
+   - Action: Type at least 2 characters to trigger search.
+   - Searches: Projects, Tasks, Users, Clients.
+   - Action: Click a result to navigate to that entity.
+   - Test: Verify results update in real-time (debounced).
+
+---
+
+### III. NOTIFICATIONS (Topbar)
+   - Location: Bell icon in top bar.
+   - Features:
+     - Unread count badge.
+     - Click notification to mark as read.
+     - Auto-clears after 24 hours.
+   - Action: Click notification with link to navigate.
+
+---
+
+### IV. PROJECT MANAGEMENT
+1. Create Project Wizard (Admin/Manager Only)
+   - Step 1: Project Name, Slug (auto-gen), Client, Budget, Due Date.
+   - Step 2: Service Selection (multi-select).
+   - Step 3: Payment Config (Installments vs Monthly, dates).
+   - Step 4: Review & Create.
+
+2. Project List Page
+   - Action: Search/filter by name or status.
+   - Action: Click project card to view details.
+
+3. Project Details Page
+   - Tabs: Overview, Kanban, List, Table, Timeline, Finance, Assets, Settings.
+   - **Kanban Board**:
+     - Action: Drag cards between columns.
+     - Action: Click task for details.
+   - **Finance Tab**:
+     - Displays: Total Value, Paid, Remaining.
+   - **Assets Tab**:
+     - Action: Add Link or File asset.
+     - Action: Toggle "Use for AI".
+     - Action: View/Delete asset.
+   - **Settings Tab**:
+     - Action: Archive/Delete project (Admin only).
+
+---
+
+### V. TASK MANAGEMENT (& AI ASSISTANT)
+1. Create Task Modal
+   - Fields: Title, Category (Service), Assignee, Due Date, Description.
+   - **AI Assistant Panel**:
+     - Action: Click "AI Assistant" to open chat.
+     - Action: Ask AI to draft/refine description.
+     - Action: Click "Apply to Task" to use AI output.
+
+2. View Task Modal
+   - Displays: Title, Status, Assignee, Due Date, Description, Comments.
+   - **Comments Section**:
+     - Action: Add new comment.
+     - Action: View existing comments.
+
+3. Edit Task Modal
+   - Action: Change status, assignee, description.
+   - Action: Delete task (permission-based).
+
+---
+
+### VI. TEAM & HR
+1. Team Directory
+   - Card grid of employees.
+   - Action: Click card to view profile.
+
+2. User Profile Page
+   - **Documents**:
+     - Action: Upload IDs (Aadhar/PAN), Contracts.
+     - Non-admin uploads go to "Pending" state.
+   - **Contribution Heatmap**:
+     - Displays tasks completed per day.
+   - **Work Stats**:
+     - Efficiency, On-Time Completion rates.
+
+3. Leave Requests
+   - **Employee**: Click "Request Leave" -> Fill form (Casual/Emergency, dates, reason).
+   - **Admin/Manager**: View pending requests, Approve/Reject.
+
+4. Profile Quick Edit Modal (Topbar)
+   - Access: Click avatar in topbar -> "Edit Profile".
+   - Action: Update name, email, password.
+
+---
+
+### VII. COMMUNICATION (CHAT)
+1. Messenger Overlay
+   - Access: "Messages" in sidebar.
+   - **Contacts List**:
+     - Online status (green dot).
+     - Last message preview.
+     - Unread count badge.
+   - **1-on-1 Chat**:
+     - Action: Send text message.
+     - Action: Send image.
+     - Read receipts visible.
+
+---
+
+### VIII. FINANCE MODULE
+1. Transactions
+   - Action: Add Income/Expense.
+   - Categories: Project, Salary, Software, Hosting, Rent, Transfer, etc.
+   - Validate: "Project" category requires project selection.
+
+2. Invoices
+   - Action: Create invoice (Client, Items, Tax).
+   - Action: Mark as Paid/Sent.
+   - View: Client sees only their invoices.
+
+3. Payroll
+   - Action: Admin runs payroll for month.
+
+4. Total Balance
+   - Hidden by default, toggle visibility.
+
+---
+
+### IX. CLIENT MANAGEMENT
+1. Client List
+   - Action: Add new client.
+   - Action: Click to view profile.
+
+2. Client Profile
+   - View associated Projects & Invoices.
+   - Action: Edit client details.
+
+---
+
+### X. SETTINGS & PERMISSIONS
+1. User Permissions (Per User)
+   - Toggles:
+     - Can Manage Tasks
+     - Can Mark Done
+     - Can Create Projects
+     - Can Use AI
+   - Delete Access: Own / Any / None.
+   - Test: Disable a permission and verify it's enforced.
+
+2. System Settings
+   - Update: System Name, Logo.
+   - Manage Services: Add/Edit/Delete.
+
+================================================================================
+3. QA SMOKE TEST CHECKLIST
+================================================================================
+1. [ ] Start in pre-logged state as Admin.
+2. [ ] Create new Client ("Test Client Corp").
+3. [ ] Create new Project via Wizard.
+   - [ ] Add 2 services, set budget.
+4. [ ] Go to Project -> Add Task.
+   - [ ] Use AI Assistant.
+5. [ ] Go to Team -> Request Leave.
+6. [ ] Approve leave request.
+7. [ ] Go to Finance -> Add Income linked to Project.
+8. [ ] Check Project Finance Tab -> Verify "Paid" updated.
+9. [ ] Open Chat -> Send message.
+10. [ ] Use Global Search -> Search for created project.
+11. [ ] Test as Client role:
+    - [ ] Verify only "My Projects" and "My Invoices" visible.
+    - [ ] Verify internal finance data hidden.

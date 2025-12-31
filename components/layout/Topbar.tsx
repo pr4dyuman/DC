@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, Search, Settings, LogOut, User as UserIcon, Loader2, Check, X, FileText, Briefcase, Users } from "lucide-react";
 import { MobileSidebar } from "./MobileSidebar";
-import { User, Notification } from "@/lib/db";
+import { User, Notification } from "@/lib/types";
 import { ProfileModal } from "./ProfileModal";
 import { getUsers, getNotifications, globalSearch, markNotificationAsRead, SearchResult } from "@/lib/actions";
 import {

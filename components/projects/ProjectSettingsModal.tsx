@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Settings, ShieldAlert, Plus, Users, Mail, Phone, Pencil, Sparkles, Lock, Check, FileText, Code, ImageIcon, FileJson, X } from "lucide-react";
 import { getClients, createClient, updateProject, deleteProject, getProjectAssets, toggleAssetAI, updateUser, getUsers, getProject } from "@/lib/actions";
-import { Client, Asset } from "@/lib/db";
+import { Client, Asset } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
