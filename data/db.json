@@ -8,7 +8,7 @@
       "jobTitle": "CEO",
       "salary": 120000,
       "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Pradyuman",
-      "lastActiveAt": "2025-12-21T07:01:26.695Z",
+      "lastActiveAt": "2025-12-22T08:02:45.395Z",
       "username": "pradyumansharma"
     },
     {
@@ -31,7 +31,7 @@
       "companyName": "film stage",
       "password": "",
       "id": "fh3eczvpc",
-      "lastActiveAt": "2025-12-20T21:46:13.817Z",
+      "lastActiveAt": "2025-12-22T07:06:18.539Z",
       "username": "shobhit1",
       "role": "client",
       "jobTitle": "film stage",
@@ -114,7 +114,7 @@
       "projectId": "cf50z7tpp",
       "title": "1st task",
       "description": "do nothing",
-      "status": "Todo",
+      "status": "Done",
       "assigneeId": "u4",
       "category": "Web Development",
       "dueDate": "2025-12-27T00:47",
@@ -126,7 +126,7 @@
       "projectId": "cf50z7tpp",
       "title": "do somthing",
       "description": "whatever you want",
-      "status": "Todo",
+      "status": "Done",
       "assigneeId": "u4",
       "category": "Web Development",
       "dueDate": "2025-12-22T02:31",
@@ -138,7 +138,7 @@
       "projectId": "cf50z7tpp",
       "title": "jine mera dill lutia",
       "description": "oho oho oho",
-      "status": "Todo",
+      "status": "Done",
       "assigneeId": "u4",
       "category": "Web Development",
       "dueDate": "2025-12-28T02:40",
@@ -170,89 +170,43 @@
     }
   ],
   "invoices": [],
-  "notifications": [
-    {
-      "id": "0.1808921093951057",
-      "userId": "u4",
-      "message": "Your leave request for 31/12/2025 has been Rejected",
-      "read": true,
-      "timestamp": "2025-12-20T21:48:03.193Z",
-      "link": "/dashboard/team/emilychen?tab=leaves"
-    },
-    {
-      "id": "0.37684346044509387",
-      "userId": "u1",
-      "message": "New Leave Request from Emily Chen: Emergency (31/12/2025 - 31/12/2025)",
-      "read": true,
-      "timestamp": "2025-12-20T21:45:53.244Z",
-      "link": "/dashboard/team"
-    },
-    {
-      "id": "0.7563105657866735",
-      "userId": "u4",
-      "message": "New task assigned: jine mera dill lutia",
-      "read": false,
-      "timestamp": "2025-12-20T21:10:19.483Z",
-      "link": "/dashboard/projects/cf50z7tpp?task=j53z5ib8h"
-    },
-    {
-      "id": "0.7356141876071622",
-      "userId": "u4",
-      "message": "New task assigned: do somthing",
-      "read": false,
-      "timestamp": "2025-12-20T21:01:59.041Z",
-      "link": "/dashboard/projects/cf50z7tpp?task=qgjpwjzw6"
-    },
-    {
-      "id": "0.060160750183547274",
-      "userId": "u4",
-      "message": "Your leave request for 21/12/2025 has been Approved",
-      "read": false,
-      "timestamp": "2025-12-20T20:53:10.334Z",
-      "link": "/dashboard/team/emilychen?tab=leaves"
-    },
-    {
-      "id": "0.014295820264484282",
-      "userId": "u4",
-      "message": "Your leave request for 21/12/2025 has been Approved",
-      "read": false,
-      "timestamp": "2025-12-20T20:53:08.630Z",
-      "link": "/dashboard/team/emilychen?tab=leaves"
-    },
-    {
-      "id": "0.9982213485034344",
-      "userId": "u4",
-      "message": "Your leave request for 21/12/2025 has been Approved",
-      "read": false,
-      "timestamp": "2025-12-20T20:53:06.125Z",
-      "link": "/dashboard/team/emilychen?tab=leaves"
-    },
-    {
-      "id": "0.17768830962502435",
-      "userId": "u1",
-      "message": "New Leave Request from Emily Chen: Emergency (21/12/2025 - 21/12/2025)",
-      "read": true,
-      "timestamp": "2025-12-20T20:47:04.229Z",
-      "link": "/dashboard/team"
-    },
-    {
-      "id": "0.04700209301433267",
-      "userId": "u4",
-      "message": "Your leave request for 23/12/2025 has been Approved",
-      "read": true,
-      "timestamp": "2025-12-20T20:34:11.243Z",
-      "link": "/dashboard/team"
-    },
-    {
-      "id": "0.08247803087385908",
-      "userId": "admin",
-      "message": "New Leave Request from Emily Chen: Casual",
-      "read": false,
-      "timestamp": "2025-12-20T10:44:46.132Z",
-      "link": "/dashboard/team"
-    }
-  ],
+  "notifications": [],
   "activities": [
+    {
+      "id": "0.0538257413823493",
+      "user": "shobhit sharma",
+      "action": "moved task to Done",
+      "target": "jine mera dill lutia",
+      "timestamp": "2025-12-22T07:04:57.408Z"
+    },
+    {
+      "id": "0.3017269691050739",
+      "user": "shobhit sharma",
+      "action": "moved task to Done",
+      "target": "do somthing",
+      "timestamp": "2025-12-22T07:04:54.372Z"
+    },
+    {
+      "id": "0.29516176005108674",
+      "user": "shobhit sharma",
+      "action": "moved task to Done",
+      "target": "1st task",
+      "timestamp": "2025-12-22T07:04:51.581Z"
+    },
+    {
+      "id": "0.2612623836585819",
+      "user": "shobhit sharma",
+      "action": "moved task to Review",
+      "target": "1st task",
+      "timestamp": "2025-12-22T07:04:50.661Z"
+    },
+    {
+      "id": "0.2669193352161052",
+      "user": "shobhit sharma",
+      "action": "moved task to In Progress",
+      "target": "1st task",
+      "timestamp": "2025-12-22T07:04:49.472Z"
+    },
     {
       "id": "0.43013705592300266",
       "user": "Emily Chen",

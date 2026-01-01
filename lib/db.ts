@@ -23,6 +23,7 @@ export type Client = {
     email: string;
     companyName: string;
     logo?: string;
+    avatar?: string;
     phone?: string;
     address?: string;
     password?: string;
@@ -119,7 +120,11 @@ export type LeaveRequest = {
 
 export type Job = { title: string; count: number };
 export type Service = { id: string; name: string; jobs: Job[] };
-export type Settings = { systemName: string; logo: string };
+export type Settings = {
+    systemName: string;
+    logo: string;
+    userPermissions?: Record<string, UserPermissions>;
+};
 export type DB = {
     users: User[];
     clients: Client[];
@@ -133,6 +138,7 @@ export type DB = {
     assets: Asset[];
     messages: Message[];
     leaveRequests: LeaveRequest[];
+
     settings: Settings;
 };
 
@@ -142,11 +148,7 @@ export type UserPermissions = {
     deleteAccess: 'none' | 'own' | 'any';
 };
 
-export type Settings = {
-    systemName: string;
-    logo: string;
-    userPermissions?: Record<string, UserPermissions>;
-};
+
 
 // Simulate network delay for "Realism"
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));

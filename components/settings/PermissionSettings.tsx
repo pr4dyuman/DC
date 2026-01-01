@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { User, UserPermissions } from '@/lib/db';
-import { getUsers, getUserPermissions, updateUserPermissions, getClients, Client } from '@/lib/actions';
+import { User, UserPermissions, Client } from '@/lib/db';
+import { getUsers, getUserPermissions, updateUserPermissions, getClients } from '@/lib/actions';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // --- Icons (Lucide) ---

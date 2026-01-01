@@ -38,9 +38,10 @@ interface ViewTaskModalProps {
     users?: any[];
     readOnly?: boolean;
     permissions?: any; // UserPermissions
+    currentUserId?: string;
 }
 
-export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnly, permissions }: ViewTaskModalProps) {
+export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnly, permissions, currentUserId }: ViewTaskModalProps) {
     const assignee = users.find(u => u.id === task.assigneeId);
     const [commentText, setCommentText] = useState("");
     const [isPending, startTransition] = useTransition();

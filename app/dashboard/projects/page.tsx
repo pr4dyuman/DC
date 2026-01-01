@@ -20,9 +20,7 @@ export default function ProjectsPage() {
 
     const [showWizard, setShowWizard] = useState(false);
 
-    useEffect(() => {
-        loadData();
-    }, []);
+
 
     const loadData = async () => {
         // Project service doesn't need categories in this view anymore if wizard handles it, 
@@ -33,6 +31,10 @@ export default function ProjectsPage() {
         setCurrentUser(u);
         setLoading(false);
     };
+
+    useEffect(() => {
+        loadData();
+    }, []);
 
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager';
 

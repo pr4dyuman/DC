@@ -214,7 +214,7 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                         setViewTaskId(null);
                     }}
                     users={users}
-                    users={users}
+
                     readOnly={readOnly}
                     permissions={permissions}
                     currentUserId={currentUserId}

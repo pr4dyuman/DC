@@ -5,7 +5,24 @@ import { revalidatePath } from "next/cache";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import { getSessionId } from "./auth";
+import { cookies } from "next/headers";
 export { getSessionId };
+
+export async function login(email: string, password: string) {
+    const data = await db.get();
+    let user: User | Client | undefined = data.users.find(u => u.email === email && u.password === password);
+    if (!user) {
+        user = data.clients?.find(c => c.email === email && c.password === password);
+    }
+
+    if (!user) {
+        return { success: false, error: "Invalid credentials" };
+    }
+
+    const cookieStore = await cookies();
+    cookieStore.set("userId", user.id);
+    return { success: true, user };
+}
 
 export type SearchResult = {
     id: string;

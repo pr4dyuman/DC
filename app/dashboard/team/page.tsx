@@ -22,9 +22,7 @@ export default function TeamPage() {
     // Form State
     const [editingUser, setEditingUser] = useState<User | null>(null);
 
-    useEffect(() => {
-        loadData();
-    }, []);
+
 
     const loadData = async () => {
         const data = await getUsers();
@@ -55,6 +53,10 @@ export default function TeamPage() {
 
         setLoading(false);
     };
+
+    useEffect(() => {
+        loadData();
+    }, []);
 
     const handleOpenDialog = (user?: any) => {
         setEditingUser(user || null);
