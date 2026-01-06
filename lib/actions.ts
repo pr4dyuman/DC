@@ -6,6 +6,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import { getSessionId } from "./auth";
 import { cookies } from "next/headers";
+import { generateId, resolveUserOrClient } from "./utils-server";
 export { getSessionId };
 
 export async function login(email: string, password: string) {
@@ -40,27 +41,83 @@ export async function getCurrentUser() {
 
 export async function getDashboardMetrics() {
     const data = await db.get();
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth(); // 0-11
 
-    const totalRevenue = data.invoices
-        .filter(i => i.status === 'Paid')
+    // 1. Revenue & Growth - Use TRANSACTIONS (not invoices) for consistency
+    const allTransactions = data.transactions || [];
+    
+    // Total Revenue = All completed income transactions (client payments) - Refunds
+    const incomeTransactions = allTransactions.filter(t => t.type === 'income' && t.status === 'completed');
+    const totalIncome = incomeTransactions.reduce((acc, curr) => acc + curr.amount, 0);
+    
+    // Subtract refunds from revenue
+    const refundTransactions = allTransactions.filter(t => t.category === 'Refund' && t.status === 'completed');
+    const totalRefunds = refundTransactions.reduce((acc, curr) => acc + curr.amount, 0);
+    
+    const totalRevenue = totalIncome - totalRefunds;
+
+    // Calculate generic "Growth" (Current Month vs Previous Month)
+    const currentMonthRevenue = incomeTransactions
+        .filter(t => {
+            const d = new Date(t.date);
+            return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+        })
         .reduce((acc, curr) => acc + curr.amount, 0);
 
-    const pendingInvoices = data.invoices
-        .filter(i => i.status === 'Pending')
+    const prevMonthDate = new Date();
+    prevMonthDate.setMonth(currentMonth - 1);
+    const prevMonth = prevMonthDate.getMonth();
+    const prevMonthYear = prevMonthDate.getFullYear();
+
+    const prevMonthRevenue = incomeTransactions
+        .filter(t => {
+            const d = new Date(t.date);
+            return d.getFullYear() === prevMonthYear && d.getMonth() === prevMonth;
+        })
         .reduce((acc, curr) => acc + curr.amount, 0);
 
-    const activeProjects = data.projects.filter(p => p.status === 'Active').length;
+    let growthPercentage = 0;
+    if (prevMonthRevenue > 0) {
+        growthPercentage = Math.round(((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100);
+    } else if (currentMonthRevenue > 0) {
+        growthPercentage = 100; // 100% growth if started from 0
+    }
 
-    // Mock utilization calculation
+    // 2. Pending Invoices & Overdue
+    const pendingInvoicesList = data.invoices.filter(i => i.status === 'Pending' || i.status === 'Overdue' || i.status === 'Processing');
+    const pendingInvoicesAmount = pendingInvoicesList.reduce((acc, curr) => acc + curr.amount, 0);
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const overdueCount = pendingInvoicesList.filter(i => (i.date < todayStr && i.status !== 'Paid') || i.status === 'Overdue').length;
+
+    // 3. Active Projects & High Priority
+    const activeProjectsList = data.projects.filter(p => p.status === 'Active');
+    const activeProjects = activeProjectsList.length;
+
+    // Deduce "High Priority" projects as those with "High" priority active tasks.
+    const activeProjectIds = new Set(activeProjectsList.map(p => p.id));
+    const highPriorityTaskProjects = new Set(
+        data.tasks
+            .filter(t => t.status !== 'Done' && t.priority === 'High' && activeProjectIds.has(t.projectId))
+            .map(t => t.projectId)
+    );
+    const highPriorityCount = highPriorityTaskProjects.size;
+
+    // 4. Team Utilization
     const totalTasks = data.tasks.length;
     const activeTasks = data.tasks.filter(t => t.status === 'In Progress').length;
     const utilization = totalTasks > 0 ? Math.round((activeTasks / totalTasks) * 100) : 0;
 
     return {
         revenue: totalRevenue,
-        pending: pendingInvoices,
+        growth: growthPercentage,
+        pending: pendingInvoicesAmount,
+        overdueCount: overdueCount,
         activeProjects,
-        utilization
+        highPriorityCount,
+        utilization,
+        activeTasksCount: activeTasks
     };
 }
 
@@ -108,20 +165,23 @@ export async function getProjectDistribution() {
 
     data.projects.forEach(p => {
         p.services.forEach(svc => {
-            distribution[svc] = (distribution[svc] || 0) + 1;
+            // Resolve ID to Name for display
+            const serviceObj = data.services.find(s => s.id === svc || s.name === svc);
+            const name = serviceObj ? serviceObj.name : svc;
+            distribution[name] = (distribution[name] || 0) + 1;
         });
     });
 
     return Object.entries(distribution).map(([name, value]) => ({ name, value }));
 }
 
-export async function getRecentActivity(): Promise<Activity[]> {
+export async function getRecentActivity(offset = 0, limit = 5): Promise<Activity[]> {
     const data = await db.get();
-    return data.activities.slice(0, 5); // Return last 5
+    return data.activities.slice(offset, offset + limit);
 }
 
 // Auto-clear notifications older than 24 hours
-export async function getNotifications(userId: string): Promise<Notification[]> {
+export async function getNotifications(userId: string, offset = 0, limit = 1000): Promise<Notification[]> {
     const data = await db.get();
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
@@ -136,10 +196,10 @@ export async function getNotifications(userId: string): Promise<Notification[]> 
         }));
     }
 
-    return validNotifications.filter(n => n.userId === userId);
+    return validNotifications.filter(n => n.userId === userId).slice(offset, offset + limit);
 }
 
-export async function getProjects() {
+export async function getProjects(offset = 0, limit = 1000) {
     const data = await db.get();
     const currentUserId = await getSessionId();
     if (!currentUserId) return []; // Require auth
@@ -147,10 +207,10 @@ export async function getProjects() {
     const currentUser = await getUser(currentUserId);
     if (currentUser?.role === 'client') {
         // STRICT: Only return projects owned by this client
-        return data.projects.filter(p => p.clientId === currentUserId);
+        return data.projects.filter(p => p.clientId === currentUserId).slice(offset, offset + limit);
     }
 
-    return data.projects;
+    return data.projects.slice(offset, offset + limit);
 }
 
 export async function getUserProjects(userId: string) {
@@ -212,118 +272,70 @@ export async function getUsers() {
 }
 
 export async function getUser(id: string) {
-    const data = await db.get();
+    // 1. Resolve User
+    const targetUser = await resolveUserOrClient(id);
+    if (!targetUser) return undefined;
 
-    // 1. Check Standard Users
-    const targetUser = data.users.find(u => u.id === id);
-    if (targetUser) {
-        const currentUserId = await getSessionId();
-        // Prevent infinite recursion if called from within getUser (unlikely but safe)
-        // Access Check
-        if (!currentUserId) return undefined; // Should satisfy middleware eventually
+    // 2. Access Control
+    const currentUserId = await getSessionId();
+    if (!currentUserId) return undefined; // Require auth
 
-        // Use raw data for role check to avoid recursion
-        const rawCurrentUser = data.users.find(u => u.id === currentUserId) ||
-            (data.clients && data.clients.find(c => c.id === currentUserId) ? { role: 'client' } as User : null);
+    const currentUser = await resolveUserOrClient(currentUserId);
+    const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
 
-        const isAdmin = rawCurrentUser && (rawCurrentUser.role === 'admin' || rawCurrentUser.role === 'manager');
-
-        if (isAdmin || currentUserId === id) {
-            return targetUser;
-        }
-
-        // Redact
-        const { salary, ...redacted } = targetUser;
-        return redacted as User;
+    if (isAdmin || currentUserId === id) {
+        return targetUser;
     }
 
-    // 2. Check Clients (Treat as User with role 'client')
-    if (data.clients) {
-        const targetClient = data.clients.find(c => c.id === id);
-        if (targetClient) {
-            const clientAsUser: User = {
-                id: targetClient.id,
-                name: targetClient.name, // Link person name
-                email: targetClient.email,
-                role: 'client' as any, // Cast to match User role type
-                jobTitle: targetClient.companyName, // Reuse field
-                avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${targetClient.companyName}`,
-                lastActiveAt: targetClient.lastActiveAt,
-                username: targetClient.username || targetClient.id
-            };
-            return clientAsUser;
-        }
-    }
-
-    return undefined;
+    // 3. Redact
+    const { salary, ...redacted } = targetUser;
+    return redacted as User;
 }
 
 
 export async function getUserByUsername(username: string) {
-    const data = await db.get();
-
-    // 1. Try finding by username in Users
-    let user = data.users.find(u => u.username === username);
-
-    // 2. If not found, try finding by ID in Users (Fallback)
-    if (!user) {
-        user = data.users.find(u => u.id === username);
-    }
-
-    // 3. If still not found, check Clients (by ID or potential future username)
-    if (!user && data.clients) {
-        const client = data.clients.find(c => c.id === username || (c as any).username === username);
-        if (client) {
-            // Adapt Client to User type
-            user = {
-                id: client.id,
-                name: client.name,
-                email: client.email,
-                role: 'client' as any,
-                jobTitle: client.companyName,
-                avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${client.companyName}`,
-                lastActiveAt: client.lastActiveAt,
-                username: client.username || client.id
-            } as User;
-        }
-    }
-
+    // 1. Resolve
+    const user = await resolveUserOrClient(username);
     if (!user) return undefined;
 
-    // Access control:
+    // 2. Access Control
     const currentUserId = await getSessionId();
     if (!currentUserId) return undefined; // Require auth
 
-    // Allow viewing public profile info of anyone? Yes, usually.
-    // Redact sensitive info
-    const { salary, password, ...redacted } = user;
-
-    // If Admin or Self, show full (but this needs logic). 
-    // For now, let's just return redacted unless we verify identity.
     const currentUser = await getUser(currentUserId);
     if (currentUser?.role === 'admin' || currentUser?.role === 'manager' || currentUser?.id === user.id) {
         return user;
     }
 
+    // 3. Redact
+    const { salary, password, ...redacted } = user;
     return redacted as User;
 }
 
-export async function getUserTasks(userId: string) {
+export async function getUserTasks(userId: string, offset = 0, limit = 1000) {
     const data = await db.get();
     // Create a set of valid project IDs for O(1) lookup
     const validProjectIds = new Set(data.projects.map(p => p.id));
 
-    return data.tasks.filter(t => t.assigneeId === userId && validProjectIds.has(t.projectId));
+    return data.tasks
+        .filter(t => t.assigneeId === userId && validProjectIds.has(t.projectId))
+        .slice(offset, offset + limit);
 }
 
 // For Client Profile: Get projects they OWN
 export async function getClientProjects(clientId: string) {
     const data = await db.get();
     // Match by clientId OR client name (legacy)
-    const client = data.clients.find(c => c.id === clientId) || data.users.find(u => u.id === clientId);
+    const client = await resolveUserOrClient(clientId);
     const clientName = client ? client.name : null;
 
     return data.projects.filter(p => p.clientId === clientId || (clientName && p.client === clientName));
+}
+
+export async function getProjectTasks(projectIds: string[]) {
+    const data = await db.get();
+    const idSet = new Set(projectIds);
+    return data.tasks.filter(t => idSet.has(t.projectId));
 }
 
 // For Client Profile: Get tasks they CREATED (Assigned to others)
@@ -377,7 +389,7 @@ export async function createUser(user: Omit<User, "id">) {
         counter++;
     }
 
-    const newUser = { ...user, id: Math.random().toString(36).substr(2, 9), username: uniqueUsername };
+    const newUser = { ...user, id: generateId(), username: uniqueUsername };
     if (!newUser.avatar) {
         newUser.avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${newUser.name}`;
     }
@@ -425,25 +437,211 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
         }
     }
 
+    // Approval Logic for Documents
+    let finalUpdates = { ...updates };
+    let notifyAdmin = false;
+
+
+    if (!isAdmin && (updates.adharCardImage || updates.panCardImage || updates.contracts || updates.otherDocuments)) {
+        // Move doc updates to pending fields
+        if (updates.adharCardImage) {
+            finalUpdates.pendingAdharCardImage = updates.adharCardImage;
+            delete finalUpdates.adharCardImage;
+        }
+        if (updates.panCardImage) {
+            finalUpdates.pendingPanCardImage = updates.panCardImage;
+            delete finalUpdates.panCardImage;
+        }
+        if (updates.contracts) {
+            finalUpdates.pendingContracts = updates.contracts;
+            delete finalUpdates.contracts;
+        }
+        if (updates.otherDocuments) {
+            finalUpdates.pendingOtherDocuments = updates.otherDocuments;
+            delete finalUpdates.otherDocuments;
+        }
+        notifyAdmin = true;
+    }
+
     await db.update((data) => {
+        let newData = { ...data };
+
         // Try updating in Users
-        const userExists = data.users.some(u => u.id === id);
+        const userExists = newData.users.some(u => u.id === id);
         if (userExists) {
-            return {
-                ...data,
-                users: data.users.map(u => u.id === id ? { ...u, ...updates } : u)
-            };
+            newData.users = newData.users.map(u => u.id === id ? { ...u, ...finalUpdates } : u);
+        } else if (newData.clients && newData.clients.some(c => c.id === id)) {
+            // Try updating in Clients
+            newData.clients = newData.clients.map(c => c.id === id ? { ...c, ...finalUpdates as Partial<Client> } : c);
+        } else {
+            return data; // No user/client found
         }
 
-        // Try updating in Clients
-        if (data.clients && data.clients.some(c => c.id === id)) {
-            return {
-                ...data,
-                clients: data.clients.map(c => c.id === id ? { ...c, ...updates } : c)
-            };
+        // Notify Admins
+        if (notifyAdmin) {
+            const adminUsers = newData.users.filter(u => u.role === 'admin' || u.role === 'manager');
+            const newNotifications = adminUsers.map(admin => ({
+                id: generateId(),
+                userId: admin.id,
+                message: `${currentUser.name} has requested to update their identity documents.`,
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: `/dashboard/team?edit=${id}` // Link to open edit dialog (needs implementation on page)
+            }));
+            newData.notifications = [...newData.notifications, ...newNotifications];
         }
 
-        return data;
+        return newData;
+    });
+    revalidatePath('/dashboard/team');
+}
+
+export async function deleteClient(id: string) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== 'admin') {
+        throw new Error("Unauthorized");
+    }
+
+    await db.update((data) => {
+        // Find the client
+        const client = data.clients.find(c => c.id === id);
+        if (!client) {
+            throw new Error("Client not found");
+        }
+
+        // IMPORTANT: Do NOT delete financial data (projects, invoices, transactions)
+        // These must be preserved for:
+        // 1. Accounting records
+        // 2. Tax compliance
+        // 3. Historical reporting
+        // 4. Revenue calculations
+
+        // Instead of deleting, mark client as "archived"
+        // This preserves all financial data while hiding client from active lists
+        
+        return {
+            ...data,
+            clients: data.clients.map(c => 
+                c.id === id 
+                    ? { ...c, archived: true, archivedAt: new Date().toISOString() }
+                    : c
+            ),
+            // Keep ALL financial data intact:
+            // - projects (with clientId reference)
+            // - invoices (linked to projects)
+            // - transactions (linked to projects)
+            // - tasks (linked to projects)
+            // - assets (linked to projects)
+            // - notifications (user history)
+            // - activities (audit trail)
+        };
+    });
+
+    revalidatePath('/dashboard/clients');
+}
+
+export async function getArchivedClients() {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== 'admin') {
+        throw new Error("Unauthorized");
+    }
+
+    const data = await db.get();
+    // Return only archived clients
+    return data.clients.filter(c => c.archived === true);
+}
+
+export async function unarchiveClient(id: string) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== 'admin') {
+        throw new Error("Unauthorized");
+    }
+
+    await db.update((data) => {
+        // Find the archived client
+        const client = data.clients.find(c => c.id === id);
+        if (!client) {
+            throw new Error("Client not found");
+        }
+        if (!client.archived) {
+            throw new Error("Client is not archived");
+        }
+
+        return {
+            ...data,
+            clients: data.clients.map(c => 
+                c.id === id 
+                    ? { ...c, archived: false, archivedAt: undefined }
+                    : c
+            )
+        };
+    });
+
+    revalidatePath('/dashboard/clients');
+}
+
+export async function approveDocumentUpdate(userId: string, type: 'adhar' | 'pan' | 'contracts' | 'other' | 'both', approve: boolean) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+        throw new Error("Unauthorized");
+    }
+
+    await db.update(data => {
+        const user = data.users.find(u => u.id === userId);
+        if (!user) return data;
+
+        let updates: any = {};
+        if (approve) {
+            if (type === 'adhar' || type === 'both') {
+                if (user.pendingAdharCardImage) {
+                    updates.adharCardImage = user.pendingAdharCardImage;
+                    updates.pendingAdharCardImage = undefined;
+                }
+            }
+            if (type === 'pan' || type === 'both') {
+                if (user.pendingPanCardImage) {
+                    updates.panCardImage = user.pendingPanCardImage;
+                    updates.pendingPanCardImage = undefined;
+                }
+            }
+            if (type === 'contracts') {
+                if (user.pendingContracts) {
+                    updates.contracts = user.pendingContracts;
+                    updates.pendingContracts = undefined;
+                }
+            }
+            if (type === 'other') {
+                if (user.pendingOtherDocuments) {
+                    updates.otherDocuments = user.pendingOtherDocuments;
+                    updates.pendingOtherDocuments = undefined;
+                }
+            }
+        } else {
+            // Reject - just clear pending
+            if (type === 'adhar' || type === 'both') updates.pendingAdharCardImage = undefined;
+            if (type === 'pan' || type === 'both') updates.pendingPanCardImage = undefined;
+            if (type === 'contracts') updates.pendingContracts = undefined;
+            if (type === 'other') updates.pendingOtherDocuments = undefined;
+        }
+
+        // Notify User
+        const message = approve
+            ? `Your document update request for ${type === 'both' ? 'documents' : type.toUpperCase()} has been APPROVED.`
+            : `Your document update request for ${type === 'both' ? 'documents' : type.toUpperCase()} has been REJECTED.`;
+
+        const notification = {
+            id: generateId(),
+            userId: userId,
+            message: message,
+            read: false,
+            timestamp: new Date().toISOString()
+        };
+
+        return {
+            ...data,
+            users: data.users.map(u => u.id === userId ? { ...u, ...updates } : u),
+            notifications: [...data.notifications, notification]
+        };
     });
     revalidatePath('/dashboard/team');
 }
@@ -474,7 +672,7 @@ export async function getServices() {
 }
 
 export async function addService(name: string, jobs: { title: string; count: number }[]) {
-    const newService = { id: Math.random().toString(36).substr(2, 9), name, jobs };
+    const newService = { id: generateId(), name, jobs };
     await db.update((data) => ({
         ...data,
         services: [...data.services, newService]
@@ -495,11 +693,15 @@ export async function deleteService(id: string) {
 
         // Remove from all projects
         const newProjects = data.projects.map(p => {
-            if (p.services && serviceName && p.services.includes(serviceName)) {
-                return {
-                    ...p,
-                    services: p.services.filter(s => s !== serviceName)
-                };
+            if (p.services) {
+                // Filter out both ID and Name (for robustness during migration)
+                const newProjectServices = p.services.filter(s => s !== id && s !== serviceName);
+                if (newProjectServices.length !== p.services.length) {
+                    return {
+                        ...p,
+                        services: newProjectServices
+                    };
+                }
             }
             return p;
         });
@@ -544,20 +746,90 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
         counter++;
     }
 
-    const newProject: Project = { ...project, id: Math.random().toString(36).substr(2, 9), slug: uniqueSlug, status: "Active", createdAt: new Date().toISOString() };
-    // Helper: auto-fill client name if ID provided but name missing? 
-    // Actually we trust the input `client` field as "Client Name" for display or "Unknown".
+    const newProject: Project = { ...project, id: generateId(), slug: uniqueSlug, status: "Active", createdAt: new Date().toISOString() };
+    
+    // Generate invoices for installment/monthly payments
+    const newInvoices: Invoice[] = [];
+    
+    // Check if project has service configs with payment configuration
+    if (project.serviceConfigs && project.serviceConfigs.length > 0) {
+        const totalServices = project.serviceConfigs.length;
+        
+        for (const serviceConfig of project.serviceConfigs) {
+            const paymentConfig = serviceConfig.paymentConfig;
+            
+            if (!paymentConfig) continue;
+            
+            if (paymentConfig.type === 'installment') {
+                // For installment payments
+                if (paymentConfig.installmentDates && paymentConfig.installmentDates.length > 0) {
+                    const amountPerInstallment = paymentConfig.installmentAmount || 
+                        (project.budget / totalServices / paymentConfig.installmentDates.length);
+                    
+                    // Create an invoice for each installment date
+                    for (const installmentDate of paymentConfig.installmentDates) {
+                        newInvoices.push({
+                            id: generateId(),
+                            projectId: newProject.id,
+                            amount: Math.round(amountPerInstallment),
+                            status: "Pending",
+                            date: installmentDate
+                        });
+                    }
+                }
+            } else if (paymentConfig.type === 'monthly') {
+                // For monthly payments - generate invoices for next 12 months or until project ends
+                if (paymentConfig.monthlyAmount && paymentConfig.billingStartDate) {
+                    const monthlyAmount = paymentConfig.monthlyAmount;
+                    const startDate = new Date(paymentConfig.billingStartDate);
+                    const projectDueDate = new Date(project.dueDate);
+                    
+                    // Calculate number of months
+                    const monthsDiff = Math.ceil((projectDueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
+                    const numberOfInvoices = Math.min(monthsDiff, 12); // Max 12 months
+                    
+                    for (let i = 0; i < numberOfInvoices; i++) {
+                        const invoiceDate = new Date(startDate);
+                        invoiceDate.setMonth(invoiceDate.getMonth() + i);
+                        
+                        newInvoices.push({
+                            id: generateId(),
+                            projectId: newProject.id,
+                            amount: monthlyAmount,
+                            status: "Pending",
+                            date: invoiceDate.toISOString().split('T')[0]
+                        });
+                    }
+                }
+            }
+        }
+    }
 
     await db.update((data) => {
         if (project.clientId && !data.clients?.find(c => c.id === project.clientId)) {
             throw new Error(`Client with ID ${project.clientId} not found`);
         }
 
+        // Create notifications for client about new invoices
+        let notifications = data.notifications || [];
+        if (project.clientId && newInvoices.length > 0) {
+            notifications = [{
+                id: generateId(),
+                userId: project.clientId,
+                message: `${newInvoices.length} pending invoice(s) for project: ${project.name}`,
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: `/dashboard/finance`
+            }, ...notifications];
+        }
+
         return {
             ...data,
             projects: [...data.projects, newProject],
+            invoices: [...newInvoices, ...(data.invoices || [])],
+            notifications,
             activities: [{
-                id: Math.random().toString(),
+                id: generateId(),
                 user: currentUser.name,
                 action: "created project",
                 target: project.name,
@@ -565,7 +837,9 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
             }, ...data.activities]
         }
     });
+    
     revalidatePath('/dashboard/projects');
+    revalidatePath('/dashboard/finance');
     return newProject;
 }
 
@@ -603,7 +877,9 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
     const defaultPermissions: UserPermissions = {
         canManageTasks: true,
         canMarkDone: true,
-        deleteAccess: 'any'
+        deleteAccess: 'any',
+        canCreateProject: false,
+        canUseAI: false
     };
 
     if (!settings.userPermissions) {
@@ -659,7 +935,7 @@ export async function deleteTask(taskId: string) {
         ...data,
         tasks: data.tasks.filter(t => t.id !== taskId),
         activities: [{
-            id: Math.random().toString(),
+            id: generateId(),
             user: userName,
             action: "deleted task",
             target: task.title,
@@ -687,18 +963,73 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
         }
     }
 
-    await db.update((data) => ({
-        ...data,
-        tasks: data.tasks.map(t => t.id === taskId ? { ...t, status } : t),
-        activities: [{
-            id: Math.random().toString(),
-            user: userName,
-            action: "moved task to " + status,
-            target: data.tasks.find(t => t.id === taskId)?.title || "Task",
-            timestamp: new Date().toISOString()
-        }, ...data.activities]
-    }));
+    await db.update((data) => {
+        // Update task status
+        const updatedTasks = data.tasks.map(t => t.id === taskId ? { ...t, status } : t);
+        const task = updatedTasks.find(t => t.id === taskId);
+        
+        let notifications = data.notifications || [];
+        let updatedProjects = data.projects;
+
+        // Auto-complete project if all tasks are done
+        if (task && status === 'Done') {
+            const projectTasks = updatedTasks.filter(t => t.projectId === task.projectId);
+            const allTasksDone = projectTasks.length > 0 && projectTasks.every(t => t.status === 'Done');
+            
+            if (allTasksDone) {
+                const project = data.projects.find(p => p.id === task.projectId);
+                
+                // Only auto-complete if project is currently Active
+                if (project && project.status === 'Active') {
+                    updatedProjects = data.projects.map(p => 
+                        p.id === task.projectId ? { ...p, status: 'Completed' as const } : p
+                    );
+
+                    // Notify client about project completion
+                    if (project.clientId) {
+                        notifications.unshift({
+                            id: generateId(),
+                            userId: project.clientId,
+                            message: `Project "${project.name}" has been completed! All tasks are done.`,
+                            read: false,
+                            timestamp: new Date().toISOString(),
+                            link: `/dashboard/projects/${project.id}`
+                        });
+                    }
+
+                    // Notify admin
+                    const adminUsers = data.users.filter(u => u.role === 'admin');
+                    adminUsers.forEach(admin => {
+                        notifications.unshift({
+                            id: generateId(),
+                            userId: admin.id,
+                            message: `Project "${project.name}" auto-completed - all tasks done`,
+                            read: false,
+                            timestamp: new Date().toISOString(),
+                            link: `/dashboard/projects/${project.id}`
+                        });
+                    });
+                }
+            }
+        }
+
+        return {
+            ...data,
+            tasks: updatedTasks,
+            projects: updatedProjects,
+            notifications,
+            activities: [{
+                id: generateId(),
+                user: userName,
+                action: "moved task to " + status,
+                target: data.tasks.find(t => t.id === taskId)?.title || "Task",
+                timestamp: new Date().toISOString()
+            }, ...data.activities]
+        };
+    });
+    
     revalidatePath('/dashboard/projects/[id]', 'page');
+    revalidatePath('/dashboard/projects');
 }
 
 export async function updateTask(taskId: string, updates: Partial<Task>) {
@@ -748,8 +1079,13 @@ export async function updateTask(taskId: string, updates: Partial<Task>) {
                 updatedProjects = data.projects.map(p => {
                     if (p.id === task.projectId) {
                         const currentServices = p.services || ((p as any).departments ? (p as any).departments : []);
-                        if (!currentServices.includes(updates.category!)) {
-                            return { ...p, services: [...currentServices, updates.category!] };
+
+                        // Resolve category to ID if possible
+                        const service = data.services?.find(s => s.name === updates.category || s.id === updates.category);
+                        const categoryIdOrName = service ? service.id : updates.category;
+
+                        if (!currentServices.includes(categoryIdOrName!)) {
+                            return { ...p, services: [...currentServices, categoryIdOrName!] };
                         }
                     }
                     return p;
@@ -762,7 +1098,7 @@ export async function updateTask(taskId: string, updates: Partial<Task>) {
             projects: updatedProjects,
             tasks: data.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t),
             activities: [{
-                id: Math.random().toString(),
+                id: generateId(),
                 user: userName,
                 action: "updated task",
                 target: updates.title || data.tasks.find(t => t.id === taskId)?.title || "Task",
@@ -776,7 +1112,7 @@ export async function updateTask(taskId: string, updates: Partial<Task>) {
 
 export async function addComment(taskId: string, userId: string, text: string) {
     const newComment = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: generateId(),
         userId,
         text,
         timestamp: new Date().toISOString()
@@ -790,7 +1126,7 @@ export async function addComment(taskId: string, userId: string, text: string) {
                 : t
         ),
         activities: [{
-            id: Math.random().toString(),
+            id: generateId(),
             user: "User", // Ideally fetch user name
             action: "commented on task",
             target: data.tasks.find(t => t.id === taskId)?.title || "Task",
@@ -803,81 +1139,144 @@ export async function addComment(taskId: string, userId: string, text: string) {
     return newComment;
 }
 
+
 export async function createTask(task: Omit<Task, "id">) {
     const currentUser = await getCurrentUser();
     const createdBy = currentUser ? currentUser.id : "system";
 
-    const permissions = await getUserPermissions(createdBy);
-    if (!permissions.canManageTasks) {
-        throw new Error("Unauthorized: You do not have permission to create tasks.");
-    }
+    const newTask = {
+        ...task,
+        id: generateId(),
+        createdAt: new Date().toISOString(),
+        createdBy,
+        comments: []
+    };
 
-    const newTask: Task = { ...task, id: Math.random().toString(36).substr(2, 9), createdAt: new Date().toISOString(), createdBy };
-
-    await db.update((data) => {
-        // Validation
-        if (!data.projects.find(p => p.id === task.projectId)) {
-            throw new Error(`Project with ID ${task.projectId} not found`);
-        }
-        if (!data.users.find(u => u.id === task.assigneeId)) {
-            throw new Error(`User with ID ${task.assigneeId} not found`);
-        }
-
-        // Auto-assign department to project if not exists
-        let updatedProjects = data.projects;
-        if (task.category) {
-            updatedProjects = data.projects.map(p => {
-                if (p.id === task.projectId) {
-                    const currentServices = p.services || ((p as any).departments ? (p as any).departments : []);
-                    if (!currentServices.includes(task.category!)) {
-                        return { ...p, services: [...currentServices, task.category!] };
-                    }
-                }
-                return p;
-            });
-        }
-
-        return {
-            ...data,
-            projects: updatedProjects,
-            tasks: [...data.tasks, newTask],
-            notifications: [{
-                id: Math.random().toString(),
-                userId: task.assigneeId,
-                message: `New task assigned: ${task.title}`,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: `/dashboard/projects/${task.projectId}?task=${newTask.id}`
-            }, ...data.notifications]
-        };
-    });
-
-    revalidatePath('/dashboard/projects');
+    await db.update((data) => ({
+        ...data,
+        tasks: [...data.tasks, newTask],
+        activities: [{
+            id: generateId(),
+            user: currentUser ? currentUser.name : "System",
+            action: "created task",
+            target: task.title,
+            timestamp: new Date().toISOString()
+        }, ...data.activities]
+    }));
     revalidatePath('/dashboard/projects/[id]', 'page');
+    revalidatePath('/dashboard/projects');
     return newTask;
 }
 
 
+// --- Client Actions ---
 
 export async function getClients() {
     const data = await db.get();
-    return data.clients || [];
+    // Only return active (non-archived) clients
+    // Archived clients are hidden but their financial data is preserved
+    return data.clients.filter(c => !c.archived);
+}
+
+export async function getClientByUsername(username: string) {
+    const data = await db.get();
+    // Return by username (preferred) or ID (fallback)
+    return data.clients.find(c => c.username === username || c.id === username);
+}
+
+export async function getClientById(id: string) {
+    const data = await db.get();
+    return data.clients?.find(c => c.id === id);
 }
 
 export async function createClient(client: Omit<Client, "id">) {
-    const newClient = { ...client, id: Math.random().toString(36).substr(2, 9) };
+    const currentUser = await getCurrentUser();
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+        throw new Error("Unauthorized: Only Admins can create clients.");
+    }
+
+    // Generate username if not provided
+    let username = client.username;
+    if (!username) {
+        username = client.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    }
+
+    // Ensure uniqueness
+    const data = await db.get();
+    let uniqueUsername = username;
+    let counter = 1;
+    // Check collision with Users OR Clients
+    while (
+        data.users.find(u => u.username === uniqueUsername) ||
+        data.clients.find(c => c.username === uniqueUsername)
+    ) {
+        uniqueUsername = `${username}${counter}`;
+        counter++;
+    }
+
+    const newClient: Client = {
+        ...client,
+        id: generateId(),
+        username: uniqueUsername,
+        lastActiveAt: new Date().toISOString()
+    };
+
+    if (!newClient.logo) {
+        newClient.logo = `https://api.dicebear.com/7.x/initials/svg?seed=${newClient.companyName}`;
+    }
+
     await db.update((data) => ({
         ...data,
         clients: [...(data.clients || []), newClient]
     }));
-    revalidatePath('/dashboard/projects');
+    revalidatePath('/dashboard/clients');
+    revalidatePath('/dashboard/team'); // In case they appear there too
     return newClient;
 }
+
+export async function updateClient(id: string, updates: Partial<Client>) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+        throw new Error("Unauthorized");
+    }
+
+    await db.update((data) => ({
+        ...data,
+        clients: data.clients.map(c => c.id === id ? { ...c, ...updates } : c)
+    }));
+    revalidatePath('/dashboard/clients');
+    revalidatePath(`/dashboard/clients/${id}`);
+}
+
 
 
 
 // Project Actions
 export async function updateProject(id: string, updates: Partial<Project>) {
+    const currentUser = await getCurrentUser();
+
+    // Status Change Validation
+    if (updates.status) {
+        // 1. Permission Check - Only admins and managers can change status
+        if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+            throw new Error("Unauthorized: Only Admins and Managers can change project status.");
+        }
+
+        const data = await db.get();
+        
+        // 2. Completion Logic - Warn if trying to complete with open tasks
+        if (updates.status === 'Completed') {
+            const projectTasks = data.tasks.filter(t => t.projectId === id);
+            const hasOpenTasks = projectTasks.some(t => t.status !== 'Done');
+
+            if (hasOpenTasks) {
+                const openCount = projectTasks.filter(t => t.status !== 'Done').length;
+                // Allow admin to override, but warn them
+                console.warn(`Warning: Marking project as Completed with ${openCount} unfinished tasks.`);
+            }
+        }
+    }
+
     const data = await db.get();
     const oldProject = data.projects.find(p => p.id === id);
 
@@ -886,11 +1285,19 @@ export async function updateProject(id: string, updates: Partial<Project>) {
 
         // Notify Client on Status Change
         if (updates.status && oldProject && oldProject.status !== updates.status && oldProject.clientId) {
-            // Check if client exists (optional but good) or just push
+            const statusMessages: Record<string, string> = {
+                'Active': 'is now active and in progress',
+                'Completed': 'has been completed',
+                'On Hold': 'has been put on hold',
+                'Cancelled': 'has been cancelled'
+            };
+
+            const message = statusMessages[updates.status] || `status updated to ${updates.status}`;
+            
             notifications = [{
-                id: Math.random().toString(),
+                id: generateId(),
                 userId: oldProject.clientId,
-                message: `Project "${oldProject.name}" status updated to ${updates.status}`,
+                message: `Project "${oldProject.name}" ${message}`,
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: `/dashboard/projects/${id}`
@@ -903,6 +1310,7 @@ export async function updateProject(id: string, updates: Partial<Project>) {
             notifications
         };
     });
+    
     revalidatePath('/dashboard/projects');
     revalidatePath(`/dashboard/projects/${id}`);
 }
@@ -990,6 +1398,67 @@ export async function getTransactions(projectId?: string, userId?: string, categ
     return transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
+export async function getClientFinanceData(clientId: string) {
+    const data = await db.get();
+    const clientProjects = data.projects.filter(p => p.clientId === clientId).map(p => p.id);
+
+    // Invoices for all client projects
+    const invoices = (data.invoices || []).filter(i => clientProjects.includes(i.projectId));
+
+    // Transactions for all client projects
+    const transactions = (data.transactions || []).filter(t => t.projectId && clientProjects.includes(t.projectId));
+
+    // Total Invoiced = Sum of ALL invoices (paid + pending)
+    const totalInvoiced = invoices.reduce((acc, curr) => acc + curr.amount, 0);
+    
+    // Total Paid = Sum of COMPLETED INCOME transactions (actual payments received from client)
+    const totalPaid = transactions
+        .filter(t => t.type === 'income' && t.status === 'completed')
+        .reduce((acc, curr) => acc + curr.amount, 0);
+    
+    // Pending Amount = Pending + Processing + Overdue invoices
+    const pendingAmount = invoices
+        .filter(i => i.status === 'Pending' || i.status === 'Processing' || i.status === 'Overdue')
+        .reduce((acc, curr) => acc + curr.amount, 0);
+
+    // Refunds (if any) - Money returned to client
+    const totalRefunds = transactions
+        .filter(t => t.type === 'expense' && t.status === 'completed')
+        .reduce((acc, curr) => acc + curr.amount, 0);
+
+    // Net Paid = Total Paid - Refunds
+    const netPaid = totalPaid - totalRefunds;
+
+    return {
+        invoices: invoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        transactions: transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        stats: {
+            totalInvoiced,
+            totalPaid: totalPaid, // Actual payments received
+            pendingAmount,
+            ltv: netPaid // Lifetime Value (Net after refunds)
+        }
+    };
+}
+
+export async function getClientActivityLogs(clientId: string, limit = 20) {
+    const data = await db.get();
+    const clientProjects = new Set(data.projects.filter(p => p.clientId === clientId).map(p => p.name));
+
+    return data.activities.filter(a => {
+        // Activity BY the client
+        if (a.user === clientId) return true;
+        // Activity ON client's project (Target matches Project Name)
+        // Note: Target is usually a human readable string. This is a heuristic.
+        // Ideally we'd store entityId and entityType. 
+        // For now, if target includes project name?
+        // Let's stick to actions BY the client or strictly matching target if we can.
+        // Or just return actions BY the client for now to be safe.
+        // Actually, let's include actions where the user is the client.
+        return a.user === clientId;
+    }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, limit);
+}
+
 export async function getCategoryMemberSummary(category: string) {
     const data = await db.get();
     const transactions = (data.transactions || []).filter(t => t.category === category);
@@ -1042,6 +1511,12 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
         // User requested strict "depended on", so let's enforce.
         throw new Error("Validation Error: Salary must be an Expense.");
     }
+    if (transaction.category === 'Refund' && transaction.type !== 'expense') {
+        throw new Error("Validation Error: Refund must be an Expense.");
+    }
+    if (transaction.category === 'Refund' && !transaction.projectId) {
+        throw new Error("Validation Error: Refunds must have a Project ID.");
+    }
     if (transaction.category === 'Other' && transaction.type !== 'expense') {
         throw new Error("Validation Error: 'Other' category is for expenses only.");
     }
@@ -1052,7 +1527,7 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
 
     const newTransaction: Transaction = {
         ...transaction,
-        id: Math.random().toString(36).substr(2, 9),
+        id: generateId(),
         status: "completed"
     };
 
@@ -1065,7 +1540,7 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
         const notifications = [...(data.notifications || [])];
         if (newTransaction.category === 'Salary' && newTransaction.userId && newTransaction.type === 'expense') {
             notifications.unshift({
-                id: Math.random().toString(),
+                id: generateId(),
                 userId: newTransaction.userId,
                 message: `Salary Payment Received: ₹${newTransaction.amount.toLocaleString()}`,
                 read: false,
@@ -1109,14 +1584,163 @@ export async function getInvoices(projectId?: string) {
     return invoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
+// Client marks invoice as paid (moves to Processing status)
+export async function clientMarkInvoiceAsPaid(invoiceId: string) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== 'client') {
+        throw new Error("Unauthorized: Only clients can mark invoices as paid");
+    }
+
+    await db.update((data) => {
+        const invoice = data.invoices.find(i => i.id === invoiceId);
+        if (!invoice) {
+            throw new Error("Invoice not found");
+        }
+
+        // Verify this invoice belongs to a project owned by this client
+        const project = data.projects.find(p => p.id === invoice.projectId);
+        if (!project || project.clientId !== currentUser.id) {
+            throw new Error("Unauthorized: This invoice doesn't belong to you");
+        }
+
+        // Only allow marking Pending invoices as paid
+        if (invoice.status !== 'Pending') {
+            throw new Error(`Cannot mark ${invoice.status} invoice as paid`);
+        }
+
+        // Update status to Processing
+        invoice.status = 'Processing';
+
+        // Notify admin about payment claim
+        const notifications = data.notifications || [];
+        const adminUsers = data.users.filter(u => u.role === 'admin');
+        
+        adminUsers.forEach(admin => {
+            notifications.unshift({
+                id: generateId(),
+                userId: admin.id,
+                message: `${currentUser.name} marked invoice ₹${invoice.amount.toLocaleString()} as paid - Awaiting approval`,
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: `/dashboard/finance`
+            });
+        });
+
+        return { ...data, notifications };
+    });
+
+    revalidatePath('/dashboard/finance');
+}
+
+// Admin approves payment (moves to Paid status and creates transaction)
+export async function adminApproveInvoicePayment(invoiceId: string) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== 'admin') {
+        throw new Error("Unauthorized: Only admins can approve payments");
+    }
+
+    await db.update((data) => {
+        const invoice = data.invoices.find(i => i.id === invoiceId);
+        if (!invoice) {
+            throw new Error("Invoice not found");
+        }
+
+        if (invoice.status !== 'Processing') {
+            throw new Error(`Can only approve Processing invoices, this is ${invoice.status}`);
+        }
+
+        // Update invoice status to Paid
+        invoice.status = 'Paid';
+
+        // Create income transaction
+        const project = data.projects.find(p => p.id === invoice.projectId);
+        const newTransaction: Transaction = {
+            id: generateId(),
+            date: new Date().toISOString().split('T')[0],
+            amount: invoice.amount,
+            type: 'income',
+            category: 'Project',
+            description: `Payment for ${project?.name || 'Project'} - Invoice ${invoice.id.substring(0, 8)}`,
+            status: 'completed',
+            projectId: invoice.projectId
+        };
+
+        data.transactions = [newTransaction, ...(data.transactions || [])];
+
+        // Notify client about approval
+        const notifications = data.notifications || [];
+        if (project?.clientId) {
+            notifications.unshift({
+                id: generateId(),
+                userId: project.clientId,
+                message: `Payment approved! ₹${invoice.amount.toLocaleString()} received for ${project.name}`,
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: `/dashboard/finance`
+            });
+        }
+
+        return { ...data, notifications };
+    });
+
+    revalidatePath('/dashboard/finance');
+}
+
+// Admin rejects payment (moves back to Pending status)
+export async function adminRejectInvoicePayment(invoiceId: string, reason?: string) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== 'admin') {
+        throw new Error("Unauthorized: Only admins can reject payments");
+    }
+
+    await db.update((data) => {
+        const invoice = data.invoices.find(i => i.id === invoiceId);
+        if (!invoice) {
+            throw new Error("Invoice not found");
+        }
+
+        if (invoice.status !== 'Processing') {
+            throw new Error(`Can only reject Processing invoices, this is ${invoice.status}`);
+        }
+
+        // Update invoice status back to Pending
+        invoice.status = 'Pending';
+
+        // Notify client about rejection
+        const notifications = data.notifications || [];
+        const project = data.projects.find(p => p.id === invoice.projectId);
+        
+        if (project?.clientId) {
+            const message = reason 
+                ? `Payment rejected: ${reason}. Please mark as paid again.`
+                : `Payment rejected for ₹${invoice.amount.toLocaleString()}. Please mark as paid again.`;
+            
+            notifications.unshift({
+                id: generateId(),
+                userId: project.clientId,
+                message,
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: `/dashboard/finance`
+            });
+        }
+
+        return { ...data, notifications };
+    });
+
+    revalidatePath('/dashboard/finance');
+}
+
+// Legacy function - kept for backward compatibility
 export async function updateInvoiceStatus(invoiceId: string, status: 'Paid' | 'Pending' | 'Overdue' | 'Processing') {
     await db.update((data) => {
         const invoice = data.invoices.find(i => i.id === invoiceId);
         if (invoice) {
             invoice.status = status;
         }
-        return data; // Return updated DB data
+        return data;
     });
+    revalidatePath('/dashboard/finance');
 }
 
 export async function deleteTransaction(transactionId: string, password: string) {
@@ -1140,7 +1764,7 @@ export async function deleteTransaction(transactionId: string, password: string)
     return { success: true };
 }
 
-export async function getHighPriorityTasks() {
+export async function getHighPriorityTasks(offset = 0, limit = 5) {
     const data = await db.get();
     // Return In Progress or Todo tasks that are High priority or Due soon (mock due soon logic if priority not set)
     // For now, let's filter by Status != Done and sort by date. 
@@ -1148,13 +1772,13 @@ export async function getHighPriorityTasks() {
     return data.tasks
         .filter(t => t.status !== 'Done')
         .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-        .slice(0, 5);
+        .slice(offset, offset + limit);
 }
 
 export async function createInvoice(invoice: Omit<Invoice, "id" | "status">) {
     const newInvoice: Invoice = {
         ...invoice,
-        id: Math.random().toString(36).substr(2, 9),
+        id: generateId(),
         status: "Pending"
     };
 
@@ -1164,7 +1788,7 @@ export async function createInvoice(invoice: Omit<Invoice, "id" | "status">) {
 
         if (project && project.clientId) {
             notifications = [{
-                id: Math.random().toString(),
+                id: generateId(),
                 userId: project.clientId,
                 message: `New Invoice Generated: ₹${invoice.amount.toLocaleString()}`,
                 read: false,
@@ -1204,26 +1828,24 @@ export async function getFinanceStats(projectId?: string, userId?: string, categ
             transactions = transactions.filter(t =>
                 t.description.toLowerCase().includes(user.name.toLowerCase())
             );
-            // Invoices are usually project based, rarely user based unless 'salesperson'? 
-            // We'll leave invoices alone for user filter or clear them?
-            // Let's assume user filter implies we only care about user-specific costs/revenues?
-            // Or maybe we filter invoices by user if (assigned?)
-            // For now, let's not aggressively filter invoices by user to avoid showing empty states unnecessarily unless we map them.
         }
     }
 
+    // Total Revenue = All completed income transactions (client payments, project income)
     const totalRevenue = transactions
-        .filter(t => t.type === 'income')
+        .filter(t => t.type === 'income' && t.status === 'completed')
         .reduce((acc, curr) => acc + curr.amount, 0);
 
+    // Total Expenses = All completed expense transactions (salaries, software, hosting, etc.)
     const totalExpenses = transactions
-        .filter(t => t.type === 'expense')
+        .filter(t => t.type === 'expense' && t.status === 'completed')
         .reduce((acc, curr) => acc + curr.amount, 0);
 
     const netProfit = totalRevenue - totalExpenses;
 
+    // Pending Invoices = Pending + Processing + Overdue
     const pendingInvoicesAmount = invoices
-        .filter(i => i.status === 'Pending')
+        .filter(i => i.status === 'Pending' || i.status === 'Processing' || i.status === 'Overdue')
         .reduce((acc, curr) => acc + curr.amount, 0);
 
     return {
@@ -1360,12 +1982,15 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
     if (data.projects) {
         data.projects.forEach(p => {
             const clientName = data.clients?.find(c => c.id === p.clientId || c.name === p.client)?.name || p.client || "";
-            if (clientName.toLowerCase().includes(lowerQuery) || p.services?.some(d => d.toLowerCase().includes(lowerQuery))) {
+            // Resolve Service IDs to Names for search
+            const serviceNames = p.services?.map(s => data.services?.find(dSvc => dSvc.id === s || dSvc.name === s)?.name || s) || [];
+
+            if (clientName.toLowerCase().includes(lowerQuery) || serviceNames.some(d => d.toLowerCase().includes(lowerQuery))) {
                 results.push({
                     id: p.id,
                     type: 'project',
                     title: `${clientName} Project`,
-                    subtitle: p.services?.join(', ') || '',
+                    subtitle: serviceNames.join(', ') || '',
                     url: `/dashboard/projects/${p.id}`
                 });
             }
@@ -1446,7 +2071,7 @@ export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt">) {
 
     const newAsset: Asset = {
         ...asset,
-        id: Math.random().toString(36).substr(2, 9),
+        id: generateId(),
         uploadedAt: new Date().toISOString()
     };
 
@@ -1454,7 +2079,7 @@ export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt">) {
         ...data,
         assets: [newAsset, ...(data.assets || [])],
         activities: [{
-            id: Math.random().toString(),
+            id: generateId(),
             user: asset.uploadedBy,
             action: `uploaded asset`,
             target: asset.name,
@@ -1476,7 +2101,7 @@ export async function deleteProjectAsset(assetId: string) {
             ...data,
             assets: data.assets.filter(a => a.id !== assetId),
             activities: asset ? [{
-                id: Math.random().toString(),
+                id: generateId(),
                 user: userName,
                 action: `deleted asset`,
                 target: asset.name,
@@ -1499,7 +2124,7 @@ export async function updateProjectAsset(assetId: string, updates: Partial<Asset
         ...data,
         assets: data.assets.map(a => a.id === assetId ? { ...a, ...updates } : a),
         activities: [{
-            id: Math.random().toString(),
+            id: generateId(),
             user: userName,
             action: `updated asset`,
             target: data.assets.find(a => a.id === assetId)?.name || "Asset",
@@ -1882,7 +2507,7 @@ export async function requestLeave(data: Omit<LeaveRequest, "id" | "status" | "c
 
     const newRequest: LeaveRequest = {
         ...data,
-        id: Math.random().toString(36).substr(2, 9),
+        id: generateId(),
         status: 'Pending',
         createdAt: new Date().toISOString(),
         userId: currentUser.id
@@ -1892,7 +2517,7 @@ export async function requestLeave(data: Omit<LeaveRequest, "id" | "status" | "c
         // Broadcast notification to ALL admins
         const admins = (dbData.users || []).filter(u => u.role === 'admin' || u.role === 'manager');
         const adminNotifications = admins.map(admin => ({
-            id: Math.random().toString(),
+            id: generateId(),
             userId: admin.id,
             message: `New Leave Request from ${currentUser.name}: ${data.type} (${new Date(data.startDate).toLocaleDateString()} - ${new Date(data.endDate).toLocaleDateString()})`,
             read: false,
@@ -1930,6 +2555,303 @@ export async function getLeaveRequests(userId?: string) {
     return requests;
 }
 
+// Employee submits a leave request
+export async function submitLeaveRequest(leaveData: Omit<LeaveRequest, 'id' | 'status' | 'createdAt'>) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+        throw new Error("Unauthorized: You must be logged in to submit leave requests");
+    }
+
+    // Validate dates
+    const startDate = new Date(leaveData.startDate);
+    const endDate = new Date(leaveData.endDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (startDate < today) {
+        throw new Error("Leave start date cannot be in the past");
+    }
+
+    if (endDate < startDate) {
+        throw new Error("Leave end date must be after start date");
+    }
+
+    // Calculate number of days
+    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    // Validate leave type limits (standard office rules)
+    if (leaveData.type === 'Casual' && daysDiff > 15) {
+        throw new Error("Casual leave cannot exceed 15 days. Please split into multiple requests or use Emergency leave.");
+    }
+
+    if (leaveData.type === 'Emergency' && daysDiff > 7) {
+        throw new Error("Emergency leave cannot exceed 7 days. For longer periods, please use Casual leave.");
+    }
+
+    const newLeaveRequest: LeaveRequest = {
+        ...leaveData,
+        id: generateId(),
+        userId: currentUser.id,
+        status: 'Pending'
+    } as LeaveRequest;
+
+    await db.update((data) => {
+        // Notify all admins about new leave request
+        const notifications = data.notifications || [];
+        const adminUsers = data.users.filter(u => u.role === 'admin');
+        
+        adminUsers.forEach(admin => {
+            notifications.unshift({
+                id: generateId(),
+                userId: admin.id,
+                message: `${currentUser.name} requested ${leaveData.type} leave (${daysDiff} day${daysDiff > 1 ? 's' : ''})`,
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: `/dashboard/team`
+            });
+        });
+
+        return {
+            ...data,
+            leaveRequests: [newLeaveRequest, ...(data.leaveRequests || [])],
+            notifications,
+            activities: [{
+                id: generateId(),
+                user: currentUser.name,
+                action: "submitted leave request",
+                target: `${leaveData.type} leave for ${daysDiff} days`,
+                timestamp: new Date().toISOString()
+            }, ...data.activities]
+        };
+    });
+
+    revalidatePath('/dashboard/team');
+    return newLeaveRequest;
+}
+
+// Admin approves a leave request
+export async function approveLeaveRequest(leaveRequestId: string) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== 'admin') {
+        throw new Error("Unauthorized: Only admins can approve leave requests");
+    }
+
+    await db.update((data) => {
+        const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
+        if (!leaveRequest) {
+            throw new Error("Leave request not found");
+        }
+
+        if (leaveRequest.status !== 'Pending') {
+            throw new Error(`Cannot approve ${leaveRequest.status} leave request`);
+        }
+
+        // Update leave request
+        leaveRequest.status = 'Approved';
+        leaveRequest.reviewedBy = currentUser.id;
+        leaveRequest.reviewedAt = new Date().toISOString();
+
+        // Calculate days for notification
+        const startDate = new Date(leaveRequest.startDate);
+        const endDate = new Date(leaveRequest.endDate);
+        const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+        // Notify employee
+        const notifications = data.notifications || [];
+        const employee = data.users.find(u => u.id === leaveRequest.userId);
+        
+        if (employee) {
+            notifications.unshift({
+                id: generateId(),
+                userId: leaveRequest.userId,
+                message: `Your ${leaveRequest.type} leave request (${daysDiff} day${daysDiff > 1 ? 's' : ''}) has been approved by ${currentUser.name}`,
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: `/dashboard/team`
+            });
+        }
+
+        return {
+            ...data,
+            notifications,
+            activities: [{
+                id: generateId(),
+                user: currentUser.name,
+                action: "approved leave request",
+                target: employee ? `${employee.name}'s ${leaveRequest.type} leave` : "Leave request",
+                timestamp: new Date().toISOString()
+            }, ...data.activities]
+        };
+    });
+
+    revalidatePath('/dashboard/team');
+}
+
+// Admin rejects a leave request
+export async function rejectLeaveRequest(leaveRequestId: string, rejectionReason?: string) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== 'admin') {
+        throw new Error("Unauthorized: Only admins can reject leave requests");
+    }
+
+    await db.update((data) => {
+        const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
+        if (!leaveRequest) {
+            throw new Error("Leave request not found");
+        }
+
+        if (leaveRequest.status !== 'Pending') {
+            throw new Error(`Cannot reject ${leaveRequest.status} leave request`);
+        }
+
+        // Update leave request
+        leaveRequest.status = 'Rejected';
+        leaveRequest.reviewedBy = currentUser.id;
+        leaveRequest.reviewedAt = new Date().toISOString();
+
+        // Calculate days for notification
+        const startDate = new Date(leaveRequest.startDate);
+        const endDate = new Date(leaveRequest.endDate);
+        const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+        // Notify employee
+        const notifications = data.notifications || [];
+        const employee = data.users.find(u => u.id === leaveRequest.userId);
+        
+        if (employee) {
+            const message = rejectionReason
+                ? `Your ${leaveRequest.type} leave request (${daysDiff} day${daysDiff > 1 ? 's' : ''}) was rejected by ${currentUser.name}. Reason: ${rejectionReason}`
+                : `Your ${leaveRequest.type} leave request (${daysDiff} day${daysDiff > 1 ? 's' : ''}) was rejected by ${currentUser.name}`;
+
+            notifications.unshift({
+                id: generateId(),
+                userId: leaveRequest.userId,
+                message,
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: `/dashboard/team`
+            });
+        }
+
+        return {
+            ...data,
+            notifications,
+            activities: [{
+                id: generateId(),
+                user: currentUser.name,
+                action: "rejected leave request",
+                target: employee ? `${employee.name}'s ${leaveRequest.type} leave` : "Leave request",
+                timestamp: new Date().toISOString()
+            }, ...data.activities]
+        };
+    });
+
+    revalidatePath('/dashboard/team');
+}
+
+// Employee cancels their own pending leave request
+export async function cancelLeaveRequest(leaveRequestId: string) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+        throw new Error("Unauthorized: You must be logged in");
+    }
+
+    await db.update((data) => {
+        const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
+        if (!leaveRequest) {
+            throw new Error("Leave request not found");
+        }
+
+        // Only the requester or admin can cancel
+        if (leaveRequest.userId !== currentUser.id && currentUser.role !== 'admin') {
+            throw new Error("Unauthorized: You can only cancel your own leave requests");
+        }
+
+        // Can only cancel pending requests
+        if (leaveRequest.status !== 'Pending') {
+            throw new Error(`Cannot cancel ${leaveRequest.status} leave request. Please contact admin.`);
+        }
+
+        // Remove the leave request
+        data.leaveRequests = data.leaveRequests.filter(lr => lr.id !== leaveRequestId);
+
+        // Notify admins if employee cancelled
+        const notifications = data.notifications || [];
+        if (currentUser.role !== 'admin') {
+            const adminUsers = data.users.filter(u => u.role === 'admin');
+            adminUsers.forEach(admin => {
+                notifications.unshift({
+                    id: generateId(),
+                    userId: admin.id,
+                    message: `${currentUser.name} cancelled their ${leaveRequest.type} leave request`,
+                    read: false,
+                    timestamp: new Date().toISOString(),
+                    link: `/dashboard/team`
+                });
+            });
+        }
+
+        return {
+            ...data,
+            notifications,
+            activities: [{
+                id: generateId(),
+                user: currentUser.name,
+                action: "cancelled leave request",
+                target: `${leaveRequest.type} leave`,
+                timestamp: new Date().toISOString()
+            }, ...data.activities]
+        };
+    });
+
+    revalidatePath('/dashboard/team');
+}
+
+// Get leave statistics for an employee
+export async function getEmployeeLeaveStats(userId: string) {
+    const data = await db.get();
+    const leaveRequests = data.leaveRequests.filter(lr => lr.userId === userId);
+    
+    const currentYear = new Date().getFullYear();
+    const thisYearRequests = leaveRequests.filter(lr => {
+        const year = new Date(lr.createdAt).getFullYear();
+        return year === currentYear;
+    });
+
+    const approvedLeaves = thisYearRequests.filter(lr => lr.status === 'Approved');
+    
+    // Calculate total days taken
+    let casualDaysTaken = 0;
+    let emergencyDaysTaken = 0;
+
+    approvedLeaves.forEach(leave => {
+        const startDate = new Date(leave.startDate);
+        const endDate = new Date(leave.endDate);
+        const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        
+        if (leave.type === 'Casual') {
+            casualDaysTaken += days;
+        } else if (leave.type === 'Emergency') {
+            emergencyDaysTaken += days;
+        }
+    });
+
+    // Standard office leave allowances per year
+    const casualLeaveAllowance = 15;
+    const emergencyLeaveAllowance = 7;
+
+    return {
+        casualDaysTaken,
+        casualDaysRemaining: Math.max(0, casualLeaveAllowance - casualDaysTaken),
+        emergencyDaysTaken,
+        emergencyDaysRemaining: Math.max(0, emergencyLeaveAllowance - emergencyDaysTaken),
+        pendingRequests: leaveRequests.filter(lr => lr.status === 'Pending').length,
+        approvedRequests: approvedLeaves.length,
+        rejectedRequests: thisYearRequests.filter(lr => lr.status === 'Rejected').length
+    };
+}
+
+
 export async function updateLeaveStatus(requestId: string, status: LeaveStatus) {
     const currentUser = await getCurrentUser();
 
@@ -1941,7 +2863,7 @@ export async function updateLeaveStatus(requestId: string, status: LeaveStatus) 
         ...dbData,
         leaveRequests: dbData.leaveRequests.map(r => r.id === requestId ? { ...r, status, reviewedBy: currentUser?.id, reviewedAt: new Date().toISOString() } : r),
         notifications: [{
-            id: Math.random().toString(),
+            id: generateId(),
             userId: request.userId,
             message: `Your leave request for ${new Date(request.startDate).toLocaleDateString()} has been ${status}`,
             read: false,
@@ -1951,4 +2873,129 @@ export async function updateLeaveStatus(requestId: string, status: LeaveStatus) 
     }));
 
     revalidatePath('/dashboard/team');
+}
+// Refund Management Functions
+
+export async function createRefund(refund: {
+    projectId: string;
+    amount: number;
+    description: string;
+    refundReason: string;
+    originalTransactionId?: string;
+    date: string;
+}) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+        throw new Error("Unauthorized: Only Admins and Managers can create refunds.");
+    }
+
+    // Validate project exists
+    const data = await db.get();
+    const project = data.projects.find(p => p.id === refund.projectId);
+    if (!project) {
+        throw new Error("Project not found");
+    }
+
+    // Validate amount is positive
+    if (refund.amount <= 0) {
+        throw new Error("Refund amount must be positive");
+    }
+
+    // Calculate total project income
+    const projectIncome = data.transactions
+        .filter(t => t.projectId === refund.projectId && t.type === 'income' && t.status === 'completed')
+        .reduce((sum, t) => sum + t.amount, 0);
+
+    // Calculate existing refunds
+    const existingRefunds = data.transactions
+        .filter(t => t.projectId === refund.projectId && t.category === 'Refund' && t.status === 'completed')
+        .reduce((sum, t) => sum + t.amount, 0);
+
+    // Validate refund doesn't exceed project income
+    if (existingRefunds + refund.amount > projectIncome) {
+        throw new Error(`Refund amount exceeds project income. Project income: ₹${projectIncome.toLocaleString()}, Existing refunds: ₹${existingRefunds.toLocaleString()}, Attempted refund: ₹${refund.amount.toLocaleString()}`);
+    }
+
+    const newRefund = {
+        id: generateId(),
+        date: refund.date,
+        amount: refund.amount,
+        type: 'expense' as const,
+        category: 'Refund' as const,
+        description: refund.description,
+        status: 'completed' as const,
+        projectId: refund.projectId
+    };
+
+    await db.update((data) => {
+        // Add refund transaction
+        const newData = {
+            ...data,
+            transactions: [...data.transactions, newRefund],
+            activities: [{
+                id: generateId(),
+                user: currentUser.name,
+                action: "issued refund",
+                target: project.name,
+                timestamp: new Date().toISOString()
+            }, ...data.activities]
+        };
+
+        // Notify client
+        if (project.clientId) {
+            const notification = {
+                id: generateId(),
+                userId: project.clientId,
+                message: `Refund of ₹${refund.amount.toLocaleString()} has been issued for ${project.name}`,
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: `/dashboard/projects/${project.slug || project.id}`
+            };
+            newData.notifications = [...newData.notifications, notification];
+        }
+
+        return newData;
+    });
+
+    revalidatePath('/dashboard/finance');
+    revalidatePath('/dashboard/clients');
+    revalidatePath(`/dashboard/projects/${project.slug || project.id}`);
+    
+    return newRefund;
+}
+
+export async function getClientFinancialSummary(clientId: string) {
+    const data = await db.get();
+    
+    // Get all projects for this client
+    const clientProjects = data.projects.filter(p => p.clientId === clientId);
+    const projectIds = new Set(clientProjects.map(p => p.id));
+
+    // Calculate total income from client
+    const totalPaid = data.transactions
+        .filter(t => t.projectId && projectIds.has(t.projectId) && t.type === 'income' && t.status === 'completed')
+        .reduce((sum, t) => sum + t.amount, 0);
+
+    // Calculate total refunds to client
+    const totalRefunds = data.transactions
+        .filter(t => t.projectId && projectIds.has(t.projectId) && t.category === 'Refund' && t.status === 'completed')
+        .reduce((sum, t) => sum + t.amount, 0);
+
+    // Calculate lifetime value (net revenue)
+    const lifetimeValue = totalPaid - totalRefunds;
+
+    return {
+        totalPaid,
+        totalRefunds,
+        lifetimeValue,
+        projectCount: clientProjects.length,
+        activeProjectCount: clientProjects.filter(p => p.status === 'Active').length
+    };
+}
+
+export async function getProjectRefunds(projectId: string) {
+    const data = await db.get();
+    return data.transactions
+        .filter(t => t.projectId === projectId && t.category === 'Refund')
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }

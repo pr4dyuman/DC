@@ -1,5 +1,5 @@
 import { getFinanceChartData, getFinanceStats, getInvoices, getTransactions, getPayrollStatus, getProjects, getUsers, getUser, getClients } from "@/lib/actions";
-import { Transaction } from "@/lib/db";
+import { Transaction } from "@/lib/types";
 import { StatsCards } from "@/components/finance/StatsCards";
 import { RevenueChart } from "@/components/finance/RevenueChart";
 import { TransactionList } from "@/components/finance/TransactionList";
@@ -16,6 +16,7 @@ import { getCategoryMemberSummary } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { TotalBalance } from "@/components/finance/TotalBalance";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getSessionId } from "@/lib/auth";
 
@@ -50,6 +51,11 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
     // getUsers() ONLY returns employees, which is why the previous check failed for clients.
     const currentUser = currentUserId ? await getUser(currentUserId) : null;
     const isUserAdmin = currentUser?.role === 'admin';
+    const isRestricted = currentUser?.role === 'employee' || currentUser?.role === 'specialist';
+
+    if (isRestricted) {
+        redirect("/dashboard");
+    }
 
     if (currentUser?.role === 'client') {
         // Force Client View immediately - Do not execute Admin logic

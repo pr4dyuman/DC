@@ -22,6 +22,7 @@ const baseRoutes: Route[] = [
     { label: "Projects", icon: FolderKanban, href: "/dashboard/projects", color: "text-violet-500" },
     { label: "Finance", icon: Banknote, href: "/dashboard/finance", color: "text-emerald-500" },
     { label: "Team", icon: Users, href: "/dashboard/team", color: "text-orange-700" },
+    { label: "Clients", icon: Briefcase, href: "/dashboard/clients", color: "text-pink-500" },
     { label: "Settings", icon: Settings, href: "/dashboard/settings", color: "text-gray-500" },
 ];
 
@@ -74,15 +75,21 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole = 
     };
 
     // Construct routes dynamically based on Role
-    let visibleRoutes = [...baseRoutes];
+    // Define access controls
+    const roleAccess: Record<string, string[]> = {
+        'admin': baseRoutes.map(r => r.label), // All routes
+        'manager': baseRoutes.map(r => r.label), // All routes
+        'employee': ['Dashboard', 'Projects', 'Clients', 'Team'],
+        'client': ['Dashboard', 'Projects', 'Finance']
+    };
 
-    if (currentUserRole === 'employee') {
-        const allowedLabels = ['Dashboard', 'Projects', 'Team']; // Employee Access
-        visibleRoutes = baseRoutes.filter(r => allowedLabels.includes(r.label));
-    } else if (currentUserRole === 'client') {
-        // Client Access - simplified text
-        const allowedLabels = ['Dashboard', 'Projects', 'Finance'];
-        visibleRoutes = baseRoutes.filter(r => allowedLabels.includes(r.label)).map(r => {
+    const allowedLabels = roleAccess[currentUserRole] || roleAccess['client']; // Fallback to minimal access
+
+    let visibleRoutes = baseRoutes.filter(r => allowedLabels.includes(r.label));
+
+    // Custom overrides for Client role
+    if (currentUserRole === 'client') {
+        visibleRoutes = visibleRoutes.map(r => {
             if (r.label === 'Projects') return { ...r, label: 'My Projects' };
             if (r.label === 'Finance') return { ...r, label: 'My Invoices', href: `/dashboard/finance?username=${currentUserUsername || currentUserId}` };
             return r;
@@ -139,7 +146,7 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole = 
                                             (isChatOpen && route.label === "Messages") ? "text-white bg-white/10" : "text-zinc-300"
                                         )}
                                     >
-                                        <div className="flex items-center flex-1 justify-between">
+                                        <div className="flex items-center flex-1 justify-between" suppressHydrationWarning>
                                             <div className="flex items-center">
                                                 <route.icon className={cn("h-5 w-5 mr-3", route.color)} />
                                                 {route.label}
@@ -159,7 +166,7 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole = 
                                             isActive(route) ? "text-white bg-white/10" : "text-zinc-300"
                                         )}
                                     >
-                                        <div className="flex items-center flex-1">
+                                        <div className="flex items-center flex-1" suppressHydrationWarning>
                                             <route.icon className={cn("h-5 w-5 mr-3", route.color)} />
                                             {route.label}
                                         </div>
@@ -171,7 +178,7 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole = 
                 </div>
                 <div className="px-3 py-2">
                     <button onClick={handleLogout} className="text-sm group flex p-3 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-white/10 rounded-lg transition text-zinc-400">
-                        <div className="flex items-center flex-1">
+                        <div className="flex items-center flex-1" suppressHydrationWarning>
                             <LogOut className="h-5 w-5 mr-3 text-red-500" />
                             Logout
                         </div>

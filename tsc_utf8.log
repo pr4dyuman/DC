@@ -1,4 +1,0 @@
-﻿components/settings/PermissionSettings.tsx(136,47): error TS2339: Property 'avatar' does not exist on type 'User | Client'.
-  Property 'avatar' does not exist on type 'Client'.
-components/settings/PermissionSettings.tsx(137,60): error TS2339: Property 'avatar' does not exist on type 'User | Client'.
-  Property 'avatar' does not exist on type 'Client'.

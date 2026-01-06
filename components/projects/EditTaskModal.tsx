@@ -5,7 +5,7 @@ import { updateTask, getUsers, getServices, deleteTask } from "@/lib/actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, Calendar } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Task } from "@/lib/db";
+import { Task } from "@/lib/types";
 
 interface EditTaskModalProps {
     task: Task;

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, Plus, Trash2, Edit2, Users, Briefcase, ChevronDown, ChevronRight, Settings } from "lucide-react";
+import { Loader2, Plus, Trash2, Edit2, Users, Briefcase, ChevronDown, ChevronRight, Settings, Shield } from "lucide-react";
 import { X } from "lucide-react";
 import PermissionSettings from "@/components/settings/PermissionSettings";
 
@@ -23,6 +23,7 @@ export default function SettingsPage() {
     // Section Visibility State
     const [isServicesOpen, setIsServicesOpen] = useState(false);
     const [isGeneralOpen, setIsGeneralOpen] = useState(false);
+    const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
 
     // Form State
     const [name, setName] = useState("");
@@ -218,7 +219,29 @@ export default function SettingsPage() {
 
             {/* Permission Management Section */}
             <div className="border rounded-lg bg-card text-card-foreground shadow-sm">
-                <PermissionSettings />
+                <div
+                    onClick={() => setIsPermissionsOpen(!isPermissionsOpen)}
+                    className="flex flex-row items-center justify-between p-6 cursor-pointer hover:bg-accent/50 transition-colors"
+                >
+                    <div className="flex items-center gap-4">
+                        <div className="p-2 bg-purple-500/10 rounded-full">
+                            <Shield className="h-6 w-6 text-purple-500" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-semibold">Permission Management</h2>
+                            <p className="text-sm text-muted-foreground">Configure user access and roles.</p>
+                        </div>
+                    </div>
+                    {isPermissionsOpen ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : <ChevronRight className="h-5 w-5 text-muted-foreground" />}
+                </div>
+
+                <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isPermissionsOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                    <div className="overflow-hidden">
+                        <div className="p-6 pt-0">
+                            <PermissionSettings />
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* General Settings Section */}

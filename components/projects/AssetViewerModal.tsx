@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Asset } from "@/lib/db";
+import { Asset } from "@/lib/types";
 import { updateProjectAsset } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { PencilIcon, SaveIcon, XIcon } from "lucide-react";

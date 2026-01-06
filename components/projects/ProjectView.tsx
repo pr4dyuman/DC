@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Project, Task, User, Transaction, Asset, Service, UserPermissions } from "@/lib/db";
+import { Project, Task, User, Transaction, Asset, Service, UserPermissions } from "@/lib/types";
 import { KanbanBoard } from "@/components/projects/KanbanBoard";
 import { CreateTaskModal } from "@/components/projects/CreateTaskModal";
 import { ProjectSettingsModal } from "@/components/projects/ProjectSettingsModal";
@@ -26,7 +26,7 @@ type ProjectViewProps = {
 
 export function ProjectView({ project, tasks, users, transactions, assets, categories, currentUser, permissions }: ProjectViewProps & { currentUser?: User }) {
     const projectServices = project.services || [];
-    const filteredCategories = categories.filter(c => projectServices.includes(c.name));
+    const filteredCategories = categories.filter(c => projectServices.includes(c.id) || projectServices.includes(c.name));
     const [selectedCategory, setSelectedCategory] = useState<string>("All");
 
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager'; // Helper
@@ -45,18 +45,20 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                             >
                                 All
                             </Badge>
-                            {project.services && project.services
-                                .filter(svc => categories.some(c => c.name === svc))
-                                .map((svc) => (
+                            {project.services && project.services.map((svc) => {
+                                const serviceObj = categories.find(c => c.id === svc || c.name === svc);
+                                const displayName = serviceObj ? serviceObj.name : svc;
+                                return (
                                     <Badge
                                         key={svc}
                                         variant={selectedCategory === svc ? "secondary" : "outline"}
                                         className={`cursor-pointer transition-all ${selectedCategory === svc ? "bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30 border-yellow-500/50" : "bg-yellow-500/5 text-yellow-600/70 hover:bg-yellow-500/10 border-yellow-500/20"}`}
-                                        onClick={() => setSelectedCategory(svc)}
+                                        onClick={() => setSelectedCategory(serviceObj ? serviceObj.id : svc)}
                                     >
-                                        {svc}
+                                        {displayName}
                                     </Badge>
-                                ))}
+                                )
+                            })}
                         </div>
                     </div>
 

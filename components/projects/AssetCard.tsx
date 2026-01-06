@@ -1,4 +1,4 @@
-import { Asset } from "@/lib/db";
+import { Asset } from "@/lib/types";
 import { FileIcon, ImageIcon, CodeIcon, LinkIcon, ArchiveIcon, FolderIcon, MoreVerticalIcon, DownloadIcon, TrashIcon, EyeIcon, CalendarIcon, UserIcon, HardDriveIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";

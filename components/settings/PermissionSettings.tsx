@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // --- Icons (Lucide) ---
 // Simulating imports if not available, but assuming lucide-react is installed
-import { Search, User as UserIcon, Building2, Check, X, Shield, ShieldAlert, Trash2 } from 'lucide-react';
+import { Search, User as UserIcon, Building2, Check, X, ShieldAlert, Trash2 } from 'lucide-react';
 
 export default function PermissionSettings() {
     const [users, setUsers] = useState<User[]>([]);
@@ -45,7 +45,7 @@ export default function PermissionSettings() {
     };
 
     const handleUpdatePermission = async (userId: string, key: keyof UserPermissions, value: any) => {
-        const currentPerms = permissionsMap[userId] || { canManageTasks: true, canMarkDone: true, deleteAccess: 'any' };
+        const currentPerms = permissionsMap[userId] || { canCreateProject: false, canManageTasks: true, canUseAI: false, canMarkDone: true, deleteAccess: 'any' };
         const newPerms = { ...currentPerms, [key]: value };
 
         // Optimistic UI
@@ -68,16 +68,33 @@ export default function PermissionSettings() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <Shield className="w-6 h-6 text-yellow-500" />
-                        Permission Management
-                    </h2>
-                    <p className="text-gray-400 text-sm">Control access levels for employees and clients.</p>
+            {/* Tabs & Search Toolbar */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-white/5 pb-2">
+                {/* Tabs Left */}
+                <div className="flex gap-4">
+                    <button
+                        onClick={() => setActiveTab('employees')}
+                        className={`pb-2 px-4 text-sm font-medium transition-colors relative ${activeTab === 'employees' ? 'text-yellow-400' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        <div className="flex items-center gap-2">
+                            <UserIcon className="w-4 h-4" />
+                            Employees
+                        </div>
+                        {activeTab === 'employees' && <motion.div layoutId="tab-underline" className="absolute bottom-[-9px] left-0 right-0 h-0.5 bg-yellow-400" />}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('clients')}
+                        className={`pb-2 px-4 text-sm font-medium transition-colors relative ${activeTab === 'clients' ? 'text-yellow-400' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        <div className="flex items-center gap-2">
+                            <Building2 className="w-4 h-4" />
+                            Clients
+                        </div>
+                        {activeTab === 'clients' && <motion.div layoutId="tab-underline" className="absolute bottom-[-9px] left-0 right-0 h-0.5 bg-yellow-400" />}
+                    </button>
                 </div>
 
-                {/* Search & Desktop Tab Toggle */}
+                {/* Search Right */}
                 <div className="flex items-center gap-4 bg-zinc-900/50 p-1 rounded-xl border border-white/5">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -86,41 +103,17 @@ export default function PermissionSettings() {
                             placeholder="Search users..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="bg-transparent border-none text-sm text-white pl-9 pr-4 py-2 focus:ring-0 w-48 md:w-64"
+                            className="bg-transparent border-none text-sm text-white pl-9 pr-4 py-1.5 focus:ring-0 w-40 md:w-56"
                         />
                     </div>
                 </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex gap-4 border-b border-white/5">
-                <button
-                    onClick={() => setActiveTab('employees')}
-                    className={`pb-3 px-4 text-sm font-medium transition-colors relative ${activeTab === 'employees' ? 'text-yellow-400' : 'text-gray-400 hover:text-white'}`}
-                >
-                    <div className="flex items-center gap-2">
-                        <UserIcon className="w-4 h-4" />
-                        Employees
-                    </div>
-                    {activeTab === 'employees' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-400" />}
-                </button>
-                <button
-                    onClick={() => setActiveTab('clients')}
-                    className={`pb-3 px-4 text-sm font-medium transition-colors relative ${activeTab === 'clients' ? 'text-yellow-400' : 'text-gray-400 hover:text-white'}`}
-                >
-                    <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4" />
-                        Clients
-                    </div>
-                    {activeTab === 'clients' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-400" />}
-                </button>
             </div>
 
             {/* List */}
             <div className="grid gap-4">
                 <AnimatePresence>
                     {filteredList.map((user) => {
-                        const perms = permissionsMap[user.id] || { canManageTasks: true, canMarkDone: true, deleteAccess: 'any' };
+                        const perms = permissionsMap[user.id] || { canCreateProject: false, canManageTasks: true, canUseAI: false, canMarkDone: true, deleteAccess: 'any' };
 
                         return (
                             <motion.div
@@ -133,8 +126,8 @@ export default function PermissionSettings() {
                                 {/* User Info */}
                                 <div className="flex items-center gap-4 min-w-[200px]">
                                     <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden border border-white/10 group-hover:border-yellow-500/50 transition-colors">
-                                        {user.avatar ? (
-                                            <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                                        {('avatar' in user && user.avatar) || ('logo' in user && user.logo) ? (
+                                            <img src={('avatar' in user && user.avatar) ? user.avatar : ('logo' in user ? user.logo : '')} alt={user.name} className="w-full h-full object-cover" />
                                         ) : (
                                             <UserIcon className="w-5 h-5 text-gray-400" />
                                         )}
@@ -167,7 +160,7 @@ export default function PermissionSettings() {
                                             <span className="text-[10px] text-gray-500">Move tasks to &quot;Done&quot;</span>
                                         </div>
                                         <Toggle
-                                            enabled={perms.canMarkDone}
+                                            enabled={perms.canMarkDone ?? true}
                                             onChange={(val) => handleUpdatePermission(user.id, 'canMarkDone', val)}
                                         />
                                     </div>

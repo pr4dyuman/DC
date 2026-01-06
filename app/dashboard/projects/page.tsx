@@ -73,13 +73,15 @@ export default function ProjectsPage() {
                                             <div className="text-sm text-muted-foreground line-clamp-1">
                                                 <div className="flex flex-wrap gap-1 mt-1">
                                                     {project.client && project.client !== project.name ? <Badge variant="outline" className="font-normal text-xs">{project.client}</Badge> : null}
-                                                    {project.services && project.services.length > 0 && project.services
-                                                        .filter((svc: string) => services.some(s => s.name === svc))
-                                                        .map((svc: string) => (
-                                                            <Badge key={svc} variant="secondary" className="font-normal text-xs bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 border-yellow-500/20">
-                                                                {svc}
+                                                    {project.services && project.services.length > 0 && project.services.map((svcIdOrName: string) => {
+                                                        const service = services.find(s => s.id === svcIdOrName || s.name === svcIdOrName);
+                                                        const displayName = service ? service.name : svcIdOrName;
+                                                        return (
+                                                            <Badge key={svcIdOrName} variant="secondary" className="font-normal text-xs bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20 border-yellow-500/20">
+                                                                {displayName}
                                                             </Badge>
-                                                        ))}
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         </div>

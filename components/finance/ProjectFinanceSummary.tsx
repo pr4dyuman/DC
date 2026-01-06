@@ -1,7 +1,7 @@
 import { TrendingUp, TrendingDown, Wallet, Target, CalendarClock, CreditCard } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Project, Transaction } from "@/lib/db";
+import { Project, Transaction } from "@/lib/types";
 
 interface ProjectFinanceSummaryProps {
     project: Project;

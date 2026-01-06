@@ -6,7 +6,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Task } from "@/lib/db";
+import { Task } from "@/lib/types";
 import { Sparkles, Calendar } from "lucide-react";
 import { AIExplanationModal } from "./AIExplanationModal";
 import { useSearchParams } from "next/navigation";

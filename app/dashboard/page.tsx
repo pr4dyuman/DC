@@ -14,15 +14,19 @@ import {
     getCurrentUser
 } from "@/lib/actions";
 import { getSessionId } from "@/lib/auth";
+import { Project, Invoice, Notification as AppNotification, Transaction, Task, Asset } from "@/lib/types";
+import { db } from "@/lib/db";
 
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { RevenueChart, ProjectDistributionChart } from "@/components/dashboard/Charts";
-import { RecentActivity } from "@/components/dashboard/RecentActivity";
+import { RecentActivityList } from "@/components/dashboard/RecentActivityList";
+import { UrgentTasksList } from "@/components/dashboard/UrgentTasksList";
+import { EmployeeTasksList } from "@/components/dashboard/EmployeeTasksList";
 import { IndianRupee, Briefcase, FileText, Activity as ActivityIcon, CheckCircle2, Clock, Calendar } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ClientDashboard } from "@/components/dashboard/ClientDashboard"; // Named import
+import { ClientDashboard } from "@/components/dashboard/ClientDashboard";
 
 export default async function DashboardPage() {
     const currentUser = await getCurrentUser();
@@ -30,16 +34,73 @@ export default async function DashboardPage() {
 
     // Client Dashboard View
     if (currentUser.role === 'client') {
-        const projects = await getProjects(); // Assuming getProjects is now filtered for client if called by client
-        const invoices = await getInvoices(); // Assuming getInvoices is now filtered for client
-        const notifications = await getNotifications(currentUser.id);
+        // Fetch ALL data for metrics calculation
+        const [projects, invoices, notifications] = await Promise.all([
+            getProjects(),
+            getInvoices(),
+            getNotifications(currentUser.id)
+        ]);
+
+        // Get additional data from db
+        const data = await db.get();
+        
+        // Filter data for this client
+        const clientProjects = projects.filter((p: Project) => p.clientId === currentUser.id);
+        const clientProjectIds = new Set(clientProjects.map((p: Project) => p.id));
+        const clientInvoices = invoices.filter((i: Invoice) => clientProjectIds.has(i.projectId));
+        const clientTransactions = data.transactions.filter((t: Transaction) => t.projectId && clientProjectIds.has(t.projectId));
+        const clientTasks = data.tasks.filter((t: Task) => clientProjectIds.has(t.projectId));
+        const clientAssets = data.assets.filter((a: Asset) => clientProjectIds.has(a.projectId));
+
+        // Calculate metrics
+        const activeProjectsCount = clientProjects.filter((p: Project) => p.status === 'Active').length;
+        const completedProjectsCount = clientProjects.filter((p: Project) => p.status === 'Completed').length;
+        const pendingInvoices = clientInvoices.filter((i: Invoice) => i.status === 'Pending' || i.status === 'Overdue');
+        const totalDue = pendingInvoices.reduce((acc: number, inv: Invoice) => acc + inv.amount, 0);
+        const unreadNotificationsCount = notifications.filter((n: AppNotification) => !n.read).length;
+        
+        // Financial metrics (Client perspective)
+        // Total Spent = Money client has paid to agency - Refunds received
+        const totalPaid = clientTransactions
+            .filter((t: Transaction) => t.type === 'income' && t.status === 'completed')
+            .reduce((sum: number, t: Transaction) => sum + t.amount, 0);
+        
+        const totalRefunded = clientTransactions
+            .filter((t: Transaction) => t.category === 'Refund' && t.status === 'completed')
+            .reduce((sum: number, t: Transaction) => sum + t.amount, 0);
+        
+        const totalSpent = totalPaid - totalRefunded;
+        
+        // Total Budget = Sum of all project budgets (remains unchanged)
+        const totalBudget = clientProjects.reduce((sum: number, p: Project) => sum + (p.budget || 0), 0);
+
+        // Task metrics
+        const totalTasks = clientTasks.length;
+        const completedTasks = clientTasks.filter((t: Task) => t.status === 'Done').length;
+
+        const clientMetrics = {
+            activeProjects: activeProjectsCount,
+            completedProjects: completedProjectsCount,
+            pendingInvoicesCount: pendingInvoices.length,
+            totalDue: totalDue,
+            unreadNotificationsCount: unreadNotificationsCount,
+            totalSpent,
+            totalBudget,
+            totalTasks,
+            completedTasks
+        };
 
         return (
             <ClientDashboard
-                projects={projects}
-                invoices={invoices}
-                notifications={notifications}
+                initialProjects={clientProjects.slice(0, 5)}
+                initialNotifications={notifications.slice(0, 5)}
                 clientName={currentUser.name}
+                clientId={currentUser.id}
+                metrics={clientMetrics}
+                transactions={clientTransactions}
+                tasks={clientTasks}
+                invoices={clientInvoices}
+                assets={clientAssets}
             />
         );
     }
@@ -60,22 +121,21 @@ export default async function DashboardPage() {
             getDashboardMetrics(),
             getRevenueData(),
             getProjectDistribution(),
-            getRecentActivity(),
-            getHighPriorityTasks()
+            getRecentActivity(), // Defaults to limit 5
+            getHighPriorityTasks() // Defaults to limit 5
         ]);
     } else {
         // Employee Data
         allProjects = await getProjects(); // Filter in memory or fetch specifically
-        myTasks = await getUserTasks(userId);
-        myActivity = await getUserActivity(userId);
+        myTasks = await getUserTasks(userId); // Defaults to limit 1000, so we have all tasks for metrics
+        myActivity = await getUserActivity(userId); // Defaults to 20 slice in action, slice to 5 for initial list if needed
 
         // Compute Employee Metrics
         const activeTasks = myTasks.filter(t => t.status === 'In Progress').length;
         const pendingTasks = myTasks.filter(t => t.status === 'Todo').length;
         const completedTasks = myTasks.filter(t => t.status === 'Done').length;
 
-        // Find projects user is involved in (via tasks or if array exists, but assignments are task based mainly)
-        // Let's assume user is involved if they have tasks in it.
+        // Find projects user is involved in
         const projectIds = new Set(myTasks.map(t => t.projectId));
         myProjects = allProjects.filter(p => projectIds.has(p.id));
     }
@@ -102,26 +162,26 @@ export default async function DashboardPage() {
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                     <MetricCard
                         title="Total Revenue"
-                        value={`₹${metrics?.revenue.toLocaleString()}`}
-                        description="+20.1% from last month"
+                        value={`₹${metrics?.revenue?.toLocaleString() ?? 0}`}
+                        description={`${(metrics?.growth ?? 0) > 0 ? '+' : ''}${metrics?.growth ?? 0}% from last month`}
                         icon={IndianRupee}
                     />
                     <MetricCard
                         title="Active Projects"
-                        value={metrics?.activeProjects}
-                        description="High priority: 2"
+                        value={metrics?.activeProjects ?? 0}
+                        description={`High priority: ${metrics?.highPriorityCount ?? 0}`}
                         icon={Briefcase}
                     />
                     <MetricCard
                         title="Pending Invoices"
-                        value={`₹${metrics?.pending.toLocaleString()}`}
-                        description="2 invoices overdue"
+                        value={`₹${metrics?.pending?.toLocaleString() ?? 0}`}
+                        description={`${metrics?.overdueCount ?? 0} invoices overdue`}
                         icon={FileText}
                     />
                     <MetricCard
                         title="Team Utilization"
-                        value={`${metrics?.utilization}%`}
-                        description="4 active tasks"
+                        value={`${metrics?.utilization ?? 0}%`}
+                        description={`${metrics?.activeTasksCount ?? 0} active tasks`}
                         icon={ActivityIcon}
                     />
                 </div>
@@ -132,30 +192,8 @@ export default async function DashboardPage() {
                 </div>
 
                 <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-7">
-                    <div className="col-span-4">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Urgent Tasks</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {(urgentTasks?.length || 0) === 0 && <p className="text-sm text-muted-foreground">No urgent tasks pending.</p>}
-                                    {urgentTasks?.map((task: any) => (
-                                        <div key={task.id} className="flex items-center">
-                                            <div className="ml-4 space-y-1">
-                                                <p className="text-sm font-medium leading-none">{task.title}</p>
-                                                <p className="text-sm text-muted-foreground">Due {new Date(task.dueDate).toLocaleDateString()}</p>
-                                            </div>
-                                            <div className={`ml-auto font-medium text-xs px-2 py-1 rounded-full ${task.status === 'In Progress' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'}`}>
-                                                {task.status}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                    <RecentActivity activities={activities || []} />
+                    <UrgentTasksList initialTasks={urgentTasks || []} />
+                    <RecentActivityList initialActivities={activities || []} />
                 </div>
             </div>
         );
@@ -199,43 +237,16 @@ export default async function DashboardPage() {
             <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
                 {/* My Active Tasks List */}
                 <div className="col-span-2">
-                    <Card className="h-full">
-                        <CardHeader>
-                            <CardTitle>My Active Tasks</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                {myTasks?.filter((t: any) => t.status === 'In Progress' || t.status === 'Todo').slice(0, 5).map((task: any) => {
-                                    const project = allProjects.find((p: any) => p.id === task.projectId);
-                                    const projectSlug = project?.slug || task.projectId;
-                                    return (
-                                        <Link key={task.id} href={`/dashboard/projects/${projectSlug}?task=${task.id}`} className="flex items-center p-3 rounded-lg hover:bg-slate-800/50 transition border border-transparent hover:border-slate-700 cursor-pointer">
-                                            <div className={`w-2 h-2 rounded-full mr-4 ${task.status === 'In Progress' ? 'bg-amber-500' : 'bg-slate-500'}`} />
-                                            <div className="flex-1 space-y-1">
-                                                <p className="text-sm font-medium leading-none text-white">{task.title}</p>
-                                                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                                    <Calendar className="w-3 h-3 text-yellow-500" /> Due {new Date(task.dueDate).toLocaleDateString()}
-                                                </p>
-                                            </div>
-                                            <div className={`px-2 py-1 rounded text-xs font-medium ${task.priority === 'High' ? 'bg-red-500/10 text-red-500' : 'bg-slate-500/10 text-slate-500'}`}>
-                                                {task.priority || 'Normal'}
-                                            </div>
-                                        </Link>
-                                    );
-                                })}
-                                {(!myTasks || myTasks.length === 0) && (
-                                    <div className="text-center py-8 text-muted-foreground">
-                                        No tasks assigned correctly.
-                                    </div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <EmployeeTasksList
+                        initialTasks={myTasks?.filter((t: any) => t.status === 'In Progress' || t.status === 'Todo').slice(0, 5) || []}
+                        userId={userId}
+                        allProjects={allProjects}
+                    />
                 </div>
 
                 {/* My Recent Activity */}
                 <div className="col-span-1">
-                    <RecentActivity activities={myActivity || []} />
+                    <RecentActivityList initialActivities={myActivity?.slice(0, 5) || []} />
                 </div>
             </div>
         </div>

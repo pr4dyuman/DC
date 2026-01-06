@@ -1,0 +1,206 @@
+{
+  "users": [
+    {
+      "id": "u1",
+      "name": "Pradyuman Sharma",
+      "email": "pradyuman@agency.com",
+      "role": "admin",
+      "jobTitle": "CEO",
+      "salary": 120000,
+      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Pradyuman",
+      "lastActiveAt": "2026-01-06T12:18:44.810Z",
+      "username": "pradyumansharma",
+      "geminiApiKey": "AIzaSyCD4N1mq2fV6kxRDpY-0d14v3KOm0UGc-s"
+    },
+    {
+      "id": "u4",
+      "name": "Emily Chen",
+      "email": "emily@agency.com",
+      "role": "employee",
+      "jobTitle": "developer",
+      "salary": 75000,
+      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Emily",
+      "lastActiveAt": "2025-12-26T18:34:51.234Z",
+      "password": "",
+      "username": "emilychen",
+      "employmentType": "Salary",
+      "contactNumber": "+91957158580"
+    }
+  ],
+  "clients": [
+    {
+      "name": "shobhit sharma",
+      "email": "testclient@digitalcorevids.com",
+      "companyName": "Film Stage Productions",
+      "password": "",
+      "id": "fh3eczvpc",
+      "lastActiveAt": "2026-01-05T17:39:55.353Z",
+      "username": "shobhit1",
+      "role": "client",
+      "jobTitle": "film stage",
+      "salary": 0,
+      "avatar": "https://api.dicebear.com/7.x/initials/svg?seed=film stage",
+      "phone": "9876543210",
+      "address": "Behind Durga Temple, Ward No. 36, Mumbai, Maharashtra",
+      "logo": "https://api.dicebear.com/7.x/initials/svg?seed=Film Stage"
+    }
+  ],
+  "projects": [
+    {
+      "id": "test_project_2",
+      "slug": "website-development-project",
+      "name": "Website Development Project",
+      "client": "shobhit sharma",
+      "clientId": "fh3eczvpc",
+      "services": [
+        "s1"
+      ],
+      "serviceConfigs": [
+        {
+          "serviceId": "s1",
+          "name": "Web Development",
+          "paymentConfig": {
+            "type": "installment",
+            "paymentDetailsLater": false,
+            "installments": 2,
+            "installmentAmount": 100000,
+            "monthlyAmount": 100000,
+            "firstPaymentDate": "2026-01-06",
+            "installmentDates": [
+              "2026-01-06",
+              "2026-01-07"
+            ]
+          }
+        }
+      ],
+      "budget": 200000,
+      "dueDate": "2026-03-31",
+      "aiEnabled": false,
+      "status": "Active",
+      "createdAt": "2026-01-05T10:00:00.000Z"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task_1",
+      "projectId": "test_project_2",
+      "title": "Setup project structure",
+      "description": "Initialize the project with basic structure",
+      "status": "Done",
+      "priority": "High",
+      "assigneeId": "u4",
+      "category": "Web Development",
+      "dueDate": "2026-01-10T10:00:00.000Z",
+      "createdAt": "2026-01-05T10:00:00.000Z",
+      "createdBy": "fh3eczvpc"
+    },
+    {
+      "id": "task_2",
+      "projectId": "test_project_2",
+      "title": "Design homepage",
+      "description": "Create homepage design mockups",
+      "status": "Done",
+      "priority": "Medium",
+      "assigneeId": "u4",
+      "category": "Web Development",
+      "dueDate": "2026-01-15T10:00:00.000Z",
+      "createdAt": "2026-01-05T10:00:00.000Z",
+      "createdBy": "u1"
+    }
+  ],
+  "services": [
+    {
+      "id": "s1",
+      "name": "Web Development",
+      "jobs": [
+        {
+          "title": "developer",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "name": "Design",
+      "jobs": []
+    },
+    {
+      "id": "s3",
+      "name": "SEO",
+      "jobs": []
+    }
+  ],
+  "invoices": [
+    {
+      "id": "inv_1",
+      "projectId": "test_project_2",
+      "amount": 100000,
+      "status": "Paid",
+      "date": "2026-01-06"
+    },
+    {
+      "id": "inv_2",
+      "projectId": "test_project_2",
+      "amount": 100000,
+      "status": "Paid",
+      "date": "2026-01-07"
+    }
+  ],
+  "transactions": [
+    {
+      "description": "1st payment",
+      "amount": 100000,
+      "type": "income",
+      "category": "Project",
+      "date": "2026-01-06",
+      "projectId": "test_project_2",
+      "id": "et3uytn40",
+      "status": "completed"
+    }
+  ],
+  "notifications": [],
+  "activities": [
+    {
+      "id": "l3l4jb9d9",
+      "user": "Pradyuman Sharma",
+      "action": "moved task to Done",
+      "target": "Setup project structure",
+      "timestamp": "2026-01-05T17:37:44.073Z"
+    },
+    {
+      "id": "ger2taq7r",
+      "user": "Pradyuman Sharma",
+      "action": "moved task to Review",
+      "target": "Setup project structure",
+      "timestamp": "2026-01-05T17:37:42.216Z"
+    },
+    {
+      "id": "r4pvs8j20",
+      "user": "Pradyuman Sharma",
+      "action": "moved task to Done",
+      "target": "Design homepage",
+      "timestamp": "2026-01-05T17:37:40.228Z"
+    },
+    {
+      "id": "act_1",
+      "user": "shobhit sharma",
+      "action": "created",
+      "target": "Website Development Project",
+      "timestamp": "2026-01-05T10:00:00.000Z"
+    },
+    {
+      "id": "act_2",
+      "user": "Pradyuman Sharma",
+      "action": "assigned task",
+      "target": "Design homepage to Emily Chen",
+      "timestamp": "2026-01-05T10:30:00.000Z"
+    }
+  ],
+  "assets": [],
+  "messages": [],
+  "leaveRequests": [],
+  "settings": {
+    "systemName": "AgencyOS",
+    "logo": ""
+  }
+}

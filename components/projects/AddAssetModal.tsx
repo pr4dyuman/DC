@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { PlusIcon, AlertTriangle, FileIcon, CheckCircle2, Loader2, ShieldCheck, Ban } from "lucide-react";
 import { addProjectAsset } from "@/lib/actions";
-import { AssetType } from "@/lib/db";
+import { AssetType } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";

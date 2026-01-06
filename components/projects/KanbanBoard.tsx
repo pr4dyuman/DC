@@ -14,7 +14,7 @@ import {
     DragEndEvent,
 } from "@dnd-kit/core";
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { Task, UserPermissions } from "@/lib/db";
+import { Task, UserPermissions } from "@/lib/types";
 import { updateTaskStatus } from "@/lib/actions"; // Server Action
 import { TaskCard } from "./TaskCard";
 import { DroppableColumn } from "./DroppableColumn";

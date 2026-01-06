@@ -1,269 +1,165 @@
-import fs from 'fs/promises';
-import path from 'path';
+import {
+    User, Client, PaymentType, PaymentConfig, ProjectServiceConfig, Project,
+    Invoice, Comment, Task, Notification, Activity, AssetType, Asset, Message,
+    TransactionType, TransactionCategory, Transaction, Service,
+    TRANSACTION_CATEGORIES, UserPermissions, DEFAULT_USER_PERMISSIONS,
+    LeaveType, LeaveStatus, LeaveRequest, Job, Settings, DB
+} from './types';
 
-const DB_PATH = path.join(process.cwd(), 'data', 'db.json');
+import {
+    connectDB,
+    UserModel,
+    ClientModel,
+    ProjectModel,
+    TaskModel,
+    InvoiceModel,
+    TransactionModel,
+    ServiceModel,
+    NotificationModel,
+    ActivityModel,
+    AssetModel,
+    MessageModel,
+    LeaveRequestModel,
+    SettingsModel
+} from './mongodb';
 
-export type User = {
-    id: string;
-    username?: string; // New: Unique handle for URLs
-    name: string;
-    email: string;
-    role: 'admin' | 'specialist' | 'manager' | 'employee' | 'client';
-    jobTitle?: string;
-    salary?: number;
-    avatar?: string;
-    password?: string;
-    geminiApiKey?: string;
-    lastActiveAt?: string; // ISO Date string for presence
-};
-export type Client = {
-    id: string;
-    username?: string; // New: Unique handle for URLs
-    name: string;
-    email: string;
-    companyName: string;
-    logo?: string;
-    avatar?: string;
-    phone?: string;
-    address?: string;
-    password?: string;
-    lastActiveAt?: string;
-};
-export type PaymentType = 'installment' | 'monthly';
+export * from './types';
 
-export type PaymentConfig = {
-    type: PaymentType;
-    // For Installment
-    installments?: number;
-    installmentAmount?: number; // total / installments
-    firstPaymentDate?: string;
-    installmentDates?: string[]; // New: Specific dates for each installment
-
-    // For Monthly
-    monthlyAmount?: number;
-    billingStartDate?: string;
-
-    // Common
-    paymentDetailsLater: boolean;
-};
-
-export type ProjectServiceConfig = {
-    serviceId: string; // matches Category.name or Category.id
-    name: string;
-    paymentConfig?: PaymentConfig;
-};
-
-export type Project = { id: string; slug?: string; name: string; client?: string; clientId?: string; services: string[]; serviceConfigs?: ProjectServiceConfig[]; status: 'Active' | 'Completed' | 'On Hold'; budget: number; dueDate: string; createdAt?: string; aiEnabled?: boolean };
-export type Invoice = { id: string; projectId: string; amount: number; status: 'Paid' | 'Pending' | 'Overdue' | 'Processing'; date: string };
-export type Comment = { id: string; userId: string; text: string; timestamp: string };
-export type Task = { id: string; projectId: string; title: string; description?: string; status: 'Todo' | 'In Progress' | 'Review' | 'Done'; priority?: 'Low' | 'Medium' | 'High'; assigneeId: string; dueDate: string; startDate?: string; category?: string; createdAt?: string; createdBy?: string; comments?: Comment[] };
-export type Notification = { id: string; userId: string; message: string; read: boolean; timestamp: string; link?: string };
-export type Activity = { id: string; user: string; action: string; target: string; timestamp: string };
-
-export type AssetType = 'image' | 'file' | 'code' | 'zip' | 'folder' | 'link';
-export type Asset = {
-    id: string;
-    projectId: string;
-    name: string;
-    type: AssetType;
-    url: string;
-    description?: string;
-    size?: string; // e.g. "2MB", "4KB"
-    uploadedAt: string;
-    uploadedBy: string;
-    content?: string; // For text/code files
-    aiEnabled?: boolean;
-};
-
-export type Message = {
-    id: string;
-    senderId: string;
-    receiverId: string; // Can be user ID, but for now assuming direct messages. Group chat would need 'groupId'
-    content: string;
-    timestamp: string;
-    read: boolean;
-    type: 'text' | 'image';
-};
-
-export type TransactionType = 'income' | 'expense';
-export type TransactionCategory = 'Project' | 'Salary' | 'Software' | 'Marketing' | 'Office' | 'Hosting' | 'Domain' | 'Equipment' | 'Internal Transfer' | 'Investor' | 'Other';
-
-
-export type Transaction = {
-    id: string;
-    date: string;
-    amount: number;
-    type: TransactionType;
-    category: TransactionCategory;
-    description: string;
-    status: 'completed' | 'pending';
-    projectId?: string;
-    relatedInvoiceId?: string;
-    userId?: string; // Linked user (e.g. for Salary)
-};
-
-export type LeaveType = 'Casual' | 'Emergency';
-export type LeaveStatus = 'Pending' | 'Approved' | 'Rejected';
-
-export type LeaveRequest = {
-    id: string;
-    userId: string;
-    startDate: string; // ISO Date
-    endDate: string;   // ISO Date
-    type: LeaveType;
-    reason: string;
-    status: LeaveStatus;
-    createdAt: string;
-    reviewedBy?: string; // Admin ID
-    reviewedAt?: string;
-};
-
-export type Job = { title: string; count: number };
-export type Service = { id: string; name: string; jobs: Job[] };
-export type Settings = {
-    systemName: string;
-    logo: string;
-    userPermissions?: Record<string, UserPermissions>;
-};
-export type DB = {
-    users: User[];
-    clients: Client[];
-    projects: Project[];
-    invoices: Invoice[];
-    tasks: Task[];
-    notifications: Notification[];
-    activities: Activity[];
-    services: Service[];
-    transactions: Transaction[];
-    assets: Asset[];
-    messages: Message[];
-    leaveRequests: LeaveRequest[];
-
-    settings: Settings;
-};
-
-export type UserPermissions = {
-    canManageTasks: boolean;
-    canMarkDone: boolean;
-    deleteAccess: 'none' | 'own' | 'any';
-};
-
-
-
-// Simulate network delay for "Realism"
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-async function readDb(): Promise<DB> {
-    // Ensure data dir exists
-    try {
-        const data = await fs.readFile(DB_PATH, 'utf-8');
-        return JSON.parse(data);
-    } catch (error) {
-        // If file doesn't exist, return empty structure or throw
-        console.error("DB Read Error", error);
-        throw new Error("Database not found");
+// Helper to convert MongoDB documents to plain objects and remove MongoDB-specific fields
+function toPlainObject<T>(doc: any): T {
+    if (!doc) return doc;
+    if (Array.isArray(doc)) {
+        return doc.map(d => toPlainObject(d)) as any;
     }
-}
-
-async function writeDb(data: DB): Promise<void> {
-    await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2));
+    
+    // Convert to plain object if it's a Mongoose document
+    const plain = doc.toObject ? doc.toObject() : doc;
+    
+    // Remove MongoDB-specific fields
+    const { _id, __v, createdAt, updatedAt, ...rest } = plain;
+    
+    return rest as T;
 }
 
 export const db = {
-    get: async () => {
-        // await delay(300); // Delay removed for performance
-        const data = await readDb();
+    get: async (): Promise<DB> => {
+        await connectDB();
 
-        // Data Migration Helpers
-        if (!data.services) {
-            // Migration check: if categories exist, migrate them to services
-            if ((data as any).categories) {
-                data.services = (data as any).categories.map((c: any) => ({
-                    id: c.id,
-                    name: c.name,
-                    jobs: []
-                }));
-                delete (data as any).categories; // Cleanup old key
-            } else {
-                data.services = [
-                    { id: "c1", name: "Web Dev", jobs: [] },
-                    { id: "c2", name: "SEO", jobs: [] },
-                    { id: "c3", name: "Video Production", jobs: [] },
-                    { id: "c4", name: "Amazon E-com", jobs: [] },
-                    { id: "c5", name: "Design", jobs: [] }
-                ];
-            }
+        const [users, clients, projects, tasks, invoices, transactions, services, notifications, activities, assets, messages, leaveRequests, settingsDoc] = await Promise.all([
+            UserModel.find({}).lean(),
+            ClientModel.find({}).lean(),
+            ProjectModel.find({}).lean(),
+            TaskModel.find({}).lean(),
+            InvoiceModel.find({}).lean(),
+            TransactionModel.find({}).lean(),
+            ServiceModel.find({}).lean(),
+            NotificationModel.find({}).lean(),
+            ActivityModel.find({}).lean(),
+            AssetModel.find({}).lean(),
+            MessageModel.find({}).lean(),
+            LeaveRequestModel.find({}).lean(),
+            SettingsModel.findOne({}).lean()
+        ]);
 
-        }
+        // Default settings if none exist, with all required fields
+        const settings: Settings = settingsDoc 
+            ? toPlainObject(settingsDoc) 
+            : { systemName: 'AgencyOS', logo: '', userPermissions: {} };
 
-        if (data.projects) {
-            data.projects = data.projects.map((p: any) => {
-                // Migration: Ensure 'name' exists (fallback to client)
-                if (!p.name) p.name = p.client || "Untitled Project";
+        // Ensure settings always have required fields
+        if (!settings.systemName) settings.systemName = 'AgencyOS';
+        if (settings.logo === undefined || settings.logo === null) settings.logo = '';
+        if (!settings.userPermissions) settings.userPermissions = {};
 
-                // Migrate 'department' or 'departments' to 'services'
-                if (p.departments && !p.services) {
-                    return { ...p, services: p.departments, departments: undefined };
-                }
-                if (p.department && !p.services) {
-                    return { ...p, services: [p.department], department: undefined };
-                }
-                return p;
-            });
-        }
-
-        if (!data.clients) {
-            data.clients = [
-                { id: "cl1", name: "John Doe", email: "john@techstart.com", companyName: "TechStart", phone: "+1 555 0101" },
-                { id: "cl2", name: "Jane Smith", email: "jane@growth.io", companyName: "Growth.io" }
-            ];
-        }
-
-        if (!data.transactions) {
-            data.transactions = [
-                { id: "t1", date: "2024-05-01", amount: 5000, type: "income", category: "Project", description: "Website Down Payment", status: "completed", projectId: "p1" },
-                { id: "t2", date: "2024-05-05", amount: 150, type: "expense", category: "Software", description: "Figma Subscription", status: "completed" },
-                { id: "t3", date: "2024-05-10", amount: 2000, type: "expense", category: "Salary", description: "Freelancer Payment", status: "completed" },
-                { id: "t4", date: "2024-05-15", amount: 12000, type: "income", category: "Project", description: "SEO Campaign Q2", status: "completed", projectId: "p2" },
-                { id: "t5", date: "2024-05-20", amount: 20, type: "expense", category: "Hosting", description: "Vercel Pro", status: "completed", projectId: "p1" }
-            ];
-        }
-
-        if (!data.invoices) data.invoices = [];
-        if (!data.tasks) data.tasks = [];
-        if (!data.users) data.users = [];
-        if (!data.notifications) data.notifications = [];
-        if (!data.activities) data.activities = [];
-        if (!data.assets) data.assets = [];
-        if (!data.messages) data.messages = [];
-        if (!data.leaveRequests) data.leaveRequests = [];
-        if (!data.settings) {
-            data.settings = { systemName: 'AgencyOS', logo: '' };
-        }
-
-        return data;
+        // Convert all documents to plain objects without MongoDB fields
+        return {
+            users: toPlainObject(users),
+            clients: toPlainObject(clients),
+            projects: toPlainObject(projects),
+            tasks: toPlainObject(tasks),
+            invoices: toPlainObject(invoices),
+            transactions: toPlainObject(transactions),
+            services: toPlainObject(services),
+            notifications: toPlainObject(notifications),
+            activities: toPlainObject(activities),
+            assets: toPlainObject(assets),
+            messages: toPlainObject(messages),
+            leaveRequests: toPlainObject(leaveRequests),
+            settings
+        };
     },
-    update: async (callback: (data: DB) => DB) => {
-        // await delay(300);
-        const data = await readDb();
 
-        // Ensure properties exist before update
-        if (!data.services) data.services = [];
-        if (!data.clients) data.clients = [];
-        if (!data.transactions) data.transactions = [];
-        if (!data.invoices) data.invoices = [];
-        if (!data.tasks) data.tasks = [];
-        if (!data.users) data.users = [];
-        if (!data.notifications) data.notifications = [];
-        if (!data.activities) data.activities = [];
-        if (!data.activities) data.activities = [];
-        if (!data.assets) data.assets = [];
-        if (!data.messages) data.messages = [];
-        if (!data.leaveRequests) data.leaveRequests = [];
-        if (!data.settings) data.settings = { systemName: 'AgencyOS', logo: '' };
+    update: async (callback: (data: DB) => DB): Promise<DB> => {
+        await connectDB();
 
-        const newData = callback(data);
-        await writeDb(newData);
+        // Get current data
+        const currentData = await db.get();
+
+        // Apply the callback transformation
+        const newData = callback(currentData);
+
+        // Update all collections in parallel
+        await Promise.all([
+            // Clear and insert users
+            UserModel.deleteMany({}).then(async () => {
+                if (newData.users.length > 0) await UserModel.insertMany(newData.users);
+            }),
+            // Clear and insert clients
+            ClientModel.deleteMany({}).then(async () => {
+                if (newData.clients.length > 0) await ClientModel.insertMany(newData.clients);
+            }),
+            // Clear and insert projects
+            ProjectModel.deleteMany({}).then(async () => {
+                if (newData.projects.length > 0) await ProjectModel.insertMany(newData.projects);
+            }),
+            // Clear and insert tasks
+            TaskModel.deleteMany({}).then(async () => {
+                if (newData.tasks.length > 0) await TaskModel.insertMany(newData.tasks);
+            }),
+            // Clear and insert invoices
+            InvoiceModel.deleteMany({}).then(async () => {
+                if (newData.invoices.length > 0) await InvoiceModel.insertMany(newData.invoices);
+            }),
+            // Clear and insert transactions
+            TransactionModel.deleteMany({}).then(async () => {
+                if (newData.transactions.length > 0) await TransactionModel.insertMany(newData.transactions);
+            }),
+            // Clear and insert services
+            ServiceModel.deleteMany({}).then(async () => {
+                if (newData.services.length > 0) await ServiceModel.insertMany(newData.services);
+            }),
+            // Clear and insert notifications
+            NotificationModel.deleteMany({}).then(async () => {
+                if (newData.notifications.length > 0) await NotificationModel.insertMany(newData.notifications);
+            }),
+            // Clear and insert activities
+            ActivityModel.deleteMany({}).then(async () => {
+                if (newData.activities.length > 0) await ActivityModel.insertMany(newData.activities);
+            }),
+            // Clear and insert assets
+            AssetModel.deleteMany({}).then(async () => {
+                if (newData.assets.length > 0) await AssetModel.insertMany(newData.assets);
+            }),
+            // Clear and insert messages
+            MessageModel.deleteMany({}).then(async () => {
+                if (newData.messages.length > 0) await MessageModel.insertMany(newData.messages);
+            }),
+            // Clear and insert leave requests
+            LeaveRequestModel.deleteMany({}).then(async () => {
+                if (newData.leaveRequests.length > 0) await LeaveRequestModel.insertMany(newData.leaveRequests);
+            }),
+            // Update settings
+            SettingsModel.deleteMany({}).then(async () => {
+                // Ensure settings have required fields
+                const settingsToSave = {
+                    systemName: newData.settings.systemName || 'AgencyOS',
+                    logo: newData.settings.logo || '',
+                    userPermissions: newData.settings.userPermissions || {}
+                };
+                await SettingsModel.create(settingsToSave);
+            })
+        ]);
+
         return newData;
     }
 };
