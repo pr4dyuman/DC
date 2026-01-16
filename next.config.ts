@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '10mb',
     },
   },
+  compiler: {
+    removeConsole: process.env.NODE_ENV === "production",
+  },
 };
 
 export default nextConfig;

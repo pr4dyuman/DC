@@ -67,7 +67,7 @@ export function AIChatBox({ projectId, taskState, userId, onClose, onApply }: AI
     };
 
     return (
-        <div className="flex flex-col h-full bg-background/95 backdrop-blur-sm border-l border-border shadow-2xl w-[400px] absolute right-0 top-0 bottom-0 z-50 animate-in slide-in-from-right duration-300">
+        <div className="flex flex-col h-full bg-background/95 backdrop-blur-sm shadow-2xl z-50 animate-in slide-in-from-right duration-300 w-full lg:w-[400px] absolute inset-0 lg:static lg:border-l border-border">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border/50 bg-muted/30">
                 <div className="flex items-center gap-2 text-primary">
@@ -124,7 +124,7 @@ export function AIChatBox({ projectId, taskState, userId, onClose, onApply }: AI
 
                             {/* Action Buttons (AI Only) */}
                             {msg.role === 'model' && (
-                                <div className="mt-3 pt-2 border-t border-border/10 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="mt-3 pt-2 border-t border-border/10 flex justify-end opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                                     <button
                                         onClick={() => onApply(msg.content)}
                                         className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-md transition-colors"

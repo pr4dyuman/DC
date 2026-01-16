@@ -25,32 +25,33 @@ export default function TeamPage() {
 
 
     const loadData = async () => {
-        const data = await getUsers();
-        setUsers(data);
+        // Parallelize initial check
+        const [usersData, currentId] = await Promise.all([
+            getUsers(),
+            getSessionId()
+        ]);
+        
+        setUsers(usersData);
 
-        // Fetch current user role
-        try {
-            const currentId = await getSessionId();
-            if (currentId) {
+        // Fetch current user details if ID exists
+        if (currentId) {
+            try {
                 const currentUser = await getUser(currentId);
                 if (currentUser) {
                     setCurrentUserRole(currentUser.role);
                     setCurrentUserId(currentUser.id);
 
                     if (currentUser.role === 'admin' || currentUser.role === 'manager') {
+                        // Independent fetch for leave requests
                         const requests = await getLeaveRequests();
-                        // Filter logic if needed, getLeaveRequests defaults to all if no ID passed (simulating admin view)
-                        // But strictly in action we implemented it to return all if no ID arg. 
-                        // Let's filter client-side just in case or rely on action.
-                        // Strictly status === 'Pending' for Admin Dashboard
                         setLeaveRequests(requests.filter(r => r.status === 'Pending'));
                     }
                 }
+            } catch (e) {
+                console.error("Failed to fetch current user", e);
             }
-        } catch (e) {
-            console.error("Failed to fetch current user", e);
         }
-
+        
         setLoading(false);
     };
 

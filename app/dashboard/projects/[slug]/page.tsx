@@ -32,7 +32,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         role: 'client',
         username: c.username || c.id,
         avatar: c.logo || `https://api.dicebear.com/7.x/initials/svg?seed=${c.companyName}`,
-        jobTitle: c.companyName
+        jobTitle: c.companyName,
+        agencyId: c.agencyId
     }));
 
     const allUsers = [...users, ...clientUsers];

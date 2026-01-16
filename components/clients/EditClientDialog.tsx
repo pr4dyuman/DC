@@ -20,7 +20,7 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
     const router = useRouter();
     const [submitting, setSubmitting] = useState(false);
 
-    const [formData, setFormData] = useState<Omit<Client, "id">>({
+    const [formData, setFormData] = useState<Omit<Client, "id" | "agencyId">>({
         name: "",
         username: "",
         email: "",

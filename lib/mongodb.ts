@@ -1,5 +1,6 @@
 import mongoose, { Schema, Model, Document } from 'mongoose';
 import {
+    Agency, SuperAdmin,
     User, Client, Project, Task, Invoice, Transaction, Service,
     Notification, Activity, Asset, Message, LeaveRequest, Settings,
     PaymentConfig, ProjectServiceConfig, Comment, Job
@@ -101,9 +102,153 @@ const ProjectServiceConfigSchema = new Schema<ProjectServiceConfig>({
     paymentConfig: { type: PaymentConfigSchema }
 }, { _id: false });
 
+// ============================================================================
+// MULTI-TENANCY SCHEMAS
+// ============================================================================
+
+// Agency Limits Schema (Embedded)
+const AgencyLimitsSchema = new Schema({
+    maxUsers: { type: Number, required: true },
+    maxProjects: { type: Number, required: true },
+    maxClients: { type: Number, required: true },
+    maxStorage: { type: Number, required: true },
+    maxMonthlyInvoices: { type: Number, required: true },
+    aiEnabled: { type: Boolean, required: true },
+    customBranding: { type: Boolean, required: true }
+}, { _id: false });
+
+// Agency Usage Schema (Embedded)
+const AgencyUsageSchema = new Schema({
+    users: { type: Number, default: 0 },
+    projects: { type: Number, default: 0 },
+    clients: { type: Number, default: 0 },
+    storage: { type: Number, default: 0 },
+    monthlyInvoices: { type: Number, default: 0 }
+}, { _id: false });
+
+// Agency Settings Schema (Embedded)
+const AgencySettingsSchema = new Schema({
+    systemName: { type: String, required: true },
+    timezone: { type: String, default: 'UTC' },
+    currency: { type: String, default: 'USD' },
+    dateFormat: { type: String, default: 'MM/DD/YYYY' },
+    allowClientRegistration: { type: Boolean, default: false },
+    requireEmailVerification: { type: Boolean, default: false },
+    enableTwoFactor: { type: Boolean, default: false }
+}, { _id: false });
+
+// Agency Features Schema (Embedded)
+const AgencyFeaturesSchema = new Schema({
+    aiAssistant: { type: Boolean, default: false },
+    advancedReporting: { type: Boolean, default: false },
+    apiAccess: { type: Boolean, default: false },
+    whiteLabel: { type: Boolean, default: false },
+    customDomain: { type: Boolean, default: false },
+    ssoEnabled: { type: Boolean, default: false }
+}, { _id: false });
+
+// Agency Schema
+const AgencySchema = new Schema({
+    id: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
+    domain: { type: String, sparse: true },
+    
+    // Branding
+    logo: { type: String },
+    primaryColor: { type: String },
+    secondaryColor: { type: String },
+    
+    // Status & Plan
+    status: { 
+        type: String, 
+        enum: ['active', 'suspended', 'trial', 'cancelled'], 
+        required: true,
+        default: 'trial'
+    },
+    plan: { 
+        type: String, 
+        enum: ['free', 'starter', 'pro', 'enterprise'], 
+        required: true,
+        default: 'free'
+    },
+    trialEndsAt: { type: String },
+    
+    // Limits & Usage
+    limits: { type: AgencyLimitsSchema, required: true },
+    usage: { type: AgencyUsageSchema, required: true },
+    
+    // Billing
+    // Billing
+    billing: {
+        subscriptionId: { type: String },
+        stripeCustomerId: { type: String },
+        subscriptionStatus: { 
+            type: String, 
+            enum: ['active', 'past_due', 'canceled', 'unpaid', 'trialing', 'incomplete', 'incomplete_expired', 'paused']
+        },
+        currentPeriodEnd: { type: String },
+        cancelAtPeriodEnd: { type: Boolean },
+        billingEmail: { type: String, required: true },
+        billingAddress: { type: String },
+        taxId: { type: String }
+    },
+    
+    // Settings
+    settings: { type: AgencySettingsSchema, required: true },
+    
+    // Metadata
+    createdAt: { type: String, required: true },
+    createdBy: { type: String, required: true },
+    updatedAt: { type: String },
+    lastActivityAt: { type: String },
+    
+    // Features
+    features: { type: AgencyFeaturesSchema, required: true }
+}, { timestamps: true });
+
+// Indexes for Agency
+// AgencySchema.index({ slug: 1 }); // Already unique
+AgencySchema.index({ status: 1 });
+AgencySchema.index({ plan: 1 });
+AgencySchema.index({ createdBy: 1 });
+
+// SuperAdmin Permissions Schema (Embedded)
+const SuperAdminPermissionsSchema = new Schema({
+    canCreateAgency: { type: Boolean, default: true },
+    canDeleteAgency: { type: Boolean, default: true },
+    canSuspendAgency: { type: Boolean, default: true },
+    canViewBilling: { type: Boolean, default: true },
+    canManagePlans: { type: Boolean, default: true }
+}, { _id: false });
+
+// SuperAdmin Schema
+const SuperAdminSchema = new Schema({
+    id: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    role: { type: String, default: 'superadmin' },
+    avatar: { type: String },
+    phone: { type: String },
+    twoFactorEnabled: { type: Boolean, default: false },
+    twoFactorSecret: { type: String },
+    createdAt: { type: String, required: true },
+    lastLoginAt: { type: String },
+    permissions: { type: SuperAdminPermissionsSchema, required: true }
+}, { timestamps: true });
+
+// Indexes for SuperAdmin
+// SuperAdminSchema.index({ email: 1 }); // Already unique
+
+// ============================================================================
+// EXISTING SCHEMAS (Updated with agencyId)
+// ============================================================================
+
 // User Schema
 const UserSchema = new Schema<User>({
     id: { type: String, required: true, unique: true },
+    agencyId: { type: String, required: false, index: true }, // NEW: Multi-tenancy
     username: { type: String, sparse: true },
     name: { type: String, required: true },
     email: { type: String, required: true },
@@ -132,6 +277,7 @@ UserSchema.index({ email: 1 });
 // Client Schema
 const ClientSchema = new Schema<Client>({
     id: { type: String, required: true, unique: true },
+    agencyId: { type: String, required: true, index: true },
     username: { type: String, sparse: true },
     name: { type: String, required: true },
     email: { type: String, required: true },
@@ -161,6 +307,7 @@ ClientSchema.index({ archived: 1 });
 // Project Schema
 const ProjectSchema = new Schema<Project>({
     id: { type: String, required: true, unique: true },
+    agencyId: { type: String, required: true, index: true },
     slug: { type: String },
     name: { type: String, required: true },
     client: { type: String },
@@ -182,6 +329,7 @@ ProjectSchema.index({ slug: 1 });
 // Task Schema
 const TaskSchema = new Schema<Task>({
     id: { type: String, required: true, unique: true },
+    agencyId: { type: String, required: true, index: true },
     projectId: { type: String, required: true },
     title: { type: String, required: true },
     description: { type: String },
@@ -205,6 +353,7 @@ TaskSchema.index({ createdBy: 1 });
 // Invoice Schema
 const InvoiceSchema = new Schema<Invoice>({
     id: { type: String, required: true, unique: true },
+    agencyId: { type: String, required: true, index: true },
     projectId: { type: String, required: true },
     amount: { type: Number, required: true },
     status: { type: String, enum: ['Paid', 'Pending', 'Overdue', 'Processing'], required: true },
@@ -218,6 +367,7 @@ InvoiceSchema.index({ status: 1 });
 // Transaction Schema
 const TransactionSchema = new Schema<Transaction>({
     id: { type: String, required: true, unique: true },
+    agencyId: { type: String, required: true, index: true },
     date: { type: String, required: true },
     amount: { type: Number, required: true },
     type: { type: String, enum: ['income', 'expense'], required: true },
@@ -238,6 +388,7 @@ TransactionSchema.index({ date: 1 });
 // Service Schema
 const ServiceSchema = new Schema<Service>({
     id: { type: String, required: true, unique: true },
+    agencyId: { type: String, required: true, index: true },
     name: { type: String, required: true },
     jobs: [JobSchema]
 }, { timestamps: true });
@@ -247,6 +398,7 @@ const ServiceSchema = new Schema<Service>({
 // Notification Schema
 const NotificationSchema = new Schema<Notification>({
     id: { type: String, required: true, unique: true },
+    agencyId: { type: String, required: true, index: true },
     userId: { type: String, required: true },
     message: { type: String, required: true },
     read: { type: Boolean, required: true, default: false },
@@ -261,6 +413,7 @@ NotificationSchema.index({ read: 1 });
 // Activity Schema
 const ActivitySchema = new Schema<Activity>({
     id: { type: String, required: true, unique: true },
+    agencyId: { type: String, required: true, index: true },
     user: { type: String, required: true },
     action: { type: String, required: true },
     target: { type: String, required: true },
@@ -273,6 +426,7 @@ ActivitySchema.index({ timestamp: -1 });
 // Asset Schema
 const AssetSchema = new Schema<Asset>({
     id: { type: String, required: true, unique: true },
+    agencyId: { type: String, required: true, index: true },
     projectId: { type: String, required: true },
     name: { type: String, required: true },
     type: { type: String, enum: ['image', 'file', 'code', 'zip', 'folder', 'link'], required: true },
@@ -291,6 +445,7 @@ AssetSchema.index({ projectId: 1 });
 // Message Schema
 const MessageSchema = new Schema<Message>({
     id: { type: String, required: true, unique: true },
+    agencyId: { type: String, required: true, index: true },
     senderId: { type: String, required: true },
     receiverId: { type: String, required: true },
     content: { type: String, required: true },
@@ -306,6 +461,7 @@ MessageSchema.index({ receiverId: 1 });
 // Leave Request Schema
 const LeaveRequestSchema = new Schema<LeaveRequest>({
     id: { type: String, required: true, unique: true },
+    agencyId: { type: String, required: true, index: true },
     userId: { type: String, required: true },
     startDate: { type: String, required: true },
     endDate: { type: String, required: true },
@@ -328,9 +484,14 @@ const SettingsSchema = new Schema<Settings>({
 }, { timestamps: true });
 
 // ============================================================================
-// MODELS
+// MODEL EXPORTS
 // ============================================================================
 
+// Multi-tenancy models
+export const AgencyModel = (mongoose.models.Agency as Model<Agency>) || mongoose.model<Agency>('Agency', AgencySchema);
+export const SuperAdminModel = (mongoose.models.SuperAdmin as Model<SuperAdmin>) || mongoose.model<SuperAdmin>('SuperAdmin', SuperAdminSchema);
+
+// Existing models
 export const UserModel = (mongoose.models.User as Model<User>) || mongoose.model<User>('User', UserSchema);
 export const ClientModel = (mongoose.models.Client as Model<Client>) || mongoose.model<Client>('Client', ClientSchema);
 export const ProjectModel = (mongoose.models.Project as Model<Project>) || mongoose.model<Project>('Project', ProjectSchema);

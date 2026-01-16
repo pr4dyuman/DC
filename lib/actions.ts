@@ -3,26 +3,51 @@
 import { db, User, Project, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig, LeaveRequest, LeaveType, LeaveStatus, UserPermissions } from "./db";
 import { revalidatePath } from "next/cache";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { withAgencyId, getCurrentAgency } from "./agency-context";
 
-import { getSessionId } from "./auth";
 import { cookies } from "next/headers";
 import { generateId, resolveUserOrClient } from "./utils-server";
-export { getSessionId };
 
-export async function login(email: string, password: string) {
-    const data = await db.get();
-    let user: User | Client | undefined = data.users.find(u => u.email === email && u.password === password);
-    if (!user) {
-        user = data.clients?.find(c => c.email === email && c.password === password);
-    }
-
-    if (!user) {
-        return { success: false, error: "Invalid credentials" };
-    }
-
+// Authentication
+export async function getSessionId() {
     const cookieStore = await cookies();
-    cookieStore.set("userId", user.id);
-    return { success: true, user };
+    return cookieStore.get("userId")?.value;
+}
+
+export async function login(userId: string) {
+    const cookieStore = await cookies();
+    cookieStore.set("userId", userId);
+}
+
+// NEW: For Dev Mode - Bypass Login
+export async function bypassLogin(userId: string, role: string) {
+    const cookieStore = await cookies();
+    cookieStore.set("userId", userId);
+    cookieStore.set("userRole", role);
+    return { success: true };
+}
+
+export async function logout() {
+    const cookieStore = await cookies();
+    cookieStore.delete("userId");
+    cookieStore.delete("userRole");
+}
+
+
+
+export async function getAllUsers() {
+    const data = await db.get();
+    return data.users;
+}
+
+export async function getAllClients() {
+    const data = await db.get();
+    return data.clients;
+}
+
+export async function getSuperAdmins() {
+    const data = await db.get();
+    return data.superAdmins || [];
 }
 
 export type SearchResult = {
@@ -32,12 +57,6 @@ export type SearchResult = {
     subtitle?: string;
     url: string;
 };
-
-export async function getCurrentUser() {
-    const userId = await getSessionId();
-    if (!userId) return null;
-    return getUser(userId);
-}
 
 export async function getDashboardMetrics() {
     const data = await db.get();
@@ -371,7 +390,7 @@ export async function getUserContributionHistory(userId: string) {
         .filter(a => a.user === user.name && a.timestamp >= isoOneYearAgo);
 }
 
-export async function createUser(user: Omit<User, "id">) {
+export async function createUser(user: Omit<User, "id" | "agencyId">) {
     // Generate/Validate username
     let username = user.username;
     if (!username) {
@@ -389,7 +408,7 @@ export async function createUser(user: Omit<User, "id">) {
         counter++;
     }
 
-    const newUser = { ...user, id: generateId(), username: uniqueUsername };
+    const newUser = await withAgencyId({ ...user, id: generateId(), username: uniqueUsername });
     if (!newUser.avatar) {
         newUser.avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${newUser.name}`;
     }
@@ -400,6 +419,69 @@ export async function createUser(user: Omit<User, "id">) {
     revalidatePath('/dashboard/team');
     return newUser;
 }
+
+// Import auth session
+import { getSessionUser } from "@/lib/auth";
+import { UserModel, ClientModel, SuperAdminModel, connectDB } from "@/lib/mongodb";
+
+// Helper to sanitize Mongoose docs for Client Components
+function sanitizeDoc(doc: any) {
+    if (!doc) return null;
+    return JSON.parse(JSON.stringify(doc));
+}
+
+export async function getCurrentUser() {
+    await connectDB();
+    
+    // 1. Try new Auth System (JWT)
+    const session = await getSessionUser();
+    
+    if (session) {
+        if (session.role === 'superadmin') {
+            const admin = await SuperAdminModel.findOne({ id: session.userId }).lean();
+            if (admin) return sanitizeDoc(admin) as any; 
+        } else if (session.role === 'client') {
+            const client = await ClientModel.findOne({ id: session.userId }).lean();
+            if (client) {
+                return sanitizeDoc({ ...client, role: 'client' }) as any; 
+            }
+        } else {
+             const user = await UserModel.findOne({ id: session.userId }).lean();
+             if (user) return sanitizeDoc(user) as User;
+        }
+    }
+
+    // 2. Legacy Fallback (Cookie based) - Kept for safety during transition
+    const userId = await getSessionId();
+    if (!userId) return null;
+    
+    // Check for Super Admin
+    const allSuperAdmins = (await db.get()).superAdmins;
+    const superAdmin = allSuperAdmins?.find(s => s.id === userId);
+    if (superAdmin) return superAdmin;
+
+    const data = await db.get();
+    const user = data.users.find(u => u.id === userId);
+    if (user) return user;
+    
+    const client = data.clients.find(c => c.id === userId);
+    if (client) {
+         // Return as User type for compatibility
+         return {
+            id: client.id,
+            name: client.name,
+            email: client.email,
+            role: 'client' as any,
+            agencyId: client.agencyId,
+            avatar: client.logo,
+            username: client.username || client.id.substring(0,8)
+         } as User;
+    }
+
+    return null;
+}
+
+import { hashPassword, comparePassword } from "@/lib/auth";
 
 export async function updateUser(id: string, updates: Partial<User>, oldPassword?: string) {
     // Permission Check
@@ -417,22 +499,56 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
         if (!oldPassword) {
             throw new Error("Old password is required to change password");
         }
-        const data = await db.get();
-        const user = data.users.find(u => u.id === id);
-        if (!user) throw new Error("User not found");
-        if (user.password && user.password !== oldPassword) {
-            throw new Error("Incorrect old password");
+        
+        await connectDB();
+        
+        // Find user in MongoDB (Check all collections since we don't strictly know type here easily without lookup)
+        // But typically this action is for Users. Let's check User first.
+        let user: any = await UserModel.findOne({ id: id });
+        let model: any = UserModel;
+        
+        if (!user) {
+            user = await ClientModel.findOne({ id: id });
+            model = ClientModel;
         }
+        if (!user) {
+             user = await SuperAdminModel.findOne({ id: id });
+             model = SuperAdminModel;
+        }
+
+        console.log(`[updateUser] Lookup ID: ${id}, Found: ${!!user}`); // DEBUG
+        if (!user) {
+             throw new Error("User not found");
+        }
+
+        if (user.password) {
+             // Use secure comparison
+             const isMatch = await comparePassword(oldPassword, user.password);
+             if (!isMatch) {
+                 throw new Error("Incorrect old password");
+             }
+        }
+        
+        // Hash the NEW password
+        updates.password = await hashPassword(updates.password);
+        
+        // Perform Update
+        await model.findOneAndUpdate({ id: id }, { $set: updates });
+        return; // Return void as original signature implies (or updated user)
     }
 
-    // Uniqueness Check for Username
+    // For non-password updates, continuing with MongoDB update logic
+    await connectDB();
+    
+    // Check username uniqueness if updating username
     if (updates.username) {
-        const data = await db.get();
-        // Check both users and clients for username collision
-        const existingUser = data.users.find(u => u.username === updates.username && u.id !== id);
-        const existingClient = data.clients?.find(c => (c as any).username === updates.username && c.id !== id);
+        // ... (Reimplement MongoDB uniqueness check if needed, or rely on unique index)
+        // For now, let's assume MongoDB unique index on username handles this, or skip strict check
+        const existingUser = await UserModel.findOne({ username: updates.username, id: { $ne: id } });
+        const existingClient = await ClientModel.findOne({ username: updates.username, id: { $ne: id } });
+        const existingSuperAdmin = await SuperAdminModel.findOne({ username: updates.username, id: { $ne: id } });
 
-        if (existingUser || existingClient) {
+        if (existingUser || existingClient || existingSuperAdmin) {
             throw new Error(`Username "${updates.username}" is already taken.`);
         }
     }
@@ -458,12 +574,11 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
         }
         if (updates.otherDocuments) {
             finalUpdates.pendingOtherDocuments = updates.otherDocuments;
-            delete finalUpdates.otherDocuments;
         }
         notifyAdmin = true;
     }
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         let newData = { ...data };
 
         // Try updating in Users
@@ -480,14 +595,14 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
         // Notify Admins
         if (notifyAdmin) {
             const adminUsers = newData.users.filter(u => u.role === 'admin' || u.role === 'manager');
-            const newNotifications = adminUsers.map(admin => ({
+            const newNotifications = await Promise.all(adminUsers.map(async admin => await withAgencyId({
                 id: generateId(),
                 userId: admin.id,
                 message: `${currentUser.name} has requested to update their identity documents.`,
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: `/dashboard/team?edit=${id}` // Link to open edit dialog (needs implementation on page)
-            }));
+            })));
             newData.notifications = [...newData.notifications, ...newNotifications];
         }
 
@@ -586,7 +701,7 @@ export async function approveDocumentUpdate(userId: string, type: 'adhar' | 'pan
         throw new Error("Unauthorized");
     }
 
-    await db.update(data => {
+    await db.update(async data => {
         const user = data.users.find(u => u.id === userId);
         if (!user) return data;
 
@@ -629,13 +744,13 @@ export async function approveDocumentUpdate(userId: string, type: 'adhar' | 'pan
             ? `Your document update request for ${type === 'both' ? 'documents' : type.toUpperCase()} has been APPROVED.`
             : `Your document update request for ${type === 'both' ? 'documents' : type.toUpperCase()} has been REJECTED.`;
 
-        const notification = {
+        const notification = await withAgencyId({
             id: generateId(),
             userId: userId,
             message: message,
             read: false,
             timestamp: new Date().toISOString()
-        };
+        });
 
         return {
             ...data,
@@ -672,8 +787,8 @@ export async function getServices() {
 }
 
 export async function addService(name: string, jobs: { title: string; count: number }[]) {
-    const newService = { id: generateId(), name, jobs };
-    await db.update((data) => ({
+    const newService = await withAgencyId({ id: generateId(), name, jobs });
+    await db.update(async (data) => ({
         ...data,
         services: [...data.services, newService]
     }));
@@ -725,7 +840,7 @@ export async function updateService(id: string, name: string, jobs: { title: str
     revalidatePath('/dashboard/projects');
 }
 
-export async function createProject(project: Omit<Project, "id" | "status" | "createdAt">) {
+export async function createProject(project: Omit<Project, "id" | "status" | "createdAt" | "agencyId">) {
     const currentUser = await getCurrentUser();
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
         throw new Error("Unauthorized: Only Admins and Managers can create projects.");
@@ -746,7 +861,7 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
         counter++;
     }
 
-    const newProject: Project = { ...project, id: generateId(), slug: uniqueSlug, status: "Active", createdAt: new Date().toISOString() };
+    const newProject: Project = await withAgencyId({ ...project, id: generateId(), slug: uniqueSlug, status: "Active", createdAt: new Date().toISOString() });
     
     // Generate invoices for installment/monthly payments
     const newInvoices: Invoice[] = [];
@@ -768,13 +883,13 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
                     
                     // Create an invoice for each installment date
                     for (const installmentDate of paymentConfig.installmentDates) {
-                        newInvoices.push({
+                        newInvoices.push(await withAgencyId({
                             id: generateId(),
                             projectId: newProject.id,
                             amount: Math.round(amountPerInstallment),
                             status: "Pending",
                             date: installmentDate
-                        });
+                        }));
                     }
                 }
             } else if (paymentConfig.type === 'monthly') {
@@ -792,20 +907,20 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
                         const invoiceDate = new Date(startDate);
                         invoiceDate.setMonth(invoiceDate.getMonth() + i);
                         
-                        newInvoices.push({
+                        newInvoices.push(await withAgencyId({
                             id: generateId(),
                             projectId: newProject.id,
                             amount: monthlyAmount,
                             status: "Pending",
                             date: invoiceDate.toISOString().split('T')[0]
-                        });
+                        }));
                     }
                 }
             }
         }
     }
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         if (project.clientId && !data.clients?.find(c => c.id === project.clientId)) {
             throw new Error(`Client with ID ${project.clientId} not found`);
         }
@@ -813,14 +928,15 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
         // Create notifications for client about new invoices
         let notifications = data.notifications || [];
         if (project.clientId && newInvoices.length > 0) {
-            notifications = [{
+            const newNotification = await withAgencyId({
                 id: generateId(),
                 userId: project.clientId,
                 message: `${newInvoices.length} pending invoice(s) for project: ${project.name}`,
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: `/dashboard/finance`
-            }, ...notifications];
+            });
+            notifications = [newNotification, ...notifications];
         }
 
         return {
@@ -828,13 +944,13 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
             projects: [...data.projects, newProject],
             invoices: [...newInvoices, ...(data.invoices || [])],
             notifications,
-            activities: [{
+            activities: [await withAgencyId({
                 id: generateId(),
                 user: currentUser.name,
                 action: "created project",
                 target: project.name,
                 timestamp: new Date().toISOString()
-            }, ...data.activities]
+            }), ...data.activities]
         }
     });
     
@@ -931,16 +1047,16 @@ export async function deleteTask(taskId: string) {
 
     // If 'any', proceed.
 
-    await db.update((data) => ({
+    await db.update(async (data) => ({
         ...data,
         tasks: data.tasks.filter(t => t.id !== taskId),
-        activities: [{
+        activities: [await withAgencyId({
             id: generateId(),
             user: userName,
             action: "deleted task",
             target: task.title,
             timestamp: new Date().toISOString()
-        }, ...data.activities]
+        }), ...data.activities]
     }));
     revalidatePath('/dashboard/projects/[id]', 'page');
     revalidatePath('/dashboard/projects');
@@ -963,7 +1079,7 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
         }
     }
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         // Update task status
         const updatedTasks = data.tasks.map(t => t.id === taskId ? { ...t, status } : t);
         const task = updatedTasks.find(t => t.id === taskId);
@@ -987,7 +1103,7 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
 
                     // Notify client about project completion
                     if (project.clientId) {
-                        notifications.unshift({
+                        const notif = await withAgencyId({
                             id: generateId(),
                             userId: project.clientId,
                             message: `Project "${project.name}" has been completed! All tasks are done.`,
@@ -995,20 +1111,20 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
                             timestamp: new Date().toISOString(),
                             link: `/dashboard/projects/${project.id}`
                         });
+                        notifications = [notif, ...notifications];
                     }
 
                     // Notify admin
                     const adminUsers = data.users.filter(u => u.role === 'admin');
-                    adminUsers.forEach(admin => {
-                        notifications.unshift({
-                            id: generateId(),
-                            userId: admin.id,
-                            message: `Project "${project.name}" auto-completed - all tasks done`,
-                            read: false,
-                            timestamp: new Date().toISOString(),
-                            link: `/dashboard/projects/${project.id}`
-                        });
-                    });
+                    const adminNotifs = await Promise.all(adminUsers.map(async admin => await withAgencyId({
+                        id: generateId(),
+                        userId: admin.id,
+                        message: `Project "${project.name}" auto-completed - all tasks done`,
+                        read: false,
+                        timestamp: new Date().toISOString(),
+                        link: `/dashboard/projects/${project.id}`
+                    })));
+                    notifications = [...adminNotifs, ...notifications];
                 }
             }
         }
@@ -1018,13 +1134,13 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
             tasks: updatedTasks,
             projects: updatedProjects,
             notifications,
-            activities: [{
+            activities: [await withAgencyId({
                 id: generateId(),
                 user: userName,
                 action: "moved task to " + status,
                 target: data.tasks.find(t => t.id === taskId)?.title || "Task",
                 timestamp: new Date().toISOString()
-            }, ...data.activities]
+            }), ...data.activities]
         };
     });
     
@@ -1061,7 +1177,7 @@ export async function updateTask(taskId: string, updates: Partial<Task>) {
         }
     }
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         let updatedProjects = data.projects;
 
         // Validation
@@ -1097,13 +1213,13 @@ export async function updateTask(taskId: string, updates: Partial<Task>) {
             ...data,
             projects: updatedProjects,
             tasks: data.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t),
-            activities: [{
+            activities: [await withAgencyId({
                 id: generateId(),
                 user: userName,
                 action: "updated task",
                 target: updates.title || data.tasks.find(t => t.id === taskId)?.title || "Task",
                 timestamp: new Date().toISOString()
-            }, ...data.activities]
+            }), ...data.activities]
         };
     });
     revalidatePath('/dashboard/projects/[id]', 'page');
@@ -1118,21 +1234,23 @@ export async function addComment(taskId: string, userId: string, text: string) {
         timestamp: new Date().toISOString()
     };
 
-    await db.update((data) => ({
-        ...data,
-        tasks: data.tasks.map(t =>
-            t.id === taskId
-                ? { ...t, comments: [...(t.comments || []), newComment] }
-                : t
-        ),
-        activities: [{
-            id: generateId(),
-            user: "User", // Ideally fetch user name
-            action: "commented on task",
-            target: data.tasks.find(t => t.id === taskId)?.title || "Task",
-            timestamp: new Date().toISOString()
-        }, ...data.activities]
-    }));
+    await db.update(async (data) => {
+        return {
+            ...data,
+            tasks: data.tasks.map(t =>
+                t.id === taskId
+                    ? { ...t, comments: [...(t.comments || []), newComment] }
+                    : t
+            ),
+            activities: [await withAgencyId({
+                id: generateId(),
+                user: "User", // Ideally fetch user name
+                action: "commented on task",
+                target: data.tasks.find(t => t.id === taskId)?.title || "Task",
+                timestamp: new Date().toISOString()
+            }), ...data.activities]
+        };
+    });
 
     revalidatePath('/dashboard/projects/[id]', 'page');
     revalidatePath('/dashboard/projects');
@@ -1140,29 +1258,31 @@ export async function addComment(taskId: string, userId: string, text: string) {
 }
 
 
-export async function createTask(task: Omit<Task, "id">) {
+export async function createTask(task: Omit<Task, "id" | "agencyId">) {
     const currentUser = await getCurrentUser();
     const createdBy = currentUser ? currentUser.id : "system";
 
-    const newTask = {
+    const newTask = await withAgencyId({
         ...task,
         id: generateId(),
         createdAt: new Date().toISOString(),
         createdBy,
         comments: []
-    };
+    } as unknown as Task);
 
-    await db.update((data) => ({
-        ...data,
-        tasks: [...data.tasks, newTask],
-        activities: [{
-            id: generateId(),
-            user: currentUser ? currentUser.name : "System",
-            action: "created task",
-            target: task.title,
-            timestamp: new Date().toISOString()
-        }, ...data.activities]
-    }));
+    await db.update(async (data) => {
+        return {
+            ...data,
+            tasks: [...data.tasks, newTask],
+            activities: [await withAgencyId({
+                id: generateId(),
+                user: currentUser ? currentUser.name : "System",
+                action: "created task",
+                target: task.title,
+                timestamp: new Date().toISOString()
+            }), ...data.activities]
+        };
+    });
     revalidatePath('/dashboard/projects/[id]', 'page');
     revalidatePath('/dashboard/projects');
     return newTask;
@@ -1189,7 +1309,7 @@ export async function getClientById(id: string) {
     return data.clients?.find(c => c.id === id);
 }
 
-export async function createClient(client: Omit<Client, "id">) {
+export async function createClient(client: Omit<Client, "id" | "agencyId">) {
     const currentUser = await getCurrentUser();
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
         throw new Error("Unauthorized: Only Admins can create clients.");
@@ -1214,12 +1334,12 @@ export async function createClient(client: Omit<Client, "id">) {
         counter++;
     }
 
-    const newClient: Client = {
+    const newClient: Client = await withAgencyId({
         ...client,
         id: generateId(),
         username: uniqueUsername,
         lastActiveAt: new Date().toISOString()
-    };
+    });
 
     if (!newClient.logo) {
         newClient.logo = `https://api.dicebear.com/7.x/initials/svg?seed=${newClient.companyName}`;
@@ -1280,7 +1400,7 @@ export async function updateProject(id: string, updates: Partial<Project>) {
     const data = await db.get();
     const oldProject = data.projects.find(p => p.id === id);
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         let notifications = data.notifications || [];
 
         // Notify Client on Status Change
@@ -1294,14 +1414,14 @@ export async function updateProject(id: string, updates: Partial<Project>) {
 
             const message = statusMessages[updates.status] || `status updated to ${updates.status}`;
             
-            notifications = [{
+            notifications = [await withAgencyId({
                 id: generateId(),
                 userId: oldProject.clientId,
                 message: `Project "${oldProject.name}" ${message}`,
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: `/dashboard/projects/${id}`
-            }, ...notifications];
+            }), ...notifications];
         }
 
         return {
@@ -1500,7 +1620,7 @@ export async function getCategoryMemberSummary(category: string) {
     return Array.from(summaryMap.values()).sort((a, b) => b.total - a.total);
 }
 
-export async function createTransaction(transaction: Omit<Transaction, "id" | "status">) {
+export async function createTransaction(transaction: Omit<Transaction, "id" | "status" | "agencyId"> & { status?: Transaction['status'] }) {
     // STRICT SERVER-SIDE VALIDATION
     if (transaction.category === 'Project' && !transaction.projectId) {
         throw new Error("Validation Error: Projects must have a Project ID.");
@@ -1525,13 +1645,13 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
     // but the modal handles the description/type logic. We assume if category is Internal Transfer,
     // dependencies were met by client. Ideally we'd add memberId to schema for strict server check.
 
-    const newTransaction: Transaction = {
+    const newTransaction: Transaction = await withAgencyId({
         ...transaction,
         id: generateId(),
-        status: "completed"
-    };
+        status: transaction.status || "completed"
+    });
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         if (transaction.projectId && !data.projects?.find(p => p.id === transaction.projectId)) {
             throw new Error(`Project with ID ${transaction.projectId} not found`);
         }
@@ -1539,14 +1659,14 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
         // GENERATE NOTIFICATION FOR SALARY
         const notifications = [...(data.notifications || [])];
         if (newTransaction.category === 'Salary' && newTransaction.userId && newTransaction.type === 'expense') {
-            notifications.unshift({
+            notifications.unshift(await withAgencyId({
                 id: generateId(),
                 userId: newTransaction.userId,
                 message: `Salary Payment Received: ₹${newTransaction.amount.toLocaleString()}`,
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: '/dashboard/finance' // Or profile link? Finance seems appropriate if they have access, or just informational.
-            });
+            }));
         }
 
         return {
@@ -1561,6 +1681,38 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
         revalidatePath(`/dashboard/projects/${transaction.projectId}`);
     }
     return newTransaction;
+}
+
+export async function markTransactionAsPaid(transactionId: string) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+        throw new Error("Unauthorized: Only Admins can mark transactions as paid.");
+    }
+
+    await db.update(async (data) => {
+        const transactionIndex = data.transactions.findIndex(t => t.id === transactionId);
+        if (transactionIndex === -1) {
+            throw new Error("Transaction not found");
+        }
+
+        const transaction = data.transactions[transactionIndex];
+        if (transaction.status === 'completed') {
+            throw new Error("Transaction is already active/completed");
+        }
+
+        // Update status
+        const updatedTransaction = { ...transaction, status: 'completed' as const, date: new Date().toISOString().split('T')[0] }; // Update date to payment date? Or keep original due date? Usually payment date.
+        
+        const newTransactions = [...data.transactions];
+        newTransactions[transactionIndex] = updatedTransaction;
+
+        return {
+            ...data,
+            transactions: newTransactions
+        };
+    });
+
+    revalidatePath('/dashboard/finance');
 }
 
 export async function getInvoices(projectId?: string) {
@@ -1591,7 +1743,7 @@ export async function clientMarkInvoiceAsPaid(invoiceId: string) {
         throw new Error("Unauthorized: Only clients can mark invoices as paid");
     }
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         const invoice = data.invoices.find(i => i.id === invoiceId);
         if (!invoice) {
             throw new Error("Invoice not found");
@@ -1615,16 +1767,16 @@ export async function clientMarkInvoiceAsPaid(invoiceId: string) {
         const notifications = data.notifications || [];
         const adminUsers = data.users.filter(u => u.role === 'admin');
         
-        adminUsers.forEach(admin => {
-            notifications.unshift({
+        for (const admin of adminUsers) {
+            notifications.unshift(await withAgencyId({
                 id: generateId(),
                 userId: admin.id,
                 message: `${currentUser.name} marked invoice ₹${invoice.amount.toLocaleString()} as paid - Awaiting approval`,
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: `/dashboard/finance`
-            });
-        });
+            }));
+        }
 
         return { ...data, notifications };
     });
@@ -1639,7 +1791,7 @@ export async function adminApproveInvoicePayment(invoiceId: string) {
         throw new Error("Unauthorized: Only admins can approve payments");
     }
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         const invoice = data.invoices.find(i => i.id === invoiceId);
         if (!invoice) {
             throw new Error("Invoice not found");
@@ -1654,30 +1806,42 @@ export async function adminApproveInvoicePayment(invoiceId: string) {
 
         // Create income transaction
         const project = data.projects.find(p => p.id === invoice.projectId);
-        const newTransaction: Transaction = {
+        
+        // Calculate Installment Number for better description
+        const projectInvoices = data.invoices
+            .filter(i => i.projectId === invoice.projectId)
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        const installmentIndex = projectInvoices.findIndex(i => i.id === invoice.id);
+        const installmentNumber = installmentIndex !== -1 ? installmentIndex + 1 : '?';
+        const totalInstallments = projectInvoices.length;
+
+        const description = `Installment ${installmentNumber}/${totalInstallments} for ${project?.name || 'Project'} - ${invoice.date}`;
+
+        const newTransaction: Transaction = await withAgencyId({
             id: generateId(),
             date: new Date().toISOString().split('T')[0],
             amount: invoice.amount,
             type: 'income',
             category: 'Project',
-            description: `Payment for ${project?.name || 'Project'} - Invoice ${invoice.id.substring(0, 8)}`,
+            description: description,
             status: 'completed',
             projectId: invoice.projectId
-        };
+        });
 
         data.transactions = [newTransaction, ...(data.transactions || [])];
 
         // Notify client about approval
         const notifications = data.notifications || [];
         if (project?.clientId) {
-            notifications.unshift({
+            notifications.unshift(await withAgencyId({
                 id: generateId(),
                 userId: project.clientId,
                 message: `Payment approved! ₹${invoice.amount.toLocaleString()} received for ${project.name}`,
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: `/dashboard/finance`
-            });
+            }));
         }
 
         return { ...data, notifications };
@@ -1693,7 +1857,7 @@ export async function adminRejectInvoicePayment(invoiceId: string, reason?: stri
         throw new Error("Unauthorized: Only admins can reject payments");
     }
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         const invoice = data.invoices.find(i => i.id === invoiceId);
         if (!invoice) {
             throw new Error("Invoice not found");
@@ -1715,14 +1879,14 @@ export async function adminRejectInvoicePayment(invoiceId: string, reason?: stri
                 ? `Payment rejected: ${reason}. Please mark as paid again.`
                 : `Payment rejected for ₹${invoice.amount.toLocaleString()}. Please mark as paid again.`;
             
-            notifications.unshift({
+            notifications.unshift(await withAgencyId({
                 id: generateId(),
                 userId: project.clientId,
                 message,
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: `/dashboard/finance`
-            });
+            }));
         }
 
         return { ...data, notifications };
@@ -1775,26 +1939,27 @@ export async function getHighPriorityTasks(offset = 0, limit = 5) {
         .slice(offset, offset + limit);
 }
 
-export async function createInvoice(invoice: Omit<Invoice, "id" | "status">) {
-    const newInvoice: Invoice = {
+export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "agencyId">) {
+    const newInvoice: Invoice = await withAgencyId({
         ...invoice,
         id: generateId(),
         status: "Pending"
-    };
+    });
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         const project = data.projects.find(p => p.id === invoice.projectId);
         let notifications = data.notifications || [];
 
         if (project && project.clientId) {
-            notifications = [{
+            notifications = [await withAgencyId({
                 id: generateId(),
                 userId: project.clientId,
                 message: `New Invoice Generated: ₹${invoice.amount.toLocaleString()}`,
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: `/dashboard/finance`
-            }, ...notifications];
+            }), ...notifications];
+
         }
 
         if (!data.projects?.find(p => p.id === invoice.projectId)) {
@@ -1898,7 +2063,7 @@ export async function getFinanceChartData(projectId?: string, userId?: string, c
         const tDate = new Date(t.date);
         const tMonth = tDate.toLocaleString('default', { month: 'short' });
         const monthData = chartData.find(d => d.name === tMonth);
-        if (monthData) {
+        if (monthData && t.status === 'completed') {
             if (t.type === 'income') monthData.income += t.amount;
             if (t.type === 'expense') monthData.expense += t.amount;
         }
@@ -2061,7 +2226,7 @@ export async function getProjectAssets(projectId: string) {
     return (data.assets || []).filter(a => a.projectId === projectId).sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
 }
 
-export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt">) {
+export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt" | "agencyId">) {
     // Server-Side Safety Check
     const FORBIDDEN_EXTENSIONS = ['.exe', '.bat', '.cmd', '.sh', '.vbs', '.msi', '.jar', '.com', '.scr', '.pif'];
     const fileName = asset.name.toLowerCase();
@@ -2069,22 +2234,22 @@ export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt">) {
         throw new Error("Security Alert: Malicious file type rejected by server.");
     }
 
-    const newAsset: Asset = {
+    const newAsset: Asset = await withAgencyId({
         ...asset,
         id: generateId(),
         uploadedAt: new Date().toISOString()
-    };
+    });
 
-    await db.update((data) => ({
+    await db.update(async (data) => ({
         ...data,
         assets: [newAsset, ...(data.assets || [])],
-        activities: [{
+        activities: [await withAgencyId({
             id: generateId(),
             user: asset.uploadedBy,
             action: `uploaded asset`,
             target: asset.name,
             timestamp: new Date().toISOString()
-        }, ...data.activities]
+        }), ...data.activities]
     }));
 
     revalidatePath(`/dashboard/projects/${asset.projectId}`);
@@ -2095,18 +2260,18 @@ export async function deleteProjectAsset(assetId: string) {
     const currentUser = await getCurrentUser();
     const userName = currentUser ? currentUser.name : "System";
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         const asset = data.assets.find(a => a.id === assetId);
         return {
             ...data,
             assets: data.assets.filter(a => a.id !== assetId),
-            activities: asset ? [{
+            activities: asset ? [await withAgencyId({
                 id: generateId(),
                 user: userName,
                 action: `deleted asset`,
                 target: asset.name,
                 timestamp: new Date().toISOString()
-            }, ...data.activities] : data.activities
+            }), ...data.activities] : data.activities
         };
     });
 
@@ -2120,16 +2285,16 @@ export async function updateProjectAsset(assetId: string, updates: Partial<Asset
     const currentUser = await getCurrentUser();
     const userName = currentUser ? currentUser.name : "System";
 
-    await db.update((data) => ({
+    await db.update(async (data) => ({
         ...data,
         assets: data.assets.map(a => a.id === assetId ? { ...a, ...updates } : a),
-        activities: [{
+        activities: [await withAgencyId({
             id: generateId(),
             user: userName,
             action: `updated asset`,
             target: data.assets.find(a => a.id === assetId)?.name || "Asset",
             timestamp: new Date().toISOString()
-        }, ...data.activities]
+        }), ...data.activities]
     }));
     revalidatePath('/dashboard/projects/[id]', 'page');
 }
@@ -2414,6 +2579,9 @@ export async function chatWithTaskAI(
     const data = await db.get();
     const currentUser = data.users.find(u => u.id === userId);
 
+    console.log(`[chatWithTaskAI] UserId: ${userId}, UserFound: ${!!currentUser}, HasKey: ${!!currentUser?.geminiApiKey}`);
+    console.log(`[chatWithTaskAI] EnvKey Present: ${!!process.env.GEMINI_API_KEY}`);
+
     // 1. Gather Broad Context (Board Awareness)
     const allProjectTasks = data.tasks.filter(t => t.projectId === projectId);
     const tasksSummary = allProjectTasks.slice(0, 15).map(t => `- ${t.title} (${t.status})`).join('\n');
@@ -2426,7 +2594,10 @@ export async function chatWithTaskAI(
     });
 
     const apiKey = currentUser?.geminiApiKey || process.env.GEMINI_API_KEY?.trim();
-    if (!apiKey) throw new Error("Missing API Key");
+    if (!apiKey) {
+        console.error("[chatWithTaskAI] FATAL: No API Key found in User Profile OR Environment.");
+        throw new Error("Missing API Key");
+    }
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
@@ -2481,60 +2652,7 @@ export async function chatWithTaskAI(
 // Leave Management Actions
 // ----------------------------------------------------------------------
 
-export async function requestLeave(data: Omit<LeaveRequest, "id" | "status" | "createdAt">) {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) throw new Error("Unauthorized");
 
-    // validation
-    const startDate = new Date(data.startDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // Parse date as midnight UTC to avoid timezone issues or just use string comparison if ISO
-    // For simplicity ensuring we compare dates correctly.
-    const startCheck = new Date(startDate);
-    startCheck.setHours(0, 0, 0, 0);
-
-    // 2 days rule: Must be >= today + 2
-    if (data.type === 'Casual') {
-        const minDate = new Date(today);
-        minDate.setDate(today.getDate() + 2); // e.g. if today is 20th, min is 22nd.
-
-        if (startCheck < minDate) {
-            throw new Error("Casual leave must be applied at least 2 days in advance.");
-        }
-    }
-
-    const newRequest: LeaveRequest = {
-        ...data,
-        id: generateId(),
-        status: 'Pending',
-        createdAt: new Date().toISOString(),
-        userId: currentUser.id
-    };
-
-    await db.update((dbData) => {
-        // Broadcast notification to ALL admins
-        const admins = (dbData.users || []).filter(u => u.role === 'admin' || u.role === 'manager');
-        const adminNotifications = admins.map(admin => ({
-            id: generateId(),
-            userId: admin.id,
-            message: `New Leave Request from ${currentUser.name}: ${data.type} (${new Date(data.startDate).toLocaleDateString()} - ${new Date(data.endDate).toLocaleDateString()})`,
-            read: false,
-            timestamp: new Date().toISOString(),
-            link: '/dashboard/team' // Admins go to Team page to approve
-        }));
-
-        return {
-            ...dbData,
-            leaveRequests: [newRequest, ...(dbData.leaveRequests || [])],
-            notifications: [...adminNotifications, ...(dbData.notifications || [])]
-        };
-    });
-
-    revalidatePath('/dashboard/team');
-    return newRequest;
-}
 
 export async function getLeaveRequests(userId?: string) {
     const data = await db.get();
@@ -2556,7 +2674,7 @@ export async function getLeaveRequests(userId?: string) {
 }
 
 // Employee submits a leave request
-export async function submitLeaveRequest(leaveData: Omit<LeaveRequest, 'id' | 'status' | 'createdAt'>) {
+export async function requestLeave(leaveData: Omit<LeaveRequest, 'id' | 'status' | 'createdAt' | 'agencyId'>) {
     const currentUser = await getCurrentUser();
     if (!currentUser) {
         throw new Error("Unauthorized: You must be logged in to submit leave requests");
@@ -2588,40 +2706,41 @@ export async function submitLeaveRequest(leaveData: Omit<LeaveRequest, 'id' | 's
         throw new Error("Emergency leave cannot exceed 7 days. For longer periods, please use Casual leave.");
     }
 
-    const newLeaveRequest: LeaveRequest = {
+    const newLeaveRequest: LeaveRequest = await withAgencyId({
         ...leaveData,
         id: generateId(),
         userId: currentUser.id,
-        status: 'Pending'
-    } as LeaveRequest;
+        status: 'Pending',
+        createdAt: new Date().toISOString()
+    } as LeaveRequest);
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         // Notify all admins about new leave request
         const notifications = data.notifications || [];
         const adminUsers = data.users.filter(u => u.role === 'admin');
         
-        adminUsers.forEach(admin => {
-            notifications.unshift({
+        for (const admin of adminUsers) {
+            notifications.unshift(await withAgencyId({
                 id: generateId(),
                 userId: admin.id,
                 message: `${currentUser.name} requested ${leaveData.type} leave (${daysDiff} day${daysDiff > 1 ? 's' : ''})`,
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: `/dashboard/team`
-            });
-        });
+            }));
+        }
 
         return {
             ...data,
             leaveRequests: [newLeaveRequest, ...(data.leaveRequests || [])],
             notifications,
-            activities: [{
+            activities: [await withAgencyId({
                 id: generateId(),
                 user: currentUser.name,
                 action: "submitted leave request",
                 target: `${leaveData.type} leave for ${daysDiff} days`,
                 timestamp: new Date().toISOString()
-            }, ...data.activities]
+            }), ...data.activities]
         };
     });
 
@@ -2636,7 +2755,7 @@ export async function approveLeaveRequest(leaveRequestId: string) {
         throw new Error("Unauthorized: Only admins can approve leave requests");
     }
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
         if (!leaveRequest) {
             throw new Error("Leave request not found");
@@ -2661,26 +2780,26 @@ export async function approveLeaveRequest(leaveRequestId: string) {
         const employee = data.users.find(u => u.id === leaveRequest.userId);
         
         if (employee) {
-            notifications.unshift({
+            notifications.unshift(await withAgencyId({
                 id: generateId(),
                 userId: leaveRequest.userId,
                 message: `Your ${leaveRequest.type} leave request (${daysDiff} day${daysDiff > 1 ? 's' : ''}) has been approved by ${currentUser.name}`,
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: `/dashboard/team`
-            });
+            }));
         }
 
         return {
             ...data,
             notifications,
-            activities: [{
+            activities: [await withAgencyId({
                 id: generateId(),
                 user: currentUser.name,
                 action: "approved leave request",
                 target: employee ? `${employee.name}'s ${leaveRequest.type} leave` : "Leave request",
                 timestamp: new Date().toISOString()
-            }, ...data.activities]
+            }), ...data.activities]
         };
     });
 
@@ -2694,7 +2813,7 @@ export async function rejectLeaveRequest(leaveRequestId: string, rejectionReason
         throw new Error("Unauthorized: Only admins can reject leave requests");
     }
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
         if (!leaveRequest) {
             throw new Error("Leave request not found");
@@ -2723,26 +2842,26 @@ export async function rejectLeaveRequest(leaveRequestId: string, rejectionReason
                 ? `Your ${leaveRequest.type} leave request (${daysDiff} day${daysDiff > 1 ? 's' : ''}) was rejected by ${currentUser.name}. Reason: ${rejectionReason}`
                 : `Your ${leaveRequest.type} leave request (${daysDiff} day${daysDiff > 1 ? 's' : ''}) was rejected by ${currentUser.name}`;
 
-            notifications.unshift({
+            notifications.unshift(await withAgencyId({
                 id: generateId(),
                 userId: leaveRequest.userId,
                 message,
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: `/dashboard/team`
-            });
+            }));
         }
 
         return {
             ...data,
             notifications,
-            activities: [{
+            activities: [await withAgencyId({
                 id: generateId(),
                 user: currentUser.name,
                 action: "rejected leave request",
                 target: employee ? `${employee.name}'s ${leaveRequest.type} leave` : "Leave request",
                 timestamp: new Date().toISOString()
-            }, ...data.activities]
+            }), ...data.activities]
         };
     });
 
@@ -2756,7 +2875,7 @@ export async function cancelLeaveRequest(leaveRequestId: string) {
         throw new Error("Unauthorized: You must be logged in");
     }
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
         if (!leaveRequest) {
             throw new Error("Leave request not found");
@@ -2779,28 +2898,28 @@ export async function cancelLeaveRequest(leaveRequestId: string) {
         const notifications = data.notifications || [];
         if (currentUser.role !== 'admin') {
             const adminUsers = data.users.filter(u => u.role === 'admin');
-            adminUsers.forEach(admin => {
-                notifications.unshift({
+            for (const admin of adminUsers) {
+                notifications.unshift(await withAgencyId({
                     id: generateId(),
                     userId: admin.id,
                     message: `${currentUser.name} cancelled their ${leaveRequest.type} leave request`,
                     read: false,
                     timestamp: new Date().toISOString(),
                     link: `/dashboard/team`
-                });
-            });
+                }));
+            }
         }
 
         return {
             ...data,
             notifications,
-            activities: [{
+            activities: [await withAgencyId({
                 id: generateId(),
                 user: currentUser.name,
                 action: "cancelled leave request",
                 target: `${leaveRequest.type} leave`,
                 timestamp: new Date().toISOString()
-            }, ...data.activities]
+            }), ...data.activities]
         };
     });
 
@@ -2859,17 +2978,17 @@ export async function updateLeaveStatus(requestId: string, status: LeaveStatus) 
     const request = data.leaveRequests?.find(r => r.id === requestId);
     if (!request) throw new Error("Request not found");
 
-    await db.update((dbData) => ({
+    await db.update(async (dbData) => ({
         ...dbData,
         leaveRequests: dbData.leaveRequests.map(r => r.id === requestId ? { ...r, status, reviewedBy: currentUser?.id, reviewedAt: new Date().toISOString() } : r),
-        notifications: [{
+        notifications: [await withAgencyId({
             id: generateId(),
             userId: request.userId,
             message: `Your leave request for ${new Date(request.startDate).toLocaleDateString()} has been ${status}`,
             read: false,
             timestamp: new Date().toISOString(),
             link: `/dashboard/team/${data.users.find(u => u.id === request.userId)?.username || request.userId}?tab=leaves`
-        }, ...(dbData.notifications || [])]
+        }), ...(dbData.notifications || [])]
     }));
 
     revalidatePath('/dashboard/team');
@@ -2916,7 +3035,7 @@ export async function createRefund(refund: {
         throw new Error(`Refund amount exceeds project income. Project income: ₹${projectIncome.toLocaleString()}, Existing refunds: ₹${existingRefunds.toLocaleString()}, Attempted refund: ₹${refund.amount.toLocaleString()}`);
     }
 
-    const newRefund = {
+    const newRefund = await withAgencyId({
         id: generateId(),
         date: refund.date,
         amount: refund.amount,
@@ -2925,32 +3044,33 @@ export async function createRefund(refund: {
         description: refund.description,
         status: 'completed' as const,
         projectId: refund.projectId
-    };
+    });
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         // Add refund transaction
         const newData = {
             ...data,
             transactions: [...data.transactions, newRefund],
-            activities: [{
+            activities: [await withAgencyId({
                 id: generateId(),
                 user: currentUser.name,
                 action: "issued refund",
                 target: project.name,
                 timestamp: new Date().toISOString()
-            }, ...data.activities]
+            }), ...data.activities],
+            notifications: data.notifications // Initialize notifications
         };
 
         // Notify client
         if (project.clientId) {
-            const notification = {
+            const notification = await withAgencyId({
                 id: generateId(),
                 userId: project.clientId,
                 message: `Refund of ₹${refund.amount.toLocaleString()} has been issued for ${project.name}`,
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: `/dashboard/projects/${project.slug || project.id}`
-            };
+            });
             newData.notifications = [...newData.notifications, notification];
         }
 

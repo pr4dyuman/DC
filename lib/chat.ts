@@ -2,6 +2,8 @@
 
 import { db, Message, User, Client } from "./db";
 import { revalidatePath } from "next/cache";
+import { withAgencyId } from "./agency-context";
+import { generateId } from "./utils-server";
 
 export type { Message };
 
@@ -82,24 +84,29 @@ export async function getContacts(currentUserId: string): Promise<Contact[]> {
         });
     }
 
-    // Add Clients
-    for (const client of clients) {
-        const lastActive = client.lastActiveAt ? new Date(client.lastActiveAt).getTime() : 0;
-        const isOnline = (now - lastActive) < ONLINE_THRESHOLD_MS;
+    // Determine if current user is a client
+    const isClient = data.clients.some(c => c.id === currentUserId);
 
-        contacts.push({
-            id: client.id,
-            username: client.username,
-            name: client.name,
-            email: client.email,
-            companyName: client.companyName,
-            avatar: client.logo,
-            role: 'Client',
-            type: 'client',
-            unreadCount: 0,
-            isOnline,
-            lastActiveAt: client.lastActiveAt
-        } as any);
+    // Add Clients (Only if current user is NOT a client)
+    if (!isClient) {
+        for (const client of clients) {
+            const lastActive = client.lastActiveAt ? new Date(client.lastActiveAt).getTime() : 0;
+            const isOnline = (now - lastActive) < ONLINE_THRESHOLD_MS;
+
+            contacts.push({
+                id: client.id,
+                username: client.username,
+                name: client.name,
+                email: client.email,
+                companyName: client.companyName,
+                avatar: client.logo,
+                role: 'Client',
+                type: 'client',
+                unreadCount: 0,
+                isOnline,
+                lastActiveAt: client.lastActiveAt
+            } as any);
+        }
     }
 
     // Calculate last message and unread count
@@ -143,17 +150,35 @@ export async function getMessages(currentUserId: string, otherUserId: string): P
 }
 
 export async function sendMessage(senderId: string, receiverId: string, content: string, type: 'text' | 'image' = 'text') {
+    // 1. Try to resolve agencyId robustly
+    let agencyId = 'default-agency';
+    try {
+        const agency = await import("./agency-context").then(m => m.getCurrentAgency());
+        if (agency) {
+            agencyId = agency.id;
+        } else {
+            // Fallback: look up user
+            const userData = await db.get().then(d => d.users.find(u => u.id === senderId));
+            if (userData && userData.agencyId) {
+                agencyId = userData.agencyId;
+            }
+        }
+    } catch (e) {
+        console.warn("Failed to get agency context in sendMessage, using default/fallback", e);
+    }
+
     const newMessage: Message = {
-        id: Math.random().toString(36).substring(2, 9),
+        id: generateId(),
         senderId,
         receiverId,
         content,
         timestamp: new Date().toISOString(),
         read: false,
-        type
+        type,
+        agencyId // Explicitly set
     };
 
-    await db.update((data) => {
+    await db.update(async (data) => {
         if (!data.messages) data.messages = [];
         data.messages.push(newMessage);
         return data;

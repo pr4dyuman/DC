@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createTask, getServices, getUsers, enhanceTaskDescription } from "@/lib/actions";
+import { createTask, getServices, getUsers, enhanceTaskDescription, getCurrentUser } from "@/lib/actions";
 import { AIChatBox } from "./AIChatBox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Loader2, Sparkles, Calendar } from "lucide-react";
@@ -35,9 +35,10 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
 
     useEffect(() => {
         if (open) {
-            Promise.all([getUsers(), getServices()]).then(([u, s]) => {
+            Promise.all([getUsers(), getServices(), getCurrentUser()]).then(([u, s, currentUser]) => {
                 setUsers(u);
                 setServices(s);
+                if (currentUser) setCurrentUserId(currentUser.id);
                 if (s.length > 0 && !category) setCategory(s[0].name);
                 if (u.length > 0 && !assigneeId) setAssigneeId(u[0].id);
             });
@@ -77,11 +78,11 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                     <Plus className="mr-2 h-4 w-4" /> Add Task
                 </button>
             </DialogTrigger>
-            <DialogContent className={`transition-all duration-300 ${showChat ? "sm:max-w-[900px]" : "sm:max-w-[500px]"}`}>
+            <DialogContent className={`transition-all duration-300 w-full max-w-[95vw] ${showChat ? "lg:max-w-[900px] sm:max-w-[500px]" : "sm:max-w-[500px]"}`}>
                 <DialogHeader>
                     <DialogTitle>Create New Task</DialogTitle>
                 </DialogHeader>
-                <div className="flex gap-6 h-[600px]">
+                <div className="relative flex flex-col lg:flex-row h-[600px] lg:gap-6 overflow-hidden">
                     {/* Left Side: Form */}
                     <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto pr-1">
                         <div className="space-y-2">
@@ -168,15 +169,13 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
 
                     {/* Right Side: AI Chat */}
                     {showChat && (
-                        <div className="w-[400px] border-l border-border pl-6 relative animate-in slide-in-from-right duration-300 fade-in">
-                            <AIChatBox
-                                projectId={projectId}
-                                taskState={{ title, description }}
-                                userId={currentUserId}
-                                onClose={() => setShowChat(false)}
-                                onApply={(text) => setDescription(text)}
-                            />
-                        </div>
+                        <AIChatBox
+                            projectId={projectId}
+                            taskState={{ title, description }}
+                            userId={currentUserId}
+                            onClose={() => setShowChat(false)}
+                            onApply={(text) => setDescription(text)}
+                        />
                     )}
                 </div>
             </DialogContent>

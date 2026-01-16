@@ -38,7 +38,8 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
         bonus: "",
         deduction: "",
         // Internal Transfer Specific
-        transferDirection: "to_member" as "to_member" | "from_member"
+        transferDirection: "to_member" as "to_member" | "from_member", 
+        status: "completed" as "completed" | "pending"
     });
 
     // Validation Errors
@@ -182,7 +183,9 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                 category: dbCategory,
                 date: formData.date,
                 projectId: formData.projectId || undefined,
-                userId: formData.memberId || undefined
+
+                userId: formData.memberId || undefined,
+                status: formData.status
             });
             setOpen(false);
             // Reset form
@@ -196,7 +199,9 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                 baseSalary: 0,
                 bonus: "",
                 deduction: "",
-                transferDirection: "to_member"
+
+                transferDirection: "to_member",
+                status: "completed"
             });
             router.refresh();
         } catch (error) {
@@ -509,6 +514,23 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                                 className="col-span-3"
                                 required
                             />
+                        </div>
+
+                         {/* Status Selection */}
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label className="text-right">Status</Label>
+                            <Select 
+                                value={formData.status} 
+                                onValueChange={(val: "completed" | "pending") => setFormData(prev => ({ ...prev, status: val }))}
+                            >
+                                <SelectTrigger className="col-span-3">
+                                    <SelectValue placeholder="Select Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="completed">Completed (Paid/Received)</SelectItem>
+                                    <SelectItem value="pending">Pending (Future/Payable)</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
 

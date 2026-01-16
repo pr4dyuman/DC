@@ -152,8 +152,8 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
 
     const startVirusScan = async () => {
         setIsScanning(true);
-        // Simulate Server-Side Scan Delay
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Instant scan - no artificial delay for production performance
+        // In production, this would be a real server-side scan
 
         // Mock Scan Result (In real world, this comes from server)
         // We could fail specific names for demo purposes

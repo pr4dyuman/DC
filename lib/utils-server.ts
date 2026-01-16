@@ -20,6 +20,22 @@ export async function resolveUserOrClient(identifier: string): Promise<User | un
         user = data.users.find(u => u.id === identifier);
     }
 
+    // 2.1 Check Super Admins
+    if (!user && data.superAdmins) {
+        const sa = data.superAdmins.find(s => s.id === identifier);
+        if (sa) {
+            user = {
+                id: sa.id,
+                name: sa.name,
+                email: sa.email,
+                role: 'superadmin' as any,
+                avatar: sa.avatar,
+                createdAt: sa.createdAt,
+                agencyId: 'super-admin'
+            } as any as User;
+        }
+    }
+
     // 3. If still not found, check Clients (by ID or potential future username)
     if (!user && data.clients) {
         const client = data.clients.find(c => c.id === identifier || (c as any).username === identifier);

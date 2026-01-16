@@ -31,7 +31,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
     const isManager = currentUserRole === 'manager';
     const canManageFinances = isAdmin || isManager;
 
-    const [formData, setFormData] = useState<Omit<User, "id">>({
+    const [formData, setFormData] = useState<Omit<User, "id" | "agencyId">>({
         name: "",
         username: "",
         email: "",

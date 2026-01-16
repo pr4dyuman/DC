@@ -1,0 +1,145 @@
+"use client";
+
+import { useState } from "react";
+import { suspendAgency, activateAgency, deleteAgency, updateAgencyPlan } from "@/lib/actions/super-admin";
+import { Ban, CheckCircle, Trash2, Edit } from "lucide-react";
+import { useRouter } from "next/navigation";
+
+export default function AgencyActions({ agency }: { agency: any }) {
+    const router = useRouter();
+    const [showPlanModal, setShowPlanModal] = useState(false);
+    const [selectedPlan, setSelectedPlan] = useState(agency.plan);
+    
+    const handleSuspend = async () => {
+        if (!confirm("Are you sure you want to suspend this agency?")) return;
+        const reason = prompt("Reason for suspension:");
+        await suspendAgency(agency.id, reason || undefined);
+        router.refresh();
+    };
+    
+    const handleActivate = async () => {
+        await activateAgency(agency.id);
+        router.refresh();
+    };
+    
+    const handleDelete = async () => {
+        if (!confirm("⚠️ WARNING: This will permanently delete the agency and ALL its data. This cannot be undone. Are you absolutely sure?")) return;
+        const confirmation = prompt("Type 'DELETE' to confirm:");
+        if (confirmation !== 'DELETE') return;
+        await deleteAgency(agency.id);
+        router.push('/super-admin/agencies');
+    };
+    
+    const handleUpdatePlan = async () => {
+        await updateAgencyPlan(agency.id, selectedPlan);
+        setShowPlanModal(false);
+        router.refresh();
+    };
+    
+    return (
+        <>
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={() => setShowPlanModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                    <Edit className="w-4 h-4" />
+                    <span>Change Plan</span>
+                </button>
+                
+                {agency.status === 'active' ? (
+                    <button
+                        onClick={handleSuspend}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                        <Ban className="w-4 h-4" />
+                        <span>Suspend</span>
+                    </button>
+                ) : (
+                    <button
+                        onClick={handleActivate}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Activate</span>
+                    </button>
+                )}
+                
+                <button
+                    onClick={handleDelete}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete</span>
+                </button>
+            </div>
+            
+            {/* Plan Modal */}
+            {showPlanModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                        <h3 className="text-xl font-bold text-gray-900 mb-4">Change Plan</h3>
+                        <div className="space-y-3 mb-6">
+                            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                <input
+                                    type="radio"
+                                    name="plan"
+                                    value="free"
+                                    checked={selectedPlan === 'free'}
+                                    onChange={(e) => setSelectedPlan(e.target.value as any)}
+                                    className="w-4 h-4"
+                                />
+                                <div>
+                                    <p className="font-medium">Free</p>
+                                    <p className="text-sm text-gray-600">5 users, 10 projects</p>
+                                </div>
+                            </label>
+                            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                <input
+                                    type="radio"
+                                    name="plan"
+                                    value="pro"
+                                    checked={selectedPlan === 'pro'}
+                                    onChange={(e) => setSelectedPlan(e.target.value as any)}
+                                    className="w-4 h-4"
+                                />
+                                <div>
+                                    <p className="font-medium">Pro</p>
+                                    <p className="text-sm text-gray-600">25 users, 100 projects</p>
+                                </div>
+                            </label>
+                            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                <input
+                                    type="radio"
+                                    name="plan"
+                                    value="enterprise"
+                                    checked={selectedPlan === 'enterprise'}
+                                    onChange={(e) => setSelectedPlan(e.target.value as any)}
+                                    className="w-4 h-4"
+                                />
+                                <div>
+                                    <p className="font-medium">Enterprise</p>
+                                    <p className="text-sm text-gray-600">Unlimited everything</p>
+                                </div>
+                            </label>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={handleUpdatePlan}
+                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                Update Plan
+                            </button>
+                            <button
+                                onClick={() => setShowPlanModal(false)}
+                                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+}

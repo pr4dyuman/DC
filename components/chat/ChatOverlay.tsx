@@ -45,10 +45,10 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
         }
     }, [isOpen, initialActiveId]);
 
-    // Poll for contacts list every 30s (reduced from 5s)
+    // Poll for contacts list every 2 minutes (optimized for performance)
     useActivePolling(() => {
         loadContacts();
-    }, 30000, isOpen && !!currentUserId);
+    }, 120000, isOpen && !!currentUserId);
 
     // Load messages when active contact changes
     useEffect(() => {
@@ -59,10 +59,10 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
         }
     }, [currentUserId, activeContactId]);
 
-    // Poll messages every 3s (only if chat open and active)
+    // Poll messages every 10s (optimized for performance while maintaining responsiveness)
     useActivePolling(() => {
         loadMessages();
-    }, 3000, isOpen && !!currentUserId && !!activeContactId);
+    }, 10000, isOpen && !!currentUserId && !!activeContactId);
 
     // Scroll to bottom
     useEffect(() => {
@@ -99,7 +99,8 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
             content: newMessage,
             timestamp: new Date().toISOString(),
             read: false,
-            type: 'text'
+            type: 'text',
+            agencyId: 'optimistic'
         };
 
         setMessages(prev => [...prev, optimisticMessage]);

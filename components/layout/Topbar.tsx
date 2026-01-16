@@ -8,6 +8,7 @@ import { MobileSidebar } from "./MobileSidebar";
 import { User, Notification } from "@/lib/types";
 import { ProfileModal } from "./ProfileModal";
 import { getUsers, getNotifications, globalSearch, markNotificationAsRead, SearchResult } from "@/lib/actions";
+import { logout } from "@/lib/auth";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -279,17 +280,23 @@ export function Topbar({ currentUser: propUser }: TopbarProps) {
                                     <UserIcon className="mr-2 h-4 w-4" />
                                     <span>Edit Profile</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                    <Link href="/dashboard/settings" className="cursor-pointer">
-                                        <Settings className="mr-2 h-4 w-4" />
-                                        <span>Settings</span>
-                                    </Link>
-                                </DropdownMenuItem>
+                                {user.role !== 'client' && (
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/dashboard/settings" className="cursor-pointer">
+                                            <Settings className="mr-2 h-4 w-4" />
+                                            <span>Settings</span>
+                                        </Link>
+                                    </DropdownMenuItem>
+                                )}
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-red-600">
-                                    <LogOut className="mr-2 h-4 w-4" />
-                                    <span>Log out</span>
-                                </DropdownMenuItem>
+                                    <DropdownMenuItem className="text-red-600 focus:text-red-600 cursor-pointer" onClick={async () => {
+                                        await logout();
+                                        router.push('/login');
+                                        router.refresh();
+                                    }}>
+                                        <LogOut className="mr-2 h-4 w-4" />
+                                        <span>Log out</span>
+                                    </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     ) : (

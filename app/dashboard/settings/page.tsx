@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Loader2, Plus, Trash2, Edit2, Users, Briefcase, ChevronDown, ChevronRight, Settings, Shield } from "lucide-react";
 import { X } from "lucide-react";
 import PermissionSettings from "@/components/settings/PermissionSettings";
+import { SecuritySettings } from "@/components/settings/SecuritySettings";
 
 type Job = { title: string; count: number };
 type Service = { id: string; name: string; jobs: Job[] };
@@ -30,11 +31,6 @@ export default function SettingsPage() {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [submitting, setSubmitting] = useState(false);
 
-    // Password State
-    const [currentUser, setCurrentUser] = useState<any>(null);
-    const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
-    const [passSubmitting, setPassSubmitting] = useState(false);
-
     useEffect(() => {
         loadData();
     }, []);
@@ -43,30 +39,10 @@ export default function SettingsPage() {
         const [servicesData, usersData] = await Promise.all([getServices(), getUsers()]);
         setServices(servicesData || []);
         // Mock current user as first user for now
-        if (usersData && usersData.length > 0) {
-            setCurrentUser(usersData[0]);
-        }
+        // if (usersData && usersData.length > 0) {
+        //     setCurrentUser(usersData[0]);
+        // }
         setLoading(false);
-    };
-
-    const handlePasswordChange = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (passwords.new !== passwords.confirm) {
-            alert("New passwords do not match");
-            return;
-        }
-        if (!currentUser) return;
-
-        setPassSubmitting(true);
-        try {
-            await updateUser(currentUser.id, { password: passwords.new }, passwords.current);
-            setPasswords({ current: "", new: "", confirm: "" });
-            alert("Password updated successfully");
-        } catch (error: any) {
-            alert(error.message);
-        } finally {
-            setPassSubmitting(false);
-        }
     };
 
     const handleOpenDialog = (service?: Service) => {
@@ -265,47 +241,7 @@ export default function SettingsPage() {
                 <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isGeneralOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
                     <div className="overflow-hidden">
                         <div className="p-6 pt-0">
-                            <div className="space-y-6">
-                                <h3 className="text-lg font-medium">Change Password</h3>
-                                <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="current-password">Current Password</Label>
-                                        <Input
-                                            id="current-password"
-                                            type="password"
-                                            value={passwords.current}
-                                            onChange={e => setPasswords({ ...passwords, current: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="new-password">New Password</Label>
-                                        <Input
-                                            id="new-password"
-                                            type="password"
-                                            value={passwords.new}
-                                            onChange={e => setPasswords({ ...passwords, new: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="confirm-password">Confirm New Password</Label>
-                                        <Input
-                                            id="confirm-password"
-                                            type="password"
-                                            value={passwords.confirm}
-                                            onChange={e => setPasswords({ ...passwords, confirm: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="flex justify-end pt-2">
-                                        <Button type="submit" disabled={passSubmitting} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                                            {passSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                            Update Password
-                                        </Button>
-                                    </div>
-                                </form>
-                            </div>
+                            <SecuritySettings />
                         </div>
                     </div>
                 </div>

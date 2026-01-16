@@ -1,5 +1,199 @@
+// ============================================================================
+// MULTI-TENANCY TYPES
+// ============================================================================
+
+export type AgencyPlan = 'free' | 'starter' | 'pro' | 'enterprise';
+export type AgencyStatus = 'active' | 'suspended' | 'trial' | 'cancelled';
+
+export type AgencyLimits = {
+    maxUsers: number;
+    maxProjects: number;
+    maxClients: number;
+    maxStorage: number;        // in MB
+    maxMonthlyInvoices: number;
+    aiEnabled: boolean;        // Synced with Schema
+    customBranding: boolean;   // Synced with Schema
+};
+
+export type AgencyFeatures = {
+    aiAssistant: boolean;
+    advancedReporting: boolean;
+    apiAccess: boolean;
+    whiteLabel: boolean;
+    customDomain: boolean;
+    ssoEnabled: boolean;
+};
+
+export type AgencyUsage = {
+    users: number;
+    projects: number;
+    clients: number;
+    storage: number;           // in MB
+    monthlyInvoices: number;
+};
+
+export type Agency = {
+    id: string;
+    name: string;              // "Digital Corvids", "Marketing Pro"
+    slug: string;              // "digital-corvids", "marketing-pro"
+    domain?: string;           // Optional custom domain
+    
+    // Branding
+    logo?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+    
+    // Status & Plan
+    status: AgencyStatus;
+    plan: AgencyPlan;
+    trialEndsAt?: string;      // ISO date
+    
+    // Limits & Usage
+    limits: AgencyLimits;
+    usage: AgencyUsage;
+    
+    // Billing
+    billing: {
+        subscriptionId?: string;
+        stripeCustomerId?: string;
+        subscriptionStatus?: 'active' | 'past_due' | 'canceled' | 'unpaid' | 'trialing' | 'incomplete' | 'incomplete_expired' | 'paused';
+        currentPeriodEnd?: string;
+        cancelAtPeriodEnd?: boolean;
+        billingEmail: string;
+        billingAddress?: string;
+        taxId?: string;
+    };
+    
+    // Settings
+    settings: {
+        systemName: string;
+        timezone: string;
+        currency: string;
+        dateFormat: string;
+        allowClientRegistration: boolean;
+        requireEmailVerification: boolean;
+        enableTwoFactor: boolean;
+    };
+    
+    // Metadata
+    createdAt: string;
+    createdBy: string;         // Super admin ID
+    updatedAt?: string;
+    lastActivityAt?: string;
+    
+    // Features
+    features: AgencyFeatures;
+};
+
+export type SuperAdmin = {
+    id: string;
+    name: string;
+    email: string;
+    password: string;
+    role: 'superadmin';
+    avatar?: string;
+    phone?: string;
+    twoFactorEnabled?: boolean;
+    twoFactorSecret?: string;
+    createdAt: string;
+    lastLoginAt?: string;
+    permissions: {
+        canCreateAgency: boolean;
+        canDeleteAgency: boolean;
+        canSuspendAgency: boolean;
+        canViewBilling: boolean;
+        canManagePlans: boolean;
+    };
+};
+
+// Plan configurations
+// Plan configurations
+export const AGENCY_PLANS: Record<AgencyPlan, { limits: AgencyLimits; features: AgencyFeatures }> = {
+    free: {
+        limits: {
+            maxUsers: 3,
+            maxProjects: 5,
+            maxClients: 10,
+            maxStorage: 100,           // 100 MB
+            maxMonthlyInvoices: 20,
+            aiEnabled: false,
+            customBranding: false,
+        },
+        features: {
+            aiAssistant: false,
+            advancedReporting: false,
+            apiAccess: false,
+            whiteLabel: false,
+            customDomain: false,
+            ssoEnabled: false,
+        }
+    },
+    starter: {
+        limits: {
+            maxUsers: 10,
+            maxProjects: 50,
+            maxClients: 100,
+            maxStorage: 1024,          // 1 GB
+            maxMonthlyInvoices: 100,
+            aiEnabled: true,
+            customBranding: false,
+        },
+        features: {
+            aiAssistant: true,
+            advancedReporting: true,
+            apiAccess: false,
+            whiteLabel: false,
+            customDomain: false,
+            ssoEnabled: false,
+        }
+    },
+    pro: {
+        limits: {
+            maxUsers: 50,
+            maxProjects: 500,
+            maxClients: 1000,
+            maxStorage: 10240,         // 10 GB
+            maxMonthlyInvoices: 1000,
+            aiEnabled: true,
+            customBranding: true,
+        },
+        features: {
+            aiAssistant: true,
+            advancedReporting: true,
+            apiAccess: true,
+            whiteLabel: true,
+            customDomain: false,
+            ssoEnabled: false,
+        }
+    },
+    enterprise: {
+        limits: {
+            maxUsers: -1,              // Unlimited
+            maxProjects: -1,
+            maxClients: -1,
+            maxStorage: -1,
+            maxMonthlyInvoices: -1,
+            aiEnabled: true,
+            customBranding: true,
+        },
+        features: {
+            aiAssistant: true,
+            advancedReporting: true,
+            apiAccess: true,
+            whiteLabel: true,
+            customDomain: true,
+            ssoEnabled: true,
+        }
+    },
+};
+
+// ============================================================================
+// EXISTING TYPES (Updated with agencyId)
+// ============================================================================
+
 export type User = {
     id: string;
+    agencyId: string;          // NEW: Links to agency
     username?: string; // New: Unique handle for URLs
     name: string;
     email: string;
@@ -23,7 +217,8 @@ export type User = {
 };
 export type Client = {
     id: string;
-    username?: string; // New: Unique handle for URLs
+    agencyId: string;          // NEW: Links to agency
+    username?: string;
     name: string;
     email: string;
     role?: 'client';
@@ -69,16 +264,17 @@ export type ProjectServiceConfig = {
     paymentConfig?: PaymentConfig;
 };
 
-export type Project = { id: string; slug?: string; name: string; client?: string; clientId?: string; services: string[]; serviceConfigs?: ProjectServiceConfig[]; status: 'Active' | 'Completed' | 'On Hold'; budget: number; dueDate: string; createdAt?: string; aiEnabled?: boolean };
-export type Invoice = { id: string; projectId: string; amount: number; status: 'Paid' | 'Pending' | 'Overdue' | 'Processing'; date: string };
+export type Project = { id: string; agencyId: string; slug?: string; name: string; client?: string; clientId?: string; services: string[]; serviceConfigs?: ProjectServiceConfig[]; status: 'Active' | 'Completed' | 'On Hold'; budget: number; dueDate: string; createdAt?: string; aiEnabled?: boolean };
+export type Invoice = { id: string; agencyId: string; projectId: string; amount: number; status: 'Paid' | 'Pending' | 'Overdue' | 'Processing'; date: string };
 export type Comment = { id: string; userId: string; text: string; timestamp: string };
-export type Task = { id: string; projectId: string; title: string; description?: string; status: 'Todo' | 'In Progress' | 'Review' | 'Done'; priority?: 'Low' | 'Medium' | 'High'; assigneeId: string; dueDate: string; startDate?: string; category?: string; createdAt?: string; createdBy?: string; comments?: Comment[] };
-export type Notification = { id: string; userId: string; message: string; read: boolean; timestamp: string; link?: string };
-export type Activity = { id: string; user: string; action: string; target: string; timestamp: string };
+export type Task = { id: string; agencyId: string; projectId: string; title: string; description?: string; status: 'Todo' | 'In Progress' | 'Review' | 'Done'; priority?: 'Low' | 'Medium' | 'High'; assigneeId: string; dueDate: string; startDate?: string; category?: string; createdAt?: string; createdBy?: string; comments?: Comment[] };
+export type Notification = { id: string; agencyId: string; userId: string; message: string; read: boolean; timestamp: string; link?: string };
+export type Activity = { id: string; agencyId: string; user: string; action: string; target: string; timestamp: string };
 
 export type AssetType = 'image' | 'file' | 'code' | 'zip' | 'folder' | 'link';
 export type Asset = {
     id: string;
+    agencyId: string;          // NEW: Links to agency
     projectId: string;
     name: string;
     type: AssetType;
@@ -96,6 +292,7 @@ export type LeaveStatus = 'Pending' | 'Approved' | 'Rejected';
 
 export type LeaveRequest = {
     id: string;
+    agencyId: string;          // NEW: Links to agency
     userId: string;
     startDate: string; // ISO Date
     endDate: string;   // ISO Date
@@ -111,6 +308,7 @@ export type Job = { title: string; count: number };
 
 export type Message = {
     id: string;
+    agencyId: string;          // NEW: Links to agency
     senderId: string;
     receiverId: string; // Can be user ID, but for now assuming direct messages. Group chat would need 'groupId'
     content: string;
@@ -119,7 +317,7 @@ export type Message = {
     type: 'text' | 'image';
 };
 
-export type Service = { id: string; name: string; jobs: Job[] };
+export type Service = { id: string; agencyId: string; name: string; jobs: Job[] };
 
 export type TransactionType = 'income' | 'expense';
 export type TransactionCategory = 'Project' | 'Salary' | 'Software' | 'Marketing' | 'Office' | 'Hosting' | 'Domain' | 'Equipment' | 'Internal Transfer' | 'Investor' | 'Refund' | 'Other';
@@ -127,6 +325,7 @@ export const TRANSACTION_CATEGORIES: TransactionCategory[] = ['Project', 'Salary
 
 export type Transaction = {
     id: string;
+    agencyId: string;          // NEW: Links to agency
     date: string;
     amount: number;
     type: TransactionType;
@@ -161,6 +360,8 @@ export type Settings = {
 };
 
 export type DB = {
+    agencies: Agency[];
+    superAdmins: SuperAdmin[];
     users: User[];
     clients: Client[];
     projects: Project[];
