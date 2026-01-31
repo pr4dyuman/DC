@@ -105,7 +105,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                 </TabsContent>
 
                 {isAdmin && (
-                    <TabsContent value="finance" className="flex-1 overflow-auto data-[state=inactive]:hidden text-left">
+                    <TabsContent value="finance" className="flex-1 overflow-auto data-[state=inactive]:hidden text-left no-scrollbar">
                         <div className="container max-w-4xl py-6 space-y-6">
                             <ProjectFinanceSummary project={project} transactions={transactions} />
                             <PaymentSettingsCard project={project} />
@@ -113,7 +113,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                     </TabsContent>
                 )}
 
-                <TabsContent value="assets" className="flex-1 overflow-auto data-[state=inactive]:hidden">
+                <TabsContent value="assets" className="flex-1 overflow-auto data-[state=inactive]:hidden no-scrollbar">
                     <div className="space-y-4 p-1">
                         <AssetList assets={assets} />
                     </div>

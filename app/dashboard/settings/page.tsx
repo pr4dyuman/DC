@@ -11,6 +11,8 @@ import { Loader2, Plus, Trash2, Edit2, Users, Briefcase, ChevronDown, ChevronRig
 import { X } from "lucide-react";
 import PermissionSettings from "@/components/settings/PermissionSettings";
 import { SecuritySettings } from "@/components/settings/SecuritySettings";
+import { AgencySettings } from "@/components/settings/AgencySettings";
+import { EmailSettings } from "@/components/settings/EmailSettings";
 
 type Job = { title: string; count: number };
 type Service = { id: string; name: string; jobs: Job[] };
@@ -240,8 +242,10 @@ export default function SettingsPage() {
 
                 <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isGeneralOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
                     <div className="overflow-hidden">
-                        <div className="p-6 pt-0">
+                        <div className="p-6 pt-0 space-y-6">
+                            <AgencySettings />
                             <SecuritySettings />
+                            <EmailSettings />
                         </div>
                     </div>
                 </div>

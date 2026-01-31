@@ -73,6 +73,7 @@ export type Agency = {
         allowClientRegistration: boolean;
         requireEmailVerification: boolean;
         enableTwoFactor: boolean;
+        emailNotificationsEnabled: boolean;
     };
     
     // Metadata

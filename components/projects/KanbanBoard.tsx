@@ -171,7 +171,7 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
             >
-                <div className="flex h-full gap-4 overflow-x-auto pb-4">
+                <div className="flex h-full gap-4 overflow-x-auto pb-4 no-scrollbar">
                     {COLUMNS.map((col) => (
                         <DroppableColumn
                             key={col}

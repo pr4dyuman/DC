@@ -21,9 +21,11 @@ interface SidebarProps {
     currentUserId?: string;
     currentUserUsername?: string;
     currentUserRole?: string;
+    agencyName?: string;
+    agencyLogo?: string;
 }
 
-export function Sidebar({ currentUserId, currentUserUsername, currentUserRole }: SidebarProps) {
+export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, agencyName = "Agency OS", agencyLogo }: SidebarProps) {
     const pathname = usePathname();
     const { openChat } = useChat();
 
@@ -53,56 +55,57 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole }:
             label: "Team",
             icon: Users,
             href: "/dashboard/team",
-            color: "text-orange-700",
+            color: "text-pink-700",
         },
         {
             label: "Finance",
             icon: DollarSign,
             href: "/dashboard/finance",
-            color: "text-emerald-500",
+            color: "text-orange-700",
         },
         {
             label: "Clients",
             icon: Building2,
             href: "/dashboard/clients",
-            color: "text-blue-500",
+            color: "text-yellow-600",
         },
         {
             label: "Settings",
             icon: Settings,
             href: "/dashboard/settings",
-            color: "text-gray-500",
-        }
-    ].filter(route => {
-        if (route.href === "/dashboard/clients") {
-            return currentUserRole === 'admin';
-        }
-        if (route.href === "/dashboard/team" && currentUserRole === 'client') {
-            return false;
-        }
-        if (route.href === "/dashboard/finance" && currentUserRole === 'client') {
-             // Keep finance explicitly enabled or disabled based on preference, but usually enabled.
-             return true; 
-        }
-        if (route.href === "/dashboard/settings" && currentUserRole === 'client') {
-            return false;
+            isSettings: true, // Marker for filtering
+        },
+    ];
+
+    // Filter routes based on role logic...
+    const filteredRoutes = routes.filter(route => {
+        if (currentUserRole === 'client') {
+            if (route.isSettings) return false;
+            if (route.label === 'Team') return false; 
+            if (route.label === 'Clients') return false;
         }
         return true;
     });
 
     return (
-        <div className="space-y-4 py-4 flex flex-col h-full bg-[#111827] text-white">
+        <div className="space-y-4 py-4 flex flex-col h-full bg-[#111827] text-white overflow-y-auto no-scrollbar">
             <div className="px-3 py-2 flex-1">
-                <Link href="/dashboard" className="flex items-center pl-3 mb-14">
+                <Link href="/dashboard" className="flex items-center pl-3 mb-14 transition hover:opacity-75">
                     <div className="relative w-8 h-8 mr-4">
-                        <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center font-bold text-white">
-                            A
-                        </div>
+                        {agencyLogo ? (
+                             <img src={agencyLogo} alt="Logo" className="w-8 h-8 rounded-md object-cover" />
+                        ) : (
+                             <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-xl">
+                                A
+                             </div>
+                        )}
                     </div>
-                    <h1 className="text-2xl font-bold">Agency OS</h1>
+                    <h1 className="text-xl font-bold truncate max-w-[180px]" title={agencyName}>
+                        {agencyName}
+                    </h1>
                 </Link>
                 <div className="space-y-1">
-                    {routes.map((route) => (
+                    {filteredRoutes.map((route) => (
                         route.isAction ? (
                             <button
                                 key={route.label}

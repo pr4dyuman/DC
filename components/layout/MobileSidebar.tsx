@@ -1,6 +1,6 @@
 "use client";
 
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Sidebar } from "./Sidebar";
 import { Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -10,9 +10,11 @@ interface MobileSidebarProps {
     currentUserId?: string;
     currentUserUsername?: string;
     currentUserRole?: string;
+    agencyName?: string;
+    agencyLogo?: string;
 }
 
-export function MobileSidebar({ currentUserId, currentUserUsername, currentUserRole }: MobileSidebarProps) {
+export function MobileSidebar({ currentUserId, currentUserUsername, currentUserRole, agencyName, agencyLogo }: MobileSidebarProps) {
     const [open, setOpen] = useState(false);
     const pathname = usePathname();
     const [mounted, setMounted] = useState(false);
@@ -36,8 +38,15 @@ export function MobileSidebar({ currentUserId, currentUserUsername, currentUserR
                 </button>
             </SheetTrigger>
             <SheetContent side="left" className="p-0 w-72">
+                <SheetTitle className="hidden">Navigation Menu</SheetTitle>
                 <div className="h-full">
-                    <Sidebar currentUserId={currentUserId} currentUserUsername={currentUserUsername} currentUserRole={currentUserRole} />
+                    <Sidebar 
+                        currentUserId={currentUserId} 
+                        currentUserUsername={currentUserUsername} 
+                        currentUserRole={currentUserRole}
+                        agencyName={agencyName}
+                        agencyLogo={agencyLogo}
+                    />
                 </div>
             </SheetContent>
         </Sheet>

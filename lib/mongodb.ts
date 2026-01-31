@@ -7,7 +7,7 @@ import {
 } from './types';
 
 // MongoDB Connection
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://maharshiankit05_db_user:pVqBK5hxBhNylA6P@cluster0.7i5lvqh.mongodb.net/AgencyOS?retryWrites=true&w=majority';
+const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
     throw new Error('Please define the MONGODB_URI environment variable in .env.local');
@@ -41,9 +41,9 @@ export async function connectDB() {
         };
 
         console.log('🔌 Attempting to connect to MongoDB...');
-        console.log('📍 URI:', MONGODB_URI.replace(/\/\/([^:]+):([^@]+)@/, '//$1:****@')); // Hide password in logs
+        console.log('📍 URI:', MONGODB_URI!.replace(/\/\/([^:]+):([^@]+)@/, '//$1:****@')); // Hide password in logs
 
-        cached.promise = mongoose.connect(MONGODB_URI, opts)
+        cached.promise = mongoose.connect(MONGODB_URI!, opts)
             .then((mongoose) => {
                 console.log('✅ MongoDB Connected Successfully');
                 return mongoose;
@@ -134,7 +134,8 @@ const AgencySettingsSchema = new Schema({
     dateFormat: { type: String, default: 'MM/DD/YYYY' },
     allowClientRegistration: { type: Boolean, default: false },
     requireEmailVerification: { type: Boolean, default: false },
-    enableTwoFactor: { type: Boolean, default: false }
+    enableTwoFactor: { type: Boolean, default: false },
+    emailNotificationsEnabled: { type: Boolean, default: true }
 }, { _id: false });
 
 // Agency Features Schema (Embedded)

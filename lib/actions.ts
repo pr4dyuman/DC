@@ -9,6 +9,81 @@ import { cookies } from "next/headers";
 import { generateId, resolveUserOrClient } from "./utils-server";
 
 // Authentication
+import { connectDB, AgencyModel, UserModel, ClientModel, SuperAdminModel, ProjectModel, TaskModel, InvoiceModel, TransactionModel, ServiceModel, NotificationModel, ActivityModel, AssetModel, MessageModel, LeaveRequestModel, SettingsModel } from "./mongodb";
+
+// Brevo Email Service
+import {
+    sendProjectCreatedEmail,
+    sendProjectStatusChangedEmail,
+    sendProjectCompletedEmail,
+    sendTaskAssignedEmail,
+    sendTaskStatusChangedEmail,
+    sendTaskCommentEmail,
+    sendInvoiceCreatedEmail,
+    sendPaymentPendingApprovalEmail,
+    sendPaymentApprovedEmail,
+    sendPaymentRejectedEmail,
+    sendLeaveRequestedEmail,
+    sendLeaveApprovedEmail,
+    sendLeaveRejectedEmail,
+    sendLeaveCancelledEmail,
+    sendSalaryPaidEmail,
+    sendRefundIssuedEmail,
+    sendDocumentUpdateRequestedEmail,
+    sendDocumentUpdateResponseEmail,
+    sendClientAccountCreatedEmail,
+    sendEmployeeAccountCreatedEmail,
+} from "./brevo-mail";
+
+export async function getAgencySettings() {
+    const agency = await getCurrentAgency();
+    if (!agency) return null;
+    return {
+        name: agency.name,
+        logo: agency.logo || "",
+        primaryColor: agency.primaryColor,
+        secondaryColor: agency.secondaryColor,
+        emailNotificationsEnabled: agency.settings?.emailNotificationsEnabled ?? true
+    };
+}
+
+export async function updateEmailSettings(enabled: boolean) {
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+
+    await AgencyModel.updateOne(
+        { id: agency.id },
+        { 
+            $set: { 
+                "settings.emailNotificationsEnabled": enabled
+            } 
+        }
+    );
+    
+    revalidatePath("/dashboard");
+    return { success: true };
+}
+
+export async function updateAgencyDetails(name: string, logo: string, primaryColor?: string, secondaryColor?: string) {
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+
+    await AgencyModel.updateOne(
+        { id: agency.id },
+        { 
+            $set: { 
+                name, 
+                logo,
+                ...(primaryColor && { primaryColor }),
+                ...(secondaryColor && { secondaryColor })
+            } 
+        }
+    );
+    
+    revalidatePath("/dashboard");
+    return { success: true };
+}
+
 export async function getSessionId() {
     const cookieStore = await cookies();
     return cookieStore.get("userId")?.value;
@@ -36,18 +111,21 @@ export async function logout() {
 
 
 export async function getAllUsers() {
-    const data = await db.get();
-    return data.users;
+    await connectDB();
+    const users = await UserModel.find({}).lean();
+    return users.map(u => ({ ...sanitizeDoc(u), agencyId: u.agencyId || 'default-agency' }));
 }
 
 export async function getAllClients() {
-    const data = await db.get();
-    return data.clients;
+    await connectDB();
+    const clients = await ClientModel.find({}).lean();
+    return clients.map(c => ({ ...sanitizeDoc(c), agencyId: c.agencyId || 'default-agency' }));
 }
 
 export async function getSuperAdmins() {
-    const data = await db.get();
-    return data.superAdmins || [];
+    await connectDB();
+    const admins = await SuperAdminModel.find({}).lean();
+    return admins.map(a => sanitizeDoc(a));
 }
 
 export type SearchResult = {
@@ -59,20 +137,27 @@ export type SearchResult = {
 };
 
 export async function getDashboardMetrics() {
-    const data = await db.get();
+    await connectDB();
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth(); // 0-11
 
-    // 1. Revenue & Growth - Use TRANSACTIONS (not invoices) for consistency
-    const allTransactions = data.transactions || [];
-    
+    // Parallel fetch for dashboard data
+    const [transactions, pendingInvoicesList, activeProjectsCount, projects, tasks] = await Promise.all([
+        TransactionModel.find({}).lean(),
+        InvoiceModel.find({ status: { $in: ['Pending', 'Overdue', 'Processing'] } }).lean(),
+        ProjectModel.countDocuments({ status: 'Active' }),
+        ProjectModel.find({ status: 'Active' }).select('id').lean(), // For task priority check
+        TaskModel.find({}).select('status priority projectId').lean() // Need all tasks for utilization
+    ]);
+
+    // 1. Revenue & Growth
     // Total Revenue = All completed income transactions (client payments) - Refunds
-    const incomeTransactions = allTransactions.filter(t => t.type === 'income' && t.status === 'completed');
-    const totalIncome = incomeTransactions.reduce((acc, curr) => acc + curr.amount, 0);
+    const incomeTransactions = transactions.filter((t: any) => t.type === 'income' && t.status === 'completed');
+    const totalIncome = incomeTransactions.reduce((acc: number, curr: any) => acc + curr.amount, 0);
     
     // Subtract refunds from revenue
-    const refundTransactions = allTransactions.filter(t => t.category === 'Refund' && t.status === 'completed');
-    const totalRefunds = refundTransactions.reduce((acc, curr) => acc + curr.amount, 0);
+    const refundTransactions = transactions.filter((t: any) => t.category === 'Refund' && t.status === 'completed');
+    const totalRefunds = refundTransactions.reduce((acc: number, curr: any) => acc + curr.amount, 0);
     
     const totalRevenue = totalIncome - totalRefunds;
 
@@ -100,32 +185,28 @@ export async function getDashboardMetrics() {
     if (prevMonthRevenue > 0) {
         growthPercentage = Math.round(((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100);
     } else if (currentMonthRevenue > 0) {
-        growthPercentage = 100; // 100% growth if started from 0
+        growthPercentage = 100;
     }
 
     // 2. Pending Invoices & Overdue
-    const pendingInvoicesList = data.invoices.filter(i => i.status === 'Pending' || i.status === 'Overdue' || i.status === 'Processing');
     const pendingInvoicesAmount = pendingInvoicesList.reduce((acc, curr) => acc + curr.amount, 0);
 
     const todayStr = new Date().toISOString().split('T')[0];
     const overdueCount = pendingInvoicesList.filter(i => (i.date < todayStr && i.status !== 'Paid') || i.status === 'Overdue').length;
 
     // 3. Active Projects & High Priority
-    const activeProjectsList = data.projects.filter(p => p.status === 'Active');
-    const activeProjects = activeProjectsList.length;
-
     // Deduce "High Priority" projects as those with "High" priority active tasks.
-    const activeProjectIds = new Set(activeProjectsList.map(p => p.id));
+    const activeProjectIds = new Set(projects.map(p => p.id));
     const highPriorityTaskProjects = new Set(
-        data.tasks
+        tasks
             .filter(t => t.status !== 'Done' && t.priority === 'High' && activeProjectIds.has(t.projectId))
             .map(t => t.projectId)
     );
     const highPriorityCount = highPriorityTaskProjects.size;
 
     // 4. Team Utilization
-    const totalTasks = data.tasks.length;
-    const activeTasks = data.tasks.filter(t => t.status === 'In Progress').length;
+    const totalTasks = tasks.length;
+    const activeTasks = tasks.filter(t => t.status === 'In Progress').length;
     const utilization = totalTasks > 0 ? Math.round((activeTasks / totalTasks) * 100) : 0;
 
     return {
@@ -133,7 +214,7 @@ export async function getDashboardMetrics() {
         growth: growthPercentage,
         pending: pendingInvoicesAmount,
         overdueCount: overdueCount,
-        activeProjects,
+        activeProjects: activeProjectsCount,
         highPriorityCount,
         utilization,
         activeTasksCount: activeTasks
@@ -141,7 +222,9 @@ export async function getDashboardMetrics() {
 }
 
 export async function getRevenueData() {
-    const data = await db.get();
+    await connectDB();
+    const transactions = await TransactionModel.find({}).lean();
+    
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const currentYear = new Date().getFullYear();
 
@@ -162,7 +245,7 @@ export async function getRevenueData() {
     }
 
     // Aggregate Transactions
-    (data.transactions || []).forEach(t => {
+    transactions.forEach(t => {
         const tDate = new Date(t.date);
         const tMonth = tDate.getMonth();
         const tYear = tDate.getFullYear();
@@ -179,13 +262,18 @@ export async function getRevenueData() {
 }
 
 export async function getProjectDistribution() {
-    const data = await db.get();
+    await connectDB();
+    const [projects, services] = await Promise.all([
+        ProjectModel.find({}).lean(),
+        ServiceModel.find({}).lean()
+    ]);
+
     const distribution: Record<string, number> = {};
 
-    data.projects.forEach(p => {
+    projects.forEach(p => {
         p.services.forEach(svc => {
             // Resolve ID to Name for display
-            const serviceObj = data.services.find(s => s.id === svc || s.name === svc);
+            const serviceObj = services.find(s => s.id === svc || s.name === svc);
             const name = serviceObj ? serviceObj.name : svc;
             distribution[name] = (distribution[name] || 0) + 1;
         });
@@ -195,41 +283,139 @@ export async function getProjectDistribution() {
 }
 
 export async function getRecentActivity(offset = 0, limit = 5): Promise<Activity[]> {
-    const data = await db.get();
-    return data.activities.slice(offset, offset + limit);
+    await connectDB();
+    const activities = await ActivityModel.find({}).sort({ timestamp: -1 }).skip(offset).limit(limit).lean();
+    return activities.map(a => sanitizeDoc(a));
+}
+
+export async function getUrgentTasks(limit = 5) {
+    await connectDB();
+    const tasks = await TaskModel.find({ status: { $ne: 'Done' }, priority: 'High' })
+        .sort({ dueDate: 1 })
+        .limit(limit)
+        .lean();
+    return tasks.map(t => ({...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency'}));
+}
+
+export async function getClientDashboardData(clientId: string) {
+    await connectDB();
+    
+    // Parallel Fetch
+    const [projects, invoices, transactions, tasks, assets, notifications] = await Promise.all([
+        ProjectModel.find({ clientId }).lean(),
+        InvoiceModel.find({}).lean(), // Need to filter by projectIds in memory or 2-step
+        TransactionModel.find({}).lean(), // Need to filter by projectIds
+        TaskModel.find({}).lean(), // Need to filter by projectIds
+        AssetModel.find({}).lean(), // Need to filter by projectIds
+        NotificationModel.find({ userId: clientId }).sort({ timestamp: -1 }).limit(5).lean()
+    ]);
+    
+    // Filter by project IDs owned by client
+    const projectIds = new Set(projects.map((p: any) => p.id));
+    
+    const clientInvoices = invoices.filter((i: any) => projectIds.has(i.projectId));
+    const clientTransactions = transactions.filter((t: any) => t.projectId && projectIds.has(t.projectId));
+    const clientTasks = tasks.filter((t: any) => projectIds.has(t.projectId));
+    const clientAssets = assets.filter((a: any) => projectIds.has(a.projectId));
+    
+    // Metrics
+    const activeProjectsCount = projects.filter((p: any) => p.status === 'Active').length;
+    const completedProjectsCount = projects.filter((p: any) => p.status === 'Completed').length;
+    const pendingInvoices = clientInvoices.filter((i: any) => i.status === 'Pending' || i.status === 'Overdue');
+    const totalDue = pendingInvoices.reduce((acc: number, inv: any) => acc + inv.amount, 0);
+    const unreadNotificationsCount = notifications.filter((n: any) => !n.read).length; // Note: this is only from the latest 5. Ideally query count.
+    const unreadCountReal = await NotificationModel.countDocuments({ userId: clientId, read: false });
+
+    // Financials
+    const totalPaid = clientTransactions
+        .filter((t: any) => t.type === 'income' && t.status === 'completed')
+        .reduce((sum: number, t: any) => sum + t.amount, 0);
+    const totalRefunded = clientTransactions
+        .filter((t: any) => t.category === 'Refund' && t.status === 'completed')
+        .reduce((sum: number, t: any) => sum + t.amount, 0);
+    
+    const totalSpent = totalPaid - totalRefunded;
+    const totalBudget = projects.reduce((sum: number, p: any) => sum + (p.budget || 0), 0);
+
+    const clientMetrics = {
+        activeProjects: activeProjectsCount,
+        completedProjects: completedProjectsCount,
+        pendingInvoicesCount: pendingInvoices.length,
+        totalDue: totalDue,
+        unreadNotificationsCount: unreadCountReal,
+        totalSpent,
+        totalBudget,
+        totalTasks: clientTasks.length,
+        completedTasks: clientTasks.filter((t: any) => t.status === 'Done').length
+    };
+    
+    return {
+        projects: projects.map(p => ({...sanitizeDoc(p), agencyId: p.agencyId || 'default-agency'})),
+        invoices: clientInvoices.map(i => sanitizeDoc(i)),
+        transactions: clientTransactions.map(t => sanitizeDoc(t)),
+        tasks: clientTasks.map(t => ({...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency'})),
+        assets: clientAssets.map(a => sanitizeDoc(a)),
+        notifications: notifications.map(n => sanitizeDoc(n)),
+        metrics: clientMetrics
+    };
+}
+
+export async function getEmployeeDashboardData(userId: string) {
+    await connectDB();
+    const tasks = await TaskModel.find({ assigneeId: userId }).lean();
+    const user = await UserModel.findOne({ id: userId }).lean();
+    
+    // Recent Activity
+    const activities = user 
+        ? await ActivityModel.find({ user: user.name }).sort({ timestamp: -1 }).limit(5).lean() 
+        : [];
+        
+    // Projects involved in
+    const projectIds = [...new Set(tasks.map(t => t.projectId))];
+    const projects = await ProjectModel.find({ id: { $in: projectIds } }).lean();
+    
+    return {
+        tasks: tasks.map(t => ({...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency'})),
+        activities: activities.map(a => sanitizeDoc(a)),
+        projects: projects.map(p => ({...sanitizeDoc(p), agencyId: p.agencyId || 'default-agency'})),
+        user: user ? sanitizeDoc(user) : null
+    };
 }
 
 // Auto-clear notifications older than 24 hours
+// Auto-clear notifications older than 24 hours
 export async function getNotifications(userId: string, offset = 0, limit = 1000): Promise<Notification[]> {
-    const data = await db.get();
+    await connectDB();
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    // Filter valid notifications
-    const validNotifications = data.notifications.filter(n => n.timestamp > oneDayAgo);
+    // Clean up old notifications efficiently
+    await NotificationModel.deleteMany({ timestamp: { $lt: oneDayAgo } });
 
-    // If cleanup is needed, update DB
-    if (validNotifications.length < data.notifications.length) {
-        await db.update(curr => ({
-            ...curr,
-            notifications: validNotifications
-        }));
-    }
+    const notifications = await NotificationModel.find({ userId }) // Filter by userId at DB level
+        .sort({ timestamp: -1 }) // Sort by new
+        .skip(offset)
+        .limit(limit)
+        .lean();
 
-    return validNotifications.filter(n => n.userId === userId).slice(offset, offset + limit);
+    return notifications.map(n => sanitizeDoc(n));
 }
 
 export async function getProjects(offset = 0, limit = 1000) {
-    const data = await db.get();
+    await connectDB();
     const currentUserId = await getSessionId();
     if (!currentUserId) return []; // Require auth
 
     const currentUser = await getUser(currentUserId);
-    if (currentUser?.role === 'client') {
+    if (!currentUser) return [];
+
+    let query: any = {};
+    if (currentUser.role === 'client') {
         // STRICT: Only return projects owned by this client
-        return data.projects.filter(p => p.clientId === currentUserId).slice(offset, offset + limit);
+        query.clientId = currentUserId;
     }
 
-    return data.projects.slice(offset, offset + limit);
+    const projects = await ProjectModel.find(query).skip(offset).limit(limit).lean();
+    return projects.map(p => ({ ...sanitizeDoc(p), agencyId: p.agencyId || 'default-agency' }));
 }
 
 export async function getUserProjects(userId: string) {
@@ -253,39 +439,45 @@ export async function getUserProjects(userId: string) {
 }
 
 export async function getProject(id: string) {
-    const data = await db.get();
-    return data.projects.find(p => p.id === id);
+    await connectDB();
+    const project = await ProjectModel.findOne({ id }).lean();
+    if (!project) return undefined;
+    return { ...sanitizeDoc(project), agencyId: project.agencyId || 'default-agency' };
 }
 
 export async function getProjectBySlug(slug: string) {
-    const data = await db.get();
-    // Support lookup by Slug OR ID for robustness during migration/mixed states
-    return data.projects.find(p => p.slug === slug || p.id === slug);
+    await connectDB();
+    const project = await ProjectModel.findOne({ $or: [{ slug }, { id: slug }] }).lean();
+    if (!project) return undefined;
+    return { ...sanitizeDoc(project), agencyId: project.agencyId || 'default-agency' };
 }
 
 export async function getUsers() {
-    const data = await db.get();
+    await connectDB();
     const currentUserId = await getSessionId();
-    const currentUser = await getUser(currentUserId!); // Use enhanced getUser
+    const currentUser = await getUser(currentUserId!); 
     const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
 
-    // If client, arguably they shouldn't see users at all, or only those assigned to their projects?
-    // For now, let's return [] for clients to be safe/strict, unless we need them for chat.
+    // Fetch all users
+    const usersRaw = await UserModel.find({}).lean();
+    const users = usersRaw.map(u => ({ ...sanitizeDoc(u), agencyId: u.agencyId || 'default-agency' }));
+
+    console.log('[getUsers Debug] Current User Role:', currentUser?.role);
+
     if (currentUser?.role === 'client') {
-        // Allow clients to see all users so they can assign tasks, but redact sensitive info
-        return data.users.map(user => {
-            const { salary, password, ...redacted } = user;
+        return users.map(user => {
+            const { salary, password, ...redacted } = user as any;
             return redacted as User;
         });
     }
 
-    return data.users.map(user => {
+    return users.map(user => {
         if (isAdmin || user.id === currentUserId) {
-            return user;
+            // console.log(`[getUsers Debug] Not redacting for ${user.name} (Role: ${user.role}, Salary: ${user.salary})`);
+            return user as User;
         }
-        // Redact salary
-        const { salary, ...redacted } = user;
-        // Cast back to User to satisfy return type, though strictly it's missing salary
+        const { salary, ...redacted } = user as any;
+        console.log(`[getUsers Debug] Redacting salary for ${user.name}`);
         return redacted as User;
     });
 }
@@ -303,12 +495,12 @@ export async function getUser(id: string) {
     const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
 
     if (isAdmin || currentUserId === id) {
-        return targetUser;
+        return sanitizeDoc(targetUser);
     }
 
     // 3. Redact
     const { salary, ...redacted } = targetUser;
-    return redacted as User;
+    return sanitizeDoc(redacted as User);
 }
 
 
@@ -323,71 +515,94 @@ export async function getUserByUsername(username: string) {
 
     const currentUser = await getUser(currentUserId);
     if (currentUser?.role === 'admin' || currentUser?.role === 'manager' || currentUser?.id === user.id) {
-        return user;
+        return sanitizeDoc(user);
     }
 
     // 3. Redact
     const { salary, password, ...redacted } = user;
-    return redacted as User;
+    return sanitizeDoc(redacted as User);
 }
 
 export async function getUserTasks(userId: string, offset = 0, limit = 1000) {
-    const data = await db.get();
-    // Create a set of valid project IDs for O(1) lookup
-    const validProjectIds = new Set(data.projects.map(p => p.id));
-
-    return data.tasks
-        .filter(t => t.assigneeId === userId && validProjectIds.has(t.projectId))
-        .slice(offset, offset + limit);
+    await connectDB();
+    
+    // Fetch tasks for user
+    const tasksRaw = await TaskModel.find({ assigneeId: userId }).lean();
+    
+    // Verify projects exist (equivalent to validProjectIds logic but faster)
+    const projectIds = [...new Set(tasksRaw.map(t => t.projectId))];
+    const validProjects = await ProjectModel.find({ id: { $in: projectIds } }).select('id').lean();
+    const validProjectIdSet = new Set(validProjects.map(p => p.id));
+    
+    // Filter and slice
+    const validTasks = tasksRaw.filter(t => validProjectIdSet.has(t.projectId));
+    
+    return validTasks.slice(offset, offset + limit).map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' }));
 }
 
 // For Client Profile: Get projects they OWN
 export async function getClientProjects(clientId: string) {
-    const data = await db.get();
-    // Match by clientId OR client name (legacy)
+    await connectDB();
+    
     const client = await resolveUserOrClient(clientId);
     const clientName = client ? client.name : null;
 
-    return data.projects.filter(p => p.clientId === clientId || (clientName && p.client === clientName));
+    let query: any = { clientId: clientId };
+    if (clientName) {
+        query = { 
+            $or: [
+                { clientId: clientId },
+                { client: clientName }
+            ]
+        };
+    }
+
+    const projects = await ProjectModel.find(query).lean();
+    return projects.map(p => ({ ...sanitizeDoc(p), agencyId: p.agencyId || 'default-agency' }));
 }
 
 export async function getProjectTasks(projectIds: string[]) {
-    const data = await db.get();
-    const idSet = new Set(projectIds);
-    return data.tasks.filter(t => idSet.has(t.projectId));
+    await connectDB();
+    const tasks = await TaskModel.find({ projectId: { $in: projectIds } }).lean();
+    return tasks.map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' }));
 }
 
 // For Client Profile: Get tasks they CREATED (Assigned to others)
 export async function getClientCreatedTasks(userId: string) {
-    const data = await db.get();
-    return data.tasks.filter(t => t.createdBy === userId).sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
+    await connectDB();
+    const tasks = await TaskModel.find({ createdBy: userId }).sort({ createdAt: -1 }).lean();
+    return tasks.map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' }));
 }
 
 export async function getUserActivity(userId: string) {
-    const data = await db.get();
-    // Filter activities where the actor is the user (by name for now since activity stores 'user' as name)
-    // Or if we can link by ID. Currently activity.user is a string name.
-    // We'll search by user name.
-    const user = data.users.find(u => u.id === userId);
+    await connectDB();
+    const user = await getUser(userId);
     if (!user) return [];
 
     // Limit to last 20 for dashboard
-    return data.activities
-        .filter(a => a.user === user.name)
-        .slice(0, 20);
+    const activities = await ActivityModel.find({ user: user.name })
+        .sort({ timestamp: -1 })
+        .limit(20)
+        .lean();
+        
+    return activities.map(a => sanitizeDoc(a));
 }
 
 export async function getUserContributionHistory(userId: string) {
-    const data = await db.get();
-    const user = data.users.find(u => u.id === userId);
+    await connectDB();
+    const user = await getUser(userId);
     if (!user) return [];
 
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
     const isoOneYearAgo = oneYearAgo.toISOString();
 
-    return data.activities
-        .filter(a => a.user === user.name && a.timestamp >= isoOneYearAgo);
+    const activities = await ActivityModel.find({ 
+        user: user.name, 
+        timestamp: { $gte: isoOneYearAgo } 
+    }).lean();
+
+    return activities.map(a => sanitizeDoc(a));
 }
 
 export async function createUser(user: Omit<User, "id" | "agencyId">) {
@@ -416,13 +631,32 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
         ...data,
         users: [...data.users, newUser]
     }));
+    
+    // Send welcome email to employee
+    try {
+        const agency = await getCurrentAgency();
+        
+        if (newUser.email) {
+            await sendEmployeeAccountCreatedEmail({
+                employeeEmail: newUser.email,
+                employeeName: newUser.name,
+                username: newUser.username,
+                password: user.password || 'Please contact admin for password',
+                role: newUser.role,
+                dashboardLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`,
+                agencyName: agency?.name || 'Agency',
+            });
+        }
+    } catch (emailError) {
+        console.error('[Email] Failed to send employee account creation email:', emailError);
+    }
+    
     revalidatePath('/dashboard/team');
     return newUser;
 }
 
 // Import auth session
 import { getSessionUser } from "@/lib/auth";
-import { UserModel, ClientModel, SuperAdminModel, connectDB } from "@/lib/mongodb";
 
 // Helper to sanitize Mongoose docs for Client Components
 function sanitizeDoc(doc: any) {
@@ -954,6 +1188,30 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
         }
     });
     
+    // Send email notification to client
+    if (project.clientId) {
+        try {
+            const client = await getClientById(project.clientId);
+            if (client?.email) {
+                const paymentPlan = project.serviceConfigs && project.serviceConfigs.length > 0
+                    ? project.serviceConfigs[0].paymentConfig?.type || 'one-time'
+                    : 'one-time';
+                
+                await sendProjectCreatedEmail({
+                    clientEmail: client.email,
+                    clientName: client.name,
+                    projectName: project.name,
+                    budget: project.budget,
+                    paymentPlan: paymentPlan,
+                    invoiceCount: newInvoices.length,
+                    projectLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${newProject.slug || newProject.id}`,
+                });
+            }
+        } catch (emailError) {
+            console.error('[Email] Failed to send project creation email:', emailError);
+        }
+    }
+    
     revalidatePath('/dashboard/projects');
     revalidatePath('/dashboard/finance');
     return newProject;
@@ -1125,6 +1383,24 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
                         link: `/dashboard/projects/${project.id}`
                     })));
                     notifications = [...adminNotifs, ...notifications];
+                    
+                    // Send email notifications for project completion
+                    try {
+                        const client = project.clientId ? await getClientById(project.clientId) : null;
+                        const adminEmails = adminUsers.map(u => u.email).filter(Boolean) as string[];
+                        
+                        if (client?.email || adminEmails.length > 0) {
+                            await sendProjectCompletedEmail({
+                                clientEmail: client?.email || '',
+                                adminEmails,
+                                clientName: client?.name || '',
+                                projectName: project.name,
+                                projectLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${project.id}`,
+                            });
+                        }
+                    } catch (emailError) {
+                        console.error('[Email] Failed to send project completion email:', emailError);
+                    }
                 }
             }
         }
@@ -1252,6 +1528,43 @@ export async function addComment(taskId: string, userId: string, text: string) {
         };
     });
 
+    // Send email notification to task participants
+    try {
+        const data = await db.get();
+        const task = data.tasks.find(t => t.id === taskId);
+        const commenter = await getUser(userId);
+        
+        if (task && commenter) {
+            // Gather all participants (assignee, creator, previous commenters)
+            const participantIds = new Set<string>();
+            if (task.assigneeId) participantIds.add(task.assigneeId);
+            if (task.createdBy) participantIds.add(task.createdBy);
+            task.comments?.forEach(c => participantIds.add(c.userId));
+            
+            // Remove the commenter from recipients
+            participantIds.delete(userId);
+            
+            // Get emails
+            const participantEmails: string[] = [];
+            for (const id of participantIds) {
+                const user = await getUser(id);
+                if (user?.email) participantEmails.push(user.email);
+            }
+            
+            if (participantEmails.length > 0) {
+                await sendTaskCommentEmail({
+                    recipientEmails: participantEmails,
+                    taskTitle: task.title,
+                    commenterName: commenter.name,
+                    commentText: text,
+                    taskLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${task.projectId}?task=${taskId}`,
+                });
+            }
+        }
+    } catch (emailError) {
+        console.error('[Email] Failed to send task comment email:', emailError);
+    }
+
     revalidatePath('/dashboard/projects/[id]', 'page');
     revalidatePath('/dashboard/projects');
     return newComment;
@@ -1283,6 +1596,30 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
             }), ...data.activities]
         };
     });
+    
+    // Send email notification to assignee
+    if (task.assigneeId) {
+        try {
+            const assignee = await getUser(task.assigneeId);
+            const project = await getProject(task.projectId);
+            
+            if (assignee?.email && project) {
+                await sendTaskAssignedEmail({
+                    assigneeEmail: assignee.email,
+                    assigneeName: assignee.name,
+                    taskTitle: task.title,
+                    taskDescription: task.description || '',
+                    projectName: project.name,
+                    dueDate: task.dueDate,
+                    priority: task.priority || 'Medium',
+                    taskLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${task.projectId}?task=${newTask.id}`,
+                });
+            }
+        } catch (emailError) {
+            console.error('[Email] Failed to send task assignment email:', emailError);
+        }
+    }
+    
     revalidatePath('/dashboard/projects/[id]', 'page');
     revalidatePath('/dashboard/projects');
     return newTask;
@@ -1349,6 +1686,26 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
         ...data,
         clients: [...(data.clients || []), newClient]
     }));
+    
+    // Send welcome email to client
+    try {
+        const agency = await getCurrentAgency();
+        
+        if (newClient.email) {
+            await sendClientAccountCreatedEmail({
+                clientEmail: newClient.email,
+                clientName: newClient.name,
+                companyName: newClient.companyName,
+                username: newClient.username,
+                password: client.password || 'Please contact admin for password',
+                dashboardLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`,
+                agencyName: agency?.name || 'Agency',
+            });
+        }
+    } catch (emailError) {
+        console.error('[Email] Failed to send client account creation email:', emailError);
+    }
+    
     revalidatePath('/dashboard/clients');
     revalidatePath('/dashboard/team'); // In case they appear there too
     return newClient;
@@ -1430,6 +1787,33 @@ export async function updateProject(id: string, updates: Partial<Project>) {
             notifications
         };
     });
+    
+    // Send email notification for status change
+    if (updates.status && oldProject && oldProject.status !== updates.status && oldProject.clientId) {
+        try {
+            const client = await getClientById(oldProject.clientId);
+            if (client?.email) {
+                const statusMessages: Record<string, string> = {
+                    'Active': 'is now active and in progress',
+                    'Completed': 'has been completed',
+                    'On Hold': 'has been put on hold',
+                    'Cancelled': 'has been cancelled'
+                };
+                
+                await sendProjectStatusChangedEmail({
+                    clientEmail: client.email,
+                    clientName: client.name,
+                    projectName: oldProject.name,
+                    oldStatus: oldProject.status,
+                    newStatus: updates.status,
+                    statusMessage: statusMessages[updates.status] || `status updated to ${updates.status}`,
+                    projectLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${id}`,
+                });
+            }
+        } catch (emailError) {
+            console.error('[Email] Failed to send project status change email:', emailError);
+        }
+    }
     
     revalidatePath('/dashboard/projects');
     revalidatePath(`/dashboard/projects/${id}`);
@@ -1669,6 +2053,25 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
             }));
         }
 
+        // Send email for salary payment
+        if (newTransaction.category === 'Salary' && newTransaction.userId && newTransaction.type === 'expense') {
+            try {
+                const employee = data.users.find(u => u.id === newTransaction.userId);
+                if (employee?.email) {
+                    await sendSalaryPaidEmail({
+                        employeeEmail: employee.email,
+                        employeeName: employee.name,
+                        amount: newTransaction.amount,
+                        month: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
+                        paymentDate: newTransaction.date,
+                        financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/finance`,
+                    });
+                }
+            } catch (emailError) {
+                console.error('[Email] Failed to send salary payment email:', emailError);
+            }
+        }
+
         return {
             ...data,
             transactions: [newTransaction, ...(data.transactions || [])],
@@ -1781,6 +2184,27 @@ export async function clientMarkInvoiceAsPaid(invoiceId: string) {
         return { ...data, notifications };
     });
 
+    // Send email notification to admins
+    try {
+        const data = await db.get();
+        const adminUsers = data.users.filter(u => u.role === 'admin');
+        const adminEmails = adminUsers.map(u => u.email).filter(Boolean) as string[];
+        const invoice = data.invoices.find(i => i.id === invoiceId);
+        const project = invoice ? await getProject(invoice.projectId) : null;
+        
+        if (adminEmails.length > 0 && invoice && project) {
+            await sendPaymentPendingApprovalEmail({
+                adminEmails,
+                clientName: currentUser.name,
+                amount: invoice.amount,
+                projectName: project.name,
+                financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/finance`,
+            });
+        }
+    } catch (emailError) {
+        console.error('[Email] Failed to send payment pending approval email:', emailError);
+    }
+
     revalidatePath('/dashboard/finance');
 }
 
@@ -1847,6 +2271,28 @@ export async function adminApproveInvoicePayment(invoiceId: string) {
         return { ...data, notifications };
     });
 
+    // Send email notification to client
+    try {
+        const data = await db.get();
+        const invoice = data.invoices.find(i => i.id === invoiceId);
+        const project = invoice ? data.projects.find(p => p.id === invoice.projectId) : null;
+        
+        if (project?.clientId && invoice) {
+            const client = await getClientById(project.clientId);
+            if (client?.email) {
+                await sendPaymentApprovedEmail({
+                    clientEmail: client.email,
+                    clientName: client.name,
+                    amount: invoice.amount,
+                    projectName: project.name,
+                    financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/finance`,
+                });
+            }
+        }
+    } catch (emailError) {
+        console.error('[Email] Failed to send payment approved email:', emailError);
+    }
+
     revalidatePath('/dashboard/finance');
 }
 
@@ -1891,6 +2337,29 @@ export async function adminRejectInvoicePayment(invoiceId: string, reason?: stri
 
         return { ...data, notifications };
     });
+
+    // Send email notification to client
+    try {
+        const data = await db.get();
+        const invoice = data.invoices.find(i => i.id === invoiceId);
+        const project = invoice ? data.projects.find(p => p.id === invoice.projectId) : null;
+        
+        if (project?.clientId && invoice) {
+            const client = await getClientById(project.clientId);
+            if (client?.email) {
+                await sendPaymentRejectedEmail({
+                    clientEmail: client.email,
+                    clientName: client.name,
+                    amount: invoice.amount,
+                    projectName: project.name,
+                    rejectionReason: reason,
+                    financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/finance`,
+                });
+            }
+        }
+    } catch (emailError) {
+        console.error('[Email] Failed to send payment rejected email:', emailError);
+    }
 
     revalidatePath('/dashboard/finance');
 }
@@ -1972,6 +2441,26 @@ export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "ag
             notifications
         };
     });
+
+    // Send email notification to client
+    try {
+        const project = await getProject(invoice.projectId);
+        if (project?.clientId) {
+            const client = await getClientById(project.clientId);
+            if (client?.email) {
+                await sendInvoiceCreatedEmail({
+                    clientEmail: client.email,
+                    clientName: client.name,
+                    amount: invoice.amount,
+                    projectName: project.name,
+                    dueDate: invoice.date,
+                    financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/finance`,
+                });
+            }
+        }
+    } catch (emailError) {
+        console.error('[Email] Failed to send invoice creation email:', emailError);
+    }
 
     revalidatePath('/dashboard/finance');
     return newInvoice;
@@ -2744,6 +3233,28 @@ export async function requestLeave(leaveData: Omit<LeaveRequest, 'id' | 'status'
         };
     });
 
+    // Send email notification to admins
+    try {
+        const data = await db.get();
+        const adminUsers = data.users.filter(u => u.role === 'admin');
+        const adminEmails = adminUsers.map(u => u.email).filter(Boolean) as string[];
+        
+        if (adminEmails.length > 0) {
+            await sendLeaveRequestedEmail({
+                adminEmails,
+                employeeName: currentUser.name,
+                leaveType: leaveData.type,
+                startDate: leaveData.startDate,
+                endDate: leaveData.endDate,
+                days: daysDiff,
+                reason: leaveData.reason || 'No reason provided',
+                teamLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/team`,
+            });
+        }
+    } catch (emailError) {
+        console.error('[Email] Failed to send leave request email:', emailError);
+    }
+
     revalidatePath('/dashboard/team');
     return newLeaveRequest;
 }
@@ -2802,6 +3313,30 @@ export async function approveLeaveRequest(leaveRequestId: string) {
             }), ...data.activities]
         };
     });
+
+    // Send email notification to employee
+    try {
+        const data = await db.get();
+        const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
+        const employee = leaveRequest ? data.users.find(u => u.id === leaveRequest.userId) : null;
+        
+        if (employee?.email && leaveRequest) {
+            const daysDiff = Math.ceil((new Date(leaveRequest.endDate).getTime() - new Date(leaveRequest.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+            
+            await sendLeaveApprovedEmail({
+                employeeEmail: employee.email,
+                employeeName: employee.name,
+                leaveType: leaveRequest.type,
+                startDate: leaveRequest.startDate,
+                endDate: leaveRequest.endDate,
+                days: daysDiff,
+                approvedBy: currentUser.name,
+                teamLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/team`,
+            });
+        }
+    } catch (emailError) {
+        console.error('[Email] Failed to send leave approved email:', emailError);
+    }
 
     revalidatePath('/dashboard/team');
 }
@@ -2865,6 +3400,31 @@ export async function rejectLeaveRequest(leaveRequestId: string, rejectionReason
         };
     });
 
+    // Send email notification to employee
+    try {
+        const data = await db.get();
+        const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
+        const employee = leaveRequest ? data.users.find(u => u.id === leaveRequest.userId) : null;
+        
+        if (employee?.email && leaveRequest) {
+            const daysDiff = Math.ceil((new Date(leaveRequest.endDate).getTime() - new Date(leaveRequest.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+            
+            await sendLeaveRejectedEmail({
+                employeeEmail: employee.email,
+                employeeName: employee.name,
+                leaveType: leaveRequest.type,
+                startDate: leaveRequest.startDate,
+                endDate: leaveRequest.endDate,
+                days: daysDiff,
+                rejectedBy: currentUser.name,
+                rejectionReason,
+                teamLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/team`,
+            });
+        }
+    } catch (emailError) {
+        console.error('[Email] Failed to send leave rejected email:', emailError);
+    }
+
     revalidatePath('/dashboard/team');
 }
 
@@ -2922,6 +3482,27 @@ export async function cancelLeaveRequest(leaveRequestId: string) {
             }), ...data.activities]
         };
     });
+
+    // Send email notification to admins
+    if (currentUser.role !== 'admin') {
+        try {
+            const data = await db.get();
+            const adminUsers = data.users.filter(u => u.role === 'admin');
+            const adminEmails = adminUsers.map(u => u.email).filter(Boolean) as string[];
+            const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
+            
+            if (adminEmails.length > 0 && leaveRequest) {
+                await sendLeaveCancelledEmail({
+                    adminEmails,
+                    employeeName: currentUser.name,
+                    leaveType: leaveRequest.type,
+                    teamLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/team`,
+                });
+            }
+        } catch (emailError) {
+            console.error('[Email] Failed to send leave cancelled email:', emailError);
+        }
+    }
 
     revalidatePath('/dashboard/team');
 }
@@ -3076,6 +3657,24 @@ export async function createRefund(refund: {
 
         return newData;
     });
+
+    // Send email notification to client
+    try {
+        const client = project.clientId ? await getClientById(project.clientId) : null;
+        
+        if (client?.email) {
+            await sendRefundIssuedEmail({
+                clientEmail: client.email,
+                clientName: client.name,
+                amount: refund.amount,
+                projectName: project.name,
+                refundReason: refund.refundReason,
+                projectLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${project.slug || project.id}`,
+            });
+        }
+    } catch (emailError) {
+        console.error('[Email] Failed to send refund issued email:', emailError);
+    }
 
     revalidatePath('/dashboard/finance');
     revalidatePath('/dashboard/clients');

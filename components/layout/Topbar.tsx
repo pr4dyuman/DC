@@ -23,9 +23,11 @@ import { Button } from "@/components/ui/button";
 
 interface TopbarProps {
     currentUser?: User;
+    agencyName?: string;
+    agencyLogo?: string;
 }
 
-export function Topbar({ currentUser: propUser }: TopbarProps) {
+export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: TopbarProps) {
     const router = useRouter();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [user, setUser] = useState<User | undefined>(propUser);
@@ -132,7 +134,7 @@ export function Topbar({ currentUser: propUser }: TopbarProps) {
             <div className="h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 flex items-center justify-between z-10">
                 <div className="flex items-center gap-4">
                     <div className="md:hidden mr-2">
-                        {mounted && <MobileSidebar currentUserId={user.id} currentUserUsername={user.username} currentUserRole={user.role} />}
+                        {mounted && <MobileSidebar currentUserId={user.id} currentUserUsername={user.username} currentUserRole={user.role} agencyName={agencyName} agencyLogo={agencyLogo} />}
                     </div>
                     <h2 className="text-lg font-semibold">Dashboard</h2>
                 </div>
