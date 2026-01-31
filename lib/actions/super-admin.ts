@@ -209,7 +209,8 @@ export async function createAgency(data: {
             dateFormat: 'MM/DD/YYYY',
             allowClientRegistration: false,
             requireEmailVerification: false,
-            enableTwoFactor: false
+            enableTwoFactor: false,
+            emailNotificationsEnabled: true
         },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
