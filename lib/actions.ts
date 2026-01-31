@@ -1696,7 +1696,7 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
                 clientEmail: newClient.email,
                 clientName: newClient.name,
                 companyName: newClient.companyName,
-                username: newClient.username,
+                username: newClient.username || '',
                 password: client.password || 'Please contact admin for password',
                 dashboardLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`,
                 agencyName: agency?.name || 'Agency',
