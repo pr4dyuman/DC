@@ -4,7 +4,7 @@ import { Building2, Users, FolderKanban, DollarSign, TrendingUp, AlertCircle } f
 
 export default async function SuperAdminDashboard() {
     const analytics = await getSystemAnalytics();
-    
+
     const stats = [
         {
             name: "Total Agencies",
@@ -35,14 +35,14 @@ export default async function SuperAdminDashboard() {
             href: "/super-admin/users"
         },
     ];
-    
+
     return (
         <div className="space-y-6">
             <div>
                 <h1 className="text-3xl font-bold text-gray-900">Super Admin Dashboard</h1>
                 <p className="text-gray-600 mt-1">System overview and management</p>
             </div>
-            
+
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {stats.map((stat) => {
@@ -66,7 +66,7 @@ export default async function SuperAdminDashboard() {
                     );
                 })}
             </div>
-            
+
             {/* Agencies by Plan */}
             <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Agencies by Plan</h2>
@@ -85,7 +85,7 @@ export default async function SuperAdminDashboard() {
                     </div>
                 </div>
             </div>
-            
+
             {/* Recent Agencies */}
             <div className="bg-white rounded-lg shadow">
                 <div className="p-6 border-b border-gray-200">
@@ -102,21 +102,19 @@ export default async function SuperAdminDashboard() {
                                 <div>
                                     <h3 className="font-semibold text-gray-900">{agency.name}</h3>
                                     <p className="text-sm text-gray-600 mt-1">
-                                        Created {new Date(agency.createdAt).toLocaleDateString()}
+                                        Created {new Date(agency.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                        agency.plan === 'enterprise' ? 'bg-purple-100 text-purple-800' :
-                                        agency.plan === 'pro' ? 'bg-blue-100 text-blue-800' :
-                                        'bg-gray-100 text-gray-800'
-                                    }`}>
+                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${agency.plan === 'enterprise' ? 'bg-purple-100 text-purple-800' :
+                                            agency.plan === 'pro' ? 'bg-blue-100 text-blue-800' :
+                                                'bg-gray-100 text-gray-800'
+                                        }`}>
                                         {agency.plan.toUpperCase()}
                                     </span>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                        agency.status === 'active' ? 'bg-green-100 text-green-800' :
-                                        'bg-red-100 text-red-800'
-                                    }`}>
+                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${agency.status === 'active' ? 'bg-green-100 text-green-800' :
+                                            'bg-red-100 text-red-800'
+                                        }`}>
                                         {agency.status}
                                     </span>
                                 </div>

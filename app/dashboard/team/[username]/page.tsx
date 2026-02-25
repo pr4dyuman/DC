@@ -511,7 +511,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                                     </span>
                                                     {task.dueDate && (
                                                         <div className="text-xs text-neutral-500 mt-2">
-                                                            Due {new Date(task.dueDate).toLocaleDateString()}
+                                                            Due {new Date(task.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                         </div>
                                                     )}
                                                 </div>
@@ -552,7 +552,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                                             <span className="text-yellow-500">{activity.action}</span> {activity.target}
                                                         </p>
                                                         <p className="text-xs text-neutral-500 mt-1">
-                                                            {new Date(activity.timestamp).toLocaleString(undefined, {
+                                                            {new Date(activity.timestamp).toLocaleString('en-IN', {
                                                                 dateStyle: 'medium',
                                                                 timeStyle: 'short'
                                                             })}

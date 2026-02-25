@@ -64,7 +64,7 @@ export function UrgentTasksList({ initialTasks }: UrgentTasksListProps) {
                             <div key={task.id} className="flex items-center p-2 rounded-lg hover:bg-muted/50 transition-colors">
                                 <div className="ml-2 space-y-1">
                                     <p className="text-sm font-medium leading-none">{task.title}</p>
-                                    <p className="text-sm text-muted-foreground">Due {new Date(task.dueDate).toLocaleDateString()}</p>
+                                    <p className="text-sm text-muted-foreground">Due {new Date(task.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                                 </div>
                                 <div className={`ml-auto font-medium text-xs px-2 py-1 rounded-full ${task.status === 'In Progress' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'}`}>
                                     {task.status}

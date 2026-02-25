@@ -65,7 +65,7 @@ export function ClientNotificationsList({ initialNotifications, userId }: Client
                                     <div>
                                         <p className="text-sm text-zinc-200">{n.message}</p>
                                         <p className="text-xs text-muted-foreground mt-1">
-                                            {new Date(n.timestamp).toLocaleDateString()}
+                                            {new Date(n.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                         </p>
                                     </div>
                                 </div>

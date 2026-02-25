@@ -31,7 +31,7 @@ export function InvoiceManager({ invoices, isClient = false }: InvoiceManagerPro
     });
 
     const [formData, setFormData] = useState({
-        projectId: "p1", // Default mock project ID
+        projectId: "", // Force user to select a project
         amount: "",
         date: "", // Initialize empty to avoid hydration mismatch
     });
@@ -52,7 +52,7 @@ export function InvoiceManager({ invoices, isClient = false }: InvoiceManagerPro
                 date: formData.date
             });
             setOpen(false);
-            setFormData({ projectId: "p1", amount: "", date: new Date().toISOString().split('T')[0] });
+            setFormData({ projectId: "", amount: "", date: new Date().toISOString().split('T')[0] });
             router.refresh();
         } catch (error) {
             console.error(error);
@@ -167,7 +167,7 @@ export function InvoiceManager({ invoices, isClient = false }: InvoiceManagerPro
                                         {isClient ? (
                                             invoice.status === 'Pending' && (
                                                 <Button size="sm" variant="outline" onClick={() => handleStatusUpdate(invoice.id, 'Processing')}>
-                                                    Mark as Paid
+                                                    Submit Payment
                                                 </Button>
                                             )
                                         ) : (

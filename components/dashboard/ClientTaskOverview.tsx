@@ -134,7 +134,7 @@ export function ClientTaskOverview({ tasks, projects }: ClientTaskOverviewProps)
                                                         </p>
                                                     </div>
                                                     <div className="text-xs text-amber-400 ml-2">
-                                                        {new Date(task.dueDate).toLocaleDateString()}
+                                                        {new Date(task.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                     </div>
                                                 </div>
                                             </div>

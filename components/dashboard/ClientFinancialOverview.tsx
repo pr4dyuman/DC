@@ -79,7 +79,7 @@ export function ClientFinancialOverview({
                     </div>
                     {/* Progress Bar */}
                     <div className="mt-3 w-full bg-zinc-800 rounded-full h-2">
-                        <div 
+                        <div
                             className="bg-indigo-500 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${totalBudget > 0 ? Math.min((totalSpent / totalBudget) * 100, 100) : 0}%` }}
                         ></div>
@@ -102,7 +102,7 @@ export function ClientFinancialOverview({
                                     // - "expense" type = Refund FROM agency = INCOME (green, plus)
                                     const isExpense = transaction.type === 'income';
                                     const isIncome = transaction.type === 'expense';
-                                    
+
                                     return (
                                         <div
                                             key={transaction.id}
@@ -111,12 +111,11 @@ export function ClientFinancialOverview({
                                             <div className="flex-1">
                                                 <p className="text-sm font-medium">{transaction.description}</p>
                                                 <p className="text-xs text-muted-foreground mt-1">
-                                                    {new Date(transaction.date).toLocaleDateString()} • {transaction.category}
+                                                    {new Date(transaction.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} • {transaction.category}
                                                 </p>
                                             </div>
-                                            <div className={`text-sm font-semibold ${
-                                                isIncome ? 'text-emerald-500' : 'text-red-500'
-                                            }`}>
+                                            <div className={`text-sm font-semibold ${isIncome ? 'text-emerald-500' : 'text-red-500'
+                                                }`}>
                                                 {isIncome ? '+' : '-'}₹{transaction.amount.toLocaleString()}
                                             </div>
                                         </div>

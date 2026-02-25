@@ -8,31 +8,31 @@ import { useState } from "react";
 export default function AgencyTable({ agencies }: { agencies: any[] }) {
     const [filter, setFilter] = useState<string>("all");
     const [search, setSearch] = useState("");
-    
+
     const filteredAgencies = agencies.filter((agency) => {
         const matchesFilter = filter === "all" || agency.status === filter || agency.plan === filter;
         const matchesSearch = agency.name.toLowerCase().includes(search.toLowerCase());
         return matchesFilter && matchesSearch;
     });
-    
+
     const handleSuspend = async (agencyId: string) => {
         if (!confirm("Are you sure you want to suspend this agency?")) return;
         await suspendAgency(agencyId, "Suspended by super admin");
         window.location.reload();
     };
-    
+
     const handleActivate = async (agencyId: string) => {
         await activateAgency(agencyId);
         window.location.reload();
     };
-    
+
     const handleDelete = async (agencyId: string) => {
         if (!confirm("⚠️ WARNING: This will permanently delete the agency and ALL its data. This cannot be undone. Are you absolutely sure?")) return;
         if (!confirm("Last chance! Type 'DELETE' to confirm.")) return;
         await deleteAgency(agencyId);
         window.location.reload();
     };
-    
+
     return (
         <div className="bg-white rounded-lg shadow">
             <div className="p-6 border-b border-gray-200">
@@ -58,7 +58,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                     </select>
                 </div>
             </div>
-            
+
             <div className="overflow-x-auto">
                 <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-200">
@@ -99,19 +99,17 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                        agency.plan === 'enterprise' ? 'bg-purple-100 text-purple-800' :
-                                        agency.plan === 'pro' ? 'bg-blue-100 text-blue-800' :
-                                        'bg-gray-100 text-gray-800'
-                                    }`}>
+                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${agency.plan === 'enterprise' ? 'bg-purple-100 text-purple-800' :
+                                            agency.plan === 'pro' ? 'bg-blue-100 text-blue-800' :
+                                                'bg-gray-100 text-gray-800'
+                                        }`}>
                                         {agency.plan.toUpperCase()}
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                        agency.status === 'active' ? 'bg-green-100 text-green-800' :
-                                        'bg-red-100 text-red-800'
-                                    }`}>
+                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${agency.status === 'active' ? 'bg-green-100 text-green-800' :
+                                            'bg-red-100 text-red-800'
+                                        }`}>
                                         {agency.status}
                                     </span>
                                 </td>
@@ -125,7 +123,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                                     ${(agency.stats?.revenue || 0).toLocaleString()}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {new Date(agency.createdAt).toLocaleDateString()}
+                                    {new Date(agency.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <div className="flex items-center justify-end gap-2">
@@ -167,7 +165,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                     </tbody>
                 </table>
             </div>
-            
+
             {filteredAgencies.length === 0 && (
                 <div className="text-center py-12">
                     <p className="text-gray-500">No agencies found</p>

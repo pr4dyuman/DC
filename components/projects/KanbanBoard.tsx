@@ -133,7 +133,12 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
             try {
                 await updateTaskStatus(taskId, newStatus as Task['status']);
             } catch (e) {
-                // Revert on error?
+                // Revert optimistic update on error
+                setTasks(prev =>
+                    prev.map(t =>
+                        t.id === taskId ? { ...t, status: active.data.current?.task?.status } : t
+                    )
+                );
                 console.error("Move failed", e);
             }
         }

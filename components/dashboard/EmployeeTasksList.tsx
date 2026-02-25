@@ -83,7 +83,7 @@ export function EmployeeTasksList({ initialTasks, userId, allProjects }: Employe
                                     <div className="flex-1 space-y-1">
                                         <p className="text-sm font-medium leading-none text-white">{task.title}</p>
                                         <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                            <Calendar className="w-3 h-3 text-yellow-500" /> Due {new Date(task.dueDate).toLocaleDateString()}
+                                            <Calendar className="w-3 h-3 text-yellow-500" /> Due {new Date(task.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                         </p>
                                     </div>
                                     <div className={`px-2 py-1 rounded text-xs font-medium ${task.priority === 'High' ? 'bg-red-500/10 text-red-500' : 'bg-slate-500/10 text-slate-500'}`}>

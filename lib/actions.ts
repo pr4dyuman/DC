@@ -53,13 +53,13 @@ export async function updateEmailSettings(enabled: boolean) {
 
     await AgencyModel.updateOne(
         { id: agency.id },
-        { 
-            $set: { 
+        {
+            $set: {
                 "settings.emailNotificationsEnabled": enabled
-            } 
+            }
         }
     );
-    
+
     revalidatePath("/dashboard");
     return { success: true };
 }
@@ -70,16 +70,16 @@ export async function updateAgencyDetails(name: string, logo: string, primaryCol
 
     await AgencyModel.updateOne(
         { id: agency.id },
-        { 
-            $set: { 
-                name, 
+        {
+            $set: {
+                name,
                 logo,
                 ...(primaryColor && { primaryColor }),
                 ...(secondaryColor && { secondaryColor })
-            } 
+            }
         }
     );
-    
+
     revalidatePath("/dashboard");
     return { success: true };
 }
@@ -154,11 +154,11 @@ export async function getDashboardMetrics() {
     // Total Revenue = All completed income transactions (client payments) - Refunds
     const incomeTransactions = transactions.filter((t: any) => t.type === 'income' && t.status === 'completed');
     const totalIncome = incomeTransactions.reduce((acc: number, curr: any) => acc + curr.amount, 0);
-    
+
     // Subtract refunds from revenue
     const refundTransactions = transactions.filter((t: any) => t.category === 'Refund' && t.status === 'completed');
     const totalRefunds = refundTransactions.reduce((acc: number, curr: any) => acc + curr.amount, 0);
-    
+
     const totalRevenue = totalIncome - totalRefunds;
 
     // Calculate generic "Growth" (Current Month vs Previous Month)
@@ -224,7 +224,7 @@ export async function getDashboardMetrics() {
 export async function getRevenueData() {
     await connectDB();
     const transactions = await TransactionModel.find({}).lean();
-    
+
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const currentYear = new Date().getFullYear();
 
@@ -294,12 +294,12 @@ export async function getUrgentTasks(limit = 5) {
         .sort({ dueDate: 1 })
         .limit(limit)
         .lean();
-    return tasks.map(t => ({...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency'}));
+    return tasks.map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' }));
 }
 
 export async function getClientDashboardData(clientId: string) {
     await connectDB();
-    
+
     // Parallel Fetch
     const [projects, invoices, transactions, tasks, assets, notifications] = await Promise.all([
         ProjectModel.find({ clientId }).lean(),
@@ -309,15 +309,15 @@ export async function getClientDashboardData(clientId: string) {
         AssetModel.find({}).lean(), // Need to filter by projectIds
         NotificationModel.find({ userId: clientId }).sort({ timestamp: -1 }).limit(5).lean()
     ]);
-    
+
     // Filter by project IDs owned by client
     const projectIds = new Set(projects.map((p: any) => p.id));
-    
+
     const clientInvoices = invoices.filter((i: any) => projectIds.has(i.projectId));
     const clientTransactions = transactions.filter((t: any) => t.projectId && projectIds.has(t.projectId));
     const clientTasks = tasks.filter((t: any) => projectIds.has(t.projectId));
     const clientAssets = assets.filter((a: any) => projectIds.has(a.projectId));
-    
+
     // Metrics
     const activeProjectsCount = projects.filter((p: any) => p.status === 'Active').length;
     const completedProjectsCount = projects.filter((p: any) => p.status === 'Completed').length;
@@ -333,7 +333,7 @@ export async function getClientDashboardData(clientId: string) {
     const totalRefunded = clientTransactions
         .filter((t: any) => t.category === 'Refund' && t.status === 'completed')
         .reduce((sum: number, t: any) => sum + t.amount, 0);
-    
+
     const totalSpent = totalPaid - totalRefunded;
     const totalBudget = projects.reduce((sum: number, p: any) => sum + (p.budget || 0), 0);
 
@@ -348,12 +348,12 @@ export async function getClientDashboardData(clientId: string) {
         totalTasks: clientTasks.length,
         completedTasks: clientTasks.filter((t: any) => t.status === 'Done').length
     };
-    
+
     return {
-        projects: projects.map(p => ({...sanitizeDoc(p), agencyId: p.agencyId || 'default-agency'})),
+        projects: projects.map(p => ({ ...sanitizeDoc(p), agencyId: p.agencyId || 'default-agency' })),
         invoices: clientInvoices.map(i => sanitizeDoc(i)),
         transactions: clientTransactions.map(t => sanitizeDoc(t)),
-        tasks: clientTasks.map(t => ({...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency'})),
+        tasks: clientTasks.map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' })),
         assets: clientAssets.map(a => sanitizeDoc(a)),
         notifications: notifications.map(n => sanitizeDoc(n)),
         metrics: clientMetrics
@@ -364,20 +364,20 @@ export async function getEmployeeDashboardData(userId: string) {
     await connectDB();
     const tasks = await TaskModel.find({ assigneeId: userId }).lean();
     const user = await UserModel.findOne({ id: userId }).lean();
-    
+
     // Recent Activity
-    const activities = user 
-        ? await ActivityModel.find({ user: user.name }).sort({ timestamp: -1 }).limit(5).lean() 
+    const activities = user
+        ? await ActivityModel.find({ user: user.name }).sort({ timestamp: -1 }).limit(5).lean()
         : [];
-        
+
     // Projects involved in
     const projectIds = [...new Set(tasks.map(t => t.projectId))];
     const projects = await ProjectModel.find({ id: { $in: projectIds } }).lean();
-    
+
     return {
-        tasks: tasks.map(t => ({...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency'})),
+        tasks: tasks.map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' })),
         activities: activities.map(a => sanitizeDoc(a)),
-        projects: projects.map(p => ({...sanitizeDoc(p), agencyId: p.agencyId || 'default-agency'})),
+        projects: projects.map(p => ({ ...sanitizeDoc(p), agencyId: p.agencyId || 'default-agency' })),
         user: user ? sanitizeDoc(user) : null
     };
 }
@@ -455,7 +455,7 @@ export async function getProjectBySlug(slug: string) {
 export async function getUsers() {
     await connectDB();
     const currentUserId = await getSessionId();
-    const currentUser = await getUser(currentUserId!); 
+    const currentUser = await getUser(currentUserId!);
     const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
 
     // Fetch all users
@@ -525,31 +525,31 @@ export async function getUserByUsername(username: string) {
 
 export async function getUserTasks(userId: string, offset = 0, limit = 1000) {
     await connectDB();
-    
+
     // Fetch tasks for user
     const tasksRaw = await TaskModel.find({ assigneeId: userId }).lean();
-    
+
     // Verify projects exist (equivalent to validProjectIds logic but faster)
     const projectIds = [...new Set(tasksRaw.map(t => t.projectId))];
     const validProjects = await ProjectModel.find({ id: { $in: projectIds } }).select('id').lean();
     const validProjectIdSet = new Set(validProjects.map(p => p.id));
-    
+
     // Filter and slice
     const validTasks = tasksRaw.filter(t => validProjectIdSet.has(t.projectId));
-    
+
     return validTasks.slice(offset, offset + limit).map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' }));
 }
 
 // For Client Profile: Get projects they OWN
 export async function getClientProjects(clientId: string) {
     await connectDB();
-    
+
     const client = await resolveUserOrClient(clientId);
     const clientName = client ? client.name : null;
 
     let query: any = { clientId: clientId };
     if (clientName) {
-        query = { 
+        query = {
             $or: [
                 { clientId: clientId },
                 { client: clientName }
@@ -584,7 +584,7 @@ export async function getUserActivity(userId: string) {
         .sort({ timestamp: -1 })
         .limit(20)
         .lean();
-        
+
     return activities.map(a => sanitizeDoc(a));
 }
 
@@ -597,9 +597,9 @@ export async function getUserContributionHistory(userId: string) {
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
     const isoOneYearAgo = oneYearAgo.toISOString();
 
-    const activities = await ActivityModel.find({ 
-        user: user.name, 
-        timestamp: { $gte: isoOneYearAgo } 
+    const activities = await ActivityModel.find({
+        user: user.name,
+        timestamp: { $gte: isoOneYearAgo }
     }).lean();
 
     return activities.map(a => sanitizeDoc(a));
@@ -631,11 +631,11 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
         ...data,
         users: [...data.users, newUser]
     }));
-    
+
     // Send welcome email to employee
     try {
         const agency = await getCurrentAgency();
-        
+
         if (newUser.email) {
             await sendEmployeeAccountCreatedEmail({
                 employeeEmail: newUser.email,
@@ -650,7 +650,7 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
     } catch (emailError) {
         console.error('[Email] Failed to send employee account creation email:', emailError);
     }
-    
+
     revalidatePath('/dashboard/team');
     return newUser;
 }
@@ -666,29 +666,29 @@ function sanitizeDoc(doc: any) {
 
 export async function getCurrentUser() {
     await connectDB();
-    
+
     // 1. Try new Auth System (JWT)
     const session = await getSessionUser();
-    
+
     if (session) {
         if (session.role === 'superadmin') {
             const admin = await SuperAdminModel.findOne({ id: session.userId }).lean();
-            if (admin) return sanitizeDoc(admin) as any; 
+            if (admin) return sanitizeDoc(admin) as any;
         } else if (session.role === 'client') {
             const client = await ClientModel.findOne({ id: session.userId }).lean();
             if (client) {
-                return sanitizeDoc({ ...client, role: 'client' }) as any; 
+                return sanitizeDoc({ ...client, role: 'client' }) as any;
             }
         } else {
-             const user = await UserModel.findOne({ id: session.userId }).lean();
-             if (user) return sanitizeDoc(user) as User;
+            const user = await UserModel.findOne({ id: session.userId }).lean();
+            if (user) return sanitizeDoc(user) as User;
         }
     }
 
     // 2. Legacy Fallback (Cookie based) - Kept for safety during transition
     const userId = await getSessionId();
     if (!userId) return null;
-    
+
     // Check for Super Admin
     const allSuperAdmins = (await db.get()).superAdmins;
     const superAdmin = allSuperAdmins?.find(s => s.id === userId);
@@ -697,19 +697,19 @@ export async function getCurrentUser() {
     const data = await db.get();
     const user = data.users.find(u => u.id === userId);
     if (user) return user;
-    
+
     const client = data.clients.find(c => c.id === userId);
     if (client) {
-         // Return as User type for compatibility
-         return {
+        // Return as User type for compatibility
+        return {
             id: client.id,
             name: client.name,
             email: client.email,
             role: 'client' as any,
             agencyId: client.agencyId,
             avatar: client.logo,
-            username: client.username || client.id.substring(0,8)
-         } as User;
+            username: client.username || client.id.substring(0, 8)
+        } as User;
     }
 
     return null;
@@ -733,39 +733,39 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
         if (!oldPassword) {
             throw new Error("Old password is required to change password");
         }
-        
+
         await connectDB();
-        
+
         // Find user in MongoDB (Check all collections since we don't strictly know type here easily without lookup)
         // But typically this action is for Users. Let's check User first.
         let user: any = await UserModel.findOne({ id: id });
         let model: any = UserModel;
-        
+
         if (!user) {
             user = await ClientModel.findOne({ id: id });
             model = ClientModel;
         }
         if (!user) {
-             user = await SuperAdminModel.findOne({ id: id });
-             model = SuperAdminModel;
+            user = await SuperAdminModel.findOne({ id: id });
+            model = SuperAdminModel;
         }
 
         console.log(`[updateUser] Lookup ID: ${id}, Found: ${!!user}`); // DEBUG
         if (!user) {
-             throw new Error("User not found");
+            throw new Error("User not found");
         }
 
         if (user.password) {
-             // Use secure comparison
-             const isMatch = await comparePassword(oldPassword, user.password);
-             if (!isMatch) {
-                 throw new Error("Incorrect old password");
-             }
+            // Use secure comparison
+            const isMatch = await comparePassword(oldPassword, user.password);
+            if (!isMatch) {
+                throw new Error("Incorrect old password");
+            }
         }
-        
+
         // Hash the NEW password
         updates.password = await hashPassword(updates.password);
-        
+
         // Perform Update
         await model.findOneAndUpdate({ id: id }, { $set: updates });
         return; // Return void as original signature implies (or updated user)
@@ -773,7 +773,7 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
 
     // For non-password updates, continuing with MongoDB update logic
     await connectDB();
-    
+
     // Check username uniqueness if updating username
     if (updates.username) {
         // ... (Reimplement MongoDB uniqueness check if needed, or rely on unique index)
@@ -867,11 +867,11 @@ export async function deleteClient(id: string) {
 
         // Instead of deleting, mark client as "archived"
         // This preserves all financial data while hiding client from active lists
-        
+
         return {
             ...data,
-            clients: data.clients.map(c => 
-                c.id === id 
+            clients: data.clients.map(c =>
+                c.id === id
                     ? { ...c, archived: true, archivedAt: new Date().toISOString() }
                     : c
             ),
@@ -918,8 +918,8 @@ export async function unarchiveClient(id: string) {
 
         return {
             ...data,
-            clients: data.clients.map(c => 
-                c.id === id 
+            clients: data.clients.map(c =>
+                c.id === id
                     ? { ...c, archived: false, archivedAt: undefined }
                     : c
             )
@@ -1096,25 +1096,25 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
     }
 
     const newProject: Project = await withAgencyId({ ...project, id: generateId(), slug: uniqueSlug, status: "Active", createdAt: new Date().toISOString() });
-    
+
     // Generate invoices for installment/monthly payments
     const newInvoices: Invoice[] = [];
-    
+
     // Check if project has service configs with payment configuration
     if (project.serviceConfigs && project.serviceConfigs.length > 0) {
         const totalServices = project.serviceConfigs.length;
-        
+
         for (const serviceConfig of project.serviceConfigs) {
             const paymentConfig = serviceConfig.paymentConfig;
-            
+
             if (!paymentConfig) continue;
-            
+
             if (paymentConfig.type === 'installment') {
                 // For installment payments
                 if (paymentConfig.installmentDates && paymentConfig.installmentDates.length > 0) {
-                    const amountPerInstallment = paymentConfig.installmentAmount || 
+                    const amountPerInstallment = paymentConfig.installmentAmount ||
                         (project.budget / totalServices / paymentConfig.installmentDates.length);
-                    
+
                     // Create an invoice for each installment date
                     for (const installmentDate of paymentConfig.installmentDates) {
                         newInvoices.push(await withAgencyId({
@@ -1132,15 +1132,15 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
                     const monthlyAmount = paymentConfig.monthlyAmount;
                     const startDate = new Date(paymentConfig.billingStartDate);
                     const projectDueDate = new Date(project.dueDate);
-                    
+
                     // Calculate number of months
                     const monthsDiff = Math.ceil((projectDueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
                     const numberOfInvoices = Math.min(monthsDiff, 12); // Max 12 months
-                    
+
                     for (let i = 0; i < numberOfInvoices; i++) {
                         const invoiceDate = new Date(startDate);
                         invoiceDate.setMonth(invoiceDate.getMonth() + i);
-                        
+
                         newInvoices.push(await withAgencyId({
                             id: generateId(),
                             projectId: newProject.id,
@@ -1187,7 +1187,7 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
             }), ...data.activities]
         }
     });
-    
+
     // Send email notification to client
     if (project.clientId) {
         try {
@@ -1196,7 +1196,7 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
                 const paymentPlan = project.serviceConfigs && project.serviceConfigs.length > 0
                     ? project.serviceConfigs[0].paymentConfig?.type || 'one-time'
                     : 'one-time';
-                
+
                 await sendProjectCreatedEmail({
                     clientEmail: client.email,
                     clientName: client.name,
@@ -1211,7 +1211,7 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
             console.error('[Email] Failed to send project creation email:', emailError);
         }
     }
-    
+
     revalidatePath('/dashboard/projects');
     revalidatePath('/dashboard/finance');
     return newProject;
@@ -1341,7 +1341,7 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
         // Update task status
         const updatedTasks = data.tasks.map(t => t.id === taskId ? { ...t, status } : t);
         const task = updatedTasks.find(t => t.id === taskId);
-        
+
         let notifications = data.notifications || [];
         let updatedProjects = data.projects;
 
@@ -1349,13 +1349,13 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
         if (task && status === 'Done') {
             const projectTasks = updatedTasks.filter(t => t.projectId === task.projectId);
             const allTasksDone = projectTasks.length > 0 && projectTasks.every(t => t.status === 'Done');
-            
+
             if (allTasksDone) {
                 const project = data.projects.find(p => p.id === task.projectId);
-                
+
                 // Only auto-complete if project is currently Active
                 if (project && project.status === 'Active') {
-                    updatedProjects = data.projects.map(p => 
+                    updatedProjects = data.projects.map(p =>
                         p.id === task.projectId ? { ...p, status: 'Completed' as const } : p
                     );
 
@@ -1383,12 +1383,12 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
                         link: `/dashboard/projects/${project.id}`
                     })));
                     notifications = [...adminNotifs, ...notifications];
-                    
+
                     // Send email notifications for project completion
                     try {
                         const client = project.clientId ? await getClientById(project.clientId) : null;
                         const adminEmails = adminUsers.map(u => u.email).filter(Boolean) as string[];
-                        
+
                         if (client?.email || adminEmails.length > 0) {
                             await sendProjectCompletedEmail({
                                 clientEmail: client?.email || '',
@@ -1419,7 +1419,7 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
             }), ...data.activities]
         };
     });
-    
+
     revalidatePath('/dashboard/projects/[id]', 'page');
     revalidatePath('/dashboard/projects');
 }
@@ -1533,24 +1533,24 @@ export async function addComment(taskId: string, userId: string, text: string) {
         const data = await db.get();
         const task = data.tasks.find(t => t.id === taskId);
         const commenter = await getUser(userId);
-        
+
         if (task && commenter) {
             // Gather all participants (assignee, creator, previous commenters)
             const participantIds = new Set<string>();
             if (task.assigneeId) participantIds.add(task.assigneeId);
             if (task.createdBy) participantIds.add(task.createdBy);
             task.comments?.forEach(c => participantIds.add(c.userId));
-            
+
             // Remove the commenter from recipients
             participantIds.delete(userId);
-            
+
             // Get emails
             const participantEmails: string[] = [];
             for (const id of participantIds) {
                 const user = await getUser(id);
                 if (user?.email) participantEmails.push(user.email);
             }
-            
+
             if (participantEmails.length > 0) {
                 await sendTaskCommentEmail({
                     recipientEmails: participantEmails,
@@ -1596,13 +1596,13 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
             }), ...data.activities]
         };
     });
-    
+
     // Send email notification to assignee
     if (task.assigneeId) {
         try {
             const assignee = await getUser(task.assigneeId);
             const project = await getProject(task.projectId);
-            
+
             if (assignee?.email && project) {
                 await sendTaskAssignedEmail({
                     assigneeEmail: assignee.email,
@@ -1619,7 +1619,7 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
             console.error('[Email] Failed to send task assignment email:', emailError);
         }
     }
-    
+
     revalidatePath('/dashboard/projects/[id]', 'page');
     revalidatePath('/dashboard/projects');
     return newTask;
@@ -1686,11 +1686,11 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
         ...data,
         clients: [...(data.clients || []), newClient]
     }));
-    
+
     // Send welcome email to client
     try {
         const agency = await getCurrentAgency();
-        
+
         if (newClient.email) {
             await sendClientAccountCreatedEmail({
                 clientEmail: newClient.email,
@@ -1705,7 +1705,7 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
     } catch (emailError) {
         console.error('[Email] Failed to send client account creation email:', emailError);
     }
-    
+
     revalidatePath('/dashboard/clients');
     revalidatePath('/dashboard/team'); // In case they appear there too
     return newClient;
@@ -1740,7 +1740,7 @@ export async function updateProject(id: string, updates: Partial<Project>) {
         }
 
         const data = await db.get();
-        
+
         // 2. Completion Logic - Warn if trying to complete with open tasks
         if (updates.status === 'Completed') {
             const projectTasks = data.tasks.filter(t => t.projectId === id);
@@ -1770,7 +1770,7 @@ export async function updateProject(id: string, updates: Partial<Project>) {
             };
 
             const message = statusMessages[updates.status] || `status updated to ${updates.status}`;
-            
+
             notifications = [await withAgencyId({
                 id: generateId(),
                 userId: oldProject.clientId,
@@ -1787,7 +1787,7 @@ export async function updateProject(id: string, updates: Partial<Project>) {
             notifications
         };
     });
-    
+
     // Send email notification for status change
     if (updates.status && oldProject && oldProject.status !== updates.status && oldProject.clientId) {
         try {
@@ -1799,7 +1799,7 @@ export async function updateProject(id: string, updates: Partial<Project>) {
                     'On Hold': 'has been put on hold',
                     'Cancelled': 'has been cancelled'
                 };
-                
+
                 await sendProjectStatusChangedEmail({
                     clientEmail: client.email,
                     clientName: client.name,
@@ -1814,7 +1814,7 @@ export async function updateProject(id: string, updates: Partial<Project>) {
             console.error('[Email] Failed to send project status change email:', emailError);
         }
     }
-    
+
     revalidatePath('/dashboard/projects');
     revalidatePath(`/dashboard/projects/${id}`);
 }
@@ -1914,12 +1914,12 @@ export async function getClientFinanceData(clientId: string) {
 
     // Total Invoiced = Sum of ALL invoices (paid + pending)
     const totalInvoiced = invoices.reduce((acc, curr) => acc + curr.amount, 0);
-    
+
     // Total Paid = Sum of COMPLETED INCOME transactions (actual payments received from client)
     const totalPaid = transactions
         .filter(t => t.type === 'income' && t.status === 'completed')
         .reduce((acc, curr) => acc + curr.amount, 0);
-    
+
     // Pending Amount = Pending + Processing + Overdue invoices
     const pendingAmount = invoices
         .filter(i => i.status === 'Pending' || i.status === 'Processing' || i.status === 'Overdue')
@@ -2105,7 +2105,7 @@ export async function markTransactionAsPaid(transactionId: string) {
 
         // Update status
         const updatedTransaction = { ...transaction, status: 'completed' as const, date: new Date().toISOString().split('T')[0] }; // Update date to payment date? Or keep original due date? Usually payment date.
-        
+
         const newTransactions = [...data.transactions];
         newTransactions[transactionIndex] = updatedTransaction;
 
@@ -2169,7 +2169,7 @@ export async function clientMarkInvoiceAsPaid(invoiceId: string) {
         // Notify admin about payment claim
         const notifications = data.notifications || [];
         const adminUsers = data.users.filter(u => u.role === 'admin');
-        
+
         for (const admin of adminUsers) {
             notifications.unshift(await withAgencyId({
                 id: generateId(),
@@ -2191,7 +2191,7 @@ export async function clientMarkInvoiceAsPaid(invoiceId: string) {
         const adminEmails = adminUsers.map(u => u.email).filter(Boolean) as string[];
         const invoice = data.invoices.find(i => i.id === invoiceId);
         const project = invoice ? await getProject(invoice.projectId) : null;
-        
+
         if (adminEmails.length > 0 && invoice && project) {
             await sendPaymentPendingApprovalEmail({
                 adminEmails,
@@ -2230,12 +2230,12 @@ export async function adminApproveInvoicePayment(invoiceId: string) {
 
         // Create income transaction
         const project = data.projects.find(p => p.id === invoice.projectId);
-        
+
         // Calculate Installment Number for better description
         const projectInvoices = data.invoices
             .filter(i => i.projectId === invoice.projectId)
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        
+
         const installmentIndex = projectInvoices.findIndex(i => i.id === invoice.id);
         const installmentNumber = installmentIndex !== -1 ? installmentIndex + 1 : '?';
         const totalInstallments = projectInvoices.length;
@@ -2276,7 +2276,7 @@ export async function adminApproveInvoicePayment(invoiceId: string) {
         const data = await db.get();
         const invoice = data.invoices.find(i => i.id === invoiceId);
         const project = invoice ? data.projects.find(p => p.id === invoice.projectId) : null;
-        
+
         if (project?.clientId && invoice) {
             const client = await getClientById(project.clientId);
             if (client?.email) {
@@ -2319,12 +2319,12 @@ export async function adminRejectInvoicePayment(invoiceId: string, reason?: stri
         // Notify client about rejection
         const notifications = data.notifications || [];
         const project = data.projects.find(p => p.id === invoice.projectId);
-        
+
         if (project?.clientId) {
-            const message = reason 
+            const message = reason
                 ? `Payment rejected: ${reason}. Please mark as paid again.`
                 : `Payment rejected for ₹${invoice.amount.toLocaleString()}. Please mark as paid again.`;
-            
+
             notifications.unshift(await withAgencyId({
                 id: generateId(),
                 userId: project.clientId,
@@ -2343,7 +2343,7 @@ export async function adminRejectInvoicePayment(invoiceId: string, reason?: stri
         const data = await db.get();
         const invoice = data.invoices.find(i => i.id === invoiceId);
         const project = invoice ? data.projects.find(p => p.id === invoice.projectId) : null;
-        
+
         if (project?.clientId && invoice) {
             const client = await getClientById(project.clientId);
             if (client?.email) {
@@ -2394,6 +2394,7 @@ export async function deleteTransaction(transactionId: string, password: string)
         return data;
     });
 
+    revalidatePath('/dashboard/finance');
     return { success: true };
 }
 
@@ -3207,7 +3208,7 @@ export async function requestLeave(leaveData: Omit<LeaveRequest, 'id' | 'status'
         // Notify all admins about new leave request
         const notifications = data.notifications || [];
         const adminUsers = data.users.filter(u => u.role === 'admin');
-        
+
         for (const admin of adminUsers) {
             notifications.unshift(await withAgencyId({
                 id: generateId(),
@@ -3238,7 +3239,7 @@ export async function requestLeave(leaveData: Omit<LeaveRequest, 'id' | 'status'
         const data = await db.get();
         const adminUsers = data.users.filter(u => u.role === 'admin');
         const adminEmails = adminUsers.map(u => u.email).filter(Boolean) as string[];
-        
+
         if (adminEmails.length > 0) {
             await sendLeaveRequestedEmail({
                 adminEmails,
@@ -3289,7 +3290,7 @@ export async function approveLeaveRequest(leaveRequestId: string) {
         // Notify employee
         const notifications = data.notifications || [];
         const employee = data.users.find(u => u.id === leaveRequest.userId);
-        
+
         if (employee) {
             notifications.unshift(await withAgencyId({
                 id: generateId(),
@@ -3319,10 +3320,10 @@ export async function approveLeaveRequest(leaveRequestId: string) {
         const data = await db.get();
         const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
         const employee = leaveRequest ? data.users.find(u => u.id === leaveRequest.userId) : null;
-        
+
         if (employee?.email && leaveRequest) {
             const daysDiff = Math.ceil((new Date(leaveRequest.endDate).getTime() - new Date(leaveRequest.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
-            
+
             await sendLeaveApprovedEmail({
                 employeeEmail: employee.email,
                 employeeName: employee.name,
@@ -3371,7 +3372,7 @@ export async function rejectLeaveRequest(leaveRequestId: string, rejectionReason
         // Notify employee
         const notifications = data.notifications || [];
         const employee = data.users.find(u => u.id === leaveRequest.userId);
-        
+
         if (employee) {
             const message = rejectionReason
                 ? `Your ${leaveRequest.type} leave request (${daysDiff} day${daysDiff > 1 ? 's' : ''}) was rejected by ${currentUser.name}. Reason: ${rejectionReason}`
@@ -3405,10 +3406,10 @@ export async function rejectLeaveRequest(leaveRequestId: string, rejectionReason
         const data = await db.get();
         const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
         const employee = leaveRequest ? data.users.find(u => u.id === leaveRequest.userId) : null;
-        
+
         if (employee?.email && leaveRequest) {
             const daysDiff = Math.ceil((new Date(leaveRequest.endDate).getTime() - new Date(leaveRequest.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
-            
+
             await sendLeaveRejectedEmail({
                 employeeEmail: employee.email,
                 employeeName: employee.name,
@@ -3490,7 +3491,7 @@ export async function cancelLeaveRequest(leaveRequestId: string) {
             const adminUsers = data.users.filter(u => u.role === 'admin');
             const adminEmails = adminUsers.map(u => u.email).filter(Boolean) as string[];
             const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
-            
+
             if (adminEmails.length > 0 && leaveRequest) {
                 await sendLeaveCancelledEmail({
                     adminEmails,
@@ -3511,7 +3512,7 @@ export async function cancelLeaveRequest(leaveRequestId: string) {
 export async function getEmployeeLeaveStats(userId: string) {
     const data = await db.get();
     const leaveRequests = data.leaveRequests.filter(lr => lr.userId === userId);
-    
+
     const currentYear = new Date().getFullYear();
     const thisYearRequests = leaveRequests.filter(lr => {
         const year = new Date(lr.createdAt).getFullYear();
@@ -3519,7 +3520,7 @@ export async function getEmployeeLeaveStats(userId: string) {
     });
 
     const approvedLeaves = thisYearRequests.filter(lr => lr.status === 'Approved');
-    
+
     // Calculate total days taken
     let casualDaysTaken = 0;
     let emergencyDaysTaken = 0;
@@ -3528,7 +3529,7 @@ export async function getEmployeeLeaveStats(userId: string) {
         const startDate = new Date(leave.startDate);
         const endDate = new Date(leave.endDate);
         const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        
+
         if (leave.type === 'Casual') {
             casualDaysTaken += days;
         } else if (leave.type === 'Emergency') {
@@ -3661,7 +3662,7 @@ export async function createRefund(refund: {
     // Send email notification to client
     try {
         const client = project.clientId ? await getClientById(project.clientId) : null;
-        
+
         if (client?.email) {
             await sendRefundIssuedEmail({
                 clientEmail: client.email,
@@ -3679,13 +3680,13 @@ export async function createRefund(refund: {
     revalidatePath('/dashboard/finance');
     revalidatePath('/dashboard/clients');
     revalidatePath(`/dashboard/projects/${project.slug || project.id}`);
-    
+
     return newRefund;
 }
 
 export async function getClientFinancialSummary(clientId: string) {
     const data = await db.get();
-    
+
     // Get all projects for this client
     const clientProjects = data.projects.filter(p => p.clientId === clientId);
     const projectIds = new Set(clientProjects.map(p => p.id));

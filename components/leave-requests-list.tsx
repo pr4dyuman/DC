@@ -88,7 +88,7 @@ export function LeaveRequestsList({ requests, mode, users = [] }: LeaveRequestsL
                                         )}
                                     </div>
                                     <div className="text-sm text-slate-400">
-                                        {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
+                                        {new Date(request.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} - {new Date(request.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                     </div>
                                     <p className="text-sm text-slate-300 mt-2">
                                         {request.reason}

@@ -243,7 +243,7 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: Topbar
                                                         )}
                                                     </div>
                                                     <p className="text-xs text-muted-foreground mt-1">
-                                                        {new Date(notification.timestamp).toLocaleString()}
+                                                        {new Date(notification.timestamp).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
                                                     </p>
                                                 </div>
                                             ))}
@@ -291,14 +291,14 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: Topbar
                                     </DropdownMenuItem>
                                 )}
                                 <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-red-600 focus:text-red-600 cursor-pointer" onClick={async () => {
-                                        await logout();
-                                        router.push('/login');
-                                        router.refresh();
-                                    }}>
-                                        <LogOut className="mr-2 h-4 w-4" />
-                                        <span>Log out</span>
-                                    </DropdownMenuItem>
+                                <DropdownMenuItem className="text-red-600 focus:text-red-600 cursor-pointer" onClick={async () => {
+                                    await logout();
+                                    router.push('/login');
+                                    router.refresh();
+                                }}>
+                                    <LogOut className="mr-2 h-4 w-4" />
+                                    <span>Log out</span>
+                                </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     ) : (

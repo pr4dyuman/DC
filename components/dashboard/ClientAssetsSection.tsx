@@ -92,7 +92,7 @@ export function ClientAssetsSection({ assets, projects }: ClientAssetsSectionPro
                                                 {getProjectName(asset.projectId)}
                                             </p>
                                             <p className="text-xs text-muted-foreground mt-1">
-                                                {asset.size} • {new Date(asset.uploadedAt).toLocaleDateString()}
+                                                {asset.size} • {new Date(asset.uploadedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                             </p>
                                         </div>
                                         <button

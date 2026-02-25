@@ -224,7 +224,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                                             <span className="text-yellow-500">{activity.action}</span> {activity.target}
                                                         </p>
                                                         <p className="text-xs text-neutral-500 mt-1">
-                                                            {new Date(activity.timestamp).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                                                            {new Date(activity.timestamp).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -263,7 +263,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                             </div>
                                             <div className="flex justify-between text-sm pt-2">
                                                 <span className="text-muted-foreground">Due Date</span>
-                                                <span>{new Date(project.dueDate).toLocaleDateString()}</span>
+                                                <span>{new Date(project.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                                             </div>
                                         </CardContent>
                                     </Card>
@@ -297,7 +297,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                                             }`} />
                                                         <div>
                                                             <p className="text-sm font-medium text-white">#{invoice.id.slice(0, 8)}</p>
-                                                            <p className="text-xs text-muted-foreground">{new Date(invoice.date).toLocaleDateString()}</p>
+                                                            <p className="text-xs text-muted-foreground">{new Date(invoice.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
@@ -337,7 +337,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                                         </div>
                                                         <div>
                                                             <p className="text-sm font-medium text-white">{tx.description}</p>
-                                                            <p className="text-xs text-muted-foreground">{new Date(tx.date).toLocaleDateString()}</p>
+                                                            <p className="text-xs text-muted-foreground">{new Date(tx.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                                                         </div>
                                                     </div>
                                                     <p className={`text-sm font-bold ${tx.type?.toLowerCase() === 'income' ? 'text-green-500' : 'text-white'
@@ -378,7 +378,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                                     <p className="text-sm font-medium text-white">
                                                         <span className="text-yellow-500">{activity.action}</span>
                                                     </p>
-                                                    <span className="text-xs text-muted-foreground">{new Date(activity.timestamp).toLocaleString()}</span>
+                                                    <span className="text-xs text-muted-foreground">{new Date(activity.timestamp).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
                                                 </div>
                                                 <p className="text-sm text-muted-foreground mt-1">{activity.target}</p>
                                             </div>
