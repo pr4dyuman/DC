@@ -1,0 +1,51 @@
+[
+  {
+    "_id": "698b64baa5b83b49be0c00e7",
+    "id": "agency-1",
+    "name": "Default Agency",
+    "slug": "default-agency",
+    "status": "active",
+    "plan": "pro",
+    "limits": {
+      "maxUsers": 100,
+      "maxProjects": 100,
+      "maxClients": 100,
+      "maxStorage": 1073741824,
+      "maxMonthlyInvoices": 100,
+      "aiEnabled": true,
+      "customBranding": true
+    },
+    "usage": {
+      "users": 3,
+      "projects": 0,
+      "clients": 1,
+      "storage": 0,
+      "monthlyInvoices": 0
+    },
+    "billing": {
+      "billingEmail": "admin@agency.com"
+    },
+    "settings": {
+      "systemName": "Default Agency OS",
+      "timezone": "UTC",
+      "currency": "USD",
+      "dateFormat": "MM/DD/YYYY",
+      "allowClientRegistration": false,
+      "requireEmailVerification": false,
+      "enableTwoFactor": false,
+      "emailNotificationsEnabled": true
+    },
+    "createdAt": "2026-01-20T06:31:07.076Z",
+    "createdBy": "system",
+    "updatedAt": "Tue Feb 10 2026 22:43:16 GMT+0530 (India Standard Time)",
+    "features": {
+      "aiAssistant": true,
+      "advancedReporting": true,
+      "apiAccess": true,
+      "whiteLabel": true,
+      "customDomain": false,
+      "ssoEnabled": false
+    },
+    "__v": 0
+  }
+]

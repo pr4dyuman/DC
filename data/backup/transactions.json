@@ -1,0 +1,45 @@
+[
+  {
+    "_id": "698b64baa5b83b49be0c00b3",
+    "id": "4xqmc9yv6",
+    "agencyId": "default-agency",
+    "date": "2026-01-15",
+    "amount": 10000,
+    "type": "expense",
+    "category": "Software",
+    "description": "jvvhg",
+    "status": "completed",
+    "createdAt": "2026-01-16T12:51:31.851Z",
+    "updatedAt": "2026-01-16T12:51:31.851Z",
+    "__v": 0
+  },
+  {
+    "_id": "698b64baa5b83b49be0c00b1",
+    "id": "mfo2m22l9",
+    "agencyId": "agency-1",
+    "date": "2026-02-09",
+    "amount": 10000,
+    "type": "expense",
+    "category": "Software",
+    "description": "office rent",
+    "status": "completed",
+    "createdAt": "2026-02-09T18:17:05.242Z",
+    "updatedAt": "2026-02-09T18:17:05.242Z",
+    "__v": 0
+  },
+  {
+    "_id": "698b64baa5b83b49be0c00b2",
+    "id": "y7112x5hb",
+    "agencyId": "default-agency",
+    "date": "2026-01-14",
+    "amount": 100000,
+    "type": "income",
+    "category": "Project",
+    "description": "bj",
+    "status": "completed",
+    "projectId": "d28kzjyad",
+    "createdAt": "2026-01-16T12:51:31.851Z",
+    "updatedAt": "2026-01-16T12:51:31.851Z",
+    "__v": 0
+  }
+]

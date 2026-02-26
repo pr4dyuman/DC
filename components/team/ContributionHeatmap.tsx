@@ -17,7 +17,7 @@ interface ContributionHeatmapProps {
 }
 
 const COLORS = {
-    empty: "bg-neutral-950", // Dark Black/Empty
+    empty: "bg-muted", // Empty
     level1: "bg-green-900",  // Dark Green (1 task)
     level2: "bg-green-700",  // Medium Green (2 tasks)
     level3: "bg-green-500",  // Light Green (3 tasks)
@@ -133,7 +133,7 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
             <div className="flex flex-col gap-2"> {/* Removed min-w constraint */}
 
                 {/* Month Labels */}
-                <div className="flex text-xs text-neutral-400 mb-1 relative h-6 w-full">
+                <div className="flex text-xs text-muted-foreground mb-1 relative h-6 w-full">
                     {months.map((m, i) => (
                         <span key={i} style={{ left: `${(m.index / weeks.length) * 100}%`, position: 'absolute' }}>{m.label}</span>
                     ))}
@@ -163,9 +163,9 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
                                                     aria-label={`${count} completed tasks on ${niceDate}`}
                                                 />
                                             </TooltipTrigger>
-                                            <TooltipContent className="bg-neutral-900 border-neutral-800 text-white p-2 text-xs shadow-xl z-50">
+                                            <TooltipContent className="bg-card border-border text-foreground p-2 text-xs shadow-xl z-50">
                                                 <p className="font-semibold mb-1">{niceDate}</p>
-                                                <p className="text-neutral-300">
+                                                <p className="text-muted-foreground">
                                                     {isLeave ? "On Leave" : (count === 0 ? `No tasks ${tooltipLabel}` : `${count} task${count === 1 ? '' : 's'} ${tooltipLabel}`)}
                                                 </p>
                                             </TooltipContent>
@@ -177,10 +177,10 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
                     ))}
                 </div>
 
-                <div className="flex items-center justify-end text-[10px] text-neutral-500 mt-2 gap-2">
+                <div className="flex items-center justify-end text-[10px] text-muted-foreground mt-2 gap-2">
                     <span>Less</span>
                     <div className="flex gap-[2px]">
-                        <div className="w-3 h-3 rounded-[2px] bg-neutral-950" title="0 tasks"></div>
+                        <div className="w-3 h-3 rounded-[2px] bg-muted" title="0 tasks"></div>
                         <div className="w-3 h-3 rounded-[2px] bg-green-900" title="1 task"></div>
                         <div className="w-3 h-3 rounded-[2px] bg-green-700" title="2 tasks"></div>
                         <div className="w-3 h-3 rounded-[2px] bg-green-500" title="3 tasks"></div>
@@ -191,7 +191,7 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
             </div>
 
             {/* Contribution Stats Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 border-t border-neutral-800 pt-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 border-t border-border pt-6">
                 {(() => {
                     // Calculate Stats
                     const values = Object.values(data);
@@ -239,20 +239,20 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
                     return (
                         <>
                             <div className="flex flex-col">
-                                <span className="text-xs text-neutral-500">Total Completed</span>
-                                <span className="text-base font-bold text-white">{totalTasks}</span>
+                                <span className="text-xs text-muted-foreground">Total Completed</span>
+                                <span className="text-base font-bold text-foreground">{totalTasks}</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-xs text-neutral-500">Max Streak</span>
-                                <span className="text-base font-bold text-white">{maxStreak} Days</span>
+                                <span className="text-xs text-muted-foreground">Max Streak</span>
+                                <span className="text-base font-bold text-foreground">{maxStreak} Days</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-xs text-neutral-500">Current Streak</span>
-                                <span className="text-base font-bold text-white">{currentStreak} Days</span>
+                                <span className="text-xs text-muted-foreground">Current Streak</span>
+                                <span className="text-base font-bold text-foreground">{currentStreak} Days</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-xs text-neutral-500">Active Days</span>
-                                <span className="text-base font-bold text-white">{activeDays}</span>
+                                <span className="text-xs text-muted-foreground">Active Days</span>
+                                <span className="text-base font-bold text-foreground">{activeDays}</span>
                             </div>
                         </>
                     );

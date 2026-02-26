@@ -78,7 +78,7 @@ export function ClientFinancialOverview({
                         </div>
                     </div>
                     {/* Progress Bar */}
-                    <div className="mt-3 w-full bg-zinc-800 rounded-full h-2">
+                    <div className="mt-3 w-full bg-muted rounded-full h-2">
                         <div
                             className="bg-indigo-500 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${totalBudget > 0 ? Math.min((totalSpent / totalBudget) * 100, 100) : 0}%` }}
@@ -106,7 +106,7 @@ export function ClientFinancialOverview({
                                     return (
                                         <div
                                             key={transaction.id}
-                                            className="flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition"
+                                            className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition"
                                         >
                                             <div className="flex-1">
                                                 <p className="text-sm font-medium">{transaction.description}</p>

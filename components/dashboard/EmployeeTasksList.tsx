@@ -71,17 +71,17 @@ export function EmployeeTasksList({ initialTasks, userId, allProjects }: Employe
                     <div className="space-y-4">
                         {activeTasks.length === 0 && (
                             <div className="text-center py-8 text-muted-foreground">
-                                No tasks assigned correctly.
+                                No active tasks assigned.
                             </div>
                         )}
                         {activeTasks.map((task) => {
                             const project = allProjects.find((p) => p.id === task.projectId);
                             const projectSlug = project?.slug || task.projectId;
                             return (
-                                <Link key={task.id} href={`/dashboard/projects/${projectSlug}?task=${task.id}`} className="flex items-center p-3 rounded-lg hover:bg-slate-800/50 transition border border-transparent hover:border-slate-700 cursor-pointer">
+                                <Link key={task.id} href={`/dashboard/projects/${projectSlug}?task=${task.id}`} className="flex items-center p-3 rounded-lg hover:bg-muted/50 transition border border-transparent hover:border-border cursor-pointer">
                                     <div className={`w-2 h-2 rounded-full mr-4 ${task.status === 'In Progress' ? 'bg-amber-500' : 'bg-slate-500'}`} />
                                     <div className="flex-1 space-y-1">
-                                        <p className="text-sm font-medium leading-none text-white">{task.title}</p>
+                                        <p className="text-sm font-medium leading-none text-foreground">{task.title}</p>
                                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                                             <Calendar className="w-3 h-3 text-yellow-500" /> Due {new Date(task.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                         </p>

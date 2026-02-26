@@ -9,13 +9,13 @@ export default async function SuperAdminLayout({
     children: React.ReactNode;
 }) {
     const sessionUser = await getSessionUser();
-    
+
     if (!sessionUser || sessionUser.role !== 'superadmin') {
         redirect('/dashboard');
     }
-    
+
     return (
-        <div className="flex h-screen bg-[#111827] text-gray-100">
+        <div className="flex h-screen text-foreground" style={{ backgroundColor: 'var(--content-bg)' }}>
             <SuperAdminSidebar />
             <div className="flex-1 flex flex-col overflow-hidden">
                 <SuperAdminTopbar />

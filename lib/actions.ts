@@ -1,15 +1,16 @@
 "use server";
 
-import { db, User, Project, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig, LeaveRequest, LeaveType, LeaveStatus, UserPermissions } from "./db";
+import { db, User, Project, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig, LeaveRequest, LeaveType, LeaveStatus, UserPermissions, Transaction, TransactionType, TransactionCategory } from "./db";
 import { revalidatePath } from "next/cache";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { withAgencyId, getCurrentAgency } from "./agency-context";
-
-import { cookies } from "next/headers";
 import { generateId, resolveUserOrClient } from "./utils-server";
 
 // Authentication
 import { connectDB, AgencyModel, UserModel, ClientModel, SuperAdminModel, ProjectModel, TaskModel, InvoiceModel, TransactionModel, ServiceModel, NotificationModel, ActivityModel, AssetModel, MessageModel, LeaveRequestModel, SettingsModel } from "./mongodb";
+import { getSessionUser } from "@/lib/auth";
+import { getSessionId as authGetSessionId, login as authLogin, logout as authLogout } from "@/lib/auth";
+import { hashPassword, comparePassword } from "@/lib/auth";
 
 // Brevo Email Service
 import {
@@ -84,30 +85,10 @@ export async function updateAgencyDetails(name: string, logo: string, primaryCol
     return { success: true };
 }
 
-export async function getSessionId() {
-    const cookieStore = await cookies();
-    return cookieStore.get("userId")?.value;
-}
-
-export async function login(userId: string) {
-    const cookieStore = await cookies();
-    cookieStore.set("userId", userId);
-}
-
-// NEW: For Dev Mode - Bypass Login
-export async function bypassLogin(userId: string, role: string) {
-    const cookieStore = await cookies();
-    cookieStore.set("userId", userId);
-    cookieStore.set("userRole", role);
-    return { success: true };
-}
-
-export async function logout() {
-    const cookieStore = await cookies();
-    cookieStore.delete("userId");
-    cookieStore.delete("userRole");
-}
-
+// Re-export auth functions for backward compatibility
+export const getSessionId = authGetSessionId;
+export const login = authLogin;
+export const logout = authLogout;
 
 
 export async function getAllUsers() {
@@ -383,7 +364,6 @@ export async function getEmployeeDashboardData(userId: string) {
 }
 
 // Auto-clear notifications older than 24 hours
-// Auto-clear notifications older than 24 hours
 export async function getNotifications(userId: string, offset = 0, limit = 1000): Promise<Notification[]> {
     await connectDB();
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -462,8 +442,6 @@ export async function getUsers() {
     const usersRaw = await UserModel.find({}).lean();
     const users = usersRaw.map(u => ({ ...sanitizeDoc(u), agencyId: u.agencyId || 'default-agency' }));
 
-    console.log('[getUsers Debug] Current User Role:', currentUser?.role);
-
     if (currentUser?.role === 'client') {
         return users.map(user => {
             const { salary, password, ...redacted } = user as any;
@@ -473,11 +451,9 @@ export async function getUsers() {
 
     return users.map(user => {
         if (isAdmin || user.id === currentUserId) {
-            // console.log(`[getUsers Debug] Not redacting for ${user.name} (Role: ${user.role}, Salary: ${user.salary})`);
             return user as User;
         }
         const { salary, ...redacted } = user as any;
-        console.log(`[getUsers Debug] Redacting salary for ${user.name}`);
         return redacted as User;
     });
 }
@@ -655,9 +631,6 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
     return newUser;
 }
 
-// Import auth session
-import { getSessionUser } from "@/lib/auth";
-
 // Helper to sanitize Mongoose docs for Client Components
 function sanitizeDoc(doc: any) {
     if (!doc) return null;
@@ -715,7 +688,6 @@ export async function getCurrentUser() {
     return null;
 }
 
-import { hashPassword, comparePassword } from "@/lib/auth";
 
 export async function updateUser(id: string, updates: Partial<User>, oldPassword?: string) {
     // Permission Check
@@ -750,7 +722,7 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
             model = SuperAdminModel;
         }
 
-        console.log(`[updateUser] Lookup ID: ${id}, Found: ${!!user}`); // DEBUG
+
         if (!user) {
             throw new Error("User not found");
         }
@@ -1843,7 +1815,6 @@ export async function deleteProject(id: string, password: string) {
 // Finance Actions
 // ----------------------------------------------------------------------
 
-import { Transaction, TransactionType, TransactionCategory } from "./db";
 
 export async function getTransactions(projectId?: string, userId?: string, category?: string) {
     const data = await db.get();
@@ -1927,7 +1898,7 @@ export async function getClientFinanceData(clientId: string) {
 
     // Refunds (if any) - Money returned to client
     const totalRefunds = transactions
-        .filter(t => t.type === 'expense' && t.status === 'completed')
+        .filter(t => t.type === 'expense' && t.category === 'Refund' && t.status === 'completed')
         .reduce((acc, curr) => acc + curr.amount, 0);
 
     // Net Paid = Total Paid - Refunds
@@ -2006,6 +1977,9 @@ export async function getCategoryMemberSummary(category: string) {
 
 export async function createTransaction(transaction: Omit<Transaction, "id" | "status" | "agencyId"> & { status?: Transaction['status'] }) {
     // STRICT SERVER-SIDE VALIDATION
+    if (!transaction.amount || transaction.amount <= 0) {
+        throw new Error("Validation Error: Amount must be greater than zero.");
+    }
     if (transaction.category === 'Project' && !transaction.projectId) {
         throw new Error("Validation Error: Projects must have a Project ID.");
     }
@@ -2023,6 +1997,19 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
     }
     if (transaction.category === 'Other' && transaction.type !== 'expense') {
         throw new Error("Validation Error: 'Other' category is for expenses only.");
+    }
+    if (transaction.category === 'Freelancer' && transaction.type !== 'expense') {
+        throw new Error("Validation Error: Freelancer payments must be an Expense.");
+    }
+    if (transaction.category === 'Tax' && transaction.type !== 'expense') {
+        throw new Error("Validation Error: Tax payments must be an Expense.");
+    }
+    if (transaction.category === 'Reimbursement' && transaction.type !== 'expense') {
+        throw new Error("Validation Error: Reimbursements must be an Expense.");
+    }
+    if (transaction.category === 'Retainer') {
+        if (transaction.type !== 'income') throw new Error("Validation Error: Retainer must be Income.");
+        if (!transaction.projectId) throw new Error("Validation Error: Retainer must be linked to a Project.");
     }
 
     // Note: Internal Transfer checks are harder without memberId in transaction object,
@@ -2103,8 +2090,8 @@ export async function markTransactionAsPaid(transactionId: string) {
             throw new Error("Transaction is already active/completed");
         }
 
-        // Update status
-        const updatedTransaction = { ...transaction, status: 'completed' as const, date: new Date().toISOString().split('T')[0] }; // Update date to payment date? Or keep original due date? Usually payment date.
+        // Update status only — preserve original date
+        const updatedTransaction = { ...transaction, status: 'completed' as const };
 
         const newTransactions = [...data.transactions];
         newTransactions[transactionIndex] = updatedTransaction;
@@ -2250,7 +2237,8 @@ export async function adminApproveInvoicePayment(invoiceId: string) {
             category: 'Project',
             description: description,
             status: 'completed',
-            projectId: invoice.projectId
+            projectId: invoice.projectId,
+            invoiceId: invoice.id // Link back to the invoice
         });
 
         data.transactions = [newTransaction, ...(data.transactions || [])];
@@ -2383,8 +2371,12 @@ export async function deleteTransaction(transactionId: string, password: string)
     const user = await getUser(currentUserId);
     if (!user) throw new Error("User not found");
 
-    // Simple password check (In real app, hash check)
-    // Assuming user.password is stored in plain text for this mock environment
+    // Role check: Only admins can delete transactions
+    if (user.role !== 'admin') {
+        throw new Error("Unauthorized: Only admins can delete transactions.");
+    }
+
+    // Password verification
     if (user.password !== password) {
         throw new Error("Invalid Password");
     }
@@ -2410,6 +2402,13 @@ export async function getHighPriorityTasks(offset = 0, limit = 5) {
 }
 
 export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "agencyId">) {
+    if (!invoice.amount || invoice.amount <= 0) {
+        throw new Error("Validation Error: Invoice amount must be greater than zero.");
+    }
+    if (!invoice.projectId) {
+        throw new Error("Validation Error: Invoice must be linked to a project.");
+    }
+
     const newInvoice: Invoice = await withAgencyId({
         ...invoice,
         id: generateId(),
@@ -2486,6 +2485,10 @@ export async function getFinanceStats(projectId?: string, userId?: string, categ
         }
     }
 
+    if (category) {
+        transactions = transactions.filter(t => t.category === category);
+    }
+
     // Total Revenue = All completed income transactions (client payments, project income)
     const totalRevenue = transactions
         .filter(t => t.type === 'income' && t.status === 'completed')
@@ -2499,15 +2502,17 @@ export async function getFinanceStats(projectId?: string, userId?: string, categ
     const netProfit = totalRevenue - totalExpenses;
 
     // Pending Invoices = Pending + Processing + Overdue
-    const pendingInvoicesAmount = invoices
-        .filter(i => i.status === 'Pending' || i.status === 'Processing' || i.status === 'Overdue')
-        .reduce((acc, curr) => acc + curr.amount, 0);
+    const pendingInvoices = invoices
+        .filter(i => i.status === 'Pending' || i.status === 'Processing' || i.status === 'Overdue');
+    const pendingInvoicesAmount = pendingInvoices.reduce((acc, curr) => acc + curr.amount, 0);
+    const pendingInvoicesCount = pendingInvoices.length;
 
     return {
         totalRevenue,
         totalExpenses,
         netProfit,
-        pendingInvoicesAmount
+        pendingInvoicesAmount,
+        pendingInvoicesCount
     };
 }
 
@@ -2529,37 +2534,40 @@ export async function getFinanceChartData(projectId?: string, userId?: string, c
         }
     }
 
-    // Group by month (last 6 months)
-    const months = [];
+    if (category) {
+        transactions = transactions.filter(t => t.category === category);
+    }
+
+    // Group by month (last 6 months) — include year to prevent cross-year matching
+    const monthKeys: string[] = [];
+    const monthLabels: string[] = [];
     for (let i = 5; i >= 0; i--) {
         const d = new Date();
         d.setMonth(d.getMonth() - i);
-        months.push(d.toLocaleString('default', { month: 'short' }));
+        // Key includes year for accurate matching
+        monthKeys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+        monthLabels.push(d.toLocaleString('default', { month: 'short' }));
     }
 
-    // This is a simplified aggregation. In a real app we'd map dates properly.
-    // For now returning the mock structure but ideally we'd compute it.
-    // Let's implement a basic computation mapping transaction dates to these months.
-
-    const chartData = months.map(month => {
-        return {
-            name: month,
-            income: 0,
-            expense: 0
-        };
-    });
+    const chartData = monthKeys.map((key, idx) => ({
+        name: monthLabels[idx],
+        key,
+        income: 0,
+        expense: 0
+    }));
 
     transactions.forEach(t => {
         const tDate = new Date(t.date);
-        const tMonth = tDate.toLocaleString('default', { month: 'short' });
-        const monthData = chartData.find(d => d.name === tMonth);
+        const tKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, '0')}`;
+        const monthData = chartData.find(d => d.key === tKey);
         if (monthData && t.status === 'completed') {
             if (t.type === 'income') monthData.income += t.amount;
             if (t.type === 'expense') monthData.expense += t.amount;
         }
     });
 
-    return chartData;
+    // Strip the internal key before returning
+    return chartData.map(({ key, ...rest }) => rest);
 }
 
 export async function getPayrollStatus(userId?: string) {

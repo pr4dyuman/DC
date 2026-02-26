@@ -1,6 +1,6 @@
 "use client";
 
-import { Select, SelectItem } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter, useSearchParams } from "next/navigation";
 
 interface FinanceFiltersProps {
@@ -38,12 +38,17 @@ export function FinanceFilters({ projects, users }: FinanceFiltersProps) {
             {!isUserActive && !isCategoryActive && (
                 <div className="w-full sm:w-[250px]">
                     <Select value={currentProject} onValueChange={(val) => updateFilter("projectId", val)}>
-                        <SelectItem value="all">Select Project</SelectItem>
-                        {projects.map((p) => (
-                            <SelectItem key={p.id} value={p.id} title={`${p.title} (${p.client})`}>
-                                {p.title} ({p.client})
-                            </SelectItem>
-                        ))}
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select Project" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Projects</SelectItem>
+                            {projects.map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                    {p.title} ({p.client})
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
                     </Select>
                 </div>
             )}
@@ -52,12 +57,17 @@ export function FinanceFilters({ projects, users }: FinanceFiltersProps) {
             {!isProjectActive && !isCategoryActive && (
                 <div className="w-full sm:w-[250px]">
                     <Select value={currentUser} onValueChange={(val) => updateFilter("userId", val)}>
-                        <SelectItem value="all">Select Team Member</SelectItem>
-                        {users.map((u) => (
-                            <SelectItem key={u.id} value={u.id} title={`${u.name} (${u.jobTitle || 'Team Member'})`}>
-                                {u.name} ({u.jobTitle || 'Team Member'})
-                            </SelectItem>
-                        ))}
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select Team Member" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Team Members</SelectItem>
+                            {users.map((u) => (
+                                <SelectItem key={u.id} value={u.id}>
+                                    {u.name} ({u.jobTitle || 'Team Member'})
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
                     </Select>
                 </div>
             )}
@@ -66,9 +76,18 @@ export function FinanceFilters({ projects, users }: FinanceFiltersProps) {
             {!isProjectActive && !isUserActive && (
                 <div className="w-full sm:w-[250px]">
                     <Select value={currentCategory} onValueChange={(val) => updateFilter("category", val)}>
-                        <SelectItem value="all">Others</SelectItem>
-                        <SelectItem value="Internal Transfer">Internal Transfers</SelectItem>
-                        <SelectItem value="Investor">Investors</SelectItem>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Others" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Others</SelectItem>
+                            <SelectItem value="Tax">Tax Payments</SelectItem>
+                            <SelectItem value="Reimbursement">Reimbursements</SelectItem>
+                            <SelectItem value="Retainer">Retainers</SelectItem>
+                            <SelectItem value="Freelancer">Freelancers</SelectItem>
+                            <SelectItem value="Internal Transfer">Internal Transfers</SelectItem>
+                            <SelectItem value="Investor">Investors</SelectItem>
+                        </SelectContent>
                     </Select>
                 </div>
             )}

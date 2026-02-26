@@ -12,43 +12,91 @@ input[type=number] {
 }
 
 :root {
-  /* Base - Rich Black Theme */
-  --background: #050505;
-  --foreground: #fafafa;
+  /* ── Premium Light Theme ── */
+  --background: #f5f5f7;
+  --foreground: #0a0a0a;
 
-  /* Primary - Vivid Gold */
-  --primary: #ffd60a;
-  --primary-foreground: #000000;
+  /* Primary - Deep Gold (darker for contrast on white) */
+  --primary: #d4a00a;
+  --primary-foreground: #ffffff;
 
-  /* Secondary - Zinc 900 */
-  --secondary: #18181b;
-  --secondary-foreground: #fafafa;
+  /* Secondary */
+  --secondary: #f0f0f3;
+  --secondary-foreground: #0a0a0a;
 
-  /* Muted - Zinc 800 */
-  --muted: #27272a;
-  --muted-foreground: #a1a1aa;
+  /* Muted */
+  --muted: #e8e8eb;
+  --muted-foreground: #6b6b6b;
 
-  /* Accent - Zinc 800 */
-  --accent: #27272a;
-  --accent-foreground: #fafafa;
+  /* Accent */
+  --accent: #e8e8eb;
+  --accent-foreground: #0a0a0a;
 
   /* Destructive */
-  --destructive: #ef4444;
+  --destructive: #dc2626;
   --destructive-foreground: #ffffff;
 
   /* Borders & Inputs */
-  --border: #27272a;
-  --input: #27272a;
-  --ring: #ffd60a;
+  --border: #d4d4d8;
+  --input: #d4d4d8;
+  --ring: #d4a00a;
 
   /* Card & Popovers */
-  --card: #121212;
-  --card-foreground: #fafafa;
-  --popover: #121212;
-  --popover-foreground: #fafafa;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
 
   /* Radius */
   --radius: 0.5rem;
+
+  /* Sidebar & Layout (light) */
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #0a0a0a;
+  --sidebar-muted: #6b6b6b;
+  --sidebar-border: #d4a00a33;
+  --sidebar-active-bg: #d4a00a15;
+  --sidebar-hover-bg: #00000008;
+  --content-bg: #f5f5f7;
+}
+
+.dark {
+  /* ── Pure Black Dark Theme ── */
+  --background: #000000;
+  --foreground: #fafafa;
+
+  --primary: #ffd60a;
+  --primary-foreground: #09090b;
+
+  --secondary: #0a0a0a;
+  --secondary-foreground: #fafafa;
+
+  --muted: #171717;
+  --muted-foreground: #d4d4d8;
+
+  --accent: #171717;
+  --accent-foreground: #fafafa;
+
+  --destructive: #7f1d1d;
+  --destructive-foreground: #fef2f2;
+
+  --border: #1a1a1a;
+  --input: #1a1a1a;
+  --ring: #ffd60a;
+
+  --card: #0a0a0a;
+  --card-foreground: #fafafa;
+  --popover: #0a0a0a;
+  --popover-foreground: #fafafa;
+
+  /* Sidebar & Layout (dark) */
+  --sidebar-bg: #050505;
+  --sidebar-text: #ffffff;
+  --sidebar-muted: #a1a1aa;
+  --sidebar-border: #ffd60a33;
+  --sidebar-active-bg: #ffd60a1a;
+  --sidebar-hover-bg: #ffffff1a;
+  --content-bg: #080808;
 }
 
 @theme inline {
@@ -87,51 +135,6 @@ input[type=number] {
   --radius-lg: var(--radius);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Harmonized Zinc Scale */
-    --background: #050505;
-    /* Deep Black */
-    --foreground: #fafafa;
-    /* Zinc 50 */
-
-    --primary: #ffd60a;
-    /* Vivid Gold */
-    --primary-foreground: #09090b;
-    /* Zinc 950 */
-
-    --secondary: #27272a;
-    /* Zinc 800 */
-    --secondary-foreground: #fafafa;
-
-    --muted: #27272a;
-    /* Zinc 800 */
-    --muted-foreground: #d4d4d8;
-    /* Zinc 300 - Brighter for better legibility */
-
-    --accent: #27272a;
-    /* Zinc 800 */
-    --accent-foreground: #fafafa;
-
-    --destructive: #7f1d1d;
-    /* Red 900 */
-    --destructive-foreground: #fef2f2;
-    /* Red 50 */
-
-    --border: #27272a;
-    /* Zinc 800 */
-    --input: #27272a;
-    /* Zinc 800 */
-    --ring: #ffd60a;
-
-    --card: #141415;
-    /* Custom Dark Zinc - Distinct from bg #050505 */
-    --card-foreground: #fafafa;
-    --popover: #141415;
-    --popover-foreground: #fafafa;
-  }
-}
-
 body {
   background-color: var(--background);
   color: var(--foreground);
@@ -166,6 +169,8 @@ body {
 
 /* Hide scrollbar for IE, Edge and Firefox */
 .no-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }

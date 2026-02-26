@@ -22,14 +22,12 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { getUser, getUserTasks, getUserActivity, getUserByUsername, getUserProjects, getSessionId, getClientProjects, getClientCreatedTasks, getProjectTasks } from "@/lib/actions";
+import { getUser, getUserTasks, getUserActivity, getUserByUsername, getUserProjects, getSessionId, getClientProjects, getClientCreatedTasks, getProjectTasks, getLeaveRequests, getUserContributionHistory } from "@/lib/actions";
 import { EditUserDialog } from "@/components/team/EditUserDialog";
 import { useChat } from "@/context/ChatContext";
-import { getLeaveRequests } from "@/lib/actions";
 import { LeaveRequest } from "@/lib/types";
 import { LeaveRequestDialog } from "@/components/leave-request-dialog";
 import { LeaveRequestsList } from "@/components/leave-requests-list";
-import { getUserContributionHistory } from "@/lib/actions";
 import { ContributionHeatmap, DailyStats } from "@/components/team/ContributionHeatmap";
 
 export default function EmployeeProfilePage({ params }: { params: Promise<{ username: string }> }) {
@@ -156,8 +154,6 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                     const createdTasks = await getClientCreatedTasks(userData.id);
                     setClientCreatedTasks(createdTasks);
 
-                    setClientCreatedTasks(createdTasks);
-
                     // NEW: Fetch all tasks for these projects to populate stats
                     if (projects.length > 0) {
                         const projectIds = projects.map(p => p.id);
@@ -271,27 +267,27 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
             />
 
             {/* Profile Header Card */}
-            <div className="relative rounded-xl overflow-hidden bg-gradient-to-r from-neutral-900 to-neutral-800 border border-neutral-800 shadow-2xl">
+            <div className="relative rounded-xl overflow-hidden bg-gradient-to-r from-secondary to-muted border border-border shadow-2xl">
                 {/* Background Pattern */}
                 <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_30%_20%,_var(--tw-gradient-stops))] from-yellow-500 via-transparent to-transparent"></div>
 
                 <div className="relative p-8 md:p-10 flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
-                    <Avatar className="h-32 w-32 border-4 border-neutral-800 shadow-xl ring-2 ring-yellow-500/20">
+                    <Avatar className="h-32 w-32 border-4 border-border shadow-xl ring-2 ring-primary/20">
                         <AvatarImage src={user.avatar} className="object-cover" />
-                        <AvatarFallback className="text-3xl bg-neutral-800 text-yellow-500">
+                        <AvatarFallback className="text-3xl bg-muted text-primary">
                             {user.name.substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                     </Avatar>
 
                     <div className="flex-1 space-y-4">
                         <div>
-                            <h2 className="text-3xl font-bold text-white tracking-tight">{user.name}</h2>
-                            {user.username && <p className="text-neutral-400 font-medium text-lg">@{user.username}</p>}
+                            <h2 className="text-3xl font-bold text-foreground tracking-tight">{user.name}</h2>
+                            {user.username && <p className="text-muted-foreground font-medium text-lg">@{user.username}</p>}
                             <p className="text-yellow-500 font-medium text-lg mt-1 flex items-center justify-center md:justify-start gap-2">
                                 <Briefcase className="h-4 w-4" />
                                 {user.jobTitle || "Team Member"}
                                 <span className="text-neutral-500">•</span>
-                                <span className="capitalize text-neutral-400">{user.role}</span>
+                                <span className="capitalize text-muted-foreground">{user.role}</span>
 
                                 {!isSelf && (
                                     <button
@@ -306,33 +302,35 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                         </div>
 
                         <div className="flex flex-wrap justify-center md:justify-start gap-3">
-                            <Badge variant="secondary" className="bg-neutral-800 text-neutral-300 hover:bg-neutral-700 px-3 py-1">
+                            <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-accent px-3 py-1">
                                 <Mail className="mr-2 h-3 w-3 text-yellow-500" />
                                 {user.email}
                             </Badge>
                             {/* Salary Logic: Only Show if Self or Admin/Manager */}
                             {user.salary && user.salary > 0 && (isSelf || currentUserRole === 'admin' || currentUserRole === 'manager') && (
-                                <Badge variant="secondary" className="bg-neutral-800 text-green-400 hover:bg-neutral-700 px-3 py-1">
+                                <Badge variant="secondary" className="bg-muted text-green-400 hover:bg-accent px-3 py-1">
                                     <IndianRupee className="mr-2 h-3 w-3" />
                                     {user.salary.toLocaleString()}/mo
                                 </Badge>
                             )}
-                            <Badge variant="secondary" className="bg-neutral-800 text-neutral-300 hover:bg-neutral-700 px-3 py-1">
-                                <Calendar className="mr-2 h-3 w-3 text-yellow-500" />
-                                Joined May 2024
-                            </Badge>
+                            {user.createdAt && (
+                                <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-accent px-3 py-1">
+                                    <Calendar className="mr-2 h-3 w-3 text-yellow-500" />
+                                    Joined {new Date(user.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+                                </Badge>
+                            )}
                         </div>
                     </div>
 
                     <div className="flex flex-col gap-3 min-w-[200px]">
                         <div className="grid grid-cols-2 gap-3">
-                            <Card className="bg-neutral-800/50 border-neutral-700 p-4 text-center">
-                                <div className="text-2xl font-bold text-white">{completedTasks}</div>
-                                <div className="text-xs text-neutral-400 uppercase tracking-wider font-medium">Done</div>
+                            <Card className="bg-muted/50 border-border p-4 text-center">
+                                <div className="text-2xl font-bold text-foreground">{completedTasks}</div>
+                                <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Done</div>
                             </Card>
-                            <Card className="bg-neutral-800/50 border-neutral-700 p-4 text-center">
+                            <Card className="bg-muted/50 border-border p-4 text-center">
                                 <div className="text-2xl font-bold text-yellow-500">{efficiency}%</div>
-                                <div className="text-xs text-neutral-400 uppercase tracking-wider font-medium">
+                                <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
                                     {user.role === 'client' ? 'Progress' : 'Efficiency'}
                                 </div>
                             </Card>
@@ -343,7 +341,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
 
             {/* Content Tabs */}
             <Tabs defaultValue="overview" className="space-y-6">
-                <TabsList className="w-full h-auto grid grid-cols-2 lg:grid-cols-4 gap-2 bg-neutral-900 border border-neutral-800 p-2 rounded-lg">
+                <TabsList className="w-full h-auto grid grid-cols-2 lg:grid-cols-4 gap-2 bg-secondary border border-border p-2 rounded-lg">
                     <TabsTrigger value="overview" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black text-sm py-2">
                         Overview
                     </TabsTrigger>
@@ -364,7 +362,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                 <TabsContent value="overview" className="space-y-6 animate-in slide-in-from-bottom-2 duration-300" >
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
 
-                        <Card className="col-span-1 md:col-span-2 bg-neutral-900 border-neutral-800">
+                        <Card className="col-span-1 md:col-span-2 bg-card border-border">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="flex items-center gap-2">
                                     <ActivityIcon className="h-5 w-5 text-yellow-500" />
@@ -374,12 +372,12 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                     value={selectedYear.toString()}
                                     onValueChange={(val) => setSelectedYear(parseInt(val))}
                                 >
-                                    <SelectTrigger className="w-[100px] h-8 bg-neutral-800 border-neutral-700 text-xs">
+                                    <SelectTrigger className="w-[100px] h-8 bg-secondary border-border text-xs">
                                         <SelectValue placeholder="Year" />
                                     </SelectTrigger>
-                                    <SelectContent className="bg-neutral-800 border-neutral-700">
+                                    <SelectContent className="bg-secondary border-border">
                                         {availableYears.map(y => (
-                                            <SelectItem key={y} value={y.toString()} className="text-xs focus:bg-neutral-700 focus:text-white">
+                                            <SelectItem key={y} value={y.toString()} className="text-xs focus:bg-muted focus:text-foreground">
                                                 {y}
                                             </SelectItem>
                                         ))}
@@ -396,7 +394,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                             </CardContent>
                         </Card>
 
-                        <Card className="bg-neutral-900 border-neutral-800">
+                        <Card className="bg-card border-border">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <Zap className="h-5 w-5 text-yellow-500" />
@@ -405,14 +403,14 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 {/* Projects Row */}
-                                <div className="bg-neutral-800/40 border border-neutral-700/50 p-4 rounded-xl flex items-center justify-between group hover:border-neutral-600 transition-colors">
+                                <div className="bg-muted/40 border border-border p-4 rounded-xl flex items-center justify-between group hover:border-muted-foreground/30 transition-colors">
                                     <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-neutral-800 rounded-lg text-white group-hover:bg-neutral-700 transition-colors">
+                                        <div className="p-2 bg-muted rounded-lg text-foreground group-hover:bg-accent transition-colors">
                                             <Briefcase className="h-4 w-4" />
                                         </div>
-                                        <span className="text-neutral-300 font-medium">Active Projects</span>
+                                        <span className="text-muted-foreground font-medium">Active Projects</span>
                                     </div>
-                                    <span className="text-2xl font-bold text-white">{userProjects.filter(p => p.status === 'Active').length}</span>
+                                    <span className="text-2xl font-bold text-foreground">{userProjects.filter(p => p.status === 'Active').length}</span>
                                 </div>
 
                                 {/* Task Grid */}
@@ -468,7 +466,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
 
                 {/* TASKS TAB */}
                 <TabsContent value="tasks" className="animate-in slide-in-from-bottom-2 duration-300" >
-                    <Card className="bg-neutral-900 border-neutral-800">
+                    <Card className="bg-card border-border">
                         <CardHeader>
                             <CardTitle>Assigned Tasks</CardTitle>
                             <CardDescription>Current workload and status</CardDescription>
@@ -480,22 +478,22 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                 ) : (
                                     tasks.map(task => (
                                         <Link href={`/dashboard/projects/${task.projectId}?task=${task.id}`} key={task.id} className="block">
-                                            <div className="flex items-center justify-between p-4 bg-neutral-800/50 rounded-lg group hover:bg-neutral-800 transition-colors border border-neutral-800 hover:border-neutral-700">
+                                            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg group hover:bg-muted transition-colors border border-border hover:border-muted-foreground/30">
                                                 <div className="flex items-start gap-4">
                                                     <div className={`mt-1 h-3 w-3 rounded-full ${task.status === 'Done' ? 'bg-green-500' :
                                                         task.status === 'In Progress' ? 'bg-blue-500' :
-                                                            'bg-neutral-500'
+                                                            'bg-muted-foreground/50'
                                                         }`} />
                                                     <div>
-                                                        <h4 className="font-medium text-white group-hover:text-yellow-500 transition-colors">{task.title}</h4>
-                                                        <p className="text-sm text-neutral-400 mt-1 line-clamp-1">{task.description || "No description provided."}</p>
+                                                        <h4 className="font-medium text-foreground group-hover:text-primary transition-colors">{task.title}</h4>
+                                                        <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{task.description || "No description provided."}</p>
 
                                                         <div className="flex gap-2 mt-2">
-                                                            <Badge variant="outline" className="text-xs border-neutral-700 text-neutral-400">
+                                                            <Badge variant="outline" className="text-xs border-border text-muted-foreground">
                                                                 {task.priority || 'Normal'}
                                                             </Badge>
                                                             {task.category && (
-                                                                <Badge variant="outline" className="text-xs border-neutral-700 text-neutral-400">
+                                                                <Badge variant="outline" className="text-xs border-border text-muted-foreground">
                                                                     {task.category}
                                                                 </Badge>
                                                             )}
@@ -505,7 +503,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                                 <div className="text-right">
                                                     <span className={`text-xs font-semibold px-2 py-1 rounded-full ${task.status === 'Done' ? 'bg-green-900/30 text-green-400' :
                                                         task.status === 'In Progress' ? 'bg-blue-900/30 text-blue-400' :
-                                                            'bg-neutral-700 text-neutral-300'
+                                                            'bg-muted text-muted-foreground'
                                                         }`}>
                                                         {task.status}
                                                     </span>
@@ -526,7 +524,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
 
                 {/* ACTIVITY TAB */}
                 <TabsContent value="activity" className="animate-in slide-in-from-bottom-2 duration-300" >
-                    <Card className="bg-neutral-900 border-neutral-800">
+                    <Card className="bg-card border-border">
                         <CardHeader>
                             <CardTitle>Recent Activity</CardTitle>
                             <CardDescription>Latest actions performed by {user.name}</CardDescription>
@@ -540,15 +538,15 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                         <div key={activity.id || i} className="flex gap-4 relative">
                                             {/* Timeline Line */}
                                             {i !== activities.length - 1 && (
-                                                <div className="absolute left-2.5 top-8 bottom-[-24px] w-px bg-neutral-800"></div>
+                                                <div className="absolute left-2.5 top-8 bottom-[-24px] w-px bg-border"></div>
                                             )}
 
-                                            <div className="h-5 w-5 rounded-full bg-neutral-800 border-2 border-yellow-500 z-10 flex-shrink-0 mt-1"></div>
+                                            <div className="h-5 w-5 rounded-full bg-muted border-2 border-primary z-10 flex-shrink-0 mt-1"></div>
 
                                             <div className="flex-1 pb-1">
                                                 <div className="flex justify-between items-start">
                                                     <div>
-                                                        <p className="text-sm font-medium text-white">
+                                                        <p className="text-sm font-medium text-foreground">
                                                             <span className="text-yellow-500">{activity.action}</span> {activity.target}
                                                         </p>
                                                         <p className="text-xs text-neutral-500 mt-1">
@@ -571,7 +569,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                 {/* LEAVES TAB */}
                 {user.role !== 'client' && (
                     <TabsContent value="leaves" className="animate-in slide-in-from-bottom-2 duration-300">
-                        <Card className="bg-neutral-900 border-neutral-800">
+                        <Card className="bg-card border-border">
                             <CardHeader>
                                 <CardTitle>Leave History</CardTitle>
                                 <CardDescription>View your leave requests and status</CardDescription>

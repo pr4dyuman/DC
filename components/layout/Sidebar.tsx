@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-    LayoutDashboard, 
-    Users, 
-    Briefcase, 
-    DollarSign, 
-    Settings, 
-    CheckSquare, 
+import {
+    LayoutDashboard,
+    Users,
+    Briefcase,
+    DollarSign,
+    Settings,
+    CheckSquare,
     FileText,
     PieChart,
     Building2,
@@ -46,7 +46,7 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, a
         {
             label: "Messages",
             icon: MessageCircle,
-            href: "#", 
+            href: "#",
             color: "text-green-500",
             isAction: true,
             onClick: () => openChat(),
@@ -81,23 +81,23 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, a
     const filteredRoutes = routes.filter(route => {
         if (currentUserRole === 'client') {
             if (route.isSettings) return false;
-            if (route.label === 'Team') return false; 
+            if (route.label === 'Team') return false;
             if (route.label === 'Clients') return false;
         }
         return true;
     });
 
     return (
-        <div className="space-y-4 py-4 flex flex-col h-full bg-[#111827] text-white overflow-y-auto no-scrollbar">
+        <div className="space-y-4 py-4 flex flex-col h-full overflow-y-auto no-scrollbar" style={{ backgroundColor: 'var(--sidebar-bg)', color: 'var(--sidebar-text)' }}>
             <div className="px-3 py-2 flex-1">
                 <Link href="/dashboard" className="flex items-center pl-3 mb-14 transition hover:opacity-75">
                     <div className="relative w-8 h-8 mr-4">
                         {agencyLogo ? (
-                             <img src={agencyLogo} alt="Logo" className="w-8 h-8 rounded-md object-cover" />
+                            <img src={agencyLogo} alt="Logo" className="w-8 h-8 rounded-md object-cover" />
                         ) : (
-                             <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-xl">
+                            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-xl">
                                 A
-                             </div>
+                            </div>
                         )}
                     </div>
                     <h1 className="text-xl font-bold truncate max-w-[180px]" title={agencyName}>
@@ -111,8 +111,8 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, a
                                 key={route.label}
                                 onClick={route.onClick}
                                 className={cn(
-                                    "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-white/10 rounded-lg transition",
-                                    "text-zinc-400"
+                                    "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer rounded-lg transition",
+                                    "text-[var(--sidebar-muted)] hover:text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)]"
                                 )}
                             >
                                 <div className="flex items-center flex-1">
@@ -125,8 +125,9 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, a
                                 key={route.href}
                                 href={route.href}
                                 className={cn(
-                                    "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-white/10 rounded-lg transition",
-                                    pathname === route.href ? "text-white bg-white/10" : "text-zinc-400"
+                                    "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer rounded-lg transition",
+                                    "hover:text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)]",
+                                    pathname === route.href ? "text-[var(--sidebar-text)] bg-[var(--sidebar-active-bg)]" : "text-[var(--sidebar-muted)]"
                                 )}
                             >
                                 <div className="flex items-center flex-1">
@@ -138,11 +139,11 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, a
                     ))}
                 </div>
             </div>
-            
+
             {/* User Info / Role Badge */}
             <div className="px-3 py-2">
-                <div className="bg-white/5 rounded-lg p-3 text-xs text-zinc-400">
-                    <p className="font-semibold text-white">{currentUserUsername || "User"}</p>
+                <div className="rounded-lg p-3 text-xs border" style={{ backgroundColor: 'var(--sidebar-hover-bg)', borderColor: 'var(--sidebar-border)', color: 'var(--sidebar-muted)' }}>
+                    <p className="font-semibold" style={{ color: 'var(--sidebar-text)' }}>{currentUserUsername || "User"}</p>
                     <p className="capitalize">{currentUserRole || "Guest"}</p>
                 </div>
             </div>

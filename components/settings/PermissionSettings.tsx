@@ -64,7 +64,7 @@ export default function PermissionSettings() {
         ? users.filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase()))
         : clients.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.email.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    if (loading) return <div className="p-8 text-center text-gray-400 animate-pulse">Loading permissions...</div>;
+    if (loading) return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading permissions...</div>;
 
     return (
         <div className="space-y-6">
@@ -74,7 +74,7 @@ export default function PermissionSettings() {
                 <div className="flex gap-4">
                     <button
                         onClick={() => setActiveTab('employees')}
-                        className={`pb-2 px-4 text-sm font-medium transition-colors relative ${activeTab === 'employees' ? 'text-yellow-400' : 'text-gray-400 hover:text-white'}`}
+                        className={`pb-2 px-4 text-sm font-medium transition-colors relative ${activeTab === 'employees' ? 'text-yellow-400' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                         <div className="flex items-center gap-2">
                             <UserIcon className="w-4 h-4" />
@@ -84,7 +84,7 @@ export default function PermissionSettings() {
                     </button>
                     <button
                         onClick={() => setActiveTab('clients')}
-                        className={`pb-2 px-4 text-sm font-medium transition-colors relative ${activeTab === 'clients' ? 'text-yellow-400' : 'text-gray-400 hover:text-white'}`}
+                        className={`pb-2 px-4 text-sm font-medium transition-colors relative ${activeTab === 'clients' ? 'text-yellow-400' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                         <div className="flex items-center gap-2">
                             <Building2 className="w-4 h-4" />
@@ -95,15 +95,15 @@ export default function PermissionSettings() {
                 </div>
 
                 {/* Search Right */}
-                <div className="flex items-center gap-4 bg-zinc-900/50 p-1 rounded-xl border border-white/5">
+                <div className="flex items-center gap-4 bg-secondary p-1 rounded-xl border border-border">
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <input
                             type="text"
                             placeholder="Search users..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="bg-transparent border-none text-sm text-white pl-9 pr-4 py-1.5 focus:ring-0 w-40 md:w-56"
+                            className="bg-transparent border-none text-sm text-foreground pl-9 pr-4 py-1.5 focus:ring-0 w-40 md:w-56"
                         />
                     </div>
                 </div>
@@ -121,20 +121,20 @@ export default function PermissionSettings() {
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
-                                className="bg-zinc-900/40 backdrop-blur-sm border border-white/5 rounded-xl p-4 md:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 hover:border-yellow-500/20 transition-all group"
+                                className="bg-secondary backdrop-blur-sm border border-border rounded-xl p-4 md:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 hover:border-primary/20 transition-all group"
                             >
                                 {/* User Info */}
                                 <div className="flex items-center gap-4 min-w-[200px]">
-                                    <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden border border-white/10 group-hover:border-yellow-500/50 transition-colors">
+                                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden border border-border group-hover:border-primary/50 transition-colors">
                                         {('avatar' in user && user.avatar) || ('logo' in user && user.logo) ? (
                                             <img src={('avatar' in user && user.avatar) ? user.avatar : ('logo' in user ? user.logo : '')} alt={user.name} className="w-full h-full object-cover" />
                                         ) : (
-                                            <UserIcon className="w-5 h-5 text-gray-400" />
+                                            <UserIcon className="w-5 h-5 text-muted-foreground" />
                                         )}
                                     </div>
                                     <div>
-                                        <h3 className="text-white font-medium">{user.name}</h3>
-                                        <p className="text-xs text-gray-500">{user.email}</p>
+                                        <h3 className="text-foreground font-medium">{user.name}</h3>
+                                        <p className="text-xs text-muted-foreground">{user.email}</p>
                                     </div>
                                 </div>
 
@@ -144,8 +144,8 @@ export default function PermissionSettings() {
                                     {/* Permission: Manage Tasks */}
                                     <div className="flex items-center justify-between gap-4 min-w-[200px]">
                                         <div className="flex flex-col">
-                                            <span className="text-sm text-gray-300 font-medium">Task Management</span>
-                                            <span className="text-[10px] text-gray-500">Create, edit, move pending tasks</span>
+                                            <span className="text-sm text-foreground font-medium">Task Management</span>
+                                            <span className="text-[10px] text-muted-foreground">Create, edit, move pending tasks</span>
                                         </div>
                                         <Toggle
                                             enabled={perms.canManageTasks}
@@ -156,8 +156,8 @@ export default function PermissionSettings() {
                                     {/* Permission: Mark Done */}
                                     <div className="flex items-center justify-between gap-4 min-w-[200px]">
                                         <div className="flex flex-col">
-                                            <span className="text-sm text-gray-300 font-medium">Completion Rights</span>
-                                            <span className="text-[10px] text-gray-500">Move tasks to &quot;Done&quot;</span>
+                                            <span className="text-sm text-foreground font-medium">Completion Rights</span>
+                                            <span className="text-[10px] text-muted-foreground">Move tasks to &quot;Done&quot;</span>
                                         </div>
                                         <Toggle
                                             enabled={perms.canMarkDone ?? true}
@@ -170,9 +170,9 @@ export default function PermissionSettings() {
                                         <div className="flex flex-col">
                                             <div className="flex items-center gap-2">
                                                 <Trash2 className="w-3 h-3 text-red-400/70" />
-                                                <span className="text-sm text-gray-300 font-medium">Delete Access</span>
+                                                <span className="text-sm text-foreground font-medium">Delete Access</span>
                                             </div>
-                                            <span className="text-[10px] text-gray-500">
+                                            <span className="text-[10px] text-muted-foreground">
                                                 {perms.deleteAccess === 'none' ? 'Cannot delete' :
                                                     perms.deleteAccess === 'own' ? 'Own tasks only' : 'Can delete any'}
                                             </span>
@@ -181,14 +181,14 @@ export default function PermissionSettings() {
                                             <select
                                                 value={perms.deleteAccess}
                                                 onChange={(e) => handleUpdatePermission(user.id, 'deleteAccess', e.target.value)}
-                                                className="bg-black/40 border border-white/10 text-xs text-gray-300 rounded-lg py-1.5 pl-2 pr-6 focus:ring-1 focus:ring-yellow-500/50 outline-none appearance-none cursor-pointer hover:bg-black/60 transition-colors"
+                                                className="bg-secondary border border-border text-xs text-foreground rounded-lg py-1.5 pl-2 pr-6 focus:ring-1 focus:ring-primary/50 outline-none appearance-none cursor-pointer hover:bg-muted transition-colors"
                                             >
                                                 <option value="none">None</option>
                                                 <option value="own">Own Only</option>
                                                 <option value="any">Any Task</option>
                                             </select>
                                             {/* Custom Arrow */}
-                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
                                                 <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
                                                     <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                                 </svg>
@@ -203,7 +203,7 @@ export default function PermissionSettings() {
                 </AnimatePresence>
 
                 {filteredList.length === 0 && (
-                    <div className="text-center py-12 text-gray-500">
+                    <div className="text-center py-12 text-muted-foreground">
                         No users found matching your search.
                     </div>
                 )}
@@ -216,7 +216,7 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (val: boole
     return (
         <button
             onClick={() => onChange(!enabled)}
-            className={`w-11 h-6 rounded-full relative transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-yellow-500/20 ${enabled ? 'bg-yellow-500' : 'bg-zinc-700'}`}
+            className={`w-11 h-6 rounded-full relative transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-yellow-500/20 ${enabled ? 'bg-yellow-500' : 'bg-muted-foreground/30'}`}
         >
             <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-300 shadow-sm ${enabled ? 'left-6' : 'left-1'}`} />
         </button>

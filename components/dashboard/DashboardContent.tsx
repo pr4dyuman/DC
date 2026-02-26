@@ -14,7 +14,7 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
     // Client Dashboard View
     if (currentUser.role === 'client') {
         const data = await getClientDashboardData(currentUser.id);
-        
+
         return (
             <ClientDashboard
                 initialProjects={data.projects.slice(0, 5)}
@@ -37,13 +37,13 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
     if (isAdmin) {
         // Parallel Fetch for Admin
         const [metrics, revenueData, projectDist, activities, urgentTasks] = await Promise.all([
-             getDashboardMetrics(),
-             getRevenueData(),
-             getProjectDistribution(),
-             getRecentActivity(),
-             getUrgentTasks()
+            getDashboardMetrics(),
+            getRevenueData(),
+            getProjectDistribution(),
+            getRecentActivity(),
+            getUrgentTasks()
         ]);
-        
+
         return (
             <div className="flex-1 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0">
@@ -53,9 +53,13 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
                     </div>
                     <div className="flex items-center space-x-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
                         <div className="hidden md:flex h-9 items-center rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm whitespace-nowrap">
-                            <span className="text-muted-foreground mr-2">Dec 01, 2024 - Dec 31, 2024</span>
+                            <span className="text-muted-foreground mr-2">{new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })} - {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}</span>
                         </div>
-                        <button className="flex-1 sm:flex-none inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 whitespace-nowrap">
+                        <button
+                            disabled
+                            title="Coming soon"
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 whitespace-nowrap"
+                        >
                             Download Report
                         </button>
                     </div>
@@ -67,6 +71,7 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
                         value={`₹${metrics?.revenue?.toLocaleString() ?? 0}`}
                         description={`${(metrics?.growth ?? 0) > 0 ? '+' : ''}${metrics?.growth ?? 0}% from last month`}
                         icon={IndianRupee}
+                        trend={(metrics?.growth ?? 0) > 0 ? 'up' : (metrics?.growth ?? 0) < 0 ? 'down' : 'neutral'}
                     />
                     <MetricCard
                         title="Active Projects"
@@ -105,7 +110,6 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
     // EMPLOYEE VIEW
     const data = await getEmployeeDashboardData(userId);
     const myTasks = data.tasks;
-    // const myActivity = data.activities; // Not used in layout logic directly but available
     const myProjects = data.projects;
 
     return (
@@ -118,19 +122,19 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                 <MetricCard
                     title="Active Tasks"
-                    value={myTasks?.filter((t: any) => t.status === 'In Progress').length || 0}
+                    value={myTasks?.filter((t: Task) => t.status === 'In Progress').length || 0}
                     description="Tasks currently in progress"
                     icon={ActivityIcon}
                 />
                 <MetricCard
                     title="Pending Tasks"
-                    value={myTasks?.filter((t: any) => t.status === 'Todo').length || 0}
+                    value={myTasks?.filter((t: Task) => t.status === 'Todo').length || 0}
                     description="Tasks waiting for you"
                     icon={Clock}
                 />
                 <MetricCard
                     title="Completed Tasks"
-                    value={myTasks?.filter((t: any) => t.status === 'Done').length || 0}
+                    value={myTasks?.filter((t: Task) => t.status === 'Done').length || 0}
                     description="Tasks finished (all time)"
                     icon={CheckCircle2}
                 />
@@ -146,7 +150,7 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
                 {/* My Active Tasks List */}
                 <div className="col-span-2">
                     <EmployeeTasksList
-                        initialTasks={myTasks?.filter((t: any) => t.status === 'In Progress' || t.status === 'Todo').slice(0, 5) || []}
+                        initialTasks={myTasks?.filter((t: Task) => t.status === 'In Progress' || t.status === 'Todo').slice(0, 5) || []}
                         userId={userId}
                         allProjects={myProjects}
                     />

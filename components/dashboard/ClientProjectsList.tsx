@@ -71,7 +71,7 @@ export function ClientProjectsList({ initialProjects }: ClientProjectsListProps)
                                         </div>
                                         <div className={`px-2 py-1 rounded-full text-xs font-medium ${project.status === 'Active' ? 'bg-green-500/10 text-green-500' :
                                             project.status === 'Completed' ? 'bg-blue-500/10 text-blue-500' :
-                                                'bg-zinc-800 text-zinc-400'
+                                                'bg-muted text-muted-foreground'
                                             }`}>
                                             {project.status}
                                         </div>

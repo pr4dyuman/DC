@@ -19,7 +19,7 @@ interface ClientCardProps {
 export function ClientCard({ client, onEdit, onUnarchive, onDelete, isArchived }: ClientCardProps) {
     return (
         <Link href={`/dashboard/clients/${client.username || client.id}`} className="block h-full">
-            <Card className="group relative overflow-hidden transition-all hover:shadow-lg h-full border-neutral-800 hover:border-pink-500/50 hover:bg-neutral-900 cursor-pointer">
+            <Card className="group relative overflow-hidden transition-all hover:shadow-lg h-full border-border hover:border-pink-500/50 hover:bg-muted cursor-pointer">
                 {(onEdit || onUnarchive || onDelete) && (
                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
                         {isArchived && onUnarchive ? (

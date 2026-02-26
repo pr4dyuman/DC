@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Settings, ShieldAlert, Plus, Users, Mail, Phone, Pencil, Sparkles, Lock, Check, FileText, Code, ImageIcon, FileJson, X } from "lucide-react";
+import { Settings, ShieldAlert, Plus, Users, Mail, Phone, Pencil, Sparkles, Lock, Check, FileText, Code, ImageIcon, FileJson, X, Eye, EyeOff } from "lucide-react";
 import { getClients, createClient, updateProject, deleteProject, getProjectAssets, toggleAssetAI, updateUser, getUsers, getProject } from "@/lib/actions";
 import { Client, Asset } from "@/lib/types";
 import { useRouter } from "next/navigation";
@@ -105,12 +105,13 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
         // Auto-generate safe slug
         const newSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-        // If name hasn't meaningfully changed, don't update
-        if (newSlug === currentSlug) return; // Optional check
-
         // Update both name and slug
         await updateProject(projectId, { name, slug: newSlug });
-        router.push(`/dashboard/projects/${newSlug}`);
+        if (newSlug !== currentSlug) {
+            router.push(`/dashboard/projects/${newSlug}`);
+        } else {
+            router.refresh();
+        }
     };
 
 
@@ -400,7 +401,7 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
                                         onClick={() => setIsKeyVisible(!isKeyVisible)}
                                         className="absolute right-2 top-2.5 text-indigo-400 hover:text-indigo-600"
                                     >
-                                        {isKeyVisible ? <Settings className="h-4 w-4" /> : <Settings className="h-4 w-4" />} {/* Simplified icon toggle */}
+                                        {isKeyVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                     </button>
                                 </div>
                                 <Button onClick={handleSaveApiKey} disabled={aiLoading || !apiKey} size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">

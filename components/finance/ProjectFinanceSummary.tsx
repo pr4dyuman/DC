@@ -14,7 +14,7 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
     // 1. Calculate Actuals (From Transactions)
     const projectTransactions = transactions.filter(t => t.projectId === project.id);
     const totalPaid = projectTransactions
-        .filter(t => t.type === 'income')
+        .filter(t => t.type === 'income' && t.category === 'Project')
         .reduce((acc, curr) => acc + curr.amount, 0);
 
     const totalExpenses = projectTransactions

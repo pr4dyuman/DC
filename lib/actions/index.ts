@@ -1,8 +1,10 @@
 // Re-export all actions from domain-specific files
 // This maintains backward compatibility while improving bundle splitting
 
-export { login, getCurrentUser, getSessionId } from './auth';
+// Super admin actions from their dedicated file
+export * from './super-admin';
 
-// Export everything else from the original actions file for now
-// We'll gradually migrate functions to domain-specific files
+// Export everything from the original actions file
+// The auth functions (login, getCurrentUser, getSessionId, logout) are
+// already exported from lib/actions.ts which re-exports from lib/auth.ts
 export * from '../actions';

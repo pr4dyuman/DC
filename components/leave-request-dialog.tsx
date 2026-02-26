@@ -49,7 +49,7 @@ export function LeaveRequestDialog({ userId }: { userId: string }) {
             <DialogTrigger asChild>
                 <Button variant="outline">Request Leave</Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] bg-slate-900 text-white border-slate-800">
+            <DialogContent className="sm:max-w-[425px] bg-card text-card-foreground border-border">
                 <DialogHeader>
                     <DialogTitle>Request Leave</DialogTitle>
                 </DialogHeader>
@@ -64,7 +64,7 @@ export function LeaveRequestDialog({ userId }: { userId: string }) {
                         <Label>Leave Type</Label>
                         <select
                             name="type"
-                            className="flex h-10 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-white"
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             required
                         >
                             <option value="Casual">Casual (2 Days Notice)</option>
@@ -75,17 +75,17 @@ export function LeaveRequestDialog({ userId }: { userId: string }) {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label>From</Label>
-                            <Input name="startDate" type="date" required className="bg-slate-950 border-slate-800 text-white" />
+                            <Input name="startDate" type="date" required className="bg-background border-input" />
                         </div>
                         <div className="space-y-2">
                             <Label>To</Label>
-                            <Input name="endDate" type="date" required className="bg-slate-950 border-slate-800 text-white" />
+                            <Input name="endDate" type="date" required className="bg-background border-input" />
                         </div>
                     </div>
 
                     <div className="space-y-2">
                         <Label>Reason</Label>
-                        <Textarea name="reason" placeholder="Why are you taking leave?" required className="bg-slate-950 border-slate-800 text-white" />
+                        <Textarea name="reason" placeholder="Why are you taking leave?" required className="bg-background border-input" />
                     </div>
 
                     <DialogFooter>

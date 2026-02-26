@@ -63,7 +63,7 @@ export function RecentActivityList({ initialActivities }: RecentActivityListProp
                         {activities.map((activity) => (
                             <div key={activity.id} className="flex items-center">
                                 <Avatar className="h-9 w-9">
-                                    <AvatarFallback className="bg-indigo-100 text-indigo-700 font-medium">
+                                    <AvatarFallback className="bg-indigo-500/20 text-indigo-400 font-medium">
                                         {activity.user.charAt(0)}
                                     </AvatarFallback>
                                 </Avatar>

@@ -36,11 +36,11 @@ export function RevenueChart({ data }: RevenueChartProps) {
                         />
                         <Tooltip
                             cursor={{ fill: 'transparent' }}
-                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                            contentStyle={{ backgroundColor: 'var(--card)', color: 'var(--card-foreground)', borderRadius: '8px', border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}
                         />
                         <Legend />
-                        <Bar dataKey="income" fill="#10b981" radius={[4, 4, 0, 0]} name="Income" />
-                        <Bar dataKey="expense" fill="#ef4444" radius={[4, 4, 0, 0]} name="Expense" />
+                        <Bar dataKey="income" fill="#34d399" radius={[4, 4, 0, 0]} name="Income" />
+                        <Bar dataKey="expense" fill="#fb7185" radius={[4, 4, 0, 0]} name="Expense" />
                     </BarChart>
                 </ResponsiveContainer>
             </CardContent>

@@ -1,27 +1,30 @@
 "use client";
 
-import { Invoice } from "@/lib/types";
+import { Invoice, Project } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
-import { createInvoice, updateInvoiceStatus } from "@/lib/actions";
+import { createInvoice, clientMarkInvoiceAsPaid, adminApproveInvoicePayment, adminRejectInvoicePayment } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 
 interface InvoiceManagerProps {
     invoices: Invoice[];
     isClient?: boolean;
+    projects?: Project[];
 }
 
-export function InvoiceManager({ invoices, isClient = false }: InvoiceManagerProps) {
+export function InvoiceManager({ invoices, isClient = false, projects = [] }: InvoiceManagerProps) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
     const router = useRouter();
     const formatter = new Intl.NumberFormat('en-IN', {
@@ -31,19 +34,19 @@ export function InvoiceManager({ invoices, isClient = false }: InvoiceManagerPro
     });
 
     const [formData, setFormData] = useState({
-        projectId: "", // Force user to select a project
+        projectId: "",
         amount: "",
-        date: "", // Initialize empty to avoid hydration mismatch
+        date: "",
     });
 
     useEffect(() => {
         setMounted(true);
-        // Set default date on client side
         setFormData(prev => ({ ...prev, date: new Date().toISOString().split('T')[0] }));
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!formData.projectId) return;
         setLoading(true);
         try {
             await createInvoice({
@@ -61,13 +64,44 @@ export function InvoiceManager({ invoices, isClient = false }: InvoiceManagerPro
         }
     };
 
-    const handleStatusUpdate = async (id: string, newStatus: 'Paid' | 'Pending' | 'Overdue' | 'Processing') => {
+    const handleClientSubmitPayment = async (invoiceId: string) => {
+        setActionLoadingId(invoiceId);
         try {
-            await updateInvoiceStatus(id, newStatus);
+            await clientMarkInvoiceAsPaid(invoiceId);
             router.refresh();
         } catch (error) {
             console.error(error);
+        } finally {
+            setActionLoadingId(null);
         }
+    };
+
+    const handleAdminApprove = async (invoiceId: string) => {
+        setActionLoadingId(invoiceId);
+        try {
+            await adminApproveInvoicePayment(invoiceId);
+            router.refresh();
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setActionLoadingId(null);
+        }
+    };
+
+    const handleAdminReject = async (invoiceId: string) => {
+        setActionLoadingId(invoiceId);
+        try {
+            await adminRejectInvoicePayment(invoiceId);
+            router.refresh();
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setActionLoadingId(null);
+        }
+    };
+
+    const getProjectName = (projectId: string) => {
+        return projects.find(p => p.id === projectId)?.name || projectId;
     };
 
     return (
@@ -94,10 +128,27 @@ export function InvoiceManager({ invoices, isClient = false }: InvoiceManagerPro
                                     </DialogHeader>
                                     <div className="grid gap-4 py-4">
                                         <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label className="text-right">Project</Label>
+                                            <Select
+                                                value={formData.projectId}
+                                                onValueChange={(val) => setFormData({ ...formData, projectId: val })}
+                                            >
+                                                <SelectTrigger className="col-span-3">
+                                                    <SelectValue placeholder="Select Project" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {projects.map(p => (
+                                                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="grid grid-cols-4 items-center gap-4">
                                             <Label htmlFor="amount" className="text-right">Amount</Label>
                                             <Input
                                                 id="amount"
                                                 type="number"
+                                                min="1"
                                                 value={formData.amount}
                                                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                                                 className="col-span-3"
@@ -117,7 +168,7 @@ export function InvoiceManager({ invoices, isClient = false }: InvoiceManagerPro
                                         </div>
                                     </div>
                                     <DialogFooter>
-                                        <Button type="submit" disabled={loading}>
+                                        <Button type="submit" disabled={loading || !formData.projectId}>
                                             {loading ? "Creating..." : "Create Invoice"}
                                         </Button>
                                     </DialogFooter>
@@ -136,7 +187,7 @@ export function InvoiceManager({ invoices, isClient = false }: InvoiceManagerPro
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>ID</TableHead>
+                            <TableHead>Project</TableHead>
                             <TableHead>Date</TableHead>
                             <TableHead>Amount</TableHead>
                             <TableHead>Status</TableHead>
@@ -151,14 +202,14 @@ export function InvoiceManager({ invoices, isClient = false }: InvoiceManagerPro
                         ) : (
                             invoices.map((invoice) => (
                                 <TableRow key={invoice.id}>
-                                    <TableCell className="font-medium">{invoice.id}</TableCell>
+                                    <TableCell className="font-medium">{getProjectName(invoice.projectId)}</TableCell>
                                     <TableCell>{format(new Date(invoice.date), "MMM d, yyyy")}</TableCell>
                                     <TableCell>{formatter.format(invoice.amount)}</TableCell>
                                     <TableCell>
                                         <Badge variant={invoice.status === 'Paid' ? 'secondary' : 'default'} className={
-                                            invoice.status === 'Paid' ? 'bg-emerald-100 text-emerald-800' :
-                                                invoice.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                                                    invoice.status === 'Processing' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'
+                                            invoice.status === 'Paid' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' :
+                                                invoice.status === 'Pending' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' :
+                                                    invoice.status === 'Processing' ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20' : 'bg-red-500/15 text-red-400 border border-red-500/20'
                                         }>
                                             {invoice.status}
                                         </Badge>
@@ -166,17 +217,36 @@ export function InvoiceManager({ invoices, isClient = false }: InvoiceManagerPro
                                     <TableCell>
                                         {isClient ? (
                                             invoice.status === 'Pending' && (
-                                                <Button size="sm" variant="outline" onClick={() => handleStatusUpdate(invoice.id, 'Processing')}>
-                                                    Submit Payment
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    disabled={actionLoadingId === invoice.id}
+                                                    onClick={() => handleClientSubmitPayment(invoice.id)}
+                                                >
+                                                    {actionLoadingId === invoice.id ? (
+                                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</>
+                                                    ) : "Submit Payment"}
                                                 </Button>
                                             )
                                         ) : (
                                             invoice.status === 'Processing' && (
                                                 <div className="flex gap-2">
-                                                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => handleStatusUpdate(invoice.id, 'Paid')}>
-                                                        Approve
+                                                    <Button
+                                                        size="sm"
+                                                        className="bg-emerald-600 hover:bg-emerald-700"
+                                                        disabled={actionLoadingId === invoice.id}
+                                                        onClick={() => handleAdminApprove(invoice.id)}
+                                                    >
+                                                        {actionLoadingId === invoice.id ? (
+                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                        ) : "Approve"}
                                                     </Button>
-                                                    <Button size="sm" variant="destructive" onClick={() => handleStatusUpdate(invoice.id, 'Pending')}>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="destructive"
+                                                        disabled={actionLoadingId === invoice.id}
+                                                        onClick={() => handleAdminReject(invoice.id)}
+                                                    >
                                                         Reject
                                                     </Button>
                                                 </div>

@@ -8,6 +8,7 @@ import { updateLeaveStatus } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Loader2, Check, X } from "lucide-react";
+import { toast } from "sonner";
 
 interface LeaveRequestsListProps {
     requests: LeaveRequest[];
@@ -30,6 +31,7 @@ export function LeaveRequestsList({ requests, mode, users = [] }: LeaveRequestsL
             router.refresh();
         } catch (error) {
             console.error(error);
+            toast.error("Failed to process leave request. Please try again.");
             // Revert if error (remove from processedIds)
             setProcessedIds(prev => {
                 const next = new Set(prev);
@@ -61,7 +63,7 @@ export function LeaveRequestsList({ requests, mode, users = [] }: LeaveRequestsL
     }
 
     return (
-        <Card className="bg-neutral-900 border-neutral-800 mb-6">
+        <Card className="bg-card border-border mb-6">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
@@ -71,7 +73,7 @@ export function LeaveRequestsList({ requests, mode, users = [] }: LeaveRequestsL
             <CardContent>
                 <div className="space-y-4">
                     {visibleRequests.map((request) => (
-                        <Card key={request.id} className="bg-slate-900 border-slate-800">
+                        <Card key={request.id} className="bg-card border-border">
                             <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
@@ -82,15 +84,15 @@ export function LeaveRequestsList({ requests, mode, users = [] }: LeaveRequestsL
                                             {request.type} Leave
                                         </span>
                                         {mode === 'admin' && (
-                                            <span className="text-slate-400 text-sm">
-                                                by <span className="text-white font-medium">{getUserName(request.userId)}</span>
+                                            <span className="text-muted-foreground text-sm">
+                                                by <span className="text-foreground font-medium">{getUserName(request.userId)}</span>
                                             </span>
                                         )}
                                     </div>
-                                    <div className="text-sm text-slate-400">
+                                    <div className="text-sm text-muted-foreground">
                                         {new Date(request.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} - {new Date(request.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                     </div>
-                                    <p className="text-sm text-slate-300 mt-2">
+                                    <p className="text-sm text-muted-foreground mt-2">
                                         {request.reason}
                                     </p>
                                 </div>
@@ -116,7 +118,7 @@ export function LeaveRequestsList({ requests, mode, users = [] }: LeaveRequestsL
                                     </div>
                                 )}
                                 {mode === 'admin' && request.status !== 'Pending' && (
-                                    <div className="text-xs text-slate-500">
+                                    <div className="text-xs text-muted-foreground">
                                         Reviewed
                                     </div>
                                 )}

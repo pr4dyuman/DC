@@ -65,7 +65,7 @@ export default function ProjectsPage() {
                 <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                     {projects.map(project => (
                         <Link key={project.id} href={`/dashboard/projects/${project.slug || project.id}`} className="block group">
-                            <Card className="h-full transition-all border-neutral-800 hover:border-yellow-500/50 hover:bg-neutral-900 hover:shadow-lg">
+                            <Card className="h-full transition-all border-border hover:border-primary/50 hover:bg-muted hover:shadow-lg">
                                 <CardHeader className="pb-2">
                                     <div className="flex justify-between items-start">
                                         <div className="flex-1">

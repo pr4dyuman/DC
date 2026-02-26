@@ -22,8 +22,8 @@ import { ArrowLeft } from "lucide-react";
 interface FinanceContentProps {
     searchParams: { [key: string]: string | string[] | undefined };
     currentUser: any; // Passed from parent to avoid re-fetching if possible, but page.tsx might not have it.
-                     // Actually page.tsx doesn't have currentUser easily available without blocking.
-                     // So FinanceContent should fetch it. It's cached.
+    // Actually page.tsx doesn't have currentUser easily available without blocking.
+    // So FinanceContent should fetch it. It's cached.
 }
 
 export async function FinanceContent({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
@@ -98,8 +98,6 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
 
     // --- ADMIN / EMPLOYEE LOGIC BELOW (Only runs if NOT client) ---
 
-    // --- ADMIN / EMPLOYEE LOGIC BELOW (Only runs if NOT client) ---
-
     // Parallelize all independent data fetching
     const [
         stats,
@@ -121,8 +119,8 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
         getUsers()
     ]);
 
-    // Filter pending payables (Expenses that are Pending)
-    const pendingPayables = transactions.filter(t => t.type === 'expense' && t.status === 'pending');
+    // Filter pending transactions (both income and expense)
+    const pendingPayables = transactions.filter(t => t.status === 'pending');
 
     const categorySummary = category ? await getCategoryMemberSummary(category) : [];
 
@@ -173,7 +171,7 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
         salaryTransactions = transactions.filter(t =>
             t.type === 'expense' &&
             t.category === 'Salary' &&
-            (t.description.toLowerCase().includes(selectedUser.name.toLowerCase()) || true)
+            t.description.toLowerCase().includes(selectedUser.name.toLowerCase())
         );
 
         // Investment: Income + Description match (assuming user 'invested' or paid into company)
@@ -206,7 +204,7 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
                     <TeamFinanceSummary
                         stats={teamStats}
                         userName={selectedUser.name}
-                        salary={selectedUser.salary || 5000}
+                        salary={selectedUser.salary ?? 0}
                     />
 
                     <div className="grid gap-6 md:grid-cols-2">
@@ -354,7 +352,7 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
                     </TabsContent>
 
                     <TabsContent value="invoices" className="space-y-4">
-                        <InvoiceManager invoices={invoices} />
+                        <InvoiceManager invoices={invoices} projects={rawProjects} />
                     </TabsContent>
 
                     <TabsContent value="payroll" className="space-y-4">

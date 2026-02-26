@@ -40,7 +40,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
         salary: 0,
         avatar: "",
         password: "",
-        employmentType: "Salary" as 'Salary' | 'Project Based',
+        employmentType: "Salary" as 'Salary' | 'Project Based' | 'Freelancer',
         contactNumber: "",
         adharCardImage: "",
         panCardImage: ""
@@ -269,13 +269,16 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                                     disabled={!canManageFinances}
                                                     className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed">
                                                     <option value="Salary">On Salary</option>
+                                                    <option value="Freelancer">Freelancer</option>
                                                     <option value="Project Based">Project Based</option>
                                                 </select>
                                             </div>
                                         )}
-                                        {canManageFinances && formData.employmentType === 'Salary' && formData.role !== 'client' && (
+                                        {canManageFinances && (formData.employmentType === 'Salary' || formData.employmentType === 'Freelancer') && formData.role !== 'client' && (
                                             <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
-                                                <label className="text-xs font-medium text-muted-foreground">Salary (₹)</label>
+                                                <label className="text-xs font-medium text-muted-foreground">
+                                                    {formData.employmentType === 'Freelancer' ? 'Rate (₹)' : 'Salary (₹)'}
+                                                </label>
                                                 <input type="number" value={formData.salary} onChange={e => setFormData({ ...formData, salary: parseInt(e.target.value) || 0 })}
                                                     className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary" />
                                             </div>

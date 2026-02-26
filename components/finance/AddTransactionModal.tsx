@@ -38,8 +38,12 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
         bonus: "",
         deduction: "",
         // Internal Transfer Specific
-        transferDirection: "to_member" as "to_member" | "from_member", 
-        status: "completed" as "completed" | "pending"
+        transferDirection: "to_member" as "to_member" | "from_member",
+        status: "completed" as "completed" | "pending",
+        // Tax Specific
+        taxType: "" as string,
+        // Reimbursement Specific
+        expenseType: "" as string
     });
 
     // Validation Errors
@@ -66,12 +70,22 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
         } else if (cat === "Refund") {
             setFormData(prev => ({ ...prev, type: "expense", projectId: projectId || prev.projectId || "", description: "" }));
         } else if (cat === "Internal Transfer") {
-            setFormData(prev => ({ ...prev, type: "expense", projectId: "", transferDirection: "to_member", description: "" })); // Default to to_member (expense)
+            setFormData(prev => ({ ...prev, type: "expense", projectId: "", transferDirection: "to_member", description: "" }));
+        } else if (cat === "Investor") {
+            setFormData(prev => ({ ...prev, type: "income", projectId: "", description: "" }));
+        } else if (cat === "Freelancer") {
+            setFormData(prev => ({ ...prev, type: "expense", projectId: "", description: "", memberId: "" }));
+        } else if (cat === "Tax") {
+            setFormData(prev => ({ ...prev, type: "expense", projectId: "", description: "", taxType: "" }));
+        } else if (cat === "Reimbursement") {
+            setFormData(prev => ({ ...prev, type: "expense", projectId: "", description: "", memberId: "", expenseType: "" }));
+        } else if (cat === "Retainer") {
+            setFormData(prev => ({ ...prev, type: "income", projectId: projectId || prev.projectId || "", description: "" }));
         } else if (cat === "Project") {
             // Just to be safe: If switching TO Project, act like init.
             setFormData(prev => ({ ...prev, projectId: projectId || prev.projectId || "", description: "" }));
         } else {
-            // Generic Categories (Software, Marketing, Other, etc.)
+            // Generic Categories (Other)
             setFormData(prev => ({ ...prev, type: "expense", projectId: "", description: "" }));
         }
     };
@@ -85,7 +99,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                 baseSalary: member.salary || 0,
                 // Auto-generate description for Employee
                 description: selectedCategory === "Salary"
-                    ? `Salary - ${member.name} - ${new Date().toLocaleString('default', { month: 'long' })}`
+                    ? `Salary Payment - ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })} - ${member.name}`
                     : prev.description
             }));
 
@@ -171,9 +185,29 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                 if (formData.transferDirection === "to_member") dbType = "expense";
                 else dbType = "income";
             }
+            else if (selectedCategory === "Investor") {
+                dbCategory = "Investor";
+                dbType = "income"; // STRICT: Investors are always income
+            }
+            else if (selectedCategory === "Freelancer") {
+                dbCategory = "Freelancer";
+                dbType = "expense";
+            }
+            else if (selectedCategory === "Tax") {
+                dbCategory = "Tax";
+                dbType = "expense";
+            }
+            else if (selectedCategory === "Reimbursement") {
+                dbCategory = "Reimbursement";
+                dbType = "expense";
+            }
+            else if (selectedCategory === "Retainer") {
+                dbCategory = "Retainer";
+                dbType = "income";
+            }
             else {
                 dbCategory = selectedCategory;
-                dbType = "expense"; // STRICT: Other expenses are expenses
+                dbType = "expense";
             }
 
             await createTransaction({
@@ -185,7 +219,9 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                 projectId: formData.projectId || undefined,
 
                 userId: formData.memberId || undefined,
-                status: formData.status
+                status: formData.status,
+                taxType: formData.taxType ? formData.taxType as any : undefined,
+                expenseType: formData.expenseType ? formData.expenseType as any : undefined
             });
             setOpen(false);
             // Reset form
@@ -201,7 +237,9 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                 deduction: "",
 
                 transferDirection: "to_member",
-                status: "completed"
+                status: "completed",
+                taxType: "",
+                expenseType: ""
             });
             router.refresh();
         } catch (error) {
@@ -299,6 +337,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                                     <Label className="text-right">Amount</Label>
                                     <Input
                                         type="number"
+                                        min="1"
                                         value={formData.amount}
                                         onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
                                         className="col-span-3"
@@ -343,6 +382,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                                     <Label className="text-right">Refund Amount</Label>
                                     <Input
                                         type="number"
+                                        min="1"
                                         value={formData.amount}
                                         onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
                                         className="col-span-3"
@@ -407,6 +447,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                                     <Label className="text-right font-bold">Total Pay</Label>
                                     <Input
                                         type="number"
+                                        min="1"
                                         value={formData.amount}
                                         disabled
                                         className="col-span-3 font-bold"
@@ -461,6 +502,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                                     <Label className="text-right">Amount</Label>
                                     <Input
                                         type="number"
+                                        min="1"
                                         value={formData.amount}
                                         onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
                                         className="col-span-3"
@@ -478,9 +520,367 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                                 </div>
                             </>
                         )}
+                        {/* --- INVESTOR CATEGORY --- */}
+                        {selectedCategory === "Investor" && (
+                            <>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label className="text-right">Investor / Source</Label>
+                                    <Input
+                                        value={formData.description}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                                        className="col-span-3"
+                                        placeholder="e.g. Investor Name or Funding Source"
+                                        required
+                                    />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label className="text-right">Amount</Label>
+                                    <Input
+                                        type="number"
+                                        min="1"
+                                        value={formData.amount}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
+                                        className="col-span-3"
+                                        required
+                                    />
+                                </div>
+                                <div className="text-sm text-muted-foreground bg-emerald-50 dark:bg-emerald-950 p-3 rounded-md border border-emerald-200 dark:border-emerald-800">
+                                    <p className="font-medium text-emerald-900 dark:text-emerald-100">Note:</p>
+                                    <p className="text-emerald-800 dark:text-emerald-200">This will be recorded as Income (investment into the company).</p>
+                                </div>
+                            </>
+                        )}
 
-                        {/* --- GENERIC CATEGORY (Other, Marketing, Software, etc.) --- */}
-                        {selectedCategory !== "Project" && selectedCategory !== "Salary" && selectedCategory !== "Internal Transfer" && (
+                        {/* --- FREELANCER CATEGORY --- */}
+                        {selectedCategory === "Freelancer" && (() => {
+                            const freelancers = users.filter(u => u.employmentType === 'Freelancer');
+                            return (
+                                <>
+                                    <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label className="text-right">Freelancer</Label>
+                                        {freelancers.length > 0 ? (
+                                            <Select
+                                                value={formData.memberId || "none"}
+                                                onValueChange={(val) => {
+                                                    if (val === "none") {
+                                                        setFormData(prev => ({ ...prev, memberId: "", description: "", amount: "" }));
+                                                        return;
+                                                    }
+                                                    const member = freelancers.find(u => u.id === val);
+                                                    if (member) {
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            memberId: member.id,
+                                                            description: `Freelancer Payment - ${member.name}`,
+                                                            amount: member.salary ? member.salary.toString() : prev.amount,
+                                                        }));
+                                                    }
+                                                }}
+                                            >
+                                                <SelectTrigger className="col-span-3">
+                                                    <SelectValue placeholder="Select Freelancer" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="none">Select Freelancer</SelectItem>
+                                                    {freelancers.map(u => (
+                                                        <SelectItem key={u.id} value={u.id}>
+                                                            {u.name} {u.jobTitle ? `(${u.jobTitle})` : ''} {u.salary ? `- ₹${u.salary.toLocaleString()}` : ''}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        ) : (
+                                            <div className="col-span-3 text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                                                No freelancers found. Add team members with &quot;Freelancer&quot; employment type in Settings → Team.
+                                            </div>
+                                        )}
+                                    </div>
+                                    {formData.memberId && (
+                                        <>
+                                            <div className="grid grid-cols-4 items-center gap-4">
+                                                <Label className="text-right">Description</Label>
+                                                <Input
+                                                    value={formData.description}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                                                    className="col-span-3"
+                                                    placeholder="e.g. Freelancer Payment - Web Development"
+                                                    required
+                                                />
+                                            </div>
+                                            {projects.length > 0 && (
+                                                <div className="grid grid-cols-4 items-center gap-4">
+                                                    <Label className="text-right">Project <span className="text-xs text-muted-foreground">(Optional)</span></Label>
+                                                    <Select value={formData.projectId || "none"} onValueChange={(val) => setFormData(prev => ({ ...prev, projectId: val === "none" ? "" : val }))}>
+                                                        <SelectTrigger className="col-span-3">
+                                                            <SelectValue placeholder="Link to Project (Optional)" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="none">No Project</SelectItem>
+                                                            {projects.map(p => (
+                                                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            )}
+                                            <div className="grid grid-cols-4 items-center gap-4">
+                                                <Label className="text-right">Amount</Label>
+                                                <Input
+                                                    type="number"
+                                                    min="1"
+                                                    value={formData.amount}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
+                                                    className="col-span-3"
+                                                    required
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+                                    <div className="text-sm text-muted-foreground bg-orange-50 dark:bg-orange-950 p-3 rounded-md border border-orange-200 dark:border-orange-800">
+                                        <p className="text-orange-800 dark:text-orange-200">Freelancer/Contractor payment — recorded as Expense.</p>
+                                    </div>
+                                </>
+                            );
+                        })()}
+                        {/* --- TAX CATEGORY --- */}
+                        {selectedCategory === "Tax" && (
+                            <>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label className="text-right">Tax Type</Label>
+                                    <Select
+                                        value={formData.taxType || "none"}
+                                        onValueChange={(val) => {
+                                            const taxLabel = val === "none" ? "" : val;
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                taxType: taxLabel,
+                                                description: taxLabel ? `${taxLabel} Payment - ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}` : ""
+                                            }));
+                                        }}
+                                    >
+                                        <SelectTrigger className="col-span-3">
+                                            <SelectValue placeholder="Select Tax Type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">Select Tax Type</SelectItem>
+                                            <SelectItem value="GST">GST</SelectItem>
+                                            <SelectItem value="TDS">TDS</SelectItem>
+                                            <SelectItem value="Income Tax">Income Tax</SelectItem>
+                                            <SelectItem value="Professional Tax">Professional Tax</SelectItem>
+                                            <SelectItem value="Other">Other Tax</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                {formData.taxType && (
+                                    <>
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label className="text-right">Description</Label>
+                                            <Input
+                                                value={formData.description}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                                                className="col-span-3"
+                                                placeholder="e.g. GST Payment - Q3 2026"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label className="text-right">Amount</Label>
+                                            <Input
+                                                type="number"
+                                                min="1"
+                                                value={formData.amount}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
+                                                className="col-span-3"
+                                                required
+                                            />
+                                        </div>
+                                    </>
+                                )}
+                                <div className="text-sm text-muted-foreground bg-red-50 dark:bg-red-950 p-3 rounded-md border border-red-200 dark:border-red-800">
+                                    <p className="text-red-800 dark:text-red-200">Tax payment — recorded as Expense.</p>
+                                </div>
+                            </>
+                        )}
+
+                        {/* --- REIMBURSEMENT CATEGORY --- */}
+                        {selectedCategory === "Reimbursement" && (() => {
+                            const employees = users.filter(u => u.role !== 'client');
+                            return (
+                                <>
+                                    <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label className="text-right">Employee</Label>
+                                        <Select
+                                            value={formData.memberId || "none"}
+                                            onValueChange={(val) => {
+                                                if (val === "none") {
+                                                    setFormData(prev => ({ ...prev, memberId: "", description: "" }));
+                                                    return;
+                                                }
+                                                const member = employees.find(u => u.id === val);
+                                                if (member) {
+                                                    const expLabel = formData.expenseType || "Expense";
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        memberId: member.id,
+                                                        description: `${expLabel} Reimbursement - ${member.name}`
+                                                    }));
+                                                }
+                                            }}
+                                        >
+                                            <SelectTrigger className="col-span-3">
+                                                <SelectValue placeholder="Select Employee" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">Select Employee</SelectItem>
+                                                {employees.map(u => (
+                                                    <SelectItem key={u.id} value={u.id}>
+                                                        {u.name} {u.jobTitle ? `(${u.jobTitle})` : ''}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {formData.memberId && (
+                                        <>
+                                            <div className="grid grid-cols-4 items-center gap-4">
+                                                <Label className="text-right">Expense Type</Label>
+                                                <Select
+                                                    value={formData.expenseType || "none"}
+                                                    onValueChange={(val) => {
+                                                        const expLabel = val === "none" ? "" : val;
+                                                        const member = employees.find(u => u.id === formData.memberId);
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            expenseType: expLabel,
+                                                            description: expLabel && member ? `${expLabel} Reimbursement - ${member.name}` : prev.description
+                                                        }));
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="col-span-3">
+                                                        <SelectValue placeholder="Select Expense Type" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">Select Expense Type</SelectItem>
+                                                        <SelectItem value="Travel">Travel</SelectItem>
+                                                        <SelectItem value="Meals">Meals</SelectItem>
+                                                        <SelectItem value="Client Meeting">Client Meeting</SelectItem>
+                                                        <SelectItem value="Equipment">Equipment</SelectItem>
+                                                        <SelectItem value="Other">Other</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="grid grid-cols-4 items-center gap-4">
+                                                <Label className="text-right">Description</Label>
+                                                <Input
+                                                    value={formData.description}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                                                    className="col-span-3"
+                                                    placeholder="e.g. Travel Reimbursement - Client Visit"
+                                                    required
+                                                />
+                                            </div>
+                                            {projects.length > 0 && (
+                                                <div className="grid grid-cols-4 items-center gap-4">
+                                                    <Label className="text-right">Project <span className="text-xs text-muted-foreground">(Optional)</span></Label>
+                                                    <Select value={formData.projectId || "none"} onValueChange={(val) => setFormData(prev => ({ ...prev, projectId: val === "none" ? "" : val }))}>
+                                                        <SelectTrigger className="col-span-3">
+                                                            <SelectValue placeholder="Link to Project (Optional)" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="none">No Project</SelectItem>
+                                                            {projects.map(p => (
+                                                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            )}
+                                            <div className="grid grid-cols-4 items-center gap-4">
+                                                <Label className="text-right">Amount</Label>
+                                                <Input
+                                                    type="number"
+                                                    min="1"
+                                                    value={formData.amount}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
+                                                    className="col-span-3"
+                                                    required
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+                                    <div className="text-sm text-muted-foreground bg-violet-50 dark:bg-violet-950 p-3 rounded-md border border-violet-200 dark:border-violet-800">
+                                        <p className="text-violet-800 dark:text-violet-200">Employee reimbursement — recorded as Expense.</p>
+                                    </div>
+                                </>
+                            );
+                        })()}
+
+                        {/* --- RETAINER CATEGORY --- */}
+                        {selectedCategory === "Retainer" && (
+                            <>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label className="text-right">Project</Label>
+                                    <Select
+                                        value={formData.projectId || "none"}
+                                        onValueChange={(val) => {
+                                            if (val === "none") {
+                                                setFormData(prev => ({ ...prev, projectId: "", description: "" }));
+                                                return;
+                                            }
+                                            const project = projects.find(p => p.id === val);
+                                            if (project) {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    projectId: project.id,
+                                                    description: `Monthly Retainer - ${project.name} - ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`
+                                                }));
+                                            }
+                                        }}
+                                    >
+                                        <SelectTrigger className="col-span-3">
+                                            <SelectValue placeholder="Select Project" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">Select Project</SelectItem>
+                                            {projects.map(p => (
+                                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                {formData.projectId && (
+                                    <>
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label className="text-right">Description</Label>
+                                            <Input
+                                                value={formData.description}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                                                className="col-span-3"
+                                                placeholder="e.g. Monthly Retainer - Feb 2026"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label className="text-right">Amount</Label>
+                                            <Input
+                                                type="number"
+                                                min="1"
+                                                value={formData.amount}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
+                                                className="col-span-3"
+                                                required
+                                            />
+                                        </div>
+                                    </>
+                                )}
+                                <div className="text-sm text-muted-foreground bg-teal-50 dark:bg-teal-950 p-3 rounded-md border border-teal-200 dark:border-teal-800">
+                                    <p className="text-teal-800 dark:text-teal-200">Client retainer payment — recorded as Income.</p>
+                                </div>
+                            </>
+                        )}
+
+                        {/* --- GENERIC CATEGORY (Other) --- */}
+                        {selectedCategory !== "Project" && selectedCategory !== "Salary" && selectedCategory !== "Internal Transfer" && selectedCategory !== "Refund" && selectedCategory !== "Investor" && selectedCategory !== "Freelancer" && selectedCategory !== "Tax" && selectedCategory !== "Reimbursement" && selectedCategory !== "Retainer" && (
                             <>
                                 <div className="grid grid-cols-4 items-center gap-4">
                                     <Label className="text-right">Description</Label>
@@ -496,6 +896,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                                     <Label className="text-right">Amount</Label>
                                     <Input
                                         type="number"
+                                        min="1"
                                         value={formData.amount}
                                         onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
                                         className="col-span-3"
@@ -516,11 +917,11 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                             />
                         </div>
 
-                         {/* Status Selection */}
+                        {/* Status Selection */}
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label className="text-right">Status</Label>
-                            <Select 
-                                value={formData.status} 
+                            <Select
+                                value={formData.status}
                                 onValueChange={(val: "completed" | "pending") => setFormData(prev => ({ ...prev, status: val }))}
                             >
                                 <SelectTrigger className="col-span-3">

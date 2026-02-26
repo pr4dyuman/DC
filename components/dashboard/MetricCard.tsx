@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { LucideIcon } from "lucide-react";
+import { LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
 
 interface MetricCardProps {
     title: string;
@@ -7,17 +7,24 @@ interface MetricCardProps {
     description: string;
     icon: LucideIcon;
     trend?: "up" | "down" | "neutral";
+    iconColor?: string;
 }
 
-export function MetricCard({ title, value, description, icon: Icon, trend }: MetricCardProps) {
+export function MetricCard({ title, value, description, icon: Icon, trend, iconColor = "text-amber-500" }: MetricCardProps) {
     return (
-        <Card>
+        <Card className="hover:border-amber-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/5">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{title}</CardTitle>
-                <Icon className="h-4 w-4 text-yellow-500" />
+                <div className="rounded-md bg-amber-500/10 p-1.5">
+                    <Icon className={`h-4 w-4 ${iconColor}`} />
+                </div>
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">{value}</div>
+                <div className="flex items-center gap-2">
+                    <span className="text-2xl font-bold">{value}</span>
+                    {trend === 'up' && <TrendingUp className="h-4 w-4 text-emerald-500" />}
+                    {trend === 'down' && <TrendingDown className="h-4 w-4 text-red-500" />}
+                </div>
                 <p className="text-xs text-muted-foreground">{description}</p>
             </CardContent>
         </Card>

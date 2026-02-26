@@ -44,9 +44,9 @@ export function ClientTaskOverview({ tasks, projects }: ClientTaskOverviewProps)
             <CardContent>
                 {/* Task Statistics */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                    <div className="p-3 rounded-lg bg-zinc-800/50 border border-zinc-700">
+                    <div className="p-3 rounded-lg bg-muted/50 border border-border">
                         <div className="flex items-center gap-2 mb-1">
-                            <Clock className="h-3 w-3 text-zinc-400" />
+                            <Clock className="h-3 w-3 text-muted-foreground" />
                             <span className="text-xs text-muted-foreground">To Do</span>
                         </div>
                         <div className="text-xl font-bold">{todoTasks}</div>

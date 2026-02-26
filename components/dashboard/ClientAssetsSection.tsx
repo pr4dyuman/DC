@@ -56,7 +56,7 @@ export function ClientAssetsSection({ assets, projects }: ClientAssetsSectionPro
                         <div className="text-lg font-bold">{assetsByType.image}</div>
                         <div className="text-xs text-muted-foreground">Images</div>
                     </div>
-                    <div className="p-2 rounded-lg bg-zinc-800/50 border border-zinc-700 text-center">
+                    <div className="p-2 rounded-lg bg-muted/50 border border-border text-center">
                         <FileText className="h-4 w-4 text-zinc-400 mx-auto mb-1" />
                         <div className="text-lg font-bold">{assetsByType.file}</div>
                         <div className="text-xs text-muted-foreground">Files</div>
@@ -109,7 +109,7 @@ export function ClientAssetsSection({ assets, projects }: ClientAssetsSectionPro
                 </div>
 
                 {/* Total Count */}
-                <div className="mt-4 pt-4 border-t border-zinc-800">
+                <div className="mt-4 pt-4 border-t border-border">
                     <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Total Assets</span>
                         <span className="font-semibold">{assets.length}</span>

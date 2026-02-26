@@ -152,6 +152,15 @@ export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
                                             />
                                         </div>
                                         <div className="space-y-1">
+                                            <Label className="text-xs">Amount per Installment (₹)</Label>
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                value={formConfig.installmentAmount || ''}
+                                                onChange={(e) => setFormConfig({ ...formConfig, installmentAmount: parseInt(e.target.value) })}
+                                            />
+                                        </div>
+                                        <div className="space-y-1 col-span-2">
                                             <Label className="text-xs">First Payment Date</Label>
                                             <Input
                                                 type="date"

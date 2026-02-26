@@ -28,6 +28,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
     const [viewMode, setViewMode] = useState<'chats' | 'users'>('chats');
     const [isLoadingContacts, setIsLoadingContacts] = useState(false);
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Initial load and sync with props
@@ -128,6 +129,9 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
         }
     }
 
+    const filteredContacts = searchQuery.trim()
+        ? contacts.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.role?.toLowerCase().includes(searchQuery.toLowerCase()))
+        : contacts;
     const activeContact = contacts.find(c => c.id === activeContactId);
 
     if (!isOpen) return null;
@@ -135,15 +139,15 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 md:p-8 animate-in fade-in duration-200">
             <div
-                className="w-full max-w-6xl h-[85vh] bg-[#09090b] border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row ring-1 ring-zinc-800"
+                className="w-full max-w-6xl h-[85vh] bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row ring-1 ring-border"
                 style={{ backdropFilter: 'blur(20px)' }}
             >
                 {/* Sidebar / Contact List */}
-                <div className="w-full md:w-80 border-r border-zinc-800 flex flex-col bg-[#0c0c0e]">
-                    <div className="p-4 border-b border-zinc-800 flex justify-between items-center">
-                        <h2 className="text-lg font-bold text-zinc-100">Messages</h2>
+                <div className="w-full md:w-80 border-r border-border flex flex-col bg-secondary">
+                    <div className="p-4 border-b border-border flex justify-between items-center">
+                        <h2 className="text-lg font-bold text-foreground">Messages</h2>
                         {/* Mobile Close Button */}
-                        <button onClick={onClose} className="md:hidden p-2 hover:bg-zinc-800 rounded-full text-zinc-400">
+                        <button onClick={onClose} className="md:hidden p-2 hover:bg-muted rounded-full text-muted-foreground">
                             <X className="w-5 h-5" />
                         </button>
                     </div>
@@ -155,14 +159,16 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                             <input
                                 type="text"
                                 placeholder="Search..."
-                                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-2 pl-9 pr-4 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-zinc-600"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full bg-secondary border border-border rounded-xl py-2 pl-9 pr-4 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground"
                             />
                         </div>
 
                         {/* New Message Button */}
                         <button
                             onClick={() => setViewMode(viewMode === 'chats' ? 'users' : 'chats')}
-                            className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl text-sm font-medium transition flex items-center justify-center border border-zinc-700"
+                            className="w-full py-2 bg-muted hover:bg-accent text-foreground rounded-xl text-sm font-medium transition flex items-center justify-center border border-border"
                         >
                             {viewMode === 'chats' ? (
                                 <>
@@ -181,8 +187,8 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                     <div className="flex-1 overflow-y-auto px-2 space-y-1 custom-scrollbar">
                         {viewMode === 'chats' ? (
                             // Show active chats only
-                            contacts.filter(c => c.lastMessage).length > 0 ? (
-                                contacts
+                            filteredContacts.filter(c => c.lastMessage).length > 0 ? (
+                                filteredContacts
                                     .filter(c => c.lastMessage)
                                     .map(contact => (
                                         <ContactItem
@@ -200,7 +206,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                             )
                         ) : (
                             // Show all users for selection
-                            contacts.map(contact => (
+                            filteredContacts.map(contact => (
                                 <ContactItem
                                     key={contact.id}
                                     contact={contact}
@@ -216,25 +222,25 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                 </div>
 
                 {/* Main Chat Area */}
-                <div className="flex-1 flex flex-col bg-[#050505]">
+                <div className="flex-1 flex flex-col bg-background">
                     {activeContact ? (
                         <>
                             {/* Chat Header */}
-                            <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-[#09090b]/50 backdrop-blur-md">
+                            <div className="p-4 border-b border-border flex justify-between items-center bg-card/50 backdrop-blur-md">
                                 <div className="flex items-center">
                                     <div className="relative">
                                         <img
                                             src={activeContact.avatar || "/placeholder-avatar.jpg"}
                                             alt={activeContact.name}
-                                            className="w-10 h-10 rounded-full border border-zinc-800"
+                                            className="w-10 h-10 rounded-full border border-border"
                                         />
                                         {activeContact.isOnline && (
                                             <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-[#09090b] shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
                                         )}
                                     </div>
                                     <div className="ml-3">
-                                        <h3 className="font-semibold text-zinc-100 leading-tight">{activeContact.name}</h3>
-                                        <div className="text-xs text-zinc-400 flex items-center">
+                                        <h3 className="font-semibold text-foreground leading-tight">{activeContact.name}</h3>
+                                        <div className="text-xs text-muted-foreground flex items-center">
                                             {activeContact.isOnline ? (
                                                 <span className="text-green-500 font-medium">Online</span>
                                             ) : (
@@ -247,14 +253,14 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex items-center space-x-2 text-zinc-400">
+                                <div className="flex items-center space-x-2 text-muted-foreground">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <button className="p-2 hover:bg-zinc-800 rounded-full transition focus:outline-none">
+                                            <button className="p-2 hover:bg-muted rounded-full transition focus:outline-none">
                                                 <MoreVertical className="w-5 h-5" />
                                             </button>
                                         </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800 text-zinc-200">
+                                        <DropdownMenuContent align="end" className="bg-card border-border text-foreground">
                                             <DropdownMenuItem
                                                 onClick={handleDeleteConversation}
                                                 className="text-red-500 focus:text-red-400 focus:bg-red-500/10 cursor-pointer gap-2"
@@ -266,7 +272,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                                     </DropdownMenu>
 
                                     <button onClick={onClose} className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-full transition ml-2 md:hidden"><X className="w-5 h-5" /></button>
-                                    <button onClick={onClose} className="hidden md:block p-2 hover:bg-zinc-800 rounded-full transition ml-4"><X className="w-5 h-5" /></button>
+                                    <button onClick={onClose} className="hidden md:block p-2 hover:bg-muted rounded-full transition ml-4"><X className="w-5 h-5" /></button>
                                 </div>
                             </div>
 
@@ -274,7 +280,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                             <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-[url('/bg-pattern.svg')] lg:bg-none">
                                 {messages.length === 0 ? (
                                     <div className="h-full flex flex-col items-center justify-center text-zinc-500 opacity-50">
-                                        <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mb-4">
+                                        <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-4">
                                             <Send className="w-8 h-8 text-zinc-600" />
                                         </div>
                                         <p>Start messaging with {activeContact.name}</p>
@@ -292,9 +298,9 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                             </div>
 
                             {/* Input Area */}
-                            <div className="p-4 bg-[#09090b] border-t border-zinc-800">
-                                <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-2 flex items-center shadow-lg">
-                                    <button className="p-2 text-zinc-400 hover:text-zinc-200 transition">
+                            <div className="p-4 bg-card border-t border-border">
+                                <div className="bg-secondary border border-border rounded-2xl p-2 flex items-center shadow-lg">
+                                    <button className="p-2 text-zinc-600 cursor-not-allowed" title="Attachments coming soon" disabled>
                                         <Paperclip className="w-5 h-5" />
                                     </button>
                                     <input
@@ -303,7 +309,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                                         onChange={(e) => setNewMessage(e.target.value)}
                                         onKeyDown={(e) => e.key === "Enter" && handleSend()}
                                         placeholder="Type a message..."
-                                        className="flex-1 bg-transparent border-none focus:outline-none text-zinc-200 placeholder:text-zinc-600 px-2 py-1"
+                                        className="flex-1 bg-transparent border-none focus:outline-none text-foreground placeholder:text-muted-foreground px-2 py-1"
                                     />
                                     <button
                                         onClick={handleSend}
@@ -320,16 +326,16 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                             <div className="absolute top-4 right-4">
                                 <button
                                     onClick={onClose}
-                                    className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition"
+                                    className="p-2 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
-                            <div className="w-20 h-20 bg-zinc-900 rounded-3xl flex items-center justify-center mb-6 shadow-2xl border border-zinc-800 rotate-12">
+                            <div className="w-20 h-20 bg-secondary rounded-3xl flex items-center justify-center mb-6 shadow-2xl border border-border rotate-12">
                                 <Send className="w-10 h-10 text-primary" />
                             </div>
-                            <h2 className="text-2xl font-bold text-zinc-200 mb-2">Agency Messenger</h2>
-                            <p className="max-w-md text-center text-zinc-400">Select a contact from the list to start a rich messaging session. Secure, private, and premium.</p>
+                            <h2 className="text-2xl font-bold text-foreground mb-2">Agency Messenger</h2>
+                            <p className="max-w-md text-center text-muted-foreground">Select a contact from the list to start a rich messaging session. Secure, private, and premium.</p>
                         </div>
                     )}
                 </div>

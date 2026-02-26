@@ -21,10 +21,11 @@ export function PendingPayablesList({ transactions }: PendingPayablesListProps) 
     // Removed early return to ensure visibility
     // if (transactions.length === 0) return null;
 
-    const handleMarkPaid = async (id: string, amount: number) => {
+    const handleMarkPaid = async (id: string, amount: number, type: string) => {
         try {
             setLoadingId(id);
-            if (confirm(`Mark ₹${amount.toLocaleString()} as Paid? This will deduct from your total balance.`)) {
+            const action = type === 'income' ? 'Mark as Received' : 'Mark as Paid';
+            if (confirm(`${action}: ₹${amount.toLocaleString()}?`)) {
                 await markTransactionAsPaid(id);
                 toast.success("Marked as paid successfully");
                 router.refresh();
@@ -44,13 +45,22 @@ export function PendingPayablesList({ transactions }: PendingPayablesListProps) 
             <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                     <CardTitle className="text-amber-700 dark:text-amber-500 flex items-center gap-2">
-                        <Clock className="h-5 w-5" /> Pending Payables
+                        <Clock className="h-5 w-5" /> Pending Transactions
                     </CardTitle>
                     <div className="text-right">
                         <p className="text-sm text-muted-foreground">Total Pending</p>
-                        <p className="text-xl font-bold text-amber-600 dark:text-amber-400">
-                            ₹{totalPending.toLocaleString()}
-                        </p>
+                        <div className="flex gap-3 justify-end">
+                            {transactions.some(t => t.type === 'income') && (
+                                <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                                    +₹{transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0).toLocaleString()}
+                                </span>
+                            )}
+                            {transactions.some(t => t.type === 'expense') && (
+                                <span className="text-lg font-bold text-red-600 dark:text-red-400">
+                                    -₹{transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0).toLocaleString()}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
             </CardHeader>
@@ -71,6 +81,12 @@ export function PendingPayablesList({ transactions }: PendingPayablesListProps) 
                                 <div>
                                     <p className="font-medium">{t.description}</p>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${t.type === 'income'
+                                                ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200'
+                                                : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
+                                            }`}>
+                                            {t.type === 'income' ? 'Receivable' : 'Payable'}
+                                        </span>
                                         <span className="capitalize">{t.category}</span>
                                         <span>•</span>
                                         <span>{t.date}</span>
@@ -78,19 +94,19 @@ export function PendingPayablesList({ transactions }: PendingPayablesListProps) 
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
                                 <span className="font-bold text-lg">₹{t.amount.toLocaleString()}</span>
-                                <Button 
-                                    size="sm" 
+                                <Button
+                                    size="sm"
                                     className="bg-amber-600 hover:bg-amber-700 text-white border-none"
-                                    onClick={() => handleMarkPaid(t.id, t.amount)}
+                                    onClick={() => handleMarkPaid(t.id, t.amount, t.type)}
                                     disabled={loadingId === t.id}
                                 >
                                     {loadingId === t.id ? (
-                                        <span className="flex items-center"><Clock className="mr-1 h-3 w-3 animate-spin"/> Paying...</span>
+                                        <span className="flex items-center"><Clock className="mr-1 h-3 w-3 animate-spin" /> Paying...</span>
                                     ) : (
-                                        <span className="flex items-center"><Check className="mr-1 h-3 w-3"/> Mark Paid</span>
+                                        <span className="flex items-center"><Check className="mr-1 h-3 w-3" /> Mark Paid</span>
                                     )}
                                 </Button>
                             </div>

@@ -66,7 +66,7 @@ export function UrgentTasksList({ initialTasks }: UrgentTasksListProps) {
                                     <p className="text-sm font-medium leading-none">{task.title}</p>
                                     <p className="text-sm text-muted-foreground">Due {new Date(task.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                                 </div>
-                                <div className={`ml-auto font-medium text-xs px-2 py-1 rounded-full ${task.status === 'In Progress' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'}`}>
+                                <div className={`ml-auto font-medium text-xs px-2 py-1 rounded-full ${task.status === 'In Progress' ? 'bg-amber-500/15 text-amber-400' : 'bg-muted text-muted-foreground'}`}>
                                     {task.status}
                                 </div>
                             </div>

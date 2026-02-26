@@ -1,0 +1,347 @@
+[
+  {
+    "_id": "698b64baa5b83b49be0c00ec",
+    "id": "dym3dm7du",
+    "agencyId": "default-agency",
+    "slug": "dc",
+    "name": "dc",
+    "client": "Acme Corp",
+    "clientId": "client-1",
+    "services": [
+      "621gkp4gr"
+    ],
+    "serviceConfigs": [
+      {
+        "serviceId": "621gkp4gr",
+        "name": "web design",
+        "paymentConfig": {
+          "type": "installment",
+          "installments": 1,
+          "installmentAmount": 0,
+          "firstPaymentDate": "2026-01-21",
+          "installmentDates": [
+            "2026-01-21"
+          ],
+          "monthlyAmount": 0,
+          "paymentDetailsLater": false
+        }
+      }
+    ],
+    "status": "Completed",
+    "budget": 100000,
+    "dueDate": "2026-01-16",
+    "createdAt": "Fri Jan 16 2026 12:51:31 GMT+0000 (Coordinated Universal Time)",
+    "aiEnabled": false,
+    "updatedAt": "2026-01-16T12:51:31.866Z",
+    "__v": 0
+  },
+  {
+    "_id": "698b64baa5b83b49be0c00eb",
+    "id": "xxi1xo4zh",
+    "agencyId": "default-agency",
+    "slug": "doctors-food-store-marketing",
+    "name": "Doctors Food Store Marketing",
+    "clientId": "oagnyapwj",
+    "services": [
+      "621gkp4gr",
+      "k6rrixfh8"
+    ],
+    "serviceConfigs": [
+      {
+        "serviceId": "621gkp4gr",
+        "name": "web design",
+        "paymentConfig": {
+          "type": "monthly",
+          "installments": 1,
+          "installmentAmount": 0,
+          "installmentDates": [],
+          "monthlyAmount": 25000,
+          "paymentDetailsLater": false
+        }
+      }
+    ],
+    "status": "Active",
+    "budget": 50000,
+    "dueDate": "2026-01-31",
+    "createdAt": "2026-01-18T15:47:29.198Z",
+    "aiEnabled": false,
+    "updatedAt": "2026-01-18T15:47:33.118Z",
+    "__v": 0
+  },
+  {
+    "_id": "698b64baa5b83b49be0c00e9",
+    "id": "d28kzjyad",
+    "agencyId": "default-agency",
+    "slug": "web-dc",
+    "name": "web dc",
+    "client": "Acme Corp",
+    "clientId": "client-1",
+    "services": [
+      "c1y1oid7c"
+    ],
+    "serviceConfigs": [
+      {
+        "serviceId": "c1y1oid7c",
+        "name": "Web dev",
+        "paymentConfig": {
+          "type": "installment",
+          "installments": 1,
+          "installmentAmount": 0,
+          "firstPaymentDate": "2026-01-29",
+          "installmentDates": [
+            "2026-01-29"
+          ],
+          "monthlyAmount": 0,
+          "paymentDetailsLater": false
+        }
+      }
+    ],
+    "status": "Completed",
+    "budget": 100000,
+    "dueDate": "2026-01-30",
+    "createdAt": "Fri Jan 16 2026 12:51:31 GMT+0000 (Coordinated Universal Time)",
+    "aiEnabled": true,
+    "updatedAt": "2026-01-16T12:51:31.866Z",
+    "__v": 0
+  },
+  {
+    "_id": "698b64baa5b83b49be0c00ea",
+    "id": "f68ptrgbo",
+    "agencyId": "default-agency",
+    "slug": "ssp",
+    "name": "ssp",
+    "client": "ankit",
+    "clientId": "eqpr429c2",
+    "services": [
+      "621gkp4gr"
+    ],
+    "serviceConfigs": [
+      {
+        "serviceId": "621gkp4gr",
+        "name": "web design",
+        "paymentConfig": {
+          "type": "installment",
+          "installments": 1,
+          "installmentAmount": 0,
+          "firstPaymentDate": "2026-01-20",
+          "installmentDates": [
+            "2026-01-20"
+          ],
+          "monthlyAmount": 0,
+          "paymentDetailsLater": false
+        }
+      }
+    ],
+    "status": "Active",
+    "budget": 100000,
+    "dueDate": "2026-01-17",
+    "createdAt": "Fri Jan 16 2026 12:51:31 GMT+0000 (Coordinated Universal Time)",
+    "aiEnabled": false,
+    "updatedAt": "2026-01-16T12:51:31.866Z",
+    "__v": 0
+  },
+  {
+    "_id": "698b64baa5b83b49be0c00ed",
+    "id": "ggyzwm46n",
+    "agencyId": "default-agency",
+    "slug": "sssp",
+    "name": "sssp",
+    "client": "ankit",
+    "clientId": "eqpr429c2",
+    "services": [
+      "c1y1oid7c"
+    ],
+    "serviceConfigs": [
+      {
+        "serviceId": "c1y1oid7c",
+        "name": "Web dev",
+        "paymentConfig": {
+          "type": "installment",
+          "installments": 1,
+          "installmentAmount": 0,
+          "firstPaymentDate": "2026-01-28",
+          "installmentDates": [
+            "2026-01-28"
+          ],
+          "monthlyAmount": 0,
+          "paymentDetailsLater": false
+        }
+      }
+    ],
+    "status": "Active",
+    "budget": 100000,
+    "dueDate": "2026-01-31",
+    "createdAt": "Fri Jan 16 2026 12:51:31 GMT+0000 (Coordinated Universal Time)",
+    "aiEnabled": false,
+    "updatedAt": "2026-01-16T12:51:31.866Z",
+    "__v": 0
+  },
+  {
+    "_id": "698b64baa5b83b49be0c00ee",
+    "id": "tfq1a9yoe",
+    "agencyId": "agency-1",
+    "slug": "dccc",
+    "name": "dccc",
+    "client": "an",
+    "clientId": "7qzbjdz2l",
+    "services": [
+      "c1y1oid7c",
+      "hvtwypr6b",
+      "k6rrixfh8",
+      "621gkp4gr"
+    ],
+    "serviceConfigs": [
+      {
+        "serviceId": "c1y1oid7c",
+        "name": "Web dev",
+        "paymentConfig": {
+          "type": "installment",
+          "installments": 1,
+          "installmentAmount": 0,
+          "firstPaymentDate": "2026-02-11",
+          "installmentDates": [
+            "2026-02-11"
+          ],
+          "monthlyAmount": 0,
+          "paymentDetailsLater": false
+        }
+      },
+      {
+        "serviceId": "hvtwypr6b",
+        "name": "SEO",
+        "paymentConfig": {
+          "type": "installment",
+          "installments": 1,
+          "installmentAmount": 0,
+          "firstPaymentDate": "2026-02-12",
+          "installmentDates": [
+            "2026-02-12"
+          ],
+          "monthlyAmount": 0,
+          "paymentDetailsLater": false
+        }
+      },
+      {
+        "serviceId": "k6rrixfh8",
+        "name": "Packaging Design ",
+        "paymentConfig": {
+          "type": "installment",
+          "installments": 1,
+          "installmentAmount": 0,
+          "firstPaymentDate": "2026-02-13",
+          "installmentDates": [
+            "2026-02-13"
+          ],
+          "monthlyAmount": 0,
+          "paymentDetailsLater": false
+        }
+      },
+      {
+        "serviceId": "621gkp4gr",
+        "name": "web design",
+        "paymentConfig": {
+          "type": "installment",
+          "installments": 1,
+          "installmentAmount": 0,
+          "firstPaymentDate": "2026-02-21",
+          "installmentDates": [
+            "2026-02-21"
+          ],
+          "monthlyAmount": 0,
+          "paymentDetailsLater": false
+        }
+      }
+    ],
+    "status": "Active",
+    "budget": 100000,
+    "dueDate": "2026-02-28",
+    "createdAt": "2026-02-09T16:21:19.966Z",
+    "aiEnabled": false,
+    "updatedAt": "2026-02-09T16:21:20.883Z",
+    "__v": 0
+  },
+  {
+    "_id": "698b64baa5b83b49be0c00ef",
+    "id": "2ujgsidmn",
+    "agencyId": "agency-1",
+    "slug": "xyz",
+    "name": "xyz",
+    "client": "divyank",
+    "clientId": "tvkfhftyf",
+    "services": [
+      "c1y1oid7c",
+      "hvtwypr6b",
+      "k6rrixfh8",
+      "621gkp4gr"
+    ],
+    "serviceConfigs": [
+      {
+        "serviceId": "c1y1oid7c",
+        "name": "Web dev",
+        "paymentConfig": {
+          "type": "installment",
+          "installments": 1,
+          "installmentAmount": 0,
+          "firstPaymentDate": "2026-02-28",
+          "installmentDates": [
+            "2026-02-28"
+          ],
+          "monthlyAmount": 0,
+          "paymentDetailsLater": false
+        }
+      },
+      {
+        "serviceId": "hvtwypr6b",
+        "name": "SEO",
+        "paymentConfig": {
+          "type": "installment",
+          "installments": 1,
+          "installmentAmount": 0,
+          "firstPaymentDate": "2026-02-28",
+          "installmentDates": [
+            "2026-02-28"
+          ],
+          "monthlyAmount": 0,
+          "paymentDetailsLater": false
+        }
+      },
+      {
+        "serviceId": "k6rrixfh8",
+        "name": "Packaging Design ",
+        "paymentConfig": {
+          "type": "installment",
+          "installments": 1,
+          "installmentAmount": 0,
+          "firstPaymentDate": "2026-02-28",
+          "installmentDates": [
+            "2026-02-28"
+          ],
+          "monthlyAmount": 0,
+          "paymentDetailsLater": false
+        }
+      },
+      {
+        "serviceId": "621gkp4gr",
+        "name": "web design",
+        "paymentConfig": {
+          "type": "installment",
+          "installments": 1,
+          "installmentAmount": 0,
+          "firstPaymentDate": "2026-02-28",
+          "installmentDates": [
+            "2026-02-28"
+          ],
+          "monthlyAmount": 0,
+          "paymentDetailsLater": false
+        }
+      }
+    ],
+    "status": "Completed",
+    "budget": 100000,
+    "dueDate": "2026-02-28",
+    "createdAt": "2026-02-09T18:04:23.354Z",
+    "aiEnabled": false,
+    "updatedAt": "2026-02-09T18:04:24.798Z",
+    "__v": 0
+  }
+]

@@ -1,18 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getServices, addService, deleteService, updateService, getUser, getUsers, updateUser } from "@/lib/actions";
+import { getServices, addService, deleteService, updateService, updateUser } from "@/lib/actions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, Plus, Trash2, Edit2, Users, Briefcase, ChevronDown, ChevronRight, Settings, Shield } from "lucide-react";
+import { Loader2, Plus, Trash2, Edit2, Users, Briefcase, ChevronDown, ChevronRight, Settings, Shield, Palette, Sun, Moon } from "lucide-react";
 import { X } from "lucide-react";
 import PermissionSettings from "@/components/settings/PermissionSettings";
 import { SecuritySettings } from "@/components/settings/SecuritySettings";
 import { AgencySettings } from "@/components/settings/AgencySettings";
 import { EmailSettings } from "@/components/settings/EmailSettings";
+import { useTheme } from "@/components/providers/ThemeProvider";
 
 type Job = { title: string; count: number };
 type Service = { id: string; name: string; jobs: Job[] };
@@ -27,6 +28,8 @@ export default function SettingsPage() {
     const [isServicesOpen, setIsServicesOpen] = useState(false);
     const [isGeneralOpen, setIsGeneralOpen] = useState(false);
     const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
+    const [isAppearanceOpen, setIsAppearanceOpen] = useState(false);
+    const { theme, setTheme } = useTheme();
 
     // Form State
     const [name, setName] = useState("");
@@ -38,12 +41,8 @@ export default function SettingsPage() {
     }, []);
 
     const loadData = async () => {
-        const [servicesData, usersData] = await Promise.all([getServices(), getUsers()]);
+        const servicesData = await getServices();
         setServices(servicesData || []);
-        // Mock current user as first user for now
-        // if (usersData && usersData.length > 0) {
-        //     setCurrentUser(usersData[0]);
-        // }
         setLoading(false);
     };
 
@@ -116,6 +115,79 @@ export default function SettingsPage() {
                 <p className="text-muted-foreground">Manage your agency services and system configurations.</p>
             </div>
 
+            {/* Appearance Section */}
+            <div className="border rounded-lg bg-card text-card-foreground shadow-sm">
+                <div
+                    onClick={() => setIsAppearanceOpen(!isAppearanceOpen)}
+                    className="flex flex-row items-center justify-between p-6 cursor-pointer hover:bg-accent/50 transition-colors"
+                >
+                    <div className="flex items-center gap-4">
+                        <div className="p-2 bg-sky-500/10 rounded-full">
+                            <Palette className="h-6 w-6 text-sky-500" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-semibold">Appearance</h2>
+                            <p className="text-sm text-muted-foreground">Customize the look and feel.</p>
+                        </div>
+                    </div>
+                    {isAppearanceOpen ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : <ChevronRight className="h-5 w-5 text-muted-foreground" />}
+                </div>
+
+                <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isAppearanceOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                    <div className="overflow-hidden">
+                        <div className="p-6 pt-0">
+                            <Label className="text-sm font-medium mb-4 block">Theme</Label>
+                            <div className="grid grid-cols-2 gap-4 max-w-md">
+                                {/* Dark Theme Card */}
+                                <button
+                                    onClick={() => setTheme("dark")}
+                                    className={`relative flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all duration-200 cursor-pointer hover:scale-[1.02] ${theme === "dark"
+                                        ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
+                                        : "border-border hover:border-muted-foreground/30"
+                                        }`}
+                                >
+                                    <div className="w-full aspect-[4/3] rounded-lg bg-black border border-neutral-800 p-2 flex flex-col gap-1">
+                                        <div className="h-1.5 w-8 rounded bg-neutral-700" />
+                                        <div className="h-1.5 w-12 rounded bg-neutral-800" />
+                                        <div className="flex-1 rounded bg-neutral-900 mt-1" />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Moon className="h-4 w-4" />
+                                        <span className="text-sm font-medium">Dark</span>
+                                    </div>
+                                    {theme === "dark" && (
+                                        <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
+                                    )}
+                                </button>
+
+                                {/* Light Theme Card */}
+                                <button
+                                    onClick={() => setTheme("light")}
+                                    className={`relative flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all duration-200 cursor-pointer hover:scale-[1.02] ${theme === "light"
+                                        ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
+                                        : "border-border hover:border-muted-foreground/30"
+                                        }`}
+                                >
+                                    <div className="w-full aspect-[4/3] rounded-lg bg-gray-100 border border-gray-200 p-2 flex flex-col gap-1">
+                                        <div className="h-1.5 w-8 rounded bg-gray-300" />
+                                        <div className="h-1.5 w-12 rounded bg-gray-200" />
+                                        <div className="flex-1 rounded bg-white mt-1 border border-gray-200" />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Sun className="h-4 w-4" />
+                                        <span className="text-sm font-medium">Light</span>
+                                    </div>
+                                    {theme === "light" && (
+                                        <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
+                                    )}
+                                </button>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-3">Your preference is saved automatically.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* Service Management Section */}
             <div className="border rounded-lg bg-card text-card-foreground shadow-sm">
                 <div
@@ -150,7 +222,7 @@ export default function SettingsPage() {
                             ) : (
                                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                                     {services.map(service => (
-                                        <div key={service.id} className="border rounded-lg p-4 bg-background/50 hover:bg-background/80 transition-all border-neutral-800 hover:border-yellow-500/50 group relative">
+                                        <div key={service.id} className="border rounded-lg p-4 bg-background/50 hover:bg-background/80 transition-all border-border hover:border-primary/50 group relative">
                                             <div className="flex justify-between items-start mb-3">
                                                 <div className="flex items-center gap-2 font-semibold">
                                                     {service.name}

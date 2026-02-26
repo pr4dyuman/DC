@@ -1,0 +1,77 @@
+[
+  {
+    "_id": "698b64baa5b83b49be0c00a8",
+    "id": "062w1708n",
+    "agencyId": "default-agency",
+    "name": "Social Media Management",
+    "jobs": [],
+    "createdAt": "2026-01-18T15:53:33.221Z",
+    "updatedAt": "2026-01-18T15:53:33.221Z",
+    "__v": 0
+  },
+  {
+    "_id": "698b64baa5b83b49be0c00a5",
+    "id": "hvtwypr6b",
+    "agencyId": "default-agency",
+    "name": "SEO",
+    "jobs": [],
+    "createdAt": "2026-01-18T15:53:50.478Z",
+    "updatedAt": "2026-01-18T15:53:50.478Z",
+    "__v": 0
+  },
+  {
+    "_id": "698b64baa5b83b49be0c00a7",
+    "id": "621gkp4gr",
+    "agencyId": "default-agency",
+    "name": "web design",
+    "jobs": [
+      {
+        "title": "web design",
+        "count": 1
+      }
+    ],
+    "createdAt": "2026-01-16T12:51:31.820Z",
+    "updatedAt": "2026-01-16T12:51:31.820Z",
+    "__v": 0
+  },
+  {
+    "_id": "698b64baa5b83b49be0c00aa",
+    "id": "t9vl0nzhq",
+    "agencyId": "default-agency",
+    "name": "Amzon E-Com Management",
+    "jobs": [],
+    "createdAt": "2026-01-18T15:54:26.700Z",
+    "updatedAt": "2026-01-18T15:54:26.700Z",
+    "__v": 0
+  },
+  {
+    "_id": "698b64baa5b83b49be0c00a4",
+    "id": "c1y1oid7c",
+    "agencyId": "default-agency",
+    "name": "Web dev",
+    "jobs": [],
+    "createdAt": "2026-01-16T12:51:31.821Z",
+    "updatedAt": "2026-01-16T12:51:31.821Z",
+    "__v": 0
+  },
+  {
+    "_id": "698b64baa5b83b49be0c00a6",
+    "id": "k6rrixfh8",
+    "agencyId": "default-agency",
+    "name": "Packaging Design ",
+    "jobs": [],
+    "createdAt": "2026-01-18T15:52:54.027Z",
+    "updatedAt": "2026-01-18T15:52:54.027Z",
+    "__v": 0
+  },
+  {
+    "_id": "698b64baa5b83b49be0c00a9",
+    "id": "7dyy2rmpa",
+    "agencyId": "default-agency",
+    "name": "Meta Ads",
+    "jobs": [],
+    "createdAt": "2026-01-18T15:53:19.141Z",
+    "updatedAt": "2026-01-18T15:53:19.141Z",
+    "__v": 0
+  }
+]

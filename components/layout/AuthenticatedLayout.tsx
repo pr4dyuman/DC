@@ -1,11 +1,9 @@
 
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
-import { getCurrentUser } from "@/lib/actions";
+import { getCurrentUser, getAgencySettings } from "@/lib/actions";
 import { redirect } from "next/navigation";
 import { DashboardChatProvider } from "@/components/providers/DashboardChatProvider";
-
-import { getAgencySettings } from "@/lib/actions";
 
 export async function AuthenticatedLayout({
     children
@@ -14,7 +12,7 @@ export async function AuthenticatedLayout({
 }) {
     const user = await getCurrentUser();
     const agencySettings = await getAgencySettings();
-    
+
     if (!user) {
         redirect("/login");
     }
@@ -32,18 +30,18 @@ export async function AuthenticatedLayout({
     return (
         <DashboardChatProvider currentUserId={dashboardUser.id}>
             <div className="h-full relative">
-                <div className="hidden h-full md:flex md:w-72 md:flex-col md:fixed md:inset-y-0 z-[80] bg-gray-900">
-                    <Sidebar 
-                        currentUserId={dashboardUser.id} 
-                        currentUserUsername={dashboardUser.username} 
+                <div className="hidden h-full md:flex md:w-72 md:flex-col md:fixed md:inset-y-0 z-[80]" style={{ backgroundColor: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)' }}>
+                    <Sidebar
+                        currentUserId={dashboardUser.id}
+                        currentUserUsername={dashboardUser.username}
                         currentUserRole={dashboardUser.role}
                         agencyName={agencyName}
                         agencyLogo={agencyLogo}
                     />
                 </div>
-                <main className="md:pl-72 min-h-screen bg-[#111827] text-gray-100 pb-10">
-                    <Topbar 
-                        currentUser={dashboardUser} 
+                <main className="md:pl-72 min-h-screen pb-10" style={{ backgroundColor: 'var(--content-bg)', color: 'var(--foreground)' }}>
+                    <Topbar
+                        currentUser={dashboardUser}
                         agencyName={agencyName}
                         agencyLogo={agencyLogo}
                     />

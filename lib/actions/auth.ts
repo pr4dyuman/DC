@@ -1,71 +1,61 @@
 "use server";
 
-import { db, User, Client } from "../db";
-import { cookies } from "next/headers";
-import { getSessionId } from "../auth"; // Fixed: import from parent directory
+import { User } from "../db";
+import { getSessionId } from "../auth";
 import { resolveUserOrClient } from "../utils-server";
 import { SuperAdminModel, UserModel, ClientModel, connectDB } from "../mongodb";
+import { login as authLogin } from "../auth";
+import bcrypt from "bcryptjs";
 
 export { getSessionId };
 
-import bcrypt from "bcryptjs";
-
 export async function login(email: string, password: string) {
     await connectDB();
-    
+
     // Check super admin first
     const superAdmin = await SuperAdminModel.findOne({ email }).lean();
     if (superAdmin) {
-        const isValid = await bcrypt.compare(password, superAdmin.password) || superAdmin.password === password;
-        if (isValid) {
-            const cookieStore = await cookies();
-            cookieStore.set("userId", superAdmin.id);
-            cookieStore.set("userRole", "superadmin");
+        if (superAdmin.password && await bcrypt.compare(password, superAdmin.password)) {
+            await authLogin(superAdmin.id, 'superadmin');
             return { success: true, user: superAdmin, isSuperAdmin: true };
         }
     }
-    
+
     // Check regular user
     const user = await UserModel.findOne({ email }).lean();
     if (user) {
-        const isValid = (user.password && await bcrypt.compare(password, user.password)) || user.password === password;
-        if (isValid) {
-            const cookieStore = await cookies();
-            cookieStore.set("userId", user.id);
-            cookieStore.set("userRole", user.role);
+        if (user.password && await bcrypt.compare(password, user.password)) {
+            await authLogin(user.id, user.role, user.agencyId);
             return { success: true, user, isSuperAdmin: false };
         }
     }
-    
+
     // Check client
     const client = await ClientModel.findOne({ email }).lean();
     if (client) {
-         const isValid = (client.password && await bcrypt.compare(password, client.password)) || client.password === password;
-         if (isValid) {
-            const cookieStore = await cookies();
-            cookieStore.set("userId", client.id);
-            cookieStore.set("userRole", "client");
+        if (client.password && await bcrypt.compare(password, client.password)) {
+            await authLogin(client.id, 'client', client.agencyId);
             return { success: true, user: client, isSuperAdmin: false };
         }
     }
-    
+
     return { success: false, error: "Invalid credentials" };
 }
 
 export async function getCurrentUser() {
     const userId = await getSessionId();
     if (!userId) return null;
-    
+
     const targetUser = await resolveUserOrClient(userId);
     if (!targetUser) return undefined;
 
-    const currentUser = await resolveUserOrClient(userId);
-    const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
+    const isAdmin = targetUser.role === 'admin' || targetUser.role === 'manager';
 
-    if (isAdmin || userId === userId) {
+    if (isAdmin) {
         return targetUser;
     }
 
+    // Redact salary for non-admin users viewing their own profile
     const { salary, ...redacted } = targetUser;
     return redacted as User;
 }

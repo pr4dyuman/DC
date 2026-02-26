@@ -58,12 +58,12 @@ export function ClientNotificationsList({ initialNotifications, userId }: Client
                     ) : (
                         <div className="space-y-4">
                             {notifications.map((n, i) => (
-                                <div key={i} className="flex gap-4 items-start p-3 rounded-lg hover:bg-white/5 transition">
+                                <div key={i} className="flex gap-4 items-start p-3 rounded-lg hover:bg-muted/50 transition">
                                     <div className="bg-indigo-500/10 p-2 rounded-full mt-1">
                                         <Activity className="w-4 h-4 text-indigo-400" />
                                     </div>
                                     <div>
-                                        <p className="text-sm text-zinc-200">{n.message}</p>
+                                        <p className="text-sm text-foreground">{n.message}</p>
                                         <p className="text-xs text-muted-foreground mt-1">
                                             {new Date(n.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                         </p>

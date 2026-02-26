@@ -43,14 +43,8 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: Topbar
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
 
-    // Initial User Fetch (Fail-safe)
-    useEffect(() => {
-        if (!user) {
-            getUsers().then(users => {
-                if (users && users.length > 0) setUser(users[0]);
-            });
-        }
-    }, [user]);
+    // Sync user from props
+    // Note: Removed unsafe fallback that picked first user from DB on auth failure
 
     // Update User from Props
     useEffect(() => {
@@ -194,7 +188,6 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: Topbar
                         )}
                     </div>
 
-                    {/* Notifications */}
                     {/* Notifications */}
                     {mounted ? (
                         <DropdownMenu>

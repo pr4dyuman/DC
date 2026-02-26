@@ -6,17 +6,18 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Task } from "@/lib/types";
+import { Task, UserPermissions } from "@/lib/types";
 import { Sparkles, Calendar } from "lucide-react";
 import { AIExplanationModal } from "./AIExplanationModal";
 import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 
 interface TaskCardProps {
     task: Task;
     aiEnabled?: boolean;
-    users?: any[];
+    users?: { id: string; name: string; avatar?: string; jobTitle?: string; role?: string }[];
     readOnly?: boolean;
-    permissions?: any; // Avoiding circular dependency
+    permissions?: UserPermissions;
 }
 
 export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEnabled, readOnly, permissions }: TaskCardProps & { onView: (task: Task) => void; onEdit: (task: Task) => void; currentUserId?: string; aiEnabled?: boolean }) {
@@ -50,10 +51,6 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
 
     const [showAIModal, setShowAIModal] = useState(false);
 
-    // Hack: Infer current user ID from the user list if possible or passed prop
-    // Ideally TaskCard should receive currentUserId prop. Let's fix this properly.
-    // For now assuming the first user in list is NOT necessarily the current user.
-    // We need to update component signature.
 
 
     const style = {
@@ -78,7 +75,7 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
         e.stopPropagation();
 
         if (aiEnabled === false) {
-            alert("Please enable AI features in Project Settings to use this.");
+            toast.info("Please enable AI features in Project Settings to use this.");
             return;
         }
 
@@ -126,9 +123,9 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
                                     {assignee ? (
                                         <>
                                             {assignee.name}
-                                            {(assignee.jobTitle || ['admin', 'manager', 'client'].includes(assignee.role?.toLowerCase())) && (
+                                            {(assignee.jobTitle || (assignee.role && ['admin', 'manager', 'client'].includes(assignee.role.toLowerCase()))) && (
                                                 <span className="text-yellow-600 dark:text-yellow-500 ml-1">
-                                                    ({assignee.jobTitle || assignee.role.charAt(0).toUpperCase() + assignee.role.slice(1)})
+                                                    ({assignee.jobTitle || (assignee.role ? assignee.role.charAt(0).toUpperCase() + assignee.role.slice(1) : '')})
                                                 </span>
                                             )}
                                         </>

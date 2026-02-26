@@ -34,10 +34,10 @@ export function RevenueChart({ data }: RevenueChartProps) {
                             />
                             <Tooltip
                                 cursor={{ fill: 'transparent' }}
-                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                contentStyle={{ backgroundColor: 'var(--card)', color: 'var(--card-foreground)', borderRadius: '8px', border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}
                             />
-                            <Bar dataKey="revenue" fill="#4f46e5" radius={[4, 4, 0, 0]} name="Revenue" />
-                            <Bar dataKey="expenses" fill="#f43f5e" radius={[4, 4, 0, 0]} name="Expenses" />
+                            <Bar dataKey="revenue" fill="#a78bfa" radius={[4, 4, 0, 0]} name="Revenue" />
+                            <Bar dataKey="expenses" fill="#fb7185" radius={[4, 4, 0, 0]} name="Expenses" />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
@@ -46,7 +46,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
     );
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+const COLORS = ['#a78bfa', '#34d399', '#fbbf24', '#fb7185'];
 
 export function ProjectDistributionChart({ data }: { data: any[] }) {
     return (

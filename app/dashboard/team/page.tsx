@@ -30,7 +30,7 @@ export default function TeamPage() {
             getUsers(),
             getSessionId()
         ]);
-        
+
         setUsers(usersData);
 
         // Fetch current user details if ID exists
@@ -51,7 +51,7 @@ export default function TeamPage() {
                 console.error("Failed to fetch current user", e);
             }
         }
-        
+
         setLoading(false);
     };
 
@@ -59,7 +59,7 @@ export default function TeamPage() {
         loadData();
     }, []);
 
-    const handleOpenDialog = (user?: any) => {
+    const handleOpenDialog = (user?: User) => {
         setEditingUser(user || null);
         setIsDialogOpen(true);
     };
@@ -86,7 +86,7 @@ export default function TeamPage() {
                 <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                     {users.map(user => (
                         <Link href={`/dashboard/team/${user.username || user.id}`} key={user.id} className="block h-full">
-                            <Card className="group relative overflow-hidden transition-all hover:shadow-lg h-full border-neutral-800 hover:border-yellow-500/50 hover:bg-neutral-900 cursor-pointer">
+                            <Card className="group relative overflow-hidden transition-all hover:shadow-lg h-full border-border hover:border-primary/50 hover:bg-muted cursor-pointer">
                                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
                                     {(currentUserRole === 'admin' || currentUserRole === 'manager' || currentUserId === user.id) && (
                                         <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOpenDialog(user); }} className="p-2 bg-secondary text-secondary-foreground rounded-full hover:bg-secondary/80">

@@ -22,7 +22,7 @@ const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
             <label className={cn(
                 "group relative inline-flex h-[24px] w-[44px] shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
                 disabled && "cursor-not-allowed opacity-50",
-                checked ? "bg-primary" : "bg-neutral-700",
+                checked ? "bg-primary" : "bg-muted-foreground/30",
                 className
             )}>
                 <input

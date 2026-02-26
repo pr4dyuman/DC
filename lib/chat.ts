@@ -2,8 +2,9 @@
 
 import { db, Message, User, Client } from "./db";
 import { revalidatePath } from "next/cache";
-import { withAgencyId } from "./agency-context";
+import { withAgencyId, getCurrentAgency } from "./agency-context";
 import { generateId } from "./utils-server";
+import { UserModel, ClientModel, MessageModel, connectDB } from "./mongodb";
 
 export type { Message };
 
@@ -26,27 +27,22 @@ export type Contact = {
 const ONLINE_THRESHOLD_MS = 60 * 1000;
 
 export async function heartbeat(userId: string) {
-    await db.update((data) => {
-        const now = new Date();
-        const userIndex = data.users.findIndex(u => u.id === userId);
+    await connectDB();
+    const now = new Date().toISOString();
 
-        if (userIndex !== -1) {
-            const lastActive = data.users[userIndex].lastActiveAt ? new Date(data.users[userIndex].lastActiveAt).getTime() : 0;
-            // Optimize: Only write if more than 30 seconds have passed to save disk IO/DB load
-            if (now.getTime() - lastActive > 30000) {
-                data.users[userIndex].lastActiveAt = now.toISOString();
-            }
-        } else {
-            const clientIndex = data.clients.findIndex(c => c.id === userId);
-            if (clientIndex !== -1) {
-                const lastActive = data.clients[clientIndex].lastActiveAt ? new Date(data.clients[clientIndex].lastActiveAt).getTime() : 0;
-                if (now.getTime() - lastActive > 30000) {
-                    data.clients[clientIndex].lastActiveAt = now.toISOString();
-                }
-            }
-        }
-        return data; // If no changes, db adapter might still write, but at least we don't change data needlessly.
-    });
+    // Direct targeted update — avoids loading all collections just to update one field
+    const userResult = await UserModel.updateOne(
+        { id: userId },
+        { $set: { lastActiveAt: now } }
+    );
+
+    // If no user was found, try clients
+    if (userResult.matchedCount === 0) {
+        await ClientModel.updateOne(
+            { id: userId },
+            { $set: { lastActiveAt: now } }
+        );
+    }
 }
 
 export async function getTotalUnreadCount(currentUserId: string): Promise<number> {
@@ -150,17 +146,19 @@ export async function getMessages(currentUserId: string, otherUserId: string): P
 }
 
 export async function sendMessage(senderId: string, receiverId: string, content: string, type: 'text' | 'image' = 'text') {
-    // 1. Try to resolve agencyId robustly
+    await connectDB();
+
+    // Resolve agencyId
     let agencyId = 'default-agency';
     try {
-        const agency = await import("./agency-context").then(m => m.getCurrentAgency());
+        const agency = await getCurrentAgency();
         if (agency) {
             agencyId = agency.id;
         } else {
-            // Fallback: look up user
-            const userData = await db.get().then(d => d.users.find(u => u.id === senderId));
-            if (userData && userData.agencyId) {
-                agencyId = userData.agencyId;
+            // Fallback: look up user directly from DB
+            const userData = await UserModel.findOne({ id: senderId }).lean();
+            if (userData && (userData as any).agencyId) {
+                agencyId = (userData as any).agencyId;
             }
         }
     } catch (e) {
@@ -175,17 +173,17 @@ export async function sendMessage(senderId: string, receiverId: string, content:
         timestamp: new Date().toISOString(),
         read: false,
         type,
-        agencyId // Explicitly set
+        agencyId
     };
 
-    await db.update(async (data) => {
-        if (!data.messages) data.messages = [];
-        data.messages.push(newMessage);
-        return data;
-    });
+    // Direct MongoDB insert — bypasses the heavy db.update read-modify-write cycle
+    // which could lose the message due to React cache() stale reads
+    await MessageModel.create(newMessage);
 
     // Also update sender's presence
     await heartbeat(senderId);
+
+    revalidatePath('/dashboard');
 
     return newMessage;
 }

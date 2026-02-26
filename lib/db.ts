@@ -34,14 +34,14 @@ function toPlainObject<T>(doc: any): T {
     if (Array.isArray(doc)) {
         return doc.map(d => toPlainObject(d)) as any;
     }
-    
+
     // Convert to plain object if it's a Mongoose document
     const plain = doc.toObject ? doc.toObject() : doc;
-    
+
     // Remove MongoDB-specific fields
     // KEEP createdAt and updatedAt as they are required by schema
     const { _id, __v, ...rest } = plain;
-    
+
     return rest as T;
 }
 
@@ -68,8 +68,8 @@ export const db = {
         ]);
 
         // Default settings if none exist, with all required fields
-        const settings: Settings = settingsDoc 
-            ? toPlainObject(settingsDoc) 
+        const settings: Settings = settingsDoc
+            ? toPlainObject(settingsDoc)
             : { systemName: 'AgencyOS', logo: '', userPermissions: {} };
 
         // Ensure settings always have required fields
@@ -130,16 +130,16 @@ export const db = {
             agencyId: a.agencyId || fallbackAgencyId
         }));
 
-         const validAssets = toPlainObject<any[]>(assets).map(a => ({
+        const validAssets = toPlainObject<any[]>(assets).map(a => ({
             ...a,
             agencyId: a.agencyId || fallbackAgencyId
         }));
-        
+
         const validMessages = toPlainObject<any[]>(messages).map(m => ({
             ...m,
             agencyId: m.agencyId || fallbackAgencyId
         }));
-        
+
         const validLeaveRequests = toPlainObject<any[]>(leaveRequests).map(l => ({
             ...l,
             agencyId: l.agencyId || fallbackAgencyId
@@ -177,75 +177,71 @@ export const db = {
         // Apply the callback transformation (support both sync and async)
         const newData = await callback(currentData);
 
-        // Update all collections in parallel
-        await Promise.all([
-            // Clear and insert agencies
-            AgencyModel.deleteMany({}).then(async () => {
-                if (newData.agencies.length > 0) await AgencyModel.insertMany(newData.agencies);
-            }),
-            // Clear and insert superAdmins
-            SuperAdminModel.deleteMany({}).then(async () => {
-                if (newData.superAdmins.length > 0) await SuperAdminModel.insertMany(newData.superAdmins);
-            }),
-            // Clear and insert users
-            UserModel.deleteMany({}).then(async () => {
-                if (newData.users.length > 0) await UserModel.insertMany(newData.users);
-            }),
-            // Clear and insert clients
-            ClientModel.deleteMany({}).then(async () => {
-                if (newData.clients.length > 0) await ClientModel.insertMany(newData.clients);
-            }),
-            // Clear and insert projects
-            ProjectModel.deleteMany({}).then(async () => {
-                if (newData.projects.length > 0) await ProjectModel.insertMany(newData.projects);
-            }),
-            // Clear and insert tasks
-            TaskModel.deleteMany({}).then(async () => {
-                if (newData.tasks.length > 0) await TaskModel.insertMany(newData.tasks);
-            }),
-            // Clear and insert invoices
-            InvoiceModel.deleteMany({}).then(async () => {
-                if (newData.invoices.length > 0) await InvoiceModel.insertMany(newData.invoices);
-            }),
-            // Clear and insert transactions
-            TransactionModel.deleteMany({}).then(async () => {
-                if (newData.transactions.length > 0) await TransactionModel.insertMany(newData.transactions);
-            }),
-            // Clear and insert services
-            ServiceModel.deleteMany({}).then(async () => {
-                if (newData.services.length > 0) await ServiceModel.insertMany(newData.services);
-            }),
-            // Clear and insert notifications
-            NotificationModel.deleteMany({}).then(async () => {
-                if (newData.notifications.length > 0) await NotificationModel.insertMany(newData.notifications);
-            }),
-            // Clear and insert activities
-            ActivityModel.deleteMany({}).then(async () => {
-                if (newData.activities.length > 0) await ActivityModel.insertMany(newData.activities);
-            }),
-            // Clear and insert assets
-            AssetModel.deleteMany({}).then(async () => {
-                if (newData.assets.length > 0) await AssetModel.insertMany(newData.assets);
-            }),
-            // Clear and insert messages
-            MessageModel.deleteMany({}).then(async () => {
-                if (newData.messages.length > 0) await MessageModel.insertMany(newData.messages);
-            }),
-            // Clear and insert leave requests
-            LeaveRequestModel.deleteMany({}).then(async () => {
-                if (newData.leaveRequests.length > 0) await LeaveRequestModel.insertMany(newData.leaveRequests);
-            }),
-            // Update settings
-            SettingsModel.deleteMany({}).then(async () => {
-                // Ensure settings have required fields
-                const settingsToSave = {
-                    systemName: newData.settings.systemName || 'AgencyOS',
-                    logo: newData.settings.logo || '',
-                    userPermissions: newData.settings.userPermissions || {}
-                };
-                await SettingsModel.create(settingsToSave);
+        // Diff-based update: only touch documents that actually changed.
+        // This avoids deleting ALL data and re-inserting, which risks data loss.
+        const collectionMap: { model: any; key: keyof DB }[] = [
+            { model: AgencyModel, key: 'agencies' },
+            { model: SuperAdminModel, key: 'superAdmins' },
+            { model: UserModel, key: 'users' },
+            { model: ClientModel, key: 'clients' },
+            { model: ProjectModel, key: 'projects' },
+            { model: TaskModel, key: 'tasks' },
+            { model: InvoiceModel, key: 'invoices' },
+            { model: TransactionModel, key: 'transactions' },
+            { model: ServiceModel, key: 'services' },
+            { model: NotificationModel, key: 'notifications' },
+            { model: ActivityModel, key: 'activities' },
+            { model: AssetModel, key: 'assets' },
+            { model: MessageModel, key: 'messages' },
+            { model: LeaveRequestModel, key: 'leaveRequests' },
+        ];
+
+        await Promise.all(
+            collectionMap.map(async ({ model, key }) => {
+                const oldItems = (currentData[key] as any[]) || [];
+                const newItems = (newData[key] as any[]) || [];
+
+                const oldMap = new Map(oldItems.map(item => [item.id, item]));
+                const newMap = new Map(newItems.map(item => [item.id, item]));
+
+                // Find items to insert (in new but not in old)
+                const toInsert = newItems.filter(item => !oldMap.has(item.id));
+
+                // Find items to delete (in old but not in new)
+                const toDeleteIds = oldItems.filter(item => !newMap.has(item.id)).map(item => item.id);
+
+                // Find items to update (in both, but content changed)
+                const toUpdate = newItems.filter(item => {
+                    const oldItem = oldMap.get(item.id);
+                    if (!oldItem) return false;
+                    return JSON.stringify(oldItem) !== JSON.stringify(item);
+                });
+
+                const ops: Promise<any>[] = [];
+
+                if (toInsert.length > 0) {
+                    ops.push(model.insertMany(toInsert));
+                }
+
+                if (toDeleteIds.length > 0) {
+                    ops.push(model.deleteMany({ id: { $in: toDeleteIds } }));
+                }
+
+                for (const item of toUpdate) {
+                    ops.push(model.replaceOne({ id: item.id }, item, { upsert: true }));
+                }
+
+                await Promise.all(ops);
             })
-        ]);
+        );
+
+        // Update settings separately (singleton document, no id field)
+        const settingsToSave = {
+            systemName: newData.settings.systemName || 'AgencyOS',
+            logo: newData.settings.logo || '',
+            userPermissions: newData.settings.userPermissions || {}
+        };
+        await SettingsModel.updateOne({}, { $set: settingsToSave }, { upsert: true });
 
         return newData;
     }

@@ -15,7 +15,7 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
                 "max-w-[70%] rounded-2xl px-4 py-3 shadow-sm",
                 isOwn
                     ? "bg-primary text-primary-foreground rounded-br-none"
-                    : "bg-zinc-800 text-zinc-100 rounded-bl-none border border-zinc-700"
+                    : "bg-muted text-foreground rounded-bl-none border border-border"
             )}>
                 {message.type === 'image' ? (
                     <div className="relative rounded-lg overflow-hidden mb-1">
@@ -56,15 +56,15 @@ export function ContactItem({ contact, isActive, onClick }: ContactItemProps) {
         <div
             onClick={onClick}
             className={cn(
-                "flex items-center hover:bg-zinc-800/50 p-3 rounded-xl cursor-pointer transition w-full group mb-1",
-                isActive ? "bg-zinc-800 border-l-2 border-primary" : "border-l-2 border-transparent"
+                "flex items-center hover:bg-muted/50 p-3 rounded-xl cursor-pointer transition w-full group mb-1",
+                isActive ? "bg-muted" : ""
             )}
         >
             <div className="relative">
                 {contact.avatar ? (
-                    <img src={contact.avatar} alt={contact.name} className="w-10 h-10 rounded-full object-cover border border-zinc-700" />
+                    <img src={contact.avatar} alt={contact.name} className="w-10 h-10 rounded-full object-cover border border-border" />
                 ) : (
-                    <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700 text-zinc-400">
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center border border-border text-muted-foreground">
                         <User className="w-5 h-5" />
                     </div>
                 )}
@@ -77,12 +77,12 @@ export function ContactItem({ contact, isActive, onClick }: ContactItemProps) {
             <div className="ml-3 flex-1 overflow-hidden">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center overflow-hidden">
-                        <h4 className={cn("text-sm font-semibold truncate", isActive ? "text-primary" : "text-zinc-200 group-hover:text-white")}>
+                        <h4 className={cn("text-sm font-semibold truncate", isActive ? "text-primary" : "text-foreground group-hover:text-primary")}>
                             {contact.name}
                             {contact.username && <span className="ml-1 text-xs text-zinc-500 font-normal">@{contact.username}</span>}
                         </h4>
                         {contact.jobTitle && (
-                            <span className="ml-2 text-[10px] text-zinc-500 truncate hidden sm:inline-block border border-zinc-700 rounded px-1 py-0.5">
+                            <span className="ml-2 text-[10px] text-muted-foreground truncate hidden sm:inline-block border border-border rounded px-1 py-0.5">
                                 {contact.jobTitle}
                             </span>
                         )}

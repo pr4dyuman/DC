@@ -37,21 +37,21 @@ export type Agency = {
     name: string;              // "Digital Corvids", "Marketing Pro"
     slug: string;              // "digital-corvids", "marketing-pro"
     domain?: string;           // Optional custom domain
-    
+
     // Branding
     logo?: string;
     primaryColor?: string;
     secondaryColor?: string;
-    
+
     // Status & Plan
     status: AgencyStatus;
     plan: AgencyPlan;
     trialEndsAt?: string;      // ISO date
-    
+
     // Limits & Usage
     limits: AgencyLimits;
     usage: AgencyUsage;
-    
+
     // Billing
     billing: {
         subscriptionId?: string;
@@ -63,7 +63,7 @@ export type Agency = {
         billingAddress?: string;
         taxId?: string;
     };
-    
+
     // Settings
     settings: {
         systemName: string;
@@ -75,13 +75,13 @@ export type Agency = {
         enableTwoFactor: boolean;
         emailNotificationsEnabled: boolean;
     };
-    
+
     // Metadata
     createdAt: string;
     createdBy: string;         // Super admin ID
     updatedAt?: string;
     lastActivityAt?: string;
-    
+
     // Features
     features: AgencyFeatures;
 };
@@ -107,7 +107,6 @@ export type SuperAdmin = {
     };
 };
 
-// Plan configurations
 // Plan configurations
 export const AGENCY_PLANS: Record<AgencyPlan, { limits: AgencyLimits; features: AgencyFeatures }> = {
     free: {
@@ -205,7 +204,7 @@ export type User = {
     password?: string;
     geminiApiKey?: string;
     lastActiveAt?: string; // ISO Date string for presence
-    employmentType?: 'Salary' | 'Project Based';
+    employmentType?: 'Salary' | 'Project Based' | 'Freelancer';
     contactNumber?: string;
     adharCardImage?: string;
     panCardImage?: string;
@@ -215,6 +214,8 @@ export type User = {
     pendingContracts?: string[];
     otherDocuments?: string[];
     pendingOtherDocuments?: string[];
+    createdAt?: string;
+    updatedAt?: string;
 };
 export type Client = {
     id: string;
@@ -321,8 +322,8 @@ export type Message = {
 export type Service = { id: string; agencyId: string; name: string; jobs: Job[] };
 
 export type TransactionType = 'income' | 'expense';
-export type TransactionCategory = 'Project' | 'Salary' | 'Software' | 'Marketing' | 'Office' | 'Hosting' | 'Domain' | 'Equipment' | 'Internal Transfer' | 'Investor' | 'Refund' | 'Other';
-export const TRANSACTION_CATEGORIES: TransactionCategory[] = ['Project', 'Salary', 'Software', 'Marketing', 'Office', 'Hosting', 'Domain', 'Equipment', 'Internal Transfer', 'Investor', 'Refund', 'Other'];
+export type TransactionCategory = 'Project' | 'Salary' | 'Freelancer' | 'Tax' | 'Reimbursement' | 'Retainer' | 'Internal Transfer' | 'Investor' | 'Refund' | 'Other';
+export const TRANSACTION_CATEGORIES: TransactionCategory[] = ['Project', 'Salary', 'Freelancer', 'Tax', 'Reimbursement', 'Retainer', 'Internal Transfer', 'Investor', 'Refund', 'Other'];
 
 export type Transaction = {
     id: string;
@@ -335,6 +336,9 @@ export type Transaction = {
     status: 'completed' | 'pending';
     projectId?: string;
     userId?: string; // Optional: For salary or reimbursements
+    taxType?: 'GST' | 'TDS' | 'Income Tax' | 'Professional Tax' | 'Other';
+    expenseType?: 'Travel' | 'Meals' | 'Client Meeting' | 'Equipment' | 'Other';
+    invoiceId?: string; // Links back to the invoice that generated this transaction
 };
 
 export type UserPermissions = {

@@ -95,7 +95,7 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
                     <div>
                         <CardTitle>{title}</CardTitle>
                         <CardDescription>
-                            You made {transactions.length} transactions this month.
+                            You made {transactions.length} transactions.
                         </CardDescription>
                     </div>
                 </div>
