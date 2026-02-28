@@ -115,6 +115,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
     const [checkpoints, setCheckpoints] = useState<CheckpointInfo[]>([]);
     const [rollbackModal, setRollbackModal] = useState<{ analysis: RollbackAnalysis; loading: boolean } | null>(null);
     const [undoConfirmModal, setUndoConfirmModal] = useState<{ checkpointId: string; label: string; totalActions: number } | null>(null);
+    const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ type: 'clear' | 'delete'; sessionId?: string; sessionTitle?: string; hasAgentMessages: boolean } | null>(null);
     const [undoingCheckpoint, setUndoingCheckpoint] = useState<string | null>(null);
     const pendingRollbackRef = useRef<any[]>([]); // Accumulates rollback data during a single agent response
 
@@ -160,7 +161,24 @@ export function SingularityChat({ userId }: { userId?: string }) {
         setTimeout(() => setCopiedId(null), 2000);
     };
 
-    const clearChat = () => { setMessages([]); setAttachments([]); };
+    const clearChat = () => {
+        // Check if there are agent messages with tool actions
+        const hasAgentActions = messages.some(m => m.role === 'model' && m.toolActions && m.toolActions.length > 0);
+        if (messages.length > 0) {
+            setDeleteConfirmModal({ type: 'clear', hasAgentMessages: hasAgentActions });
+        }
+    };
+
+    const executeClearChat = () => {
+        setMessages([]);
+        setAttachments([]);
+        setCheckpoints([]);
+        // Persist the cleared state to DB
+        if (sessionId) {
+            saveMessages([], sessionId);
+        }
+        setDeleteConfirmModal(null);
+    };
 
     // ===================== SESSION MANAGEMENT =====================
 
@@ -234,7 +252,20 @@ export function SingularityChat({ userId }: { userId?: string }) {
         setShowHistory(false);
     };
 
-    const deleteSession = async (sid: string) => {
+    const requestDeleteSession = (sid: string) => {
+        const session = sessions.find(s => s.id === sid);
+        const hasAgentActions = session?.mode === 'agent';
+        setDeleteConfirmModal({
+            type: 'delete',
+            sessionId: sid,
+            sessionTitle: session?.title || 'this chat',
+            hasAgentMessages: hasAgentActions,
+        });
+    };
+
+    const executeDeleteSession = async () => {
+        if (!deleteConfirmModal?.sessionId) return;
+        const sid = deleteConfirmModal.sessionId;
         try {
             await fetch(`/api/singularity/history?id=${sid}`, { method: 'DELETE' });
             setSessions(prev => prev.filter(s => s.id !== sid));
@@ -244,6 +275,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
         } catch (err) {
             console.error('Failed to delete session:', err);
         }
+        setDeleteConfirmModal(null);
     };
 
     // Auto-save messages after streaming completes (debounced)
@@ -834,7 +866,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                             </p>
                                         </div>
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }}
+                                            onClick={(e) => { e.stopPropagation(); requestDeleteSession(s.id); }}
                                             className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 rounded transition-all"
                                         >
                                             <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
@@ -951,6 +983,68 @@ export function SingularityChat({ userId }: { userId?: string }) {
                             </button>
                             <button
                                 onClick={() => setUndoConfirmModal(null)}
+                                className="px-4 py-2.5 text-xs font-medium rounded-xl bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete / Clear Chat Warning Modal */}
+            {deleteConfirmModal && (
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-card border border-border rounded-2xl shadow-2xl max-w-sm w-full p-5 sm:p-6 space-y-4 animate-in zoom-in-95 fade-in duration-200">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
+                                <AlertTriangle className="w-5 h-5 text-destructive" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold text-foreground">
+                                    {deleteConfirmModal.type === 'delete' ? 'Delete Chat' : 'Clear Chat'}
+                                </h3>
+                                <p className="text-xs text-muted-foreground">
+                                    {deleteConfirmModal.type === 'delete'
+                                        ? `"${deleteConfirmModal.sessionTitle}"`
+                                        : 'All messages will be removed'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl bg-muted/50 border border-border/40 p-3 space-y-2">
+                            {deleteConfirmModal.hasAgentMessages && (
+                                <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+                                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                                        <strong>Agent actions cannot be undone.</strong> Any projects, tasks, clients, or data the AI created or modified will remain in your system.
+                                    </p>
+                                </div>
+                            )}
+                            <ul className="text-xs text-muted-foreground space-y-1">
+                                <li className="flex items-start gap-1.5">
+                                    <span className="text-destructive mt-0.5">•</span>
+                                    {deleteConfirmModal.type === 'delete'
+                                        ? 'This chat and its undo checkpoints will be permanently deleted'
+                                        : 'Messages and undo checkpoints will be cleared'}
+                                </li>
+                                <li className="flex items-start gap-1.5">
+                                    <span className="text-destructive mt-0.5">•</span>
+                                    You will <strong className="text-foreground">no longer be able to undo</strong> any actions from this chat
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <button
+                                onClick={deleteConfirmModal.type === 'delete' ? executeDeleteSession : executeClearChat}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors shadow-sm"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                {deleteConfirmModal.type === 'delete' ? 'Delete Chat' : 'Clear Messages'}
+                            </button>
+                            <button
+                                onClick={() => setDeleteConfirmModal(null)}
                                 className="px-4 py-2.5 text-xs font-medium rounded-xl bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
                             >
                                 Cancel
