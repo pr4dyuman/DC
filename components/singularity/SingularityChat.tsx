@@ -204,9 +204,9 @@ export function SingularityChat({ userId }: { userId?: string }) {
             const data = await res.json();
             setSessionId(sid);
             setMode(data.mode || 'chat');
-            setMessages((data.messages || []).map((m: any) => ({
+            setMessages((data.messages || []).map((m: any, i: number) => ({
                 ...m,
-                id: m.timestamp || `msg-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                id: m.id || `msg-${i}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 timestamp: new Date(m.timestamp),
                 isStreaming: false,
             })));
@@ -1043,10 +1043,10 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                         </div>
                                     ))}
 
-                                    {/* Undo Checkpoint button — only on finished agent messages with write actions */}
-                                    {!msg.isStreaming && msg.toolActions.some(ta => ta.rollbackData && ta.rollbackData.length > 0) && (() => {
-                                        const msgIndex = messages.filter(m => !m.isStreaming).indexOf(msg);
-                                        const cp = checkpoints.find(c => c.messageIndex >= msgIndex && c.messageIndex <= msgIndex + 2);
+                                    {/* Undo Checkpoint button — on finished agent messages with a matching checkpoint */}
+                                    {!msg.isStreaming && (() => {
+                                        const msgIndex = messages.indexOf(msg);
+                                        const cp = checkpoints.find(c => c.messageIndex >= msgIndex - 1 && c.messageIndex <= msgIndex + 2);
                                         if (!cp) return null;
                                         return (
                                             <button
