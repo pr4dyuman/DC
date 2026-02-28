@@ -232,8 +232,9 @@ export async function POST(req: NextRequest) {
                         }
 
                         // Drain remaining transcript chunks (can arrive after turnComplete)
-                        const drainEnd = Date.now() + 2000;
-                        while (Date.now() < drainEnd) {
+                        // Use a rolling window: extend drain whenever new data arrives
+                        let drainDeadline = Date.now() + 5000;
+                        while (Date.now() < drainDeadline) {
                             const remaining = messageQueue.shift();
                             if (!remaining) {
                                 await new Promise(r => setTimeout(r, 100));
@@ -243,6 +244,8 @@ export async function POST(req: NextRequest) {
                                 controller.enqueue(encoder.encode(
                                     `data: ${JSON.stringify({ type: 'response', text: (remaining.serverContent as any).outputTranscription.text })}\n\n`
                                 ));
+                                // Extend drain window — more transcription may follow
+                                drainDeadline = Math.max(drainDeadline, Date.now() + 2000);
                             }
                         }
 
@@ -385,9 +388,9 @@ export async function POST(req: NextRequest) {
                     }
 
                     // IMPORTANT: Transcript chunks can arrive AFTER turnComplete.
-                    // Drain any remaining messages for up to 2 seconds.
-                    const drainEnd = Date.now() + 2000;
-                    while (Date.now() < drainEnd) {
+                    // Use a rolling window: extend drain whenever new data arrives.
+                    let drainDeadline = Date.now() + 5000;
+                    while (Date.now() < drainDeadline) {
                         const remaining = messageQueue.shift();
                         if (!remaining) {
                             await new Promise(r => setTimeout(r, 100));
@@ -397,6 +400,8 @@ export async function POST(req: NextRequest) {
                             controller.enqueue(encoder.encode(
                                 `data: ${JSON.stringify({ type: 'response', text: (remaining.serverContent as any).outputTranscription.text })}\n\n`
                             ));
+                            // Extend drain window — more transcription may follow
+                            drainDeadline = Math.max(drainDeadline, Date.now() + 2000);
                         }
                     }
 
