@@ -39,7 +39,7 @@ export function ClientAssetsSection({ assets, projects }: ClientAssetsSectionPro
             case 'link':
                 return <LinkIcon className="h-4 w-4 text-green-400" />;
             default:
-                return <FileText className="h-4 w-4 text-zinc-400" />;
+                return <FileText className="h-4 w-4 text-muted-foreground" />;
         }
     };
 
@@ -57,7 +57,7 @@ export function ClientAssetsSection({ assets, projects }: ClientAssetsSectionPro
                         <div className="text-xs text-muted-foreground">Images</div>
                     </div>
                     <div className="p-2 rounded-lg bg-muted/50 border border-border text-center">
-                        <FileText className="h-4 w-4 text-zinc-400 mx-auto mb-1" />
+                        <FileText className="h-4 w-4 text-muted-foreground mx-auto mb-1" />
                         <div className="text-lg font-bold">{assetsByType.file}</div>
                         <div className="text-xs text-muted-foreground">Files</div>
                     </div>

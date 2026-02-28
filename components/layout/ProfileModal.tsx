@@ -156,7 +156,7 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
                                 <div className="flex items-start gap-6">
                                     <div className="flex flex-col items-center gap-2">
                                         <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                                            <Avatar className="h-20 w-20 border-2 border-zinc-100 shadow-sm">
+                                            <Avatar className="h-20 w-20 border-2 border-border shadow-sm">
                                                 <AvatarImage src={avatar} className="object-cover" />
                                                 <AvatarFallback className="text-xl bg-indigo-100 text-indigo-700">
                                                     {name.substring(0, 2).toUpperCase()}
@@ -207,7 +207,7 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
                                     <div className="flex items-start gap-6">
                                         <div className="flex flex-col items-center gap-2">
                                             <div
-                                                className="h-20 w-20 border-2 border-dashed border-zinc-200 rounded-lg flex items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors relative group overflow-hidden"
+                                                className="h-20 w-20 border-2 border-dashed border-border rounded-lg flex items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors relative group overflow-hidden"
                                                 onClick={() => systemLogoRef.current?.click()}
                                             >
                                                 {systemLogo ? (

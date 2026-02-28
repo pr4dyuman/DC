@@ -155,7 +155,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                     <div className="p-4 pt-2 space-y-3">
                         {/* Search */}
                         <div className="relative">
-                            <Search className="absolute left-3 top-2.5 w-4 h-4 text-zinc-500" />
+                            <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
                             <input
                                 type="text"
                                 placeholder="Search..."
@@ -199,7 +199,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                                         />
                                     ))
                             ) : (
-                                <div className="text-center py-8 text-zinc-500 text-sm">
+                                <div className="text-center py-8 text-muted-foreground text-sm">
                                     <p>No active chats.</p>
                                     <p className="mt-1">Click "New Message" to start.</p>
                                 </div>
@@ -279,9 +279,9 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                             {/* Messages */}
                             <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-[url('/bg-pattern.svg')] lg:bg-none">
                                 {messages.length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center text-zinc-500 opacity-50">
+                                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50">
                                         <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-4">
-                                            <Send className="w-8 h-8 text-zinc-600" />
+                                            <Send className="w-8 h-8 text-muted-foreground" />
                                         </div>
                                         <p>Start messaging with {activeContact.name}</p>
                                     </div>
@@ -300,7 +300,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                             {/* Input Area */}
                             <div className="p-4 bg-card border-t border-border">
                                 <div className="bg-secondary border border-border rounded-2xl p-2 flex items-center shadow-lg">
-                                    <button className="p-2 text-zinc-600 cursor-not-allowed" title="Attachments coming soon" disabled>
+                                    <button className="p-2 text-muted-foreground cursor-not-allowed" title="Attachments coming soon" disabled>
                                         <Paperclip className="w-5 h-5" />
                                     </button>
                                     <input
@@ -322,7 +322,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                             </div>
                         </>
                     ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-zinc-500 relative">
+                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground relative">
                             <div className="absolute top-4 right-4">
                                 <button
                                     onClick={onClose}

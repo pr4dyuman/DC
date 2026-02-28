@@ -32,7 +32,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager'; // Helper
 
     return (
-        <div className="h-[calc(100vh-8rem)] flex flex-col">
+        <div className="h-[calc(100vh-8rem)] flex flex-col overflow-hidden">
             <Tabs defaultValue="board" className="flex-1 flex flex-col overflow-hidden">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-2">
                     <div>

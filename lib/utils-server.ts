@@ -1,8 +1,9 @@
 import { connectDB, UserModel, ClientModel, SuperAdminModel } from "./mongodb";
 import { User } from "./types"; // Ensure User type is imported
+import { randomUUID } from "crypto";
 
 export function generateId(): string {
-    return Math.random().toString(36).substr(2, 9);
+    return randomUUID();
 }
 
 /**
@@ -31,19 +32,19 @@ export async function resolveUserOrClient(identifier: string): Promise<User | un
     // 2. Check Super Admin
     if (superAdmin) {
         return {
-             id: superAdmin.id,
-             name: superAdmin.name,
-             email: superAdmin.email,
-             role: 'superadmin' as any, // Cast to any to bypass strict User role enum if needed
-             avatar: superAdmin.avatar,
-             createdAt: superAdmin.createdAt,
-             agencyId: 'super-admin'
+            id: superAdmin.id,
+            name: superAdmin.name,
+            email: superAdmin.email,
+            role: 'superadmin' as any, // Cast to any to bypass strict User role enum if needed
+            avatar: superAdmin.avatar,
+            createdAt: superAdmin.createdAt,
+            agencyId: 'super-admin'
         } as any as User;
     }
 
     // 3. Check Client
     if (client) {
-         return {
+        return {
             id: client.id,
             name: client.name,
             email: client.email,
@@ -53,7 +54,7 @@ export async function resolveUserOrClient(identifier: string): Promise<User | un
             lastActiveAt: client.lastActiveAt,
             username: client.username || client.id,
             agencyId: client.agencyId || 'default-agency'
-         } as User;
+        } as User;
     }
 
     return undefined;

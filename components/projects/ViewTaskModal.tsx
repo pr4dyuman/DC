@@ -77,7 +77,7 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
             case "Done": return { color: "bg-green-100 text-green-700 border-green-200", icon: CheckCircle2 };
             case "In Progress": return { color: "bg-blue-100 text-blue-700 border-blue-200", icon: Timer };
             case "Review": return { color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: AlertCircle };
-            default: return { color: "bg-slate-100 text-slate-700 border-slate-200", icon: Circle };
+            default: return { color: "bg-muted text-muted-foreground border-border", icon: Circle };
         }
     };
 
@@ -229,14 +229,14 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
                         <div className="flex items-center gap-2 pb-2 border-b border-zinc-100 dark:border-zinc-800">
                             <MessageSquare className="w-5 h-5 text-indigo-500" />
                             <h3 className="text-lg font-semibold text-foreground">
-                                Comments <span className="text-zinc-400 text-sm font-normal ml-1">({comments.length})</span>
+                                Comments <span className="text-muted-foreground text-sm font-normal ml-1">({comments.length})</span>
                             </h3>
                         </div>
 
                         {/* Comment List */}
                         <div className="space-y-4">
                             {comments.length === 0 ? (
-                                <p className="text-sm text-zinc-500 italic">No comments yet. Be the first to start a discussion.</p>
+                                <p className="text-sm text-muted-foreground italic">No comments yet. Be the first to start a discussion.</p>
                             ) : (
                                 comments.map((comment) => {
                                     const commentUser = users.find(u => u.id === comment.userId);
@@ -244,7 +244,7 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
                                         <div key={comment.id} className="flex gap-3 group">
                                             <Avatar className="h-8 w-8 border border-zinc-200 dark:border-zinc-700 mt-1">
                                                 <AvatarImage src={commentUser?.avatar} />
-                                                <AvatarFallback className="bg-slate-100 text-slate-600 text-xs">
+                                                <AvatarFallback className="bg-muted text-muted-foreground text-xs">
                                                     {commentUser?.name?.substring(0, 2).toUpperCase() || "U"}
                                                 </AvatarFallback>
                                             </Avatar>
@@ -253,7 +253,7 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
                                                     <span className="text-sm font-semibold text-foreground">
                                                         {commentUser?.name || "Unknown User"}
                                                     </span>
-                                                    <span className="text-[10px] text-zinc-400">
+                                                    <span className="text-[10px] text-muted-foreground">
                                                         {format(new Date(comment.timestamp), "MMM d, p")}
                                                     </span>
                                                 </div>

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
 
 /* Hide number input arrows */
 input[type=number]::-webkit-outer-spin-button,

@@ -302,7 +302,7 @@ export default function SettingsPage() {
                 >
                     <div className="flex items-center gap-4">
                         <div className="p-2 bg-gray-500/10 rounded-full">
-                            <Settings className="h-6 w-6 text-gray-500" />
+                            <Settings className="h-6 w-6 text-muted-foreground" />
                         </div>
                         <div>
                             <h2 className="text-lg font-semibold">General Settings</h2>

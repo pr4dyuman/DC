@@ -154,10 +154,10 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                 <div className="mb-4 flex gap-2">
                     <div className="h-9 w-24 bg-muted animate-pulse rounded"></div>
                 </div>
-                <div className="flex h-full gap-4 overflow-x-auto pb-4">
+                <div className="grid grid-cols-4 h-full gap-4 pb-4">
                     {COLUMNS.map((col) => (
-                        <div key={col} className="flex h-full min-w-[290px] w-[290px] flex-col rounded-md bg-muted/50 p-4 border border-dashed">
-                            <h3 className="font-semibold mb-3 text-sm text-gray-700">{col}</h3>
+                        <div key={col} className="flex h-full min-w-0 w-full flex-col rounded-md bg-muted/50 p-4 border border-dashed">
+                            <h3 className="font-semibold mb-3 text-sm text-foreground">{col}</h3>
                         </div>
                     ))}
                 </div>
@@ -176,7 +176,7 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
             >
-                <div className="flex h-full gap-4 overflow-x-auto pb-4 no-scrollbar">
+                <div className="grid grid-cols-4 h-full gap-4 pb-4">
                     {COLUMNS.map((col) => (
                         <DroppableColumn
                             key={col}

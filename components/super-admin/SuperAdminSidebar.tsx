@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-    LayoutDashboard, 
-    Building2, 
-    BarChart3, 
-    CreditCard, 
-    Settings, 
+import {
+    LayoutDashboard,
+    Building2,
+    BarChart3,
+    CreditCard,
+    Settings,
     FileText,
     LogOut
 } from "lucide-react";
@@ -24,33 +24,32 @@ const navigation = [
 
 export default function SuperAdminSidebar() {
     const pathname = usePathname();
-    
+
     const handleLogout = async () => {
         await logout();
         window.location.href = "/login";
     };
-    
+
     return (
-        <div className="w-64 bg-gray-900 text-white flex flex-col">
+        <div className="w-64 bg-card border-r border-border flex flex-col">
             <div className="p-6">
-                <h1 className="text-2xl font-bold">Super Admin</h1>
-                <p className="text-gray-400 text-sm mt-1">System Management</p>
+                <h1 className="text-2xl font-bold text-foreground">Super Admin</h1>
+                <p className="text-muted-foreground text-sm mt-1">System Management</p>
             </div>
-            
+
             <nav className="flex-1 px-3 space-y-1">
                 {navigation.map((item) => {
                     const Icon = item.icon;
                     const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
-                    
+
                     return (
                         <Link
                             key={item.name}
                             href={item.href}
-                            className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                                isActive
-                                    ? "bg-gray-800 text-white"
-                                    : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                            }`}
+                            className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${isActive
+                                    ? "bg-muted text-foreground"
+                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                }`}
                         >
                             <Icon className="w-5 h-5" />
                             <span>{item.name}</span>
@@ -58,11 +57,11 @@ export default function SuperAdminSidebar() {
                     );
                 })}
             </nav>
-            
+
             <div className="p-3">
                 <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white transition-colors w-full"
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors w-full"
                 >
                     <LogOut className="w-5 h-5" />
                     <span>Logout</span>

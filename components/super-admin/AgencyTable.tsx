@@ -34,20 +34,20 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
     };
 
     return (
-        <div className="bg-white rounded-lg shadow">
-            <div className="p-6 border-b border-gray-200">
+        <div className="bg-card rounded-lg shadow border border-border">
+            <div className="p-6 border-b border-border">
                 <div className="flex items-center gap-4">
                     <input
                         type="text"
                         placeholder="Search agencies..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="flex-1 px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent placeholder:text-muted-foreground"
                     />
                     <select
                         value={filter}
                         onChange={(e) => setFilter(e.target.value)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent"
                     >
                         <option value="all">All Agencies</option>
                         <option value="active">Active</option>
@@ -61,75 +61,59 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
 
             <div className="overflow-x-auto">
                 <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
+                    <thead className="bg-muted border-b border-border">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Agency
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Plan
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Status
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Users
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Projects
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Revenue
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Created
-                            </th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Actions
-                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Agency</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Plan</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Users</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Projects</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Revenue</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Created</th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-card divide-y divide-border">
                         {filteredAgencies.map((agency) => (
-                            <tr key={agency.id} className="hover:bg-gray-50">
+                            <tr key={agency.id} className="hover:bg-muted/50">
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div>
-                                        <div className="font-medium text-gray-900">{agency.name}</div>
-                                        <div className="text-sm text-gray-500">{agency.slug}</div>
+                                        <div className="font-medium text-foreground">{agency.name}</div>
+                                        <div className="text-sm text-muted-foreground">{agency.slug}</div>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${agency.plan === 'enterprise' ? 'bg-purple-100 text-purple-800' :
-                                            agency.plan === 'pro' ? 'bg-blue-100 text-blue-800' :
-                                                'bg-gray-100 text-gray-800'
+                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${agency.plan === 'enterprise' ? 'bg-purple-500/10 text-purple-500' :
+                                        agency.plan === 'pro' ? 'bg-blue-500/10 text-blue-500' :
+                                            'bg-muted text-muted-foreground'
                                         }`}>
                                         {agency.plan.toUpperCase()}
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${agency.status === 'active' ? 'bg-green-100 text-green-800' :
-                                            'bg-red-100 text-red-800'
+                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${agency.status === 'active' ? 'bg-green-500/10 text-green-500' :
+                                        'bg-red-500/10 text-red-500'
                                         }`}>
                                         {agency.status}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                                     {agency.stats?.users || 0}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                                     {agency.stats?.projects || 0}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                                     ${(agency.stats?.revenue || 0).toLocaleString()}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                                     {new Date(agency.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <div className="flex items-center justify-end gap-2">
                                         <Link
                                             href={`/super-admin/agencies/${agency.id}`}
-                                            className="text-blue-600 hover:text-blue-900"
+                                            className="text-blue-500 hover:text-blue-400"
                                             title="View Details"
                                         >
                                             <Eye className="w-4 h-4" />
@@ -137,7 +121,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                                         {agency.status === 'active' ? (
                                             <button
                                                 onClick={() => handleSuspend(agency.id)}
-                                                className="text-red-600 hover:text-red-900"
+                                                className="text-red-500 hover:text-red-400"
                                                 title="Suspend"
                                             >
                                                 <Ban className="w-4 h-4" />
@@ -145,7 +129,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                                         ) : (
                                             <button
                                                 onClick={() => handleActivate(agency.id)}
-                                                className="text-green-600 hover:text-green-900"
+                                                className="text-green-500 hover:text-green-400"
                                                 title="Activate"
                                             >
                                                 <CheckCircle className="w-4 h-4" />
@@ -153,7 +137,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                                         )}
                                         <button
                                             onClick={() => handleDelete(agency.id)}
-                                            className="text-red-600 hover:text-red-900"
+                                            className="text-red-500 hover:text-red-400"
                                             title="Delete"
                                         >
                                             <Trash2 className="w-4 h-4" />
@@ -168,7 +152,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
 
             {filteredAgencies.length === 0 && (
                 <div className="text-center py-12">
-                    <p className="text-gray-500">No agencies found</p>
+                    <p className="text-muted-foreground">No agencies found</p>
                 </div>
             )}
         </div>

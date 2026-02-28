@@ -79,7 +79,7 @@ export function ContactItem({ contact, isActive, onClick }: ContactItemProps) {
                     <div className="flex items-center overflow-hidden">
                         <h4 className={cn("text-sm font-semibold truncate", isActive ? "text-primary" : "text-foreground group-hover:text-primary")}>
                             {contact.name}
-                            {contact.username && <span className="ml-1 text-xs text-zinc-500 font-normal">@{contact.username}</span>}
+                            {contact.username && <span className="ml-1 text-xs text-muted-foreground font-normal">@{contact.username}</span>}
                         </h4>
                         {contact.jobTitle && (
                             <span className="ml-2 text-[10px] text-muted-foreground truncate hidden sm:inline-block border border-border rounded px-1 py-0.5">
@@ -88,14 +88,14 @@ export function ContactItem({ contact, isActive, onClick }: ContactItemProps) {
                         )}
                     </div>
                     {contact.lastMessage && (
-                        <span className="text-[10px] text-zinc-500 whitespace-nowrap ml-2">
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-2">
                             {format(new Date(contact.lastMessage.timestamp), "HH:mm")}
                         </span>
                     )}
                 </div>
 
                 <div className="flex justify-between items-center mt-0.5">
-                    <p className="text-xs text-zinc-500 truncate max-w-[120px]">
+                    <p className="text-xs text-muted-foreground truncate max-w-[120px]">
                         {contact.lastMessage?.content || <span className="italic opacity-50">Start a conversation</span>}
                     </p>
 

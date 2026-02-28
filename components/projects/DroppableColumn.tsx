@@ -22,7 +22,7 @@ export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTas
     const { setNodeRef } = useDroppable({ id });
 
     return (
-        <div ref={setNodeRef} className="flex h-full min-w-[290px] w-[290px] flex-col rounded-lg bg-muted/50 p-4 border border-border/50">
+        <div ref={setNodeRef} className="flex h-full min-w-0 w-full flex-col rounded-lg bg-muted/50 p-4 border border-border/50 overflow-hidden">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-sm uppercase text-muted-foreground">{title}</h3>
                 <span className="text-xs font-bold bg-background text-foreground px-2 py-0.5 rounded-full border">
@@ -31,7 +31,7 @@ export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTas
             </div>
 
             <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                <div className="flex-1 flex flex-col gap-2 min-h-[100px] overflow-y-auto pr-1 custom-scrollbar">
+                <div className="flex-1 flex flex-col gap-2 min-h-[100px] overflow-y-auto no-scrollbar">
                     {tasks.map((task) => (
                         <TaskCard
                             key={task.id}

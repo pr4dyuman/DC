@@ -18,8 +18,7 @@ export function PendingPayablesList({ transactions }: PendingPayablesListProps) 
     const [loadingId, setLoadingId] = useState<string | null>(null);
     const router = useRouter();
 
-    // Removed early return to ensure visibility
-    // if (transactions.length === 0) return null;
+    if (transactions.length === 0) return null;
 
     const handleMarkPaid = async (id: string, amount: number, type: string) => {
         try {
@@ -82,8 +81,8 @@ export function PendingPayablesList({ transactions }: PendingPayablesListProps) 
                                     <p className="font-medium">{t.description}</p>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${t.type === 'income'
-                                                ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200'
-                                                : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
+                                            ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200'
+                                            : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
                                             }`}>
                                             {t.type === 'income' ? 'Receivable' : 'Payable'}
                                         </span>

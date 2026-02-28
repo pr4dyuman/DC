@@ -89,7 +89,7 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
             <div ref={cardRef}>
                 <Card
                     onClick={handleCardClick}
-                    className={`cursor-pointer bg-card border-border hover:border-primary/50 transition-all duration-500 shadow-sm hover:shadow-md group relative ${isHighlighted ? 'ring-2 ring-yellow-500 border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)]' : ''}`}
+                    className={`cursor-pointer bg-card border-border hover:border-primary/50 transition-all duration-500 shadow-sm hover:shadow-md group relative overflow-hidden ${isHighlighted ? 'ring-2 ring-yellow-500 border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)]' : ''}`}
                 >
                     {/* Header with Title and Edit Button */}
                     <div className="p-4 flex items-start justify-between gap-3">
@@ -144,31 +144,31 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
                     </div>
 
                     {/* Footer Info */}
-                    <div className="px-4 pb-4 pt-0 flex items-center justify-between">
-                        <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-medium">
+                    <div className="px-4 pb-4 pt-0 overflow-hidden">
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium min-w-0 flex-wrap">
                             {task.dueDate && (
-                                <div className="flex items-center gap-1.5">
-                                    <Calendar className="w-3 h-3 text-yellow-500" />
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                    <Calendar className="w-3 h-3 text-yellow-500 shrink-0" />
                                     <span>{format(new Date(task.dueDate), "MMM d")}</span>
                                 </div>
                             )}
 
                             {task.category && (
-                                <div className="flex items-center gap-1.5 text-indigo-500/80">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-tag"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" /><path d="M7 7h.01" /></svg>
-                                    <span className="truncate max-w-[100px]">{task.category}</span>
+                                <div className="flex items-center gap-1.5 text-indigo-500/80 min-w-0 overflow-hidden">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-tag shrink-0"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" /><path d="M7 7h.01" /></svg>
+                                    <span className="truncate">{task.category}</span>
                                 </div>
                             )}
 
-                            <div className="flex items-center">
+                            <div className="flex items-center shrink-0">
                                 <button
                                     onClick={handleExplainClick}
                                     className={`flex items-center gap-1 transition-colors px-1.5 py-0.5 rounded-md ${isAiDisabled
-                                        ? "text-zinc-300 dark:text-zinc-600 cursor-not-allowed"
+                                        ? "text-muted-foreground/50 cursor-not-allowed"
                                         : "text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"}`}
                                     title={isAiDisabled ? "AI Disabled in Settings" : "Explain this task with AI"}
                                 >
-                                    <Sparkles className="w-3 h-3" />
+                                    <Sparkles className="w-3 h-3 shrink-0" />
                                     <span className="text-[9px] font-medium">Explain</span>
                                 </button>
                             </div>

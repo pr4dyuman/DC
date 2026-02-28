@@ -71,7 +71,7 @@ export function PayrollManager({ items }: PayrollManagerProps) {
                                     <TableCell className="font-medium">
                                         <div className="flex items-center gap-2">
                                             {/* Avatar fallback if we had Avatar component handy, else text */}
-                                            <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-700">
+                                            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
                                                 {item.user.name.charAt(0)}
                                             </div>
                                             {item.user.name}

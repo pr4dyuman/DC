@@ -12,7 +12,8 @@ import {
     FileText,
     PieChart,
     Building2,
-    MessageCircle
+    MessageCircle,
+    Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChat } from "@/context/ChatContext";
@@ -42,7 +43,12 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, a
             href: "/dashboard/projects",
             color: "text-violet-500",
         },
-
+        {
+            label: "Singularity",
+            icon: Sparkles,
+            href: "/dashboard/singularity",
+            color: "text-violet-500",
+        },
         {
             label: "Messages",
             icon: MessageCircle,

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Settings, ShieldAlert, Plus, Users, Mail, Phone, Pencil, Sparkles, Lock, Check, FileText, Code, ImageIcon, FileJson, X, Eye, EyeOff } from "lucide-react";
-import { getClients, createClient, updateProject, deleteProject, getProjectAssets, toggleAssetAI, updateUser, getUsers, getProject } from "@/lib/actions";
+import { Settings, ShieldAlert, Plus, Users, Mail, Phone, Pencil, Sparkles, Check, FileText, Code, ImageIcon, FileJson, X, Brain } from "lucide-react";
+import { getClients, createClient, updateProject, deleteProject, getProjectAssets, toggleAssetAI, getUsers, getProject, getAgencyAIConfig } from "@/lib/actions";
 import { Client, Asset } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -38,11 +38,9 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
     const [clientLoading, setClientLoading] = useState(false);
 
     // AI State
-    const [apiKey, setApiKey] = useState("");
-    const [isKeyVisible, setIsKeyVisible] = useState(false);
     const [assets, setAssets] = useState<Asset[]>([]);
     const [aiLoading, setAiLoading] = useState(false);
-    const [userHasKey, setUserHasKey] = useState(false);
+    const [aiConfigured, setAiConfigured] = useState(false);
     const [enabled, setEnabled] = useState(aiEnabled === undefined ? false : aiEnabled);
 
     useEffect(() => {
@@ -66,11 +64,11 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
     }, [currentClientId]);
 
     const loadData = async () => {
-        const [clientsData, assetsData, usersData, projectData] = await Promise.all([
+        const [clientsData, assetsData, projectData, aiConfig] = await Promise.all([
             getClients(),
             getProjectAssets(projectId),
-            getUsers(),
-            getProject(projectId)
+            getProject(projectId),
+            getAgencyAIConfig()
         ]);
         setClients(clientsData);
         setAssets(assetsData);
@@ -78,15 +76,7 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
             setStatus(projectData.status);
             setName(projectData.name);
         }
-
-        // Check if user has key
-        if (currentUserId) {
-            const user = usersData.find(u => u.id === currentUserId);
-            if (user?.geminiApiKey) {
-                setApiKey(user.geminiApiKey);
-                setUserHasKey(true);
-            }
-        }
+        setAiConfigured(!!aiConfig);
     };
 
     // --- Client Handlers ---
@@ -140,22 +130,10 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
         setNewClient({ name: "", email: "", companyName: "", password: "" });
     };
 
-    // --- AI Handlers ---
-    const handleSaveApiKey = async () => {
-        if (!currentUserId || !apiKey.trim()) return;
-        setAiLoading(true);
-        try {
-            await updateUser(currentUserId, { geminiApiKey: apiKey.trim() });
-            setUserHasKey(true);
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setAiLoading(false);
-        }
-    };
+
 
     const handleToggleAsset = async (assetId: string, currentState: boolean | undefined) => {
-        if (!userHasKey || !enabled) return;
+        if (!aiConfigured || !enabled) return;
 
         // Optimistic update
         setAssets(prev => prev.map(a => a.id === assetId ? { ...a, aiEnabled: !currentState } : a));
@@ -367,46 +345,26 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
 
                     {/* AI INTELLIGENCE TAB */}
                     <TabsContent value="ai" className="flex-1 overflow-y-auto p-6 space-y-6 mt-0">
-                        {/* API Key Section */}
+                        {/* Singularity Status */}
                         <div className="p-4 rounded-xl bg-card border border-border">
-                            <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-start justify-between mb-2">
                                 <div className="space-y-1">
                                     <h3 className="font-semibold text-indigo-900 dark:text-indigo-100 flex items-center gap-2">
-                                        <Sparkles className="h-4 w-4 text-indigo-500" />
-                                        Gemini API Configuration
+                                        <Brain className="h-4 w-4 text-indigo-500" />
+                                        Singularity AI
                                     </h3>
-                                    <p className="text-xs text-indigo-700 dark:text-indigo-300 max-w-[400px]">
-                                        Add your API Key to unlock AI features. This key is stored securely to your user profile.
+                                    <p className="text-xs text-muted-foreground max-w-[400px]">
+                                        {aiConfigured
+                                            ? "AI is configured for your organization. You can enable it per-project below."
+                                            : "AI is not configured. Contact your system administrator to set up Singularity."}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-1.5 px-2 py-1 bg-secondary rounded-md border border-border">
-                                    {userHasKey ? <Check className="h-3 w-3 text-green-500" /> : <Lock className="h-3 w-3 text-amber-500" />}
+                                    {aiConfigured ? <Check className="h-3 w-3 text-green-500" /> : <Brain className="h-3 w-3 text-amber-500" />}
                                     <span className="text-xs font-medium text-indigo-900 dark:text-indigo-100">
-                                        {userHasKey ? "Active" : "Required"}
+                                        {aiConfigured ? "Active" : "Not Configured"}
                                     </span>
                                 </div>
-                            </div>
-
-                            <div className="flex gap-2">
-                                <div className="relative flex-1">
-                                    <input
-                                        type={isKeyVisible ? "text" : "password"}
-                                        placeholder="Enter your Gemini API Key..."
-                                        className="w-full h-9 rounded-md border border-input bg-input px-3 pr-8 text-sm focus:ring-primary"
-                                        value={apiKey}
-                                        onChange={(e) => setApiKey(e.target.value)}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsKeyVisible(!isKeyVisible)}
-                                        className="absolute right-2 top-2.5 text-indigo-400 hover:text-indigo-600"
-                                    >
-                                        {isKeyVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                    </button>
-                                </div>
-                                <Button onClick={handleSaveApiKey} disabled={aiLoading || !apiKey} size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                                    {aiLoading ? "Saving..." : "Save Key"}
-                                </Button>
                             </div>
                         </div>
 
@@ -419,7 +377,7 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
                                 </p>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className={`text-xs font-medium ${enabled ? 'text-indigo-600' : 'text-zinc-500'}`}>
+                                <span className={`text-xs font-medium ${enabled ? 'text-indigo-600' : 'text-muted-foreground'}`}>
                                     {enabled ? 'Enabled' : 'Disabled'}
                                 </span>
                                 <button
@@ -441,7 +399,7 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
                         </div>
 
                         {/* Context Manager */}
-                        <div className={`space-y-4 ${(!userHasKey || !enabled) ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+                        <div className={`space-y-4 ${(!aiConfigured || !enabled) ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
                             <div className="flex items-center justify-between">
                                 <h3 className="font-medium flex items-center gap-2">
                                     Context Manager

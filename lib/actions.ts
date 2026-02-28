@@ -2,7 +2,9 @@
 
 import { db, User, Project, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig, LeaveRequest, LeaveType, LeaveStatus, UserPermissions, Transaction, TransactionType, TransactionCategory } from "./db";
 import { revalidatePath } from "next/cache";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateContent, generateContentWithParts, generateContentWithChat } from "./ai-provider";
+import { createSession, sendMessage, closeSession, isSessionActive } from "./live-session";
+import type { AIConfig } from "./types";
 import { withAgencyId, getCurrentAgency } from "./agency-context";
 import { generateId, resolveUserOrClient } from "./utils-server";
 
@@ -46,6 +48,22 @@ export async function getAgencySettings() {
         secondaryColor: agency.secondaryColor,
         emailNotificationsEnabled: agency.settings?.emailNotificationsEnabled ?? true
     };
+}
+
+// Get the AI config for the current user's agency
+export async function getAgencyAIConfig(): Promise<AIConfig | null> {
+    await connectDB();
+    const agency = await getCurrentAgency();
+    if (!agency) {
+        console.log('[getAgencyAIConfig] No agency found for current user');
+        return null;
+    }
+    if (!agency.aiConfig) {
+        console.log('[getAgencyAIConfig] Agency found but no aiConfig:', agency.id);
+        return null;
+    }
+    console.log('[getAgencyAIConfig] Found config for agency:', agency.id, 'provider:', (agency.aiConfig as any).provider);
+    return agency.aiConfig as AIConfig;
 }
 
 export async function updateEmailSettings(enabled: boolean) {
@@ -122,13 +140,17 @@ export async function getDashboardMetrics() {
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth(); // 0-11
 
+    // Get current agency for filtering
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+
     // Parallel fetch for dashboard data
     const [transactions, pendingInvoicesList, activeProjectsCount, projects, tasks] = await Promise.all([
-        TransactionModel.find({}).lean(),
-        InvoiceModel.find({ status: { $in: ['Pending', 'Overdue', 'Processing'] } }).lean(),
-        ProjectModel.countDocuments({ status: 'Active' }),
-        ProjectModel.find({ status: 'Active' }).select('id').lean(), // For task priority check
-        TaskModel.find({}).select('status priority projectId').lean() // Need all tasks for utilization
+        TransactionModel.find(agencyFilter).lean(),
+        InvoiceModel.find({ ...agencyFilter, status: { $in: ['Pending', 'Overdue', 'Processing'] } }).lean(),
+        ProjectModel.countDocuments({ ...agencyFilter, status: 'Active' }),
+        ProjectModel.find({ ...agencyFilter, status: 'Active' }).select('id').lean(),
+        TaskModel.find(agencyFilter).select('status priority projectId').lean()
     ]);
 
     // 1. Revenue & Growth
@@ -204,7 +226,9 @@ export async function getDashboardMetrics() {
 
 export async function getRevenueData() {
     await connectDB();
-    const transactions = await TransactionModel.find({}).lean();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const transactions = await TransactionModel.find(agencyFilter).lean();
 
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const currentYear = new Date().getFullYear();
@@ -603,6 +627,10 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
     if (!newUser.avatar) {
         newUser.avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${newUser.name}`;
     }
+    // Hash password before storing
+    if (newUser.password) {
+        newUser.password = await hashPassword(newUser.password);
+    }
     await db.update((data) => ({
         ...data,
         users: [...data.users, newUser]
@@ -819,7 +847,7 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
 
 export async function deleteClient(id: string) {
     const currentUser = await getCurrentUser();
-    if (!currentUser || currentUser.role !== 'admin') {
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
         throw new Error("Unauthorized");
     }
 
@@ -968,10 +996,14 @@ export async function approveDocumentUpdate(userId: string, type: 'adhar' | 'pan
 }
 
 export async function adminResetPassword(id: string, newPassword: string) {
-    // Ideally verify admin privileges here via session/auth
+    const currentUser = await getCurrentUser();
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+        throw new Error("Unauthorized: Only Admins can reset passwords.");
+    }
+    const hashedPassword = await hashPassword(newPassword);
     await db.update((data) => ({
         ...data,
-        users: data.users.map(u => u.id === id ? { ...u, password: newPassword } : u)
+        users: data.users.map(u => u.id === id ? { ...u, password: hashedPassword } : u)
     }));
     revalidatePath('/dashboard/team');
 }
@@ -1492,7 +1524,7 @@ export async function addComment(taskId: string, userId: string, text: string) {
             ),
             activities: [await withAgencyId({
                 id: generateId(),
-                user: "User", // Ideally fetch user name
+                user: (await resolveUserOrClient(userId))?.name || "Unknown User",
                 action: "commented on task",
                 target: data.tasks.find(t => t.id === taskId)?.title || "Task",
                 timestamp: new Date().toISOString()
@@ -1653,6 +1685,10 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
     if (!newClient.logo) {
         newClient.logo = `https://api.dicebear.com/7.x/initials/svg?seed=${newClient.companyName}`;
     }
+    // Hash password before storing
+    if (newClient.password) {
+        newClient.password = await hashPassword(newClient.password);
+    }
 
     await db.update((data) => ({
         ...data,
@@ -1792,8 +1828,15 @@ export async function updateProject(id: string, updates: Partial<Project>) {
 }
 
 export async function verifyAdminPassword(password: string): Promise<boolean> {
-    // Mock check - in prod use env vars / auth system
-    return password === "123";
+    const currentUser = await getCurrentUser();
+    if (!currentUser) return false;
+    if (currentUser.role !== 'admin' && currentUser.role !== 'manager') return false;
+
+    await connectDB();
+    const user = await UserModel.findOne({ id: currentUser.id }).lean();
+    if (!user?.password) return false;
+
+    return comparePassword(password, user.password);
 }
 
 export async function deleteProject(id: string, password: string) {
@@ -1995,9 +2038,7 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
     if (transaction.category === 'Refund' && !transaction.projectId) {
         throw new Error("Validation Error: Refunds must have a Project ID.");
     }
-    if (transaction.category === 'Other' && transaction.type !== 'expense') {
-        throw new Error("Validation Error: 'Other' category is for expenses only.");
-    }
+    // Note: 'Other' can be either income or expense
     if (transaction.category === 'Freelancer' && transaction.type !== 'expense') {
         throw new Error("Validation Error: Freelancer payments must be an Expense.");
     }
@@ -2150,8 +2191,10 @@ export async function clientMarkInvoiceAsPaid(invoiceId: string) {
             throw new Error(`Cannot mark ${invoice.status} invoice as paid`);
         }
 
-        // Update status to Processing
-        invoice.status = 'Processing';
+        // Update status to Processing (immutable update)
+        const updatedInvoices = data.invoices.map(i =>
+            i.id === invoiceId ? { ...i, status: 'Processing' as const } : i
+        );
 
         // Notify admin about payment claim
         const notifications = data.notifications || [];
@@ -2168,7 +2211,7 @@ export async function clientMarkInvoiceAsPaid(invoiceId: string) {
             }));
         }
 
-        return { ...data, notifications };
+        return { ...data, invoices: updatedInvoices, notifications };
     });
 
     // Send email notification to admins
@@ -2212,8 +2255,10 @@ export async function adminApproveInvoicePayment(invoiceId: string) {
             throw new Error(`Can only approve Processing invoices, this is ${invoice.status}`);
         }
 
-        // Update invoice status to Paid
-        invoice.status = 'Paid';
+        // Update invoice status to Paid (immutable update)
+        const updatedInvoices = data.invoices.map(i =>
+            i.id === invoiceId ? { ...i, status: 'Paid' as const } : i
+        );
 
         // Create income transaction
         const project = data.projects.find(p => p.id === invoice.projectId);
@@ -2241,7 +2286,7 @@ export async function adminApproveInvoicePayment(invoiceId: string) {
             invoiceId: invoice.id // Link back to the invoice
         });
 
-        data.transactions = [newTransaction, ...(data.transactions || [])];
+        const updatedTransactions = [newTransaction, ...(data.transactions || [])];
 
         // Notify client about approval
         const notifications = data.notifications || [];
@@ -2256,7 +2301,7 @@ export async function adminApproveInvoicePayment(invoiceId: string) {
             }));
         }
 
-        return { ...data, notifications };
+        return { ...data, invoices: updatedInvoices, transactions: updatedTransactions, notifications };
     });
 
     // Send email notification to client
@@ -2301,8 +2346,10 @@ export async function adminRejectInvoicePayment(invoiceId: string, reason?: stri
             throw new Error(`Can only reject Processing invoices, this is ${invoice.status}`);
         }
 
-        // Update invoice status back to Pending
-        invoice.status = 'Pending';
+        // Update invoice status back to Pending (immutable update)
+        const updatedInvoices = data.invoices.map(i =>
+            i.id === invoiceId ? { ...i, status: 'Pending' as const } : i
+        );
 
         // Notify client about rejection
         const notifications = data.notifications || [];
@@ -2323,7 +2370,7 @@ export async function adminRejectInvoicePayment(invoiceId: string, reason?: stri
             }));
         }
 
-        return { ...data, notifications };
+        return { ...data, invoices: updatedInvoices, notifications };
     });
 
     // Send email notification to client
@@ -2354,13 +2401,10 @@ export async function adminRejectInvoicePayment(invoiceId: string, reason?: stri
 
 // Legacy function - kept for backward compatibility
 export async function updateInvoiceStatus(invoiceId: string, status: 'Paid' | 'Pending' | 'Overdue' | 'Processing') {
-    await db.update((data) => {
-        const invoice = data.invoices.find(i => i.id === invoiceId);
-        if (invoice) {
-            invoice.status = status;
-        }
-        return data;
-    });
+    await db.update((data) => ({
+        ...data,
+        invoices: data.invoices.map(i => i.id === invoiceId ? { ...i, status } : i)
+    }));
     revalidatePath('/dashboard/finance');
 }
 
@@ -2376,8 +2420,10 @@ export async function deleteTransaction(transactionId: string, password: string)
         throw new Error("Unauthorized: Only admins can delete transactions.");
     }
 
-    // Password verification
-    if (user.password !== password) {
+    // Password verification (secure hash comparison)
+    await connectDB();
+    const userDoc = await UserModel.findOne({ id: currentUserId }).lean();
+    if (!userDoc?.password || !(await comparePassword(password, userDoc.password))) {
         throw new Error("Invalid Password");
     }
 
@@ -2637,71 +2683,77 @@ export async function updateSystemSettings(settings: { systemName: string; logo:
 export async function globalSearch(query: string): Promise<SearchResult[]> {
     if (!query || query.length < 2) return [];
 
-    const data = await db.get();
+    await connectDB();
     const results: SearchResult[] = [];
-    const lowerQuery = query.toLowerCase();
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escapedQuery, 'i');
 
     // Search Projects
-    if (data.projects) {
-        data.projects.forEach(p => {
-            const clientName = data.clients?.find(c => c.id === p.clientId || c.name === p.client)?.name || p.client || "";
-            // Resolve Service IDs to Names for search
-            const serviceNames = p.services?.map(s => data.services?.find(dSvc => dSvc.id === s || dSvc.name === s)?.name || s) || [];
+    const projects = await ProjectModel.find({
+        $or: [{ name: regex }, { client: regex }]
+    }).limit(5).lean();
 
-            if (clientName.toLowerCase().includes(lowerQuery) || serviceNames.some(d => d.toLowerCase().includes(lowerQuery))) {
-                results.push({
-                    id: p.id,
-                    type: 'project',
-                    title: `${clientName} Project`,
-                    subtitle: serviceNames.join(', ') || '',
-                    url: `/dashboard/projects/${p.id}`
-                });
-            }
+    for (const p of projects) {
+        const proj = sanitizeDoc(p) as any;
+        const clientDoc = proj.clientId ? await ClientModel.findOne({ id: proj.clientId }).lean() : null;
+        const clientName = clientDoc ? (clientDoc as any).name : (proj.client || '');
+        results.push({
+            id: proj.id,
+            type: 'project',
+            title: proj.name,
+            subtitle: clientName ? `Client: ${clientName}` : '',
+            url: `/dashboard/projects/${proj.slug || proj.id}`
         });
     }
 
     // Search Clients
-    if (data.clients) {
-        data.clients.forEach(c => {
-            if (c.name.toLowerCase().includes(lowerQuery) || c.companyName.toLowerCase().includes(lowerQuery)) {
-                results.push({
-                    id: c.id,
-                    type: 'client',
-                    title: c.name,
-                    subtitle: c.companyName,
-                    url: `/dashboard/projects?client=${c.id}`
-                });
-            }
+    const clients = await ClientModel.find({
+        $or: [{ name: regex }, { companyName: regex }]
+    }).limit(5).lean();
+
+    for (const c of clients) {
+        const client = sanitizeDoc(c) as any;
+        results.push({
+            id: client.id,
+            type: 'client',
+            title: client.name,
+            subtitle: client.companyName,
+            url: `/dashboard/clients/${client.slug || client.id}`
         });
     }
 
     // Search Tasks
-    if (data.tasks) {
-        data.tasks.forEach(t => {
-            if (t.title.toLowerCase().includes(lowerQuery)) {
-                results.push({
-                    id: t.id,
-                    type: 'task',
-                    title: t.title,
-                    subtitle: t.status,
-                    url: `/dashboard/projects/${t.projectId}?task=${t.id}`
-                });
-            }
+    const tasks = await TaskModel.find({
+        $or: [{ title: regex }, { description: regex }]
+    }).limit(5).lean();
+
+    for (const t of tasks) {
+        const task = sanitizeDoc(t) as any;
+        // Look up the project slug for the task URL
+        const taskProject = await ProjectModel.findOne({ id: task.projectId }).select('slug id').lean();
+        const projectSlug = taskProject ? ((taskProject as any).slug || (taskProject as any).id) : task.projectId;
+        results.push({
+            id: task.id,
+            type: 'task',
+            title: task.title,
+            subtitle: task.status,
+            url: `/dashboard/projects/${projectSlug}?task=${task.id}`
         });
     }
 
     // Search Users
-    if (data.users) {
-        data.users.forEach(u => {
-            if (u.name.toLowerCase().includes(lowerQuery) || u.email.toLowerCase().includes(lowerQuery)) {
-                results.push({
-                    id: u.id,
-                    type: 'user',
-                    title: u.name,
-                    subtitle: u.role,
-                    url: `/dashboard/team/${u.username || u.id}`
-                });
-            }
+    const users = await UserModel.find({
+        $or: [{ name: regex }, { email: regex }]
+    }).limit(5).lean();
+
+    for (const u of users) {
+        const user = sanitizeDoc(u) as any;
+        results.push({
+            id: user.id,
+            type: 'user',
+            title: user.name,
+            subtitle: user.role,
+            url: `/dashboard/team/${user.username || user.id}`
         });
     }
 
@@ -2863,54 +2915,33 @@ export async function explainTask(taskId: string, userId: string) {
         comments: task.comments || []
     };
 
-    let promptText = `
-        You are a **Senior Technical Project Manager & Solution Architect**.
-        Your goal is to provide a highly accurate, actionable, and context-aware explanation of a specific task.
-        
-        ### CRITICAL INSTRUCTIONS
-        1. **Analyze Assets First**: Before answering, deeply analyze the provided Project Assets (Code, Docs, Images). Your advice MUST be based on this concrete data if available.
-        2. **Board Awareness**: Consider the "Current Board State". Are there duplicate tasks? Is this task blocking others? (e.g., if many tasks are in "Review", warn about bottlenecks).
-        3. **Accuracy**: Do not hallucinate. If you lack info, ask for it.
-        4. **Tone**: Professional, precise, yet encouraging.
+    let promptText = `You are a Senior Technical Project Manager & Solution Architect.
+Provide a comprehensive, actionable analysis of this task.
 
-        ---
-        ### PROJECT CONTEXT
-        **Project**: ${context.project?.name}
-        **Departments**: ${context.project?.departments}
-        
-        ${boardSummary}
+### PROJECT
+**Project**: ${context.project?.name}
+**Departments**: ${context.project?.departments}
 
-        ---
-        ### TARGET TASK
-        **Title**: ${context.task.title}
-        **Status**: ${context.task.status} | **Priority**: ${context.task.priority}
-        **Assignee**: ${context.task.assignee}
-        **Due Date**: ${context.task.dueDate}
-        
-        **Description**:
-        ${context.task.description || "No description provided."}
+${boardSummary}
 
-        **Recent Activity/Comments**:
-        ${context.comments.length > 0 ? context.comments.map(c => `- ${c.text}`).join('\n') : "No comments yet."}
+### TARGET TASK
+**Title**: ${context.task.title}
+**Status**: ${context.task.status} | **Priority**: ${context.task.priority}
+**Assignee**: ${context.task.assignee}
+**Due Date**: ${context.task.dueDate}
 
-        ---
-        ### RESPONSE FORMAT
-        Please provide your response in the following Markdown format:
+**Description**:
+${context.task.description || "No description provided."}
 
-        **1. Task Summary**
-        A one-sentence summary of what actually needs to be done.
+**Recent Comments**:
+${context.comments.length > 0 ? context.comments.map(c => `- ${c.text}`).join('\n') : "No comments yet."}
 
-        **2. Asset Analysis & Context**
-        (If assets are present) "Based on [File Name], I see that..." - connect the task to the code/docs.
-
-        **3. Strategic Advice (The "Mentor" View)**
-        - **Potential Pitfalls**: What could go wrong?
-        - **Dependencies**: Who else should I talk to?
-        - **Technical Tips**: Specific libs or patterns to use (based on codebase).
-
-        **4. Recommended Next Steps**
-        A clear, checkbox-style list (e.g., "- [ ] Step 1") for the assignee.
-    `;
+### INSTRUCTIONS
+- Analyze any provided assets (code, docs, images) and reference them specifically.
+- Check the board state for duplicates, blockers, or bottlenecks.
+- Provide: a task summary, strategic advice (pitfalls, dependencies, tips), and recommended next steps as a checklist.
+- Use Markdown with headings and bullet points.
+`;
 
     // Process Text/Code Assets directly into prompt
     const textAssets = projectAssets.filter(a => ['file', 'code', 'link'].includes(a.type) && a.content);
@@ -2923,24 +2954,11 @@ export async function explainTask(taskId: string, userId: string) {
         promptText += `\n\n(No text-based assets enabled for AI context. Advice will be general.)\n`;
     }
 
-    // Initialize Client
-    // Priority: User Key > Env Key
-    const apiKey = currentUser?.geminiApiKey || process.env.GEMINI_API_KEY?.trim();
-    console.log("Runtime API Key Check:", apiKey ? `Present (User: ${!!currentUser?.geminiApiKey})` : "MISSING");
-
-    if (!apiKey) {
-        return "AI Service Error: No API Key found. Please add your Gemini API Key in Project Settings.";
+    // Get AI config from agency (set by super-admin)
+    const aiConfig = await getAgencyAIConfig();
+    if (!aiConfig) {
+        return "Singularity is not configured. Please contact your administrator to set up AI.";
     }
-
-    // Fallback strategy
-    const modelsToTry = [
-        "gemini-3-flash-preview", // Try experimental fast model first if available
-        "gemini-3-flash",       // High quality
-        "gemini-3-flash",     // Fast fallback
-    ];
-
-    let lastError = null;
-    let attemptedModels = [];
 
     // Prepare content parts (Text + Images)
     const parts: any[] = [{ text: promptText }];
@@ -2968,27 +2986,13 @@ export async function explainTask(taskId: string, userId: string) {
         });
     }
 
-    for (const modelName of modelsToTry) {
-        try {
-            attemptedModels.push(modelName);
-            const genAI = new GoogleGenerativeAI(apiKey);
-            console.log(`[explainTask] Attempting model: ${modelName}`);
-            const currentModel = genAI.getGenerativeModel({ model: modelName });
-
-            const result = await currentModel.generateContent(parts);
-            const response = await result.response;
-            return response.text();
-        } catch (error: any) {
-            console.warn(`[explainTask] Model ${modelName} failed:`, error.message?.substring(0, 150));
-            lastError = error;
-            // Continue to next model
-        }
+    try {
+        const result = await generateContentWithParts(aiConfig, parts);
+        return result;
+    } catch (error: any) {
+        console.error("[explainTask] Singularity error:", error.message);
+        return `Singularity Error: ${error.message || "Unknown error"}`;
     }
-
-    // If we get here, all models failed.
-    console.error("[explainTask] All models failed. Last Error:", JSON.stringify(lastError, null, 2));
-
-    return `AI Service Error: All models failed (${attemptedModels.join(", ")}) . Last error: ${lastError?.message || "Unknown error"}`;
 }
 
 export async function enhanceTaskDescription(projectId: string, title: string, content: string, userId: string) {
@@ -3007,54 +3011,43 @@ export async function enhanceTaskDescription(projectId: string, title: string, c
         assetContext += `\n--- Asset: ${a.name} ---\n${a.content?.substring(0, 2000) || "(Empty)"}\n`;
     });
 
-    const apiKey = currentUser?.geminiApiKey || process.env.GEMINI_API_KEY?.trim();
-    if (!apiKey) throw new Error("Missing API Key");
+    const aiConfig = await getAgencyAIConfig();
+    if (!aiConfig) throw new Error("Singularity is not configured. Contact your administrator.");
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); // Use fast model for editor interactions
-
-    const isEnhancement = content.length > 20; // Increased threshold slightly
+    const isEnhancement = content.length > 20;
     const actionType = isEnhancement ? "Refine and Format" : "Generate from scratch";
 
-    const prompt = `
-        You are a **Senior Technical Project Manager**.
-        Your goal is to ${actionType} a task description for a project management board.
+    const prompt = `You are a Senior Technical Project Manager.
+${actionType} a task description for: "${title}"
 
-        ### PROJECT CONTEXT
-        **Project**: ${project?.client || "General"}
-        **Project Knowledge Base (Assets)**:
-        ${assetContext || "(No enabled assets found)"}
-        
-        **Existing Board Context**:
-        ${tasksSummary}
+### PROJECT CONTEXT
+**Project**: ${project?.client || "General"}
+**Board**: ${tasksSummary || '(Empty)'}
+**Knowledge Base**: ${assetContext || '(None)'}
 
-        ### INPUT
-        **Task Title**: ${title}
-        **Draft Content**: "${content}"
+### DRAFT
+${content || '(No draft provided)'}
 
-        ### INSTRUCTIONS
-        ${isEnhancement ?
-            `The user has written a draft description. 
-            - **Goal**: Polish it into a professional, clear specification.
-            - **Structure**: Use Markdown (## Headers, - Bullets).
-            - **Acceptance Criteria**: Add a dedicated section with boolean-verifiable requirements.
-            - **Clarity**: Remove ambiguity. Check against 'Project Knowledge Base' for consistency (e.g. correct terminology).` :
+### INSTRUCTIONS
+${isEnhancement ?
+            `Polish this draft into a professional task specification:
+- Use Markdown structure (## Headers, - Bullets)
+- Add an Acceptance Criteria section with verifiable requirements
+- Cross-reference the Knowledge Base for correct terminology
+- Remove ambiguity, keep it actionable` :
 
-            `The user has provided a Title but minimal/no description.
-            - **Goal**: GENERATE a complete, implementation-ready task specification.
-            - **Structure**:
-                1. **Objective**: High-level goal.
-                2. **Detailed Implementation**: Steps to take.
-                3. **Technical Considerations**: API endpoints, schema changes (infer from Knowledge Base or Title).
-                4. **Acceptance Criteria**: Checklist of 3-5 items.`
+            `Generate a complete task specification from the title:
+- Include: Objective, Implementation Steps, Technical Considerations, Acceptance Criteria (3-5 items)
+- Infer details from the Knowledge Base and Board context
+- Use Markdown with clear structure`
         }
-        
-        **Constraint**: Return ONLY the raw Markdown content. Do not include conversational filler.
-    `;
+
+Return ONLY the Markdown content.`;
+
 
     try {
-        const result = await model.generateContent(prompt);
-        return result.response.text();
+        const result = await generateContent(aiConfig, prompt);
+        return result;
     } catch (error: any) {
         console.error("Enhance Task Error", error);
         return content; // Fallback to original
@@ -3066,6 +3059,127 @@ export type ChatMessage = {
     content: string;
 };
 
+// ============================================================================
+// AI CHAT SESSION MANAGEMENT (Persistent Live API Sessions)
+// ============================================================================
+
+/**
+ * Build the system instruction for the AI chat session.
+ * Contains project context, board summary, assets, and current task state.
+ */
+function buildChatSystemInstruction(
+    projectId: string,
+    currentTitle: string,
+    currentDescription: string,
+    data: any
+): string {
+    const allProjectTasks = data.tasks.filter((t: any) => t.projectId === projectId);
+    const tasksSummary = allProjectTasks.slice(0, 15)
+        .map((t: any) => {
+            const assignee = data.users.find((u: any) => u.id === t.assigneeId);
+            return `- ${t.title} (${t.status}) [${assignee?.name || 'Unassigned'}]`;
+        }).join('\n');
+
+    const projectAssets = (data.assets || []).filter((a: any) => a.projectId === projectId && a.aiEnabled);
+    let assetContext = "";
+    projectAssets.filter((a: any) => ['file', 'code', 'link'].includes(a.type) && a.content).forEach((a: any) => {
+        assetContext += `\n--- Asset: ${a.name} ---\n${a.content?.substring(0, 2000) || "(Empty)"}\n`;
+    });
+
+    return `You are Singularity, a Senior Technical Project Manager & Agile Coach.
+You are helping a user create and refine a task.
+
+### PROJECT BOARD
+${tasksSummary || '(No tasks yet)'}
+
+### KNOWLEDGE BASE
+${assetContext || '(No assets available)'}
+
+### CURRENT TASK
+**Title**: ${currentTitle}
+**Draft**: ${currentDescription || '(Empty)'}
+
+### YOUR ROLE
+- Help clarify, refine, and structure the task
+- If asked to generate/write the task, provide a full Markdown description
+- If asked about project assets, answer using the knowledge base
+- Be professional, concise, and actionable
+- Use Markdown formatting (bold, lists, headings)`;
+}
+
+/**
+ * Create a persistent AI chat session.
+ * Returns a sessionId that can be used for subsequent messages.
+ */
+export async function createAISession(
+    projectId: string,
+    currentTitle: string,
+    currentDescription: string,
+    userId: string
+): Promise<string> {
+    const aiConfig = await getAgencyAIConfig();
+    if (!aiConfig) throw new Error("Singularity is not configured.");
+
+    // Only use persistent sessions for Live API models
+    const modelId = aiConfig.model || 'gemini-2.5-flash-lite';
+    if (!modelId.includes('native-audio')) {
+        // For non-Live models, return a marker so the client knows to use legacy flow
+        return 'legacy';
+    }
+
+    const data = await db.get();
+    const systemInstruction = buildChatSystemInstruction(projectId, currentTitle, currentDescription, data);
+
+    const sessionId = await createSession(aiConfig.apiKey, modelId, systemInstruction);
+    console.log(`[AI Session] Created ${sessionId} for project ${projectId}`);
+    return sessionId;
+}
+
+/**
+ * Send a message to an existing AI chat session.
+ * For Live API models, uses persistent session (fast, no reconnect).
+ * For legacy models, falls back to full context + history send.
+ */
+export async function sendAIMessage(
+    sessionId: string,
+    userMessage: string,
+    // Legacy fallback params
+    projectId?: string,
+    currentTitle?: string,
+    currentDescription?: string,
+    history?: ChatMessage[],
+    userId?: string
+): Promise<string> {
+    // Legacy flow for non-Live models
+    if (sessionId === 'legacy') {
+        return chatWithTaskAI(
+            projectId!, currentTitle!, currentDescription!,
+            history || [], userMessage, userId!
+        );
+    }
+
+    try {
+        const result = await sendMessage(sessionId, userMessage);
+        return result;
+    } catch (error: any) {
+        console.error('[AI Session] Send error:', error.message);
+        return "I encountered an error. Please try again.";
+    }
+}
+
+/**
+ * Close an AI chat session when the chat box is closed.
+ */
+export async function closeAISession(sessionId: string): Promise<void> {
+    if (sessionId === 'legacy') return;
+    closeSession(sessionId);
+    console.log(`[AI Session] Closed ${sessionId}`);
+}
+
+/**
+ * Legacy chat function — used as fallback for non-Live models.
+ * Sends full context + history each time.
+ */
 export async function chatWithTaskAI(
     projectId: string,
     currentTitle: string,
@@ -3075,74 +3189,113 @@ export async function chatWithTaskAI(
     userId: string
 ) {
     const data = await db.get();
-    const currentUser = data.users.find(u => u.id === userId);
+    const aiConfig = await getAgencyAIConfig();
+    if (!aiConfig) throw new Error("Singularity is not configured.");
 
-    console.log(`[chatWithTaskAI] UserId: ${userId}, UserFound: ${!!currentUser}, HasKey: ${!!currentUser?.geminiApiKey}`);
-    console.log(`[chatWithTaskAI] EnvKey Present: ${!!process.env.GEMINI_API_KEY}`);
-
-    // 1. Gather Broad Context (Board Awareness)
-    const allProjectTasks = data.tasks.filter(t => t.projectId === projectId);
-    const tasksSummary = allProjectTasks.slice(0, 15).map(t => `- ${t.title} (${t.status})`).join('\n');
-
-    // 2. Fetch Asset Content
-    const projectAssets = (data.assets || []).filter(a => a.projectId === projectId && a.aiEnabled);
-    let assetContext = "";
-    projectAssets.filter(a => ['file', 'code', 'link'].includes(a.type) && a.content).forEach(a => {
-        assetContext += `\n--- Asset: ${a.name} ---\n${a.content?.substring(0, 1500) || "(Empty)"}\n`;
-    });
-
-    const apiKey = currentUser?.geminiApiKey || process.env.GEMINI_API_KEY?.trim();
-    if (!apiKey) {
-        console.error("[chatWithTaskAI] FATAL: No API Key found in User Profile OR Environment.");
-        throw new Error("Missing API Key");
-    }
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-        model: "gemini-3-flash-preview",
-        systemInstruction: `
-        You are a **Senior Technical Project Manager & Agile Coach**.
-        You are having a conversation with a user who is creating a task.
-        
-        **Your Goal**: Help the user clarify, refine, and structure their task. 
-        **Tone**: Professional, insightful, yet conversational and concise.
-        
-        ### CONTEXT
-        **Project Board Summary**:
-        ${tasksSummary}
-        
-        **Project Knowledge Base**:
-        ${assetContext || "(No assets available)"}
-        
-        ### CURRENT TASK STATE
-        **Title**: ${currentTitle}
-        **Draft Description**: 
-        ${currentDescription || "(Empty)"}
-        
-        ### INSTRUCTIONS
-        - Answer the user's latest query.
-        - If they ask to "generate" or "write" the task, provide a full, well-structured Markdown description.
-        - If they ask a question regarding project assets, answer it using project context.
-        - Use standard Markdown (bold, lists) for readability.
-        - REMEMBER: You are in a chat. Be helpful.
-        `
-    });
-
-    // 3. Start Chat
-    const chat = model.startChat({
-        history: history.map(h => ({
-            role: h.role,
-            parts: [{ text: h.content }]
-        })),
-    });
+    const systemInstruction = buildChatSystemInstruction(projectId, currentTitle, currentDescription, data);
 
     try {
-        const result = await chat.sendMessage(userMessage);
-        const response = await result.response;
-        return response.text();
+        const result = await generateContentWithChat(aiConfig, history, systemInstruction, userMessage);
+        return result;
     } catch (error: any) {
-        console.error("AI Chat Error:", error);
+        console.error("Singularity Chat Error:", error);
         return "I encountered an error. Please try again.";
+    }
+}
+
+// ============================================================================
+// SINGULARITY — Standalone AI Chatbot (No system prompt)
+// ============================================================================
+
+export async function singularityChat(
+    history: Array<{ role: 'user' | 'model'; content: string }>,
+    userMessage: string
+): Promise<{ response: string; thinking: string }> {
+    const aiConfig = await getAgencyAIConfig();
+    if (!aiConfig) throw new Error("Singularity is not configured.");
+
+    // Build a simple prompt with history (no system instruction)
+    let fullPrompt = '';
+    if (history.length > 0) {
+        fullPrompt += history
+            .map(m => `${m.role === 'user' ? 'User' : 'Singularity'}: ${m.content}`)
+            .join('\n\n');
+        fullPrompt += '\n\n';
+    }
+    fullPrompt += `User: ${userMessage}`;
+
+    const modelId = aiConfig.model || 'gemini-2.5-flash-lite';
+    const isLive = modelId.includes('native-audio');
+
+    if (isLive) {
+        // Use the Live API directly — same approach as liveGenerateContent
+        const { GoogleGenAI, Modality } = await import("@google/genai");
+        const ai = new GoogleGenAI({ apiKey: aiConfig.apiKey });
+        const messageQueue: any[] = [];
+
+        const waitMsg = (): Promise<any> => new Promise((resolve) => {
+            const check = () => {
+                const msg = messageQueue.shift();
+                if (msg) resolve(msg);
+                else setTimeout(check, 100);
+            };
+            check();
+        });
+
+        const session = await ai.live.connect({
+            model: `models/${modelId}`,
+            config: {
+                responseModalities: [Modality.AUDIO],
+                speechConfig: {
+                    voiceConfig: {
+                        prebuiltVoiceConfig: { voiceName: 'Zephyr' }
+                    }
+                },
+                outputAudioTranscription: {},
+            } as any,
+            callbacks: {
+                onopen: () => { },
+                onmessage: (message: any) => messageQueue.push(message),
+                onerror: (e: any) => console.error('[Singularity] Error:', e?.message || e),
+                onclose: () => { },
+            },
+        });
+
+        session.sendClientContent({ turns: [fullPrompt] });
+
+        let transcriptText = '';
+        let thoughtText = '';
+        let done = false;
+        const timeout = setTimeout(() => { done = true; }, 60000);
+
+        while (!done) {
+            const message = await waitMsg();
+            if ((message.serverContent as any)?.outputTranscription?.text) {
+                transcriptText += (message.serverContent as any).outputTranscription.text;
+            }
+            if (message.serverContent?.modelTurn?.parts) {
+                for (const part of message.serverContent.modelTurn.parts) {
+                    if (part.text) thoughtText += part.text;
+                }
+            }
+            if (message.serverContent?.turnComplete) done = true;
+        }
+
+        clearTimeout(timeout);
+        session.close();
+
+        const response = transcriptText.trim() ||
+            thoughtText.replace(/\*\*[A-Z][^*]*\*\*\s*\n\n/g, '').trim() ||
+            thoughtText.trim();
+
+        return {
+            response,
+            thinking: thoughtText.trim(),
+        };
+    } else {
+        // Non-live model fallback
+        const result = await generateContent(aiConfig, fullPrompt);
+        return { response: result, thinking: '' };
     }
 }
 
@@ -3285,10 +3438,12 @@ export async function approveLeaveRequest(leaveRequestId: string) {
             throw new Error(`Cannot approve ${leaveRequest.status} leave request`);
         }
 
-        // Update leave request
-        leaveRequest.status = 'Approved';
-        leaveRequest.reviewedBy = currentUser.id;
-        leaveRequest.reviewedAt = new Date().toISOString();
+        // Update leave request (immutable)
+        const updatedLeaveRequests = data.leaveRequests.map(lr =>
+            lr.id === leaveRequestId
+                ? { ...lr, status: 'Approved' as const, reviewedBy: currentUser.id, reviewedAt: new Date().toISOString() }
+                : lr
+        );
 
         // Calculate days for notification
         const startDate = new Date(leaveRequest.startDate);
@@ -3312,6 +3467,7 @@ export async function approveLeaveRequest(leaveRequestId: string) {
 
         return {
             ...data,
+            leaveRequests: updatedLeaveRequests,
             notifications,
             activities: [await withAgencyId({
                 id: generateId(),
@@ -3367,10 +3523,12 @@ export async function rejectLeaveRequest(leaveRequestId: string, rejectionReason
             throw new Error(`Cannot reject ${leaveRequest.status} leave request`);
         }
 
-        // Update leave request
-        leaveRequest.status = 'Rejected';
-        leaveRequest.reviewedBy = currentUser.id;
-        leaveRequest.reviewedAt = new Date().toISOString();
+        // Update leave request (immutable)
+        const updatedLeaveRequests = data.leaveRequests.map(lr =>
+            lr.id === leaveRequestId
+                ? { ...lr, status: 'Rejected' as const, reviewedBy: currentUser.id, reviewedAt: new Date().toISOString() }
+                : lr
+        );
 
         // Calculate days for notification
         const startDate = new Date(leaveRequest.startDate);
@@ -3398,6 +3556,7 @@ export async function rejectLeaveRequest(leaveRequestId: string, rejectionReason
 
         return {
             ...data,
+            leaveRequests: updatedLeaveRequests,
             notifications,
             activities: [await withAgencyId({
                 id: generateId(),
@@ -3444,6 +3603,9 @@ export async function cancelLeaveRequest(leaveRequestId: string) {
         throw new Error("Unauthorized: You must be logged in");
     }
 
+    // Store deleted request data for email before it's removed
+    let deletedLeaveData: { type: string } | null = null;
+
     await db.update(async (data) => {
         const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
         if (!leaveRequest) {
@@ -3459,6 +3621,9 @@ export async function cancelLeaveRequest(leaveRequestId: string) {
         if (leaveRequest.status !== 'Pending') {
             throw new Error(`Cannot cancel ${leaveRequest.status} leave request. Please contact admin.`);
         }
+
+        // Save data for email before removing
+        deletedLeaveData = { type: leaveRequest.type };
 
         // Remove the leave request
         data.leaveRequests = data.leaveRequests.filter(lr => lr.id !== leaveRequestId);
@@ -3493,18 +3658,17 @@ export async function cancelLeaveRequest(leaveRequestId: string) {
     });
 
     // Send email notification to admins
-    if (currentUser.role !== 'admin') {
+    if (currentUser.role !== 'admin' && deletedLeaveData) {
         try {
             const data = await db.get();
             const adminUsers = data.users.filter(u => u.role === 'admin');
             const adminEmails = adminUsers.map(u => u.email).filter(Boolean) as string[];
-            const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
 
-            if (adminEmails.length > 0 && leaveRequest) {
+            if (adminEmails.length > 0) {
                 await sendLeaveCancelledEmail({
                     adminEmails,
                     employeeName: currentUser.name,
-                    leaveType: leaveRequest.type,
+                    leaveType: (deletedLeaveData as { type: string }).type,
                     teamLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/team`,
                 });
             }
@@ -3563,7 +3727,9 @@ export async function getEmployeeLeaveStats(userId: string) {
 
 export async function updateLeaveStatus(requestId: string, status: LeaveStatus) {
     const currentUser = await getCurrentUser();
-
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+        throw new Error("Unauthorized: Only admins can update leave status.");
+    }
     const data = await db.get();
     const request = data.leaveRequests?.find(r => r.id === requestId);
     if (!request) throw new Error("Request not found");

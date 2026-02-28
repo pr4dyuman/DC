@@ -42,7 +42,7 @@ export function AIExplanationModal({ taskId, open, onOpenChange, userId }: AIExp
             setExplanation(result);
         } catch (err) {
             console.error(err);
-            setError("Failed to generate explanation. Please check your API key and try again.");
+            setError("Singularity is not configured. Contact your administrator.");
         } finally {
             setLoading(false);
         }
@@ -54,7 +54,7 @@ export function AIExplanationModal({ taskId, open, onOpenChange, userId }: AIExp
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Sparkles className="h-5 w-5 text-primary" />
-                        AI Task Assistant
+                        Singularity
                     </DialogTitle>
                     <DialogDescription>
                         Get a clear summary and next steps for this task.

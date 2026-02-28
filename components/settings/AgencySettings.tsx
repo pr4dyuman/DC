@@ -103,21 +103,21 @@ export function AgencySettings() {
                     <div className="space-y-4">
                         <Label>Agency Logo</Label>
                         <div className="flex items-center gap-6">
-                            <Avatar className="h-20 w-20 border-2 border-dashed border-gray-300">
+                            <Avatar className="h-20 w-20 border-2 border-dashed border-border">
                                 <AvatarImage src={logoPreview} />
                                 <AvatarFallback className="bg-muted text-muted-foreground">
                                     <ImageIcon className="h-8 w-8 opacity-50" />
                                 </AvatarFallback>
                             </Avatar>
-                            
+
                             <div className="space-y-2">
                                 <div className="flex items-center gap-2">
                                     <Button type="button" variant="outline" size="sm" className="relative cursor-pointer overflow-hidden">
                                         <Upload className="mr-2 h-4 w-4" />
                                         Upload Logo
-                                        <Input 
-                                            type="file" 
-                                            className="absolute inset-0 opacity-0 cursor-pointer" 
+                                        <Input
+                                            type="file"
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
                                             accept="image/*"
                                             onChange={handleLogoUpload}
                                         />
@@ -134,7 +134,7 @@ export function AgencySettings() {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div className="pt-2">
                         <Button type="submit" disabled={saving}>
                             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

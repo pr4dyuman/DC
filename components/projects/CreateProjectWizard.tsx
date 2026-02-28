@@ -411,7 +411,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
                                 <input
                                     type="checkbox"
                                     id={`later-${config.serviceId}`}
-                                    className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                                    className="rounded border-border text-primary focus:ring-primary h-4 w-4"
                                     checked={config.paymentConfig?.paymentDetailsLater || false}
                                     onChange={(e) => updatePaymentConfig(config.serviceId, { paymentDetailsLater: e.target.checked })}
                                 />

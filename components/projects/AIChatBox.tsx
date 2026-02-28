@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, X, Sparkles, User, Bot, CornerDownLeft, ArrowRight, Check } from "lucide-react";
-import { chatWithTaskAI, ChatMessage } from "@/lib/actions";
-import { cn } from "@/lib/utils"; // Assuming this exists, if not I'll standard tailwind string interpolation
+import { chatWithTaskAI, createAISession, sendAIMessage, closeAISession } from "@/lib/actions";
+import type { ChatMessage } from "@/lib/actions";
+import { cn } from "@/lib/utils";
 
 interface AIChatBoxProps {
     projectId: string;
@@ -20,6 +21,8 @@ export function AIChatBox({ projectId, taskState, userId, onClose, onApply }: AI
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [isConnecting, setIsConnecting] = useState(true);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll to bottom
@@ -29,8 +32,53 @@ export function AIChatBox({ projectId, taskState, userId, onClose, onApply }: AI
         }
     }, [messages, isLoading]);
 
+    // Create persistent session on mount
+    useEffect(() => {
+        let mounted = true;
+        const initSession = async () => {
+            try {
+                setIsConnecting(true);
+                const id = await createAISession(
+                    projectId,
+                    taskState.title,
+                    taskState.description,
+                    userId
+                );
+                if (mounted) {
+                    setSessionId(id);
+                    setIsConnecting(false);
+                    console.log('[AIChatBox] Session created:', id);
+                }
+            } catch (error) {
+                console.error('[AIChatBox] Failed to create session:', error);
+                if (mounted) {
+                    setIsConnecting(false);
+                    // Fall back to legacy mode
+                    setSessionId('legacy');
+                }
+            }
+        };
+        initSession();
+
+        // Close session on unmount
+        return () => {
+            mounted = false;
+            if (sessionId && sessionId !== 'legacy') {
+                closeAISession(sessionId).catch(() => { });
+            }
+        };
+    }, []); // Only on mount
+
+    // Close session handler
+    const handleClose = useCallback(() => {
+        if (sessionId && sessionId !== 'legacy') {
+            closeAISession(sessionId).catch(() => { });
+        }
+        onClose();
+    }, [sessionId, onClose]);
+
     const handleSend = async () => {
-        if (!inputValue.trim() || isLoading) return;
+        if (!inputValue.trim() || isLoading || !sessionId) return;
 
         const userMsg = inputValue.trim();
         setInputValue("");
@@ -41,12 +89,14 @@ export function AIChatBox({ projectId, taskState, userId, onClose, onApply }: AI
         setIsLoading(true);
 
         try {
-            const aiResponse = await chatWithTaskAI(
+            const aiResponse = await sendAIMessage(
+                sessionId,
+                userMsg,
+                // Legacy fallback params
                 projectId,
                 taskState.title,
                 taskState.description,
-                messages, // Send previous history
-                userMsg,
+                messages, // Previous history for legacy mode
                 userId
             );
 
@@ -72,10 +122,13 @@ export function AIChatBox({ projectId, taskState, userId, onClose, onApply }: AI
             <div className="flex items-center justify-between p-4 border-b border-border/50 bg-muted/30">
                 <div className="flex items-center gap-2 text-primary">
                     <Sparkles className="w-5 h-5 fill-primary/20" />
-                    <h3 className="font-semibold text-sm">AI Task Assistant</h3>
+                    <h3 className="font-semibold text-sm">Singularity</h3>
+                    {sessionId && sessionId !== 'legacy' && (
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Live session active" />
+                    )}
                 </div>
                 <button
-                    onClick={onClose}
+                    onClick={handleClose}
                     className="p-1 hover:bg-muted rounded-full transition-colors text-muted-foreground"
                 >
                     <X className="w-5 h-5" />
@@ -87,7 +140,16 @@ export function AIChatBox({ projectId, taskState, userId, onClose, onApply }: AI
                 ref={scrollRef}
                 className="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth no-scrollbar"
             >
-                {messages.length === 0 && (
+                {isConnecting && (
+                    <div className="flex flex-col items-center justify-center h-full text-center p-4 text-muted-foreground space-y-3 opacity-80">
+                        <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center mb-2">
+                            <Sparkles className="w-6 h-6 text-indigo-600 animate-spin" />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">Connecting to Singularity...</p>
+                    </div>
+                )}
+
+                {!isConnecting && messages.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-full text-center p-4 text-muted-foreground space-y-3 opacity-80">
                         <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center mb-2">
                             <Sparkles className="w-6 h-6 text-indigo-600" />
@@ -159,20 +221,21 @@ export function AIChatBox({ projectId, taskState, userId, onClose, onApply }: AI
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Ask AI to refine or generate..."
+                        placeholder="Ask Singularity to refine or generate..."
                         className="flex-1 max-h-32 min-h-[44px] bg-transparent border-none focus:ring-0 resize-none py-2.5 px-3 text-sm"
                         rows={1}
+                        disabled={isConnecting}
                     />
                     <button
                         onClick={handleSend}
-                        disabled={!inputValue.trim() || isLoading}
+                        disabled={!inputValue.trim() || isLoading || isConnecting}
                         className="h-9 w-9 flex items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-0.5"
                     >
                         <ArrowRight className="w-4 h-4" />
                     </button>
                 </div>
                 <div className="text-center mt-2">
-                    <p className="text-[10px] text-muted-foreground">AI can help you write, format, and structure your task.</p>
+                    <p className="text-[10px] text-muted-foreground">Singularity can help you write, format, and structure your task.</p>
                 </div>
             </div>
         </div>

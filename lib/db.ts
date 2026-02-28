@@ -35,14 +35,36 @@ function toPlainObject<T>(doc: any): T {
         return doc.map(d => toPlainObject(d)) as any;
     }
 
-    // Convert to plain object if it's a Mongoose document
+    // .lean() already returns plain objects, but handle Mongoose docs too
     const plain = doc.toObject ? doc.toObject() : doc;
 
     // Remove MongoDB-specific fields
-    // KEEP createdAt and updatedAt as they are required by schema
     const { _id, __v, ...rest } = plain;
 
     return rest as T;
+}
+
+// Simple async mutex to serialize db.update() calls and prevent race conditions
+let updateLock: Promise<any> = Promise.resolve();
+
+function withLock<T>(fn: () => Promise<T>): Promise<T> {
+    const prev = updateLock;
+    let resolve: () => void;
+    updateLock = new Promise<void>(r => { resolve = r; });
+    return prev
+        .then(() => fn())
+        .finally(() => resolve!());
+}
+
+// Fallback agencyId for legacy data that predates multi-tenancy
+const FALLBACK_AGENCY_ID = 'default-agency';
+
+// Helper: backfill agencyId for legacy documents
+function backfillAgencyId<T extends Record<string, any>>(docs: any[]): T[] {
+    return toPlainObject<any[]>(docs).map(d => ({
+        ...d,
+        agencyId: d.agencyId || FALLBACK_AGENCY_ID
+    }));
 }
 
 export const db = {
@@ -67,7 +89,7 @@ export const db = {
             SettingsModel.findOne({}).lean()
         ]);
 
-        // Default settings if none exist, with all required fields
+        // Default settings if none exist
         const settings: Settings = settingsDoc
             ? toPlainObject(settingsDoc)
             : { systemName: 'AgencyOS', logo: '', userPermissions: {} };
@@ -77,172 +99,116 @@ export const db = {
         if (settings.logo === undefined || settings.logo === null) settings.logo = '';
         if (!settings.userPermissions) settings.userPermissions = {};
 
-        // Helper to ensure Agency validity (Backfilling legacy data)
+        // Backfill legacy data
         const validAgencies = toPlainObject<any[]>(agencies).map(agency => ({
             ...agency,
             createdAt: agency.createdAt || new Date().toISOString(),
             billing: {
                 ...agency.billing,
-                billingEmail: agency.billing?.billingEmail || 'legacy-agency@example.com' // Fallback for legacy data
+                billingEmail: agency.billing?.billingEmail || 'legacy-agency@example.com'
             }
         }));
 
-        // Backfill agencyId for all other collections to prevent validation errors
-        const fallbackAgencyId = 'default-agency';
-
-        const validClients = toPlainObject<any[]>(clients).map(c => ({
-            ...c,
-            agencyId: c.agencyId || fallbackAgencyId
-        }));
-
-        const validProjects = toPlainObject<any[]>(projects).map(p => ({
-            ...p,
-            agencyId: p.agencyId || fallbackAgencyId
-        }));
-
-        const validTasks = toPlainObject<any[]>(tasks).map(t => ({
-            ...t,
-            agencyId: t.agencyId || fallbackAgencyId
-        }));
-
-        const validInvoices = toPlainObject<any[]>(invoices).map(i => ({
-            ...i,
-            agencyId: i.agencyId || fallbackAgencyId
-        }));
-
-        const validTransactions = toPlainObject<any[]>(transactions).map(t => ({
-            ...t,
-            agencyId: t.agencyId || fallbackAgencyId
-        }));
-
-        const validServices = toPlainObject<any[]>(services).map(s => ({
-            ...s,
-            agencyId: s.agencyId || fallbackAgencyId
-        }));
-
-        const validNotifications = toPlainObject<any[]>(notifications).map(n => ({
-            ...n,
-            agencyId: n.agencyId || fallbackAgencyId
-        }));
-
-        const validActivities = toPlainObject<any[]>(activities).map(a => ({
-            ...a,
-            agencyId: a.agencyId || fallbackAgencyId
-        }));
-
-        const validAssets = toPlainObject<any[]>(assets).map(a => ({
-            ...a,
-            agencyId: a.agencyId || fallbackAgencyId
-        }));
-
-        const validMessages = toPlainObject<any[]>(messages).map(m => ({
-            ...m,
-            agencyId: m.agencyId || fallbackAgencyId
-        }));
-
-        const validLeaveRequests = toPlainObject<any[]>(leaveRequests).map(l => ({
-            ...l,
-            agencyId: l.agencyId || fallbackAgencyId
-        }));
-
-        // Convert all documents to plain objects without MongoDB fields
         return {
             agencies: validAgencies,
-            superAdmins: toPlainObject(superAdmins), // SuperAdmins don't belong to an agency
-            users: toPlainObject<any[]>(users).map(u => ({
-                ...u,
-                agencyId: u.agencyId || fallbackAgencyId
-            })),
-            clients: validClients,
-            projects: validProjects,
-            tasks: validTasks,
-            invoices: validInvoices,
-            transactions: validTransactions,
-            services: validServices,
-            notifications: validNotifications,
-            activities: validActivities,
-            assets: validAssets,
-            messages: validMessages,
-            leaveRequests: validLeaveRequests,
+            superAdmins: toPlainObject(superAdmins),
+            users: backfillAgencyId(users),
+            clients: backfillAgencyId(clients),
+            projects: backfillAgencyId(projects),
+            tasks: backfillAgencyId(tasks),
+            invoices: backfillAgencyId(invoices),
+            transactions: backfillAgencyId(transactions),
+            services: backfillAgencyId(services),
+            notifications: backfillAgencyId(notifications),
+            activities: backfillAgencyId(activities),
+            assets: backfillAgencyId(assets),
+            messages: backfillAgencyId(messages),
+            leaveRequests: backfillAgencyId(leaveRequests),
             settings
         };
     }),
 
     update: async (callback: (data: DB) => DB | Promise<DB>): Promise<DB> => {
-        await connectDB();
+        // Serialize concurrent updates via mutex lock to prevent race conditions
+        return withLock(async () => {
+            await connectDB();
 
-        // Get current data
-        const currentData = await db.get();
+            // Get current data
+            const currentData = await db.get();
 
-        // Apply the callback transformation (support both sync and async)
-        const newData = await callback(currentData);
+            // Apply the callback transformation
+            const newData = await callback(currentData);
 
-        // Diff-based update: only touch documents that actually changed.
-        // This avoids deleting ALL data and re-inserting, which risks data loss.
-        const collectionMap: { model: any; key: keyof DB }[] = [
-            { model: AgencyModel, key: 'agencies' },
-            { model: SuperAdminModel, key: 'superAdmins' },
-            { model: UserModel, key: 'users' },
-            { model: ClientModel, key: 'clients' },
-            { model: ProjectModel, key: 'projects' },
-            { model: TaskModel, key: 'tasks' },
-            { model: InvoiceModel, key: 'invoices' },
-            { model: TransactionModel, key: 'transactions' },
-            { model: ServiceModel, key: 'services' },
-            { model: NotificationModel, key: 'notifications' },
-            { model: ActivityModel, key: 'activities' },
-            { model: AssetModel, key: 'assets' },
-            { model: MessageModel, key: 'messages' },
-            { model: LeaveRequestModel, key: 'leaveRequests' },
-        ];
+            // Diff-based update: only touch documents that actually changed
+            const collectionMap: { model: any; key: keyof DB }[] = [
+                { model: AgencyModel, key: 'agencies' },
+                { model: SuperAdminModel, key: 'superAdmins' },
+                { model: UserModel, key: 'users' },
+                { model: ClientModel, key: 'clients' },
+                { model: ProjectModel, key: 'projects' },
+                { model: TaskModel, key: 'tasks' },
+                { model: InvoiceModel, key: 'invoices' },
+                { model: TransactionModel, key: 'transactions' },
+                { model: ServiceModel, key: 'services' },
+                { model: NotificationModel, key: 'notifications' },
+                { model: ActivityModel, key: 'activities' },
+                { model: AssetModel, key: 'assets' },
+                { model: MessageModel, key: 'messages' },
+                { model: LeaveRequestModel, key: 'leaveRequests' },
+            ];
 
-        await Promise.all(
-            collectionMap.map(async ({ model, key }) => {
-                const oldItems = (currentData[key] as any[]) || [];
-                const newItems = (newData[key] as any[]) || [];
+            await Promise.all(
+                collectionMap.map(async ({ model, key }) => {
+                    const oldItems = (currentData[key] as any[]) || [];
+                    const newItems = (newData[key] as any[]) || [];
 
-                const oldMap = new Map(oldItems.map(item => [item.id, item]));
-                const newMap = new Map(newItems.map(item => [item.id, item]));
+                    const oldMap = new Map(oldItems.map(item => [item.id, item]));
+                    const newMap = new Map(newItems.map(item => [item.id, item]));
 
-                // Find items to insert (in new but not in old)
-                const toInsert = newItems.filter(item => !oldMap.has(item.id));
+                    // Find items to insert (in new but not in old)
+                    const toInsert = newItems.filter(item => !oldMap.has(item.id));
 
-                // Find items to delete (in old but not in new)
-                const toDeleteIds = oldItems.filter(item => !newMap.has(item.id)).map(item => item.id);
+                    // Find items to delete (in old but not in new)
+                    const toDeleteIds = oldItems.filter(item => !newMap.has(item.id)).map(item => item.id);
 
-                // Find items to update (in both, but content changed)
-                const toUpdate = newItems.filter(item => {
-                    const oldItem = oldMap.get(item.id);
-                    if (!oldItem) return false;
-                    return JSON.stringify(oldItem) !== JSON.stringify(item);
-                });
+                    // Find items to update (in both, but content changed)
+                    const toUpdate = newItems.filter(item => {
+                        const oldItem = oldMap.get(item.id);
+                        if (!oldItem) return false;
+                        return JSON.stringify(oldItem) !== JSON.stringify(item);
+                    });
 
-                const ops: Promise<any>[] = [];
+                    const ops: Promise<any>[] = [];
 
-                if (toInsert.length > 0) {
-                    ops.push(model.insertMany(toInsert));
-                }
+                    if (toInsert.length > 0) {
+                        ops.push(model.insertMany(toInsert));
+                    }
 
-                if (toDeleteIds.length > 0) {
-                    ops.push(model.deleteMany({ id: { $in: toDeleteIds } }));
-                }
+                    if (toDeleteIds.length > 0) {
+                        ops.push(model.deleteMany({ id: { $in: toDeleteIds } }));
+                    }
 
-                for (const item of toUpdate) {
-                    ops.push(model.replaceOne({ id: item.id }, item, { upsert: true }));
-                }
+                    for (const item of toUpdate) {
+                        ops.push(model.replaceOne({ id: item.id }, item, { upsert: true }));
+                    }
 
-                await Promise.all(ops);
-            })
-        );
+                    await Promise.all(ops);
+                })
+            );
 
-        // Update settings separately (singleton document, no id field)
-        const settingsToSave = {
-            systemName: newData.settings.systemName || 'AgencyOS',
-            logo: newData.settings.logo || '',
-            userPermissions: newData.settings.userPermissions || {}
-        };
-        await SettingsModel.updateOne({}, { $set: settingsToSave }, { upsert: true });
+            // Update settings separately (singleton document, no id field)
+            const settingsToSave: Record<string, any> = {
+                systemName: newData.settings.systemName || 'AgencyOS',
+                logo: newData.settings.logo || '',
+                userPermissions: newData.settings.userPermissions || {}
+            };
+            // Include agencyId in settings if present
+            if (newData.settings.agencyId) {
+                settingsToSave.agencyId = newData.settings.agencyId;
+            }
+            await SettingsModel.updateOne({}, { $set: settingsToSave }, { upsert: true });
 
-        return newData;
+            return newData;
+        });
     }
 };

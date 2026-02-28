@@ -24,6 +24,16 @@ export type AgencyFeatures = {
     ssoEnabled: boolean;
 };
 
+// AI Configuration Types
+export type AIProvider = 'gemini' | 'openai' | 'nvidia' | 'github';
+
+export type AIConfig = {
+    provider: AIProvider;
+    apiKey: string;
+    model: string;
+    customModelId?: string;
+};
+
 export type AgencyUsage = {
     users: number;
     projects: number;
@@ -81,6 +91,9 @@ export type Agency = {
     createdBy: string;         // Super admin ID
     updatedAt?: string;
     lastActivityAt?: string;
+
+    // AI Configuration (Singularity)
+    aiConfig?: AIConfig;
 
     // Features
     features: AgencyFeatures;
@@ -202,7 +215,6 @@ export type User = {
     salary?: number;
     avatar?: string;
     password?: string;
-    geminiApiKey?: string;
     lastActiveAt?: string; // ISO Date string for presence
     employmentType?: 'Salary' | 'Project Based' | 'Freelancer';
     contactNumber?: string;
@@ -359,6 +371,7 @@ export const DEFAULT_USER_PERMISSIONS: UserPermissions = {
 };
 
 export type Settings = {
+    agencyId?: string;
     systemName: string;
     logo: string;
     userPermissions?: Record<string, UserPermissions>;

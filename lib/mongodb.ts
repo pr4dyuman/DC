@@ -148,44 +148,51 @@ const AgencyFeaturesSchema = new Schema({
     ssoEnabled: { type: Boolean, default: false }
 }, { _id: false });
 
+// AI Config Schema (Embedded in Agency)
+const AIConfigSchema = new Schema({
+    provider: { type: String, enum: ['gemini', 'openai', 'nvidia', 'github'], required: true },
+    apiKey: { type: String, required: true },
+    model: { type: String, required: true },
+    customModelId: { type: String }
+}, { _id: false });
+
 // Agency Schema
 const AgencySchema = new Schema({
     id: { type: String, required: true, unique: true },
     name: { type: String, required: true },
     slug: { type: String, required: true, unique: true },
     domain: { type: String, sparse: true },
-    
+
     // Branding
     logo: { type: String },
     primaryColor: { type: String },
     secondaryColor: { type: String },
-    
+
     // Status & Plan
-    status: { 
-        type: String, 
-        enum: ['active', 'suspended', 'trial', 'cancelled'], 
+    status: {
+        type: String,
+        enum: ['active', 'suspended', 'trial', 'cancelled'],
         required: true,
         default: 'trial'
     },
-    plan: { 
-        type: String, 
-        enum: ['free', 'starter', 'pro', 'enterprise'], 
+    plan: {
+        type: String,
+        enum: ['free', 'starter', 'pro', 'enterprise'],
         required: true,
         default: 'free'
     },
     trialEndsAt: { type: String },
-    
+
     // Limits & Usage
     limits: { type: AgencyLimitsSchema, required: true },
     usage: { type: AgencyUsageSchema, required: true },
-    
-    // Billing
+
     // Billing
     billing: {
         subscriptionId: { type: String },
         stripeCustomerId: { type: String },
-        subscriptionStatus: { 
-            type: String, 
+        subscriptionStatus: {
+            type: String,
             enum: ['active', 'past_due', 'canceled', 'unpaid', 'trialing', 'incomplete', 'incomplete_expired', 'paused']
         },
         currentPeriodEnd: { type: String },
@@ -194,18 +201,21 @@ const AgencySchema = new Schema({
         billingAddress: { type: String },
         taxId: { type: String }
     },
-    
+
     // Settings
     settings: { type: AgencySettingsSchema, required: true },
-    
+
     // Metadata
     createdAt: { type: String, required: true },
     createdBy: { type: String, required: true },
     updatedAt: { type: String },
     lastActivityAt: { type: String },
-    
+
     // Features
-    features: { type: AgencyFeaturesSchema, required: true }
+    features: { type: AgencyFeaturesSchema, required: true },
+
+    // AI Configuration (Singularity)
+    aiConfig: { type: AIConfigSchema }
 }, { timestamps: true });
 
 // Indexes for Agency
@@ -249,7 +259,7 @@ const SuperAdminSchema = new Schema({
 // User Schema
 const UserSchema = new Schema<User>({
     id: { type: String, required: true, unique: true },
-    agencyId: { type: String, required: false, index: true }, // NEW: Multi-tenancy
+    agencyId: { type: String, required: true, index: true }, // Multi-tenancy
     username: { type: String, sparse: true },
     name: { type: String, required: true },
     email: { type: String, required: true },
@@ -258,9 +268,8 @@ const UserSchema = new Schema<User>({
     salary: { type: Number },
     avatar: { type: String },
     password: { type: String },
-    geminiApiKey: { type: String },
     lastActiveAt: { type: String },
-    employmentType: { type: String, enum: ['Salary', 'Project Based'] },
+    employmentType: { type: String, enum: ['Salary', 'Project Based', 'Freelancer'] },
     contactNumber: { type: String },
     adharCardImage: { type: String },
     panCardImage: { type: String },
@@ -273,7 +282,7 @@ const UserSchema = new Schema<User>({
 }, { timestamps: true });
 
 // Note: id and username already have indexes from unique constraint
-UserSchema.index({ email: 1 });
+UserSchema.index({ email: 1, agencyId: 1 }); // Compound index: email unique per agency
 
 // Client Schema
 const ClientSchema = new Schema<Client>({
@@ -315,7 +324,7 @@ const ProjectSchema = new Schema<Project>({
     clientId: { type: String },
     services: [{ type: String }],
     serviceConfigs: [ProjectServiceConfigSchema],
-    status: { type: String, enum: ['Active', 'Completed', 'On Hold'], required: true },
+    status: { type: String, enum: ['Active', 'Completed', 'On Hold', 'Cancelled'], required: true },
     budget: { type: Number, required: true },
     dueDate: { type: String, required: true },
     createdAt: { type: String },
@@ -372,11 +381,14 @@ const TransactionSchema = new Schema<Transaction>({
     date: { type: String, required: true },
     amount: { type: Number, required: true },
     type: { type: String, enum: ['income', 'expense'], required: true },
-    category: { type: String, enum: ['Project', 'Salary', 'Software', 'Marketing', 'Office', 'Hosting', 'Domain', 'Equipment', 'Internal Transfer', 'Investor', 'Refund', 'Other'], required: true },
+    category: { type: String, enum: ['Project', 'Salary', 'Freelancer', 'Tax', 'Reimbursement', 'Retainer', 'Internal Transfer', 'Investor', 'Refund', 'Other'], required: true },
     description: { type: String, required: true },
     status: { type: String, enum: ['completed', 'pending'], required: true },
     projectId: { type: String },
-    userId: { type: String }
+    userId: { type: String },
+    taxType: { type: String, enum: ['GST', 'TDS', 'Income Tax', 'Professional Tax', 'Other'] },
+    expenseType: { type: String, enum: ['Travel', 'Meals', 'Client Meeting', 'Equipment', 'Other'] },
+    invoiceId: { type: String }
 }, { timestamps: true });
 
 // Note: id already has index from unique constraint
@@ -469,6 +481,7 @@ const LeaveRequestSchema = new Schema<LeaveRequest>({
     type: { type: String, enum: ['Casual', 'Emergency'], required: true },
     reason: { type: String, required: true },
     status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], required: true },
+    createdAt: { type: String },
     reviewedBy: { type: String },
     reviewedAt: { type: String }
 }, { timestamps: true });
@@ -479,6 +492,7 @@ LeaveRequestSchema.index({ status: 1 });
 
 // Settings Schema
 const SettingsSchema = new Schema<Settings>({
+    agencyId: { type: String, index: true },
     systemName: { type: String, required: true, default: 'AgencyOS' },
     logo: { type: String, required: false, default: '' },
     userPermissions: { type: Schema.Types.Mixed, required: false }
@@ -505,14 +519,6 @@ export const ActivityModel = (mongoose.models.Activity as Model<Activity>) || mo
 export const AssetModel = (mongoose.models.Asset as Model<Asset>) || mongoose.model<Asset>('Asset', AssetSchema);
 export const MessageModel = (mongoose.models.Message as Model<Message>) || mongoose.model<Message>('Message', MessageSchema);
 
-// Force recreate LeaveRequest model to pick up schema changes
-if (mongoose.models.LeaveRequest) {
-    delete mongoose.models.LeaveRequest;
-}
-export const LeaveRequestModel = mongoose.model<LeaveRequest>('LeaveRequest', LeaveRequestSchema);
+export const LeaveRequestModel = (mongoose.models.LeaveRequest as Model<LeaveRequest>) || mongoose.model<LeaveRequest>('LeaveRequest', LeaveRequestSchema);
 
-// Force recreate Settings model to pick up schema changes
-if (mongoose.models.Settings) {
-    delete mongoose.models.Settings;
-}
-export const SettingsModel = mongoose.model<Settings>('Settings', SettingsSchema);
+export const SettingsModel = (mongoose.models.Settings as Model<Settings>) || mongoose.model<Settings>('Settings', SettingsSchema);

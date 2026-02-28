@@ -1,7 +1,7 @@
 "use server";
 
 import { AgencyModel, UserModel, SuperAdminModel, ProjectModel, ClientModel, InvoiceModel, TransactionModel, connectDB } from "../mongodb";
-import { Agency, User, AGENCY_PLANS } from "../types";
+import { Agency, User, AGENCY_PLANS, AIConfig } from "../types";
 import { getSessionUser } from "../auth";
 import { generateId } from "../utils-server";
 import { revalidatePath } from "next/cache";
@@ -33,7 +33,7 @@ function toSerializable<T>(obj: T): T {
         }
         return value;
     });
-    
+
     return JSON.parse(jsonString);
 }
 
@@ -43,9 +43,9 @@ function toSerializable<T>(obj: T): T {
 export async function getAllAgenciesWithStats() {
     await verifySuperAdmin();
     await connectDB();
-    
+
     const agencies = await AgencyModel.find({}).lean();
-    
+
     // Get stats for each agency
     const agenciesWithStats = await Promise.all(
         agencies.map(async (agency) => {
@@ -54,7 +54,7 @@ export async function getAllAgenciesWithStats() {
                 ProjectModel.countDocuments({ agencyId: agency.id }),
                 ClientModel.countDocuments({ agencyId: agency.id })
             ]);
-            
+
             return {
                 ...agency,
                 stats: {
@@ -65,7 +65,7 @@ export async function getAllAgenciesWithStats() {
             };
         })
     );
-    
+
     return toSerializable(agenciesWithStats);
 }
 
@@ -75,12 +75,12 @@ export async function getAllAgenciesWithStats() {
 export async function getAgencyDetails(agencyId: string) {
     await verifySuperAdmin();
     await connectDB();
-    
+
     const agency = await AgencyModel.findOne({ id: agencyId }).lean();
     if (!agency) {
         throw new Error('Agency not found');
     }
-    
+
     // Get detailed stats
     // Get detailed stats (Counts only, no private data)
     const [userCount, projectCount, clientCount] = await Promise.all([
@@ -88,7 +88,7 @@ export async function getAgencyDetails(agencyId: string) {
         ProjectModel.countDocuments({ agencyId }),
         ClientModel.countDocuments({ agencyId })
     ]);
-    
+
     // Only fetch users list for management purposes (e.g. to see who is the admin)
     // But for now, we'll return the Owner info or just the list of users to help with support.
     const users = await UserModel.find({ agencyId }).lean();
@@ -110,7 +110,7 @@ export async function getAgencyDetails(agencyId: string) {
 export async function getSystemAnalytics() {
     await verifySuperAdmin();
     await connectDB();
-    
+
     const [
         totalAgencies,
         activeAgencies,
@@ -122,18 +122,18 @@ export async function getSystemAnalytics() {
         AgencyModel.countDocuments({ status: 'suspended' }),
         UserModel.countDocuments({})
     ]);
-    
+
     // Get agencies by plan
     const agenciesByPlan = await AgencyModel.aggregate([
         { $group: { _id: '$plan', count: { $sum: 1 } } }
     ]);
-    
+
     // Get recent agencies
     const recentAgencies = await AgencyModel.find({})
         .sort({ createdAt: -1 })
         .limit(10)
         .lean();
-    
+
     return toSerializable({
         totalAgencies,
         activeAgencies,
@@ -159,19 +159,19 @@ export async function createAgency(data: {
 }) {
     const sa = await verifySuperAdmin();
     await connectDB();
-    
+
     // Check if email already exists
     const existingUser = await UserModel.findOne({ email: data.ownerEmail });
     if (existingUser) {
         throw new Error('Email already in use');
     }
-    
+
     const agencyId = generateId();
     const userId = generateId();
-    
+
     // Get plan defaults
     const planDefaults = AGENCY_PLANS[data.plan];
-    
+
     // Create agency
     const agency: Agency = {
         id: agencyId,
@@ -216,7 +216,7 @@ export async function createAgency(data: {
         updatedAt: new Date().toISOString(),
         createdBy: sa.userId
     };
-    
+
     // Create owner user
     const hashedPassword = await bcrypt.hash(data.ownerPassword, 10);
     const owner: User = {
@@ -231,13 +231,13 @@ export async function createAgency(data: {
         salary: 0,
         createdAt: new Date().toISOString()
     } as User;
-    
+
     // Save to database
     await AgencyModel.create(agency);
     await UserModel.create(owner);
-    
+
     revalidatePath('/super-admin/agencies');
-    
+
     return { agency, owner };
 }
 
@@ -247,24 +247,24 @@ export async function createAgency(data: {
 export async function updateAgency(agencyId: string, updates: Partial<Agency>) {
     await verifySuperAdmin();
     await connectDB();
-    
+
     const result = await AgencyModel.updateOne(
         { id: agencyId },
-        { 
+        {
             $set: {
                 ...updates,
                 updatedAt: new Date().toISOString()
             }
         }
     );
-    
+
     if (result.modifiedCount === 0) {
         throw new Error('Agency not found or no changes made');
     }
-    
+
     revalidatePath('/super-admin/agencies');
     revalidatePath(`/super-admin/agencies/${agencyId}`);
-    
+
     return true;
 }
 
@@ -274,11 +274,11 @@ export async function updateAgency(agencyId: string, updates: Partial<Agency>) {
 export async function suspendAgency(agencyId: string, reason?: string) {
     await verifySuperAdmin();
     await connectDB();
-    
+
     await AgencyModel.updateOne(
         { id: agencyId },
-        { 
-            $set: { 
+        {
+            $set: {
                 status: 'suspended',
                 suspendedAt: new Date().toISOString(),
                 suspensionReason: reason,
@@ -286,10 +286,10 @@ export async function suspendAgency(agencyId: string, reason?: string) {
             }
         }
     );
-    
+
     revalidatePath('/super-admin/agencies');
     revalidatePath(`/super-admin/agencies/${agencyId}`);
-    
+
     return true;
 }
 
@@ -299,11 +299,11 @@ export async function suspendAgency(agencyId: string, reason?: string) {
 export async function activateAgency(agencyId: string) {
     await verifySuperAdmin();
     await connectDB();
-    
+
     await AgencyModel.updateOne(
         { id: agencyId },
-        { 
-            $set: { 
+        {
+            $set: {
                 status: 'active',
                 updatedAt: new Date().toISOString()
             },
@@ -313,10 +313,10 @@ export async function activateAgency(agencyId: string) {
             }
         }
     );
-    
+
     revalidatePath('/super-admin/agencies');
     revalidatePath(`/super-admin/agencies/${agencyId}`);
-    
+
     return true;
 }
 
@@ -326,7 +326,7 @@ export async function activateAgency(agencyId: string) {
 export async function deleteAgency(agencyId: string) {
     await verifySuperAdmin();
     await connectDB();
-    
+
     // Delete all agency data
     await Promise.all([
         AgencyModel.deleteOne({ id: agencyId }),
@@ -337,9 +337,9 @@ export async function deleteAgency(agencyId: string) {
         TransactionModel.deleteMany({ agencyId })
         // Add other models as needed
     ]);
-    
+
     revalidatePath('/super-admin/agencies');
-    
+
     return true;
 }
 
@@ -349,13 +349,13 @@ export async function deleteAgency(agencyId: string) {
 export async function updateAgencyPlan(agencyId: string, plan: 'free' | 'pro' | 'enterprise') {
     await verifySuperAdmin();
     await connectDB();
-    
+
     const planDefaults = AGENCY_PLANS[plan];
-    
+
     await AgencyModel.updateOne(
         { id: agencyId },
-        { 
-            $set: { 
+        {
+            $set: {
                 plan,
                 limits: planDefaults.limits,
                 features: planDefaults.features,
@@ -363,11 +363,91 @@ export async function updateAgencyPlan(agencyId: string, plan: 'free' | 'pro' | 
             }
         }
     );
-    
+
     revalidatePath('/super-admin/agencies');
     revalidatePath(`/super-admin/agencies/${agencyId}`);
-    
+
     return true;
 }
 
 
+// =============================================================================
+// Singularity AI Configuration (Per-Agency)
+// =============================================================================
+
+/**
+ * Get AI config for a specific agency (super-admin only)
+ */
+export async function getAgencyAIConfigSuperAdmin(agencyId: string): Promise<AIConfig | null> {
+    await verifySuperAdmin();
+    await connectDB();
+
+    const agency = await AgencyModel.findOne({ id: agencyId }).lean();
+    if (!agency) throw new Error("Agency not found");
+
+    return toSerializable(agency.aiConfig || null) as AIConfig | null;
+}
+
+/**
+ * Update AI config for a specific agency (super-admin only)
+ */
+export async function updateAgencyAIConfigSuperAdmin(agencyId: string, config: AIConfig) {
+    await verifySuperAdmin();
+    await connectDB();
+
+    // Validate required fields
+    if (!config.provider || !config.apiKey || !config.model) {
+        throw new Error("Provider, API Key, and Model are required");
+    }
+
+    // Validate provider
+    const validProviders = ['gemini', 'openai', 'nvidia', 'github'];
+    if (!validProviders.includes(config.provider)) {
+        throw new Error(`Invalid provider: ${config.provider}`);
+    }
+
+    const result = await AgencyModel.updateOne(
+        { id: agencyId },
+        {
+            $set: {
+                aiConfig: {
+                    provider: config.provider,
+                    apiKey: config.apiKey,
+                    model: config.model,
+                    ...(config.customModelId ? { customModelId: config.customModelId } : {})
+                },
+                updatedAt: new Date().toISOString()
+            }
+        }
+    );
+
+    if (result.modifiedCount === 0) {
+        throw new Error("Agency not found or no changes made");
+    }
+
+    revalidatePath(`/super-admin/agencies/${agencyId}`);
+    revalidatePath(`/super-admin/agencies/${agencyId}/ai`);
+
+    return true;
+}
+
+/**
+ * Remove AI config for a specific agency (super-admin only)
+ */
+export async function removeAgencyAIConfig(agencyId: string) {
+    await verifySuperAdmin();
+    await connectDB();
+
+    await AgencyModel.updateOne(
+        { id: agencyId },
+        {
+            $unset: { aiConfig: '' },
+            $set: { updatedAt: new Date().toISOString() }
+        }
+    );
+
+    revalidatePath(`/super-admin/agencies/${agencyId}`);
+    revalidatePath(`/super-admin/agencies/${agencyId}/ai`);
+
+    return true;
+}

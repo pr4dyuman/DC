@@ -18,7 +18,7 @@ const getIcon = (type: Asset['type']) => {
         case 'zip': return <ArchiveIcon className="h-6 w-6 text-red-500" />;
         case 'folder': return <FolderIcon className="h-6 w-6 text-orange-500" />;
         case 'link': return <LinkIcon className="h-6 w-6 text-green-500" />;
-        default: return <FileIcon className="h-6 w-6 text-gray-500" />;
+        default: return <FileIcon className="h-6 w-6 text-muted-foreground" />;
     }
 };
 

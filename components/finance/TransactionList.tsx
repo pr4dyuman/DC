@@ -112,7 +112,7 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
             <CardContent>
                 <div className="space-y-8">
                     {filteredTransactions.length === 0 ? (
-                        <div className="text-center text-zinc-500 py-8">No transactions found.</div>
+                        <div className="text-center text-muted-foreground py-8">No transactions found.</div>
                     ) : (
                         filteredTransactions.map((transaction) => (
                             <div key={transaction.id} className="flex items-center group">
