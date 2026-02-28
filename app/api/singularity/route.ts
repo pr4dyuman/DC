@@ -153,6 +153,9 @@ export async function POST(req: NextRequest) {
 
                         // Poll and stream messages
                         let done = false;
+                        let totalResponseChars = 0;
+                        let totalThinkingChars = 0;
+                        let msgCount = 0;
                         const timeout = setTimeout(() => {
                             console.log('[Singularity Agent] Timeout reached');
                             done = true;
@@ -171,6 +174,11 @@ export async function POST(req: NextRequest) {
                         while (!done) {
                             const msg = await waitMsg();
                             if (!msg) break;
+                            msgCount++;
+
+                            // Log every message type for debugging
+                            const msgKeys = Object.keys(msg);
+                            console.log(`[Agent] Msg #${msgCount} keys:`, msgKeys);
 
                             // Handle tool calls from the model
                             if (msg.toolCall && msg.toolCall.functionCalls) {
@@ -211,6 +219,8 @@ export async function POST(req: NextRequest) {
                             if (msg.serverContent?.modelTurn?.parts) {
                                 for (const part of msg.serverContent.modelTurn.parts) {
                                     if (part.text) {
+                                        totalThinkingChars += part.text.length;
+                                        console.log(`[Agent] Thinking chunk: ${part.text.length} chars, total: ${totalThinkingChars}`);
                                         controller.enqueue(encoder.encode(
                                             `data: ${JSON.stringify({ type: 'thinking', text: part.text })}\n\n`
                                         ));
@@ -220,13 +230,17 @@ export async function POST(req: NextRequest) {
 
                             // Handle audio transcript (the actual response text)
                             if ((msg.serverContent as any)?.outputTranscription?.text) {
+                                const chunk = (msg.serverContent as any).outputTranscription.text;
+                                totalResponseChars += chunk.length;
+                                console.log(`[Agent] Response chunk: "${chunk.slice(0, 80)}${chunk.length > 80 ? '...' : ''}" (${chunk.length} chars, total: ${totalResponseChars})`);
                                 controller.enqueue(encoder.encode(
-                                    `data: ${JSON.stringify({ type: 'response', text: (msg.serverContent as any).outputTranscription.text })}\n\n`
+                                    `data: ${JSON.stringify({ type: 'response', text: chunk })}\n\n`
                                 ));
                             }
 
                             // Check for turn completion
                             if (msg.serverContent?.turnComplete) {
+                                console.log(`[Agent] turnComplete after ${msgCount} messages. Response: ${totalResponseChars} chars, Thinking: ${totalThinkingChars} chars`);
                                 done = true;
                             }
                         }
@@ -234,20 +248,29 @@ export async function POST(req: NextRequest) {
                         // Drain remaining transcript chunks (can arrive after turnComplete)
                         // Use a rolling window: extend drain whenever new data arrives
                         let drainDeadline = Date.now() + 5000;
+                        let drainCount = 0;
+                        console.log(`[Agent] Starting drain loop...`);
                         while (Date.now() < drainDeadline) {
                             const remaining = messageQueue.shift();
                             if (!remaining) {
                                 await new Promise(r => setTimeout(r, 100));
                                 continue;
                             }
+                            drainCount++;
                             if ((remaining.serverContent as any)?.outputTranscription?.text) {
+                                const chunk = (remaining.serverContent as any).outputTranscription.text;
+                                totalResponseChars += chunk.length;
+                                console.log(`[Agent] Drain chunk #${drainCount}: "${chunk.slice(0, 80)}${chunk.length > 80 ? '...' : ''}" (${chunk.length} chars, total: ${totalResponseChars})`);
                                 controller.enqueue(encoder.encode(
-                                    `data: ${JSON.stringify({ type: 'response', text: (remaining.serverContent as any).outputTranscription.text })}\n\n`
+                                    `data: ${JSON.stringify({ type: 'response', text: chunk })}\n\n`
                                 ));
                                 // Extend drain window — more transcription may follow
                                 drainDeadline = Math.max(drainDeadline, Date.now() + 2000);
+                            } else {
+                                console.log(`[Agent] Drain non-transcript msg #${drainCount}:`, Object.keys(remaining));
                             }
                         }
+                        console.log(`[Agent] Drain complete. ${drainCount} msgs drained. Final response: ${totalResponseChars} chars`);
 
                         clearTimeout(timeout);
                         session.close();
