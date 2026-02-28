@@ -446,68 +446,79 @@ export function SingularityChat({ userId }: { userId?: string }) {
             )}
 
             {/* Header */}
-            <div className="flex items-center justify-between px-3 sm:px-6 py-3 sm:py-4 border-b border-border/30 gap-2">
-                <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <div className={cn(
-                            "w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300",
-                            isAgent
-                                ? "bg-gradient-to-br from-cyan-600 to-blue-600 shadow-cyan-500/20"
-                                : "bg-gradient-to-br from-violet-600 to-indigo-600 shadow-violet-500/20"
-                        )}>
-                            {isAgent ? <Bot className="w-5 h-5 text-white" /> : <Sparkles className="w-5 h-5 text-white" />}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-3 sm:px-6 py-2.5 sm:py-4 border-b border-border/30 gap-2">
+                <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-start">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                        <div className="relative shrink-0">
+                            <div className={cn(
+                                "w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300",
+                                isAgent
+                                    ? "bg-gradient-to-br from-cyan-600 to-blue-600 shadow-cyan-500/20"
+                                    : "bg-gradient-to-br from-violet-600 to-indigo-600 shadow-violet-500/20"
+                            )}>
+                                {isAgent ? <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-white" /> : <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />}
+                            </div>
+                            <span className={cn(
+                                "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border-2 border-background",
+                                isAgent ? "bg-cyan-400" : "bg-emerald-400"
+                            )} />
                         </div>
-                        <span className={cn(
-                            "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background",
-                            isAgent ? "bg-cyan-400" : "bg-emerald-400"
-                        )} />
+                        <div className="min-w-0">
+                            <h1 className={cn(
+                                "text-sm sm:text-lg font-bold bg-clip-text text-transparent transition-all duration-300",
+                                isAgent
+                                    ? "bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-400"
+                                    : "bg-gradient-to-r from-violet-600 to-indigo-600 dark:from-violet-400 dark:to-indigo-400"
+                            )}>
+                                Singularity
+                            </h1>
+                            <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                                {isAgent ? "Agent Mode" : "AI Assistant"}
+                                <span className="hidden sm:inline">{isAgent ? " • Connected to your agency" : " • Always Ready"}</span>
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className={cn(
-                            "text-base sm:text-lg font-bold bg-clip-text text-transparent transition-all duration-300",
-                            isAgent
-                                ? "bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-400"
-                                : "bg-gradient-to-r from-violet-600 to-indigo-600 dark:from-violet-400 dark:to-indigo-400"
-                        )}>
-                            Singularity
-                        </h1>
-                        <p className="text-xs text-muted-foreground">
-                            {isAgent ? "Agent Mode • Connected to your agency" : "AI Assistant • Always Ready"}
-                        </p>
-                    </div>
+
+                    {/* Clear button — visible on mobile in the header row */}
+                    {messages.length > 0 && (
+                        <button onClick={clearChat} className="sm:hidden flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive px-2 py-1 rounded-lg hover:bg-destructive/10 transition-all shrink-0">
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                    )}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                     {/* Mode Toggle */}
                     <div className="flex items-center bg-muted/60 rounded-lg p-0.5 border border-border/30">
                         <button
                             onClick={() => handleModeSwitch('chat')}
                             className={cn(
-                                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200",
+                                "flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200",
                                 mode === 'chat'
                                     ? "bg-background text-foreground shadow-sm"
                                     : "text-muted-foreground hover:text-foreground"
                             )}
                         >
                             <MessageSquare className="w-3.5 h-3.5" />
-                            Chat
+                            <span>Chat</span>
                         </button>
                         <button
                             onClick={() => handleModeSwitch('agent')}
                             className={cn(
-                                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200",
+                                "flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200",
                                 mode === 'agent'
                                     ? "bg-background text-foreground shadow-sm"
                                     : "text-muted-foreground hover:text-foreground"
                             )}
                         >
                             <Bot className="w-3.5 h-3.5" />
-                            Agent
+                            <span>Agent</span>
                         </button>
                     </div>
 
+                    {/* Clear button — visible on desktop */}
                     {messages.length > 0 && (
-                        <button onClick={clearChat} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive px-3 py-1.5 rounded-lg hover:bg-destructive/10 transition-all">
+                        <button onClick={clearChat} className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive px-3 py-1.5 rounded-lg hover:bg-destructive/10 transition-all">
                             <Trash2 className="w-3.5 h-3.5" /> Clear
                         </button>
                     )}
@@ -540,10 +551,10 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                 )}>
                                     {isAgent ? "What would you like me to do?" : "How can I help you today?"}
                                 </h2>
-                                <p className="text-sm text-muted-foreground mt-2 max-w-md">
+                                <p className="text-xs sm:text-sm text-muted-foreground mt-1.5 sm:mt-2 max-w-md px-2 sm:px-0">
                                     {isAgent
-                                        ? "I have access to your projects, clients, team, and finances. Ask me anything or tell me to take action."
-                                        : "Ask me anything — strategy, coding, writing, analysis, or brainstorming. You can also drop images for analysis."
+                                        ? "Access your projects, clients, team, and finances."
+                                        : "Strategy, coding, writing, analysis — ask anything."
                                     }
                                 </p>
                             </div>
@@ -569,10 +580,10 @@ export function SingularityChat({ userId }: { userId?: string }) {
 
                 {/* Messages */}
                 {messages.map((msg) => (
-                    <div key={msg.id} className={cn("flex gap-3", msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
+                    <div key={msg.id} className={cn("flex gap-2 sm:gap-3", msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
                         {/* Avatar */}
                         <div className={cn(
-                            "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm mt-1 transition-all duration-300",
+                            "w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm mt-1 transition-all duration-300",
                             msg.role === 'user'
                                 ? 'bg-primary/15 text-primary border border-primary/20'
                                 : isAgent
@@ -587,7 +598,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                             }
                         </div>
 
-                        <div className={cn("max-w-[80%] space-y-2", msg.role === 'user' ? 'items-end' : 'items-start')}>
+                        <div className={cn("max-w-[85%] sm:max-w-[80%] space-y-2", msg.role === 'user' ? 'items-end' : 'items-start')}>
                             {/* User Images */}
                             {msg.images && msg.images.length > 0 && (
                                 <div className="flex gap-2 flex-wrap">
@@ -662,7 +673,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                             {/* Response Bubble */}
                             {(msg.content || msg.role === 'user') && (
                                 <div className={cn(
-                                    "relative group rounded-2xl p-4 text-sm leading-relaxed shadow-sm transition-all duration-300",
+                                    "relative group rounded-2xl p-3 sm:p-4 text-sm leading-relaxed shadow-sm transition-all duration-300",
                                     msg.role === 'user'
                                         ? 'bg-primary text-primary-foreground rounded-br-sm'
                                         : 'bg-card border border-border/30 text-foreground rounded-bl-sm'
@@ -740,7 +751,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                 <div className="h-px mb-3 bg-gradient-to-r from-transparent via-border/60 to-transparent" />
 
                 <div className={cn(
-                    "relative flex items-end gap-2 bg-card border p-2.5 rounded-2xl transition-all duration-300",
+                    "relative flex items-end gap-1.5 sm:gap-2 bg-card border p-2 sm:p-2.5 rounded-2xl transition-all duration-300",
                     isAgent
                         ? "border-border/50 focus-within:border-cyan-500/50 focus-within:shadow-[0_0_20px_rgba(6,182,212,0.08)] dark:focus-within:shadow-[0_0_20px_rgba(6,182,212,0.15)]"
                         : "border-border/50 focus-within:border-violet-500/50 focus-within:shadow-[0_0_20px_rgba(139,92,246,0.08)] dark:focus-within:shadow-[0_0_20px_rgba(139,92,246,0.15)]"
@@ -751,7 +762,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isLoading || attachments.length >= 4}
                             className={cn(
-                                "h-10 w-10 flex items-center justify-center rounded-xl text-muted-foreground/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 mb-0.5",
+                                "h-9 w-9 sm:h-10 sm:w-10 flex items-center justify-center rounded-xl text-muted-foreground/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 mb-0.5 shrink-0",
                                 isAgent
                                     ? "hover:text-cyan-500 dark:hover:text-cyan-400 hover:bg-cyan-500/10"
                                     : "hover:text-violet-500 dark:hover:text-violet-400 hover:bg-violet-500/10"
@@ -782,7 +793,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                     ? "Describe what you'd like to know about the image..."
                                     : "Message Singularity..."
                         }
-                        className="flex-1 max-h-40 min-h-[44px] bg-transparent border-none focus:ring-0 focus:outline-none resize-none py-2.5 px-1 text-sm placeholder:text-muted-foreground/40"
+                        className="flex-1 max-h-40 min-h-[40px] sm:min-h-[44px] bg-transparent border-none focus:ring-0 focus:outline-none resize-none py-2 sm:py-2.5 px-1 text-sm placeholder:text-muted-foreground/40"
                         rows={1}
                         disabled={isLoading}
                     />
@@ -801,7 +812,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                         <ArrowRight className="w-4 h-4" />
                     </button>
                 </div>
-                <p className="text-center text-[10px] text-muted-foreground/60 mt-2.5">
+                <p className="text-center text-[10px] text-muted-foreground/60 mt-2 sm:mt-2.5 hidden sm:block">
                     {isAgent
                         ? "Agent mode can read your agency data and perform actions on your behalf."
                         : "Singularity can analyze images and answer questions. Drag & drop or click 📷 to attach."
