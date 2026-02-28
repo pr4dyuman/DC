@@ -7,42 +7,22 @@ export default function SingularityLayout({
 }: {
     children: React.ReactNode;
 }) {
-    // Hide topbar and remove padding when this layout mounts
+    // Force body bg to match on mount/unmount
     useEffect(() => {
-        const main = document.querySelector('main');
-        if (!main) return;
-
-        // Hide the Topbar (first child of main is the Topbar div)
-        const topbar = main.querySelector(':scope > div:first-child') as HTMLElement;
-        if (topbar) topbar.style.display = 'none';
-
-        // Remove padding from the content wrapper (second child: div.p-8)
-        const contentWrapper = main.querySelector(':scope > div.p-8') as HTMLElement;
-        if (contentWrapper) {
-            contentWrapper.style.padding = '0';
-            contentWrapper.style.height = '100vh';
-            contentWrapper.style.overflow = 'hidden';
-        }
-
-        // Remove min-height/padding from main
-        main.style.minHeight = '100vh';
-        main.style.paddingBottom = '0';
+        const isDark = document.documentElement.classList.contains('dark');
+        const originalBg = document.body.style.backgroundColor;
+        document.body.style.backgroundColor = isDark ? '#000' : '#fff';
 
         return () => {
-            // Restore on unmount (when user navigates away)
-            if (topbar) topbar.style.display = '';
-            if (contentWrapper) {
-                contentWrapper.style.padding = '';
-                contentWrapper.style.height = '';
-                contentWrapper.style.overflow = '';
-            }
-            main.style.minHeight = '';
-            main.style.paddingBottom = '';
+            document.body.style.backgroundColor = originalBg;
         };
     }, []);
 
     return (
-        <div className="h-screen overflow-hidden">
+        <div
+            data-singularity
+            className="fixed inset-0 z-[9999] bg-white dark:bg-black overflow-hidden"
+        >
             {children}
         </div>
     );
