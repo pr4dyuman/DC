@@ -741,55 +741,57 @@ export function SingularityChat({ userId }: { userId?: string }) {
             )}
 
             {/* Header */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-3 sm:px-6 py-2.5 sm:py-4 border-b border-border/30 gap-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-3 sm:px-6 py-2.5 sm:py-3 border-b border-border/20 gap-2 backdrop-blur-xl bg-background/80 z-30 sticky top-0">
                 <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-start">
-                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                         <div className="relative shrink-0">
                             <div className={cn(
-                                "w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300",
+                                "w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shadow-lg transition-all duration-500",
                                 isAgent
-                                    ? "bg-gradient-to-br from-cyan-600 to-blue-600 shadow-cyan-500/20"
-                                    : "bg-gradient-to-br from-violet-600 to-indigo-600 shadow-violet-500/20"
+                                    ? "bg-gradient-to-br from-cyan-600 to-blue-600 shadow-cyan-500/25"
+                                    : "bg-gradient-to-br from-violet-600 to-indigo-600 shadow-violet-500/25"
                             )}>
-                                {isAgent ? <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-white" /> : <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />}
+                                {isAgent ? <Bot className="w-[18px] h-[18px] sm:w-5 sm:h-5 text-white" /> : <Sparkles className="w-[18px] h-[18px] sm:w-5 sm:h-5 text-white" />}
                             </div>
                             <span className={cn(
-                                "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border-2 border-background",
+                                "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border-2 border-background singularity-pulse-dot",
                                 isAgent ? "bg-cyan-400" : "bg-emerald-400"
                             )} />
                         </div>
                         <div className="min-w-0">
                             <h1 className={cn(
-                                "text-sm sm:text-lg font-bold bg-clip-text text-transparent transition-all duration-300",
+                                "text-sm sm:text-lg font-bold bg-clip-text text-transparent tracking-tight transition-all duration-500",
                                 isAgent
                                     ? "bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-400"
                                     : "bg-gradient-to-r from-violet-600 to-indigo-600 dark:from-violet-400 dark:to-indigo-400"
                             )}>
                                 Singularity
                             </h1>
-                            <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                            <p className="text-[10px] sm:text-xs text-muted-foreground/80 truncate">
                                 {isAgent ? "Agent Mode" : "AI Assistant"}
-                                <span className="hidden sm:inline">{isAgent ? " • Connected to your agency" : " • Always Ready"}</span>
+                                <span className="hidden sm:inline">{isAgent ? " • Connected to your agency" : " • Always ready"}</span>
                             </p>
                         </div>
                     </div>
 
                     {/* New Chat button — visible on mobile in the header row */}
-                    <button onClick={newChat} className="sm:hidden flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg hover:bg-muted/60 transition-all shrink-0" title="New Chat">
+                    <button onClick={newChat} className="sm:hidden flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-lg hover:bg-muted/60 transition-all shrink-0" title="New Chat">
                         <Plus className="w-3.5 h-3.5" />
                     </button>
                 </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                    {/* Mode Toggle */}
-                    <div className="flex items-center bg-muted/60 rounded-lg p-0.5 border border-border/30">
+                <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+                    {/* Mode Toggle — Pill with sliding highlight */}
+                    <div className="relative flex items-center bg-muted/50 rounded-xl p-1 border border-border/30">
+                        <div className={cn(
+                            "absolute top-1 bottom-1 rounded-lg bg-background shadow-sm transition-all duration-300 ease-out",
+                            mode === 'chat' ? "left-1 w-[calc(50%-4px)]" : "left-[calc(50%+2px)] w-[calc(50%-4px)]"
+                        )} />
                         <button
                             onClick={() => handleModeSwitch('chat')}
                             className={cn(
-                                "flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200",
-                                mode === 'chat'
-                                    ? "bg-background text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground"
+                                "relative z-10 flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors duration-200",
+                                mode === 'chat' ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                             )}
                         >
                             <MessageSquare className="w-3.5 h-3.5" />
@@ -798,10 +800,8 @@ export function SingularityChat({ userId }: { userId?: string }) {
                         <button
                             onClick={() => handleModeSwitch('agent')}
                             className={cn(
-                                "flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200",
-                                mode === 'agent'
-                                    ? "bg-background text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground"
+                                "relative z-10 flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors duration-200",
+                                mode === 'agent' ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                             )}
                         >
                             <Bot className="w-3.5 h-3.5" />
@@ -813,10 +813,10 @@ export function SingularityChat({ userId }: { userId?: string }) {
                     <button
                         onClick={() => { setShowHistory(!showHistory); fetchSessions(); }}
                         className={cn(
-                            "flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-all",
+                            "flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-xl transition-all duration-200",
                             showHistory
                                 ? "bg-primary/10 text-primary"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                         )}
                         title="Chat History"
                     >
@@ -826,53 +826,96 @@ export function SingularityChat({ userId }: { userId?: string }) {
 
                     <button
                         onClick={newChat}
-                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-lg hover:bg-muted/60 transition-all"
+                        className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted/50 transition-all duration-200"
                         title="New Chat"
                     >
                         <Plus className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">New</span>
+                        <span>New</span>
                     </button>
                 </div>
             </div>
 
             {/* History Sidebar */}
             {showHistory && (
-                <div className="absolute top-0 right-0 w-full sm:w-80 h-full z-40 bg-card border-l border-border/40 shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
-                        <h3 className="text-sm font-semibold text-foreground">Chat History</h3>
-                        <button onClick={() => setShowHistory(false)} className="p-1 hover:bg-muted rounded-md transition-colors">
+                <div className="absolute top-0 right-0 w-full sm:w-80 h-full z-40 bg-card/95 backdrop-blur-xl border-l border-border/30 shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-border/20 backdrop-blur-sm">
+                        <div className="flex items-center gap-2">
+                            <History className="w-4 h-4 text-muted-foreground" />
+                            <h3 className="text-sm font-semibold text-foreground">History</h3>
+                            <span className="text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-full">{sessions.length}</span>
+                        </div>
+                        <button onClick={() => setShowHistory(false)} className="p-1.5 hover:bg-muted/60 rounded-lg transition-colors">
                             <X className="w-4 h-4 text-muted-foreground" />
                         </button>
                     </div>
                     <div className="flex-1 overflow-y-auto no-scrollbar">
                         {sessions.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-40 text-muted-foreground text-xs">
-                                <Clock className="w-8 h-8 mb-2 opacity-30" />
+                                <Clock className="w-8 h-8 mb-2 opacity-20" />
                                 No conversations yet
                             </div>
                         ) : (
-                            <div className="p-2 space-y-1">
-                                {sessions.map(s => (
-                                    <div key={s.id} className={cn(
-                                        "group flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200",
-                                        s.id === sessionId
-                                            ? "bg-primary/10 border border-primary/20"
-                                            : "hover:bg-muted/60"
-                                    )}>
-                                        <div className="flex-1 min-w-0" onClick={() => loadSession(s.id)}>
-                                            <p className="text-xs font-medium text-foreground truncate">{s.title}</p>
-                                            <p className="text-[10px] text-muted-foreground mt-0.5">
-                                                {s.mode === 'agent' ? '🤖' : '💬'} {s.messageCount} messages · {new Date(s.updatedAt).toLocaleDateString()}
-                                            </p>
+                            <div className="p-2 space-y-3">
+                                {(() => {
+                                    const now = new Date();
+                                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                                    const yesterday = new Date(today.getTime() - 86400000);
+                                    const weekAgo = new Date(today.getTime() - 7 * 86400000);
+
+                                    const groups: { label: string; items: typeof sessions }[] = [
+                                        { label: 'Today', items: sessions.filter(s => new Date(s.updatedAt) >= today) },
+                                        { label: 'Yesterday', items: sessions.filter(s => { const d = new Date(s.updatedAt); return d >= yesterday && d < today; }) },
+                                        { label: 'This Week', items: sessions.filter(s => { const d = new Date(s.updatedAt); return d >= weekAgo && d < yesterday; }) },
+                                        { label: 'Older', items: sessions.filter(s => new Date(s.updatedAt) < weekAgo) },
+                                    ];
+
+                                    return groups.filter(g => g.items.length > 0).map(group => (
+                                        <div key={group.label} className="space-y-1">
+                                            <p className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider px-2 pt-1">{group.label}</p>
+                                            {group.items.map(s => (
+                                                <div key={s.id} className={cn(
+                                                    "group flex items-start gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-200",
+                                                    s.id === sessionId
+                                                        ? isAgent
+                                                            ? "bg-cyan-500/10 border border-cyan-500/20"
+                                                            : "bg-violet-500/10 border border-violet-500/20"
+                                                        : "hover:bg-muted/50 border border-transparent"
+                                                )}>
+                                                    <div className={cn(
+                                                        "w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5",
+                                                        s.mode === 'agent'
+                                                            ? "bg-cyan-500/10 text-cyan-500"
+                                                            : "bg-violet-500/10 text-violet-500"
+                                                    )}>
+                                                        {s.mode === 'agent' ? <Bot className="w-3.5 h-3.5" /> : <MessageSquare className="w-3.5 h-3.5" />}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0" onClick={() => loadSession(s.id)}>
+                                                        <p className="text-xs font-medium text-foreground truncate">{s.title}</p>
+                                                        <p className="text-[10px] text-muted-foreground/70 mt-0.5 flex items-center gap-1.5">
+                                                            <span>{s.messageCount} messages</span>
+                                                            <span className="opacity-40">·</span>
+                                                            <span>{(() => {
+                                                                const diff = Date.now() - new Date(s.updatedAt).getTime();
+                                                                const mins = Math.floor(diff / 60000);
+                                                                if (mins < 1) return 'Just now';
+                                                                if (mins < 60) return `${mins}m ago`;
+                                                                const hrs = Math.floor(mins / 60);
+                                                                if (hrs < 24) return `${hrs}h ago`;
+                                                                return `${Math.floor(hrs / 24)}d ago`;
+                                                            })()}</span>
+                                                        </p>
+                                                    </div>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); requestDeleteSession(s.id); }}
+                                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 rounded-lg transition-all mt-0.5"
+                                                    >
+                                                        <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                                                    </button>
+                                                </div>
+                                            ))}
                                         </div>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); requestDeleteSession(s.id); }}
-                                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 rounded transition-all"
-                                        >
-                                            <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
-                                        </button>
-                                    </div>
-                                ))}
+                                    ));
+                                })()}
                             </div>
                         )}
                     </div>
@@ -1061,44 +1104,44 @@ export function SingularityChat({ userId }: { userId?: string }) {
                     <div className="flex flex-col items-center justify-center h-full text-center space-y-4 sm:space-y-8 animate-in fade-in duration-700">
                         <div className="space-y-2 sm:space-y-4">
                             <div className={cn(
-                                "w-10 h-10 sm:w-20 sm:h-20 mx-auto rounded-xl sm:rounded-2xl flex items-center justify-center border shadow-xl sm:shadow-2xl transition-all duration-300",
+                                "w-12 h-12 sm:w-20 sm:h-20 mx-auto rounded-xl sm:rounded-2xl flex items-center justify-center border shadow-xl sm:shadow-2xl transition-all duration-500 singularity-float",
                                 isAgent
-                                    ? "bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-cyan-600/20 dark:to-blue-600/20 border-cyan-200 dark:border-cyan-500/20 shadow-cyan-500/10"
-                                    : "bg-gradient-to-br from-violet-100 to-indigo-100 dark:from-violet-600/20 dark:to-indigo-600/20 border-violet-200 dark:border-violet-500/20 shadow-violet-500/10"
+                                    ? "bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-cyan-600/20 dark:to-blue-600/20 border-cyan-200 dark:border-cyan-500/20 shadow-cyan-500/15"
+                                    : "bg-gradient-to-br from-violet-100 to-indigo-100 dark:from-violet-600/20 dark:to-indigo-600/20 border-violet-200 dark:border-violet-500/20 shadow-violet-500/15"
                             )}>
                                 {isAgent
-                                    ? <Bot className="w-5 h-5 sm:w-10 sm:h-10 text-cyan-500 dark:text-cyan-400" />
-                                    : <Sparkles className="w-5 h-5 sm:w-10 sm:h-10 text-violet-500 dark:text-violet-400" />
+                                    ? <Bot className="w-6 h-6 sm:w-10 sm:h-10 text-cyan-500 dark:text-cyan-400" />
+                                    : <Sparkles className="w-6 h-6 sm:w-10 sm:h-10 text-violet-500 dark:text-violet-400" />
                                 }
                             </div>
                             <div>
                                 <h2 className={cn(
-                                    "text-lg sm:text-2xl font-bold bg-clip-text text-transparent",
+                                    "text-lg sm:text-2xl font-bold bg-clip-text text-transparent singularity-shimmer",
                                     isAgent
-                                        ? "bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-300 dark:to-blue-300"
-                                        : "bg-gradient-to-r from-violet-600 to-indigo-600 dark:from-violet-300 dark:to-indigo-300"
+                                        ? "bg-gradient-to-r from-cyan-600 via-blue-500 to-cyan-600 dark:from-cyan-300 via-blue-300 dark:to-cyan-300"
+                                        : "bg-gradient-to-r from-violet-600 via-indigo-500 to-violet-600 dark:from-violet-300 via-indigo-300 dark:to-violet-300"
                                 )}>
                                     {isAgent ? "What would you like me to do?" : "How can I help you today?"}
                                 </h2>
-                                <p className="text-[11px] sm:text-sm text-muted-foreground mt-1 sm:mt-2 max-w-md px-2 sm:px-0">
+                                <p className="text-[11px] sm:text-sm text-muted-foreground/70 mt-1 sm:mt-2 max-w-md px-2 sm:px-0">
                                     {isAgent
-                                        ? "Access your projects, clients, team, and finances."
+                                        ? "I can manage your projects, clients, team, and finances."
                                         : "Strategy, coding, writing, analysis — ask anything."
                                     }
                                 </p>
                             </div>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2.5 w-full max-w-lg">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5 w-full max-w-lg">
                             {suggestions.map((s, i) => (
                                 <button key={i} onClick={() => handleSend(s)} className={cn(
-                                    "group text-left p-2.5 sm:p-3.5 rounded-xl border bg-card/50 transition-all duration-200 text-xs sm:text-sm text-muted-foreground hover:text-foreground",
+                                    "group text-left p-3 sm:p-3.5 rounded-xl border bg-card/50 transition-all duration-200 text-xs sm:text-sm text-muted-foreground hover:text-foreground hover:scale-[1.02] active:scale-[0.98]",
                                     isAgent
-                                        ? "border-border/40 hover:bg-cyan-500/5 hover:border-cyan-500/30"
-                                        : "border-border/40 hover:bg-violet-500/5 hover:border-violet-500/30"
+                                        ? "border-border/30 hover:bg-cyan-500/5 hover:border-cyan-500/30 hover:shadow-sm hover:shadow-cyan-500/5"
+                                        : "border-border/30 hover:bg-violet-500/5 hover:border-violet-500/30 hover:shadow-sm hover:shadow-violet-500/5"
                                 )}>
                                     <span className="line-clamp-1 sm:line-clamp-2">{s}</span>
                                     <ArrowRight className={cn(
-                                        "w-3.5 h-3.5 mt-1 sm:mt-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200 -translate-x-1 group-hover:translate-x-0 hidden sm:block",
+                                        "w-3.5 h-3.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200 -translate-x-1 group-hover:translate-x-0 hidden sm:block",
                                         isAgent ? "text-cyan-500 dark:text-cyan-400" : "text-violet-500 dark:text-violet-400"
                                     )} />
                                 </button>
@@ -1109,16 +1152,18 @@ export function SingularityChat({ userId }: { userId?: string }) {
 
                 {/* Messages */}
                 {messages.map((msg) => (
-                    <div key={msg.id} className={cn("flex gap-2 sm:gap-3", msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
+                    <div key={msg.id} className={cn("flex gap-2 sm:gap-3 singularity-msg-enter", msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
                         {/* Avatar */}
                         <div className={cn(
                             "w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm mt-1 transition-all duration-300",
                             msg.role === 'user'
                                 ? 'bg-primary/15 text-primary border border-primary/20'
                                 : isAgent
-                                    ? 'bg-gradient-to-br from-cyan-600 to-blue-600 text-white'
-                                    : 'bg-gradient-to-br from-violet-600 to-indigo-600 text-white'
-                        )}>
+                                    ? 'bg-gradient-to-br from-cyan-600 to-blue-600 text-white singularity-avatar-glow'
+                                    : 'bg-gradient-to-br from-violet-600 to-indigo-600 text-white singularity-avatar-glow'
+                        )}
+                            style={msg.role !== 'user' ? { '--glow-color': isAgent ? 'rgba(6, 182, 212, 0.3)' : 'rgba(139, 92, 246, 0.3)' } as React.CSSProperties : {}}
+                        >
                             {msg.role === 'user'
                                 ? <User className="w-4 h-4" />
                                 : isAgent
@@ -1171,49 +1216,69 @@ export function SingularityChat({ userId }: { userId?: string }) {
 
                             {/* Tool Actions (Agent mode only) */}
                             {msg.role === 'model' && msg.toolActions && msg.toolActions.length > 0 && (
-                                <div className="space-y-1.5">
-                                    {msg.toolActions.map((ta, i) => (
-                                        <div key={`${ta.name}-${i}`} className={cn(
-                                            "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300",
-                                            ta.status === 'calling'
-                                                ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20"
-                                                : ta.success
-                                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                                                    : "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"
-                                        )}>
-                                            {ta.status === 'calling' ? (
-                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            ) : ta.success ? (
-                                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                            ) : (
-                                                <AlertCircle className="w-3.5 h-3.5" />
-                                            )}
-                                            <span>
-                                                {ta.status === 'calling'
-                                                    ? `${ta.displayName}...`
-                                                    : ta.summary || ta.displayName
-                                                }
-                                            </span>
-                                        </div>
-                                    ))}
+                                <div className="rounded-xl border border-border/30 bg-card/50 overflow-hidden">
+                                    <div className="flex items-center gap-2 px-3 py-2 border-b border-border/20 bg-muted/30">
+                                        <Wrench className="w-3 h-3 text-muted-foreground" />
+                                        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Actions</span>
+                                        <span className="text-[10px] text-muted-foreground/60 bg-muted/60 px-1.5 py-0.5 rounded-full">{msg.toolActions.length}</span>
+                                    </div>
+                                    <div className="p-1.5 space-y-1 singularity-stagger">
+                                        {msg.toolActions.map((ta, i) => (
+                                            <div key={`${ta.name}-${i}`} className={cn(
+                                                "flex items-start gap-2.5 px-3 py-2 rounded-lg text-xs transition-all duration-300 singularity-msg-enter",
+                                                ta.status === 'calling'
+                                                    ? "bg-cyan-500/5 border border-cyan-500/15 singularity-calling-pulse"
+                                                    : ta.success
+                                                        ? "bg-emerald-500/5"
+                                                        : "bg-red-500/5"
+                                            )}>
+                                                <div className={cn(
+                                                    "w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5",
+                                                    ta.status === 'calling'
+                                                        ? "bg-cyan-500/10 text-cyan-500"
+                                                        : ta.success
+                                                            ? "bg-emerald-500/10 text-emerald-500"
+                                                            : "bg-red-500/10 text-red-500"
+                                                )}>
+                                                    {ta.status === 'calling' ? (
+                                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                                    ) : ta.success ? (
+                                                        <CheckCircle2 className="w-3 h-3" />
+                                                    ) : (
+                                                        <AlertCircle className="w-3 h-3" />
+                                                    )}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <span className="font-medium text-foreground">
+                                                        {ta.status === 'calling' ? `${ta.displayName}...` : ta.displayName}
+                                                    </span>
+                                                    {ta.summary && ta.status !== 'calling' && (
+                                                        <p className="text-muted-foreground/70 mt-0.5 text-[11px] leading-relaxed">{ta.summary}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
 
-                                    {/* Undo Checkpoint button — on finished agent messages with a matching checkpoint */}
+                                    {/* Undo Checkpoint button — integrated in action group footer */}
                                     {!msg.isStreaming && (() => {
                                         const msgIndex = messages.indexOf(msg);
                                         const cp = checkpoints.find(c => c.messageIndex >= msgIndex - 1 && c.messageIndex <= msgIndex + 2);
                                         if (!cp) return null;
                                         return (
-                                            <button
-                                                onClick={() => handleUndo(cp.id)}
-                                                disabled={undoingCheckpoint === cp.id}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-all duration-200 mt-1"
-                                            >
-                                                {undoingCheckpoint === cp.id
-                                                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                    : <Undo2 className="w-3.5 h-3.5" />
-                                                }
-                                                <span>Undo these actions</span>
-                                            </button>
+                                            <div className="px-1.5 pb-1.5">
+                                                <button
+                                                    onClick={() => handleUndo(cp.id)}
+                                                    disabled={undoingCheckpoint === cp.id}
+                                                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-amber-500/8 text-amber-600 dark:text-amber-400 border border-amber-500/15 hover:bg-amber-500/15 transition-all duration-200"
+                                                >
+                                                    {undoingCheckpoint === cp.id
+                                                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                        : <Undo2 className="w-3.5 h-3.5" />
+                                                    }
+                                                    <span>Undo these actions</span>
+                                                </button>
+                                            </div>
                                         );
                                     })()}
                                 </div>
@@ -1224,8 +1289,10 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                 <div className={cn(
                                     "relative group rounded-2xl p-3 sm:p-4 text-sm leading-relaxed shadow-sm transition-all duration-300",
                                     msg.role === 'user'
-                                        ? 'bg-primary text-primary-foreground rounded-br-sm'
-                                        : 'bg-card border border-border/30 text-foreground rounded-bl-sm'
+                                        ? 'bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-br-sm'
+                                        : isAgent
+                                            ? 'bg-card border-l-2 border-l-cyan-500/40 border border-border/20 text-foreground rounded-bl-sm'
+                                            : 'bg-card border-l-2 border-l-violet-500/40 border border-border/20 text-foreground rounded-bl-sm'
                                 )}>
                                     {msg.role === 'model' ? (
                                         <div
@@ -1256,14 +1323,24 @@ export function SingularityChat({ userId }: { userId?: string }) {
                             {msg.role === 'model' && !msg.content && msg.isStreaming && (
                                 !isAgent ? (
                                     streamingPhase === 'thinking' && (
-                                        <div className="text-xs text-muted-foreground/40 italic pl-1 animate-pulse">
-                                            Crafting response...
+                                        <div className="flex items-center gap-2 pl-1">
+                                            <div className="flex gap-1 text-violet-400">
+                                                <span className="singularity-typing-dot" />
+                                                <span className="singularity-typing-dot" />
+                                                <span className="singularity-typing-dot" />
+                                            </div>
+                                            <span className="text-xs text-muted-foreground/50">Thinking...</span>
                                         </div>
                                     )
                                 ) : (
                                     !msg.toolActions?.length && (
-                                        <div className="text-xs text-muted-foreground/40 italic pl-1 animate-pulse">
-                                            Processing your request...
+                                        <div className="flex items-center gap-2 pl-1">
+                                            <div className="flex gap-1 text-cyan-400">
+                                                <span className="singularity-typing-dot" />
+                                                <span className="singularity-typing-dot" />
+                                                <span className="singularity-typing-dot" />
+                                            </div>
+                                            <span className="text-xs text-muted-foreground/50">Processing...</span>
                                         </div>
                                     )
                                 )
@@ -1277,18 +1354,18 @@ export function SingularityChat({ userId }: { userId?: string }) {
             <div className="px-3 sm:px-6 pb-4 sm:pb-5 pt-2 sm:pt-3">
                 {/* Attachment Previews */}
                 {attachments.length > 0 && (
-                    <div className="flex gap-2 mb-3 px-1 animate-in slide-in-from-bottom-2 duration-200">
+                    <div className="flex gap-2.5 mb-3 px-1 animate-in slide-in-from-bottom-2 duration-200">
                         {attachments.map(att => (
                             <div key={att.id} className="relative group">
                                 {att.fileType === 'image' ? (
-                                    <img src={att.preview} alt="Attachment" className="w-16 h-16 object-cover rounded-xl border border-border/40 shadow-sm" />
+                                    <img src={att.preview} alt="Attachment" className="w-[72px] h-[72px] object-cover rounded-xl border border-border/30 shadow-sm" />
                                 ) : (
-                                    <div className="w-16 h-16 rounded-xl border border-border/40 shadow-sm bg-muted/50 flex flex-col items-center justify-center gap-1">
+                                    <div className="w-[72px] h-[72px] rounded-xl border border-border/30 shadow-sm bg-muted/30 flex flex-col items-center justify-center gap-1.5">
                                         <FileText className="w-5 h-5 text-cyan-500" />
-                                        <span className="text-[9px] text-muted-foreground text-center leading-tight px-1 truncate w-full">{att.fileName?.split('.').pop()?.toUpperCase()}</span>
+                                        <span className="text-[9px] font-medium text-muted-foreground/70 text-center leading-tight px-1 truncate w-full">{att.fileName?.split('.').pop()?.toUpperCase()}</span>
                                     </div>
                                 )}
-                                <button onClick={() => removeAttachment(att.id)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
+                                <button onClick={() => removeAttachment(att.id)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-sm hover:scale-110">
                                     <X className="w-3 h-3" />
                                 </button>
                             </div>
@@ -1297,21 +1374,21 @@ export function SingularityChat({ userId }: { userId?: string }) {
                 )}
 
                 {/* Gradient separator line */}
-                <div className="h-px mb-3 bg-gradient-to-r from-transparent via-border/60 to-transparent" />
+                <div className="h-px mb-3 bg-gradient-to-r from-transparent via-border/40 to-transparent" />
 
                 <div className={cn(
                     "relative flex items-end gap-1.5 sm:gap-2 bg-card border p-2 sm:p-2.5 rounded-2xl transition-all duration-300",
                     isAgent
-                        ? "border-border/50 focus-within:border-cyan-500/50 focus-within:shadow-[0_0_20px_rgba(6,182,212,0.08)] dark:focus-within:shadow-[0_0_20px_rgba(6,182,212,0.15)]"
-                        : "border-border/50 focus-within:border-violet-500/50 focus-within:shadow-[0_0_20px_rgba(139,92,246,0.08)] dark:focus-within:shadow-[0_0_20px_rgba(139,92,246,0.15)]"
+                        ? "border-border/40 focus-within:border-cyan-500/40 focus-within:shadow-[0_0_24px_rgba(6,182,212,0.08)] dark:focus-within:shadow-[0_0_24px_rgba(6,182,212,0.15)]"
+                        : "border-border/40 focus-within:border-violet-500/40 focus-within:shadow-[0_0_24px_rgba(139,92,246,0.08)] dark:focus-within:shadow-[0_0_24px_rgba(139,92,246,0.15)]"
                 )}>
-                    {/* File Upload Button — both modes */}
+                    {/* File Upload Button */}
                     <>
                         <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isLoading || attachments.length >= 4}
                             className={cn(
-                                "h-9 w-9 sm:h-10 sm:w-10 flex items-center justify-center rounded-xl text-muted-foreground/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 mb-0.5 shrink-0",
+                                "h-9 w-9 sm:h-10 sm:w-10 flex items-center justify-center rounded-xl text-muted-foreground/50 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 mb-0.5 shrink-0",
                                 isAgent
                                     ? "hover:text-cyan-500 dark:hover:text-cyan-400 hover:bg-cyan-500/10"
                                     : "hover:text-violet-500 dark:hover:text-violet-400 hover:bg-violet-500/10"
@@ -1342,7 +1419,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                     ? "Describe what you'd like to know about the image..."
                                     : "Message Singularity..."
                         }
-                        className="flex-1 max-h-40 min-h-[40px] sm:min-h-[44px] bg-transparent border-none focus:ring-0 focus:outline-none resize-none py-2 sm:py-2.5 px-1 text-sm placeholder:text-muted-foreground/40"
+                        className="flex-1 max-h-40 min-h-[40px] sm:min-h-[44px] bg-transparent border-none focus:ring-0 focus:outline-none resize-none py-2 sm:py-2.5 px-1 text-sm placeholder:text-muted-foreground/35"
                         rows={1}
                         disabled={isLoading}
                     />
@@ -1350,18 +1427,18 @@ export function SingularityChat({ userId }: { userId?: string }) {
                         onClick={() => handleSend()}
                         disabled={(!inputValue.trim() && attachments.length === 0) || isLoading}
                         className={cn(
-                            "h-9 w-9 flex items-center justify-center rounded-lg transition-all duration-200 mb-0.5 shrink-0",
+                            "h-9 w-9 flex items-center justify-center rounded-xl transition-all duration-200 mb-0.5 shrink-0",
                             (inputValue.trim() || attachments.length > 0) && !isLoading
                                 ? isAgent
                                     ? "bg-gradient-to-br from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-500/25 hover:shadow-lg hover:shadow-cyan-500/40 hover:scale-105 active:scale-95"
                                     : "bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/25 hover:shadow-lg hover:shadow-violet-500/40 hover:scale-105 active:scale-95"
-                                : "bg-muted/80 text-muted-foreground/30 cursor-not-allowed"
+                                : "bg-muted/60 text-muted-foreground/25 cursor-not-allowed"
                         )}
                     >
                         <ArrowRight className="w-4 h-4" />
                     </button>
                 </div>
-                <p className="text-center text-[10px] text-muted-foreground/60 mt-2 sm:mt-2.5 hidden sm:block">
+                <p className="text-center text-[10px] text-muted-foreground/50 mt-2 sm:mt-2.5 hidden sm:block">
                     {isAgent
                         ? "Agent mode can read your agency data and perform actions on your behalf."
                         : "Singularity can analyze images and answer questions. Drag & drop or click 📷 to attach."
@@ -1374,6 +1451,72 @@ export function SingularityChat({ userId }: { userId?: string }) {
                 .singularity-response li { margin: 2px 0; }
                 .singularity-response pre { margin: 8px 0; }
                 .singularity-response h1, .singularity-response h2, .singularity-response h3 { margin-top: 12px; }
+
+                /* Floating animation for empty state icon */
+                @keyframes singularity-float {
+                    0%, 100% { transform: translateY(0px); }
+                    50% { transform: translateY(-8px); }
+                }
+                .singularity-float { animation: singularity-float 3s ease-in-out infinite; }
+
+                /* Gradient shimmer effect */
+                @keyframes singularity-shimmer {
+                    0% { background-position: -200% center; }
+                    100% { background-position: 200% center; }
+                }
+                .singularity-shimmer {
+                    background-size: 200% auto;
+                    animation: singularity-shimmer 4s linear infinite;
+                }
+
+                /* Pulsing status dot */
+                @keyframes singularity-dot-pulse {
+                    0%, 100% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+                    50% { box-shadow: 0 0 0 4px currentColor; opacity: 0.4; }
+                }
+                .singularity-pulse-dot { animation: singularity-dot-pulse 2s ease-in-out infinite; }
+
+                /* Bouncing dots for typing indicator */
+                @keyframes singularity-bounce {
+                    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+                    40% { transform: scale(1); opacity: 1; }
+                }
+                .singularity-typing-dot {
+                    display: inline-block;
+                    width: 6px; height: 6px;
+                    border-radius: 50%;
+                    background: currentColor;
+                    animation: singularity-bounce 1.4s infinite ease-in-out both;
+                }
+                .singularity-typing-dot:nth-child(1) { animation-delay: -0.32s; }
+                .singularity-typing-dot:nth-child(2) { animation-delay: -0.16s; }
+                .singularity-typing-dot:nth-child(3) { animation-delay: 0s; }
+
+                /* Slide up animation for messages and cards */
+                @keyframes singularity-slide-up {
+                    from { opacity: 0; transform: translateY(12px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                .singularity-msg-enter { animation: singularity-slide-up 0.3s ease-out both; }
+
+                /* Stagger for tool cards */
+                .singularity-stagger > *:nth-child(1) { animation-delay: 0ms; }
+                .singularity-stagger > *:nth-child(2) { animation-delay: 60ms; }
+                .singularity-stagger > *:nth-child(3) { animation-delay: 120ms; }
+                .singularity-stagger > *:nth-child(4) { animation-delay: 180ms; }
+                .singularity-stagger > *:nth-child(5) { animation-delay: 240ms; }
+
+                /* Glow ring for AI avatar */
+                .singularity-avatar-glow {
+                    box-shadow: 0 0 12px -2px var(--glow-color, rgba(139, 92, 246, 0.3));
+                }
+
+                /* Smooth pulse for calling state border */
+                @keyframes singularity-border-pulse {
+                    0%, 100% { border-color: rgba(6, 182, 212, 0.2); }
+                    50% { border-color: rgba(6, 182, 212, 0.5); }
+                }
+                .singularity-calling-pulse { animation: singularity-border-pulse 1.5s ease-in-out infinite; }
             `}</style >
         </div >
     );
