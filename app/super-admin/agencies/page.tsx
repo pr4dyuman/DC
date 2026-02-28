@@ -8,7 +8,7 @@ export default async function AgenciesPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                     <h1 className="text-3xl font-bold text-foreground">Agencies</h1>
                     <p className="text-muted-foreground mt-1">Manage all agencies in the system</p>
@@ -23,7 +23,7 @@ export default async function AgenciesPage() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-card rounded-lg shadow border border-border p-4">
                     <p className="text-sm text-muted-foreground">Total Agencies</p>
                     <p className="text-2xl font-bold text-foreground mt-1">{agencies.length}</p>

@@ -20,7 +20,7 @@ export default async function AgencyDetailsPage({ params }: { params: Promise<{ 
                     <ArrowLeft className="w-4 h-4" />
                     <span>Back to Agencies</span>
                 </Link>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div>
                         <h1 className="text-3xl font-bold text-foreground">{agency.name}</h1>
                         <p className="text-muted-foreground mt-1">{agency.slug}</p>
@@ -118,7 +118,7 @@ export default async function AgencyDetailsPage({ params }: { params: Promise<{ 
                 </div>
                 <div className="divide-y divide-border">
                     {users.slice(0, 10).map((user: any) => (
-                        <div key={user.id} className="p-6 flex items-center justify-between">
+                        <div key={user.id} className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                             <div>
                                 <p className="font-medium text-foreground">{user.name}</p>
                                 <p className="text-sm text-muted-foreground">{user.email}</p>

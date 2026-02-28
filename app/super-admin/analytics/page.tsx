@@ -37,9 +37,9 @@ export default async function AnalyticsPage() {
             {/* Plan Distribution */}
             <div className="bg-card rounded-lg shadow border border-border p-6">
                 <h2 className="text-xl font-bold text-foreground mb-6">Agency Distribution by Plan</h2>
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                     <div className="text-center">
-                        <div className="w-32 h-32 mx-auto bg-muted rounded-full flex items-center justify-center">
+                        <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto bg-muted rounded-full flex items-center justify-center">
                             <div className="text-center">
                                 <p className="text-3xl font-bold text-foreground">{analytics.agenciesByPlan.free || 0}</p>
                                 <p className="text-sm text-muted-foreground">Free</p>
@@ -51,7 +51,7 @@ export default async function AnalyticsPage() {
                     </div>
 
                     <div className="text-center">
-                        <div className="w-32 h-32 mx-auto bg-blue-500/10 rounded-full flex items-center justify-center">
+                        <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto bg-blue-500/10 rounded-full flex items-center justify-center">
                             <div className="text-center">
                                 <p className="text-3xl font-bold text-blue-500">{analytics.agenciesByPlan.pro || 0}</p>
                                 <p className="text-sm text-blue-400">Pro</p>
@@ -63,7 +63,7 @@ export default async function AnalyticsPage() {
                     </div>
 
                     <div className="text-center">
-                        <div className="w-32 h-32 mx-auto bg-purple-500/10 rounded-full flex items-center justify-center">
+                        <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto bg-purple-500/10 rounded-full flex items-center justify-center">
                             <div className="text-center">
                                 <p className="text-3xl font-bold text-purple-500">{analytics.agenciesByPlan.enterprise || 0}</p>
                                 <p className="text-sm text-purple-400">Enterprise</p>
@@ -84,7 +84,7 @@ export default async function AnalyticsPage() {
                         <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">Active</span>
                             <div className="flex items-center gap-3">
-                                <div className="w-48 bg-muted rounded-full h-2">
+                                <div className="w-full sm:w-48 bg-muted rounded-full h-2">
                                     <div
                                         className="bg-green-500 h-2 rounded-full"
                                         style={{ width: `${(analytics.activeAgencies / analytics.totalAgencies * 100)}%` }}
@@ -96,7 +96,7 @@ export default async function AnalyticsPage() {
                         <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">Suspended</span>
                             <div className="flex items-center gap-3">
-                                <div className="w-48 bg-muted rounded-full h-2">
+                                <div className="w-full sm:w-48 bg-muted rounded-full h-2">
                                     <div
                                         className="bg-red-500 h-2 rounded-full"
                                         style={{ width: `${(analytics.suspendedAgencies / analytics.totalAgencies * 100)}%` }}

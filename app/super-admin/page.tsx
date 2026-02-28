@@ -70,7 +70,7 @@ export default async function SuperAdminDashboard() {
             {/* Agencies by Plan */}
             <div className="bg-card border border-border rounded-lg shadow p-6">
                 <h2 className="text-xl font-bold text-foreground mb-4">Agencies by Plan</h2>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="text-center p-4 bg-muted rounded-lg">
                         <p className="text-2xl font-bold text-foreground">{analytics.agenciesByPlan.free || 0}</p>
                         <p className="text-sm text-muted-foreground mt-1">Free Plan</p>
@@ -98,14 +98,14 @@ export default async function SuperAdminDashboard() {
                             href={`/super-admin/agencies/${agency.id}`}
                             className="p-6 hover:bg-muted/50 transition-colors block"
                         >
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                                 <div>
                                     <h3 className="font-semibold text-foreground">{agency.name}</h3>
                                     <p className="text-sm text-muted-foreground mt-1">
                                         Created {new Date(agency.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                     </p>
                                 </div>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${agency.plan === 'enterprise' ? 'bg-purple-500/10 text-purple-500' :
                                         agency.plan === 'pro' ? 'bg-blue-500/10 text-blue-500' :
                                             'bg-muted text-muted-foreground'

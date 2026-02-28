@@ -36,7 +36,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
     return (
         <div className="bg-card rounded-lg shadow border border-border">
             <div className="p-6 border-b border-border">
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
                     <input
                         type="text"
                         placeholder="Search agencies..."

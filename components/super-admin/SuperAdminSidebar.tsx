@@ -9,7 +9,8 @@ import {
     CreditCard,
     Settings,
     FileText,
-    LogOut
+    LogOut,
+    X
 } from "lucide-react";
 import { logout } from "@/lib/auth";
 
@@ -22,7 +23,12 @@ const navigation = [
     { name: "Settings", href: "/super-admin/settings", icon: Settings },
 ];
 
-export default function SuperAdminSidebar() {
+interface SuperAdminSidebarProps {
+    isOpen?: boolean;
+    onClose?: () => void;
+}
+
+export default function SuperAdminSidebar({ isOpen, onClose }: SuperAdminSidebarProps) {
     const pathname = usePathname();
 
     const handleLogout = async () => {
@@ -30,43 +36,74 @@ export default function SuperAdminSidebar() {
         window.location.href = "/login";
     };
 
+    const handleNavClick = () => {
+        // Close sidebar on mobile after navigation
+        if (onClose) onClose();
+    };
+
     return (
-        <div className="w-64 bg-card border-r border-border flex flex-col">
-            <div className="p-6">
-                <h1 className="text-2xl font-bold text-foreground">Super Admin</h1>
-                <p className="text-muted-foreground text-sm mt-1">System Management</p>
-            </div>
+        <>
+            {/* Mobile backdrop */}
+            {isOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                    onClick={onClose}
+                />
+            )}
 
-            <nav className="flex-1 px-3 space-y-1">
-                {navigation.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+            {/* Sidebar */}
+            <div className={`
+                fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border flex flex-col
+                transform transition-transform duration-300 ease-in-out
+                lg:relative lg:translate-x-0 lg:z-auto
+                ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+            `}>
+                <div className="p-6 flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-foreground">Super Admin</h1>
+                        <p className="text-muted-foreground text-sm mt-1">System Management</p>
+                    </div>
+                    {/* Close button on mobile */}
+                    <button
+                        onClick={onClose}
+                        className="lg:hidden p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
 
-                    return (
-                        <Link
-                            key={item.name}
-                            href={item.href}
-                            className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${isActive
+                <nav className="flex-1 px-3 space-y-1">
+                    {navigation.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+
+                        return (
+                            <Link
+                                key={item.name}
+                                href={item.href}
+                                onClick={handleNavClick}
+                                className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${isActive
                                     ? "bg-muted text-foreground"
                                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                                }`}
-                        >
-                            <Icon className="w-5 h-5" />
-                            <span>{item.name}</span>
-                        </Link>
-                    );
-                })}
-            </nav>
+                                    }`}
+                            >
+                                <Icon className="w-5 h-5" />
+                                <span>{item.name}</span>
+                            </Link>
+                        );
+                    })}
+                </nav>
 
-            <div className="p-3">
-                <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors w-full"
-                >
-                    <LogOut className="w-5 h-5" />
-                    <span>Logout</span>
-                </button>
+                <div className="p-3">
+                    <button
+                        onClick={handleLogout}
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors w-full"
+                    >
+                        <LogOut className="w-5 h-5" />
+                        <span>Logout</span>
+                    </button>
+                </div>
             </div>
-        </div>
+        </>
     );
 }

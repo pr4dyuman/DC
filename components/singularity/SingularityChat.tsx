@@ -446,7 +446,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
             )}
 
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border/30">
+            <div className="flex items-center justify-between px-3 sm:px-6 py-3 sm:py-4 border-b border-border/30 gap-2">
                 <div className="flex items-center gap-3">
                     <div className="relative">
                         <div className={cn(
@@ -464,7 +464,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                     </div>
                     <div>
                         <h1 className={cn(
-                            "text-lg font-bold bg-clip-text text-transparent transition-all duration-300",
+                            "text-base sm:text-lg font-bold bg-clip-text text-transparent transition-all duration-300",
                             isAgent
                                 ? "bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-400"
                                 : "bg-gradient-to-r from-violet-600 to-indigo-600 dark:from-violet-400 dark:to-indigo-400"
@@ -515,25 +515,25 @@ export function SingularityChat({ userId }: { userId?: string }) {
             </div>
 
             {/* Messages Area */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6 space-y-8 scroll-smooth no-scrollbar">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 sm:py-6 space-y-8 scroll-smooth no-scrollbar">
                 {/* Empty State */}
                 {messages.length === 0 && !isLoading && (
                     <div className="flex flex-col items-center justify-center h-full text-center space-y-8 animate-in fade-in duration-700">
                         <div className="space-y-4">
                             <div className={cn(
-                                "w-20 h-20 mx-auto rounded-2xl flex items-center justify-center border shadow-2xl transition-all duration-300",
+                                "w-14 h-14 sm:w-20 sm:h-20 mx-auto rounded-2xl flex items-center justify-center border shadow-2xl transition-all duration-300",
                                 isAgent
                                     ? "bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-cyan-600/20 dark:to-blue-600/20 border-cyan-200 dark:border-cyan-500/20 shadow-cyan-500/10"
                                     : "bg-gradient-to-br from-violet-100 to-indigo-100 dark:from-violet-600/20 dark:to-indigo-600/20 border-violet-200 dark:border-violet-500/20 shadow-violet-500/10"
                             )}>
                                 {isAgent
-                                    ? <Bot className="w-10 h-10 text-cyan-500 dark:text-cyan-400" />
-                                    : <Sparkles className="w-10 h-10 text-violet-500 dark:text-violet-400" />
+                                    ? <Bot className="w-7 h-7 sm:w-10 sm:h-10 text-cyan-500 dark:text-cyan-400" />
+                                    : <Sparkles className="w-7 h-7 sm:w-10 sm:h-10 text-violet-500 dark:text-violet-400" />
                                 }
                             </div>
                             <div>
                                 <h2 className={cn(
-                                    "text-2xl font-bold bg-clip-text text-transparent",
+                                    "text-xl sm:text-2xl font-bold bg-clip-text text-transparent",
                                     isAgent
                                         ? "bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-300 dark:to-blue-300"
                                         : "bg-gradient-to-r from-violet-600 to-indigo-600 dark:from-violet-300 dark:to-indigo-300"
@@ -714,7 +714,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
             </div>
 
             {/* Input Area */}
-            <div className="px-6 pb-5 pt-3">
+            <div className="px-3 sm:px-6 pb-4 sm:pb-5 pt-2 sm:pt-3">
                 {/* Attachment Previews */}
                 {attachments.length > 0 && (
                     <div className="flex gap-2 mb-3 px-1 animate-in slide-in-from-bottom-2 duration-200">

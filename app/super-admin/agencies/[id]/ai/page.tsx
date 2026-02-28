@@ -288,7 +288,7 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
                 <button
                     onClick={handleSave}
                     disabled={saving || !apiKey || !model}

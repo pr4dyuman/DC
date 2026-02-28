@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Building2, ChevronDown } from "lucide-react";
+import { Building2, ChevronDown, Menu } from "lucide-react";
 import { getAllAgencies, switchAgency, clearAgencySelection } from "@/lib/agency-context";
 
-export default function SuperAdminTopbar() {
+interface SuperAdminTopbarProps {
+    onMenuClick?: () => void;
+}
+
+export default function SuperAdminTopbar({ onMenuClick }: SuperAdminTopbarProps) {
     const [agencies, setAgencies] = useState<any[]>([]);
     const [selectedAgency, setSelectedAgency] = useState<string | null>(null);
     const [isOpen, setIsOpen] = useState(false);
@@ -50,22 +54,30 @@ export default function SuperAdminTopbar() {
     const currentAgency = agencies.find(a => a.id === selectedAgency);
 
     return (
-        <div className="bg-card border-b border-border px-6 py-4">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <h2 className="text-lg font-semibold text-foreground">Agency View</h2>
+        <div className="bg-card border-b border-border px-3 sm:px-6 py-3 sm:py-4">
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                    {/* Hamburger menu for mobile */}
+                    <button
+                        onClick={onMenuClick}
+                        className="lg:hidden p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
+                    >
+                        <Menu className="w-5 h-5" />
+                    </button>
+
+                    <h2 className="text-base sm:text-lg font-semibold text-foreground hidden sm:block">Agency View</h2>
 
                     {/* Agency Switcher */}
                     <div className="relative">
                         <button
                             onClick={() => setIsOpen(!isOpen)}
-                            className="flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 rounded-lg transition-colors"
+                            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-muted hover:bg-muted/80 rounded-lg transition-colors"
                         >
-                            <Building2 className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm font-medium text-foreground">
+                            <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <span className="text-sm font-medium text-foreground truncate max-w-[120px] sm:max-w-none">
                                 {currentAgency ? currentAgency.name : "All Agencies"}
                             </span>
-                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
                         </button>
 
                         {isOpen && (
@@ -79,8 +91,8 @@ export default function SuperAdminTopbar() {
                                         <button
                                             onClick={() => handleSwitch(null)}
                                             className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${!selectedAgency
-                                                    ? "bg-primary/10 text-primary"
-                                                    : "hover:bg-muted text-foreground"
+                                                ? "bg-primary/10 text-primary"
+                                                : "hover:bg-muted text-foreground"
                                                 }`}
                                         >
                                             <div className="flex items-center gap-2">
@@ -99,15 +111,15 @@ export default function SuperAdminTopbar() {
                                                     key={agency.id}
                                                     onClick={() => handleSwitch(agency.id)}
                                                     className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${selectedAgency === agency.id
-                                                            ? "bg-primary/10 text-primary"
-                                                            : "hover:bg-muted text-foreground"
+                                                        ? "bg-primary/10 text-primary"
+                                                        : "hover:bg-muted text-foreground"
                                                         }`}
                                                 >
                                                     <div className="flex items-center justify-between">
                                                         <span className="font-medium">{agency.name}</span>
                                                         <span className={`text-xs px-2 py-1 rounded ${agency.plan === 'enterprise' ? 'bg-purple-500/10 text-purple-500' :
-                                                                agency.plan === 'pro' ? 'bg-blue-500/10 text-blue-500' :
-                                                                    'bg-muted text-muted-foreground'
+                                                            agency.plan === 'pro' ? 'bg-blue-500/10 text-blue-500' :
+                                                                'bg-muted text-muted-foreground'
                                                             }`}>
                                                             {agency.plan}
                                                         </span>
@@ -122,10 +134,10 @@ export default function SuperAdminTopbar() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 shrink-0">
                     <div className="text-right">
                         <p className="text-sm font-medium text-foreground">Super Admin</p>
-                        <p className="text-xs text-muted-foreground">Full System Access</p>
+                        <p className="text-xs text-muted-foreground hidden sm:block">Full System Access</p>
                     </div>
                 </div>
             </div>

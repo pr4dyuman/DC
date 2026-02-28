@@ -38,10 +38,10 @@ export default function AgencyActions({ agency }: { agency: any }) {
 
     return (
         <>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
                 <button
                     onClick={() => setShowPlanModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
                 >
                     <Edit className="w-4 h-4" />
                     <span>Change Plan</span>
@@ -50,7 +50,7 @@ export default function AgencyActions({ agency }: { agency: any }) {
                 {agency.status === 'active' ? (
                     <button
                         onClick={handleSuspend}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
                     >
                         <Ban className="w-4 h-4" />
                         <span>Suspend</span>
@@ -58,7 +58,7 @@ export default function AgencyActions({ agency }: { agency: any }) {
                 ) : (
                     <button
                         onClick={handleActivate}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
                     >
                         <CheckCircle className="w-4 h-4" />
                         <span>Activate</span>
@@ -67,7 +67,7 @@ export default function AgencyActions({ agency }: { agency: any }) {
 
                 <button
                     onClick={handleDelete}
-                    className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors"
+                    className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors text-sm"
                 >
                     <Trash2 className="w-4 h-4" />
                     <span>Delete</span>
@@ -76,7 +76,7 @@ export default function AgencyActions({ agency }: { agency: any }) {
 
             {/* Plan Modal */}
             {showPlanModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-card rounded-lg p-6 max-w-md w-full border border-border">
                         <h3 className="text-xl font-bold text-foreground mb-4">Change Plan</h3>
                         <div className="space-y-3 mb-6">
