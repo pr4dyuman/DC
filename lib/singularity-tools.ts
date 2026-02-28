@@ -25,6 +25,11 @@ import {
     addService,
     updateUser,
 } from "./actions";
+import {
+    connectDB,
+    TaskModel, ProjectModel, ClientModel, InvoiceModel,
+    TransactionModel, ServiceModel, LeaveRequestModel,
+} from "./mongodb";
 
 // =============================================================================
 // TOOL EXECUTOR — Calls existing server actions
@@ -32,11 +37,39 @@ import {
 // actions.ts which has "use server", making Next.js treat this as a boundary).
 // =============================================================================
 
+export interface RollbackAction {
+    toolName: string;
+    actionType: 'create' | 'update' | 'delete';
+    entityType: 'task' | 'project' | 'client' | 'invoice' | 'transaction' | 'service' | 'leaveRequest' | 'comment';
+    entityId: string;
+    beforeSnapshot?: any;
+    createdEntityIds?: string[];
+    executedAt: string;
+}
+
+/** Snapshot an entity from MongoDB before modifying it */
+async function snapshotEntity(entityType: string, entityId: string): Promise<any> {
+    await connectDB();
+    const modelMap: Record<string, any> = {
+        task: TaskModel,
+        project: ProjectModel,
+        client: ClientModel,
+        invoice: InvoiceModel,
+        transaction: TransactionModel,
+        service: ServiceModel,
+        leaveRequest: LeaveRequestModel,
+    };
+    const Model = modelMap[entityType];
+    if (!Model) return null;
+    const doc = await Model.findOne({ id: entityId }).lean();
+    return doc || null;
+}
+
 export async function executeTool(
     name: string,
     args: Record<string, any>,
     userId: string
-): Promise<{ success: boolean; data: any; summary: string }> {
+): Promise<{ success: boolean; data: any; summary: string; rollbackData?: RollbackAction[] }> {
     try {
         switch (name) {
             case "create_project": {
@@ -62,6 +95,13 @@ export async function executeTool(
                     success: true,
                     data: { id: newProject.id, name: newProject.name, slug: newProject.slug, status: statusLabel },
                     summary: `Project "${newProject.name}" created (${statusLabel}${args.createdAt ? `, started: ${args.createdAt}` : ""}). You can now use bulk_create_tasks with projectId: ${newProject.id}`,
+                    rollbackData: [{
+                        toolName: 'create_project',
+                        actionType: 'create',
+                        entityType: 'project',
+                        entityId: newProject.id,
+                        executedAt: new Date().toISOString(),
+                    }],
                 };
             }
 
@@ -177,36 +217,61 @@ export async function executeTool(
                     success: true,
                     data: { id: newTask.id, title: newTask.title, projectId: newTask.projectId, assigneeId, assigneeName },
                     summary: `Task "${newTask.title}" created — ${assignInfo}, category: ${args.category || "none"}, due: ${dueDate}`,
+                    rollbackData: [{
+                        toolName: 'create_task',
+                        actionType: 'create',
+                        entityType: 'task',
+                        entityId: newTask.id,
+                        executedAt: new Date().toISOString(),
+                    }],
                 };
             }
 
             case "update_task_status": {
+                const taskStatusSnapshot = await snapshotEntity('task', args.taskId);
                 await updateTaskStatus(args.taskId, args.status);
                 return {
                     success: true,
                     data: { taskId: args.taskId, newStatus: args.status },
                     summary: `Task moved to "${args.status}"`,
+                    rollbackData: taskStatusSnapshot ? [{
+                        toolName: 'update_task_status',
+                        actionType: 'update',
+                        entityType: 'task',
+                        entityId: args.taskId,
+                        beforeSnapshot: taskStatusSnapshot,
+                        executedAt: new Date().toISOString(),
+                    }] : undefined,
                 };
             }
 
             case "edit_task": {
-                const updates: Record<string, any> = {};
-                if (args.title) updates.title = args.title;
-                if (args.description) updates.description = args.description;
-                if (args.priority) updates.priority = args.priority;
-                if (args.category) updates.category = args.category;
-                if (args.dueDate) updates.dueDate = args.dueDate;
+                const editUpdates: Record<string, any> = {};
+                if (args.title) editUpdates.title = args.title;
+                if (args.description) editUpdates.description = args.description;
+                if (args.priority) editUpdates.priority = args.priority;
+                if (args.category) editUpdates.category = args.category;
+                if (args.dueDate) editUpdates.dueDate = args.dueDate;
 
-                if (Object.keys(updates).length === 0) {
+                if (Object.keys(editUpdates).length === 0) {
                     return { success: false, data: null, summary: "No changes specified" };
                 }
 
-                await updateTask(args.taskId, updates);
-                const changedFields = Object.keys(updates).join(", ");
+                const editSnapshot = await snapshotEntity('task', args.taskId);
+                await updateTask(args.taskId, editUpdates);
+                const changedFields = Object.keys(editUpdates).join(", ");
                 return {
                     success: true,
-                    data: { taskId: args.taskId, updates },
+                    data: { taskId: args.taskId, updates: editUpdates },
                     summary: `Task updated — changed: ${changedFields}`,
+                    rollbackData: editSnapshot ? [{
+                        toolName: 'edit_task',
+                        actionType: 'update',
+                        entityType: 'task',
+                        entityId: args.taskId,
+                        beforeSnapshot: editSnapshot,
+                        executedAt: new Date().toISOString(),
+                    }] : undefined,
                 };
             }
 
@@ -214,29 +279,56 @@ export async function executeTool(
                 const newAssignee = await getUser(args.assigneeId).catch(() => null);
                 const newAssigneeName = newAssignee?.name || args.assigneeId;
 
+                const reassignSnapshot = await snapshotEntity('task', args.taskId);
                 await updateTask(args.taskId, { assigneeId: args.assigneeId });
                 return {
                     success: true,
                     data: { taskId: args.taskId, newAssigneeId: args.assigneeId, newAssigneeName },
                     summary: `Task reassigned to ${newAssigneeName}`,
+                    rollbackData: reassignSnapshot ? [{
+                        toolName: 'reassign_task',
+                        actionType: 'update',
+                        entityType: 'task',
+                        entityId: args.taskId,
+                        beforeSnapshot: reassignSnapshot,
+                        executedAt: new Date().toISOString(),
+                    }] : undefined,
                 };
             }
 
             case "delete_task": {
+                const deleteSnapshot = await snapshotEntity('task', args.taskId);
                 await deleteTask(args.taskId);
                 return {
                     success: true,
                     data: { taskId: args.taskId },
                     summary: `Task deleted`,
+                    rollbackData: deleteSnapshot ? [{
+                        toolName: 'delete_task',
+                        actionType: 'delete',
+                        entityType: 'task',
+                        entityId: args.taskId,
+                        beforeSnapshot: deleteSnapshot,
+                        executedAt: new Date().toISOString(),
+                    }] : undefined,
                 };
             }
 
             case "add_task_comment": {
+                const commentSnapshot = await snapshotEntity('task', args.taskId);
                 await addComment(args.taskId, userId, args.comment);
                 return {
                     success: true,
                     data: { taskId: args.taskId },
                     summary: `Comment added to task`,
+                    rollbackData: commentSnapshot ? [{
+                        toolName: 'add_task_comment',
+                        actionType: 'update',
+                        entityType: 'task',
+                        entityId: args.taskId,
+                        beforeSnapshot: commentSnapshot,
+                        executedAt: new Date().toISOString(),
+                    }] : undefined,
                 };
             }
 
@@ -250,6 +342,13 @@ export async function executeTool(
                     success: true,
                     data: { id: newInvoice.id, amount: newInvoice.amount },
                     summary: `Invoice created: ₹${args.amount.toLocaleString("en-IN")}`,
+                    rollbackData: [{
+                        toolName: 'create_invoice',
+                        actionType: 'create',
+                        entityType: 'invoice',
+                        entityId: newInvoice.id,
+                        executedAt: new Date().toISOString(),
+                    }],
                 };
             }
 
@@ -398,6 +497,14 @@ export async function executeTool(
                         projectEndDate,
                     },
                     summary,
+                    rollbackData: createdTasks.length > 0 ? [{
+                        toolName: 'bulk_create_tasks',
+                        actionType: 'create',
+                        entityType: 'task',
+                        entityId: createdTasks[0].id,
+                        createdEntityIds: createdTasks.map(t => t.id),
+                        executedAt: new Date().toISOString(),
+                    }] : undefined,
                 };
             }
 
@@ -446,6 +553,14 @@ export async function executeTool(
                     summary: `✅ ${created.length}/${txns.length} transactions imported` +
                         (failed.length > 0 ? ` (${failed.length} failed)` : "") +
                         ` | Income: ₹${totalIncome.toLocaleString("en-IN")} | Expenses: ₹${totalExpense.toLocaleString("en-IN")}`,
+                    rollbackData: created.length > 0 ? [{
+                        toolName: 'bulk_add_transactions',
+                        actionType: 'create',
+                        entityType: 'transaction',
+                        entityId: created[0].id,
+                        createdEntityIds: created.map((c: any) => c.id),
+                        executedAt: new Date().toISOString(),
+                    }] : undefined,
                 };
             }
 
@@ -474,6 +589,13 @@ export async function executeTool(
                     success: true,
                     data: { id: txn.id, category: txn.category, type: txn.type, amount: txn.amount },
                     summary: `${args.type === "income" ? "Income" : "Expense"} of ₹${args.amount.toLocaleString("en-IN")} added (${args.category})${extraInfo}`,
+                    rollbackData: [{
+                        toolName: 'add_transaction',
+                        actionType: 'create',
+                        entityType: 'transaction',
+                        entityId: txn.id,
+                        executedAt: new Date().toISOString(),
+                    }],
                 };
             }
 
@@ -521,21 +643,37 @@ export async function executeTool(
                     success: true,
                     data: { id: newClient.id, name: newClient.name, companyName: newClient.companyName },
                     summary: `Client "${newClient.name}" (${newClient.companyName}) created`,
+                    rollbackData: [{
+                        toolName: 'create_client',
+                        actionType: 'create',
+                        entityType: 'client',
+                        entityId: newClient.id,
+                        executedAt: new Date().toISOString(),
+                    }],
                 };
             }
 
             case "update_client": {
-                const updates: Record<string, any> = {};
-                if (args.name) updates.name = args.name;
-                if (args.email) updates.email = args.email;
-                if (args.companyName) updates.companyName = args.companyName;
-                if (args.phone) updates.phone = args.phone;
-                if (args.address) updates.address = args.address;
-                await updateClient(args.clientId, updates);
+                const clientUpdates: Record<string, any> = {};
+                if (args.name) clientUpdates.name = args.name;
+                if (args.email) clientUpdates.email = args.email;
+                if (args.companyName) clientUpdates.companyName = args.companyName;
+                if (args.phone) clientUpdates.phone = args.phone;
+                if (args.address) clientUpdates.address = args.address;
+                const clientSnapshot = await snapshotEntity('client', args.clientId);
+                await updateClient(args.clientId, clientUpdates);
                 return {
                     success: true,
-                    data: { clientId: args.clientId, updates },
-                    summary: `Client updated — changed: ${Object.keys(updates).join(", ")}`,
+                    data: { clientId: args.clientId, updates: clientUpdates },
+                    summary: `Client updated — changed: ${Object.keys(clientUpdates).join(", ")}`,
+                    rollbackData: clientSnapshot ? [{
+                        toolName: 'update_client',
+                        actionType: 'update',
+                        entityType: 'client',
+                        entityId: args.clientId,
+                        beforeSnapshot: clientSnapshot,
+                        executedAt: new Date().toISOString(),
+                    }] : undefined,
                 };
             }
 
@@ -572,6 +710,9 @@ export async function executeTool(
                 if (args.role) empUpdates.role = args.role;
                 if (args.salary !== undefined) empUpdates.salary = args.salary;
                 if (args.phone) empUpdates.phone = args.phone;
+                // Note: Users are not in the same model as snapshotEntity expects
+                // We store a partial snapshot of only changed fields
+                const empBefore = await getUser(args.userId).catch(() => null);
                 await updateUser(args.userId, empUpdates);
                 const empName = await getUser(args.userId).catch(() => null);
                 return {
@@ -623,12 +764,21 @@ export async function executeTool(
             }
 
             case "manage_leave_request": {
+                const leaveSnapshot = await snapshotEntity('leaveRequest', args.leaveRequestId);
                 if (args.action === "approve") {
                     await approveLeaveRequest(args.leaveRequestId);
                     return {
                         success: true,
                         data: { leaveRequestId: args.leaveRequestId, action: "approved" },
                         summary: `Leave request approved ✅`,
+                        rollbackData: leaveSnapshot ? [{
+                            toolName: 'manage_leave_request',
+                            actionType: 'update',
+                            entityType: 'leaveRequest',
+                            entityId: args.leaveRequestId,
+                            beforeSnapshot: leaveSnapshot,
+                            executedAt: new Date().toISOString(),
+                        }] : undefined,
                     };
                 } else {
                     await rejectLeaveRequest(args.leaveRequestId, args.reason || "");
@@ -636,6 +786,14 @@ export async function executeTool(
                         success: true,
                         data: { leaveRequestId: args.leaveRequestId, action: "rejected", reason: args.reason },
                         summary: `Leave request rejected ❌${args.reason ? ` — Reason: ${args.reason}` : ""}`,
+                        rollbackData: leaveSnapshot ? [{
+                            toolName: 'manage_leave_request',
+                            actionType: 'update',
+                            entityType: 'leaveRequest',
+                            entityId: args.leaveRequestId,
+                            beforeSnapshot: leaveSnapshot,
+                            executedAt: new Date().toISOString(),
+                        }] : undefined,
                     };
                 }
             }
@@ -646,6 +804,13 @@ export async function executeTool(
                     success: true,
                     data: { id: newService.id, name: newService.name },
                     summary: `Service "${newService.name}" added as a new category`,
+                    rollbackData: [{
+                        toolName: 'add_service',
+                        actionType: 'create',
+                        entityType: 'service',
+                        entityId: newService.id,
+                        executedAt: new Date().toISOString(),
+                    }],
                 };
             }
 

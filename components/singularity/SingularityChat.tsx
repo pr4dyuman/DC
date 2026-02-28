@@ -5,7 +5,8 @@ import {
     Sparkles, User, ChevronDown, ChevronRight,
     Brain, Copy, Check, Trash2, ArrowRight, Image as ImageIcon, X,
     Bot, MessageSquare, Wrench, CheckCircle2, AlertCircle, Loader2,
-    Paperclip, FileText, FileSpreadsheet, FileCode
+    Paperclip, FileText, FileSpreadsheet, FileCode,
+    Plus, Clock, Undo2, History, Shield, AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +27,7 @@ interface ToolAction {
     status: 'calling' | 'done' | 'error';
     summary?: string;
     success?: boolean;
+    rollbackData?: any[];
 }
 
 interface Message {
@@ -37,6 +39,29 @@ interface Message {
     timestamp: Date;
     isStreaming?: boolean;
     toolActions?: ToolAction[];
+}
+
+interface ChatSessionSummary {
+    id: string;
+    title: string;
+    mode: 'chat' | 'agent';
+    updatedAt: string;
+    messageCount: number;
+}
+
+interface CheckpointInfo {
+    id: string;
+    label: string;
+    messageIndex: number;
+    createdAt: string;
+}
+
+interface RollbackAnalysis {
+    checkpointId: string;
+    label: string;
+    totalActions: number;
+    safeActions: any[];
+    conflictedActions: { action: any; conflict: { entityType: string; entityId: string; entityName: string; reason: string } }[];
 }
 
 const CHAT_SUGGESTIONS = [
@@ -82,9 +107,20 @@ export function SingularityChat({ userId }: { userId?: string }) {
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [isDragOver, setIsDragOver] = useState(false);
     const [mode, setMode] = useState<'chat' | 'agent'>('chat');
+
+    // Session & History state
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
+    const [showHistory, setShowHistory] = useState(false);
+    const [checkpoints, setCheckpoints] = useState<CheckpointInfo[]>([]);
+    const [rollbackModal, setRollbackModal] = useState<{ analysis: RollbackAnalysis; loading: boolean } | null>(null);
+    const [undoingCheckpoint, setUndoingCheckpoint] = useState<string | null>(null);
+    const pendingRollbackRef = useRef<any[]>([]); // Accumulates rollback data during a single agent response
+
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Smooth auto-scroll
     useEffect(() => {
@@ -125,13 +161,226 @@ export function SingularityChat({ userId }: { userId?: string }) {
 
     const clearChat = () => { setMessages([]); setAttachments([]); };
 
+    // ===================== SESSION MANAGEMENT =====================
+
+    // Initialize a new session on mount
+    useEffect(() => {
+        if (userId && !sessionId) {
+            createNewSession();
+            fetchSessions();
+        }
+    }, [userId]);
+
+    const createNewSession = async () => {
+        if (!userId) return;
+        try {
+            const res = await fetch('/api/singularity/history', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, mode }),
+            });
+            const data = await res.json();
+            setSessionId(data.sessionId);
+            return data.sessionId;
+        } catch (err) {
+            console.error('Failed to create session:', err);
+        }
+    };
+
+    const fetchSessions = async () => {
+        if (!userId) return;
+        try {
+            const res = await fetch(`/api/singularity/history?userId=${userId}`);
+            const data = await res.json();
+            setSessions(data);
+        } catch (err) {
+            console.error('Failed to fetch sessions:', err);
+        }
+    };
+
+    const loadSession = async (sid: string) => {
+        try {
+            const res = await fetch(`/api/singularity/history?sessionId=${sid}`);
+            const data = await res.json();
+            setSessionId(sid);
+            setMode(data.mode || 'chat');
+            setMessages((data.messages || []).map((m: any) => ({
+                ...m,
+                id: m.timestamp || `msg-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                timestamp: new Date(m.timestamp),
+                isStreaming: false,
+            })));
+            setShowHistory(false);
+            // Load checkpoints for this session
+            const cpRes = await fetch(`/api/singularity/history/checkpoint?sessionId=${sid}`);
+            const cpData = await cpRes.json();
+            setCheckpoints(cpData || []);
+        } catch (err) {
+            console.error('Failed to load session:', err);
+        }
+    };
+
+    const newChat = async () => {
+        setMessages([]);
+        setAttachments([]);
+        setCheckpoints([]);
+        setIsLoading(false);
+        setStreamingPhase('idle');
+        pendingRollbackRef.current = [];
+        const newId = await createNewSession();
+        setSessionId(newId || null);
+        fetchSessions();
+        setShowHistory(false);
+    };
+
+    const deleteSession = async (sid: string) => {
+        try {
+            await fetch(`/api/singularity/history?id=${sid}`, { method: 'DELETE' });
+            setSessions(prev => prev.filter(s => s.id !== sid));
+            if (sid === sessionId) {
+                newChat();
+            }
+        } catch (err) {
+            console.error('Failed to delete session:', err);
+        }
+    };
+
+    // Auto-save messages after streaming completes (debounced)
+    const saveMessages = useCallback(async (msgs: Message[], sid: string | null) => {
+        if (!sid || !userId) return;
+        const persistable = msgs.filter(m => !m.isStreaming).map(m => ({
+            role: m.role,
+            content: m.content,
+            thinking: m.thinking,
+            images: m.images,
+            toolActions: m.toolActions?.map(ta => ({
+                name: ta.name,
+                displayName: ta.displayName,
+                status: ta.status,
+                summary: ta.summary,
+                success: ta.success,
+            })),
+            timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
+        }));
+        if (persistable.length === 0) return;
+
+        // Auto-title from first user message
+        const firstUser = persistable.find(m => m.role === 'user');
+        const title = firstUser ? firstUser.content.slice(0, 60) : undefined;
+
+        try {
+            await fetch('/api/singularity/history', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId: sid, messages: persistable, title }),
+            });
+        } catch (err) {
+            console.error('Failed to save messages:', err);
+        }
+    }, [userId]);
+
+    // Trigger save whenever streaming finishes
+    useEffect(() => {
+        const anyStreaming = messages.some(m => m.isStreaming);
+        if (!anyStreaming && messages.length > 0 && sessionId) {
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+            saveTimeoutRef.current = setTimeout(() => {
+                saveMessages(messages, sessionId);
+                fetchSessions();
+            }, 500);
+        }
+        return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
+    }, [messages, sessionId]);
+
+    // ===================== CHECKPOINT UNDO =====================
+
+    const saveCheckpoint = async (rollbackActions: any[], label: string) => {
+        if (!sessionId || rollbackActions.length === 0) return;
+        try {
+            const res = await fetch('/api/singularity/history/checkpoint', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId,
+                    messageIndex: messages.filter(m => !m.isStreaming).length,
+                    actions: rollbackActions,
+                    label,
+                }),
+            });
+            const data = await res.json();
+            setCheckpoints(prev => [{ id: data.checkpointId, label, messageIndex: messages.length, createdAt: new Date().toISOString() }, ...prev]);
+        } catch (err) {
+            console.error('Failed to save checkpoint:', err);
+        }
+    };
+
+    const handleUndo = async (checkpointId: string) => {
+        setUndoingCheckpoint(checkpointId);
+        try {
+            // First analyze for conflicts
+            const res = await fetch('/api/singularity/history/checkpoint', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'analyze', checkpointId }),
+            });
+            const analysis: RollbackAnalysis = await res.json();
+
+            if (analysis.conflictedActions.length === 0) {
+                // No conflicts — ask simple confirmation
+                if (confirm(`Undo ${analysis.totalActions} action(s)? This will reverse all database changes.`)) {
+                    await executeUndo(checkpointId, 'all');
+                }
+            } else {
+                // Has conflicts — show modal
+                setRollbackModal({ analysis, loading: false });
+            }
+        } catch (err) {
+            console.error('Undo analysis failed:', err);
+        } finally {
+            setUndoingCheckpoint(null);
+        }
+    };
+
+    const executeUndo = async (checkpointId: string, scope: 'safe' | 'all') => {
+        try {
+            const res = await fetch('/api/singularity/history/checkpoint', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ checkpointId, scope }),
+            });
+            const result = await res.json();
+
+            // Find the checkpoint to get messageIndex
+            const cp = checkpoints.find(c => c.id === checkpointId);
+            if (cp) {
+                // Truncate messages to checkpoint
+                setMessages(prev => prev.slice(0, cp.messageIndex));
+            }
+
+            // Remove the checkpoint from UI
+            setCheckpoints(prev => prev.filter(c => c.id !== checkpointId));
+            setRollbackModal(null);
+
+            // Save updated messages
+            const truncated = messages.slice(0, cp?.messageIndex || messages.length);
+            saveMessages(truncated, sessionId);
+        } catch (err) {
+            console.error('Rollback failed:', err);
+        }
+    };
+
     const handleModeSwitch = (newMode: 'chat' | 'agent') => {
         if (newMode === mode) return;
         setMode(newMode);
-        setMessages([]);
-        setAttachments([]);
-        setIsLoading(false);
-        setStreamingPhase('idle');
+        newChat();
+        // Update mode on server
+        if (sessionId) {
+            fetch('/api/singularity/history', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId, mode: newMode }),
+            }).catch(() => { });
+        }
     };
 
     // File handling — images AND documents
@@ -348,13 +597,16 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                     } : m
                                 ));
                             } else if (data.type === 'tool_result') {
-                                // Agent mode: tool finished
+                                // Agent mode: tool finished — capture rollback data
+                                if (data.rollbackData) {
+                                    pendingRollbackRef.current.push(...data.rollbackData);
+                                }
                                 setMessages(prev => prev.map(m =>
                                     m.id === msgId ? {
                                         ...m,
                                         toolActions: (m.toolActions || []).map(ta =>
                                             ta.name === data.name && ta.status === 'calling'
-                                                ? { ...ta, status: data.success ? 'done' as const : 'error' as const, summary: data.summary, success: data.success }
+                                                ? { ...ta, status: data.success ? 'done' as const : 'error' as const, summary: data.summary, success: data.success, rollbackData: data.rollbackData }
                                                 : ta
                                         )
                                     } : m
@@ -415,6 +667,14 @@ export function SingularityChat({ userId }: { userId?: string }) {
             setIsLoading(false);
             setStreamingPhase('idle');
             inputRef.current?.focus();
+
+            // Save checkpoint if there were tool actions with rollback data
+            if (pendingRollbackRef.current.length > 0) {
+                const actions = [...pendingRollbackRef.current];
+                pendingRollbackRef.current = [];
+                const label = actions.map(a => a.toolName).join(', ');
+                saveCheckpoint(actions, label);
+            }
         }
     };
 
@@ -479,12 +739,10 @@ export function SingularityChat({ userId }: { userId?: string }) {
                         </div>
                     </div>
 
-                    {/* Clear button — visible on mobile in the header row */}
-                    {messages.length > 0 && (
-                        <button onClick={clearChat} className="sm:hidden flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive px-2 py-1 rounded-lg hover:bg-destructive/10 transition-all shrink-0">
-                            <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                    )}
+                    {/* New Chat button — visible on mobile in the header row */}
+                    <button onClick={newChat} className="sm:hidden flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg hover:bg-muted/60 transition-all shrink-0" title="New Chat">
+                        <Plus className="w-3.5 h-3.5" />
+                    </button>
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -516,42 +774,159 @@ export function SingularityChat({ userId }: { userId?: string }) {
                         </button>
                     </div>
 
-                    {/* Clear button — visible on desktop */}
-                    {messages.length > 0 && (
-                        <button onClick={clearChat} className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive px-3 py-1.5 rounded-lg hover:bg-destructive/10 transition-all">
-                            <Trash2 className="w-3.5 h-3.5" /> Clear
-                        </button>
-                    )}
+                    {/* History & New Chat buttons */}
+                    <button
+                        onClick={() => { setShowHistory(!showHistory); fetchSessions(); }}
+                        className={cn(
+                            "flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-all",
+                            showHistory
+                                ? "bg-primary/10 text-primary"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                        )}
+                        title="Chat History"
+                    >
+                        <History className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">History</span>
+                    </button>
+
+                    <button
+                        onClick={newChat}
+                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded-lg hover:bg-muted/60 transition-all"
+                        title="New Chat"
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">New</span>
+                    </button>
                 </div>
             </div>
 
+            {/* History Sidebar */}
+            {showHistory && (
+                <div className="absolute top-0 right-0 w-full sm:w-80 h-full z-40 bg-card border-l border-border/40 shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
+                        <h3 className="text-sm font-semibold text-foreground">Chat History</h3>
+                        <button onClick={() => setShowHistory(false)} className="p-1 hover:bg-muted rounded-md transition-colors">
+                            <X className="w-4 h-4 text-muted-foreground" />
+                        </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto no-scrollbar">
+                        {sessions.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-40 text-muted-foreground text-xs">
+                                <Clock className="w-8 h-8 mb-2 opacity-30" />
+                                No conversations yet
+                            </div>
+                        ) : (
+                            <div className="p-2 space-y-1">
+                                {sessions.map(s => (
+                                    <div key={s.id} className={cn(
+                                        "group flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200",
+                                        s.id === sessionId
+                                            ? "bg-primary/10 border border-primary/20"
+                                            : "hover:bg-muted/60"
+                                    )}>
+                                        <div className="flex-1 min-w-0" onClick={() => loadSession(s.id)}>
+                                            <p className="text-xs font-medium text-foreground truncate">{s.title}</p>
+                                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                                                {s.mode === 'agent' ? '🤖' : '💬'} {s.messageCount} messages · {new Date(s.updatedAt).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }}
+                                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 rounded transition-all"
+                                        >
+                                            <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Conflict Resolution Modal */}
+            {rollbackModal && (
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-card border border-border rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold text-foreground">Conflicts Detected</h3>
+                                <p className="text-xs text-muted-foreground">
+                                    {rollbackModal.analysis.safeActions.length} of {rollbackModal.analysis.totalActions} actions can be safely undone
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {rollbackModal.analysis.conflictedActions.map((ca, i) => (
+                                <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20 text-xs">
+                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+                                    <div>
+                                        <span className="font-medium text-foreground">{ca.conflict.entityName}</span>
+                                        <span className="text-muted-foreground"> — {ca.conflict.reason}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => executeUndo(rollbackModal.analysis.checkpointId, 'safe')}
+                                className="flex-1 px-3 py-2 text-xs font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                            >
+                                Undo Safe Only ({rollbackModal.analysis.safeActions.length})
+                            </button>
+                            <button
+                                onClick={() => executeUndo(rollbackModal.analysis.checkpointId, 'all')}
+                                className="flex-1 px-3 py-2 text-xs font-medium rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+                            >
+                                Force Undo All
+                            </button>
+                            <button
+                                onClick={() => setRollbackModal(null)}
+                                className="px-3 py-2 text-xs font-medium rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+
+                        <p className="text-[10px] text-muted-foreground text-center">
+                            ⚠️ "Force Undo All" will discard changes you made after the AI created these items
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* Messages Area */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 sm:py-6 space-y-8 scroll-smooth no-scrollbar">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-6 py-2 sm:py-6 space-y-4 sm:space-y-8 scroll-smooth no-scrollbar">
                 {/* Empty State */}
                 {messages.length === 0 && !isLoading && (
-                    <div className="flex flex-col items-center justify-center h-full text-center space-y-8 animate-in fade-in duration-700">
-                        <div className="space-y-4">
+                    <div className="flex flex-col items-center justify-center h-full text-center space-y-4 sm:space-y-8 animate-in fade-in duration-700">
+                        <div className="space-y-2 sm:space-y-4">
                             <div className={cn(
-                                "w-14 h-14 sm:w-20 sm:h-20 mx-auto rounded-2xl flex items-center justify-center border shadow-2xl transition-all duration-300",
+                                "w-10 h-10 sm:w-20 sm:h-20 mx-auto rounded-xl sm:rounded-2xl flex items-center justify-center border shadow-xl sm:shadow-2xl transition-all duration-300",
                                 isAgent
                                     ? "bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-cyan-600/20 dark:to-blue-600/20 border-cyan-200 dark:border-cyan-500/20 shadow-cyan-500/10"
                                     : "bg-gradient-to-br from-violet-100 to-indigo-100 dark:from-violet-600/20 dark:to-indigo-600/20 border-violet-200 dark:border-violet-500/20 shadow-violet-500/10"
                             )}>
                                 {isAgent
-                                    ? <Bot className="w-7 h-7 sm:w-10 sm:h-10 text-cyan-500 dark:text-cyan-400" />
-                                    : <Sparkles className="w-7 h-7 sm:w-10 sm:h-10 text-violet-500 dark:text-violet-400" />
+                                    ? <Bot className="w-5 h-5 sm:w-10 sm:h-10 text-cyan-500 dark:text-cyan-400" />
+                                    : <Sparkles className="w-5 h-5 sm:w-10 sm:h-10 text-violet-500 dark:text-violet-400" />
                                 }
                             </div>
                             <div>
                                 <h2 className={cn(
-                                    "text-xl sm:text-2xl font-bold bg-clip-text text-transparent",
+                                    "text-lg sm:text-2xl font-bold bg-clip-text text-transparent",
                                     isAgent
                                         ? "bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-300 dark:to-blue-300"
                                         : "bg-gradient-to-r from-violet-600 to-indigo-600 dark:from-violet-300 dark:to-indigo-300"
                                 )}>
                                     {isAgent ? "What would you like me to do?" : "How can I help you today?"}
                                 </h2>
-                                <p className="text-xs sm:text-sm text-muted-foreground mt-1.5 sm:mt-2 max-w-md px-2 sm:px-0">
+                                <p className="text-[11px] sm:text-sm text-muted-foreground mt-1 sm:mt-2 max-w-md px-2 sm:px-0">
                                     {isAgent
                                         ? "Access your projects, clients, team, and finances."
                                         : "Strategy, coding, writing, analysis — ask anything."
@@ -559,17 +934,17 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                 </p>
                             </div>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-lg">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2.5 w-full max-w-lg">
                             {suggestions.map((s, i) => (
                                 <button key={i} onClick={() => handleSend(s)} className={cn(
-                                    "group text-left p-3.5 rounded-xl border bg-card/50 transition-all duration-200 text-sm text-muted-foreground hover:text-foreground",
+                                    "group text-left p-2.5 sm:p-3.5 rounded-xl border bg-card/50 transition-all duration-200 text-xs sm:text-sm text-muted-foreground hover:text-foreground",
                                     isAgent
                                         ? "border-border/40 hover:bg-cyan-500/5 hover:border-cyan-500/30"
                                         : "border-border/40 hover:bg-violet-500/5 hover:border-violet-500/30"
                                 )}>
-                                    <span className="line-clamp-2">{s}</span>
+                                    <span className="line-clamp-1 sm:line-clamp-2">{s}</span>
                                     <ArrowRight className={cn(
-                                        "w-3.5 h-3.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200 -translate-x-1 group-hover:translate-x-0",
+                                        "w-3.5 h-3.5 mt-1 sm:mt-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200 -translate-x-1 group-hover:translate-x-0 hidden sm:block",
                                         isAgent ? "text-cyan-500 dark:text-cyan-400" : "text-violet-500 dark:text-violet-400"
                                     )} />
                                 </button>
@@ -667,6 +1042,26 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                             </span>
                                         </div>
                                     ))}
+
+                                    {/* Undo Checkpoint button — only on finished agent messages with write actions */}
+                                    {!msg.isStreaming && msg.toolActions.some(ta => ta.rollbackData && ta.rollbackData.length > 0) && (() => {
+                                        const msgIndex = messages.filter(m => !m.isStreaming).indexOf(msg);
+                                        const cp = checkpoints.find(c => c.messageIndex >= msgIndex && c.messageIndex <= msgIndex + 2);
+                                        if (!cp) return null;
+                                        return (
+                                            <button
+                                                onClick={() => handleUndo(cp.id)}
+                                                disabled={undoingCheckpoint === cp.id}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-all duration-200 mt-1"
+                                            >
+                                                {undoingCheckpoint === cp.id
+                                                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    : <Undo2 className="w-3.5 h-3.5" />
+                                                }
+                                                <span>Undo these actions</span>
+                                            </button>
+                                        );
+                                    })()}
                                 </div>
                             )}
 

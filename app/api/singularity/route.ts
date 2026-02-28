@@ -189,9 +189,9 @@ export async function POST(req: NextRequest) {
                                     const result = await executeTool(fc.name, fc.args || {}, userId || '');
                                     console.log('[Singularity Agent] Tool result:', fc.name, result.success, result.summary);
 
-                                    // Stream tool_result event to UI
+                                    // Stream tool_result event to UI (include rollback data for checkpoint system)
                                     controller.enqueue(encoder.encode(
-                                        `data: ${JSON.stringify({ type: 'tool_result', name: fc.name, displayName, success: result.success, summary: result.summary })}\n\n`
+                                        `data: ${JSON.stringify({ type: 'tool_result', name: fc.name, displayName, success: result.success, summary: result.summary, rollbackData: result.rollbackData })}\n\n`
                                     ));
 
                                     // Collect function response for the model

@@ -499,6 +499,66 @@ const SettingsSchema = new Schema<Settings>({
 }, { timestamps: true });
 
 // ============================================================================
+// SINGULARITY CHAT & CHECKPOINT SCHEMAS
+// ============================================================================
+
+// Chat Message Schema (Embedded in SingularityChatSession)
+const SingularityChatMessageSchema = new Schema({
+    role: { type: String, enum: ['user', 'model'], required: true },
+    content: { type: String, default: '' },
+    thinking: { type: String },
+    images: [{ type: String }],
+    toolActions: [{
+        name: { type: String },
+        displayName: { type: String },
+        status: { type: String, enum: ['calling', 'done', 'error'] },
+        summary: { type: String },
+        success: { type: Boolean },
+        _id: false,
+    }],
+    timestamp: { type: String, required: true },
+}, { _id: false });
+
+// Chat Session Schema — stores entire conversation
+const SingularityChatSessionSchema = new Schema({
+    id: { type: String, required: true, unique: true },
+    agencyId: { type: String, required: true, index: true },
+    userId: { type: String, required: true, index: true },
+    title: { type: String, default: 'New Chat' },
+    mode: { type: String, enum: ['chat', 'agent'], required: true, default: 'chat' },
+    messages: [SingularityChatMessageSchema],
+    createdAt: { type: String, required: true },
+    updatedAt: { type: String, required: true },
+}, { timestamps: false }); // We manage our own timestamps
+
+SingularityChatSessionSchema.index({ userId: 1, updatedAt: -1 });
+
+// Checkpoint Action Schema (Embedded in SingularityCheckpoint)
+const CheckpointActionSchema = new Schema({
+    toolName: { type: String, required: true },
+    actionType: { type: String, enum: ['create', 'update', 'delete'], required: true },
+    entityType: { type: String, enum: ['task', 'project', 'client', 'invoice', 'transaction', 'service', 'leaveRequest', 'comment'], required: true },
+    entityId: { type: String, required: true },
+    beforeSnapshot: { type: Schema.Types.Mixed }, // Full entity state before change (for update/delete rollback)
+    createdEntityIds: [{ type: String }], // For bulk operations — all created IDs
+    executedAt: { type: String, required: true },
+}, { _id: false });
+
+// Checkpoint Schema — stores rollback data for agent actions
+const SingularityCheckpointSchema = new Schema({
+    id: { type: String, required: true, unique: true },
+    sessionId: { type: String, required: true, index: true },
+    agencyId: { type: String, required: true, index: true },
+    messageIndex: { type: Number, required: true }, // Position in messages array when checkpoint was created
+    actions: [CheckpointActionSchema],
+    label: { type: String, default: 'Checkpoint' },
+    status: { type: String, enum: ['active', 'rolled_back'], default: 'active' },
+    createdAt: { type: String, required: true },
+}, { timestamps: false });
+
+SingularityCheckpointSchema.index({ sessionId: 1, createdAt: -1 });
+
+// ============================================================================
 // MODEL EXPORTS
 // ============================================================================
 
@@ -522,3 +582,7 @@ export const MessageModel = (mongoose.models.Message as Model<Message>) || mongo
 export const LeaveRequestModel = (mongoose.models.LeaveRequest as Model<LeaveRequest>) || mongoose.model<LeaveRequest>('LeaveRequest', LeaveRequestSchema);
 
 export const SettingsModel = (mongoose.models.Settings as Model<Settings>) || mongoose.model<Settings>('Settings', SettingsSchema);
+
+// Singularity AI Chat models
+export const SingularityChatSessionModel = (mongoose.models.SingularityChatSession as Model<any>) || mongoose.model('SingularityChatSession', SingularityChatSessionSchema);
+export const SingularityCheckpointModel = (mongoose.models.SingularityCheckpoint as Model<any>) || mongoose.model('SingularityCheckpoint', SingularityCheckpointSchema);
