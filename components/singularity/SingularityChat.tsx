@@ -65,17 +65,17 @@ interface RollbackAnalysis {
 }
 
 const CHAT_SUGGESTIONS = [
-    "What's a good project management strategy for a small agency?",
-    "Help me write a client proposal for a web redesign",
-    "Explain microservices architecture in simple terms",
-    "Create a content calendar for social media marketing",
+    "Help me draft a proposal for a new client project",
+    "What are the best practices for managing remote teams?",
+    "Write a follow-up email to a client about project delays",
+    "Help me plan a sprint for our upcoming product launch",
 ];
 
 const AGENT_SUGGESTIONS = [
-    "What projects do we have and what's their status?",
-    "Show me the team workload — who has the most tasks?",
-    "What's our financial summary this month?",
-    "Create a task for the homepage redesign project",
+    "Create a new project called 'Website Redesign' with 5 tasks for planning, design, development, testing, and launch",
+    "Show me our financial summary — total revenue, expenses, and pending invoices",
+    "Who on the team has the most tasks? Show me everyone's workload",
+    "List all our active projects and flag any that have overdue tasks",
 ];
 
 // Simple markdown-to-HTML renderer
