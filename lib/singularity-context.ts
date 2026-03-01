@@ -237,7 +237,13 @@ GENERAL:
 - If the user doesn't specify a category, pick the most appropriate one from the services list.
 - If the user refers to a project/person by name, match it to the correct ID from the QUICK LOOKUP TABLE.
 - Be professional, concise, and helpful. Use markdown formatting.
-- If you cannot find a matching project or person, ask the user to clarify. NEVER fabricate IDs.`;
+- If you cannot find a matching project or person, ask the user to clarify. NEVER fabricate IDs.
+
+⚠️ PROJECT SERVICES/CATEGORIES — CRITICAL:
+- When creating a project with create_project, ALWAYS populate the services array with relevant category names from the SERVICES list.
+- Example: for a mobile app project → services: ["Mobile Development", "UI Design", "QA Testing"]
+- If a project already exists without categories, use update_project to add the services array.
+- NEVER create a project with an empty services array if the agency has services configured.`;
 
     } catch (error) {
         console.error("[Singularity Context] Error building context:", error);

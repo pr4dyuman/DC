@@ -7,7 +7,7 @@
 export const SINGULARITY_TOOL_DECLARATIONS = [
     {
         name: "create_project",
-        description: "Create a new project in the agency. Use this when the user asks to create, start, or set up a new project. After creating, you can use bulk_create_tasks to fill it with tasks. For HISTORICAL/past projects, set status to 'Completed' and provide a past createdAt date.",
+        description: "Create a new project in the agency. Use this when the user asks to create, start, or set up a new project. After creating, you can use bulk_create_tasks to fill it with tasks. For HISTORICAL/past projects, set status to 'Completed' and provide a past createdAt date. ALWAYS set services to the relevant categories for this project.",
         parameters: {
             type: "OBJECT",
             properties: {
@@ -15,9 +15,9 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
                 clientId: { type: "STRING", description: "Client ID from the QUICK LOOKUP TABLE (optional)" },
                 budget: { type: "NUMBER", description: "Project budget in INR" },
                 dueDate: { type: "STRING", description: "Project deadline in YYYY-MM-DD format" },
-                description: { type: "STRING", description: "Brief project description" },
                 status: { type: "STRING", description: "Project status — use 'Completed' for past/historical projects", enum: ["Active", "Completed", "On Hold"] },
                 createdAt: { type: "STRING", description: "For historical projects, the original start date in YYYY-MM-DD format" },
+                services: { type: "ARRAY", description: "List of service/category names relevant to this project (e.g. 'Mobile Development', 'UI Design', 'SEO'). Use names from the available services in the agency context.", items: { type: "STRING" } },
             },
             required: ["name", "budget", "dueDate"],
         },
@@ -61,6 +61,22 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
         },
     },
     {
+        name: "update_project",
+        description: "Update an existing project's details — name, budget, deadline, status, description, or assigned services/categories. Use when the user asks to edit, rename, or change a project.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                projectId: { type: "STRING", description: "The project ID from the QUICK LOOKUP TABLE" },
+                name: { type: "STRING", description: "New project name (optional)" },
+                budget: { type: "NUMBER", description: "New budget in INR (optional)" },
+                dueDate: { type: "STRING", description: "New deadline in YYYY-MM-DD format (optional)" },
+                status: { type: "STRING", description: "New status", enum: ["Active", "Completed", "On Hold"] },
+                services: { type: "ARRAY", description: "Updated list of service/category names for this project", items: { type: "STRING" } },
+            },
+            required: ["projectId"],
+        },
+    },
+    {
         name: "create_task",
         description: "Create a new task in a project. If no assignee specified, it auto-assigns to the least busy team member.",
         parameters: {
@@ -73,6 +89,7 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
                 category: { type: "STRING", description: "Task category — must be one of the service names from the context" },
                 priority: { type: "STRING", description: "Task priority: Low, Medium, or High", enum: ["Low", "Medium", "High"] },
                 dueDate: { type: "STRING", description: "Due date in YYYY-MM-DD format. Estimate based on task complexity if not specified." },
+                status: { type: "STRING", description: "Initial task status (default: Todo)", enum: ["Todo", "In Progress", "Review", "Done"] },
             },
             required: ["projectId", "title"],
         },
@@ -101,6 +118,7 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
                 priority: { type: "STRING", description: "New priority", enum: ["Low", "Medium", "High"] },
                 category: { type: "STRING", description: "New category — must be a service name" },
                 dueDate: { type: "STRING", description: "New due date in YYYY-MM-DD format" },
+                status: { type: "STRING", description: "New task status", enum: ["Todo", "In Progress", "Review", "Done"] },
             },
             required: ["taskId"],
         },
@@ -265,12 +283,13 @@ Always follow these rules strictly. The system will reject invalid combinations.
     },
     {
         name: "get_transactions",
-        description: "Get financial transactions. Can filter by project, user, or category. Use this when the user asks about transactions, payments, salary history, expenses, etc.",
+        description: "Get financial transactions. Can filter by project, user, category, or type (income/expense). Use this when the user asks about transactions, payments, salary history, expenses, etc.",
         parameters: {
             type: "OBJECT",
             properties: {
                 projectId: { type: "STRING", description: "Filter by project ID" },
                 userId: { type: "STRING", description: "Filter by user ID (for salary/reimbursement history)" },
+                type: { type: "STRING", description: "Filter by transaction type", enum: ["income", "expense"] },
                 category: {
                     type: "STRING",
                     description: "Filter by category",
@@ -298,13 +317,14 @@ Always follow these rules strictly. The system will reject invalid combinations.
                 companyName: { type: "STRING", description: "Client's company name" },
                 phone: { type: "STRING", description: "Phone number (optional)" },
                 address: { type: "STRING", description: "Address (optional)" },
+                logo: { type: "STRING", description: "URL to client logo image (optional)" },
             },
             required: ["name", "email", "companyName"],
         },
     },
     {
         name: "update_client",
-        description: "Update a client's details — name, email, company, phone, or address.",
+        description: "Update a client's details — name, email, company, phone, address, or logo.",
         parameters: {
             type: "OBJECT",
             properties: {
@@ -314,6 +334,7 @@ Always follow these rules strictly. The system will reject invalid combinations.
                 companyName: { type: "STRING" },
                 phone: { type: "STRING" },
                 address: { type: "STRING" },
+                logo: { type: "STRING", description: "URL to client logo image" },
             },
             required: ["clientId"],
         },
@@ -339,11 +360,35 @@ Always follow these rules strictly. The system will reject invalid combinations.
                 name: { type: "STRING" },
                 email: { type: "STRING" },
                 jobTitle: { type: "STRING" },
-                role: { type: "STRING", description: "User role", enum: ["admin", "manager", "employee"] },
+                role: { type: "STRING", description: "User role", enum: ["admin", "manager", "employee", "specialist"] },
                 salary: { type: "NUMBER", description: "Monthly salary in INR" },
                 phone: { type: "STRING" },
             },
             required: ["userId"],
+        },
+    },
+    {
+        name: "update_service",
+        description: "Update an existing service/category — rename it or change its job roles. Use when the user asks to edit or rename a service/department.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                serviceId: { type: "STRING", description: "The service ID to update" },
+                name: { type: "STRING", description: "New service name" },
+                jobs: {
+                    type: "ARRAY",
+                    description: "Updated list of job roles under this service",
+                    items: {
+                        type: "OBJECT",
+                        properties: {
+                            title: { type: "STRING", description: "Job title" },
+                            count: { type: "NUMBER", description: "Number of positions" },
+                        },
+                        required: ["title", "count"],
+                    },
+                },
+            },
+            required: ["serviceId", "name"],
         },
     },
     {
@@ -359,11 +404,12 @@ Always follow these rules strictly. The system will reject invalid combinations.
     },
     {
         name: "get_invoices",
-        description: "Get invoices — all or filtered by project. Shows amount, status, and date.",
+        description: "Get invoices — all or filtered by project or status. Shows amount, status, and date.",
         parameters: {
             type: "OBJECT",
             properties: {
                 projectId: { type: "STRING", description: "Optional project ID to filter by" },
+                status: { type: "STRING", description: "Filter by status", enum: ["pending", "paid", "Overdue", "Processing"] },
             },
         },
     },
@@ -411,6 +457,7 @@ Always follow these rules strictly. The system will reject invalid combinations.
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
     create_project: "Creating project",
+    update_project: "✏️ Updating project",
     search_agency: "Searching agency",
     get_project_tasks: "Fetching tasks",
     get_finance_summary: "Loading finances",
@@ -436,6 +483,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
     get_invoices: "📄 Loading invoices",
     manage_leave_request: "📋 Processing leave",
     add_service: "➕ Adding service",
+    update_service: "✏️ Updating service",
 };
 
 export function getToolDisplayName(toolName: string): string {

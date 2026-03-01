@@ -23,6 +23,7 @@ import {
     approveLeaveRequest,
     rejectLeaveRequest,
     addService,
+    updateService,
     updateUser,
 } from "./actions";
 import {
@@ -79,7 +80,7 @@ export async function executeTool(
                     dueDate: args.dueDate || new Date(Date.now() + 90 * 86400000).toISOString().split("T")[0],
                     clientId: args.clientId || undefined,
                     client: args.clientId ? undefined : undefined,
-                    services: [],
+                    services: args.services || [],
                 });
 
                 // For historical projects, update status and createdAt
@@ -206,7 +207,7 @@ export async function executeTool(
                     category: args.category || "",
                     priority: args.priority || "Medium",
                     dueDate,
-                    status: "Todo",
+                    status: (args.status as any) || "Todo",
                 });
 
                 const assignInfo = autoAssigned
@@ -252,6 +253,7 @@ export async function executeTool(
                 if (args.priority) editUpdates.priority = args.priority;
                 if (args.category) editUpdates.category = args.category;
                 if (args.dueDate) editUpdates.dueDate = args.dueDate;
+                if (args.status) editUpdates.status = args.status;
 
                 if (Object.keys(editUpdates).length === 0) {
                     return { success: false, data: null, summary: "No changes specified" };
@@ -341,7 +343,7 @@ export async function executeTool(
                 return {
                     success: true,
                     data: { id: newInvoice.id, amount: newInvoice.amount },
-                    summary: `Invoice created: ₹${args.amount.toLocaleString("en-IN")}`,
+                    summary: `Invoice created: ₹${args.amount.toLocaleString("en-IN")}${args.status ? ` (${args.status})` : ""}`,
                     rollbackData: [{
                         toolName: 'create_invoice',
                         actionType: 'create',
@@ -351,6 +353,37 @@ export async function executeTool(
                     }],
                 };
             }
+
+            case "update_project": {
+                const projUpdates: Record<string, any> = {};
+                if (args.name) projUpdates.name = args.name;
+                if (args.budget !== undefined) projUpdates.budget = args.budget;
+                if (args.dueDate) projUpdates.dueDate = args.dueDate;
+                if (args.status) projUpdates.status = args.status;
+                if (args.services) projUpdates.services = args.services;
+
+                if (Object.keys(projUpdates).length === 0) {
+                    return { success: false, data: null, summary: "No changes specified" };
+                }
+
+                const projSnapshot = await snapshotEntity('project', args.projectId);
+                await updateProject(args.projectId, projUpdates);
+                const changedFields = Object.keys(projUpdates).join(", ");
+                return {
+                    success: true,
+                    data: { projectId: args.projectId, updates: projUpdates },
+                    summary: `Project updated — changed: ${changedFields}`,
+                    rollbackData: projSnapshot ? [{
+                        toolName: 'update_project',
+                        actionType: 'update',
+                        entityType: 'project',
+                        entityId: args.projectId,
+                        beforeSnapshot: projSnapshot,
+                        executedAt: new Date().toISOString(),
+                    }] : undefined,
+                };
+            }
+
 
             case "get_leave_requests": {
                 const leaves = await getLeaveRequests(args.userId);
@@ -601,7 +634,9 @@ export async function executeTool(
 
             case "get_transactions": {
                 const txns = await getTransactions(args.projectId, args.userId, args.category);
-                const limited = txns.slice(0, 15);
+                // client-side filter by type if provided
+                const filtered = args.type ? txns.filter((t: any) => t.type === args.type) : txns;
+                const limited = filtered.slice(0, 15);
                 return {
                     success: true,
                     data: limited.map((t: any) => ({
@@ -613,7 +648,7 @@ export async function executeTool(
                         description: t.description,
                         status: t.status,
                     })),
-                    summary: `${txns.length} transaction(s) found | Total: ₹${txns.reduce((sum: number, t: any) => sum + (t.type === "income" ? t.amount : -t.amount), 0).toLocaleString("en-IN")}`,
+                    summary: `${filtered.length} transaction(s) found | Total: ₹${filtered.reduce((sum: number, t: any) => sum + (t.type === "income" ? t.amount : -t.amount), 0).toLocaleString("en-IN")}`,
                 };
             }
 
@@ -638,6 +673,7 @@ export async function executeTool(
                     companyName: args.companyName,
                     phone: args.phone || undefined,
                     address: args.address || undefined,
+                    logo: args.logo || undefined,
                 });
                 return {
                     success: true,
@@ -660,6 +696,7 @@ export async function executeTool(
                 if (args.companyName) clientUpdates.companyName = args.companyName;
                 if (args.phone) clientUpdates.phone = args.phone;
                 if (args.address) clientUpdates.address = args.address;
+                if (args.logo) clientUpdates.logo = args.logo;
                 const clientSnapshot = await snapshotEntity('client', args.clientId);
                 await updateClient(args.clientId, clientUpdates);
                 return {
@@ -750,16 +787,20 @@ export async function executeTool(
 
             case "get_invoices": {
                 const invoices = await getInvoices(args.projectId);
+                const filtered = args.status
+                    ? invoices.filter((inv: any) => inv.status?.toLowerCase() === args.status.toLowerCase())
+                    : invoices;
                 return {
                     success: true,
-                    data: invoices.slice(0, 20).map((inv: any) => ({
+                    data: filtered.slice(0, 20).map((inv: any) => ({
                         id: inv.id,
                         projectId: inv.projectId,
                         amount: inv.amount,
                         status: inv.status,
                         date: inv.date,
+                        description: inv.description,
                     })),
-                    summary: `${invoices.length} invoice(s) | Total: ₹${invoices.reduce((sum: number, i: any) => sum + i.amount, 0).toLocaleString("en-IN")}`,
+                    summary: `${filtered.length} invoice(s)${args.status ? ` (${args.status})` : ""} | Total: ₹${filtered.reduce((sum: number, i: any) => sum + i.amount, 0).toLocaleString("en-IN")}`,
                 };
             }
 
@@ -811,6 +852,24 @@ export async function executeTool(
                         entityId: newService.id,
                         executedAt: new Date().toISOString(),
                     }],
+                };
+            }
+
+            case "update_service": {
+                const svcSnapshot = await snapshotEntity('service', args.serviceId);
+                await updateService(args.serviceId, args.name, args.jobs || []);
+                return {
+                    success: true,
+                    data: { serviceId: args.serviceId, name: args.name },
+                    summary: `Service updated to "${args.name}"`,
+                    rollbackData: svcSnapshot ? [{
+                        toolName: 'update_service',
+                        actionType: 'update',
+                        entityType: 'service',
+                        entityId: args.serviceId,
+                        beforeSnapshot: svcSnapshot,
+                        executedAt: new Date().toISOString(),
+                    }] : undefined,
                 };
             }
 

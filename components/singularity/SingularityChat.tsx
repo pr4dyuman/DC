@@ -110,7 +110,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
     const [streamingPhase, setStreamingPhase] = useState<'idle' | 'thinking' | 'responding'>('idle');
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [isDragOver, setIsDragOver] = useState(false);
-    const [mode, setMode] = useState<'chat' | 'agent'>('chat');
+    const [mode, setMode] = useState<'chat' | 'agent'>('agent');
 
     // Session & History state
     const [sessionId, setSessionId] = useState<string | null>(null);
@@ -1242,7 +1242,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                                 {showModeDropdown && (
                                                     <>
                                                         <div className="fixed inset-0 z-[70]" onClick={() => setShowModeDropdown(false)} />
-                                                        <div className="absolute bottom-full mb-2 left-0 z-[80] w-64 bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-700/50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150">
+                                                        <div className="absolute bottom-full mb-2 right-0 z-[80] w-56 sm:w-64 bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-700/50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150">
                                                             <div className="px-4 pt-3 pb-1">
                                                                 <p className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">Singularity</p>
                                                             </div>
@@ -1259,7 +1259,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                                                         <p className="text-[11px] text-neutral-400 mt-0.5">General assistant, answers quickly</p>
                                                                     </div>
                                                                     {!isAgent && (
-                                                                        <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center shrink-0 ml-2">
+                                                                        <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center shrink-0 ml-2">
                                                                             <Check className="w-3 h-3 text-white" />
                                                                         </div>
                                                                     )}
@@ -1276,7 +1276,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                                                         <p className="text-[11px] text-neutral-400 mt-0.5">Takes actions, manages your workspace</p>
                                                                     </div>
                                                                     {isAgent && (
-                                                                        <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center shrink-0 ml-2">
+                                                                        <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center shrink-0 ml-2">
                                                                             <Check className="w-3 h-3 text-white" />
                                                                         </div>
                                                                     )}
@@ -1592,7 +1592,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                                 {showModeDropdown && (
                                                     <>
                                                         <div className="fixed inset-0 z-[70]" onClick={() => setShowModeDropdown(false)} />
-                                                        <div className="absolute bottom-full mb-2 left-0 z-[80] w-64 bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-700/50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150">
+                                                        <div className="absolute bottom-full mb-2 right-0 z-[80] w-56 sm:w-64 bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-700/50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150">
                                                             <div className="px-4 pt-3 pb-1">
                                                                 <p className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">Singularity</p>
                                                             </div>
@@ -1609,7 +1609,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                                                         <p className="text-[11px] text-neutral-400 mt-0.5">General assistant, answers quickly</p>
                                                                     </div>
                                                                     {!isAgent && (
-                                                                        <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center shrink-0 ml-2">
+                                                                        <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center shrink-0 ml-2">
                                                                             <Check className="w-3 h-3 text-white" />
                                                                         </div>
                                                                     )}
@@ -1626,7 +1626,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                                                         <p className="text-[11px] text-neutral-400 mt-0.5">Takes actions, manages your workspace</p>
                                                                     </div>
                                                                     {isAgent && (
-                                                                        <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center shrink-0 ml-2">
+                                                                        <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center shrink-0 ml-2">
                                                                             <Check className="w-3 h-3 text-white" />
                                                                         </div>
                                                                     )}
