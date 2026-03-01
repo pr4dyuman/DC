@@ -121,6 +121,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
     const [undoConfirmModal, setUndoConfirmModal] = useState<{ checkpointId: string; label: string; totalActions: number } | null>(null);
     const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ type: 'clear' | 'delete'; sessionId?: string; sessionTitle?: string; hasAgentMessages: boolean } | null>(null);
     const [showNavMenu, setShowNavMenu] = useState(false);
+    const [showModeDropdown, setShowModeDropdown] = useState(false);
     const [undoingCheckpoint, setUndoingCheckpoint] = useState<string | null>(null);
     const pendingRollbackRef = useRef<any[]>([]); // Accumulates rollback data during a single agent response
 
@@ -756,30 +757,30 @@ export function SingularityChat({ userId }: { userId?: string }) {
                 {/* Left corner Ã¢â‚¬â€ Hamburger */}
                 <button
                     onClick={() => { setShowNavMenu(!showNavMenu); setShowHistory(false); }}
-                    className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors"
+                    className="relative z-[60] p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors"
                     title="Menu"
                 >
                     <Menu className="w-5 h-5 text-neutral-500 dark:text-neutral-400" />
                 </button>
 
-                {/* Center Ã¢â‚¬â€ Title + mode badge */}
-                <div className="flex items-center gap-2">
-                    <h1 className="text-base sm:text-lg font-medium text-neutral-800 dark:text-neutral-200 tracking-tight">
-                        Singularity
-                    </h1>
-                    <button
-                        onClick={() => handleModeSwitch(isAgent ? 'chat' : 'agent')}
-                        className={cn(
-                            "flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium transition-all duration-200 border",
-                            isAgent
-                                ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20"
-                                : "bg-neutral-100 dark:bg-neutral-900 text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800"
-                        )}
-                    >
-                        {isAgent ? <Bot className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}
-                        <span>{isAgent ? 'Agent' : 'Chat'}</span>
-                    </button>
-                </div>
+                {/* Center - Title only */}
+                <h1 className="text-base sm:text-lg font-medium text-neutral-800 dark:text-neutral-200 tracking-tight">
+                    Singularity
+                </h1>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
                 {/* Right corner Ã¢â‚¬â€ New Chat + History */}
                 <div className="flex items-center gap-1">
@@ -792,7 +793,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                     </button>
                     <button
                         onClick={() => { setShowHistory(!showHistory); setShowNavMenu(false); fetchSessions(); }}
-                        className="p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors"
+                        className="relative z-[60] p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors"
                         title="Chat History"
                     >
                         <History className="w-5 h-5 text-neutral-500 dark:text-neutral-400" />
@@ -801,176 +802,179 @@ export function SingularityChat({ userId }: { userId?: string }) {
             </div>
 
             {/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â Navigation Menu Ã¢â‚¬â€ Left Side Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */}
-            {showNavMenu && (
-                <>
-                    {/* Backdrop */}
-                    <div
-                        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
-                        onClick={() => setShowNavMenu(false)}
-                    />
-                    {/* Panel */}
-                    <div className="absolute top-0 left-0 w-72 sm:w-80 h-full z-50 bg-white dark:bg-neutral-950 border-r border-neutral-200 dark:border-neutral-800 shadow-2xl animate-in slide-in-from-left duration-300 flex flex-col">
-                        {/* Brand header */}
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200 dark:border-neutral-800">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center">
-                                    <Sparkles className="w-4 h-4 text-white" />
-                                </div>
-                                <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">AgencyOS</span>
-                            </div>
-                            <button onClick={() => setShowNavMenu(false)} className="p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors">
-                                <X className="w-4 h-4 text-neutral-500" />
-                            </button>
+            {/* ••• Navigation Menu — Left Side ••• */}
+            {/* Backdrop */}
+            <div
+                className={cn(
+                    "fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-all duration-300",
+                    showNavMenu ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+                )}
+                onClick={() => setShowNavMenu(false)}
+            />
+            {/* Panel */}
+            <div className={cn(
+                "fixed top-0 left-0 w-72 sm:w-80 h-full z-50 bg-white dark:bg-neutral-950 border-r border-neutral-200 dark:border-neutral-800 shadow-2xl flex flex-col transition-transform duration-300 ease-in-out",
+                showNavMenu ? "translate-x-0" : "-translate-x-full"
+            )}>
+                {/* Brand header */}
+                <div className="flex items-center px-5 py-4 border-b border-neutral-200 dark:border-neutral-800">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center">
+                            <Sparkles className="w-4 h-4 text-white" />
                         </div>
+                        <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">AgencyOS</span>
+                    </div>
+                </div>
 
-                        {/* Nav items */}
-                        <nav className="flex-1 overflow-y-auto no-scrollbar py-3 px-3">
-                            <div className="space-y-0.5">
-                                {[
-                                    { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-                                    { icon: FolderKanban, label: "Projects", href: "/dashboard/projects" },
-                                    { icon: Sparkles, label: "Singularity", href: "/dashboard/singularity", active: true },
-                                ].map((item) => (
-                                    <Link
-                                        key={item.label}
-                                        href={item.href}
-                                        onClick={() => setShowNavMenu(false)}
-                                        className={cn(
-                                            "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
-                                            item.active
-                                                ? "bg-neutral-100 dark:bg-neutral-800/80 text-neutral-900 dark:text-white font-medium"
-                                                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-900 hover:text-neutral-900 dark:hover:text-neutral-200"
-                                        )}
-                                    >
-                                        <item.icon className="w-[18px] h-[18px]" />
-                                        <span>{item.label}</span>
-                                    </Link>
-                                ))}
-                            </div>
-
-                            <div className="my-3 border-t border-neutral-200 dark:border-neutral-800" />
-
-                            <div className="space-y-0.5">
-                                {[
-                                    { icon: Mail, label: "Messages", href: "/dashboard/messages" },
-                                    { icon: Users, label: "Team", href: "/dashboard/team" },
-                                    { icon: DollarSign, label: "Finance", href: "/dashboard/finance" },
-                                    { icon: UserCircle, label: "Clients", href: "/dashboard/clients" },
-                                ].map((item) => (
-                                    <Link
-                                        key={item.label}
-                                        href={item.href}
-                                        onClick={() => setShowNavMenu(false)}
-                                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-900 hover:text-neutral-900 dark:hover:text-neutral-200 transition-all duration-200"
-                                    >
-                                        <item.icon className="w-[18px] h-[18px]" />
-                                        <span>{item.label}</span>
-                                    </Link>
-                                ))}
-                            </div>
-
-                            <div className="my-3 border-t border-neutral-200 dark:border-neutral-800" />
-
+                {/* Nav items */}
+                <nav className="flex-1 overflow-y-auto no-scrollbar py-3 px-3">
+                    <div className="space-y-0.5">
+                        {[
+                            { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+                            { icon: FolderKanban, label: "Projects", href: "/dashboard/projects" },
+                            { icon: Sparkles, label: "Singularity", href: "/dashboard/singularity", active: true },
+                        ].map((item) => (
                             <Link
-                                href="/dashboard/settings"
+                                key={item.label}
+                                href={item.href}
+                                onClick={() => setShowNavMenu(false)}
+                                className={cn(
+                                    "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200",
+                                    item.active
+                                        ? "bg-neutral-100 dark:bg-neutral-800/80 text-neutral-900 dark:text-white font-medium"
+                                        : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-900 hover:text-neutral-900 dark:hover:text-neutral-200"
+                                )}
+                            >
+                                <item.icon className="w-[18px] h-[18px]" />
+                                <span>{item.label}</span>
+                            </Link>
+                        ))}
+                    </div>
+
+                    <div className="my-3 border-t border-neutral-200 dark:border-neutral-800" />
+
+                    <div className="space-y-0.5">
+                        {[
+                            { icon: Mail, label: "Messages", href: "/dashboard/messages" },
+                            { icon: Users, label: "Team", href: "/dashboard/team" },
+                            { icon: DollarSign, label: "Finance", href: "/dashboard/finance" },
+                            { icon: UserCircle, label: "Clients", href: "/dashboard/clients" },
+                        ].map((item) => (
+                            <Link
+                                key={item.label}
+                                href={item.href}
                                 onClick={() => setShowNavMenu(false)}
                                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-900 hover:text-neutral-900 dark:hover:text-neutral-200 transition-all duration-200"
                             >
-                                <Settings className="w-[18px] h-[18px]" />
-                                <span>Settings</span>
+                                <item.icon className="w-[18px] h-[18px]" />
+                                <span>{item.label}</span>
                             </Link>
-                        </nav>
+                        ))}
                     </div>
-                </>
-            )}
 
-            {/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â History Sidebar Ã¢â‚¬â€ Right Side Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */}
-            {showHistory && (
-                <>
-                    {/* Backdrop */}
-                    <div
-                        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
-                        onClick={() => setShowHistory(false)}
-                    />
-                    {/* Panel */}
-                    <div className="fixed top-0 right-0 w-72 sm:w-80 h-full z-50 bg-white dark:bg-black border-l border-neutral-200 dark:border-neutral-800 shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
-                        <div className="flex items-center justify-between px-5 py-4">
-                            <div className="flex items-center gap-2.5">
-                                <History className="w-5 h-5 text-neutral-500" />
-                                <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">History</h3>
-                                <span className="text-[10px] text-neutral-500 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded-full">{sessions.filter(s => s.messageCount > 0).length}</span>
-                            </div>
-                            <button onClick={() => setShowHistory(false)} className="p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors">
-                                <X className="w-4 h-4 text-neutral-500" />
-                            </button>
+                    <div className="my-3 border-t border-neutral-200 dark:border-neutral-800" />
+
+                    <Link
+                        href="/dashboard/settings"
+                        onClick={() => setShowNavMenu(false)}
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-900 hover:text-neutral-900 dark:hover:text-neutral-200 transition-all duration-200"
+                    >
+                        <Settings className="w-[18px] h-[18px]" />
+                        <span>Settings</span>
+                    </Link>
+                </nav>
+            </div>
+
+
+
+            {/* â€¢â€¢â€¢ History Sidebar â€” Right Side â€¢â€¢â€¢ */}
+            {/* Backdrop */}
+            <div
+                className={cn(
+                    "fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-all duration-300",
+                    showHistory ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+                )}
+                onClick={() => setShowHistory(false)}
+            />
+            {/* Panel */}
+            <div className={cn(
+                "fixed top-0 right-0 w-72 sm:w-80 h-full z-50 bg-white dark:bg-neutral-950 border-l border-neutral-200 dark:border-neutral-800 shadow-2xl flex flex-col transition-transform duration-300 ease-in-out",
+                showHistory ? "translate-x-0" : "translate-x-full"
+            )}>
+                {/* Header */}
+                <div className="flex items-center px-5 py-4 border-b border-neutral-200 dark:border-neutral-800">
+                    <div className="flex items-center gap-2.5">
+                        <History className="w-5 h-5 text-neutral-500" />
+                        <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">History</h3>
+                        <span className="text-[10px] text-neutral-500 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded-full">{sessions.filter(s => s.messageCount > 0).length}</span>
+                    </div>
+                </div>
+                <div className="flex-1 overflow-y-auto no-scrollbar">
+                    {sessions.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-40 text-neutral-500 text-xs">
+                            <Clock className="w-8 h-8 mb-2 opacity-20" />
+                            No conversations yet
                         </div>
-                        <div className="flex-1 overflow-y-auto no-scrollbar">
-                            {sessions.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-40 text-neutral-500 text-xs">
-                                    <Clock className="w-8 h-8 mb-2 opacity-20" />
-                                    No conversations yet
-                                </div>
-                            ) : (
-                                <div className="p-2 space-y-3">
-                                    {(() => {
-                                        const now = new Date();
-                                        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                                        const yesterday = new Date(today.getTime() - 86400000);
-                                        const weekAgo = new Date(today.getTime() - 7 * 86400000);
+                    ) : (
+                        <div className="p-2 space-y-3">
+                            {(() => {
+                                const now = new Date();
+                                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                                const yesterday = new Date(today.getTime() - 86400000);
+                                const weekAgo = new Date(today.getTime() - 7 * 86400000);
 
-                                        const groups: { label: string; items: typeof sessions }[] = [
-                                            { label: 'Today', items: sessions.filter(s => new Date(s.updatedAt) >= today && s.messageCount > 0) },
-                                            { label: 'Yesterday', items: sessions.filter(s => { const d = new Date(s.updatedAt); return d >= yesterday && d < today && s.messageCount > 0; }) },
-                                            { label: 'This Week', items: sessions.filter(s => { const d = new Date(s.updatedAt); return d >= weekAgo && d < yesterday && s.messageCount > 0; }) },
-                                            { label: 'Older', items: sessions.filter(s => new Date(s.updatedAt) < weekAgo && s.messageCount > 0) },
-                                        ];
+                                const groups: { label: string; items: typeof sessions }[] = [
+                                    { label: 'Today', items: sessions.filter(s => new Date(s.updatedAt) >= today && s.messageCount > 0) },
+                                    { label: 'Yesterday', items: sessions.filter(s => { const d = new Date(s.updatedAt); return d >= yesterday && d < today && s.messageCount > 0; }) },
+                                    { label: 'This Week', items: sessions.filter(s => { const d = new Date(s.updatedAt); return d >= weekAgo && d < yesterday && s.messageCount > 0; }) },
+                                    { label: 'Older', items: sessions.filter(s => new Date(s.updatedAt) < weekAgo && s.messageCount > 0) },
+                                ];
 
-                                        return groups.filter(g => g.items.length > 0).map(group => (
-                                            <div key={group.label} className="space-y-1">
-                                                <p className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider px-2 pt-1">{group.label}</p>
-                                                {group.items.map(s => (
-                                                    <div key={s.id} className={cn(
-                                                        "group flex items-start gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-200",
-                                                        s.id === sessionId
-                                                            ? "bg-neutral-100 dark:bg-neutral-900"
-                                                            : "hover:bg-neutral-50 dark:hover:bg-neutral-900/50"
-                                                    )}>
-                                                        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-neutral-400 dark:text-neutral-500">
-                                                            {s.mode === 'agent' ? <Bot className="w-3.5 h-3.5" /> : <MessageSquare className="w-3.5 h-3.5" />}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0" onClick={() => loadSession(s.id)}>
-                                                            <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate">{s.title}</p>
-                                                            <p className="text-[10px] text-neutral-400 mt-0.5 flex items-center gap-1.5">
-                                                                <span>{s.messageCount} messages</span>
-                                                                <span className="opacity-40">·</span>
-                                                                <span>{(() => {
-                                                                    const diff = Date.now() - new Date(s.updatedAt).getTime();
-                                                                    const mins = Math.floor(diff / 60000);
-                                                                    if (mins < 1) return 'Just now';
-                                                                    if (mins < 60) return `${mins}m ago`;
-                                                                    const hrs = Math.floor(mins / 60);
-                                                                    if (hrs < 24) return `${hrs}h ago`;
-                                                                    return `${Math.floor(hrs / 24)}d ago`;
-                                                                })()}</span>
-                                                            </p>
-                                                        </div>
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); requestDeleteSession(s.id); }}
-                                                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 rounded-lg transition-all mt-0.5"
-                                                        >
-                                                            <Trash2 className="w-3 h-3 text-neutral-400 hover:text-destructive" />
-                                                        </button>
-                                                    </div>
-                                                ))}
+                                return groups.filter(g => g.items.length > 0).map(group => (
+                                    <div key={group.label} className="space-y-1">
+                                        <p className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider px-2 pt-1">{group.label}</p>
+                                        {group.items.map(s => (
+                                            <div key={s.id} className={cn(
+                                                "group flex items-start gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-200",
+                                                s.id === sessionId
+                                                    ? "bg-neutral-100 dark:bg-neutral-800/80"
+                                                    : "hover:bg-neutral-50 dark:hover:bg-neutral-900 hover:text-neutral-900 dark:hover:text-neutral-200"
+                                            )}>
+                                                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-neutral-400 dark:text-neutral-500">
+                                                    {s.mode === 'agent' ? <Bot className="w-3.5 h-3.5" /> : <MessageSquare className="w-3.5 h-3.5" />}
+                                                </div>
+                                                <div className="flex-1 min-w-0" onClick={() => loadSession(s.id)}>
+                                                    <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate">{s.title}</p>
+                                                    <p className="text-[10px] text-neutral-400 mt-0.5 flex items-center gap-1.5">
+                                                        <span>{s.messageCount} messages</span>
+                                                        <span className="opacity-40">Â·</span>
+                                                        <span>{(() => {
+                                                            const diff = Date.now() - new Date(s.updatedAt).getTime();
+                                                            const mins = Math.floor(diff / 60000);
+                                                            if (mins < 1) return 'Just now';
+                                                            if (mins < 60) return `${mins}m ago`;
+                                                            const hrs = Math.floor(mins / 60);
+                                                            if (hrs < 24) return `${hrs}h ago`;
+                                                            return `${Math.floor(hrs / 24)}d ago`;
+                                                        })()}</span>
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); requestDeleteSession(s.id); }}
+                                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 rounded-lg transition-all mt-0.5"
+                                                >
+                                                    <Trash2 className="w-3 h-3 text-neutral-400 hover:text-destructive" />
+                                                </button>
                                             </div>
-                                        ));
-                                    })()}
-                                </div>
-                            )}
+                                        ))}
+                                    </div>
+                                ));
+                            })()}
                         </div>
-                    </div>
-                </>
-            )}
+                    )}
+                </div>
+            </div>
+
 
             {/* Conflict Resolution Modal */}
             {
@@ -1225,10 +1229,64 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                                 onChange={(e) => { handleFileSelect(e.target.files); e.target.value = ''; }}
                                             />
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-neutral-400 dark:text-neutral-500 hidden sm:block">
-                                                {isAgent ? 'Agent' : 'Chat'}
-                                            </span>
+                                        <div className="flex items-center gap-1.5">
+                                            {/* Mode Dropdown */}
+                                            <div className="relative">
+                                                <button
+                                                    onClick={() => setShowModeDropdown(prev => !prev)}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-all duration-200"
+                                                >
+                                                    <span>{isAgent ? "Agent" : "Chat"}</span>
+                                                    <ChevronDown className={cn("w-3 h-3 transition-transform duration-200", showModeDropdown && "rotate-180")} />
+                                                </button>
+                                                {showModeDropdown && (
+                                                    <>
+                                                        <div className="fixed inset-0 z-[70]" onClick={() => setShowModeDropdown(false)} />
+                                                        <div className="absolute bottom-full mb-2 left-0 z-[80] w-64 bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-700/50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150">
+                                                            <div className="px-4 pt-3 pb-1">
+                                                                <p className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">Singularity</p>
+                                                            </div>
+                                                            <div className="p-1.5 space-y-0.5">
+                                                                <button
+                                                                    onClick={() => { handleModeSwitch("chat"); setShowModeDropdown(false); }}
+                                                                    className={cn(
+                                                                        "w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-150 text-left",
+                                                                        !isAgent ? "bg-neutral-800" : "hover:bg-neutral-800/60"
+                                                                    )}
+                                                                >
+                                                                    <div>
+                                                                        <p className="text-[13px] font-semibold text-white">Chat</p>
+                                                                        <p className="text-[11px] text-neutral-400 mt-0.5">General assistant, answers quickly</p>
+                                                                    </div>
+                                                                    {!isAgent && (
+                                                                        <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center shrink-0 ml-2">
+                                                                            <Check className="w-3 h-3 text-white" />
+                                                                        </div>
+                                                                    )}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => { handleModeSwitch("agent"); setShowModeDropdown(false); }}
+                                                                    className={cn(
+                                                                        "w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-150 text-left",
+                                                                        isAgent ? "bg-neutral-800" : "hover:bg-neutral-800/60"
+                                                                    )}
+                                                                >
+                                                                    <div>
+                                                                        <p className="text-[13px] font-semibold text-white">Agent</p>
+                                                                        <p className="text-[11px] text-neutral-400 mt-0.5">Takes actions, manages your workspace</p>
+                                                                    </div>
+                                                                    {isAgent && (
+                                                                        <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center shrink-0 ml-2">
+                                                                            <Check className="w-3 h-3 text-white" />
+                                                                        </div>
+                                                                    )}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                            {/* Send */}
                                             <button
                                                 onClick={() => handleSend()}
                                                 disabled={(!inputValue.trim() && attachments.length === 0) || isLoading}
@@ -1518,27 +1576,87 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                                 accept={isAgent ? "image/*,.pdf,.txt,.md,.csv,.json,.html,.doc,.docx,.prd" : "image/*"}
                                                 multiple
                                                 className="hidden"
-                                                onChange={(e) => { handleFileSelect(e.target.files); e.target.value = ''; }}
+                                                onChange={(e) => { handleFileSelect(e.target.files); e.target.value = ""; }}
                                             />
                                         </div>
-                                        <button
-                                            onClick={() => handleSend()}
-                                            disabled={(!inputValue.trim() && attachments.length === 0) || isLoading}
-                                            className={cn(
-                                                "p-1.5 rounded-full transition-all duration-200",
-                                                (inputValue.trim() || attachments.length > 0) && !isLoading
-                                                    ? "bg-neutral-800 dark:bg-neutral-200 text-white dark:text-black hover:scale-105 active:scale-95"
-                                                    : "text-neutral-300 dark:text-neutral-600 cursor-not-allowed"
-                                            )}
-                                        >
-                                            <Send className="w-4 h-4" />
-                                        </button>
+                                        <div className="flex items-center gap-1.5">
+                                            {/* Mode Dropdown */}
+                                            <div className="relative">
+                                                <button
+                                                    onClick={() => setShowModeDropdown(prev => !prev)}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-all duration-200"
+                                                >
+                                                    <span>{isAgent ? "Agent" : "Chat"}</span>
+                                                    <ChevronDown className={cn("w-3 h-3 transition-transform duration-200", showModeDropdown && "rotate-180")} />
+                                                </button>
+                                                {showModeDropdown && (
+                                                    <>
+                                                        <div className="fixed inset-0 z-[70]" onClick={() => setShowModeDropdown(false)} />
+                                                        <div className="absolute bottom-full mb-2 left-0 z-[80] w-64 bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-700/50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-150">
+                                                            <div className="px-4 pt-3 pb-1">
+                                                                <p className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">Singularity</p>
+                                                            </div>
+                                                            <div className="p-1.5 space-y-0.5">
+                                                                <button
+                                                                    onClick={() => { handleModeSwitch("chat"); setShowModeDropdown(false); }}
+                                                                    className={cn(
+                                                                        "w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-150 text-left",
+                                                                        !isAgent ? "bg-neutral-800" : "hover:bg-neutral-800/60"
+                                                                    )}
+                                                                >
+                                                                    <div>
+                                                                        <p className="text-[13px] font-semibold text-white">Chat</p>
+                                                                        <p className="text-[11px] text-neutral-400 mt-0.5">General assistant, answers quickly</p>
+                                                                    </div>
+                                                                    {!isAgent && (
+                                                                        <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center shrink-0 ml-2">
+                                                                            <Check className="w-3 h-3 text-white" />
+                                                                        </div>
+                                                                    )}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => { handleModeSwitch("agent"); setShowModeDropdown(false); }}
+                                                                    className={cn(
+                                                                        "w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-150 text-left",
+                                                                        isAgent ? "bg-neutral-800" : "hover:bg-neutral-800/60"
+                                                                    )}
+                                                                >
+                                                                    <div>
+                                                                        <p className="text-[13px] font-semibold text-white">Agent</p>
+                                                                        <p className="text-[11px] text-neutral-400 mt-0.5">Takes actions, manages your workspace</p>
+                                                                    </div>
+                                                                    {isAgent && (
+                                                                        <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center shrink-0 ml-2">
+                                                                            <Check className="w-3 h-3 text-white" />
+                                                                        </div>
+                                                                    )}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                            {/* Send */}
+                                            <button
+                                                onClick={() => handleSend()}
+                                                disabled={(!inputValue.trim() && attachments.length === 0) || isLoading}
+                                                className={cn(
+                                                    "p-1.5 rounded-full transition-all duration-200",
+                                                    (inputValue.trim() || attachments.length > 0) && !isLoading
+                                                        ? "bg-neutral-800 dark:bg-neutral-200 text-white dark:text-black hover:scale-105 active:scale-95"
+                                                        : "text-neutral-300 dark:text-neutral-600 cursor-not-allowed"
+                                                )}
+                                            >
+                                                <Send className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                          </div>
+                            </div>
                         </div>
                     </>
-                )}
+                )
+            }
 
             <style jsx global>{`
                 .singularity-response li { margin: 2px 0; }
@@ -1566,6 +1684,6 @@ export function SingularityChat({ userId }: { userId?: string }) {
                 @keyframes singularity-border-pulse { 0%, 100% { border-color: rgba(6, 182, 212, 0.2); } 50% { border-color: rgba(6, 182, 212, 0.5); } }
                 .singularity-calling-pulse { animation: singularity-border-pulse 1.5s ease-in-out infinite; }
             `}</style>
-        </div>
+        </div >
     );
 }
