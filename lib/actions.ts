@@ -314,16 +314,19 @@ export async function getUrgentTasks(limit = 5) {
 export async function getClientDashboardData(clientId: string) {
     await connectDB();
 
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+
     // Parallel Fetch — scope invoices/tasks/assets to client's project IDs, not all data
-    const clientProjects = await ProjectModel.find({ clientId }).lean();
+    const clientProjects = await ProjectModel.find({ clientId, ...agencyFilter }).lean();
     const projectIds = clientProjects.map((p: any) => p.id);
 
     const [invoices, transactions, tasks, assets, notifications] = await Promise.all([
-        InvoiceModel.find({ projectId: { $in: projectIds } }).lean(),
-        TransactionModel.find({ projectId: { $in: projectIds } }).lean(),
-        TaskModel.find({ projectId: { $in: projectIds } }).lean(),
-        AssetModel.find({ projectId: { $in: projectIds } }).lean(),
-        NotificationModel.find({ userId: clientId }).sort({ timestamp: -1 }).limit(5).lean()
+        InvoiceModel.find({ projectId: { $in: projectIds }, ...agencyFilter }).lean(),
+        TransactionModel.find({ projectId: { $in: projectIds }, ...agencyFilter }).lean(),
+        TaskModel.find({ projectId: { $in: projectIds }, ...agencyFilter }).lean(),
+        AssetModel.find({ projectId: { $in: projectIds }, ...agencyFilter }).lean(),
+        NotificationModel.find({ userId: clientId, ...agencyFilter }).sort({ timestamp: -1 }).limit(5).lean()
     ]);
 
     const projects = clientProjects;
@@ -377,17 +380,19 @@ export async function getClientDashboardData(clientId: string) {
 
 export async function getEmployeeDashboardData(userId: string) {
     await connectDB();
-    const tasks = await TaskModel.find({ assigneeId: userId }).lean();
-    const user = await UserModel.findOne({ id: userId }).lean();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const tasks = await TaskModel.find({ assigneeId: userId, ...agencyFilter }).lean();
+    const user = await UserModel.findOne({ id: userId, ...agencyFilter }).lean();
 
     // Recent Activity
     const activities = user
-        ? await ActivityModel.find({ user: user.name }).sort({ timestamp: -1 }).limit(5).lean()
+        ? await ActivityModel.find({ user: (user as any).name, ...agencyFilter }).sort({ timestamp: -1 }).limit(5).lean()
         : [];
 
     // Projects involved in
-    const projectIds = [...new Set(tasks.map(t => t.projectId))];
-    const projects = await ProjectModel.find({ id: { $in: projectIds } }).lean();
+    const projectIds = [...new Set(tasks.map((t: any) => t.projectId))];
+    const projects = await ProjectModel.find({ id: { $in: projectIds }, ...agencyFilter }).lean();
 
     return {
         tasks: tasks.map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' })),
@@ -400,19 +405,22 @@ export async function getEmployeeDashboardData(userId: string) {
 // Auto-clear notifications older than 24 hours
 export async function getNotifications(userId: string, offset = 0, limit = 1000): Promise<Notification[]> {
     await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    // Clean up old notifications efficiently
-    await NotificationModel.deleteMany({ timestamp: { $lt: oneDayAgo } });
+    // Clean up old notifications efficiently — scoped to agency to avoid cross-tenant deletion
+    await NotificationModel.deleteMany({ ...agencyFilter, timestamp: { $lt: oneDayAgo } });
 
-    const notifications = await NotificationModel.find({ userId }) // Filter by userId at DB level
-        .sort({ timestamp: -1 }) // Sort by new
+    const notifications = await NotificationModel.find({ userId, ...agencyFilter })
+        .sort({ timestamp: -1 })
         .skip(offset)
         .limit(limit)
         .lean();
 
     return notifications.map(n => sanitizeDoc(n));
 }
+
 
 export async function getProjects(offset = 0, limit = 1000) {
     await connectDB();
@@ -2297,18 +2305,21 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
     if (!query || query.length < 2) return [];
 
     await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
     const results: SearchResult[] = [];
     const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(escapedQuery, 'i');
 
     // Search Projects
     const projects = await ProjectModel.find({
+        ...agencyFilter,
         $or: [{ name: regex }, { client: regex }]
     }).limit(5).lean();
 
     for (const p of projects) {
         const proj = sanitizeDoc(p) as any;
-        const clientDoc = proj.clientId ? await ClientModel.findOne({ id: proj.clientId }).lean() : null;
+        const clientDoc = proj.clientId ? await ClientModel.findOne({ id: proj.clientId, ...agencyFilter }).lean() : null;
         const clientName = clientDoc ? (clientDoc as any).name : (proj.client || '');
         results.push({
             id: proj.id,
@@ -2321,6 +2332,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
 
     // Search Clients
     const clients = await ClientModel.find({
+        ...agencyFilter,
         $or: [{ name: regex }, { companyName: regex }]
     }).limit(5).lean();
 
@@ -2337,13 +2349,13 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
 
     // Search Tasks
     const tasks = await TaskModel.find({
+        ...agencyFilter,
         $or: [{ title: regex }, { description: regex }]
     }).limit(5).lean();
 
     for (const t of tasks) {
         const task = sanitizeDoc(t) as any;
-        // Look up the project slug for the task URL
-        const taskProject = await ProjectModel.findOne({ id: task.projectId }).select('slug id').lean();
+        const taskProject = await ProjectModel.findOne({ id: task.projectId, ...agencyFilter }).select('slug id').lean();
         const projectSlug = taskProject ? ((taskProject as any).slug || (taskProject as any).id) : task.projectId;
         results.push({
             id: task.id,
@@ -2356,6 +2368,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
 
     // Search Users
     const users = await UserModel.find({
+        ...agencyFilter,
         $or: [{ name: regex }, { email: regex }]
     }).limit(5).lean();
 
@@ -2372,6 +2385,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
 
     return results.slice(0, 10);
 }
+
 
 export async function markNotificationAsRead(id: string) {
     await connectDB();
