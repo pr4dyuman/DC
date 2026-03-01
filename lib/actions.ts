@@ -342,7 +342,8 @@ export async function getClientDashboardData(clientId: string) {
     const pendingInvoices = clientInvoices.filter((i: any) => i.status === 'Pending' || i.status === 'Overdue');
     const totalDue = pendingInvoices.reduce((acc: number, inv: any) => acc + inv.amount, 0);
     const unreadNotificationsCount = notifications.filter((n: any) => !n.read).length; // Note: this is only from the latest 5. Ideally query count.
-    const unreadCountReal = await NotificationModel.countDocuments({ userId: clientId, read: false });
+    const unreadCountReal = await NotificationModel.countDocuments({ userId: clientId, read: false, ...agencyFilter });
+
 
     // Financials
     const totalPaid = clientTransactions
