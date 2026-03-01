@@ -1903,7 +1903,7 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
 
     const newTransaction: Transaction = {
         ...transaction, id: generateId(),
-        status: transaction.status || 'completed', agencyId: agency?.id
+        status: transaction.status || 'completed', agencyId: agency?.id || 'default-agency'
     };
     await TransactionModel.create(newTransaction);
 
@@ -2487,7 +2487,7 @@ export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt" | "
     await connectDB();
     const agency = await getCurrentAgency();
     const newAsset: Asset = {
-        ...asset, id: generateId(), uploadedAt: new Date().toISOString(), agencyId: agency?.id
+        ...asset, id: generateId(), uploadedAt: new Date().toISOString(), agencyId: agency?.id || 'default-agency'
     };
     await AssetModel.create(newAsset);
     await ActivityModel.create({
