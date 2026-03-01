@@ -189,35 +189,27 @@ export async function sendMessage(senderId: string, receiverId: string, content:
 }
 
 export async function markAsRead(currentUserId: string, senderId: string) {
-    await db.update((data) => {
-        if (!data.messages) return data;
-        let hasChanges = false;
-        data.messages = data.messages.map(m => {
-            if (m.senderId === senderId && m.receiverId === currentUserId && !m.read) {
-                hasChanges = true;
-                return { ...m, read: true };
-            }
-            return m;
-        });
-
-        // Update presence when reading too
-        if (hasChanges) {
-            const userIndex = data.users.findIndex(u => u.id === currentUserId);
-            if (userIndex !== -1) data.users[userIndex].lastActiveAt = new Date().toISOString();
-        }
-
-        return data;
-    });
+    await connectDB();
+    const agency = await getCurrentAgency();
+    await MessageModel.updateMany(
+        { senderId, receiverId: currentUserId, agencyId: agency?.id, read: false },
+        { $set: { read: true } }
+    );
+    await UserModel.updateOne(
+        { id: currentUserId, agencyId: agency?.id },
+        { $set: { lastActiveAt: new Date().toISOString() } }
+    );
 }
 
 export async function deleteConversation(currentUserId: string, otherUserId: string) {
-    await db.update((data) => {
-        if (!data.messages) return data;
-        data.messages = data.messages.filter(m =>
-            !((m.senderId === currentUserId && m.receiverId === otherUserId) ||
-                (m.senderId === otherUserId && m.receiverId === currentUserId))
-        );
-        return data;
+    await connectDB();
+    const agency = await getCurrentAgency();
+    await MessageModel.deleteMany({
+        agencyId: agency?.id,
+        $or: [
+            { senderId: currentUserId, receiverId: otherUserId },
+            { senderId: otherUserId, receiverId: currentUserId }
+        ]
     });
     revalidatePath('/dashboard');
 }

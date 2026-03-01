@@ -651,10 +651,8 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
     if (newUser.password) {
         newUser.password = await hashPassword(newUser.password);
     }
-    await db.update((data) => ({
-        ...data,
-        users: [...data.users, newUser]
-    }));
+    await connectDB();
+    await UserModel.create(newUser);
 
     // Send welcome email to employee
     try {
@@ -832,36 +830,31 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
         notifyAdmin = true;
     }
 
-    await db.update(async (data) => {
-        let newData = { ...data };
+    // Try User first, then Client
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
 
-        // Try updating in Users
-        const userExists = newData.users.some(u => u.id === id);
-        if (userExists) {
-            newData.users = newData.users.map(u => u.id === id ? { ...u, ...finalUpdates } : u);
-        } else if (newData.clients && newData.clients.some(c => c.id === id)) {
-            // Try updating in Clients
-            newData.clients = newData.clients.map(c => c.id === id ? { ...c, ...finalUpdates as Partial<Client> } : c);
-        } else {
-            return data; // No user/client found
-        }
+    const userExists = await UserModel.exists({ id, ...agencyFilter });
+    if (userExists) {
+        await UserModel.updateOne({ id, ...agencyFilter }, { $set: finalUpdates });
+    } else {
+        const clientExists = await ClientModel.exists({ id, ...agencyFilter });
+        if (!clientExists) { revalidatePath('/dashboard/settings'); return; }
+        await ClientModel.updateOne({ id, ...agencyFilter }, { $set: finalUpdates });
+    }
 
-        // Notify Admins
-        if (notifyAdmin) {
-            const adminUsers = newData.users.filter(u => u.role === 'admin' || u.role === 'manager');
-            const newNotifications = await Promise.all(adminUsers.map(async admin => await withAgencyId({
-                id: generateId(),
-                userId: admin.id,
-                message: `${currentUser.name} has requested to update their identity documents.`,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: `/dashboard/team?edit=${id}` // Link to open edit dialog (needs implementation on page)
-            })));
-            newData.notifications = [...newData.notifications, ...newNotifications];
-        }
-
-        return newData;
-    });
+    // Notify Admins if document request
+    if (notifyAdmin) {
+        const admins = await UserModel.find({ ...agencyFilter, $or: [{ role: 'admin' }, { role: 'manager' }] }).lean();
+        const currentUserDoc = await UserModel.findOne({ id, ...agencyFilter }).lean() ||
+            await ClientModel.findOne({ id, ...agencyFilter }).lean();
+        await NotificationModel.insertMany(admins.map(admin => ({
+            id: generateId(), agencyId: agency?.id, userId: admin.id,
+            message: `${(currentUserDoc as any)?.name || 'User'} has requested to update their identity documents.`,
+            read: false, timestamp: new Date().toISOString(),
+            link: `/dashboard/team?edit=${id}`
+        })));
+    }
     revalidatePath('/dashboard/team');
 }
 
@@ -900,25 +893,16 @@ export async function unarchiveClient(id: string) {
         throw new Error("Unauthorized");
     }
 
-    await db.update((data) => {
-        // Find the archived client
-        const client = data.clients.find(c => c.id === id);
-        if (!client) {
-            throw new Error("Client not found");
-        }
-        if (!client.archived) {
-            throw new Error("Client is not archived");
-        }
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const client = await ClientModel.findOne({ id, agencyId: agency?.id }).lean();
+    if (!client) throw new Error('Client not found');
+    if (!client.archived) throw new Error('Client is not archived');
 
-        return {
-            ...data,
-            clients: data.clients.map(c =>
-                c.id === id
-                    ? { ...c, archived: false, archivedAt: undefined }
-                    : c
-            )
-        };
-    });
+    await ClientModel.updateOne(
+        { id, agencyId: agency?.id },
+        { $set: { archived: false }, $unset: { archivedAt: '' } }
+    );
 
     revalidatePath('/dashboard/clients');
 }
@@ -929,62 +913,45 @@ export async function approveDocumentUpdate(userId: string, type: 'adhar' | 'pan
         throw new Error("Unauthorized");
     }
 
-    await db.update(async data => {
-        const user = data.users.find(u => u.id === userId);
-        if (!user) return data;
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const user = await UserModel.findOne({ id: userId, agencyId: agency?.id }).lean();
+    if (!user) { revalidatePath('/dashboard/team'); return; }
 
-        let updates: any = {};
-        if (approve) {
-            if (type === 'adhar' || type === 'both') {
-                if (user.pendingAdharCardImage) {
-                    updates.adharCardImage = user.pendingAdharCardImage;
-                    updates.pendingAdharCardImage = undefined;
-                }
-            }
-            if (type === 'pan' || type === 'both') {
-                if (user.pendingPanCardImage) {
-                    updates.panCardImage = user.pendingPanCardImage;
-                    updates.pendingPanCardImage = undefined;
-                }
-            }
-            if (type === 'contracts') {
-                if (user.pendingContracts) {
-                    updates.contracts = user.pendingContracts;
-                    updates.pendingContracts = undefined;
-                }
-            }
-            if (type === 'other') {
-                if (user.pendingOtherDocuments) {
-                    updates.otherDocuments = user.pendingOtherDocuments;
-                    updates.pendingOtherDocuments = undefined;
-                }
-            }
-        } else {
-            // Reject - just clear pending
-            if (type === 'adhar' || type === 'both') updates.pendingAdharCardImage = undefined;
-            if (type === 'pan' || type === 'both') updates.pendingPanCardImage = undefined;
-            if (type === 'contracts') updates.pendingContracts = undefined;
-            if (type === 'other') updates.pendingOtherDocuments = undefined;
+    let updates: any = {};
+    if (approve) {
+        if ((type === 'adhar' || type === 'both') && user.pendingAdharCardImage) {
+            updates.adharCardImage = user.pendingAdharCardImage;
+            updates.pendingAdharCardImage = null;
         }
+        if ((type === 'pan' || type === 'both') && user.pendingPanCardImage) {
+            updates.panCardImage = user.pendingPanCardImage;
+            updates.pendingPanCardImage = null;
+        }
+        if (type === 'contracts' && user.pendingContracts) {
+            updates.contracts = user.pendingContracts;
+            updates.pendingContracts = null;
+        }
+        if (type === 'other' && user.pendingOtherDocuments) {
+            updates.otherDocuments = user.pendingOtherDocuments;
+            updates.pendingOtherDocuments = null;
+        }
+    } else {
+        if (type === 'adhar' || type === 'both') updates.pendingAdharCardImage = null;
+        if (type === 'pan' || type === 'both') updates.pendingPanCardImage = null;
+        if (type === 'contracts') updates.pendingContracts = null;
+        if (type === 'other') updates.pendingOtherDocuments = null;
+    }
 
-        // Notify User
-        const message = approve
-            ? `Your document update request for ${type === 'both' ? 'documents' : type.toUpperCase()} has been APPROVED.`
-            : `Your document update request for ${type === 'both' ? 'documents' : type.toUpperCase()} has been REJECTED.`;
+    await UserModel.updateOne({ id: userId, agencyId: agency?.id }, { $set: updates });
 
-        const notification = await withAgencyId({
-            id: generateId(),
-            userId: userId,
-            message: message,
-            read: false,
-            timestamp: new Date().toISOString()
-        });
+    const message = approve
+        ? `Your document update request for ${type === 'both' ? 'documents' : type.toUpperCase()} has been APPROVED.`
+        : `Your document update request for ${type === 'both' ? 'documents' : type.toUpperCase()} has been REJECTED.`;
 
-        return {
-            ...data,
-            users: data.users.map(u => u.id === userId ? { ...u, ...updates } : u),
-            notifications: [...data.notifications, notification]
-        };
+    await NotificationModel.create({
+        id: generateId(), agencyId: agency?.id, userId,
+        message, read: false, timestamp: new Date().toISOString()
     });
     revalidatePath('/dashboard/team');
 }
@@ -994,11 +961,10 @@ export async function adminResetPassword(id: string, newPassword: string) {
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
         throw new Error("Unauthorized: Only Admins can reset passwords.");
     }
+    await connectDB();
     const hashedPassword = await hashPassword(newPassword);
-    await db.update((data) => ({
-        ...data,
-        users: data.users.map(u => u.id === id ? { ...u, password: hashedPassword } : u)
-    }));
+    const agency = await getCurrentAgency();
+    await UserModel.updateOne({ id, agencyId: agency?.id }, { $set: { password: hashedPassword } });
     revalidatePath('/dashboard/team');
 }
 
@@ -1017,55 +983,35 @@ export async function getServices() {
 }
 
 export async function addService(name: string, jobs: { title: string; count: number }[]) {
-    const newService = await withAgencyId({ id: generateId(), name, jobs });
-    await db.update(async (data) => ({
-        ...data,
-        services: [...data.services, newService]
-    }));
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const newService = { id: generateId(), agencyId: agency?.id, name, jobs };
+    await ServiceModel.create(newService);
     revalidatePath('/dashboard/settings');
     revalidatePath('/dashboard/projects');
     return newService;
 }
 
 export async function deleteService(id: string) {
-    const data = await db.get();
-    const serviceToDelete = data.services.find(s => s.id === id);
-    const serviceName = serviceToDelete?.name;
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const serviceToDelete = await ServiceModel.findOne({ id, agencyId: agency?.id }).lean();
+    const serviceName = (serviceToDelete as any)?.name;
 
-    await db.update((data) => {
-        // Remove from services list
-        const newServices = data.services.filter(c => c.id !== id);
-
-        // Remove from all projects
-        const newProjects = data.projects.map(p => {
-            if (p.services) {
-                // Filter out both ID and Name (for robustness during migration)
-                const newProjectServices = p.services.filter(s => s !== id && s !== serviceName);
-                if (newProjectServices.length !== p.services.length) {
-                    return {
-                        ...p,
-                        services: newProjectServices
-                    };
-                }
-            }
-            return p;
-        });
-
-        return {
-            ...data,
-            services: newServices,
-            projects: newProjects
-        };
-    });
+    await ServiceModel.deleteOne({ id, agencyId: agency?.id });
+    // Remove this service from all projects that reference it
+    await ProjectModel.updateMany(
+        { agencyId: agency?.id, services: { $in: [id, serviceName] } },
+        { $pull: { services: { $in: [id, serviceName] } } }
+    );
     revalidatePath('/dashboard/settings');
     revalidatePath('/dashboard/projects');
 }
 
 export async function updateService(id: string, name: string, jobs: { title: string; count: number }[]) {
-    await db.update((data) => ({
-        ...data,
-        services: data.services.map(c => c.id === id ? { ...c, name, jobs } : c)
-    }));
+    await connectDB();
+    const agency = await getCurrentAgency();
+    await ServiceModel.updateOne({ id, agencyId: agency?.id }, { $set: { name, jobs } });
     revalidatePath('/dashboard/settings');
     revalidatePath('/dashboard/projects');
 }
@@ -1083,65 +1029,60 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
     }
 
     // Unique Slug Check
-    const data = await db.get();
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error('No agency context');
+
+    // Unique slug check against DB
     let uniqueSlug = slug;
-    let counter = 1;
-    while (data.projects.find(p => p.slug === uniqueSlug)) {
-        uniqueSlug = `${slug}-${counter}`;
-        counter++;
+    let slugCounter = 1;
+    while (await ProjectModel.exists({ slug: uniqueSlug, agencyId: agency.id })) {
+        uniqueSlug = `${slug}-${slugCounter}`;
+        slugCounter++;
     }
 
-    const newProject: Project = await withAgencyId({ ...project, id: generateId(), slug: uniqueSlug, status: "Active", createdAt: new Date().toISOString() });
+    const newProject: Project = {
+        ...project, id: generateId(), slug: uniqueSlug,
+        status: 'Active', createdAt: new Date().toISOString(), agencyId: agency.id
+    };
 
-    // Generate invoices for installment/monthly payments
+    // Validate client exists if specified
+    if (project.clientId) {
+        const clientExists = await ClientModel.exists({ id: project.clientId, agencyId: agency.id });
+        if (!clientExists) throw new Error(`Client with ID ${project.clientId} not found`);
+    }
+
+    // Generate invoices from serviceConfigs BEFORE saving
     const newInvoices: Invoice[] = [];
-
-    // Check if project has service configs with payment configuration
     if (project.serviceConfigs && project.serviceConfigs.length > 0) {
         const totalServices = project.serviceConfigs.length;
-
         for (const serviceConfig of project.serviceConfigs) {
             const paymentConfig = serviceConfig.paymentConfig;
-
             if (!paymentConfig) continue;
 
             if (paymentConfig.type === 'installment') {
-                // For installment payments
                 if (paymentConfig.installmentDates && paymentConfig.installmentDates.length > 0) {
                     const amountPerInstallment = paymentConfig.installmentAmount ||
                         (project.budget / totalServices / paymentConfig.installmentDates.length);
-
-                    // Create an invoice for each installment date
                     for (const installmentDate of paymentConfig.installmentDates) {
                         newInvoices.push(await withAgencyId({
-                            id: generateId(),
-                            projectId: newProject.id,
-                            amount: Math.round(amountPerInstallment),
-                            status: "Pending",
-                            date: installmentDate
+                            id: generateId(), projectId: newProject.id,
+                            amount: Math.round(amountPerInstallment), status: 'Pending', date: installmentDate
                         }));
                     }
                 }
             } else if (paymentConfig.type === 'monthly') {
-                // For monthly payments - generate invoices for next 12 months or until project ends
                 if (paymentConfig.monthlyAmount && paymentConfig.billingStartDate) {
                     const monthlyAmount = paymentConfig.monthlyAmount;
                     const startDate = new Date(paymentConfig.billingStartDate);
                     const projectDueDate = new Date(project.dueDate);
-
-                    // Calculate number of months
                     const monthsDiff = Math.ceil((projectDueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
-                    const numberOfInvoices = Math.min(monthsDiff, 12); // Max 12 months
-
+                    const numberOfInvoices = Math.min(monthsDiff, 12);
                     for (let i = 0; i < numberOfInvoices; i++) {
                         const invoiceDate = new Date(startDate);
                         invoiceDate.setMonth(invoiceDate.getMonth() + i);
-
                         newInvoices.push(await withAgencyId({
-                            id: generateId(),
-                            projectId: newProject.id,
-                            amount: monthlyAmount,
-                            status: "Pending",
+                            id: generateId(), projectId: newProject.id,
+                            amount: monthlyAmount, status: 'Pending',
                             date: invoiceDate.toISOString().split('T')[0]
                         }));
                     }
@@ -1150,38 +1091,26 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
         }
     }
 
-    await db.update(async (data) => {
-        if (project.clientId && !data.clients?.find(c => c.id === project.clientId)) {
-            throw new Error(`Client with ID ${project.clientId} not found`);
-        }
+    // Save project + invoices
+    await ProjectModel.create(newProject);
+    if (newInvoices.length > 0) {
+        await InvoiceModel.insertMany(newInvoices.map(inv => ({ ...inv, agencyId: agency.id })));
+    }
 
-        // Create notifications for client about new invoices
-        let notifications = data.notifications || [];
-        if (project.clientId && newInvoices.length > 0) {
-            const newNotification = await withAgencyId({
-                id: generateId(),
-                userId: project.clientId,
-                message: `${newInvoices.length} pending invoice(s) for project: ${project.name}`,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: `/dashboard/finance`
-            });
-            notifications = [newNotification, ...notifications];
-        }
+    // Notify client about invoices
+    if (project.clientId && newInvoices.length > 0) {
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency.id, userId: project.clientId,
+            message: `${newInvoices.length} pending invoice(s) for project: ${project.name}`,
+            read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
+        });
+    }
 
-        return {
-            ...data,
-            projects: [...data.projects, newProject],
-            invoices: [...newInvoices, ...(data.invoices || [])],
-            notifications,
-            activities: [await withAgencyId({
-                id: generateId(),
-                user: currentUser.name,
-                action: "created project",
-                target: project.name,
-                timestamp: new Date().toISOString()
-            }), ...data.activities]
-        }
+    // Activity log
+    await ActivityModel.create({
+        id: generateId(), agencyId: agency.id, user: currentUser.name,
+        action: 'created project', target: project.name,
+        timestamp: new Date().toISOString()
     });
 
     // Send email notification to client
@@ -1192,14 +1121,10 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
                 const paymentPlan = project.serviceConfigs && project.serviceConfigs.length > 0
                     ? project.serviceConfigs[0].paymentConfig?.type || 'one-time'
                     : 'one-time';
-
                 await sendProjectCreatedEmail({
-                    clientEmail: client.email,
-                    clientName: client.name,
-                    projectName: project.name,
-                    budget: project.budget,
-                    paymentPlan: paymentPlan,
-                    invoiceCount: newInvoices.length,
+                    clientEmail: client.email, clientName: client.name,
+                    projectName: project.name, budget: project.budget,
+                    paymentPlan, invoiceCount: newInvoices.length,
                     projectLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${newProject.slug || newProject.id}`,
                 });
             }
@@ -1210,26 +1135,16 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
 
     revalidatePath('/dashboard/projects');
     revalidatePath('/dashboard/finance');
-    return newProject;
+    return sanitizeDoc(newProject);
 }
 
 export async function updateProjectPayment(projectId: string, serviceId: string, paymentConfig: PaymentConfig) {
-    await db.update((data) => {
-        return {
-            ...data,
-            projects: data.projects.map(p => {
-                if (p.id === projectId && p.serviceConfigs) {
-                    return {
-                        ...p,
-                        serviceConfigs: p.serviceConfigs.map(c =>
-                            c.serviceId === serviceId ? { ...c, paymentConfig } : c
-                        )
-                    };
-                }
-                return p;
-            })
-        };
-    });
+    await connectDB();
+    const agency = await getCurrentAgency();
+    await ProjectModel.updateOne(
+        { id: projectId, agencyId: agency?.id, 'serviceConfigs.serviceId': serviceId },
+        { $set: { 'serviceConfigs.$.paymentConfig': paymentConfig } }
+    );
     revalidatePath('/dashboard/projects/[id]', 'page');
     revalidatePath('/dashboard/projects');
 }
@@ -1265,16 +1180,13 @@ export async function updateUserPermissions(targetUserId: string, permissions: U
         throw new Error("Unauthorized: Only Admins can manage permissions.");
     }
 
-    await db.update((data) => ({
-        ...data,
-        settings: {
-            ...data.settings,
-            userPermissions: {
-                ...(data.settings.userPermissions || {}),
-                [targetUserId]: permissions
-            }
-        }
-    }));
+    await connectDB();
+    const agency = await getCurrentAgency();
+    await SettingsModel.updateOne(
+        { agencyId: agency?.id },
+        { $set: { [`userPermissions.${targetUserId}`]: permissions } },
+        { upsert: true }
+    );
     revalidatePath('/dashboard/settings');
 }
 
@@ -1635,10 +1547,8 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
         newClient.password = await hashPassword(newClient.password);
     }
 
-    await db.update((data) => ({
-        ...data,
-        clients: [...(data.clients || []), newClient]
-    }));
+    await connectDB();
+    await ClientModel.create(newClient);
 
     // Send welcome email to client
     try {
@@ -1684,63 +1594,33 @@ export async function updateClient(id: string, updates: Partial<Client>) {
 
 // Project Actions
 export async function updateProject(id: string, updates: Partial<Project>) {
-    const currentUser = await getCurrentUser();
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const oldProject = await ProjectModel.findOne({ id, agencyId: agency?.id }).lean();
 
-    // Status Change Validation
-    if (updates.status) {
-        // 1. Permission Check - Only admins and managers can change status
-        if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
-            throw new Error("Unauthorized: Only Admins and Managers can change project status.");
-        }
-
-        const data = await db.get();
-
-        // 2. Completion Logic - Warn if trying to complete with open tasks
-        if (updates.status === 'Completed') {
-            const projectTasks = data.tasks.filter(t => t.projectId === id);
-            const hasOpenTasks = projectTasks.some(t => t.status !== 'Done');
-
-            if (hasOpenTasks) {
-                const openCount = projectTasks.filter(t => t.status !== 'Done').length;
-                // Allow admin to override, but warn them
-                console.warn(`Warning: Marking project as Completed with ${openCount} unfinished tasks.`);
-            }
-        }
+    // Validation: warn if completing with open tasks
+    if (updates.status === 'Completed') {
+        const openCount = await TaskModel.countDocuments({ projectId: id, agencyId: agency?.id, status: { $ne: 'Done' } });
+        if (openCount > 0) console.warn(`Warning: Marking project as Completed with ${openCount} unfinished tasks.`);
     }
 
-    const data = await db.get();
-    const oldProject = data.projects.find(p => p.id === id);
+    await ProjectModel.updateOne({ id, agencyId: agency?.id }, { $set: updates });
 
-    await db.update(async (data) => {
-        let notifications = data.notifications || [];
-
-        // Notify Client on Status Change
-        if (updates.status && oldProject && oldProject.status !== updates.status && oldProject.clientId) {
-            const statusMessages: Record<string, string> = {
-                'Active': 'is now active and in progress',
-                'Completed': 'has been completed',
-                'On Hold': 'has been put on hold',
-                'Cancelled': 'has been cancelled'
-            };
-
-            const message = statusMessages[updates.status] || `status updated to ${updates.status}`;
-
-            notifications = [await withAgencyId({
-                id: generateId(),
-                userId: oldProject.clientId,
-                message: `Project "${oldProject.name}" ${message}`,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: `/dashboard/projects/${id}`
-            }), ...notifications];
-        }
-
-        return {
-            ...data,
-            projects: data.projects.map(p => p.id === id ? { ...p, ...updates } : p),
-            notifications
+    // Notify client on status change
+    if (updates.status && oldProject && (oldProject as any).status !== updates.status && (oldProject as any).clientId) {
+        const statusMessages: Record<string, string> = {
+            'Active': 'is now active and in progress',
+            'Completed': 'has been completed',
+            'On Hold': 'has been put on hold',
+            'Cancelled': 'has been cancelled'
         };
-    });
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency?.id, userId: (oldProject as any).clientId,
+            message: `Project "${(oldProject as any).name}" ${statusMessages[updates.status] || `status updated to ${updates.status}`}`,
+            read: false, timestamp: new Date().toISOString(),
+            link: `/dashboard/projects/${id}`
+        });
+    }
 
     // Send email notification for status change
     if (updates.status && oldProject && oldProject.status !== updates.status && oldProject.clientId) {
@@ -2010,49 +1890,43 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
         status: transaction.status || "completed"
     });
 
-    await db.update(async (data) => {
-        if (transaction.projectId && !data.projects?.find(p => p.id === transaction.projectId)) {
-            throw new Error(`Project with ID ${transaction.projectId} not found`);
-        }
+    await connectDB();
+    const agency = await getCurrentAgency();
 
-        // GENERATE NOTIFICATION FOR SALARY
-        const notifications = [...(data.notifications || [])];
-        if (newTransaction.category === 'Salary' && newTransaction.userId && newTransaction.type === 'expense') {
-            notifications.unshift(await withAgencyId({
-                id: generateId(),
-                userId: newTransaction.userId,
-                message: `Salary Payment Received: ₹${newTransaction.amount.toLocaleString()}`,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: '/dashboard/finance' // Or profile link? Finance seems appropriate if they have access, or just informational.
-            }));
-        }
+    // Validate project exists if provided
+    if (transaction.projectId) {
+        const projectExists = await ProjectModel.exists({ id: transaction.projectId, agencyId: agency?.id });
+        if (!projectExists) throw new Error(`Project with ID ${transaction.projectId} not found`);
+    }
 
-        // Send email for salary payment
-        if (newTransaction.category === 'Salary' && newTransaction.userId && newTransaction.type === 'expense') {
-            try {
-                const employee = data.users.find(u => u.id === newTransaction.userId);
-                if (employee?.email) {
-                    await sendSalaryPaidEmail({
-                        employeeEmail: employee.email,
-                        employeeName: employee.name,
-                        amount: newTransaction.amount,
-                        month: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
-                        paymentDate: newTransaction.date,
-                        financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/finance`,
-                    });
-                }
-            } catch (emailError) {
-                console.error('[Email] Failed to send salary payment email:', emailError);
+    const newTransaction: Transaction = {
+        ...transaction, id: generateId(),
+        status: transaction.status || 'completed', agencyId: agency?.id
+    };
+    await TransactionModel.create(newTransaction);
+
+    // Salary notification + email
+    if (newTransaction.category === 'Salary' && newTransaction.userId && newTransaction.type === 'expense') {
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency?.id, userId: newTransaction.userId,
+            message: `Salary Payment Received: ₹${newTransaction.amount.toLocaleString()}`,
+            read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
+        });
+        try {
+            const employee = await UserModel.findOne({ id: newTransaction.userId, agencyId: agency?.id }).lean();
+            if ((employee as any)?.email) {
+                await sendSalaryPaidEmail({
+                    employeeEmail: (employee as any).email, employeeName: (employee as any).name,
+                    amount: newTransaction.amount,
+                    month: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
+                    paymentDate: newTransaction.date,
+                    financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/finance`,
+                });
             }
+        } catch (emailError) {
+            console.error('[Email] Failed to send salary payment email:', emailError);
         }
-
-        return {
-            ...data,
-            transactions: [newTransaction, ...(data.transactions || [])],
-            notifications
-        };
-    });
+    }
 
     revalidatePath('/dashboard/finance');
     if (transaction.projectId) {
@@ -2067,31 +1941,15 @@ export async function markTransactionAsPaid(transactionId: string) {
         throw new Error("Unauthorized: Only Admins can mark transactions as paid.");
     }
 
-    await db.update(async (data) => {
-        const transactionIndex = data.transactions.findIndex(t => t.id === transactionId);
-        if (transactionIndex === -1) {
-            throw new Error("Transaction not found");
-        }
-
-        const transaction = data.transactions[transactionIndex];
-        if (transaction.status === 'completed') {
-            throw new Error("Transaction is already active/completed");
-        }
-
-        // Update status only — preserve original date
-        const updatedTransaction = { ...transaction, status: 'completed' as const };
-
-        const newTransactions = [...data.transactions];
-        newTransactions[transactionIndex] = updatedTransaction;
-
-        return {
-            ...data,
-            transactions: newTransactions
-        };
-    });
-
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const transaction = await TransactionModel.findOne({ id: transactionId, agencyId: agency?.id }).lean();
+    if (!transaction) throw new Error('Transaction not found');
+    if ((transaction as any).status === 'completed') throw new Error('Transaction is already active/completed');
+    await TransactionModel.updateOne({ id: transactionId, agencyId: agency?.id }, { $set: { status: 'completed' } });
     revalidatePath('/dashboard/finance');
 }
+
 
 export async function getInvoices(projectId?: string) {
     const data = await db.get();
@@ -2139,15 +1997,12 @@ export async function clientMarkInvoiceAsPaid(invoiceId: string) {
         read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
     })));
 
-    // Send email notification to admins
+    // Email admins (use already-fetched admins list)
     try {
-        const data = await db.get();
-        const adminUsers = data.users.filter(u => u.role === 'admin');
-        const adminEmails = adminUsers.map(u => u.email).filter(Boolean) as string[];
-        const invoice = data.invoices.find(i => i.id === invoiceId);
-        const project = invoice ? await getProject(invoice.projectId) : null;
+        const adminEmails = admins.map((u: any) => u.email).filter(Boolean) as string[];
+        const project = await getProject(invoice.projectId);
 
-        if (adminEmails.length > 0 && invoice && project) {
+        if (adminEmails.length > 0 && project) {
             await sendPaymentPendingApprovalEmail({
                 adminEmails,
                 clientName: currentUser.name,
@@ -2512,11 +2367,14 @@ export async function getSystemSettings() {
 }
 
 export async function updateSystemSettings(settings: { systemName: string; logo: string }) {
-    await db.update((data) => ({
-        ...data,
-        settings: { ...data.settings, ...settings }
-    }));
-    revalidatePath('/dashboard'); // Update all dashboard routes
+    await connectDB();
+    const agency = await getCurrentAgency();
+    await SettingsModel.updateOne(
+        { agencyId: agency?.id },
+        { $set: settings },
+        { upsert: true }
+    );
+    revalidatePath('/dashboard');
     return settings;
 }
 
@@ -2601,10 +2459,9 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
 }
 
 export async function markNotificationAsRead(id: string) {
-    await db.update((data) => ({
-        ...data,
-        notifications: data.notifications?.map(n => n.id === id ? { ...n, read: true } : n) || []
-    }));
+    await connectDB();
+    const agency = await getCurrentAgency();
+    await NotificationModel.updateOne({ id, agencyId: agency?.id }, { $set: { read: true } });
 }
 
 // ----------------------------------------------------------------------
@@ -2624,23 +2481,16 @@ export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt" | "
         throw new Error("Security Alert: Malicious file type rejected by server.");
     }
 
-    const newAsset: Asset = await withAgencyId({
-        ...asset,
-        id: generateId(),
-        uploadedAt: new Date().toISOString()
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const newAsset: Asset = {
+        ...asset, id: generateId(), uploadedAt: new Date().toISOString(), agencyId: agency?.id
+    };
+    await AssetModel.create(newAsset);
+    await ActivityModel.create({
+        id: generateId(), agencyId: agency?.id, user: asset.uploadedBy,
+        action: 'uploaded asset', target: asset.name, timestamp: new Date().toISOString()
     });
-
-    await db.update(async (data) => ({
-        ...data,
-        assets: [newAsset, ...(data.assets || [])],
-        activities: [await withAgencyId({
-            id: generateId(),
-            user: asset.uploadedBy,
-            action: `uploaded asset`,
-            target: asset.name,
-            timestamp: new Date().toISOString()
-        }), ...data.activities]
-    }));
 
     revalidatePath(`/dashboard/projects/${asset.projectId}`);
     return newAsset;
@@ -2650,24 +2500,16 @@ export async function deleteProjectAsset(assetId: string) {
     const currentUser = await getCurrentUser();
     const userName = currentUser ? currentUser.name : "System";
 
-    await db.update(async (data) => {
-        const asset = data.assets.find(a => a.id === assetId);
-        return {
-            ...data,
-            assets: data.assets.filter(a => a.id !== assetId),
-            activities: asset ? [await withAgencyId({
-                id: generateId(),
-                user: userName,
-                action: `deleted asset`,
-                target: asset.name,
-                timestamp: new Date().toISOString()
-            }), ...data.activities] : data.activities
-        };
-    });
-
-    const data = await db.get();
-    // Revalidate paths - tricky without knowing project ID easily but we can fetch it first if strictly needed,
-    // or just rely on client side update / or revalidate all projects
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const asset = await AssetModel.findOne({ id: assetId, agencyId: agency?.id }).lean();
+    await AssetModel.deleteOne({ id: assetId, agencyId: agency?.id });
+    if (asset) {
+        await ActivityModel.create({
+            id: generateId(), agencyId: agency?.id, user: userName,
+            action: 'deleted asset', target: (asset as any).name, timestamp: new Date().toISOString()
+        });
+    }
     revalidatePath('/dashboard/projects/[id]', 'page');
 }
 
@@ -2675,25 +2517,22 @@ export async function updateProjectAsset(assetId: string, updates: Partial<Asset
     const currentUser = await getCurrentUser();
     const userName = currentUser ? currentUser.name : "System";
 
-    await db.update(async (data) => ({
-        ...data,
-        assets: data.assets.map(a => a.id === assetId ? { ...a, ...updates } : a),
-        activities: [await withAgencyId({
-            id: generateId(),
-            user: userName,
-            action: `updated asset`,
-            target: data.assets.find(a => a.id === assetId)?.name || "Asset",
-            timestamp: new Date().toISOString()
-        }), ...data.activities]
-    }));
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const asset = await AssetModel.findOne({ id: assetId, agencyId: agency?.id }).lean();
+    await AssetModel.updateOne({ id: assetId, agencyId: agency?.id }, { $set: updates });
+    await ActivityModel.create({
+        id: generateId(), agencyId: agency?.id, user: userName,
+        action: 'updated asset', target: (asset as any)?.name || 'Asset',
+        timestamp: new Date().toISOString()
+    });
     revalidatePath('/dashboard/projects/[id]', 'page');
 }
 
 export async function toggleAssetAI(assetId: string, enabled: boolean) {
-    await db.update((data) => ({
-        ...data,
-        assets: data.assets.map(a => a.id === assetId ? { ...a, aiEnabled: enabled } : a)
-    }));
+    await connectDB();
+    const agency = await getCurrentAgency();
+    await AssetModel.updateOne({ id: assetId, agencyId: agency?.id }, { $set: { aiEnabled: enabled } });
     revalidatePath('/dashboard/projects/[id]', 'page');
 }
 
@@ -3205,51 +3044,31 @@ export async function requestLeave(leaveData: Omit<LeaveRequest, 'id' | 'status'
         createdAt: new Date().toISOString()
     } as LeaveRequest);
 
-    await db.update(async (data) => {
-        // Notify all admins about new leave request
-        const notifications = data.notifications || [];
-        const adminUsers = data.users.filter(u => u.role === 'admin');
+    await connectDB();
+    const agency = await getCurrentAgency();
+    await LeaveRequestModel.create({ ...newLeaveRequest, agencyId: agency?.id });
 
-        for (const admin of adminUsers) {
-            notifications.unshift(await withAgencyId({
-                id: generateId(),
-                userId: admin.id,
-                message: `${currentUser.name} requested ${leaveData.type} leave (${daysDiff} day${daysDiff > 1 ? 's' : ''})`,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: `/dashboard/team`
-            }));
-        }
-
-        return {
-            ...data,
-            leaveRequests: [newLeaveRequest, ...(data.leaveRequests || [])],
-            notifications,
-            activities: [await withAgencyId({
-                id: generateId(),
-                user: currentUser.name,
-                action: "submitted leave request",
-                target: `${leaveData.type} leave for ${daysDiff} days`,
-                timestamp: new Date().toISOString()
-            }), ...data.activities]
-        };
+    // Notify admins
+    const adminUsers = await UserModel.find({ agencyId: agency?.id, role: 'admin' }).lean();
+    await NotificationModel.insertMany(adminUsers.map((admin: any) => ({
+        id: generateId(), agencyId: agency?.id, userId: admin.id,
+        message: `${currentUser.name} requested ${leaveData.type} leave (${daysDiff} day${daysDiff > 1 ? 's' : ''})`,
+        read: false, timestamp: new Date().toISOString(), link: '/dashboard/team'
+    })));
+    await ActivityModel.create({
+        id: generateId(), agencyId: agency?.id, user: currentUser.name,
+        action: 'submitted leave request', target: `${leaveData.type} leave for ${daysDiff} days`,
+        timestamp: new Date().toISOString()
     });
 
-    // Send email notification to admins
+    // Email admins
     try {
-        const data = await db.get();
-        const adminUsers = data.users.filter(u => u.role === 'admin');
-        const adminEmails = adminUsers.map(u => u.email).filter(Boolean) as string[];
-
+        const adminEmails = adminUsers.map((u: any) => u.email).filter(Boolean) as string[];
         if (adminEmails.length > 0) {
             await sendLeaveRequestedEmail({
-                adminEmails,
-                employeeName: currentUser.name,
-                leaveType: leaveData.type,
-                startDate: leaveData.startDate,
-                endDate: leaveData.endDate,
-                days: daysDiff,
-                reason: leaveData.reason || 'No reason provided',
+                adminEmails, employeeName: currentUser.name,
+                leaveType: leaveData.type, startDate: leaveData.startDate, endDate: leaveData.endDate,
+                days: daysDiff, reason: leaveData.reason || 'No reason provided',
                 teamLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/team`,
             });
         }
@@ -3268,74 +3087,46 @@ export async function approveLeaveRequest(leaveRequestId: string) {
         throw new Error("Unauthorized: Only admins can approve leave requests");
     }
 
-    await db.update(async (data) => {
-        const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
-        if (!leaveRequest) {
-            throw new Error("Leave request not found");
-        }
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const leaveRequest = await LeaveRequestModel.findOne({ id: leaveRequestId, agencyId: agency?.id }).lean();
+    if (!leaveRequest) throw new Error('Leave request not found');
+    if ((leaveRequest as any).status !== 'Pending') throw new Error(`Cannot approve ${(leaveRequest as any).status} leave request`);
 
-        if (leaveRequest.status !== 'Pending') {
-            throw new Error(`Cannot approve ${leaveRequest.status} leave request`);
-        }
+    await LeaveRequestModel.updateOne(
+        { id: leaveRequestId, agencyId: agency?.id },
+        { $set: { status: 'Approved', reviewedBy: currentUser.id, reviewedAt: new Date().toISOString() } }
+    );
 
-        // Update leave request (immutable)
-        const updatedLeaveRequests = data.leaveRequests.map(lr =>
-            lr.id === leaveRequestId
-                ? { ...lr, status: 'Approved' as const, reviewedBy: currentUser.id, reviewedAt: new Date().toISOString() }
-                : lr
-        );
+    const startDate = new Date((leaveRequest as any).startDate);
+    const endDate = new Date((leaveRequest as any).endDate);
+    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
-        // Calculate days for notification
-        const startDate = new Date(leaveRequest.startDate);
-        const endDate = new Date(leaveRequest.endDate);
-        const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-        // Notify employee
-        const notifications = data.notifications || [];
-        const employee = data.users.find(u => u.id === leaveRequest.userId);
-
-        if (employee) {
-            notifications.unshift(await withAgencyId({
-                id: generateId(),
-                userId: leaveRequest.userId,
-                message: `Your ${leaveRequest.type} leave request (${daysDiff} day${daysDiff > 1 ? 's' : ''}) has been approved by ${currentUser.name}`,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: `/dashboard/team`
-            }));
-        }
-
-        return {
-            ...data,
-            leaveRequests: updatedLeaveRequests,
-            notifications,
-            activities: [await withAgencyId({
-                id: generateId(),
-                user: currentUser.name,
-                action: "approved leave request",
-                target: employee ? `${employee.name}'s ${leaveRequest.type} leave` : "Leave request",
-                timestamp: new Date().toISOString()
-            }), ...data.activities]
-        };
+    const employee = await UserModel.findOne({ id: (leaveRequest as any).userId, agencyId: agency?.id }).lean();
+    if (employee) {
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency?.id, userId: (leaveRequest as any).userId,
+            message: `Your ${(leaveRequest as any).type} leave request (${daysDiff} day${daysDiff > 1 ? 's' : ''}) has been approved by ${currentUser.name}`,
+            read: false, timestamp: new Date().toISOString(), link: '/dashboard/team'
+        });
+    }
+    await ActivityModel.create({
+        id: generateId(), agencyId: agency?.id, user: currentUser.name,
+        action: 'approved leave request',
+        target: employee ? `${(employee as any).name}'s ${(leaveRequest as any).type} leave` : 'Leave request',
+        timestamp: new Date().toISOString()
     });
 
-    // Send email notification to employee
+    // Email employee
     try {
-        const data = await db.get();
-        const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
-        const employee = leaveRequest ? data.users.find(u => u.id === leaveRequest.userId) : null;
-
-        if (employee?.email && leaveRequest) {
-            const daysDiff = Math.ceil((new Date(leaveRequest.endDate).getTime() - new Date(leaveRequest.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
+        if ((employee as any)?.email) {
             await sendLeaveApprovedEmail({
-                employeeEmail: employee.email,
-                employeeName: employee.name,
-                leaveType: leaveRequest.type,
-                startDate: leaveRequest.startDate,
-                endDate: leaveRequest.endDate,
-                days: daysDiff,
-                approvedBy: currentUser.name,
+                employeeEmail: (employee as any).email,
+                employeeName: (employee as any).name,
+                leaveType: (leaveRequest as any).type,
+                startDate: (leaveRequest as any).startDate,
+                endDate: (leaveRequest as any).endDate,
+                days: daysDiff, approvedBy: currentUser.name,
                 teamLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/team`,
             });
         }
@@ -3353,79 +3144,45 @@ export async function rejectLeaveRequest(leaveRequestId: string, rejectionReason
         throw new Error("Unauthorized: Only admins can reject leave requests");
     }
 
-    await db.update(async (data) => {
-        const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
-        if (!leaveRequest) {
-            throw new Error("Leave request not found");
-        }
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const leaveRequest = await LeaveRequestModel.findOne({ id: leaveRequestId, agencyId: agency?.id }).lean();
+    if (!leaveRequest) throw new Error('Leave request not found');
+    if ((leaveRequest as any).status !== 'Pending') throw new Error(`Cannot reject ${(leaveRequest as any).status} leave request`);
 
-        if (leaveRequest.status !== 'Pending') {
-            throw new Error(`Cannot reject ${leaveRequest.status} leave request`);
-        }
+    await LeaveRequestModel.updateOne(
+        { id: leaveRequestId, agencyId: agency?.id },
+        { $set: { status: 'Rejected', reviewedBy: currentUser.id, reviewedAt: new Date().toISOString() } }
+    );
 
-        // Update leave request (immutable)
-        const updatedLeaveRequests = data.leaveRequests.map(lr =>
-            lr.id === leaveRequestId
-                ? { ...lr, status: 'Rejected' as const, reviewedBy: currentUser.id, reviewedAt: new Date().toISOString() }
-                : lr
-        );
+    const startDate2 = new Date((leaveRequest as any).startDate);
+    const endDate2 = new Date((leaveRequest as any).endDate);
+    const daysDiff2 = Math.ceil((endDate2.getTime() - startDate2.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const employee2 = await UserModel.findOne({ id: (leaveRequest as any).userId, agencyId: agency?.id }).lean();
 
-        // Calculate days for notification
-        const startDate = new Date(leaveRequest.startDate);
-        const endDate = new Date(leaveRequest.endDate);
-        const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-        // Notify employee
-        const notifications = data.notifications || [];
-        const employee = data.users.find(u => u.id === leaveRequest.userId);
-
-        if (employee) {
-            const message = rejectionReason
-                ? `Your ${leaveRequest.type} leave request (${daysDiff} day${daysDiff > 1 ? 's' : ''}) was rejected by ${currentUser.name}. Reason: ${rejectionReason}`
-                : `Your ${leaveRequest.type} leave request (${daysDiff} day${daysDiff > 1 ? 's' : ''}) was rejected by ${currentUser.name}`;
-
-            notifications.unshift(await withAgencyId({
-                id: generateId(),
-                userId: leaveRequest.userId,
-                message,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: `/dashboard/team`
-            }));
-        }
-
-        return {
-            ...data,
-            leaveRequests: updatedLeaveRequests,
-            notifications,
-            activities: [await withAgencyId({
-                id: generateId(),
-                user: currentUser.name,
-                action: "rejected leave request",
-                target: employee ? `${employee.name}'s ${leaveRequest.type} leave` : "Leave request",
-                timestamp: new Date().toISOString()
-            }), ...data.activities]
-        };
+    if (employee2) {
+        const message = rejectionReason
+            ? `Your ${(leaveRequest as any).type} leave request (${daysDiff2} day${daysDiff2 > 1 ? 's' : ''}) was rejected by ${currentUser.name}. Reason: ${rejectionReason}`
+            : `Your ${(leaveRequest as any).type} leave request (${daysDiff2} day${daysDiff2 > 1 ? 's' : ''}) was rejected by ${currentUser.name}`;
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency?.id, userId: (leaveRequest as any).userId,
+            message, read: false, timestamp: new Date().toISOString(), link: '/dashboard/team'
+        });
+    }
+    await ActivityModel.create({
+        id: generateId(), agencyId: agency?.id, user: currentUser.name, action: 'rejected leave request',
+        target: employee2 ? `${(employee2 as any).name}'s ${(leaveRequest as any).type} leave` : 'Leave request',
+        timestamp: new Date().toISOString()
     });
 
-    // Send email notification to employee
+    // Email employee
     try {
-        const data = await db.get();
-        const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
-        const employee = leaveRequest ? data.users.find(u => u.id === leaveRequest.userId) : null;
-
-        if (employee?.email && leaveRequest) {
-            const daysDiff = Math.ceil((new Date(leaveRequest.endDate).getTime() - new Date(leaveRequest.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
+        if ((employee2 as any)?.email) {
             await sendLeaveRejectedEmail({
-                employeeEmail: employee.email,
-                employeeName: employee.name,
-                leaveType: leaveRequest.type,
-                startDate: leaveRequest.startDate,
-                endDate: leaveRequest.endDate,
-                days: daysDiff,
-                rejectedBy: currentUser.name,
-                rejectionReason,
+                employeeEmail: (employee2 as any).email, employeeName: (employee2 as any).name,
+                leaveType: (leaveRequest as any).type,
+                startDate: (leaveRequest as any).startDate, endDate: (leaveRequest as any).endDate,
+                days: daysDiff2, rejectedBy: currentUser.name, rejectionReason,
                 teamLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/team`,
             });
         }
@@ -3446,68 +3203,39 @@ export async function cancelLeaveRequest(leaveRequestId: string) {
     // Store deleted request data for email before it's removed
     let deletedLeaveData: { type: string } | null = null;
 
-    await db.update(async (data) => {
-        const leaveRequest = data.leaveRequests.find(lr => lr.id === leaveRequestId);
-        if (!leaveRequest) {
-            throw new Error("Leave request not found");
-        }
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const leaveRequest = await LeaveRequestModel.findOne({ id: leaveRequestId, agencyId: agency?.id }).lean();
+    if (!leaveRequest) throw new Error('Leave request not found');
+    if ((leaveRequest as any).userId !== currentUser.id && currentUser.role !== 'admin') {
+        throw new Error('Unauthorized: You can only cancel your own leave requests');
+    }
+    if ((leaveRequest as any).status !== 'Pending') {
+        throw new Error(`Cannot cancel ${(leaveRequest as any).status} leave request. Please contact admin.`);
+    }
 
-        // Only the requester or admin can cancel
-        if (leaveRequest.userId !== currentUser.id && currentUser.role !== 'admin') {
-            throw new Error("Unauthorized: You can only cancel your own leave requests");
-        }
-
-        // Can only cancel pending requests
-        if (leaveRequest.status !== 'Pending') {
-            throw new Error(`Cannot cancel ${leaveRequest.status} leave request. Please contact admin.`);
-        }
-
-        // Save data for email before removing
-        deletedLeaveData = { type: leaveRequest.type };
-
-        // Remove the leave request
-        data.leaveRequests = data.leaveRequests.filter(lr => lr.id !== leaveRequestId);
-
-        // Notify admins if employee cancelled
-        const notifications = data.notifications || [];
-        if (currentUser.role !== 'admin') {
-            const adminUsers = data.users.filter(u => u.role === 'admin');
-            for (const admin of adminUsers) {
-                notifications.unshift(await withAgencyId({
-                    id: generateId(),
-                    userId: admin.id,
-                    message: `${currentUser.name} cancelled their ${leaveRequest.type} leave request`,
-                    read: false,
-                    timestamp: new Date().toISOString(),
-                    link: `/dashboard/team`
-                }));
-            }
-        }
-
-        return {
-            ...data,
-            notifications,
-            activities: [await withAgencyId({
-                id: generateId(),
-                user: currentUser.name,
-                action: "cancelled leave request",
-                target: `${leaveRequest.type} leave`,
-                timestamp: new Date().toISOString()
-            }), ...data.activities]
-        };
+    deletedLeaveData = { type: (leaveRequest as any).type };
+    await LeaveRequestModel.deleteOne({ id: leaveRequestId, agencyId: agency?.id });
+    await ActivityModel.create({
+        id: generateId(), agencyId: agency?.id, user: currentUser.name,
+        action: 'cancelled leave request', target: `${(leaveRequest as any).type} leave`,
+        timestamp: new Date().toISOString()
     });
 
-    // Send email notification to admins
-    if (currentUser.role !== 'admin' && deletedLeaveData) {
-        try {
-            const data = await db.get();
-            const adminUsers = data.users.filter(u => u.role === 'admin');
-            const adminEmails = adminUsers.map(u => u.email).filter(Boolean) as string[];
+    if (currentUser.role !== 'admin') {
+        const adminUsers2 = await UserModel.find({ agencyId: agency?.id, role: 'admin' }).lean();
+        await NotificationModel.insertMany(adminUsers2.map((admin: any) => ({
+            id: generateId(), agencyId: agency?.id, userId: admin.id,
+            message: `${currentUser.name} cancelled their ${(leaveRequest as any).type} leave request`,
+            read: false, timestamp: new Date().toISOString(), link: '/dashboard/team'
+        })));
 
-            if (adminEmails.length > 0) {
+        // Email admins
+        try {
+            const adminEmails2 = adminUsers2.map((u: any) => u.email).filter(Boolean) as string[];
+            if (adminEmails2.length > 0 && deletedLeaveData) {
                 await sendLeaveCancelledEmail({
-                    adminEmails,
-                    employeeName: currentUser.name,
+                    adminEmails: adminEmails2, employeeName: currentUser.name,
                     leaveType: (deletedLeaveData as { type: string }).type,
                     teamLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/team`,
                 });
@@ -3570,22 +3298,21 @@ export async function updateLeaveStatus(requestId: string, status: LeaveStatus) 
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
         throw new Error("Unauthorized: Only admins can update leave status.");
     }
-    const data = await db.get();
-    const request = data.leaveRequests?.find(r => r.id === requestId);
-    if (!request) throw new Error("Request not found");
-
-    await db.update(async (dbData) => ({
-        ...dbData,
-        leaveRequests: dbData.leaveRequests.map(r => r.id === requestId ? { ...r, status, reviewedBy: currentUser?.id, reviewedAt: new Date().toISOString() } : r),
-        notifications: [await withAgencyId({
-            id: generateId(),
-            userId: request.userId,
-            message: `Your leave request for ${new Date(request.startDate).toLocaleDateString()} has been ${status}`,
-            read: false,
-            timestamp: new Date().toISOString(),
-            link: `/dashboard/team/${data.users.find(u => u.id === request.userId)?.username || request.userId}?tab=leaves`
-        }), ...(dbData.notifications || [])]
-    }));
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const request = await LeaveRequestModel.findOne({ id: requestId, agencyId: agency?.id }).lean();
+    if (!request) throw new Error('Request not found');
+    await LeaveRequestModel.updateOne(
+        { id: requestId, agencyId: agency?.id },
+        { $set: { status, reviewedBy: currentUser?.id, reviewedAt: new Date().toISOString() } }
+    );
+    const userDoc = await UserModel.findOne({ id: (request as any).userId, agencyId: agency?.id }).lean();
+    await NotificationModel.create({
+        id: generateId(), agencyId: agency?.id, userId: (request as any).userId,
+        message: `Your leave request for ${new Date((request as any).startDate).toLocaleDateString()} has been ${status}`,
+        read: false, timestamp: new Date().toISOString(),
+        link: `/dashboard/team/${(userDoc as any)?.username || (request as any).userId}?tab=leaves`
+    });
 
     revalidatePath('/dashboard/team');
 }
@@ -3604,74 +3331,41 @@ export async function createRefund(refund: {
         throw new Error("Unauthorized: Only Admins and Managers can create refunds.");
     }
 
-    // Validate project exists
-    const data = await db.get();
-    const project = data.projects.find(p => p.id === refund.projectId);
-    if (!project) {
-        throw new Error("Project not found");
-    }
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const project = await ProjectModel.findOne({ id: refund.projectId, agencyId: agency?.id }).lean();
+    if (!project) throw new Error('Project not found');
 
-    // Validate amount is positive
-    if (refund.amount <= 0) {
-        throw new Error("Refund amount must be positive");
-    }
-
-    // Calculate total project income
-    const projectIncome = data.transactions
-        .filter(t => t.projectId === refund.projectId && t.type === 'income' && t.status === 'completed')
-        .reduce((sum, t) => sum + t.amount, 0);
-
-    // Calculate existing refunds
-    const existingRefunds = data.transactions
-        .filter(t => t.projectId === refund.projectId && t.category === 'Refund' && t.status === 'completed')
-        .reduce((sum, t) => sum + t.amount, 0);
-
-    // Validate refund doesn't exceed project income
+    // Validate refund amount
+    const [incomeAgg, refundAgg] = await Promise.all([
+        TransactionModel.aggregate([{ $match: { projectId: refund.projectId, agencyId: agency?.id, type: 'income', status: 'completed' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+        TransactionModel.aggregate([{ $match: { projectId: refund.projectId, agencyId: agency?.id, category: 'Refund', status: 'completed' } }, { $group: { _id: null, total: { $sum: '$amount' } } }])
+    ]);
+    const projectIncome = incomeAgg[0]?.total || 0;
+    const existingRefunds = refundAgg[0]?.total || 0;
     if (existingRefunds + refund.amount > projectIncome) {
         throw new Error(`Refund amount exceeds project income. Project income: ₹${projectIncome.toLocaleString()}, Existing refunds: ₹${existingRefunds.toLocaleString()}, Attempted refund: ₹${refund.amount.toLocaleString()}`);
     }
 
-    const newRefund = await withAgencyId({
-        id: generateId(),
-        date: refund.date,
-        amount: refund.amount,
-        type: 'expense' as const,
-        category: 'Refund' as const,
-        description: refund.description,
-        status: 'completed' as const,
-        projectId: refund.projectId
+    const newRefund = {
+        id: generateId(), agencyId: agency?.id,
+        date: refund.date, amount: refund.amount, type: 'expense' as const, category: 'Refund' as const,
+        description: refund.description, status: 'completed' as const, projectId: refund.projectId
+    };
+    await TransactionModel.create(newRefund);
+    await ActivityModel.create({
+        id: generateId(), agencyId: agency?.id, user: currentUser.name,
+        action: 'issued refund', target: (project as any).name, timestamp: new Date().toISOString()
     });
+    if ((project as any).clientId) {
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency?.id, userId: (project as any).clientId,
+            message: `Refund of ₹${refund.amount.toLocaleString()} has been issued for ${(project as any).name}`,
+            read: false, timestamp: new Date().toISOString(),
+            link: `/dashboard/projects/${(project as any).slug || (project as any).id}`
+        });
+    }
 
-    await db.update(async (data) => {
-        // Add refund transaction
-        const newData = {
-            ...data,
-            transactions: [...data.transactions, newRefund],
-            activities: [await withAgencyId({
-                id: generateId(),
-                user: currentUser.name,
-                action: "issued refund",
-                target: project.name,
-                timestamp: new Date().toISOString()
-            }), ...data.activities],
-            notifications: data.notifications // Initialize notifications
-        };
-
-        // Notify client
-        if (project.clientId) {
-            const notification = await withAgencyId({
-                id: generateId(),
-                userId: project.clientId,
-                message: `Refund of ₹${refund.amount.toLocaleString()} has been issued for ${project.name}`,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: `/dashboard/projects/${project.slug || project.id}`
-            });
-            newData.notifications = [...newData.notifications, notification];
-        }
-
-        return newData;
-    });
 
     // Send email notification to client
     try {
