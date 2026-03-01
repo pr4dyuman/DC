@@ -16,7 +16,6 @@ import {
     Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useChat } from "@/context/ChatContext";
 
 interface SidebarProps {
     currentUserId?: string;
@@ -28,7 +27,7 @@ interface SidebarProps {
 
 export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, agencyName = "Agency OS", agencyLogo }: SidebarProps) {
     const pathname = usePathname();
-    const { openChat } = useChat();
+
 
     const routes = [
         {
@@ -52,10 +51,8 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, a
         {
             label: "Messages",
             icon: MessageCircle,
-            href: "#",
+            href: "/dashboard/messages",
             color: "text-green-500",
-            isAction: true,
-            onClick: () => openChat(),
         },
         {
             label: "Team",
@@ -112,36 +109,20 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, a
                 </Link>
                 <div className="space-y-1">
                     {filteredRoutes.map((route) => (
-                        route.isAction ? (
-                            <button
-                                key={route.label}
-                                onClick={route.onClick}
-                                className={cn(
-                                    "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer rounded-lg transition",
-                                    "text-[var(--sidebar-muted)] hover:text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)]"
-                                )}
-                            >
-                                <div className="flex items-center flex-1">
-                                    <route.icon className={cn("h-5 w-5 mr-3", route.color)} />
-                                    {route.label}
-                                </div>
-                            </button>
-                        ) : (
-                            <Link
-                                key={route.href}
-                                href={route.href}
-                                className={cn(
-                                    "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer rounded-lg transition",
-                                    "hover:text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)]",
-                                    pathname === route.href ? "text-[var(--sidebar-text)] bg-[var(--sidebar-active-bg)]" : "text-[var(--sidebar-muted)]"
-                                )}
-                            >
-                                <div className="flex items-center flex-1">
-                                    <route.icon className={cn("h-5 w-5 mr-3", route.color)} />
-                                    {route.label}
-                                </div>
-                            </Link>
-                        )
+                        <Link
+                            key={route.href}
+                            href={route.href}
+                            className={cn(
+                                "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer rounded-lg transition",
+                                "hover:text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)]",
+                                pathname === route.href ? "text-[var(--sidebar-text)] bg-[var(--sidebar-active-bg)]" : "text-[var(--sidebar-muted)]"
+                            )}
+                        >
+                            <div className="flex items-center flex-1">
+                                <route.icon className={cn("h-5 w-5 mr-3", route.color)} />
+                                {route.label}
+                            </div>
+                        </Link>
                     ))}
                 </div>
             </div>
