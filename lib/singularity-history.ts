@@ -114,6 +114,8 @@ export async function createSingularitySession(userId: string, mode: 'chat' | 'a
     return id;
 }
 
+const MAX_MESSAGES_PER_SESSION = 200;
+
 export async function updateSingularitySession(
     sessionId: string,
     messages: ChatMessage[],
@@ -121,7 +123,14 @@ export async function updateSingularitySession(
 ) {
     await connectDB();
     const now = new Date().toISOString();
-    const update: any = { messages, updatedAt: now };
+
+    // Cap to prevent MongoDB 16MB document limit
+    // Keep the first message (user context) + the most recent ones
+    const cappedMessages = messages.length > MAX_MESSAGES_PER_SESSION
+        ? [messages[0], ...messages.slice(-(MAX_MESSAGES_PER_SESSION - 1))]
+        : messages;
+
+    const update: any = { messages: cappedMessages, updatedAt: now };
     if (title) update.title = title;
 
     await SingularityChatSessionModel.updateOne(

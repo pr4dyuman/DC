@@ -1,6 +1,6 @@
 "use server";
 
-import { AgencyModel, UserModel, SuperAdminModel, ProjectModel, ClientModel, InvoiceModel, TransactionModel, connectDB } from "../mongodb";
+import { AgencyModel, UserModel, SuperAdminModel, ProjectModel, ClientModel, InvoiceModel, TransactionModel, connectDB, encryptApiKey, decryptApiKey } from "../mongodb";
 import { Agency, User, AGENCY_PLANS, AIConfig } from "../types";
 import { getSessionUser } from "../auth";
 import { generateId } from "../utils-server";
@@ -385,7 +385,11 @@ export async function getAgencyAIConfigSuperAdmin(agencyId: string): Promise<AIC
     const agency = await AgencyModel.findOne({ id: agencyId }).lean();
     if (!agency) throw new Error("Agency not found");
 
-    return toSerializable(agency.aiConfig || null) as AIConfig | null;
+    if (!agency.aiConfig) return null;
+    const config = toSerializable(agency.aiConfig) as AIConfig;
+    // Decrypt the stored API key before returning to super-admin UI
+    if (config?.apiKey) config.apiKey = decryptApiKey(config.apiKey);
+    return config;
 }
 
 /**
@@ -412,7 +416,7 @@ export async function updateAgencyAIConfigSuperAdmin(agencyId: string, config: A
             $set: {
                 aiConfig: {
                     provider: config.provider,
-                    apiKey: config.apiKey,
+                    apiKey: encryptApiKey(config.apiKey), // Encrypt before storing
                     model: config.model,
                     ...(config.customModelId ? { customModelId: config.customModelId } : {})
                 },

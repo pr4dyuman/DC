@@ -9,7 +9,7 @@ import { withAgencyId, getCurrentAgency } from "./agency-context";
 import { generateId, resolveUserOrClient } from "./utils-server";
 
 // Authentication
-import { connectDB, AgencyModel, UserModel, ClientModel, SuperAdminModel, ProjectModel, TaskModel, InvoiceModel, TransactionModel, ServiceModel, NotificationModel, ActivityModel, AssetModel, MessageModel, LeaveRequestModel, SettingsModel } from "./mongodb";
+import { connectDB, AgencyModel, UserModel, ClientModel, SuperAdminModel, ProjectModel, TaskModel, InvoiceModel, TransactionModel, ServiceModel, NotificationModel, ActivityModel, AssetModel, MessageModel, LeaveRequestModel, SettingsModel, decryptApiKey } from "./mongodb";
 import { getSessionUser } from "@/lib/auth";
 import { getSessionId as authGetSessionId, login as authLogin, logout as authLogout } from "@/lib/auth";
 import { hashPassword, comparePassword } from "@/lib/auth";
@@ -63,7 +63,10 @@ export async function getAgencyAIConfig(): Promise<AIConfig | null> {
         return null;
     }
     console.log('[getAgencyAIConfig] Found config for agency:', agency.id, 'provider:', (agency.aiConfig as any).provider);
-    return agency.aiConfig as AIConfig;
+    const config = agency.aiConfig as AIConfig;
+    // Decrypt the API key before passing to AI provider
+    if (config?.apiKey) config.apiKey = decryptApiKey(config.apiKey);
+    return config;
 }
 
 export async function updateEmailSettings(enabled: boolean) {

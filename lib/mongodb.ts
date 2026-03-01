@@ -1,10 +1,39 @@
 import mongoose, { Schema, Model, Document } from 'mongoose';
+import crypto from 'crypto';
 import {
     Agency, SuperAdmin,
     User, Client, Project, Task, Invoice, Transaction, Service,
     Notification, Activity, Asset, Message, LeaveRequest, Settings,
     PaymentConfig, ProjectServiceConfig, Comment, Job
 } from './types';
+
+// ============================================================================
+// API KEY ENCRYPTION HELPERS (AES-256-GCM)
+// Set AI_ENCRYPT_KEY=<32-byte hex> in your environment variables
+// ============================================================================
+const AI_ENCRYPT_KEY = process.env.AI_ENCRYPT_KEY;
+
+export function encryptApiKey(plaintext: string): string {
+    if (!AI_ENCRYPT_KEY) return plaintext; // Dev fallback — no-op
+    const key = Buffer.from(AI_ENCRYPT_KEY, 'hex');
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    return `enc:${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`;
+}
+
+export function decryptApiKey(value: string): string {
+    if (!AI_ENCRYPT_KEY || !value.startsWith('enc:')) return value;
+    const key = Buffer.from(AI_ENCRYPT_KEY, 'hex');
+    const [, ivHex, tagHex, encHex] = value.split(':');
+    const iv = Buffer.from(ivHex, 'hex');
+    const tag = Buffer.from(tagHex, 'hex');
+    const encrypted = Buffer.from(encHex, 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(tag);
+    return decipher.update(encrypted).toString('utf8') + decipher.final('utf8');
+}
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -281,8 +310,8 @@ const UserSchema = new Schema<User>({
     pendingOtherDocuments: [{ type: String }]
 }, { timestamps: true });
 
-// Note: id and username already have indexes from unique constraint
-UserSchema.index({ email: 1, agencyId: 1 }); // Compound index: email unique per agency
+// Compound unique index: each email is unique within an agency
+UserSchema.index({ email: 1, agencyId: 1 }, { unique: true });
 
 // Client Schema
 const ClientSchema = new Schema<Client>({
@@ -327,14 +356,14 @@ const ProjectSchema = new Schema<Project>({
     status: { type: String, enum: ['Active', 'Completed', 'On Hold', 'Cancelled'], required: true },
     budget: { type: Number, required: true },
     dueDate: { type: String, required: true },
-    createdAt: { type: String },
     aiEnabled: { type: Boolean, default: false }
 }, { timestamps: true });
 
 // Note: id already has index from unique constraint
 ProjectSchema.index({ clientId: 1 });
 ProjectSchema.index({ status: 1 });
-ProjectSchema.index({ slug: 1 });
+ProjectSchema.index({ agencyId: 1, status: 1 });                          // Compound: agency+status
+ProjectSchema.index({ agencyId: 1, slug: 1 }, { unique: true, sparse: true }); // Slug unique per agency
 
 // Task Schema
 const TaskSchema = new Schema<Task>({
@@ -349,15 +378,14 @@ const TaskSchema = new Schema<Task>({
     dueDate: { type: String, required: true },
     startDate: { type: String },
     category: { type: String },
-    createdAt: { type: String },
     createdBy: { type: String },
     comments: [CommentSchema]
 }, { timestamps: true });
 
 // Note: id already has index from unique constraint
 TaskSchema.index({ projectId: 1 });
-TaskSchema.index({ assigneeId: 1 });
-TaskSchema.index({ status: 1 });
+TaskSchema.index({ agencyId: 1, status: 1 });           // Compound: agency + status
+TaskSchema.index({ agencyId: 1, assigneeId: 1 });       // Compound: agency + assignee
 TaskSchema.index({ createdBy: 1 });
 
 // Invoice Schema
@@ -372,7 +400,7 @@ const InvoiceSchema = new Schema<Invoice>({
 
 // Note: id already has index from unique constraint
 InvoiceSchema.index({ projectId: 1 });
-InvoiceSchema.index({ status: 1 });
+InvoiceSchema.index({ agencyId: 1, status: 1 }); // Compound: agency + status
 
 // Transaction Schema
 const TransactionSchema = new Schema<Transaction>({
@@ -393,10 +421,10 @@ const TransactionSchema = new Schema<Transaction>({
 
 // Note: id already has index from unique constraint
 TransactionSchema.index({ projectId: 1 });
+TransactionSchema.index({ agencyId: 1, type: 1 });     // Compound: agency + type
+TransactionSchema.index({ agencyId: 1, date: 1 });     // Compound: agency + date (range queries)
+TransactionSchema.index({ agencyId: 1, category: 1 }); // Compound: agency + category
 TransactionSchema.index({ userId: 1 });
-TransactionSchema.index({ type: 1 });
-TransactionSchema.index({ category: 1 });
-TransactionSchema.index({ date: 1 });
 
 // Service Schema
 const ServiceSchema = new Schema<Service>({
@@ -420,8 +448,7 @@ const NotificationSchema = new Schema<Notification>({
 }, { timestamps: true });
 
 // Note: id already has index from unique constraint
-NotificationSchema.index({ userId: 1 });
-NotificationSchema.index({ read: 1 });
+NotificationSchema.index({ agencyId: 1, userId: 1, read: 1 }); // Compound: agency + user + read status
 
 // Activity Schema
 const ActivitySchema = new Schema<Activity>({
@@ -434,7 +461,7 @@ const ActivitySchema = new Schema<Activity>({
 }, { timestamps: true });
 
 // Note: id already has index from unique constraint
-ActivitySchema.index({ timestamp: -1 });
+ActivitySchema.index({ agencyId: 1, timestamp: -1 }); // Compound for agency-scoped activity feed
 
 // Asset Schema
 const AssetSchema = new Schema<Asset>({
@@ -468,8 +495,8 @@ const MessageSchema = new Schema<Message>({
 }, { timestamps: true });
 
 // Note: id already has index from unique constraint
-MessageSchema.index({ senderId: 1 });
-MessageSchema.index({ receiverId: 1 });
+MessageSchema.index({ senderId: 1, receiverId: 1 }); // Compound for conversation queries
+MessageSchema.index({ agencyId: 1, receiverId: 1 }); // For unread count queries
 
 // Leave Request Schema
 const LeaveRequestSchema = new Schema<LeaveRequest>({
@@ -481,22 +508,24 @@ const LeaveRequestSchema = new Schema<LeaveRequest>({
     type: { type: String, enum: ['Casual', 'Emergency'], required: true },
     reason: { type: String, required: true },
     status: { type: String, enum: ['Pending', 'Approved', 'Rejected'], required: true },
-    createdAt: { type: String },
     reviewedBy: { type: String },
     reviewedAt: { type: String }
 }, { timestamps: true });
 
 // Note: id already has index from unique constraint
-LeaveRequestSchema.index({ userId: 1 });
-LeaveRequestSchema.index({ status: 1 });
+LeaveRequestSchema.index({ agencyId: 1, userId: 1 });   // Compound: agency + user
+LeaveRequestSchema.index({ agencyId: 1, status: 1 });   // Compound: agency + status
 
 // Settings Schema
 const SettingsSchema = new Schema<Settings>({
-    agencyId: { type: String, index: true },
+    agencyId: { type: String, required: true },
     systemName: { type: String, required: true, default: 'AgencyOS' },
     logo: { type: String, required: false, default: '' },
     userPermissions: { type: Schema.Types.Mixed, required: false }
 }, { timestamps: true });
+
+// One settings document per agency
+SettingsSchema.index({ agencyId: 1 }, { unique: true });
 
 // ============================================================================
 // SINGULARITY CHAT & CHECKPOINT SCHEMAS
