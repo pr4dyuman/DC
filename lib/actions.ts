@@ -458,14 +458,18 @@ export async function getUserProjects(userId: string) {
 
 export async function getProject(id: string) {
     await connectDB();
-    const project = await ProjectModel.findOne({ id }).lean();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const project = await ProjectModel.findOne({ id, ...agencyFilter }).lean();
     if (!project) return undefined;
     return { ...sanitizeDoc(project), agencyId: project.agencyId || 'default-agency' };
 }
 
 export async function getProjectBySlug(slug: string) {
     await connectDB();
-    const project = await ProjectModel.findOne({ $or: [{ slug }, { id: slug }] }).lean();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const project = await ProjectModel.findOne({ $or: [{ slug }, { id: slug }], ...agencyFilter }).lean();
     if (!project) return undefined;
     return { ...sanitizeDoc(project), agencyId: project.agencyId || 'default-agency' };
 }
@@ -862,46 +866,20 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
 }
 
 export async function deleteClient(id: string) {
+    await connectDB();
     const currentUser = await getCurrentUser();
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
-        throw new Error("Unauthorized");
+        throw new Error('Unauthorized');
     }
+    const agency = await getCurrentAgency();
+    const client = await ClientModel.findOne({ id, agencyId: agency?.id }).lean();
+    if (!client) throw new Error('Client not found');
 
-    await db.update((data) => {
-        // Find the client
-        const client = data.clients.find(c => c.id === id);
-        if (!client) {
-            throw new Error("Client not found");
-        }
-
-        // IMPORTANT: Do NOT delete financial data (projects, invoices, transactions)
-        // These must be preserved for:
-        // 1. Accounting records
-        // 2. Tax compliance
-        // 3. Historical reporting
-        // 4. Revenue calculations
-
-        // Instead of deleting, mark client as "archived"
-        // This preserves all financial data while hiding client from active lists
-
-        return {
-            ...data,
-            clients: data.clients.map(c =>
-                c.id === id
-                    ? { ...c, archived: true, archivedAt: new Date().toISOString() }
-                    : c
-            ),
-            // Keep ALL financial data intact:
-            // - projects (with clientId reference)
-            // - invoices (linked to projects)
-            // - transactions (linked to projects)
-            // - tasks (linked to projects)
-            // - assets (linked to projects)
-            // - notifications (user history)
-            // - activities (audit trail)
-        };
-    });
-
+    // Soft-delete: mark as archived to preserve financial history
+    await ClientModel.updateOne(
+        { id, agencyId: agency?.id },
+        { $set: { archived: true, archivedAt: new Date().toISOString() } }
+    );
     revalidatePath('/dashboard/clients');
 }
 
@@ -1025,13 +1003,11 @@ export async function adminResetPassword(id: string, newPassword: string) {
 }
 
 export async function deleteUser(id: string, password: string) {
+    await connectDB();
     const isValid = await verifyAdminPassword(password);
-    if (!isValid) throw new Error("Invalid password");
-
-    await db.update((data) => ({
-        ...data,
-        users: data.users.filter(u => u.id !== id)
-    }));
+    if (!isValid) throw new Error('Invalid password');
+    const agency = await getCurrentAgency();
+    await UserModel.deleteOne({ id, agencyId: agency?.id });
     revalidatePath('/dashboard/team');
 }
 
@@ -1303,226 +1279,185 @@ export async function updateUserPermissions(targetUserId: string, permissions: U
 }
 
 export async function deleteTask(taskId: string) {
+    await connectDB();
     const currentUser = await getCurrentUser();
-    const userName = currentUser ? currentUser.name : "System";
-    const userId = currentUser ? currentUser.id : "system";
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error('No agency context');
 
+    const userName = currentUser ? currentUser.name : 'System';
+    const userId = currentUser ? currentUser.id : 'system';
     const permissions = await getUserPermissions(userId);
 
-    const data = await db.get();
-    const task = data.tasks.find(t => t.id === taskId);
-    if (!task) throw new Error("Task not found");
+    const task = await TaskModel.findOne({ id: taskId, agencyId: agency.id }).lean();
+    if (!task) throw new Error('Task not found');
 
-    if (permissions.deleteAccess === 'none') {
-        throw new Error("Unauthorized: You do not have permission to delete tasks.");
-    }
+    if (permissions.deleteAccess === 'none') throw new Error('Unauthorized: You do not have permission to delete tasks.');
+    if (permissions.deleteAccess === 'own' && task.createdBy !== userId) throw new Error('Unauthorized: You can only delete your own tasks.');
 
-    if (permissions.deleteAccess === 'own') {
-        if (task.createdBy !== userId) {
-            throw new Error("Unauthorized: You can only delete your own tasks.");
-        }
-    }
+    await TaskModel.deleteOne({ id: taskId, agencyId: agency.id });
+    await ActivityModel.create({
+        id: generateId(),
+        agencyId: agency.id,
+        user: userName,
+        action: 'deleted task',
+        target: task.title,
+        timestamp: new Date().toISOString()
+    });
 
-    // If 'any', proceed.
-
-    await db.update(async (data) => ({
-        ...data,
-        tasks: data.tasks.filter(t => t.id !== taskId),
-        activities: [await withAgencyId({
-            id: generateId(),
-            user: userName,
-            action: "deleted task",
-            target: task.title,
-            timestamp: new Date().toISOString()
-        }), ...data.activities]
-    }));
     revalidatePath('/dashboard/projects/[id]', 'page');
     revalidatePath('/dashboard/projects');
 }
 
 export async function updateTaskStatus(taskId: string, status: Task['status']) {
+    await connectDB();
     const currentUser = await getCurrentUser();
-    const userName = currentUser ? currentUser.name : "System";
-    const userId = currentUser ? currentUser.id : "system";
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error('No agency context');
 
+    const userName = currentUser ? currentUser.name : 'System';
+    const userId = currentUser ? currentUser.id : 'system';
     const permissions = await getUserPermissions(userId);
 
     if (status === 'Done') {
-        if (!permissions.canMarkDone) {
-            throw new Error("Unauthorized: You do not have permission to mark tasks as Done.");
-        }
+        if (!permissions.canMarkDone) throw new Error('Unauthorized: You do not have permission to mark tasks as Done.');
     } else {
-        if (!permissions.canManageTasks) {
-            throw new Error("Unauthorized: You do not have permission to manage tasks.");
-        }
+        if (!permissions.canManageTasks) throw new Error('Unauthorized: You do not have permission to manage tasks.');
     }
 
-    await db.update(async (data) => {
-        // Update task status
-        const updatedTasks = data.tasks.map(t => t.id === taskId ? { ...t, status } : t);
-        const task = updatedTasks.find(t => t.id === taskId);
+    const task = await TaskModel.findOne({ id: taskId, agencyId: agency.id }).lean();
+    if (!task) throw new Error('Task not found');
 
-        let notifications = data.notifications || [];
-        let updatedProjects = data.projects;
+    // Update the task status
+    await TaskModel.updateOne({ id: taskId, agencyId: agency.id }, { $set: { status } });
 
-        // Auto-complete project if all tasks are done
-        if (task && status === 'Done') {
-            const projectTasks = updatedTasks.filter(t => t.projectId === task.projectId);
-            const allTasksDone = projectTasks.length > 0 && projectTasks.every(t => t.status === 'Done');
+    // Activity log
+    await ActivityModel.create({
+        id: generateId(),
+        agencyId: agency.id,
+        user: userName,
+        action: 'moved task to ' + status,
+        target: task.title,
+        timestamp: new Date().toISOString()
+    });
 
-            if (allTasksDone) {
-                const project = data.projects.find(p => p.id === task.projectId);
+    // Auto-complete project if all tasks are done
+    if (status === 'Done') {
+        const projectTasks = await TaskModel.find({ projectId: task.projectId, agencyId: agency.id }).lean();
+        // Count tasks after the update (task.status is now Done)
+        const remainingOpen = projectTasks.filter(t => t.id !== taskId && t.status !== 'Done');
+        const allDone = remainingOpen.length === 0 && projectTasks.length > 0;
 
-                // Only auto-complete if project is currently Active
-                if (project && project.status === 'Active') {
-                    updatedProjects = data.projects.map(p =>
-                        p.id === task.projectId ? { ...p, status: 'Completed' as const } : p
-                    );
+        if (allDone) {
+            const project = await ProjectModel.findOne({ id: task.projectId, agencyId: agency.id }).lean();
+            if (project && project.status === 'Active') {
+                await ProjectModel.updateOne({ id: task.projectId, agencyId: agency.id }, { $set: { status: 'Completed' } });
 
-                    // Notify client about project completion
-                    if (project.clientId) {
-                        const notif = await withAgencyId({
-                            id: generateId(),
-                            userId: project.clientId,
-                            message: `Project "${project.name}" has been completed! All tasks are done.`,
-                            read: false,
-                            timestamp: new Date().toISOString(),
-                            link: `/dashboard/projects/${project.id}`
-                        });
-                        notifications = [notif, ...notifications];
-                    }
-
-                    // Notify admin
-                    const adminUsers = data.users.filter(u => u.role === 'admin');
-                    const adminNotifs = await Promise.all(adminUsers.map(async admin => await withAgencyId({
-                        id: generateId(),
-                        userId: admin.id,
-                        message: `Project "${project.name}" auto-completed - all tasks done`,
-                        read: false,
-                        timestamp: new Date().toISOString(),
+                // Notify client
+                if (project.clientId) {
+                    await NotificationModel.create({
+                        id: generateId(), agencyId: agency.id, userId: project.clientId,
+                        message: `Project "${project.name}" has been completed! All tasks are done.`,
+                        read: false, timestamp: new Date().toISOString(),
                         link: `/dashboard/projects/${project.id}`
-                    })));
-                    notifications = [...adminNotifs, ...notifications];
+                    });
+                }
 
-                    // Send email notifications for project completion
-                    try {
-                        const client = project.clientId ? await getClientById(project.clientId) : null;
-                        const adminEmails = adminUsers.map(u => u.email).filter(Boolean) as string[];
+                // Notify admins
+                const admins = await UserModel.find({ agencyId: agency.id, role: 'admin' }).lean();
+                await NotificationModel.insertMany(admins.map(admin => ({
+                    id: generateId(), agencyId: agency.id, userId: admin.id,
+                    message: `Project "${project.name}" auto-completed - all tasks done`,
+                    read: false, timestamp: new Date().toISOString(),
+                    link: `/dashboard/projects/${project.id}`
+                })));
 
-                        if (client?.email || adminEmails.length > 0) {
-                            await sendProjectCompletedEmail({
-                                clientEmail: client?.email || '',
-                                adminEmails,
-                                clientName: client?.name || '',
-                                projectName: project.name,
-                                projectLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${project.id}`,
-                            });
-                        }
-                    } catch (emailError) {
-                        console.error('[Email] Failed to send project completion email:', emailError);
+                // Email notification
+                try {
+                    const client = project.clientId ? await getClientById(project.clientId) : null;
+                    const adminEmails = admins.map(u => u.email).filter(Boolean) as string[];
+                    if (client?.email || adminEmails.length > 0) {
+                        await sendProjectCompletedEmail({
+                            clientEmail: client?.email || '',
+                            adminEmails,
+                            clientName: client?.name || '',
+                            projectName: project.name,
+                            projectLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${project.id}`,
+                        });
                     }
+                } catch (emailError) {
+                    console.error('[Email] Failed to send project completion email:', emailError);
                 }
             }
         }
-
-        return {
-            ...data,
-            tasks: updatedTasks,
-            projects: updatedProjects,
-            notifications,
-            activities: [await withAgencyId({
-                id: generateId(),
-                user: userName,
-                action: "moved task to " + status,
-                target: data.tasks.find(t => t.id === taskId)?.title || "Task",
-                timestamp: new Date().toISOString()
-            }), ...data.activities]
-        };
-    });
+    }
 
     revalidatePath('/dashboard/projects/[id]', 'page');
     revalidatePath('/dashboard/projects');
 }
 
 export async function updateTask(taskId: string, updates: Partial<Task>) {
+    await connectDB();
     const currentUser = await getCurrentUser();
-    const userName = currentUser ? currentUser.name : "System";
-    const userId = currentUser ? currentUser.id : "system";
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error('No agency context');
 
+    const userName = currentUser ? currentUser.name : 'System';
+    const userId = currentUser ? currentUser.id : 'system';
     const permissions = await getUserPermissions(userId);
 
-    // If updating status to Done
-    if (updates.status === 'Done') {
-        if (!permissions.canMarkDone) {
-            throw new Error("Unauthorized: You do not have permission to mark tasks as Done.");
-        }
+    if (updates.status === 'Done' && !permissions.canMarkDone) {
+        throw new Error('Unauthorized: You do not have permission to mark tasks as Done.');
     }
-
-    // If updating anything else (including moving to other statuses)
-    // Technically if ONLY moving to Done, we might allow it if canMarkDone is true?
-    // But usually updateTask implies editing. 
-    // Let's enforce canManageTasks for any update that isn't JUST status=Done check above.
-    // If user has canMarkDone but !canManageTasks, they should use updateTaskStatus theoretically, 
-    // or we check if OTHER fields are being updated.
-
-    // For simplicity: If updating fields other than status, require canManageTasks.
     const isStatusOnly = Object.keys(updates).length === 1 && updates.status;
     if (!isStatusOnly || (updates.status && updates.status !== 'Done')) {
-        if (!permissions.canManageTasks) {
-            throw new Error("Unauthorized: You do not have permission to edit tasks.");
-        }
+        if (!permissions.canManageTasks) throw new Error('Unauthorized: You do not have permission to edit tasks.');
     }
 
-    await db.update(async (data) => {
-        let updatedProjects = data.projects;
+    // Validation
+    if (updates.projectId) {
+        const projExists = await ProjectModel.exists({ id: updates.projectId, agencyId: agency.id });
+        if (!projExists) throw new Error(`Project with ID ${updates.projectId} not found`);
+    }
+    if (updates.assigneeId) {
+        const userExists = await UserModel.exists({ id: updates.assigneeId, agencyId: agency.id });
+        if (!userExists) throw new Error(`User with ID ${updates.assigneeId} not found`);
+    }
 
-        // Validation
-        if (updates.projectId && !data.projects.find(p => p.id === updates.projectId)) {
-            throw new Error(`Project with ID ${updates.projectId} not found`);
-        }
-        if (updates.assigneeId && !data.users.find(u => u.id === updates.assigneeId)) {
-            throw new Error(`User with ID ${updates.assigneeId} not found`);
-        }
+    const task = await TaskModel.findOne({ id: taskId, agencyId: agency.id }).lean();
+    if (!task) throw new Error('Task not found');
 
-        // Auto-assign department to project if task category changes/added
-        if (updates.category) {
-            const task = data.tasks.find(t => t.id === taskId);
-            if (task && task.projectId) {
-                updatedProjects = data.projects.map(p => {
-                    if (p.id === task.projectId) {
-                        const currentServices = p.services || ((p as any).departments ? (p as any).departments : []);
+    await TaskModel.updateOne({ id: taskId, agencyId: agency.id }, { $set: updates });
 
-                        // Resolve category to ID if possible
-                        const service = data.services?.find(s => s.name === updates.category || s.id === updates.category);
-                        const categoryIdOrName = service ? service.id : updates.category;
+    // Auto-assign department to project if task category changes
+    if (updates.category && task.projectId) {
+        const service = await ServiceModel.findOne({
+            agencyId: agency.id,
+            $or: [{ name: updates.category }, { id: updates.category }]
+        }).lean();
+        const categoryIdOrName = service ? service.id : updates.category;
+        await ProjectModel.updateOne(
+            { id: task.projectId, agencyId: agency.id, services: { $ne: categoryIdOrName } },
+            { $push: { services: categoryIdOrName } }
+        );
+    }
 
-                        if (!currentServices.includes(categoryIdOrName!)) {
-                            return { ...p, services: [...currentServices, categoryIdOrName!] };
-                        }
-                    }
-                    return p;
-                });
-            }
-        }
-
-        return {
-            ...data,
-            projects: updatedProjects,
-            tasks: data.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t),
-            activities: [await withAgencyId({
-                id: generateId(),
-                user: userName,
-                action: "updated task",
-                target: updates.title || data.tasks.find(t => t.id === taskId)?.title || "Task",
-                timestamp: new Date().toISOString()
-            }), ...data.activities]
-        };
+    // Activity log
+    await ActivityModel.create({
+        id: generateId(), agencyId: agency.id, user: userName,
+        action: 'updated task',
+        target: updates.title || task.title,
+        timestamp: new Date().toISOString()
     });
+
     revalidatePath('/dashboard/projects/[id]', 'page');
-    revalidatePath('/dashboard/projects'); // Also revalidate projects list as departments might change
+    revalidatePath('/dashboard/projects');
 }
 
 export async function addComment(taskId: string, userId: string, text: string) {
+    await connectDB();
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error('No agency context');
+
     const newComment = {
         id: generateId(),
         userId,
@@ -1530,44 +1465,37 @@ export async function addComment(taskId: string, userId: string, text: string) {
         timestamp: new Date().toISOString()
     };
 
-    await db.update(async (data) => {
-        return {
-            ...data,
-            tasks: data.tasks.map(t =>
-                t.id === taskId
-                    ? { ...t, comments: [...(t.comments || []), newComment] }
-                    : t
-            ),
-            activities: [await withAgencyId({
-                id: generateId(),
-                user: (await resolveUserOrClient(userId))?.name || "Unknown User",
-                action: "commented on task",
-                target: data.tasks.find(t => t.id === taskId)?.title || "Task",
-                timestamp: new Date().toISOString()
-            }), ...data.activities]
-        };
+    const task = await TaskModel.findOne({ id: taskId, agencyId: agency.id }).lean();
+    if (!task) throw new Error('Task not found');
+
+    // Append comment directly with $push — no full read required
+    await TaskModel.updateOne(
+        { id: taskId, agencyId: agency.id },
+        { $push: { comments: newComment } }
+    );
+
+    const commenter = await resolveUserOrClient(userId);
+    await ActivityModel.create({
+        id: generateId(), agencyId: agency.id,
+        user: commenter?.name || 'Unknown User',
+        action: 'commented on task',
+        target: task.title,
+        timestamp: new Date().toISOString()
     });
 
     // Send email notification to task participants
     try {
-        const data = await db.get();
-        const task = data.tasks.find(t => t.id === taskId);
-        const commenter = await getUser(userId);
-
-        if (task && commenter) {
-            // Gather all participants (assignee, creator, previous commenters)
+        const commenterUser = await getUser(userId);
+        if (task && commenterUser) {
             const participantIds = new Set<string>();
             if (task.assigneeId) participantIds.add(task.assigneeId);
             if (task.createdBy) participantIds.add(task.createdBy);
             task.comments?.forEach(c => participantIds.add(c.userId));
-
-            // Remove the commenter from recipients
             participantIds.delete(userId);
 
-            // Get emails
             const participantEmails: string[] = [];
-            for (const id of participantIds) {
-                const user = await getUser(id);
+            for (const pid of participantIds) {
+                const user = await getUser(pid);
                 if (user?.email) participantEmails.push(user.email);
             }
 
@@ -1575,7 +1503,7 @@ export async function addComment(taskId: string, userId: string, text: string) {
                 await sendTaskCommentEmail({
                     recipientEmails: participantEmails,
                     taskTitle: task.title,
-                    commenterName: commenter.name,
+                    commenterName: commenterUser.name,
                     commentText: text,
                     taskLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${task.projectId}?task=${taskId}`,
                 });
@@ -1592,29 +1520,30 @@ export async function addComment(taskId: string, userId: string, text: string) {
 
 
 export async function createTask(task: Omit<Task, "id" | "agencyId">) {
+    await connectDB();
     const currentUser = await getCurrentUser();
-    const createdBy = currentUser ? currentUser.id : "system";
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error('No agency context');
 
-    const newTask = await withAgencyId({
+    const newTask = {
         ...task,
         id: generateId(),
+        agencyId: agency.id,
         createdAt: new Date().toISOString(),
-        createdBy,
+        createdBy: currentUser ? currentUser.id : 'system',
         comments: []
-    } as unknown as Task);
+    } as unknown as Task;
 
-    await db.update(async (data) => {
-        return {
-            ...data,
-            tasks: [...data.tasks, newTask],
-            activities: [await withAgencyId({
-                id: generateId(),
-                user: currentUser ? currentUser.name : "System",
-                action: "created task",
-                target: task.title,
-                timestamp: new Date().toISOString()
-            }), ...data.activities]
-        };
+    await TaskModel.create(newTask);
+
+    // Activity log
+    await ActivityModel.create({
+        id: generateId(),
+        agencyId: agency.id,
+        user: currentUser ? currentUser.name : 'System',
+        action: 'created task',
+        target: task.title,
+        timestamp: new Date().toISOString()
     });
 
     // Send email notification to assignee
@@ -1642,7 +1571,7 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
 
     revalidatePath('/dashboard/projects/[id]', 'page');
     revalidatePath('/dashboard/projects');
-    return newTask;
+    return sanitizeDoc(newTask);
 }
 
 
@@ -1736,15 +1665,16 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
 }
 
 export async function updateClient(id: string, updates: Partial<Client>) {
+    await connectDB();
     const currentUser = await getCurrentUser();
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
-        throw new Error("Unauthorized");
+        throw new Error('Unauthorized');
     }
-
-    await db.update((data) => ({
-        ...data,
-        clients: data.clients.map(c => c.id === id ? { ...c, ...updates } : c)
-    }));
+    const agency = await getCurrentAgency();
+    await ClientModel.updateOne(
+        { id, agencyId: agency?.id },
+        { $set: { ...updates, updatedAt: new Date().toISOString() } }
+    );
     revalidatePath('/dashboard/clients');
     revalidatePath(`/dashboard/clients/${id}`);
 }
@@ -1856,15 +1786,16 @@ export async function verifyAdminPassword(password: string): Promise<boolean> {
 }
 
 export async function deleteProject(id: string, password: string) {
+    await connectDB();
     const isValid = await verifyAdminPassword(password);
-    if (!isValid) throw new Error("Invalid password");
+    if (!isValid) throw new Error('Invalid password');
+    const agency = await getCurrentAgency();
 
-    await db.update((data) => ({
-        ...data,
-        projects: data.projects.filter(p => p.id !== id),
-        // Delete associated tasks
-        tasks: data.tasks.filter(t => t.projectId !== id)
-    }));
+    // Delete project and all its tasks atomically
+    await Promise.all([
+        ProjectModel.deleteOne({ id, agencyId: agency?.id }),
+        TaskModel.deleteMany({ projectId: id, agencyId: agency?.id })
+    ]);
 
     revalidatePath('/dashboard/projects');
     return true;
@@ -2185,50 +2116,28 @@ export async function getInvoices(projectId?: string) {
 
 // Client marks invoice as paid (moves to Processing status)
 export async function clientMarkInvoiceAsPaid(invoiceId: string) {
+    await connectDB();
     const currentUser = await getCurrentUser();
-    if (!currentUser || currentUser.role !== 'client') {
-        throw new Error("Unauthorized: Only clients can mark invoices as paid");
-    }
+    if (!currentUser || currentUser.role !== 'client') throw new Error('Unauthorized: Only clients can mark invoices as paid');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error('No agency context');
 
-    await db.update(async (data) => {
-        const invoice = data.invoices.find(i => i.id === invoiceId);
-        if (!invoice) {
-            throw new Error("Invoice not found");
-        }
+    const invoice = await InvoiceModel.findOne({ id: invoiceId, agencyId: agency.id }).lean();
+    if (!invoice) throw new Error('Invoice not found');
 
-        // Verify this invoice belongs to a project owned by this client
-        const project = data.projects.find(p => p.id === invoice.projectId);
-        if (!project || project.clientId !== currentUser.id) {
-            throw new Error("Unauthorized: This invoice doesn't belong to you");
-        }
+    const project = await ProjectModel.findOne({ id: invoice.projectId, agencyId: agency.id }).lean();
+    if (!project || (project as any).clientId !== currentUser.id) throw new Error("Unauthorized: This invoice doesn't belong to you");
+    if (invoice.status !== 'Pending') throw new Error(`Cannot mark ${invoice.status} invoice as paid`);
 
-        // Only allow marking Pending invoices as paid
-        if (invoice.status !== 'Pending') {
-            throw new Error(`Cannot mark ${invoice.status} invoice as paid`);
-        }
+    await InvoiceModel.updateOne({ id: invoiceId, agencyId: agency.id }, { $set: { status: 'Processing' } });
 
-        // Update status to Processing (immutable update)
-        const updatedInvoices = data.invoices.map(i =>
-            i.id === invoiceId ? { ...i, status: 'Processing' as const } : i
-        );
-
-        // Notify admin about payment claim
-        const notifications = data.notifications || [];
-        const adminUsers = data.users.filter(u => u.role === 'admin');
-
-        for (const admin of adminUsers) {
-            notifications.unshift(await withAgencyId({
-                id: generateId(),
-                userId: admin.id,
-                message: `${currentUser.name} marked invoice ₹${invoice.amount.toLocaleString()} as paid - Awaiting approval`,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: `/dashboard/finance`
-            }));
-        }
-
-        return { ...data, invoices: updatedInvoices, notifications };
-    });
+    // Notify admins
+    const admins = await UserModel.find({ agencyId: agency.id, role: 'admin' }).lean();
+    await NotificationModel.insertMany(admins.map(admin => ({
+        id: generateId(), agencyId: agency.id, userId: admin.id,
+        message: `${currentUser.name} marked invoice ₹${invoice.amount.toLocaleString()} as paid - Awaiting approval`,
+        read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
+    })));
 
     // Send email notification to admins
     try {
@@ -2256,84 +2165,54 @@ export async function clientMarkInvoiceAsPaid(invoiceId: string) {
 
 // Admin approves payment (moves to Paid status and creates transaction)
 export async function adminApproveInvoicePayment(invoiceId: string) {
+    await connectDB();
     const currentUser = await getCurrentUser();
-    if (!currentUser || currentUser.role !== 'admin') {
-        throw new Error("Unauthorized: Only admins can approve payments");
+    if (!currentUser || currentUser.role !== 'admin') throw new Error('Unauthorized: Only admins can approve payments');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error('No agency context');
+
+    const invoice = await InvoiceModel.findOne({ id: invoiceId, agencyId: agency.id }).lean();
+    if (!invoice) throw new Error('Invoice not found');
+    if (invoice.status !== 'Processing') throw new Error(`Can only approve Processing invoices, this is ${invoice.status}`);
+
+    // Calculate installment number for description
+    const projectInvoices = await InvoiceModel.find({ projectId: invoice.projectId, agencyId: agency.id })
+        .sort({ date: 1 }).lean();
+    const installmentIndex = projectInvoices.findIndex(i => i.id === invoiceId);
+    const installmentNumber = installmentIndex !== -1 ? installmentIndex + 1 : '?';
+    const totalInstallments = projectInvoices.length;
+
+    const project = await ProjectModel.findOne({ id: invoice.projectId, agencyId: agency.id }).lean();
+    const description = `Installment ${installmentNumber}/${totalInstallments} for ${(project as any)?.name || 'Project'} - ${invoice.date}`;
+
+    // Update invoice to Paid and create income transaction
+    await InvoiceModel.updateOne({ id: invoiceId, agencyId: agency.id }, { $set: { status: 'Paid' } });
+    const newTransaction = {
+        id: generateId(), agencyId: agency.id,
+        date: new Date().toISOString().split('T')[0],
+        amount: invoice.amount, type: 'income' as const, category: 'Project' as const,
+        description, status: 'completed' as const,
+        projectId: invoice.projectId, invoiceId: invoice.id
+    };
+    await TransactionModel.create(newTransaction);
+
+    // Notify client
+    if ((project as any)?.clientId) {
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency.id, userId: (project as any).clientId,
+            message: `Payment approved! ₹${invoice.amount.toLocaleString()} received for ${(project as any).name}`,
+            read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
+        });
     }
 
-    await db.update(async (data) => {
-        const invoice = data.invoices.find(i => i.id === invoiceId);
-        if (!invoice) {
-            throw new Error("Invoice not found");
-        }
-
-        if (invoice.status !== 'Processing') {
-            throw new Error(`Can only approve Processing invoices, this is ${invoice.status}`);
-        }
-
-        // Update invoice status to Paid (immutable update)
-        const updatedInvoices = data.invoices.map(i =>
-            i.id === invoiceId ? { ...i, status: 'Paid' as const } : i
-        );
-
-        // Create income transaction
-        const project = data.projects.find(p => p.id === invoice.projectId);
-
-        // Calculate Installment Number for better description
-        const projectInvoices = data.invoices
-            .filter(i => i.projectId === invoice.projectId)
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-        const installmentIndex = projectInvoices.findIndex(i => i.id === invoice.id);
-        const installmentNumber = installmentIndex !== -1 ? installmentIndex + 1 : '?';
-        const totalInstallments = projectInvoices.length;
-
-        const description = `Installment ${installmentNumber}/${totalInstallments} for ${project?.name || 'Project'} - ${invoice.date}`;
-
-        const newTransaction: Transaction = await withAgencyId({
-            id: generateId(),
-            date: new Date().toISOString().split('T')[0],
-            amount: invoice.amount,
-            type: 'income',
-            category: 'Project',
-            description: description,
-            status: 'completed',
-            projectId: invoice.projectId,
-            invoiceId: invoice.id // Link back to the invoice
-        });
-
-        const updatedTransactions = [newTransaction, ...(data.transactions || [])];
-
-        // Notify client about approval
-        const notifications = data.notifications || [];
-        if (project?.clientId) {
-            notifications.unshift(await withAgencyId({
-                id: generateId(),
-                userId: project.clientId,
-                message: `Payment approved! ₹${invoice.amount.toLocaleString()} received for ${project.name}`,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: `/dashboard/finance`
-            }));
-        }
-
-        return { ...data, invoices: updatedInvoices, transactions: updatedTransactions, notifications };
-    });
-
-    // Send email notification to client
+    // Email client
     try {
-        const data = await db.get();
-        const invoice = data.invoices.find(i => i.id === invoiceId);
-        const project = invoice ? data.projects.find(p => p.id === invoice.projectId) : null;
-
-        if (project?.clientId && invoice) {
-            const client = await getClientById(project.clientId);
+        if ((project as any)?.clientId) {
+            const client = await getClientById((project as any).clientId);
             if (client?.email) {
                 await sendPaymentApprovedEmail({
-                    clientEmail: client.email,
-                    clientName: client.name,
-                    amount: invoice.amount,
-                    projectName: project.name,
+                    clientEmail: client.email, clientName: client.name, amount: invoice.amount,
+                    projectName: (project as any).name,
                     financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/finance`,
                 });
             }
@@ -2347,63 +2226,37 @@ export async function adminApproveInvoicePayment(invoiceId: string) {
 
 // Admin rejects payment (moves back to Pending status)
 export async function adminRejectInvoicePayment(invoiceId: string, reason?: string) {
+    await connectDB();
     const currentUser = await getCurrentUser();
-    if (!currentUser || currentUser.role !== 'admin') {
-        throw new Error("Unauthorized: Only admins can reject payments");
+    if (!currentUser || currentUser.role !== 'admin') throw new Error('Unauthorized: Only admins can reject payments');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error('No agency context');
+
+    const invoice = await InvoiceModel.findOne({ id: invoiceId, agencyId: agency.id }).lean();
+    if (!invoice) throw new Error('Invoice not found');
+    if (invoice.status !== 'Processing') throw new Error(`Can only reject Processing invoices, this is ${invoice.status}`);
+
+    await InvoiceModel.updateOne({ id: invoiceId, agencyId: agency.id }, { $set: { status: 'Pending' } });
+
+    const project = await ProjectModel.findOne({ id: invoice.projectId, agencyId: agency.id }).lean();
+    if ((project as any)?.clientId) {
+        const message = reason
+            ? `Payment rejected: ${reason}. Please mark as paid again.`
+            : `Payment rejected for ₹${invoice.amount.toLocaleString()}. Please mark as paid again.`;
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency.id, userId: (project as any).clientId,
+            message, read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
+        });
     }
 
-    await db.update(async (data) => {
-        const invoice = data.invoices.find(i => i.id === invoiceId);
-        if (!invoice) {
-            throw new Error("Invoice not found");
-        }
-
-        if (invoice.status !== 'Processing') {
-            throw new Error(`Can only reject Processing invoices, this is ${invoice.status}`);
-        }
-
-        // Update invoice status back to Pending (immutable update)
-        const updatedInvoices = data.invoices.map(i =>
-            i.id === invoiceId ? { ...i, status: 'Pending' as const } : i
-        );
-
-        // Notify client about rejection
-        const notifications = data.notifications || [];
-        const project = data.projects.find(p => p.id === invoice.projectId);
-
-        if (project?.clientId) {
-            const message = reason
-                ? `Payment rejected: ${reason}. Please mark as paid again.`
-                : `Payment rejected for ₹${invoice.amount.toLocaleString()}. Please mark as paid again.`;
-
-            notifications.unshift(await withAgencyId({
-                id: generateId(),
-                userId: project.clientId,
-                message,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: `/dashboard/finance`
-            }));
-        }
-
-        return { ...data, invoices: updatedInvoices, notifications };
-    });
-
-    // Send email notification to client
+    // Email client
     try {
-        const data = await db.get();
-        const invoice = data.invoices.find(i => i.id === invoiceId);
-        const project = invoice ? data.projects.find(p => p.id === invoice.projectId) : null;
-
-        if (project?.clientId && invoice) {
-            const client = await getClientById(project.clientId);
+        if ((project as any)?.clientId) {
+            const client = await getClientById((project as any).clientId);
             if (client?.email) {
                 await sendPaymentRejectedEmail({
-                    clientEmail: client.email,
-                    clientName: client.name,
-                    amount: invoice.amount,
-                    projectName: project.name,
-                    rejectionReason: reason,
+                    clientEmail: client.email, clientName: client.name, amount: invoice.amount,
+                    projectName: (project as any).name, rejectionReason: reason,
                     financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/finance`,
                 });
             }
@@ -2417,37 +2270,30 @@ export async function adminRejectInvoicePayment(invoiceId: string, reason?: stri
 
 // Legacy function - kept for backward compatibility
 export async function updateInvoiceStatus(invoiceId: string, status: 'Paid' | 'Pending' | 'Overdue' | 'Processing') {
-    await db.update((data) => ({
-        ...data,
-        invoices: data.invoices.map(i => i.id === invoiceId ? { ...i, status } : i)
-    }));
+    await connectDB();
+    const agency = await getCurrentAgency();
+    await InvoiceModel.updateOne(
+        { id: invoiceId, agencyId: agency?.id },
+        { $set: { status } }
+    );
     revalidatePath('/dashboard/finance');
 }
 
 export async function deleteTransaction(transactionId: string, password: string) {
-    const currentUserId = await getSessionId();
-    if (!currentUserId) throw new Error("Unauthorized");
-
-    const user = await getUser(currentUserId);
-    if (!user) throw new Error("User not found");
-
-    // Role check: Only admins can delete transactions
-    if (user.role !== 'admin') {
-        throw new Error("Unauthorized: Only admins can delete transactions.");
-    }
-
-    // Password verification (secure hash comparison)
     await connectDB();
+    const currentUserId = await getSessionId();
+    if (!currentUserId) throw new Error('Unauthorized');
+    const user = await getUser(currentUserId);
+    if (!user) throw new Error('User not found');
+    if (user.role !== 'admin') throw new Error('Unauthorized: Only admins can delete transactions.');
+
     const userDoc = await UserModel.findOne({ id: currentUserId }).lean();
     if (!userDoc?.password || !(await comparePassword(password, userDoc.password))) {
-        throw new Error("Invalid Password");
+        throw new Error('Invalid Password');
     }
 
-    await db.update((data) => {
-        data.transactions = data.transactions.filter(t => t.id !== transactionId);
-        return data;
-    });
-
+    const agency = await getCurrentAgency();
+    await TransactionModel.deleteOne({ id: transactionId, agencyId: agency?.id });
     revalidatePath('/dashboard/finance');
     return { success: true };
 }
@@ -2464,58 +2310,36 @@ export async function getHighPriorityTasks(offset = 0, limit = 5) {
 }
 
 export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "agencyId">) {
-    if (!invoice.amount || invoice.amount <= 0) {
-        throw new Error("Validation Error: Invoice amount must be greater than zero.");
+    await connectDB();
+    if (!invoice.amount || invoice.amount <= 0) throw new Error('Validation Error: Invoice amount must be greater than zero.');
+    if (!invoice.projectId) throw new Error('Validation Error: Invoice must be linked to a project.');
+
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error('No agency context');
+
+    const project = await ProjectModel.findOne({ id: invoice.projectId, agencyId: agency.id }).lean();
+    if (!project) throw new Error(`Project with ID ${invoice.projectId} not found`);
+
+    const newInvoice: Invoice = { ...invoice, id: generateId(), status: 'Pending', agencyId: agency.id };
+    await InvoiceModel.create(newInvoice);
+
+    // Notify client
+    if (project.clientId) {
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency.id, userId: project.clientId,
+            message: `New Invoice Generated: ₹${invoice.amount.toLocaleString()}`,
+            read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
+        });
     }
-    if (!invoice.projectId) {
-        throw new Error("Validation Error: Invoice must be linked to a project.");
-    }
 
-    const newInvoice: Invoice = await withAgencyId({
-        ...invoice,
-        id: generateId(),
-        status: "Pending"
-    });
-
-    await db.update(async (data) => {
-        const project = data.projects.find(p => p.id === invoice.projectId);
-        let notifications = data.notifications || [];
-
-        if (project && project.clientId) {
-            notifications = [await withAgencyId({
-                id: generateId(),
-                userId: project.clientId,
-                message: `New Invoice Generated: ₹${invoice.amount.toLocaleString()}`,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: `/dashboard/finance`
-            }), ...notifications];
-
-        }
-
-        if (!data.projects?.find(p => p.id === invoice.projectId)) {
-            throw new Error(`Project with ID ${invoice.projectId} not found`);
-        }
-
-        return {
-            ...data,
-            invoices: [newInvoice, ...(data.invoices || [])],
-            notifications
-        };
-    });
-
-    // Send email notification to client
+    // Email client
     try {
-        const project = await getProject(invoice.projectId);
-        if (project?.clientId) {
+        if (project.clientId) {
             const client = await getClientById(project.clientId);
             if (client?.email) {
                 await sendInvoiceCreatedEmail({
-                    clientEmail: client.email,
-                    clientName: client.name,
-                    amount: invoice.amount,
-                    projectName: project.name,
-                    dueDate: invoice.date,
+                    clientEmail: client.email, clientName: client.name, amount: invoice.amount,
+                    projectName: (project as any).name, dueDate: invoice.date,
                     financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/finance`,
                 });
             }
@@ -2525,7 +2349,7 @@ export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "ag
     }
 
     revalidatePath('/dashboard/finance');
-    return newInvoice;
+    return sanitizeDoc(newInvoice);
 }
 
 export async function getFinanceStats(projectId?: string, userId?: string, category?: string) {

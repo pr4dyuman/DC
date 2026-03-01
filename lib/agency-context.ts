@@ -1,16 +1,17 @@
 "use server";
 
+import { cache } from 'react';
 import { cookies } from "next/headers";
 import { AgencyModel, UserModel, ClientModel, SuperAdminModel } from "./mongodb";
 import { Agency, User, Client, AGENCY_PLANS, SuperAdmin } from "./types";
 import { getSessionUser } from "./auth";
 
 /**
- * Get the current user's agency
- * For regular users: returns their agency
- * For super admins: returns selected agency from cookie
+ * Get the current user's agency — memoized per request via React cache().
+ * This ensures even if called from 10 different server actions in the same request,
+ * the DB is only hit once.
  */
-export async function getCurrentAgency(): Promise<Agency | null> {
+export const getCurrentAgency = cache(async (): Promise<Agency | null> => {
     try {
         // 1. Try JWT session first (primary auth)
         const session = await getSessionUser();
@@ -83,7 +84,7 @@ export async function getCurrentAgency(): Promise<Agency | null> {
         console.error('Error getting current agency:', error);
         return null;
     }
-}
+});
 
 /**
  * Get agency by ID
