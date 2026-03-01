@@ -7,6 +7,41 @@ import { executeTool } from "@/lib/singularity-tools";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// ---------------------------------------------------------------------------
+// Short-response fallback helper
+// If the AI's reply has fewer than 2 non-empty lines, we ask it whether the
+// answer was complete or got cut off. The AI responds with either:
+//   "COMPLETE" → original answer was fine, return nothing extra
+//   anything else → that text is the continuation, append it
+// ---------------------------------------------------------------------------
+function isTooShort(text: string): boolean {
+    const nonEmpty = text.split('\n').filter(l => l.trim().length > 0);
+    return nonEmpty.length < 2;
+}
+
+async function checkAndContinue(
+    generateContent: (cfg: any, prompt: string, sys?: string) => Promise<string>,
+    aiConfig: any,
+    systemInstruction: string,
+    originalPrompt: string,
+    originalReply: string
+): Promise<string | null> {
+    const followUpPrompt =
+        originalPrompt +
+        `\n\nSingularity: ${originalReply}\n\n` +
+        `User: Was your previous answer fully complete, or did it get cut off? ` +
+        `If it was complete (even if short), reply with exactly the word COMPLETE and nothing else. ` +
+        `If it was cut off or incomplete, continue your answer from exactly where you left off — do NOT repeat what you already said.`;
+
+    const continuation = await generateContent(aiConfig, followUpPrompt, systemInstruction);
+    const trimmed = continuation.trim();
+
+    // AI signals it was done → nothing to add
+    if (!trimmed || trimmed.toUpperCase() === 'COMPLETE') return null;
+
+    return trimmed;
+}
+
 export async function POST(req: NextRequest) {
     try {
         const { history, message, images, documents, mode, userId } = await req.json();
@@ -61,7 +96,20 @@ export async function POST(req: NextRequest) {
             if (!isLive) {
                 // Non-live model: single response with context (no tool calling)
                 const { generateContent } = await import("@/lib/ai-provider");
-                const result = await generateContent(aiConfig, fullPrompt, systemInstruction);
+                let result = await generateContent(aiConfig, fullPrompt, systemInstruction);
+
+                // --- Short-response fallback ---
+                if (isTooShort(result)) {
+                    console.log('[Singularity Agent] Response too short, checking if complete...');
+                    const continuation = await checkAndContinue(generateContent, aiConfig, systemInstruction, fullPrompt, result);
+                    if (continuation) {
+                        console.log('[Singularity Agent] Appending continuation.');
+                        result = result + '\n\n' + continuation;
+                    } else {
+                        console.log('[Singularity Agent] AI confirmed answer was complete.');
+                    }
+                }
+
                 const encoder = new TextEncoder();
                 const stream = new ReadableStream({
                     start(controller) {
@@ -303,7 +351,20 @@ export async function POST(req: NextRequest) {
         if (!isLive) {
             // Non-live model: single response, no streaming
             const { generateContent } = await import("@/lib/ai-provider");
-            const result = await generateContent(aiConfig, fullPrompt);
+            let result = await generateContent(aiConfig, fullPrompt);
+
+            // --- Short-response fallback ---
+            if (isTooShort(result)) {
+                console.log('[Singularity Chat] Response too short, checking if complete...');
+                const continuation = await checkAndContinue(generateContent, aiConfig, '', fullPrompt, result);
+                if (continuation) {
+                    console.log('[Singularity Chat] Appending continuation.');
+                    result = result + '\n\n' + continuation;
+                } else {
+                    console.log('[Singularity Chat] AI confirmed answer was complete.');
+                }
+            }
+
             const encoder = new TextEncoder();
             const stream = new ReadableStream({
                 start(controller) {
