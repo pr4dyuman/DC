@@ -437,23 +437,18 @@ export async function getProjects(offset = 0, limit = 1000) {
 }
 
 export async function getUserProjects(userId: string) {
-    const data = await db.get();
-    const user = data.users.find(u => u.id === userId) ||
-        (data.clients && data.clients.find(c => c.id === userId) ? { role: 'client' } : null);
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
 
-    if (!user) return [];
-
-    if ((user as any).role === 'client') {
-        return data.projects.filter(p => p.clientId === userId);
-    } else {
-        // For employees, find projects where they have assigned tasks
-        // Or could be explicit members if we had that.
-        // Let's use Task-based inferrence for now.
-        const userTaskProjectIds = new Set(
-            data.tasks.filter(t => t.assigneeId === userId).map(t => t.projectId)
-        );
-        return data.projects.filter(p => userTaskProjectIds.has(p.id));
+    // Check if user is a client
+    const isClient = await ClientModel.exists({ id: userId, ...agencyFilter });
+    if (isClient) {
+        return ProjectModel.find({ clientId: userId, ...agencyFilter }).lean().then(docs => docs.map(sanitizeDoc));
     }
+    // For employees: find projects where they have assigned tasks
+    const taskProjectIds = await TaskModel.distinct('projectId', { assigneeId: userId, ...agencyFilter });
+    return ProjectModel.find({ id: { $in: taskProjectIds }, ...agencyFilter }).lean().then(docs => docs.map(sanitizeDoc));
 }
 
 export async function getProject(id: string) {
@@ -634,11 +629,16 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
         username = user.name.toLowerCase().replace(/\s+/g, '');
     }
 
-    // Ensure uniqueness (simple check)
-    const data = await db.get();
+    // Ensure username uniqueness via DB query
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
     let uniqueUsername = username;
     let counter = 1;
-    while (data.users.find(u => u.username === uniqueUsername)) {
+    while (
+        await UserModel.exists({ username: uniqueUsername, ...agencyFilter }) ||
+        await ClientModel.exists({ username: uniqueUsername, ...agencyFilter })
+    ) {
         uniqueUsername = `${username}${counter}`;
         counter++;
     }
@@ -878,13 +878,11 @@ export async function deleteClient(id: string) {
 
 export async function getArchivedClients() {
     const currentUser = await getCurrentUser();
-    if (!currentUser || currentUser.role !== 'admin') {
-        throw new Error("Unauthorized");
-    }
-
-    const data = await db.get();
-    // Return only archived clients
-    return data.clients.filter(c => c.archived === true);
+    if (!currentUser || currentUser.role !== 'admin') throw new Error('Unauthorized');
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const clients = await ClientModel.find({ agencyId: agency?.id, archived: true }).lean();
+    return clients.map(sanitizeDoc);
 }
 
 export async function unarchiveClient(id: string) {
@@ -978,8 +976,10 @@ export async function deleteUser(id: string, password: string) {
 }
 
 export async function getServices() {
-    const data = await db.get();
-    return data.services;
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const services = await ServiceModel.find(agency ? { agencyId: agency.id } : {}).lean();
+    return services.map(sanitizeDoc);
 }
 
 export async function addService(name: string, jobs: { title: string; count: number }[]) {
@@ -1150,15 +1150,18 @@ export async function updateProjectPayment(projectId: string, serviceId: string,
 }
 
 export async function getTasks(projectId: string) {
-    const data = await db.get();
-    return data.tasks.filter(t => t.projectId === projectId);
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const tasks = await TaskModel.find({ projectId, agencyId: agency?.id }).lean();
+    return tasks.map(sanitizeDoc);
 }
 
 export async function getUserPermissions(userId: string): Promise<UserPermissions> {
-    const data = await db.get();
-    const settings = data.settings;
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const settingsDoc = await SettingsModel.findOne(agency ? { agencyId: agency.id } : {}).lean();
+    const settings = settingsDoc as any;
 
-    // Default to full permissions if not defined (Backward compatibility)
     const defaultPermissions: UserPermissions = {
         canManageTasks: true,
         canMarkDone: true,
@@ -1167,10 +1170,7 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
         canUseAI: false
     };
 
-    if (!settings.userPermissions) {
-        return defaultPermissions;
-    }
-
+    if (!settings?.userPermissions) return defaultPermissions;
     return settings.userPermissions[userId] || defaultPermissions;
 }
 
@@ -1490,21 +1490,27 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
 // --- Client Actions ---
 
 export async function getClients() {
-    const data = await db.get();
-    // Only return active (non-archived) clients
-    // Archived clients are hidden but their financial data is preserved
-    return data.clients.filter(c => !c.archived);
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const clients = await ClientModel.find({ agencyId: agency?.id, archived: { $ne: true } }).lean();
+    return clients.map(sanitizeDoc);
 }
 
 export async function getClientByUsername(username: string) {
-    const data = await db.get();
-    // Return by username (preferred) or ID (fallback)
-    return data.clients.find(c => c.username === username || c.id === username);
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const client = await ClientModel.findOne({
+        agencyId: agency?.id,
+        $or: [{ username }, { id: username }]
+    }).lean();
+    return client ? sanitizeDoc(client) : null;
 }
 
 export async function getClientById(id: string) {
-    const data = await db.get();
-    return data.clients?.find(c => c.id === id);
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const client = await ClientModel.findOne({ id, agencyId: agency?.id }).lean();
+    return client ? sanitizeDoc(client) : null;
 }
 
 export async function createClient(client: Omit<Client, "id" | "agencyId">) {
@@ -1519,14 +1525,15 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
         username = client.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '');
     }
 
-    // Ensure uniqueness
-    const data = await db.get();
+    // Ensure username uniqueness via DB
+    await connectDB();
+    const agencyCtx = await getCurrentAgency();
+    const agencyFilter2 = agencyCtx ? { agencyId: agencyCtx.id } : {};
     let uniqueUsername = username;
     let counter = 1;
-    // Check collision with Users OR Clients
     while (
-        data.users.find(u => u.username === uniqueUsername) ||
-        data.clients.find(c => c.username === uniqueUsername)
+        await UserModel.exists({ username: uniqueUsername, ...agencyFilter2 }) ||
+        await ClientModel.exists({ username: uniqueUsername, ...agencyFilter2 })
     ) {
         uniqueUsername = `${username}${counter}`;
         counter++;
@@ -1884,11 +1891,6 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
     // but the modal handles the description/type logic. We assume if category is Internal Transfer,
     // dependencies were met by client. Ideally we'd add memberId to schema for strict server check.
 
-    const newTransaction: Transaction = await withAgencyId({
-        ...transaction,
-        id: generateId(),
-        status: transaction.status || "completed"
-    });
 
     await connectDB();
     const agency = await getCurrentAgency();
@@ -1904,6 +1906,7 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
         status: transaction.status || 'completed', agencyId: agency?.id
     };
     await TransactionModel.create(newTransaction);
+
 
     // Salary notification + email
     if (newTransaction.category === 'Salary' && newTransaction.userId && newTransaction.type === 'expense') {
