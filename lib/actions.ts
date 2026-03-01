@@ -709,29 +709,27 @@ export async function getCurrentUser() {
     if (!userId) return null;
 
     // Check for Super Admin
-    const allSuperAdmins = (await db.get()).superAdmins;
-    const superAdmin = allSuperAdmins?.find(s => s.id === userId);
-    if (superAdmin) return superAdmin;
+    const superAdmin = await SuperAdminModel.findOne({ id: userId }).lean();
+    if (superAdmin) return sanitizeDoc(superAdmin) as any;
 
-    const data = await db.get();
-    const user = data.users.find(u => u.id === userId);
-    if (user) return user;
+    const user = await UserModel.findOne({ id: userId }).lean();
+    if (user) return sanitizeDoc(user) as User;
 
-    const client = data.clients.find(c => c.id === userId);
+    const client = await ClientModel.findOne({ id: userId }).lean();
     if (client) {
-        // Return as User type for compatibility
-        return {
+        return sanitizeDoc({
             id: client.id,
             name: client.name,
             email: client.email,
-            role: 'client' as any,
+            role: 'client',
             agencyId: client.agencyId,
-            avatar: client.logo,
-            username: client.username || client.id.substring(0, 8)
-        } as User;
+            avatar: (client as any).logo,
+            username: (client as any).username || client.id.substring(0, 8)
+        }) as any;
     }
 
     return null;
+
 }
 
 
@@ -1694,163 +1692,108 @@ export async function deleteProject(id: string, password: string) {
 
 
 export async function getTransactions(projectId?: string, userId?: string, category?: string) {
-    const data = await db.get();
-    let transactions = data.transactions || [];
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const query: any = { ...agencyFilter };
+    if (projectId) query.projectId = projectId;
+    if (category) query.category = category;
 
-    if (projectId) {
-        transactions = transactions.filter(t => t.projectId === projectId);
-    }
-
-    // Attempt to filter by user if possible.
-    // Since transaction model doesn't explicitly have userId, we check description for now
-    // or rely on other means. ideally we should add userId to transaction model.
-    // For now, if userId is provided, we might filter 'Salary' type transactions by user name?
-    // Or just skip strict user filtering for general transactions if not supported schema-wise.
-    // Let's filter by description containing user name if we can match it, or if there's a related task?
-    // Actually, let's keep it simple: filter by 'Salary' category and user name in description if available.
-    // Category filter for "Others"
+    // Client scoping: only show transactions for their projects
     const currentUserId = await getSessionId();
     if (currentUserId) {
-        const currentUser = await getUser(currentUserId);
+        const currentUser = await getCurrentUser();
         if (currentUser?.role === 'client') {
-            // STRICT: Clients can only see transactions related to THEIR projects
-            // They cannot see "Salary" or internal expenses unless linked to their project (usually Income for us, Expense for them)
-            // Ideally we only show them:
-            // 1. Incomes (Payments they made) where projectId is theirs.
-            // 2. Maybe Project expenses if Transparency is enabled? For now, let's stick to "Payments from Client".
-
-            // Get all projects owned by this client
-            const clientProjectIds = data.projects.filter(p => p.clientId === currentUserId).map(p => p.id);
-
-            // Filter transactions: Must be in one of their projects AND usually type 'income' (Money from them)
-            // Or 'expense' if we bill them for specific items?
-            // Let's show ALL transactions linked to their projects for maximum transparency, 
-            // BUT maybe filter out sensitive internal categories unless specifically "Project" category?
-            transactions = transactions.filter(t =>
-                t.projectId && clientProjectIds.includes(t.projectId)
-            );
+            const clientProjectIds = await ProjectModel.distinct('id', { clientId: currentUserId, ...agencyFilter });
+            query.projectId = { $in: clientProjectIds };
         }
     }
 
-    if (category) {
-        transactions = transactions.filter(t => t.category === category);
-    }
+    let transactions = await TransactionModel.find(query).lean();
 
+    // userId filter: match by name in description (schema limitation)
     if (userId) {
-        const user = data.users.find(u => u.id === userId);
+        const user = await UserModel.findOne({ id: userId, ...agencyFilter }).lean().then(u => u as any);
         if (user) {
-            transactions = transactions.filter(t =>
-                t.description.toLowerCase().includes(user.name.toLowerCase()) ||
-                (t.category === 'Salary' && t.description.includes(user.name))
+            const lower = user.name.toLowerCase();
+            transactions = transactions.filter((t: any) =>
+                t.description?.toLowerCase().includes(lower) ||
+                (t.category === 'Salary' && t.description?.includes(user.name))
             );
         }
     }
 
-    // Sort by date desc
-    return transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return transactions
+        .map(sanitizeDoc)
+        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 export async function getClientFinanceData(clientId: string) {
-    const data = await db.get();
-    const clientProjects = data.projects.filter(p => p.clientId === clientId).map(p => p.id);
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const clientProjectIds = await ProjectModel.distinct('id', { clientId, ...agencyFilter });
 
-    // Invoices for all client projects
-    const invoices = (data.invoices || []).filter(i => clientProjects.includes(i.projectId));
+    const [invoices, transactions] = await Promise.all([
+        InvoiceModel.find({ projectId: { $in: clientProjectIds }, ...agencyFilter }).lean(),
+        TransactionModel.find({ projectId: { $in: clientProjectIds }, ...agencyFilter }).lean()
+    ]);
 
-    // Transactions for all client projects
-    const transactions = (data.transactions || []).filter(t => t.projectId && clientProjects.includes(t.projectId));
-
-    // Total Invoiced = Sum of ALL invoices (paid + pending)
-    const totalInvoiced = invoices.reduce((acc, curr) => acc + curr.amount, 0);
-
-    // Total Paid = Sum of COMPLETED INCOME transactions (actual payments received from client)
-    const totalPaid = transactions
-        .filter(t => t.type === 'income' && t.status === 'completed')
-        .reduce((acc, curr) => acc + curr.amount, 0);
-
-    // Pending Amount = Pending + Processing + Overdue invoices
-    const pendingAmount = invoices
-        .filter(i => i.status === 'Pending' || i.status === 'Processing' || i.status === 'Overdue')
-        .reduce((acc, curr) => acc + curr.amount, 0);
-
-    // Refunds (if any) - Money returned to client
-    const totalRefunds = transactions
-        .filter(t => t.type === 'expense' && t.category === 'Refund' && t.status === 'completed')
-        .reduce((acc, curr) => acc + curr.amount, 0);
-
-    // Net Paid = Total Paid - Refunds
+    const totalInvoiced = invoices.reduce((acc: number, i: any) => acc + i.amount, 0);
+    const totalPaid = transactions.filter((t: any) => t.type === 'income' && t.status === 'completed').reduce((acc: number, t: any) => acc + t.amount, 0);
+    const pendingAmount = invoices.filter((i: any) => ['Pending', 'Processing', 'Overdue'].includes(i.status)).reduce((acc: number, i: any) => acc + i.amount, 0);
+    const totalRefunds = transactions.filter((t: any) => t.type === 'expense' && t.category === 'Refund' && t.status === 'completed').reduce((acc: number, t: any) => acc + t.amount, 0);
     const netPaid = totalPaid - totalRefunds;
 
     return {
-        invoices: invoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-        transactions: transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-        stats: {
-            totalInvoiced,
-            totalPaid: totalPaid, // Actual payments received
-            pendingAmount,
-            ltv: netPaid // Lifetime Value (Net after refunds)
-        }
+        invoices: invoices.map(sanitizeDoc).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        transactions: transactions.map(sanitizeDoc).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        stats: { totalInvoiced, totalPaid, pendingAmount, ltv: netPaid }
     };
 }
 
 export async function getClientActivityLogs(clientId: string, limit = 20) {
-    const data = await db.get();
-    const clientProjects = new Set(data.projects.filter(p => p.clientId === clientId).map(p => p.name));
-
-    return data.activities.filter(a => {
-        // Activity BY the client
-        if (a.user === clientId) return true;
-        // Activity ON client's project (Target matches Project Name)
-        // Note: Target is usually a human readable string. This is a heuristic.
-        // Ideally we'd store entityId and entityType. 
-        // For now, if target includes project name?
-        // Let's stick to actions BY the client or strictly matching target if we can.
-        // Or just return actions BY the client for now to be safe.
-        // Actually, let's include actions where the user is the client.
-        return a.user === clientId;
-    }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, limit);
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const acts = await ActivityModel.find({ user: clientId, agencyId: agency?.id })
+        .sort({ timestamp: -1 }).limit(limit).lean();
+    return acts.map(sanitizeDoc);
 }
 
 export async function getCategoryMemberSummary(category: string) {
-    const data = await db.get();
-    const transactions = (data.transactions || []).filter(t => t.category === category);
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const transactions = await TransactionModel.find({ category, ...agencyFilter }).lean() as any[];
 
-    // Grouping Logic
     const summaryMap = new Map<string, { id: string; name: string; total: number; count: number; avatar?: string }>();
 
     if (category === 'Internal Transfer') {
-        const users = data.users;
-        transactions.forEach(t => {
-            // Find user mentioned in description
-            const user = users.find(u => t.description.toLowerCase().includes(u.name.toLowerCase()));
+        const users = await UserModel.find(agencyFilter).lean() as any[];
+        transactions.forEach((t: any) => {
+            const user = users.find((u: any) => t.description?.toLowerCase().includes(u.name.toLowerCase()));
             if (user) {
                 const existing = summaryMap.get(user.id) || { id: user.id, name: user.name, total: 0, count: 0, avatar: user.avatar };
-                existing.total += t.amount;
-                existing.count += 1;
+                existing.total += t.amount; existing.count += 1;
                 summaryMap.set(user.id, existing);
             } else {
-                // Fallback for unknown users
-                const name = "Unknown";
-                const existing = summaryMap.get(name) || { id: "unknown", name, total: 0, count: 0 };
-                existing.total += t.amount;
-                existing.count += 1;
-                summaryMap.set(name, existing);
+                const existing = summaryMap.get('unknown') || { id: 'unknown', name: 'Unknown', total: 0, count: 0 };
+                existing.total += t.amount; existing.count += 1;
+                summaryMap.set('unknown', existing);
             }
         });
     } else if (category === 'Investor') {
-        // For investors, group by description (assuming description is investor Name)
-        // Or try to parse name if possible. Let's group by description for now as simpler heuristic.
-        transactions.forEach(t => {
-            const name = t.description; // Assume description is "Investor Name" or similar
+        transactions.forEach((t: any) => {
+            const name = t.description;
             const existing = summaryMap.get(name) || { id: name, name, total: 0, count: 0 };
-            existing.total += t.amount;
-            existing.count += 1;
+            existing.total += t.amount; existing.count += 1;
             summaryMap.set(name, existing);
         });
     }
 
     return Array.from(summaryMap.values()).sort((a, b) => b.total - a.total);
 }
+
 
 export async function createTransaction(transaction: Omit<Transaction, "id" | "status" | "agencyId"> & { status?: Transaction['status'] }) {
     // STRICT SERVER-SIDE VALIDATION
@@ -1955,24 +1898,23 @@ export async function markTransactionAsPaid(transactionId: string) {
 
 
 export async function getInvoices(projectId?: string) {
-    const data = await db.get();
-    let invoices = data.invoices || [];
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const query: any = { ...agencyFilter };
+    if (projectId) query.projectId = projectId;
 
     const currentUserId = await getSessionId();
     if (currentUserId) {
-        const currentUser = await getUser(currentUserId);
+        const currentUser = await getCurrentUser();
         if (currentUser?.role === 'client') {
-            // STRICT: Filter projects owned by client first, then invoices
-            const clientProjectIds = data.projects.filter(p => p.clientId === currentUserId).map(p => p.id);
-            invoices = invoices.filter(i => clientProjectIds.includes(i.projectId));
+            const clientProjectIds = await ProjectModel.distinct('id', { clientId: currentUserId, ...agencyFilter });
+            query.projectId = { $in: clientProjectIds };
         }
     }
 
-    if (projectId) {
-        invoices = invoices.filter(i => i.projectId === projectId);
-    }
-
-    return invoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const invoices = await InvoiceModel.find(query).lean();
+    return invoices.map(sanitizeDoc).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 // Client marks invoice as paid (moves to Processing status)
@@ -2157,14 +2099,11 @@ export async function deleteTransaction(transactionId: string, password: string)
 }
 
 export async function getHighPriorityTasks(offset = 0, limit = 5) {
-    const data = await db.get();
-    // Return In Progress or Todo tasks that are High priority or Due soon (mock due soon logic if priority not set)
-    // For now, let's filter by Status != Done and sort by date. 
-    // Ideally we would add 'priority' field to tasks properly, but let's assume 'In Progress' is urgent.
-    return data.tasks
-        .filter(t => t.status !== 'Done')
-        .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-        .slice(offset, offset + limit);
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const tasks = await TaskModel.find({ agencyId: agency?.id, status: { $ne: 'Done' } })
+        .sort({ dueDate: 1 }).skip(offset).limit(limit).lean();
+    return tasks.map(sanitizeDoc);
 }
 
 export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "agencyId">) {
@@ -2211,75 +2150,56 @@ export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "ag
 }
 
 export async function getFinanceStats(projectId?: string, userId?: string, category?: string) {
-    const data = await db.get();
-    let transactions = data.transactions || [];
-    let invoices = data.invoices || [];
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const txQuery: any = { ...agencyFilter };
+    const invQuery: any = { ...agencyFilter };
+    if (projectId) { txQuery.projectId = projectId; invQuery.projectId = projectId; }
+    if (category) txQuery.category = category;
 
-    if (projectId) {
-        transactions = transactions.filter(t => t.projectId === projectId);
-        invoices = invoices.filter(i => i.projectId === projectId);
+    let [transactions, invoices, userForFilter] = await Promise.all([
+        TransactionModel.find(txQuery).lean(),
+        InvoiceModel.find(invQuery).lean(),
+        userId ? UserModel.findOne({ id: userId, ...agencyFilter }).lean() : Promise.resolve(null)
+    ]);
+
+    if (userId && userForFilter) {
+        const name = (userForFilter as any).name.toLowerCase();
+        transactions = transactions.filter((t: any) => t.description?.toLowerCase().includes(name));
     }
 
-    if (userId) {
-        const user = data.users.find(u => u.id === userId);
-        if (user) {
-            transactions = transactions.filter(t =>
-                t.description.toLowerCase().includes(user.name.toLowerCase())
-            );
-        }
-    }
-
-    if (category) {
-        transactions = transactions.filter(t => t.category === category);
-    }
-
-    // Total Revenue = All completed income transactions (client payments, project income)
-    const totalRevenue = transactions
-        .filter(t => t.type === 'income' && t.status === 'completed')
-        .reduce((acc, curr) => acc + curr.amount, 0);
-
-    // Total Expenses = All completed expense transactions (salaries, software, hosting, etc.)
-    const totalExpenses = transactions
-        .filter(t => t.type === 'expense' && t.status === 'completed')
-        .reduce((acc, curr) => acc + curr.amount, 0);
-
+    const totalRevenue = transactions.filter((t: any) => t.type === 'income' && t.status === 'completed').reduce((a: number, t: any) => a + t.amount, 0);
+    const totalExpenses = transactions.filter((t: any) => t.type === 'expense' && t.status === 'completed').reduce((a: number, t: any) => a + t.amount, 0);
     const netProfit = totalRevenue - totalExpenses;
-
-    // Pending Invoices = Pending + Processing + Overdue
-    const pendingInvoices = invoices
-        .filter(i => i.status === 'Pending' || i.status === 'Processing' || i.status === 'Overdue');
-    const pendingInvoicesAmount = pendingInvoices.reduce((acc, curr) => acc + curr.amount, 0);
-    const pendingInvoicesCount = pendingInvoices.length;
+    const pendingInvoices = invoices.filter((i: any) => ['Pending', 'Processing', 'Overdue'].includes(i.status));
 
     return {
-        totalRevenue,
-        totalExpenses,
-        netProfit,
-        pendingInvoicesAmount,
-        pendingInvoicesCount
+        totalRevenue, totalExpenses, netProfit,
+        pendingInvoicesAmount: pendingInvoices.reduce((a: number, i: any) => a + i.amount, 0),
+        pendingInvoicesCount: pendingInvoices.length
     };
 }
 
 export async function getFinanceChartData(projectId?: string, userId?: string, category?: string) {
-    const data = await db.get();
-    let transactions = data.transactions || [];
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const query: any = { ...agencyFilter };
+    if (projectId) query.projectId = projectId;
+    if (category) query.category = category;
 
-    if (projectId) {
-        transactions = transactions.filter(t => t.projectId === projectId);
-    }
+    let transactions = await TransactionModel.find(query).lean();
 
     if (userId) {
-        const user = data.users.find(u => u.id === userId);
+        const user = await UserModel.findOne({ id: userId, ...agencyFilter }).lean() as any;
         if (user) {
-            transactions = transactions.filter(t =>
-                t.description.toLowerCase().includes(user.name.toLowerCase()) ||
-                (t.category === 'Salary' && t.description.includes(user.name))
+            const lower = user.name.toLowerCase();
+            transactions = transactions.filter((t: any) =>
+                t.description?.toLowerCase().includes(lower) ||
+                (t.category === 'Salary' && t.description?.includes(user.name))
             );
         }
-    }
-
-    if (category) {
-        transactions = transactions.filter(t => t.category === category);
     }
 
     // Group by month (last 6 months) — include year to prevent cross-year matching
@@ -2315,37 +2235,26 @@ export async function getFinanceChartData(projectId?: string, userId?: string, c
 }
 
 export async function getPayrollStatus(userId?: string) {
-    const data = await db.get();
-    let users = data.users.filter(u => u.role !== 'admin');
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const userQuery: any = { role: { $ne: 'admin' }, ...agencyFilter };
+    if (userId && userId !== 'all') userQuery.id = userId;
 
-    if (userId && userId !== 'all') {
-        users = users.filter(u => u.id === userId);
-    }
+    const [users, transactions] = await Promise.all([
+        UserModel.find(userQuery).lean(),
+        TransactionModel.find({ category: 'Salary', type: 'expense', ...agencyFilter }).lean()
+    ]);
 
     const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
-    const transactions = data.transactions || [];
-
-    const payrollList = users.map(user => {
-        const salary = user.salary || 5000; // Default mock salary if not set
-
-        // Check if paid this month
-        const isPaid = transactions.some(t =>
-            t.category === 'Salary' &&
-            t.description.includes(currentMonth) &&
-            t.description.includes(user.name) &&
-            t.type === 'expense'
+    return users.map((user: any) => {
+        const salary = user.salary || 5000;
+        const isPaid = transactions.some((t: any) =>
+            t.description?.includes(currentMonth) && t.description?.includes(user.name)
         );
-
-        return {
-            user,
-            salary,
-            status: isPaid ? 'Paid' : 'Pending',
-            month: currentMonth
-        };
+        return { user: sanitizeDoc(user), salary, status: isPaid ? 'Paid' : 'Pending', month: currentMonth };
     });
-
-    return payrollList;
 }
 
 export async function payEmployee(userId: string, amount: number, month: string, userName: string) {
@@ -2365,8 +2274,11 @@ export async function payEmployee(userId: string, amount: number, month: string,
 }
 
 export async function getSystemSettings() {
-    const data = await db.get();
-    return data.settings;
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const settingsDoc = await SettingsModel.findOne(agency ? { agencyId: agency.id } : {}).lean() as any;
+    if (!settingsDoc) return { systemName: 'AgencyOS', logo: '', userPermissions: {} };
+    return sanitizeDoc(settingsDoc);
 }
 
 export async function updateSystemSettings(settings: { systemName: string; logo: string }) {
@@ -2472,8 +2384,10 @@ export async function markNotificationAsRead(id: string) {
 // ----------------------------------------------------------------------
 
 export async function getProjectAssets(projectId: string) {
-    const data = await db.get();
-    return (data.assets || []).filter(a => a.projectId === projectId).sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const assets = await AssetModel.find({ projectId, agencyId: agency?.id }).lean();
+    return assets.map(sanitizeDoc).sort((a: any, b: any) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
 }
 
 export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt" | "agencyId">) {
@@ -2544,22 +2458,30 @@ export async function toggleAssetAI(assetId: string, enabled: boolean) {
 
 
 export async function explainTask(taskId: string, userId: string) {
-    const data = await db.get();
-    const task = data.tasks.find(t => t.id === taskId);
-    if (!task) throw new Error("Task not found");
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
 
-    const project = data.projects.find(p => p.id === task.projectId);
-    const assignee = data.users.find(u => u.id === task.assigneeId);
-    const currentUser = data.users.find(u => u.id === userId);
+    const task = await TaskModel.findOne({ id: taskId, ...agencyFilter }).lean() as any;
+    if (!task) throw new Error('Task not found');
 
-    // 1. Gather Broad Context (Board Awareness)
-    const allProjectTasks = data.tasks.filter(t => t.projectId === task.projectId);
+    const [project, assignee, allProjectTasks, projectAssetsRaw] = await Promise.all([
+        ProjectModel.findOne({ id: task.projectId, ...agencyFilter }).lean(),
+        task.assigneeId ? UserModel.findOne({ id: task.assigneeId, ...agencyFilter }).lean() : Promise.resolve(null),
+        TaskModel.find({ projectId: task.projectId, ...agencyFilter }).lean(),
+        AssetModel.find({ projectId: task.projectId, aiEnabled: true, ...agencyFilter }).lean()
+    ]);
+
+    // Build user name map for board summary
+    const userIds = [...new Set(allProjectTasks.map((t: any) => t.assigneeId).filter(Boolean))];
+    const users = await UserModel.find({ id: { $in: userIds }, ...agencyFilter }).lean();
+    const userMap = Object.fromEntries(users.map((u: any) => [u.id, u.name]));
 
     const tasksByStatus = {
-        'Todo': allProjectTasks.filter(t => t.status === 'Todo').map(t => `- ${t.title} (${data.users.find(u => u.id === t.assigneeId)?.name || 'Unassigned'})`),
-        'In Progress': allProjectTasks.filter(t => t.status === 'In Progress').map(t => `- ${t.title} (${data.users.find(u => u.id === t.assigneeId)?.name || 'Unassigned'})`),
-        'Review': allProjectTasks.filter(t => t.status === 'Review').map(t => `- ${t.title} (${data.users.find(u => u.id === t.assigneeId)?.name || 'Unassigned'})`),
-        'Done': allProjectTasks.filter(t => t.status === 'Done').map(t => `- ${t.title} (${data.users.find(u => u.id === t.assigneeId)?.name || 'Unassigned'})`)
+        'Todo': allProjectTasks.filter((t: any) => t.status === 'Todo').map((t: any) => `- ${t.title} (${userMap[t.assigneeId] || 'Unassigned'})`),
+        'In Progress': allProjectTasks.filter((t: any) => t.status === 'In Progress').map((t: any) => `- ${t.title} (${userMap[t.assigneeId] || 'Unassigned'})`),
+        'Review': allProjectTasks.filter((t: any) => t.status === 'Review').map((t: any) => `- ${t.title} (${userMap[t.assigneeId] || 'Unassigned'})`),
+        'Done': allProjectTasks.filter((t: any) => t.status === 'Done').map((t: any) => `- ${t.title} (${userMap[t.assigneeId] || 'Unassigned'})`)
     };
 
     const boardSummary = `
@@ -2577,8 +2499,7 @@ export async function explainTask(taskId: string, userId: string) {
     ${tasksByStatus['Done'].join('\n') || '(None)'}
     `;
 
-    // 2. Context from Assets
-    const projectAssets = (data.assets || []).filter(a => a.projectId === task.projectId && a.aiEnabled);
+    const projectAssets = projectAssetsRaw as any[];
 
     // 3. Construct System Prompt
     const context = {
@@ -2616,7 +2537,8 @@ ${boardSummary}
 ${context.task.description || "No description provided."}
 
 **Recent Comments**:
-${context.comments.length > 0 ? context.comments.map(c => `- ${c.text}`).join('\n') : "No comments yet."}
+${context.comments.length > 0 ? context.comments.map((c: any) => `- ${c.text}`).join('\n') : "No comments yet."}
+
 
 ### INSTRUCTIONS
 - Analyze any provided assets (code, docs, images) and reference them specifically.
@@ -2678,20 +2600,22 @@ ${context.comments.length > 0 ? context.comments.map(c => `- ${c.text}`).join('\
 }
 
 export async function enhanceTaskDescription(projectId: string, title: string, content: string, userId: string) {
-    const data = await db.get();
-    const project = data.projects.find(p => p.id === projectId);
-    const currentUser = data.users.find(u => u.id === userId);
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
 
-    // Context Gathering
-    const allProjectTasks = data.tasks.filter(t => t.projectId === projectId);
-    const tasksSummary = allProjectTasks.slice(0, 10).map(t => `- ${t.title} (${t.status})`).join('\n');
+    const [project, allProjectTasks, projectAssets] = await Promise.all([
+        ProjectModel.findOne({ id: projectId, ...agencyFilter }).lean(),
+        TaskModel.find({ projectId, ...agencyFilter }).lean(),
+        AssetModel.find({ projectId, aiEnabled: true, ...agencyFilter }).lean()
+    ]);
 
-    // Fetch Asset Content (Text/Code only)
-    const projectAssets = (data.assets || []).filter(a => a.projectId === projectId && a.aiEnabled);
-    let assetContext = "";
-    projectAssets.filter(a => ['file', 'code', 'link'].includes(a.type) && a.content).forEach(a => {
-        assetContext += `\n--- Asset: ${a.name} ---\n${a.content?.substring(0, 2000) || "(Empty)"}\n`;
+    const tasksSummary = allProjectTasks.slice(0, 10).map((t: any) => `- ${t.title} (${t.status})`).join('\n');
+    let assetContext = '';
+    (projectAssets as any[]).filter((a: any) => ['file', 'code', 'link'].includes(a.type) && a.content).forEach((a: any) => {
+        assetContext += `\n--- Asset: ${a.name} ---\n${a.content?.substring(0, 2000) || '(Empty)'}\n`;
     });
+
 
     const aiConfig = await getAgencyAIConfig();
     if (!aiConfig) throw new Error("Singularity is not configured. Contact your administrator.");
@@ -2809,7 +2733,15 @@ export async function createAISession(
         return 'legacy';
     }
 
-    const data = await db.get();
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const [tasks, users, assets] = await Promise.all([
+        TaskModel.find({ projectId, ...agencyFilter }).lean(),
+        UserModel.find(agencyFilter).lean(),
+        AssetModel.find({ projectId, aiEnabled: true, ...agencyFilter }).lean()
+    ]);
+    const data = { tasks, users, assets };
     const systemInstruction = buildChatSystemInstruction(projectId, currentTitle, currentDescription, data);
 
     const sessionId = await createSession(aiConfig.apiKey, modelId, systemInstruction);
@@ -2870,11 +2802,18 @@ export async function chatWithTaskAI(
     userMessage: string,
     userId: string
 ) {
-    const data = await db.get();
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const [tasks, users, assets] = await Promise.all([
+        projectId ? TaskModel.find({ projectId, ...agencyFilter }).lean() : Promise.resolve([]),
+        UserModel.find(agencyFilter).lean(),
+        projectId ? AssetModel.find({ projectId, aiEnabled: true, ...agencyFilter }).lean() : Promise.resolve([])
+    ]);
+    const data = { tasks, users, assets };
     const aiConfig = await getAgencyAIConfig();
-    if (!aiConfig) throw new Error("Singularity is not configured.");
-
-    const systemInstruction = buildChatSystemInstruction(projectId, currentTitle, currentDescription, data);
+    if (!aiConfig) throw new Error('Singularity is not configured.');
+    const systemInstruction = buildChatSystemInstruction(projectId || '', currentTitle || '', currentDescription || '', data);
 
     try {
         const result = await generateContentWithChat(aiConfig, history, systemInstruction, userMessage);
@@ -2988,22 +2927,18 @@ export async function singularityChat(
 
 
 export async function getLeaveRequests(userId?: string) {
-    const data = await db.get();
-    let requests = data.leaveRequests || [];
-
-    // sorting: Pending first, then by date desc
-    requests = requests.sort((a, b) => {
-        if (a.status === 'Pending' && b.status !== 'Pending') return -1;
-        if (a.status !== 'Pending' && b.status === 'Pending') return 1;
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-
-    if (userId) {
-        return requests.filter(r => r.userId === userId);
-    }
-
-    // If no userId, return all (Admin view)
-    return requests;
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const query: any = agency ? { agencyId: agency.id } : {};
+    if (userId) query.userId = userId;
+    const requests = await LeaveRequestModel.find(query).lean();
+    return requests
+        .map(sanitizeDoc)
+        .sort((a: any, b: any) => {
+            if (a.status === 'Pending' && b.status !== 'Pending') return -1;
+            if (a.status !== 'Pending' && b.status === 'Pending') return 1;
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
 }
 
 // Employee submits a leave request
@@ -3253,16 +3188,17 @@ export async function cancelLeaveRequest(leaveRequestId: string) {
 
 // Get leave statistics for an employee
 export async function getEmployeeLeaveStats(userId: string) {
-    const data = await db.get();
-    const leaveRequests = data.leaveRequests.filter(lr => lr.userId === userId);
-
+    await connectDB();
+    const agency = await getCurrentAgency();
     const currentYear = new Date().getFullYear();
-    const thisYearRequests = leaveRequests.filter(lr => {
-        const year = new Date(lr.createdAt).getFullYear();
-        return year === currentYear;
-    });
+    const yearStart = new Date(`${currentYear}-01-01`).toISOString();
+    const yearEnd = new Date(`${currentYear}-12-31T23:59:59`).toISOString();
 
-    const approvedLeaves = thisYearRequests.filter(lr => lr.status === 'Approved');
+    const leaveRequests = await LeaveRequestModel.find({
+        userId, agencyId: agency?.id, createdAt: { $gte: yearStart, $lte: yearEnd }
+    }).lean() as any[];
+
+    const approvedLeaves = leaveRequests.filter((lr: any) => lr.status === 'Approved');
 
     // Calculate total days taken
     let casualDaysTaken = 0;
@@ -3291,7 +3227,8 @@ export async function getEmployeeLeaveStats(userId: string) {
         emergencyDaysRemaining: Math.max(0, emergencyLeaveAllowance - emergencyDaysTaken),
         pendingRequests: leaveRequests.filter(lr => lr.status === 'Pending').length,
         approvedRequests: approvedLeaves.length,
-        rejectedRequests: thisYearRequests.filter(lr => lr.status === 'Rejected').length
+        rejectedRequests: leaveRequests.filter((lr: any) => lr.status === 'Rejected').length
+
     };
 }
 
@@ -3396,37 +3333,37 @@ export async function createRefund(refund: {
 }
 
 export async function getClientFinancialSummary(clientId: string) {
-    const data = await db.get();
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const projectIds = await ProjectModel.distinct('id', { clientId, ...agencyFilter });
+    const projectIdSet = new Set(projectIds);
+    const clientProjectsAll = await ProjectModel.find({ clientId, ...agencyFilter }).lean() as any[];
 
-    // Get all projects for this client
-    const clientProjects = data.projects.filter(p => p.clientId === clientId);
-    const projectIds = new Set(clientProjects.map(p => p.id));
+    const transactions = await TransactionModel.find({
+        projectId: { $in: projectIds }, ...agencyFilter
+    }).lean() as any[];
 
-    // Calculate total income from client
-    const totalPaid = data.transactions
-        .filter(t => t.projectId && projectIds.has(t.projectId) && t.type === 'income' && t.status === 'completed')
-        .reduce((sum, t) => sum + t.amount, 0);
-
-    // Calculate total refunds to client
-    const totalRefunds = data.transactions
-        .filter(t => t.projectId && projectIds.has(t.projectId) && t.category === 'Refund' && t.status === 'completed')
-        .reduce((sum, t) => sum + t.amount, 0);
-
-    // Calculate lifetime value (net revenue)
+    const totalPaid = transactions
+        .filter((t: any) => t.type === 'income' && t.status === 'completed')
+        .reduce((sum: number, t: any) => sum + t.amount, 0);
+    const totalRefunds = transactions
+        .filter((t: any) => t.category === 'Refund' && t.status === 'completed')
+        .reduce((sum: number, t: any) => sum + t.amount, 0);
     const lifetimeValue = totalPaid - totalRefunds;
 
     return {
-        totalPaid,
-        totalRefunds,
-        lifetimeValue,
-        projectCount: clientProjects.length,
-        activeProjectCount: clientProjects.filter(p => p.status === 'Active').length
+        totalPaid, totalRefunds, lifetimeValue,
+        projectCount: clientProjectsAll.length,
+        activeProjectCount: clientProjectsAll.filter((p: any) => p.status === 'Active').length
     };
 }
 
 export async function getProjectRefunds(projectId: string) {
-    const data = await db.get();
-    return data.transactions
-        .filter(t => t.projectId === projectId && t.category === 'Refund')
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const refunds = await TransactionModel.find({
+        projectId, category: 'Refund', agencyId: agency?.id
+    }).lean();
+    return refunds.map(sanitizeDoc).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }

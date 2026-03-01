@@ -46,103 +46,89 @@ export async function heartbeat(userId: string) {
 }
 
 export async function getTotalUnreadCount(currentUserId: string): Promise<number> {
-    const data = await db.get();
-    return (data.messages || []).filter(m =>
-        m.receiverId === currentUserId && !m.read
-    ).length;
+    await connectDB();
+    const agency = await getCurrentAgency();
+    return MessageModel.countDocuments({
+        receiverId: currentUserId, read: false,
+        ...(agency ? { agencyId: agency.id } : {})
+    });
 }
 
 export async function getContacts(currentUserId: string): Promise<Contact[]> {
-    const data = await db.get();
-    const users = data.users.filter(u => u.id !== currentUserId);
-    const clients = data.clients;
-
-    const contacts: Contact[] = [];
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
     const now = new Date().getTime();
 
-    // Add Users
-    for (const user of users) {
-        const lastActive = user.lastActiveAt ? new Date(user.lastActiveAt).getTime() : 0;
-        const isOnline = (now - lastActive) < ONLINE_THRESHOLD_MS;
+    const [users, clients, allMessages] = await Promise.all([
+        UserModel.find({ id: { $ne: currentUserId }, ...agencyFilter }).lean(),
+        ClientModel.find({ ...agencyFilter }).lean(),
+        MessageModel.find({
+            $or: [{ senderId: currentUserId }, { receiverId: currentUserId }],
+            ...agencyFilter
+        }).lean()
+    ]);
 
+    const isClient = clients.some((c: any) => c.id === currentUserId);
+    const contacts: Contact[] = [];
+
+    for (const user of users) {
+        const u = user as any;
+        const lastActive = u.lastActiveAt ? new Date(u.lastActiveAt).getTime() : 0;
         contacts.push({
-            id: user.id,
-            username: user.username,
-            name: user.name,
-            email: user.email,
-            avatar: user.avatar,
-            role: user.role,
-            jobTitle: user.jobTitle,
-            type: 'user',
-            unreadCount: 0,
-            isOnline,
-            lastActiveAt: user.lastActiveAt
+            id: u.id, username: u.username, name: u.name, email: u.email,
+            avatar: u.avatar, role: u.role, jobTitle: u.jobTitle, type: 'user',
+            unreadCount: 0, isOnline: (now - lastActive) < ONLINE_THRESHOLD_MS,
+            lastActiveAt: u.lastActiveAt
         });
     }
 
-    // Determine if current user is a client
-    const isClient = data.clients.some(c => c.id === currentUserId);
-
-    // Add Clients (Only if current user is NOT a client)
     if (!isClient) {
         for (const client of clients) {
-            const lastActive = client.lastActiveAt ? new Date(client.lastActiveAt).getTime() : 0;
-            const isOnline = (now - lastActive) < ONLINE_THRESHOLD_MS;
-
+            const c = client as any;
+            const lastActive = c.lastActiveAt ? new Date(c.lastActiveAt).getTime() : 0;
             contacts.push({
-                id: client.id,
-                username: client.username,
-                name: client.name,
-                email: client.email,
-                companyName: client.companyName,
-                avatar: client.logo,
-                role: 'Client',
-                type: 'client',
-                unreadCount: 0,
-                isOnline,
-                lastActiveAt: client.lastActiveAt
+                id: c.id, username: c.username, name: c.name, email: c.email,
+                companyName: c.companyName, avatar: c.logo, role: 'Client', type: 'client',
+                unreadCount: 0, isOnline: (now - lastActive) < ONLINE_THRESHOLD_MS,
+                lastActiveAt: c.lastActiveAt
             } as any);
         }
     }
 
-    // Calculate last message and unread count
-    const allMessages = data.messages || [];
-
     contacts.forEach(contact => {
-        const discussion = allMessages.filter(m =>
-            (m.senderId === currentUserId && m.receiverId === contact.id) ||
-            (m.senderId === contact.id && m.receiverId === currentUserId)
-        ).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-        if (discussion.length > 0) {
-            contact.lastMessage = discussion[discussion.length - 1];
-        }
-
-        contact.unreadCount = allMessages.filter(m =>
-            m.senderId === contact.id &&
-            m.receiverId === currentUserId &&
-            !m.read
+        const discussion = (allMessages as any[])
+            .filter((m: any) =>
+                (m.senderId === currentUserId && m.receiverId === contact.id) ||
+                (m.senderId === contact.id && m.receiverId === currentUserId)
+            )
+            .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        if (discussion.length > 0) contact.lastMessage = discussion[discussion.length - 1];
+        contact.unreadCount = (allMessages as any[]).filter((m: any) =>
+            m.senderId === contact.id && m.receiverId === currentUserId && !m.read
         ).length;
     });
 
-    // Sort contacts: recent messages first
-    contacts.sort((a, b) => {
+    return contacts.sort((a, b) => {
         const timeA = a.lastMessage ? new Date(a.lastMessage.timestamp).getTime() : 0;
         const timeB = b.lastMessage ? new Date(b.lastMessage.timestamp).getTime() : 0;
         return timeB - timeA;
     });
-
-    return contacts;
 }
 
 export async function getMessages(currentUserId: string, otherUserId: string): Promise<Message[]> {
-    const data = await db.get();
-    return (data.messages || [])
-        .filter(m =>
-            (m.senderId === currentUserId && m.receiverId === otherUserId) ||
-            (m.senderId === otherUserId && m.receiverId === currentUserId)
-        )
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const msgs = await MessageModel.find({
+        $or: [
+            { senderId: currentUserId, receiverId: otherUserId },
+            { senderId: otherUserId, receiverId: currentUserId }
+        ],
+        ...(agency ? { agencyId: agency.id } : {})
+    }).lean();
+    return msgs
+        .map((m: any) => ({ ...m, _id: undefined }))
+        .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) as Message[];
 }
 
 export async function sendMessage(senderId: string, receiverId: string, content: string, type: 'text' | 'image' = 'text') {
