@@ -271,9 +271,11 @@ export async function getRevenueData() {
 
 export async function getProjectDistribution() {
     await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
     const [projects, services] = await Promise.all([
-        ProjectModel.find({}).lean(),
-        ServiceModel.find({}).lean()
+        ProjectModel.find(agencyFilter).lean(),
+        ServiceModel.find(agencyFilter).lean()
     ]);
 
     const distribution: Record<string, number> = {};
@@ -292,13 +294,17 @@ export async function getProjectDistribution() {
 
 export async function getRecentActivity(offset = 0, limit = 5): Promise<Activity[]> {
     await connectDB();
-    const activities = await ActivityModel.find({}).sort({ timestamp: -1 }).skip(offset).limit(limit).lean();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const activities = await ActivityModel.find(agencyFilter).sort({ timestamp: -1 }).skip(offset).limit(limit).lean();
     return activities.map(a => sanitizeDoc(a));
 }
 
 export async function getUrgentTasks(limit = 5) {
     await connectDB();
-    const tasks = await TaskModel.find({ status: { $ne: 'Done' }, priority: 'High' })
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const tasks = await TaskModel.find({ ...agencyFilter, status: { $ne: 'Done' }, priority: 'High' })
         .sort({ dueDate: 1 })
         .limit(limit)
         .lean();
@@ -308,23 +314,24 @@ export async function getUrgentTasks(limit = 5) {
 export async function getClientDashboardData(clientId: string) {
     await connectDB();
 
-    // Parallel Fetch
-    const [projects, invoices, transactions, tasks, assets, notifications] = await Promise.all([
-        ProjectModel.find({ clientId }).lean(),
-        InvoiceModel.find({}).lean(), // Need to filter by projectIds in memory or 2-step
-        TransactionModel.find({}).lean(), // Need to filter by projectIds
-        TaskModel.find({}).lean(), // Need to filter by projectIds
-        AssetModel.find({}).lean(), // Need to filter by projectIds
+    // Parallel Fetch — scope invoices/tasks/assets to client's project IDs, not all data
+    const clientProjects = await ProjectModel.find({ clientId }).lean();
+    const projectIds = clientProjects.map((p: any) => p.id);
+
+    const [invoices, transactions, tasks, assets, notifications] = await Promise.all([
+        InvoiceModel.find({ projectId: { $in: projectIds } }).lean(),
+        TransactionModel.find({ projectId: { $in: projectIds } }).lean(),
+        TaskModel.find({ projectId: { $in: projectIds } }).lean(),
+        AssetModel.find({ projectId: { $in: projectIds } }).lean(),
         NotificationModel.find({ userId: clientId }).sort({ timestamp: -1 }).limit(5).lean()
     ]);
 
-    // Filter by project IDs owned by client
-    const projectIds = new Set(projects.map((p: any) => p.id));
+    const projects = clientProjects;
 
-    const clientInvoices = invoices.filter((i: any) => projectIds.has(i.projectId));
-    const clientTransactions = transactions.filter((t: any) => t.projectId && projectIds.has(t.projectId));
-    const clientTasks = tasks.filter((t: any) => projectIds.has(t.projectId));
-    const clientAssets = assets.filter((a: any) => projectIds.has(a.projectId));
+    const clientInvoices = invoices;
+    const clientTransactions = transactions;
+    const clientTasks = tasks;
+    const clientAssets = assets;
 
     // Metrics
     const activeProjectsCount = projects.filter((p: any) => p.status === 'Active').length;
@@ -415,7 +422,11 @@ export async function getProjects(offset = 0, limit = 1000) {
     const currentUser = await getUser(currentUserId);
     if (!currentUser) return [];
 
-    let query: any = {};
+    // Always scope to current agency
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+
+    let query: any = { ...agencyFilter };
     if (currentUser.role === 'client') {
         // STRICT: Only return projects owned by this client
         query.clientId = currentUserId;
@@ -465,8 +476,10 @@ export async function getUsers() {
     const currentUser = await getUser(currentUserId!);
     const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
 
-    // Fetch all users
-    const usersRaw = await UserModel.find({}).lean();
+    // Fetch users scoped to current agency
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const usersRaw = await UserModel.find(agencyFilter).lean();
     const users = usersRaw.map(u => ({ ...sanitizeDoc(u), agencyId: u.agencyId || 'default-agency' }));
 
     if (currentUser?.role === 'client') {

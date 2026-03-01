@@ -25,6 +25,7 @@ import {
     LeaveRequestModel,
     SettingsModel
 } from './mongodb';
+import { getCurrentAgency } from './agency-context';
 
 export * from './types';
 
@@ -71,22 +72,26 @@ export const db = {
     get: cache(async (): Promise<DB> => {
         await connectDB();
 
+        // Scope all queries to the current agency (multi-tenancy)
+        const agency = await getCurrentAgency();
+        const agencyFilter = agency ? { agencyId: agency.id } : {};
+
         const [agencies, superAdmins, users, clients, projects, tasks, invoices, transactions, services, notifications, activities, assets, messages, leaveRequests, settingsDoc] = await Promise.all([
             AgencyModel.find({}).lean(),
             SuperAdminModel.find({}).lean(),
-            UserModel.find({}).lean(),
-            ClientModel.find({}).lean(),
-            ProjectModel.find({}).lean(),
-            TaskModel.find({}).lean(),
-            InvoiceModel.find({}).lean(),
-            TransactionModel.find({}).lean(),
-            ServiceModel.find({}).lean(),
-            NotificationModel.find({}).lean(),
-            ActivityModel.find({}).lean(),
-            AssetModel.find({}).lean(),
-            MessageModel.find({}).lean(),
-            LeaveRequestModel.find({}).lean(),
-            SettingsModel.findOne({}).lean()
+            UserModel.find(agencyFilter).lean(),
+            ClientModel.find(agencyFilter).lean(),
+            ProjectModel.find(agencyFilter).lean(),
+            TaskModel.find(agencyFilter).lean(),
+            InvoiceModel.find(agencyFilter).lean(),
+            TransactionModel.find(agencyFilter).lean(),
+            ServiceModel.find(agencyFilter).lean(),
+            NotificationModel.find(agencyFilter).lean(),
+            ActivityModel.find(agencyFilter).lean(),
+            AssetModel.find(agencyFilter).lean(),
+            MessageModel.find(agencyFilter).lean(),
+            LeaveRequestModel.find(agencyFilter).lean(),
+            SettingsModel.findOne(agencyFilter).lean()
         ]);
 
         // Default settings if none exist
