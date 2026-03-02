@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
     LayoutDashboard,
     Building2,
+    Users,
     BarChart3,
     CreditCard,
     Settings,
@@ -17,6 +18,7 @@ import { logout } from "@/lib/auth";
 const navigation = [
     { name: "Dashboard", href: "/super-admin", icon: LayoutDashboard },
     { name: "Agencies", href: "/super-admin/agencies", icon: Building2 },
+    { name: "Users", href: "/super-admin/users", icon: Users },
     { name: "Analytics", href: "/super-admin/analytics", icon: BarChart3 },
     { name: "Billing", href: "/super-admin/billing", icon: CreditCard },
     { name: "System Logs", href: "/super-admin/logs", icon: FileText },

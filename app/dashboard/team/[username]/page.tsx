@@ -264,6 +264,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                 onOpenChange={setIsEditDialogOpen}
                 onSuccess={loadData}
                 currentUserRole={currentUserRole}
+                isSelf={isSelf}
             />
 
             {/* Profile Header Card */}

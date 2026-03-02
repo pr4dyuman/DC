@@ -26,6 +26,20 @@ export type Contact = {
 // Threshold for "Online" status (1 minute)
 const ONLINE_THRESHOLD_MS = 60 * 1000;
 
+/** Converts a raw Mongoose lean Message doc into a plain serializable object */
+function serializeMessage(m: any): Message {
+    return {
+        id: m.id ?? String(m._id),
+        agencyId: m.agencyId,
+        senderId: m.senderId,
+        receiverId: m.receiverId,
+        content: m.content,
+        timestamp: m.timestamp,
+        read: !!m.read,
+        type: m.type ?? 'text',
+    };
+}
+
 export async function heartbeat(userId: string) {
     await connectDB();
     const now = new Date().toISOString();
@@ -103,7 +117,7 @@ export async function getContacts(currentUserId: string): Promise<Contact[]> {
                 (m.senderId === contact.id && m.receiverId === currentUserId)
             )
             .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-        if (discussion.length > 0) contact.lastMessage = discussion[discussion.length - 1];
+        if (discussion.length > 0) contact.lastMessage = serializeMessage(discussion[discussion.length - 1]);
         contact.unreadCount = (allMessages as any[]).filter((m: any) =>
             m.senderId === contact.id && m.receiverId === currentUserId && !m.read
         ).length;
@@ -127,8 +141,8 @@ export async function getMessages(currentUserId: string, otherUserId: string): P
         ...(agency ? { agencyId: agency.id } : {})
     }).lean();
     return msgs
-        .map((m: any) => ({ ...m, _id: undefined }))
-        .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) as Message[];
+        .map((m: any) => serializeMessage(m))
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) as Message[];
 }
 
 export async function sendMessage(senderId: string, receiverId: string, content: string, type: 'text' | 'image' = 'text') {

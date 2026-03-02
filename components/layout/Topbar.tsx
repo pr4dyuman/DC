@@ -3,10 +3,10 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Search, Settings, LogOut, User as UserIcon, Loader2, Check, X, FileText, Briefcase, Users } from "lucide-react";
+import { Bell, Search, Settings, LogOut, User as UserIcon, Loader2, Check, X, FileText, Briefcase, Users, Building2 } from "lucide-react";
 import { MobileSidebar } from "./MobileSidebar";
 import { User, Notification } from "@/lib/types";
-import { ProfileModal } from "./ProfileModal";
+
 import { getUsers, getNotifications, globalSearch, markNotificationAsRead, SearchResult } from "@/lib/actions";
 import { logout } from "@/lib/auth";
 import {
@@ -29,7 +29,7 @@ interface TopbarProps {
 
 export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: TopbarProps) {
     const router = useRouter();
-    const [isProfileOpen, setIsProfileOpen] = useState(false);
+
     const [user, setUser] = useState<User | undefined>(propUser);
 
     // Search State
@@ -271,10 +271,20 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: Topbar
                                     </div>
                                 </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
-                                    <UserIcon className="mr-2 h-4 w-4" />
-                                    <span>Edit Profile</span>
+                                <DropdownMenuItem asChild>
+                                    <Link href={`/dashboard/team/${user.username}`} className="cursor-pointer">
+                                        <UserIcon className="mr-2 h-4 w-4" />
+                                        <span>My Profile</span>
+                                    </Link>
                                 </DropdownMenuItem>
+                                {user.role === 'admin' && (
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/dashboard/settings" className="cursor-pointer">
+                                            <Building2 className="mr-2 h-4 w-4" />
+                                            <span>Agency Branding</span>
+                                        </Link>
+                                    </DropdownMenuItem>
+                                )}
                                 {user.role !== 'client' && (
                                     <DropdownMenuItem asChild>
                                         <Link href="/dashboard/settings" className="cursor-pointer">
@@ -305,11 +315,6 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: Topbar
                 </div>
             </div>
 
-            <ProfileModal
-                user={user}
-                open={isProfileOpen}
-                setOpen={setIsProfileOpen}
-            />
         </>
     );
 }

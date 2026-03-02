@@ -15,9 +15,10 @@ interface EditUserDialogProps {
     onOpenChange: (open: boolean) => void;
     onSuccess?: () => void;
     currentUserRole?: string;
+    isSelf?: boolean;
 }
 
-export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUserRole }: EditUserDialogProps) {
+export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUserRole, isSelf }: EditUserDialogProps) {
     const router = useRouter();
     const [submitting, setSubmitting] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -26,6 +27,11 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
     const [services, setServices] = useState<any[]>([]);
     const [loadingRoles, setLoadingRoles] = useState(false);
     const [showDocumentManager, setShowDocumentManager] = useState(false);
+    // Self password-change fields
+    const [currentPassword, setCurrentPassword] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [passwordError, setPasswordError] = useState("");
 
     const isAdmin = currentUserRole === 'admin';
     const isManager = currentUserRole === 'manager';
@@ -84,6 +90,10 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
             }
             setShowDeleteConfirm(false);
             setDeletePassword("");
+            setCurrentPassword("");
+            setNewPassword("");
+            setConfirmPassword("");
+            setPasswordError("");
         }
     }, [user, open]);
 
@@ -101,13 +111,31 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setPasswordError("");
         setSubmitting(true);
         try {
             if (user) {
-                // If password field is filled, we assume Admin Reset (no old password needed)
-                if (formData.password) {
+                if (isSelf) {
+                    // Self-editing: password change requires current password verification
+                    if (newPassword) {
+                        if (newPassword !== confirmPassword) {
+                            setPasswordError("New passwords do not match");
+                            setSubmitting(false);
+                            return;
+                        }
+                        if (!currentPassword) {
+                            setPasswordError("Current password is required to set a new password");
+                            setSubmitting(false);
+                            return;
+                        }
+                        // Use updateUser with currentPassword for verification
+                        await updateUser(user.id, { ...formData, password: newPassword }, currentPassword);
+                    } else {
+                        await updateUser(user.id, formData);
+                    }
+                } else if (formData.password) {
+                    // Admin force-reset (no old password needed)
                     await adminResetPassword(user.id, formData.password);
-                    // Remove password from formData for the general update to avoid "Old password required" error
                     const { password, ...updateData } = formData;
                     await updateUser(user.id, updateData);
                 } else {
@@ -118,11 +146,8 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                 if (formData.username && user.username && formData.username !== user.username) {
                     const currentPath = window.location.pathname;
                     if (currentPath.includes(user.username) || currentPath.includes(user.id)) {
-                        // We are viewing the profile, so redirect
                         router.push(`/dashboard/team/${formData.username}`);
                         router.refresh();
-                        // Don't call onSuccess immediately to avoid stale data fetch, the redirect will handle it.
-                        // But we should close dialog.
                         onOpenChange(false);
                         setSubmitting(false);
                         return;
@@ -285,23 +310,64 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                         )}
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1.5">
-                                            <label className="text-xs font-medium text-muted-foreground">Password</label>
-                                            <input
-                                                type="password"
-                                                placeholder={user ? "Unchanged" : "New Password"}
-                                                value={formData.password || ""}
-                                                onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary"
-                                            />
+                                    {/* Password section — self gets secure change, admin gets force-reset */}
+                                    {isSelf ? (
+                                        <div className="space-y-3 pt-1 border-t border-border">
+                                            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-1">Change Password</h4>
+                                            {passwordError && (
+                                                <p className="text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded-md">{passwordError}</p>
+                                            )}
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-medium text-muted-foreground">Current Password</label>
+                                                <input
+                                                    type="password"
+                                                    placeholder="Required to set new password"
+                                                    value={currentPassword}
+                                                    onChange={e => setCurrentPassword(e.target.value)}
+                                                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary"
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium text-muted-foreground">New Password</label>
+                                                    <input
+                                                        type="password"
+                                                        value={newPassword}
+                                                        onChange={e => setNewPassword(e.target.value)}
+                                                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-xs font-medium text-muted-foreground">Confirm Password</label>
+                                                    <input
+                                                        type="password"
+                                                        value={confirmPassword}
+                                                        onChange={e => setConfirmPassword(e.target.value)}
+                                                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-xs font-medium text-muted-foreground">Contact</label>
-                                            <input value={formData.contactNumber} onChange={e => setFormData({ ...formData, contactNumber: e.target.value })}
-                                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary" placeholder="+91..." />
+                                    ) : (
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-medium text-muted-foreground">Reset Password</label>
+                                                <input
+                                                    type="password"
+                                                    placeholder={user ? "Force reset" : "New Password"}
+                                                    value={formData.password || ""}
+                                                    onChange={e => setFormData({ ...formData, password: e.target.value })}
+                                                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-medium text-muted-foreground">Contact</label>
+                                                <input value={formData.contactNumber} onChange={e => setFormData({ ...formData, contactNumber: e.target.value })}
+                                                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary" placeholder="+91..." />
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
+
 
                                     <div className="space-y-3 pt-2">
                                         <div className="flex items-center justify-between border-b border-border pb-2">
