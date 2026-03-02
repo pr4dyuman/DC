@@ -36,18 +36,27 @@ export async function GET(req: NextRequest) {
     }
 }
 
-// POST /api/singularity/history — Create new session
+// POST /api/singularity/history
+// — Create new session when body has { userId, mode }
+// — Update existing session when body has { sessionId, messages } (used by sendBeacon emergency save)
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { userId, mode } = body;
+        const { userId, mode, sessionId, messages, title } = body;
 
+        // If sessionId is present — this is an emergency save from sendBeacon
+        if (sessionId && messages) {
+            await updateSingularitySession(sessionId, messages, title);
+            return NextResponse.json({ success: true });
+        }
+
+        // Otherwise — create a new session
         if (!userId) {
             return NextResponse.json({ error: "userId required" }, { status: 400 });
         }
 
-        const sessionId = await createSingularitySession(userId, mode || "chat");
-        return NextResponse.json({ sessionId });
+        const newSessionId = await createSingularitySession(userId, mode || "chat");
+        return NextResponse.json({ sessionId: newSessionId });
     } catch (error: any) {
         console.error("[History API] POST error:", error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });

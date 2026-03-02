@@ -130,6 +130,13 @@ export function SingularityChat({ userId }: { userId?: string }) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    // Refs to track latest values inside event handlers (avoids stale closures)
+    const messagesRef = useRef<Message[]>(messages);
+    const sessionIdRef = useRef<string | null>(sessionId);
+    const userIdRef = useRef<string | undefined>(userId);
+    useEffect(() => { messagesRef.current = messages; }, [messages]);
+    useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
+    useEffect(() => { userIdRef.current = userId; }, [userId]);
 
     // Smooth auto-scroll
     useEffect(() => {
@@ -283,9 +290,8 @@ export function SingularityChat({ userId }: { userId?: string }) {
         setDeleteConfirmModal(null);
     };
 
-    // Auto-save messages after streaming completes (debounced)
-    const saveMessages = useCallback(async (msgs: Message[], sid: string | null) => {
-        if (!sid || !userId) return;
+    // Save messages to DB — works both as regular fetch and via sendBeacon
+    const buildSavePayload = (msgs: Message[], sid: string) => {
         const persistable = msgs.filter(m => !m.isStreaming).map(m => ({
             role: m.role,
             content: m.content,
@@ -300,35 +306,66 @@ export function SingularityChat({ userId }: { userId?: string }) {
             })),
             timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
         }));
-        if (persistable.length === 0) return;
-
-        // Auto-title from first user message
+        if (persistable.length === 0) return null;
         const firstUser = persistable.find(m => m.role === 'user');
         const title = firstUser ? firstUser.content.slice(0, 60) : undefined;
+        return JSON.stringify({ sessionId: sid, messages: persistable, title });
+    };
 
+    const saveMessages = useCallback(async (msgs: Message[], sid: string | null) => {
+        if (!sid || !userId) return;
+        const payload = buildSavePayload(msgs, sid);
+        if (!payload) return;
         try {
             await fetch('/api/singularity/history', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionId: sid, messages: persistable, title }),
+                body: payload,
             });
         } catch (err) {
             console.error('Failed to save messages:', err);
         }
     }, [userId]);
 
-    // Trigger save whenever streaming finishes
+    // Trigger save immediately when streaming finishes (no debounce)
     useEffect(() => {
         const anyStreaming = messages.some(m => m.isStreaming);
         if (!anyStreaming && messages.length > 0 && sessionId) {
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-            saveTimeoutRef.current = setTimeout(() => {
-                saveMessages(messages, sessionId);
-                fetchSessions();
-            }, 500);
+            saveMessages(messages, sessionId);
+            // Refresh session list shortly after (non-blocking)
+            saveTimeoutRef.current = setTimeout(fetchSessions, 800);
         }
         return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
     }, [messages, sessionId]);
+
+    // ---- Emergency save on navigation / tab-close ----
+    // Uses sendBeacon (fire-and-forget, survives page unload)
+    useEffect(() => {
+        const emergencySave = () => {
+            const sid = sessionIdRef.current;
+            const uid = userIdRef.current;
+            const msgs = messagesRef.current;
+            if (!sid || !uid || msgs.length === 0) return;
+            const payload = buildSavePayload(msgs, sid);
+            if (!payload) return;
+            navigator.sendBeacon(
+                '/api/singularity/history',
+                new Blob([payload], { type: 'application/json' })
+            );
+        };
+
+        // visibilitychange fires when switching tabs or navigating in SPA
+        const onVisibility = () => { if (document.visibilityState === 'hidden') emergencySave(); };
+        document.addEventListener('visibilitychange', onVisibility);
+        window.addEventListener('beforeunload', emergencySave);
+
+        return () => {
+            document.removeEventListener('visibilitychange', onVisibility);
+            window.removeEventListener('beforeunload', emergencySave);
+        };
+    }, []); // empty deps — refs always have latest values
+
 
     // ===================== CHECKPOINT UNDO =====================
 

@@ -96,24 +96,33 @@ export async function POST(req: NextRequest) {
             if (!isLive) {
                 // Non-live model: single response with context (no tool calling)
                 const { generateContent } = await import("@/lib/ai-provider");
-                let result = await generateContent(aiConfig, fullPrompt, systemInstruction);
-
-                // --- Short-response fallback ---
-                if (isTooShort(result)) {
-                    console.log('[Singularity Agent] Response too short, checking if complete...');
-                    const continuation = await checkAndContinue(generateContent, aiConfig, systemInstruction, fullPrompt, result);
-                    if (continuation) {
-                        console.log('[Singularity Agent] Appending continuation.');
-                        result = result + '\n\n' + continuation;
-                    } else {
-                        console.log('[Singularity Agent] AI confirmed answer was complete.');
-                    }
-                }
-
+                const result = await generateContent(aiConfig, fullPrompt, systemInstruction);
                 const encoder = new TextEncoder();
+
+                // Stream initial response immediately so user sees it right away.
+                // Fallback check (if needed) runs AFTER that — done is sent only when fully complete.
                 const stream = new ReadableStream({
-                    start(controller) {
+                    async start(controller) {
+                        // 1. Send initial response immediately — user sees it now
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response', text: result })}\n\n`));
+
+                        // 2. Short-response fallback — runs after initial text is visible
+                        if (isTooShort(result)) {
+                            console.log('[Singularity Agent] Response too short, checking if complete...');
+                            try {
+                                const continuation = await checkAndContinue(generateContent, aiConfig, systemInstruction, fullPrompt, result);
+                                if (continuation) {
+                                    console.log('[Singularity Agent] Appending continuation.');
+                                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response', text: '\n\n' + continuation })}\n\n`));
+                                } else {
+                                    console.log('[Singularity Agent] AI confirmed answer was complete.');
+                                }
+                            } catch (err) {
+                                console.error('[Singularity Agent] Fallback check failed:', err);
+                            }
+                        }
+
+                        // 3. Signal completion — unlocks the input box
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
                         controller.close();
                     }
@@ -351,24 +360,32 @@ export async function POST(req: NextRequest) {
         if (!isLive) {
             // Non-live model: single response, no streaming
             const { generateContent } = await import("@/lib/ai-provider");
-            let result = await generateContent(aiConfig, fullPrompt);
-
-            // --- Short-response fallback ---
-            if (isTooShort(result)) {
-                console.log('[Singularity Chat] Response too short, checking if complete...');
-                const continuation = await checkAndContinue(generateContent, aiConfig, '', fullPrompt, result);
-                if (continuation) {
-                    console.log('[Singularity Chat] Appending continuation.');
-                    result = result + '\n\n' + continuation;
-                } else {
-                    console.log('[Singularity Chat] AI confirmed answer was complete.');
-                }
-            }
-
+            const result = await generateContent(aiConfig, fullPrompt);
             const encoder = new TextEncoder();
+
+            // Stream initial response immediately, fallback check runs inside stream before done
             const stream = new ReadableStream({
-                start(controller) {
+                async start(controller) {
+                    // 1. Send initial response right away
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response', text: result })}\n\n`));
+
+                    // 2. Short-response fallback check
+                    if (isTooShort(result)) {
+                        console.log('[Singularity Chat] Response too short, checking if complete...');
+                        try {
+                            const continuation = await checkAndContinue(generateContent, aiConfig, '', fullPrompt, result);
+                            if (continuation) {
+                                console.log('[Singularity Chat] Appending continuation.');
+                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response', text: '\n\n' + continuation })}\n\n`));
+                            } else {
+                                console.log('[Singularity Chat] AI confirmed answer was complete.');
+                            }
+                        } catch (err) {
+                            console.error('[Singularity Chat] Fallback check failed:', err);
+                        }
+                    }
+
+                    // 3. Done
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
                     controller.close();
                 }
