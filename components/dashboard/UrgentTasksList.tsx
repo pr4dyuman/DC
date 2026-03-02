@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useInView } from "react-intersection-observer";
@@ -24,21 +24,29 @@ export function UrgentTasksList({ initialTasks }: UrgentTasksListProps) {
     const [hasMore, setHasMore] = useState(true);
     const [loading, setLoading] = useState(false);
     const { ref, inView } = useInView();
+    const loadingRef = useRef(false); // Guards against concurrent double-calls
 
     const loadMore = async () => {
-        if (loading || !hasMore) return;
+        if (loading || !hasMore || loadingRef.current) return;
+        loadingRef.current = true;
         setLoading(true);
         try {
             const newTasks = await getHighPriorityTasks(offset, 5);
             if (newTasks.length < 5) {
                 setHasMore(false);
             }
-            setTasks((prev) => [...prev, ...newTasks]);
-            setOffset((prev) => prev + 5);
+            // Deduplicate by id to guard against double-calls in StrictMode / Turbopack
+            setTasks((prev) => {
+                const existingIds = new Set(prev.map((t) => t.id));
+                const unique = newTasks.filter((t: Task) => !existingIds.has(t.id));
+                return [...prev, ...unique];
+            });
+            setOffset((prev) => prev + newTasks.length);
         } catch (error) {
             console.error("Failed to load more urgent tasks", error);
         } finally {
             setLoading(false);
+            loadingRef.current = false;
         }
     };
 
