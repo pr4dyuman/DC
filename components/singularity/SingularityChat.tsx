@@ -605,6 +605,10 @@ export function SingularityChat({ userId }: { userId?: string }) {
             setExpandedThinking(prev => new Set(prev).add(msgId));
         }
 
+        // Hoisted above try so finally block can access them for sendBeacon save
+        let accumContent = '';
+        let accumThinking = '';
+
         try {
             const history = messages
                 .filter(m => !m.isStreaming)
@@ -659,11 +663,13 @@ export function SingularityChat({ userId }: { userId?: string }) {
                             const data = JSON.parse(line.slice(6));
 
                             if (data.type === 'thinking') {
+                                accumThinking += data.text;
                                 setStreamingPhase('thinking');
                                 setMessages(prev => prev.map(m =>
                                     m.id === msgId ? { ...m, thinking: (m.thinking || '') + data.text } : m
                                 ));
                             } else if (data.type === 'response') {
+                                accumContent += data.text;
                                 setStreamingPhase('responding');
                                 setMessages(prev => prev.map(m =>
                                     m.id === msgId ? { ...m, content: (m.content || '') + data.text } : m
@@ -720,6 +726,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                         try {
                             const data = JSON.parse(line.slice(6));
                             if (data.type === 'response') {
+                                accumContent += data.text;
                                 setMessages(prev => prev.map(m =>
                                     m.id === msgId ? { ...m, content: (m.content || '') + data.text } : m
                                 ));
@@ -751,6 +758,41 @@ export function SingularityChat({ userId }: { userId?: string }) {
             setIsLoading(false);
             setStreamingPhase('idle');
             inputRef.current?.focus();
+
+            // --- Guaranteed save via sendBeacon (survives ANY navigation type) ---
+            // This uses locally tracked content, NOT React state, so timing is irrelevant.
+            if (currentSessionId) {
+                const prevMsgs = messages.filter(m => !m.isStreaming).map(m => ({
+                    role: m.role,
+                    content: m.content,
+                    thinking: m.thinking,
+                    images: m.images,
+                    timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
+                }));
+                const toSave = [
+                    ...prevMsgs,
+                    {
+                        role: 'user' as const,
+                        content: msg,
+                        images: currentAttachments.filter(a => a.fileType === 'image').map(a => a.preview),
+                        timestamp: userMsg.timestamp.toISOString(),
+                    },
+                    ...(accumContent ? [{
+                        role: 'model' as const,
+                        content: accumContent,
+                        thinking: accumThinking || undefined,
+                        timestamp: new Date().toISOString(),
+                    }] : []),
+                ];
+                if (toSave.length > 0) {
+                    const title = msg.slice(0, 60);
+                    const beaconPayload = JSON.stringify({ sessionId: currentSessionId, messages: toSave, title });
+                    navigator.sendBeacon(
+                        '/api/singularity/history',
+                        new Blob([beaconPayload], { type: 'application/json' })
+                    );
+                }
+            }
 
             // Save checkpoint if there were tool actions with rollback data
             if (pendingRollbackRef.current.length > 0) {
