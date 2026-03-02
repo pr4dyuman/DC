@@ -8,6 +8,8 @@ import { ClientNotificationsList } from "./ClientNotificationsList";
 import { ClientFinancialOverview } from "./ClientFinancialOverview";
 import { ClientTaskOverview } from "./ClientTaskOverview";
 import { ClientAssetsSection } from "./ClientAssetsSection";
+import Link from "next/link";
+
 
 interface ClientDashboardProps {
     initialProjects: Project[];
@@ -31,11 +33,11 @@ interface ClientDashboardProps {
     assets?: Asset[];
 }
 
-export function ClientDashboard({ 
-    initialProjects, 
-    initialNotifications, 
-    clientName, 
-    clientId, 
+export function ClientDashboard({
+    initialProjects,
+    initialNotifications,
+    clientName,
+    clientId,
     metrics,
     transactions = [],
     tasks = [],
@@ -45,6 +47,23 @@ export function ClientDashboard({
     const pendingAmount = invoices
         .filter(i => i.status === 'Pending' || i.status === 'Overdue')
         .reduce((sum, inv) => sum + inv.amount, 0);
+
+    // Next invoice due date
+    const pendingInvoices = invoices
+        .filter(i => i.status === 'Pending' || i.status === 'Overdue')
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const nextInvoiceDue = pendingInvoices[0]?.date
+        ? new Date(pendingInvoices[0].date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+        : null;
+
+    // Per-project progress
+    const projectProgress = initialProjects.map(p => {
+        const pTasks = tasks.filter(t => t.projectId === p.id);
+        const done = pTasks.filter(t => t.status === 'Done').length;
+        const total = pTasks.length;
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+        return { id: p.id, name: p.name, slug: (p as any).slug || p.id, pct, done, total };
+    }).filter(p => p.total > 0).slice(0, 3);
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -61,51 +80,62 @@ export function ClientDashboard({
 
             {/* Enhanced Quick Stats Grid */}
             <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
-                <Card className="hover:border-indigo-500/50 transition-colors">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Active Projects</CardTitle>
-                        <FolderKanban className="h-4 w-4 text-indigo-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{metrics.activeProjects}</div>
-                        <p className="text-xs text-muted-foreground">In progress</p>
-                    </CardContent>
-                </Card>
+                <Link href="/dashboard/projects" className="block">
+                    <Card className="hover:border-indigo-500/50 transition-colors cursor-pointer h-full">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Active Projects</CardTitle>
+                            <FolderKanban className="h-4 w-4 text-indigo-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{metrics.activeProjects}</div>
+                            <p className="text-xs text-muted-foreground">In progress</p>
+                        </CardContent>
+                    </Card>
+                </Link>
 
-                <Card className="hover:border-emerald-500/50 transition-colors">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{metrics.completedProjects}</div>
-                        <p className="text-xs text-muted-foreground">Projects done</p>
-                    </CardContent>
-                </Card>
+                <Link href="/dashboard/projects" className="block">
+                    <Card className="hover:border-emerald-500/50 transition-colors cursor-pointer h-full">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{metrics.completedProjects}</div>
+                            <p className="text-xs text-muted-foreground">Projects done</p>
+                        </CardContent>
+                    </Card>
+                </Link>
 
-                <Card className="hover:border-amber-500/50 transition-colors">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Pending Invoices</CardTitle>
-                        <CreditCard className="h-4 w-4 text-amber-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{metrics.pendingInvoicesCount}</div>
-                        <p className="text-xs text-muted-foreground">
-                            {metrics.totalDue > 0 ? `₹${metrics.totalDue.toLocaleString()}` : "All paid!"}
-                        </p>
-                    </CardContent>
-                </Card>
+                <Link href="/dashboard/finance?tab=invoices" className="block">
+                    <Card className="hover:border-amber-500/50 transition-colors cursor-pointer h-full">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Pending Invoices</CardTitle>
+                            <CreditCard className="h-4 w-4 text-amber-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{metrics.pendingInvoicesCount}</div>
+                            <p className="text-xs text-muted-foreground">
+                                {metrics.totalDue > 0 ? `₹${metrics.totalDue.toLocaleString()}` : "All paid!"}
+                            </p>
+                            {nextInvoiceDue && (
+                                <p className="text-xs text-amber-500 mt-1">Next due: {nextInvoiceDue}</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                </Link>
 
-                <Card className="hover:border-blue-500/50 transition-colors">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Spent</CardTitle>
-                        <Wallet className="h-4 w-4 text-blue-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">₹{metrics.totalSpent.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground">Payments made</p>
-                    </CardContent>
-                </Card>
+                <Link href="/dashboard/finance?tab=history" className="block">
+                    <Card className="hover:border-blue-500/50 transition-colors cursor-pointer h-full">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Total Spent</CardTitle>
+                            <Wallet className="h-4 w-4 text-blue-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">₹{metrics.totalSpent.toLocaleString()}</div>
+                            <p className="text-xs text-muted-foreground">Payments made</p>
+                        </CardContent>
+                    </Card>
+                </Link>
 
                 <Card className="hover:border-blue-500/50 transition-colors">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -118,6 +148,30 @@ export function ClientDashboard({
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Project Progress Bars */}
+            {projectProgress.length > 0 && (
+                <div className="rounded-lg border bg-card p-4 space-y-3">
+                    <p className="text-sm font-semibold text-muted-foreground">Project Progress</p>
+                    {projectProgress.map(p => (
+                        <Link key={p.id} href={`/dashboard/projects/${p.slug}`} className="block group">
+                            <div className="space-y-1">
+                                <div className="flex justify-between text-xs">
+                                    <span className="font-medium truncate group-hover:text-indigo-400 transition-colors">{p.name}</span>
+                                    <span className="text-muted-foreground ml-2 shrink-0">{p.done}/{p.total} tasks · {p.pct}%</span>
+                                </div>
+                                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                                    <div
+                                        className={`h-full rounded-full transition-all duration-500 ${p.pct === 100 ? 'bg-emerald-500' : p.pct >= 50 ? 'bg-indigo-500' : 'bg-amber-500'
+                                            }`}
+                                        style={{ width: `${p.pct}%` }}
+                                    />
+                                </div>
+                            </div>
+                        </Link>
+                    ))}
+                </div>
+            )}
 
             {/* Financial & Task Overview */}
             <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">

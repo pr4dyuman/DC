@@ -1,35 +1,39 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createTask, getServices, getUsers, enhanceTaskDescription, getCurrentUser } from "@/lib/actions";
+import { createTask, getServices, getUsers, getCurrentUser } from "@/lib/actions";
 import { AIChatBox } from "./AIChatBox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Loader2, Sparkles, Calendar } from "lucide-react";
+import { Plus, Loader2, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Task } from "@/lib/types";
+import { toast } from "sonner";
+import { DateTimeInput } from "@/components/ui/DateTimeInput";
+
+type TaskPriority = 'Low' | 'Medium' | 'High';
 
 interface CreateTaskModalProps {
     projectId: string;
     assigneeId?: string;
 }
 
+const PRIORITY_OPTIONS: TaskPriority[] = ["Low", "Medium", "High"];
+
 export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }: CreateTaskModalProps) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
-
     const [loading, setLoading] = useState(false);
-    const [aiProcessing, setAiProcessing] = useState(false);
     const [showChat, setShowChat] = useState(false);
-    const [currentUserId, setCurrentUserId] = useState("u1"); // Mock user ID for now, ideally passed via props or context
+    const [currentUserId, setCurrentUserId] = useState("");
 
-    // Form State
+    // Form state
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [dueDate, setDueDate] = useState("");
-    const [startDate, setStartDate] = useState("");
     const [assigneeId, setAssigneeId] = useState(defaultAssignee);
     const [category, setCategory] = useState("");
+    const [priority, setPriority] = useState<TaskPriority>("Medium");
 
-    // Data State
     const [users, setUsers] = useState<any[]>([]);
     const [services, setServices] = useState<any[]>([]);
 
@@ -39,130 +43,155 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                 setUsers(u);
                 setServices(s);
                 if (currentUser) setCurrentUserId(currentUser.id);
+                // Set defaults only if not already set
                 if (s.length > 0 && !category) setCategory(s[0].name);
                 if (u.length > 0 && !assigneeId) setAssigneeId(u[0].id);
             });
         }
     }, [open]);
 
-    const handleEnhance = (e: React.MouseEvent) => {
-        e.preventDefault();
-        setShowChat(!showChat);
+    const resetForm = () => {
+        setTitle("");
+        setDescription("");
+        setDueDate("");
+        setCategory("");
+        setPriority("Medium");
+        setShowChat(false);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        await createTask({
-            projectId,
-            title,
-            description,
-            status: "Todo",
-            assigneeId,
-            category,
-            dueDate: dueDate || new Date().toISOString()
-        });
-        setLoading(false);
-        setOpen(false);
-        // Reset form
-        setTitle("");
-        setDescription("");
-        setDueDate("");
-        router.refresh();
+        try {
+            await createTask({
+                projectId,
+                title,
+                description,
+                status: "Todo",
+                assigneeId,
+                category,
+                priority,
+                dueDate: dueDate || "",
+            });
+            toast.success("Task created");
+            setOpen(false);
+            resetForm();
+            router.refresh();
+        } catch {
+            toast.error("Failed to create task");
+        } finally {
+            setLoading(false);
+        }
     };
 
+    const inputCls = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
+    const labelCls = "text-sm font-medium text-foreground";
+
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
             <DialogTrigger asChild>
-                <button className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                <button className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 transition-colors">
                     <Plus className="mr-2 h-4 w-4" /> Add Task
                 </button>
             </DialogTrigger>
-            <DialogContent className={`transition-all duration-300 w-full max-w-[95vw] ${showChat ? "lg:max-w-[900px] sm:max-w-[500px]" : "sm:max-w-[500px]"}`}>
+            <DialogContent className={`transition-all duration-300 w-full max-w-[95vw] ${showChat ? "lg:max-w-[900px] sm:max-w-[500px]" : "sm:max-w-[520px]"}`}>
                 <DialogHeader>
                     <DialogTitle>Create New Task</DialogTitle>
                 </DialogHeader>
-                <div className="relative flex flex-col lg:flex-row h-[85vh] sm:h-[600px] lg:gap-6 overflow-hidden">
+                <div className="relative flex flex-col lg:flex-row h-[85vh] sm:h-[580px] lg:gap-6 overflow-hidden">
                     {/* Left Side: Form */}
                     <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto pr-1 no-scrollbar">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Task Title</label>
+                        {/* Title */}
+                        <div className="space-y-1.5">
+                            <label className={labelCls}>Task Title</label>
                             <input
                                 required
                                 value={title}
                                 onChange={e => setTitle(e.target.value)}
-                                placeholder="Task Name"
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                placeholder="Task name"
+                                className={inputCls}
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Category</label>
-                                <select
-                                    value={category}
-                                    onChange={e => setCategory(e.target.value)}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                >
-                                    <option value="" disabled>Select Category</option>
-                                    {services.map(s => (
-                                        <option key={s.id} value={s.name}>{s.name}</option>
-                                    ))}
+                        {/* Category + Assignee */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>Category</label>
+                                <select value={category} onChange={e => setCategory(e.target.value)} className={inputCls}>
+                                    <option value="">No Category</option>
+                                    {services.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                                 </select>
                             </div>
-
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Assign To</label>
-                                <select
-                                    value={assigneeId}
-                                    onChange={e => setAssigneeId(e.target.value)}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                >
-                                    <option value="" disabled>Select Employee</option>
-                                    {users.map(u => (
-                                        <option key={u.id} value={u.id}>
-                                            {u.name} ({u.jobTitle || u.role})
-                                        </option>
-                                    ))}
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>Assign To</label>
+                                <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)} className={inputCls}>
+                                    <option value="">Unassigned</option>
+                                    {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.jobTitle || u.role})</option>)}
                                 </select>
                             </div>
                         </div>
 
-                        <div className="space-y-2">
+                        {/* Priority */}
+                        <div className="space-y-1.5">
+                            <label className={labelCls}>Priority</label>
+                            <div className="flex gap-2">
+                                {PRIORITY_OPTIONS.map(p => (
+                                    <button
+                                        key={p}
+                                        type="button"
+                                        onClick={() => setPriority(p)}
+                                        className={`flex-1 h-9 rounded-md border text-xs font-semibold transition-all ${priority === p
+                                            ? p === 'High' ? 'bg-red-500/15 border-red-500/50 text-red-500'
+                                                : p === 'Medium' ? 'bg-amber-500/15 border-amber-500/50 text-amber-600'
+                                                    : 'bg-blue-500/15 border-blue-500/50 text-blue-500'
+                                            : 'border-input bg-background text-muted-foreground hover:bg-muted'
+                                            }`}
+                                    >
+                                        {p}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Description */}
+                        <div className="space-y-1.5">
                             <div className="flex items-center justify-between">
-                                <label className="text-sm font-medium">Description</label>
+                                <label className={labelCls}>Description</label>
                                 <button
-                                    onClick={handleEnhance}
-                                    type="button" // Prevent form submit
+                                    onClick={() => setShowChat(!showChat)}
+                                    type="button"
                                     disabled={!title}
                                     className={`text-xs flex items-center gap-1.5 px-2 py-1 rounded-md transition-all font-medium border ${showChat
-                                        ? "bg-indigo-50 text-indigo-700 border-indigo-200 ring-1 ring-indigo-200"
+                                        ? "bg-indigo-500/10 text-indigo-600 border-indigo-500/20 ring-1 ring-indigo-200"
                                         : "text-muted-foreground border-transparent hover:bg-muted"
                                         }`}
                                 >
-                                    <Sparkles className={`h-3 w-3 ${showChat ? "fill-indigo-300" : ""}`} />
+                                    <Sparkles className={`h-3 w-3 ${showChat ? "fill-indigo-400" : ""}`} />
                                     {showChat ? "Close Assistant" : "AI Assistant"}
                                 </button>
                             </div>
                             <textarea
                                 value={description}
                                 onChange={e => setDescription(e.target.value)}
-                                placeholder="Task details..."
-                                className="flex min-h-[200px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                placeholder="Task details, acceptance criteria..."
+                                className="flex min-h-[160px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                             />
                         </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Due Date & Time</label>
-                            <input
+                        <div className="space-y-1.5">
+                            <label className={labelCls}>Due Date &amp; Time <span className="text-muted-foreground font-normal">(optional)</span></label>
+                            <DateTimeInput
                                 type="datetime-local"
                                 value={dueDate}
                                 onChange={e => setDueDate(e.target.value)}
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm [&::-webkit-calendar-picker-indicator]:filter-[invert(82%)_sepia(38%)_saturate(1324%)_hue-rotate(358deg)_brightness(103%)_contrast(106%)] cursor-pointer"
                             />
                         </div>
 
-                        <button disabled={loading} type="submit" className="w-full inline-flex items-center justify-center rounded-md text-sm font-medium bg-indigo-600 text-white h-10 px-4 hover:bg-indigo-700 mt-4">
+                        <button
+                            disabled={loading}
+                            type="submit"
+                            className="w-full inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium bg-primary text-primary-foreground h-10 px-4 hover:bg-primary/90 transition-colors mt-2"
+                        >
                             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create Task"}
                         </button>
                     </form>

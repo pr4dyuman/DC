@@ -148,12 +148,14 @@ export async function getDashboardMetrics() {
     const agencyFilter = agency ? { agencyId: agency.id } : {};
 
     // Parallel fetch for dashboard data
-    const [transactions, pendingInvoicesList, activeProjectsCount, projects, tasks] = await Promise.all([
+    const [transactions, pendingInvoicesList, activeProjectsCount, projects, tasks, allUsers, pendingLeaves] = await Promise.all([
         TransactionModel.find(agencyFilter).lean(),
         InvoiceModel.find({ ...agencyFilter, status: { $in: ['Pending', 'Overdue', 'Processing'] } }).lean(),
         ProjectModel.countDocuments({ ...agencyFilter, status: 'Active' }),
         ProjectModel.find({ ...agencyFilter, status: 'Active' }).select('id').lean(),
-        TaskModel.find(agencyFilter).select('status priority projectId').lean()
+        TaskModel.find(agencyFilter).select('status priority projectId assigneeId').lean(),
+        UserModel.find(agencyFilter).select('id role').lean(),
+        LeaveRequestModel.countDocuments({ ...agencyFilter, status: 'Pending' })
     ]);
 
     // 1. Revenue & Growth
@@ -210,10 +212,14 @@ export async function getDashboardMetrics() {
     );
     const highPriorityCount = highPriorityTaskProjects.size;
 
-    // 4. Team Utilization
+    // 4. Team Members Assigned (replaces abstract utilization %)
+    const activeTasks = tasks.filter(t => t.status === 'In Progress');
     const totalTasks = tasks.length;
-    const activeTasks = tasks.filter(t => t.status === 'In Progress').length;
-    const utilization = totalTasks > 0 ? Math.round((activeTasks / totalTasks) * 100) : 0;
+    const utilization = totalTasks > 0 ? Math.round((activeTasks.length / totalTasks) * 100) : 0;
+    const teamMembersList = allUsers.filter((u: any) => u.role !== 'client');
+    const totalMembers = teamMembersList.length;
+    const assignedMemberIds = new Set(activeTasks.map((t: any) => t.assigneeId).filter(Boolean));
+    const assignedMembers = [...assignedMemberIds].filter(id => teamMembersList.some((u: any) => u.id === id)).length;
 
     return {
         revenue: totalRevenue,
@@ -223,7 +229,10 @@ export async function getDashboardMetrics() {
         activeProjects: activeProjectsCount,
         highPriorityCount,
         utilization,
-        activeTasksCount: activeTasks
+        activeTasksCount: activeTasks.length,
+        assignedMembers,
+        totalMembers,
+        pendingLeaveCount: pendingLeaves
     };
 }
 
@@ -308,7 +317,15 @@ export async function getUrgentTasks(limit = 5) {
         .sort({ dueDate: 1 })
         .limit(limit)
         .lean();
-    return tasks.map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' }));
+    const sanitized = tasks.map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' }));
+    const projectIds = [...new Set(sanitized.map((t: any) => t.projectId))];
+    const projs = await ProjectModel.find({ id: { $in: projectIds } }).select('id name slug').lean();
+    const projMap = new Map(projs.map((p: any) => [p.id, { name: p.name, slug: p.slug || p.id }]));
+    return sanitized.map((t: any) => ({
+        ...t,
+        projectName: projMap.get(t.projectId)?.name ?? 'Unknown Project',
+        projectSlug: projMap.get(t.projectId)?.slug ?? t.projectId,
+    }));
 }
 
 export async function getClientDashboardData(clientId: string) {
@@ -383,15 +400,16 @@ export async function getEmployeeDashboardData(userId: string) {
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
-    const tasks = await TaskModel.find({ assigneeId: userId, ...agencyFilter }).lean();
-    const user = await UserModel.findOne({ id: userId, ...agencyFilter }).lean();
+    const [tasks, user, leaveRequests] = await Promise.all([
+        TaskModel.find({ assigneeId: userId, ...agencyFilter }).lean(),
+        UserModel.findOne({ id: userId, ...agencyFilter }).lean(),
+        LeaveRequestModel.find({ userId, ...agencyFilter }).sort({ createdAt: -1 }).limit(5).lean()
+    ]);
 
-    // Recent Activity
     const activities = user
         ? await ActivityModel.find({ user: (user as any).name, ...agencyFilter }).sort({ timestamp: -1 }).limit(5).lean()
         : [];
 
-    // Projects involved in
     const projectIds = [...new Set(tasks.map((t: any) => t.projectId))];
     const projects = await ProjectModel.find({ id: { $in: projectIds }, ...agencyFilter }).lean();
 
@@ -399,7 +417,8 @@ export async function getEmployeeDashboardData(userId: string) {
         tasks: tasks.map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' })),
         activities: activities.map(a => sanitizeDoc(a)),
         projects: projects.map(p => ({ ...sanitizeDoc(p), agencyId: p.agencyId || 'default-agency' })),
-        user: user ? sanitizeDoc(user) : null
+        user: user ? sanitizeDoc(user) : null,
+        leaveRequests: leaveRequests.map(l => sanitizeDoc(l))
     };
 }
 
@@ -1162,6 +1181,18 @@ export async function getTasks(projectId: string) {
     const tasks = await TaskModel.find({ projectId, agencyId: agency?.id }).lean();
     return tasks.map(sanitizeDoc);
 }
+
+/** Lightweight: fetch all tasks for every project in the agency (for list-page progress bars) */
+export async function getAllProjectTasks() {
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const tasks = await TaskModel.find(agencyFilter)
+        .select('projectId status assigneeId')
+        .lean();
+    return tasks.map(sanitizeDoc);
+}
+
 
 export async function getUserPermissions(userId: string): Promise<UserPermissions> {
     await connectDB();
@@ -2117,7 +2148,15 @@ export async function getHighPriorityTasks(offset = 0, limit = 5) {
     const agency = await getCurrentAgency();
     const tasks = await TaskModel.find({ agencyId: agency?.id, status: { $ne: 'Done' } })
         .sort({ dueDate: 1 }).skip(offset).limit(limit).lean();
-    return tasks.map(sanitizeDoc);
+    const sanitized = tasks.map(sanitizeDoc);
+    const projectIds = [...new Set(sanitized.map((t: any) => t.projectId))];
+    const projs = await ProjectModel.find({ id: { $in: projectIds } }).select('id name slug').lean();
+    const projMap = new Map(projs.map((p: any) => [p.id, { name: p.name, slug: p.slug || p.id }]));
+    return sanitized.map((t: any) => ({
+        ...t,
+        projectName: projMap.get(t.projectId)?.name ?? 'Unknown Project',
+        projectSlug: projMap.get(t.projectId)?.slug ?? t.projectId,
+    }));
 }
 
 export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "agencyId">) {

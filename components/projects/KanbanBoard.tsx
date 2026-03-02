@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import {
     DndContext,
     DragOverlay,
@@ -15,13 +15,21 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Task, UserPermissions } from "@/lib/types";
-import { updateTaskStatus } from "@/lib/actions"; // Server Action
+import { updateTaskStatus, updateTask } from "@/lib/actions";
 import { TaskCard } from "./TaskCard";
+import { toast } from "sonner";
 import { DroppableColumn } from "./DroppableColumn";
 import { ViewTaskModal } from "./ViewTaskModal";
 import { EditTaskModal } from "./EditTaskModal";
 
 const COLUMNS = ["Todo", "In Progress", "Review", "Done"];
+
+const COLUMN_COLORS: Record<string, string> = {
+    "Todo": "text-muted-foreground",
+    "In Progress": "text-blue-500",
+    "Review": "text-yellow-500",
+    "Done": "text-emerald-500",
+};
 
 interface KanbanBoardProps {
     initialTasks: Task[];
@@ -39,22 +47,16 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
     const [mounted, setMounted] = useState(false);
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [activeTask, setActiveTask] = useState<Task | null>(null);
-    // const [selectedCategory, setSelectedCategory] = useState<string>("All"); // Lifted to parent
+    const [activeColumn, setActiveColumn] = useState(0); // mobile: which column tab is active
 
-    // Use IDs to track open modals so we always get the latest task data from 'tasks' state
     const [viewTaskId, setViewTaskId] = useState<string | null>(null);
     const [editTaskId, setEditTaskId] = useState<string | null>(null);
 
     const viewingTask = tasks.find(t => t.id === viewTaskId);
     const editingTask = tasks.find(t => t.id === editTaskId);
 
-    useEffect(() => {
-        setMounted(true);
-    }, []);
-
-    useEffect(() => {
-        setTasks(initialTasks);
-    }, [initialTasks]);
+    useEffect(() => { setMounted(true); }, []);
+    useEffect(() => { setTasks(initialTasks); }, [initialTasks]);
 
     const pointerSensor = useSensor(PointerSensor, {
         activationConstraint: { distance: 5 },
@@ -64,84 +66,62 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
         coordinateGetter: sortableKeyboardCoordinates,
         disabled: readOnly
     });
-
     const sensors = useSensors(pointerSensor, keyboardSensor);
 
     const handleDragStart = (event: DragStartEvent) => {
         if (readOnly) return;
-        // View Only Mode check
-        if (permissions && !permissions.canManageTasks && !permissions.canMarkDone) {
-            return; // Cannot drag anything
-        }
-
+        if (permissions && !permissions.canManageTasks && !permissions.canMarkDone) return;
         setActiveTask(event.active.data.current?.task);
     };
 
-    const handleDragOver = (event: DragOverEvent) => {
-        // Optional: Add logic for realtime reordering visual feedback if needed
-    };
+    const handleDragOver = (event: DragOverEvent) => { };
 
     const handleDragEnd = async (event: DragEndEvent) => {
         if (readOnly) return;
         const { active, over } = event;
-
         if (!over) return;
 
         const taskId = active.id as string;
         const overId = over.id as string;
 
-        // Determine New Status
         let newStatus = overId;
         if (!COLUMNS.includes(overId)) {
             const overTask = tasks.find(t => t.id === overId);
             if (overTask) newStatus = overTask.status;
         }
 
-        // --- PERMISSION CHECKS ---
         if (permissions) {
-            // 1. Moving to Done?
             if (newStatus === 'Done') {
                 if (!permissions.canMarkDone) {
-                    // Revert visual
                     setActiveTask(null);
-                    alert("You do not have permission to mark tasks as Done.");
+                    toast.error("You don't have permission to mark tasks as Done.");
                     return;
                 }
             } else {
-                // 2. Moving to/between other columns (Manage Tasks)
-                // If moving FROM Done to Todo? That counts as Manage Tasks (undoing done)
-                // If moving Todo -> In Progress? Manage Tasks.
                 if (!permissions.canManageTasks) {
                     setActiveTask(null);
-                    alert("You do not have permission to manage task status.");
+                    toast.error("You don't have permission to manage task status.");
                     return;
                 }
             }
         }
 
-        // Update Local State
-        setTasks((prev) =>
-            prev.map(t =>
-                t.id === taskId ? { ...t, status: newStatus as Task['status'] } : t
-            )
-        );
-
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus as Task['status'] } : t));
         setActiveTask(null);
 
-        // Persist to Server
         if (COLUMNS.includes(newStatus) || tasks.find(t => t.id === overId)) {
             try {
                 await updateTaskStatus(taskId, newStatus as Task['status']);
             } catch (e) {
-                // Revert optimistic update on error
-                setTasks(prev =>
-                    prev.map(t =>
-                        t.id === taskId ? { ...t, status: active.data.current?.task?.status } : t
-                    )
-                );
-                console.error("Move failed", e);
+                setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: active.data.current?.task?.status } : t));
+                toast.error("Failed to move task");
             }
         }
+    };
+
+    // Called from TaskCard for quick inline edits (priority / assignee)
+    const handleQuickEdit = (taskId: string, patch: Partial<Task>) => {
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...patch } : t));
     };
 
     const filteredTasks = selectedCategory === "All"
@@ -151,10 +131,7 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
     if (!mounted) {
         return (
             <div className="flex flex-col h-full">
-                <div className="mb-4 flex gap-2">
-                    <div className="h-9 w-24 bg-muted animate-pulse rounded"></div>
-                </div>
-                <div className="grid grid-cols-4 h-full gap-4 pb-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 h-full gap-4 pb-4">
                     {COLUMNS.map((col) => (
                         <div key={col} className="flex h-full min-w-0 w-full flex-col rounded-md bg-muted/50 p-4 border border-dashed">
                             <h3 className="font-semibold mb-3 text-sm text-foreground">{col}</h3>
@@ -162,12 +139,34 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                     ))}
                 </div>
             </div>
-        )
+        );
     }
 
     return (
-        <div className="flex flex-col h-full">
-            {/* Filter UI removed - handled by parent ProjectView */}
+        <div className="flex flex-col h-full gap-4">
+            {/* Mobile: column tab selector */}
+            <div className="flex md:hidden rounded-lg bg-muted p-1 gap-1">
+                {COLUMNS.map((col, i) => {
+                    const count = filteredTasks.filter(t => t.status === col).length;
+                    return (
+                        <button
+                            key={col}
+                            onClick={() => setActiveColumn(i)}
+                            className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-semibold transition-all ${activeColumn === i
+                                ? 'bg-background shadow-sm text-foreground'
+                                : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                        >
+                            <span className={activeColumn === i ? COLUMN_COLORS[col] : ''}>
+                                {col === "In Progress" ? "Progress" : col}
+                            </span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${activeColumn === i ? 'bg-primary/10 text-primary' : 'bg-muted-foreground/10'}`}>
+                                {count}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
 
             <DndContext
                 sensors={sensors}
@@ -176,7 +175,8 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
             >
-                <div className="grid grid-cols-4 h-full gap-4 pb-4">
+                {/* Desktop: all 4 columns */}
+                <div className="hidden md:grid grid-cols-4 h-full gap-4 pb-4">
                     {COLUMNS.map((col) => (
                         <DroppableColumn
                             key={col}
@@ -190,8 +190,27 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                             aiEnabled={aiEnabled}
                             readOnly={readOnly}
                             permissions={permissions}
+                            onQuickEdit={handleQuickEdit}
                         />
                     ))}
+                </div>
+
+                {/* Mobile: single active column */}
+                <div className="flex md:hidden h-full pb-4">
+                    <DroppableColumn
+                        key={COLUMNS[activeColumn]}
+                        id={COLUMNS[activeColumn]}
+                        title={COLUMNS[activeColumn]}
+                        tasks={filteredTasks.filter(t => t.status === COLUMNS[activeColumn])}
+                        users={users || []}
+                        onViewTask={(task) => setViewTaskId(task.id)}
+                        onEditTask={(task) => !readOnly && setEditTaskId(task.id)}
+                        currentUserId={currentUserId}
+                        aiEnabled={aiEnabled}
+                        readOnly={readOnly}
+                        permissions={permissions}
+                        onQuickEdit={handleQuickEdit}
+                    />
                 </div>
 
                 <DragOverlay>
@@ -204,6 +223,7 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                             aiEnabled={aiEnabled}
                             currentUserId={currentUserId}
                             permissions={permissions}
+                            onQuickEdit={() => { }}
                         />
                     ) : null}
                 </DragOverlay>
@@ -219,7 +239,6 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                         setViewTaskId(null);
                     }}
                     users={users}
-
                     readOnly={readOnly}
                     permissions={permissions}
                     currentUserId={currentUserId}

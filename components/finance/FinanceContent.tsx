@@ -33,6 +33,9 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
     let userId = typeof params.userId === 'string' ? params.userId : undefined;
     const category = typeof params.category === 'string' ? params.category : undefined;
     const memberId = typeof params.memberId === 'string' ? params.memberId : undefined;
+    const activeTab = typeof params.tab === 'string' && ['overview', 'transactions', 'invoices', 'payroll'].includes(params.tab)
+        ? params.tab
+        : 'overview';
 
     // Resolve username to userId if provided
     if (username && !userId) {
@@ -80,7 +83,7 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
                     </div>
                 </div>
 
-                <Tabs defaultValue="invoices" className="space-y-4">
+                <Tabs defaultValue={['invoices', 'history'].includes(activeTab) ? activeTab : 'invoices'} className="space-y-4">
                     <TabsList>
                         <TabsTrigger value="invoices">Invoices</TabsTrigger>
                         <TabsTrigger value="history">Payment History</TabsTrigger>
@@ -326,7 +329,7 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
                     )}
                 </div>
             ) : (
-                <Tabs defaultValue="overview" className="space-y-4">
+                <Tabs defaultValue={activeTab} className="space-y-4">
                     <TabsList>
                         <TabsTrigger value="overview">Overview</TabsTrigger>
                         <TabsTrigger value="transactions">Transactions</TabsTrigger>

@@ -15,10 +15,11 @@ interface DroppableColumnProps {
     currentUserId?: string;
     aiEnabled?: boolean;
     readOnly?: boolean;
-    permissions?: any; // Avoiding circular dependency/type import issues for now, or import UserPermissions
+    permissions?: any;
+    onQuickEdit?: (taskId: string, patch: Partial<Task>) => void;
 }
 
-export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTask, currentUserId, aiEnabled, readOnly, permissions }: DroppableColumnProps) {
+export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTask, currentUserId, aiEnabled, readOnly, permissions, onQuickEdit }: DroppableColumnProps) {
     const { setNodeRef } = useDroppable({ id });
 
     return (
@@ -32,7 +33,11 @@ export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTas
 
             <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                 <div className="flex-1 flex flex-col gap-2 min-h-[100px] overflow-y-auto no-scrollbar">
-                    {tasks.map((task) => (
+                    {tasks.length === 0 ? (
+                        <div className="flex-1 flex items-center justify-center rounded-md border border-dashed border-border/50 min-h-[80px]">
+                            <p className="text-xs text-muted-foreground/50 select-none">Drop tasks here</p>
+                        </div>
+                    ) : tasks.map((task) => (
                         <TaskCard
                             key={task.id}
                             task={task}
@@ -43,6 +48,7 @@ export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTas
                             aiEnabled={aiEnabled}
                             readOnly={readOnly}
                             permissions={permissions}
+                            onQuickEdit={onQuickEdit}
                         />
                     ))}
                 </div>
