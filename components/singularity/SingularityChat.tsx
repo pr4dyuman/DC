@@ -511,13 +511,13 @@ export function SingularityChat({ userId }: { userId?: string }) {
                     mimeType: 'application/pdf',
                     fileType: 'document',
                     fileName: file.name,
-                    textContent: `[PDF Document: ${file.name} Ã¢â‚¬â€ ${(file.size / 1024).toFixed(0)}KB. Content will be extracted by AI.]`,
+                    textContent: `[PDF Document: ${file.name} — ${(file.size / 1024).toFixed(0)}KB. Content will be extracted by AI.]`,
                 };
             } else {
                 // Text-based files: Read as text directly
                 textContent = await file.text();
                 if (textContent.length > 100000) {
-                    textContent = textContent.slice(0, 100000) + '\n\n[... truncated Ã¢â‚¬â€ document too large, showing first 100K characters ...]';
+                    textContent = textContent.slice(0, 100000) + '\n\n[... truncated — document too large, showing first 100K characters ...]';
                 }
             }
 
@@ -1106,7 +1106,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                             </div>
 
                             <p className="text-[10px] text-muted-foreground text-center">
-                                Ã¢Å¡Â Ã¯Â¸Â "Force Undo All" will discard changes you made after the AI created these items
+                                ⚠️ "Force Undo All" will discard changes you made after the AI created these items
                             </p>
                         </div>
                     </div>
@@ -1134,15 +1134,15 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                 <p className="text-xs text-foreground font-medium">What will happen:</p>
                                 <ul className="text-xs text-muted-foreground space-y-1">
                                     <li className="flex items-start gap-1.5">
-                                        <span className="text-cyan-500 mt-0.5">Ã¢â‚¬Â¢</span>
+                                        <span className="text-cyan-500 mt-0.5">•</span>
                                         Only <strong className="text-foreground">this response&apos;s</strong> database changes will be reversed
                                     </li>
                                     <li className="flex items-start gap-1.5">
-                                        <span className="text-cyan-500 mt-0.5">Ã¢â‚¬Â¢</span>
+                                        <span className="text-cyan-500 mt-0.5">•</span>
                                         Previous and later actions are <strong className="text-foreground">not affected</strong>
                                     </li>
                                     <li className="flex items-start gap-1.5">
-                                        <span className="text-cyan-500 mt-0.5">Ã¢â‚¬Â¢</span>
+                                        <span className="text-cyan-500 mt-0.5">•</span>
                                         Messages from this point will be removed from chat
                                     </li>
                                 </ul>
@@ -1204,13 +1204,13 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                 )}
                                 <ul className="text-xs text-muted-foreground space-y-1">
                                     <li className="flex items-start gap-1.5">
-                                        <span className="text-destructive mt-0.5">Ã¢â‚¬Â¢</span>
+                                        <span className="text-destructive mt-0.5">•</span>
                                         {deleteConfirmModal.type === 'delete'
                                             ? 'This chat and its undo checkpoints will be permanently deleted'
                                             : 'Messages and undo checkpoints will be cleared'}
                                     </li>
                                     <li className="flex items-start gap-1.5">
-                                        <span className="text-destructive mt-0.5">Ã¢â‚¬Â¢</span>
+                                        <span className="text-destructive mt-0.5">•</span>
                                         You will <strong className="text-foreground">no longer be able to undo</strong> any actions from this chat
                                     </li>
                                 </ul>
