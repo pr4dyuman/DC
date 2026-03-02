@@ -1718,20 +1718,25 @@ export async function getTransactions(projectId?: string, userId?: string, categ
         }
     }
 
-    let transactions = await TransactionModel.find(query).lean();
-
-    // userId filter: match by name in description (schema limitation)
+    // userId filter: use the userId DB field directly for reliable matching
     if (userId) {
-        const user = await UserModel.findOne({ id: userId, ...agencyFilter }).lean().then(u => u as any);
+        const user = await UserModel.findOne({ id: userId, ...agencyFilter }).lean() as any;
         if (user) {
             const lower = user.name.toLowerCase();
-            transactions = transactions.filter((t: any) =>
-                t.description?.toLowerCase().includes(lower) ||
-                (t.category === 'Salary' && t.description?.includes(user.name))
-            );
+            // Primary: filter by userId field (set for Salary, Freelancer, Reimbursement, Internal Transfer)
+            // Fallback: also include description matches for legacy/Investor transactions
+            const withUserId = await TransactionModel.find({ ...query, userId }).lean();
+            const withoutUserId = await TransactionModel.find({ ...query, $or: [{ userId: { $exists: false } }, { userId: null }, { userId: '' }] }).lean();
+            const descMatches = withoutUserId.filter((t: any) => t.description?.toLowerCase().includes(lower));
+            const seen = new Set(withUserId.map((t: any) => t.id));
+            const merged = [...withUserId, ...descMatches.filter((t: any) => !seen.has(t.id))];
+            return merged
+                .map(sanitizeDoc)
+                .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
         }
     }
 
+    const transactions = await TransactionModel.find(query).lean();
     return transactions
         .map(sanitizeDoc)
         .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -2175,7 +2180,11 @@ export async function getFinanceStats(projectId?: string, userId?: string, categ
 
     if (userId && userForFilter) {
         const name = (userForFilter as any).name.toLowerCase();
-        transactions = transactions.filter((t: any) => t.description?.toLowerCase().includes(name));
+        // Primary: match by userId DB field; fallback: description match for legacy transactions
+        transactions = transactions.filter((t: any) =>
+            t.userId === userId ||
+            (!t.userId && t.description?.toLowerCase().includes(name))
+        );
     }
 
     const totalRevenue = transactions.filter((t: any) => t.type === 'income' && t.status === 'completed').reduce((a: number, t: any) => a + t.amount, 0);
@@ -2204,9 +2213,10 @@ export async function getFinanceChartData(projectId?: string, userId?: string, c
         const user = await UserModel.findOne({ id: userId, ...agencyFilter }).lean() as any;
         if (user) {
             const lower = user.name.toLowerCase();
+            // Primary: match by userId DB field; fallback: description match for legacy transactions
             transactions = transactions.filter((t: any) =>
-                t.description?.toLowerCase().includes(lower) ||
-                (t.category === 'Salary' && t.description?.includes(user.name))
+                t.userId === userId ||
+                (!t.userId && t.description?.toLowerCase().includes(lower))
             );
         }
     }
@@ -2250,17 +2260,29 @@ export async function getPayrollStatus(userId?: string) {
     const userQuery: any = { role: { $ne: 'admin' }, ...agencyFilter };
     if (userId && userId !== 'all') userQuery.id = userId;
 
+    // Get current month boundaries for date-range matching
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    const currentMonth = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
     const [users, transactions] = await Promise.all([
         UserModel.find(userQuery).lean(),
-        TransactionModel.find({ category: 'Salary', type: 'expense', ...agencyFilter }).lean()
+        TransactionModel.find({
+            category: 'Salary',
+            type: 'expense',
+            date: { $gte: startOfMonth, $lte: endOfMonth },
+            ...agencyFilter
+        }).lean()
     ]);
-
-    const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
     return users.map((user: any) => {
         const salary = user.salary || 5000;
+        // Primary: match by userId DB field (set when salary transaction is created)
+        // Fallback: description match for legacy transactions without userId
         const isPaid = transactions.some((t: any) =>
-            t.description?.includes(currentMonth) && t.description?.includes(user.name)
+            t.userId === user.id ||
+            (!t.userId && t.description?.includes(user.name) && t.description?.includes(currentMonth))
         );
         return { user: sanitizeDoc(user), salary, status: isPaid ? 'Paid' : 'Pending', month: currentMonth };
     });

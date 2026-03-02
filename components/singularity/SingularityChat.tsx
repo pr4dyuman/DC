@@ -816,7 +816,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
 
     return (
         <div
-            className="flex flex-col h-screen relative bg-white dark:bg-black"
+            className="flex flex-col h-[100dvh] relative bg-white dark:bg-black"
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
@@ -1607,7 +1607,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                         </div>
 
                         {/* Bottom Input Area (when chatting) */}
-                        <div className="pb-4 sm:pb-5 pt-2 px-4 sm:px-8">
+                        <div className="sticky bottom-0 shrink-0 bg-white dark:bg-black pb-4 pb-safe sm:pb-5 pt-2 px-4 sm:px-8">
                             <div className="max-w-3xl mx-auto">
                                 {/* Attachment Previews */}
                                 {attachments.length > 0 && (
