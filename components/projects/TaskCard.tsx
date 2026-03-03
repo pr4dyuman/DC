@@ -123,7 +123,7 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
             <div ref={cardRef}>
                 <Card
                     onClick={() => onView(task)}
-                    className={`cursor-pointer bg-card border-border hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-md group relative overflow-hidden ${isHighlighted ? 'ring-2 ring-yellow-500 border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)]' : ''} ${isPending ? 'opacity-70' : ''}`}
+                    className={`cursor-pointer bg-card border-border hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-md group relative ${isHighlighted ? 'ring-2 ring-yellow-500 border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)]' : ''} ${isPending ? 'opacity-70' : ''}`}
                 >
                     {/* Header */}
                     <div className="p-4 flex items-start justify-between gap-3">

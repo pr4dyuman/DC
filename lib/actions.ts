@@ -2533,6 +2533,58 @@ export async function toggleAssetAI(assetId: string, enabled: boolean) {
 
 
 
+export interface ExtractedTaskFields {
+    title?: string;
+    description?: string;
+    category?: string;
+    priority?: 'Low' | 'Medium' | 'High';
+}
+
+/**
+ * Extract structured task fields from an AI response text.
+ * The AI parses the message and returns best-fit values for title, description, category, priority.
+ */
+export async function extractTaskFields(
+    aiResponseText: string,
+    availableCategories: string[],
+): Promise<ExtractedTaskFields> {
+    const aiConfig = await getAgencyAIConfig();
+    if (!aiConfig) throw new Error('Singularity is not configured.');
+
+    const systemInstruction = `You are a task field extractor. Given an AI-generated task description or discussion, extract structured fields for creating a project task.
+
+RULES:
+- "title": A short, actionable task title (max 10 words). If the text is a conversation, extract the core task.
+- "description": The full task description with details, acceptance criteria, steps, etc. Preserve formatting.
+- "category": Pick the BEST matching category from this list: [${availableCategories.join(', ')}]. If none match well, return empty string.
+- "priority": One of "Low", "Medium", "High". Infer from urgency/importance cues. Default to "Medium" if unclear.
+
+Return ONLY valid JSON. No markdown fences, no extra text. Example:
+{"title":"Implement user login","description":"Create a login page with...","category":"Web Development","priority":"High"}`;
+
+    const prompt = `Extract task fields from this AI response:\n\n${aiResponseText}`;
+
+    try {
+        const result = await generateContent(aiConfig, prompt, systemInstruction);
+        // Strip any markdown fences the model might add
+        const cleaned = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const parsed = JSON.parse(cleaned) as ExtractedTaskFields;
+        // Validate category against available list
+        if (parsed.category && !availableCategories.includes(parsed.category)) {
+            parsed.category = '';
+        }
+        // Validate priority
+        if (parsed.priority && !['Low', 'Medium', 'High'].includes(parsed.priority)) {
+            parsed.priority = 'Medium';
+        }
+        return parsed;
+    } catch (error: any) {
+        console.error('[extractTaskFields] Error:', error.message);
+        // Fallback: just use the full text as description
+        return { description: aiResponseText };
+    }
+}
+
 export async function explainTask(taskId: string, userId: string) {
     await connectDB();
     const agency = await getCurrentAgency();

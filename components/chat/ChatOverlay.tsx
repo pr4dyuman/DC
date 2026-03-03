@@ -2,16 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Message, Contact, getContacts, getMessages, sendMessage, markAsRead, deleteConversation } from "@/lib/chat";
-import { MessageBubble, ContactItem } from "./ChatComponents";
-import { X, Send, Search, Paperclip, MoreVertical, Smile, MessageCircle, Trash2 } from "lucide-react";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { MessagesList, ContactItem } from "./ChatComponents";
+import { X, Send, Search, Paperclip, MessageCircle, Trash2, ArrowLeft, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useActivePolling } from "@/hooks/use-active-polling";
+import { toast } from "sonner";
+import { format, isToday, isYesterday } from "date-fns";
 
 interface ChatOverlayProps {
     isOpen: boolean;
@@ -26,10 +22,9 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const [viewMode, setViewMode] = useState<'chats' | 'users'>('chats');
-    const [isLoadingContacts, setIsLoadingContacts] = useState(false);
-    const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [mobileView, setMobileView] = useState<'sidebar' | 'chat'>('sidebar');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Initial load and sync with props
@@ -43,6 +38,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
     useEffect(() => {
         if (isOpen && initialActiveId) {
             setActiveContactId(initialActiveId);
+            setMobileView('chat');
             setViewMode('chats');
         }
     }, [isOpen, initialActiveId]);
@@ -50,7 +46,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
     // Reset delete confirm when switching contacts
     useEffect(() => { setShowDeleteConfirm(false); }, [activeContactId]);
 
-    // Poll for contacts list every 2 minutes (optimized for performance)
+    // Poll for contacts list every 2 minutes
     useActivePolling(() => {
         loadContacts();
     }, 120000, isOpen && !!currentUserId);
@@ -59,12 +55,11 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
     useEffect(() => {
         if (currentUserId && activeContactId) {
             loadMessages();
-            // Mark as read
             markAsRead(currentUserId, activeContactId);
         }
     }, [currentUserId, activeContactId]);
 
-    // Poll messages every 10s (optimized for performance while maintaining responsiveness)
+    // Poll messages every 10s
     useActivePolling(() => {
         loadMessages();
     }, 10000, isOpen && !!currentUserId && !!activeContactId);
@@ -77,8 +72,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
     async function loadContacts() {
         if (!currentUserId) return;
         try {
-            const data = await getContacts(currentUserId);
-            setContacts(data);
+            setContacts(await getContacts(currentUserId));
         } catch (error) {
             console.error("Failed to load contacts", error);
         }
@@ -87,8 +81,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
     async function loadMessages() {
         if (!currentUserId || !activeContactId) return;
         try {
-            const data = await getMessages(currentUserId, activeContactId);
-            setMessages(data);
+            setMessages(await getMessages(currentUserId, activeContactId));
         } catch (error) {
             console.error("Failed to load messages", error);
         }
@@ -113,26 +106,35 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
 
         try {
             await sendMessage(currentUserId, activeContactId, optimisticMessage.content);
-            await loadMessages(); // Refresh to get real ID
-            await loadContacts(); // Update last message in list
+            await loadMessages();
+            await loadContacts();
         } catch (error) {
             console.error("Failed to send", error);
+            toast.error("Failed to send message");
         }
     }
 
     async function handleDeleteConversation(contactId?: string) {
         const targetId = contactId || activeContactId;
         if (!currentUserId || !targetId) return;
-        if (confirm("Are you sure you want to delete this conversation? This action cannot be undone.")) {
-            try {
-                await deleteConversation(currentUserId, targetId);
-                setMessages([]);
-                if (targetId === activeContactId) setActiveContactId(null);
-                await loadContacts();
-            } catch (error) {
-                console.error("Failed to delete conversation", error);
+        try {
+            await deleteConversation(currentUserId, targetId);
+            setMessages([]);
+            if (targetId === activeContactId) {
+                setActiveContactId(null);
+                setMobileView('sidebar');
             }
+            await loadContacts();
+            toast.success("Conversation deleted");
+        } catch (error) {
+            console.error("Failed to delete conversation", error);
+            toast.error("Failed to delete conversation");
         }
+    }
+
+    function selectContact(id: string) {
+        setActiveContactId(id);
+        setMobileView('chat');
     }
 
     const filteredContacts = searchQuery.trim()
@@ -149,17 +151,15 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                 style={{ backdropFilter: 'blur(20px)' }}
             >
                 {/* Sidebar / Contact List */}
-                <div className="w-full md:w-80 border-r border-border flex flex-col bg-secondary">
+                <div className={`w-full md:w-80 border-r border-border flex flex-col bg-secondary ${mobileView === 'chat' ? 'hidden md:flex' : 'flex'}`}>
                     <div className="p-4 border-b border-border flex justify-between items-center">
                         <h2 className="text-lg font-bold text-foreground">Messages</h2>
-                        {/* Mobile Close Button */}
                         <button onClick={onClose} className="md:hidden p-2 hover:bg-muted rounded-full text-muted-foreground">
                             <X className="w-5 h-5" />
                         </button>
                     </div>
 
                     <div className="p-4 pt-2 space-y-3">
-                        {/* Search */}
                         <div className="relative">
                             <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
                             <input
@@ -170,29 +170,20 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                                 className="w-full bg-secondary border border-border rounded-xl py-2 pl-9 pr-4 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground"
                             />
                         </div>
-
-                        {/* New Message Button */}
                         <button
                             onClick={() => setViewMode(viewMode === 'chats' ? 'users' : 'chats')}
                             className="w-full py-2 bg-muted hover:bg-accent text-foreground rounded-xl text-sm font-medium transition flex items-center justify-center border border-border"
                         >
                             {viewMode === 'chats' ? (
-                                <>
-                                    <MessageCircle className="w-4 h-4 mr-2" />
-                                    New Message
-                                </>
+                                <><MessageCircle className="w-4 h-4 mr-2" />New Message</>
                             ) : (
-                                <>
-                                    <X className="w-4 h-4 mr-2" />
-                                    Cancel Selection
-                                </>
+                                <><X className="w-4 h-4 mr-2" />Cancel Selection</>
                             )}
                         </button>
                     </div>
 
                     <div className="flex-1 overflow-y-auto px-2 space-y-1 custom-scrollbar">
                         {viewMode === 'chats' ? (
-                            // Show active chats only
                             filteredContacts.filter(c => c.lastMessage).length > 0 ? (
                                 filteredContacts
                                     .filter(c => c.lastMessage)
@@ -201,7 +192,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                                             key={contact.id}
                                             contact={contact}
                                             isActive={contact.id === activeContactId}
-                                            onClick={() => setActiveContactId(contact.id)}
+                                            onClick={() => selectContact(contact.id)}
                                             onDelete={async (contactId) => {
                                                 await handleDeleteConversation(contactId);
                                             }}
@@ -210,18 +201,17 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                             ) : (
                                 <div className="text-center py-8 text-muted-foreground text-sm">
                                     <p>No active chats.</p>
-                                    <p className="mt-1">Click "New Message" to start.</p>
+                                    <p className="mt-1">Click &quot;New Message&quot; to start.</p>
                                 </div>
                             )
                         ) : (
-                            // Show all users for selection
                             filteredContacts.map(contact => (
                                 <ContactItem
                                     key={contact.id}
                                     contact={contact}
                                     isActive={contact.id === activeContactId}
                                     onClick={() => {
-                                        setActiveContactId(contact.id);
+                                        selectContact(contact.id);
                                         setViewMode('chats');
                                     }}
                                 />
@@ -231,12 +221,19 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                 </div>
 
                 {/* Main Chat Area */}
-                <div className="flex-1 flex flex-col bg-background">
+                <div className={`flex-1 flex flex-col bg-background ${mobileView === 'sidebar' ? 'hidden md:flex' : 'flex'}`}>
                     {activeContact ? (
                         <>
                             {/* Chat Header */}
                             <div className="p-4 border-b border-border flex justify-between items-center bg-card/50 backdrop-blur-md">
                                 <div className="flex items-center">
+                                    {/* Mobile back button */}
+                                    <button
+                                        onClick={() => setMobileView('sidebar')}
+                                        className="md:hidden p-1.5 rounded-lg hover:bg-muted transition text-muted-foreground hover:text-foreground mr-2"
+                                    >
+                                        <ArrowLeft className="w-4 h-4" />
+                                    </button>
                                     <div className="relative">
                                         <img
                                             src={activeContact.avatar || "/placeholder-avatar.jpg"}
@@ -244,7 +241,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                                             className="w-10 h-10 rounded-full border border-border"
                                         />
                                         {activeContact.isOnline && (
-                                            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-[#09090b] shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                                            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
                                         )}
                                     </div>
                                     <div className="ml-3">
@@ -255,7 +252,11 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                                             ) : (
                                                 <span>
                                                     {activeContact.lastActiveAt
-                                                        ? `Last seen ${new Date(activeContact.lastActiveAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                                                        ? (isToday(new Date(activeContact.lastActiveAt))
+                                                            ? `Last seen ${format(new Date(activeContact.lastActiveAt), "HH:mm")}`
+                                                            : isYesterday(new Date(activeContact.lastActiveAt))
+                                                                ? `Last seen Yesterday ${format(new Date(activeContact.lastActiveAt), "HH:mm")}`
+                                                                : `Last seen ${format(new Date(activeContact.lastActiveAt), "d MMM HH:mm")}`)
                                                         : (activeContact.jobTitle || activeContact.role)}
                                                 </span>
                                             )}
@@ -295,22 +296,17 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                             </div>
 
                             {/* Messages */}
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-[url('/bg-pattern.svg')] lg:bg-none">
+                            <div className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
                                 {messages.length === 0 ? (
                                     <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50">
-                                        <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-4">
+                                        <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-4 border border-border">
                                             <Send className="w-8 h-8 text-muted-foreground" />
                                         </div>
-                                        <p>Start messaging with {activeContact.name}</p>
+                                        <p className="font-medium">Start messaging with {activeContact.name}</p>
+                                        <p className="text-xs mt-1">Send the first message to begin the conversation.</p>
                                     </div>
                                 ) : (
-                                    messages.map((msg, idx) => (
-                                        <MessageBubble
-                                            key={msg.id || idx}
-                                            message={msg}
-                                            isOwn={msg.senderId === currentUserId}
-                                        />
-                                    ))
+                                    <MessagesList messages={messages} currentUserId={currentUserId || ''} />
                                 )}
                                 <div ref={messagesEndRef} />
                             </div>
@@ -349,11 +345,12 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
-                            <div className="w-20 h-20 bg-secondary rounded-3xl flex items-center justify-center mb-6 shadow-2xl border border-border rotate-12">
-                                <Send className="w-10 h-10 text-primary" />
+                            <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mb-6 shadow-2xl border border-primary/20">
+                                <MessageSquare className="w-10 h-10 text-primary" />
                             </div>
                             <h2 className="text-2xl font-bold text-foreground mb-2">Agency Messenger</h2>
-                            <p className="max-w-md text-center text-muted-foreground">Select a contact from the list to start a rich messaging session. Secure, private, and premium.</p>
+                            <p className="max-w-md text-center text-muted-foreground">Select a contact from the list to start a conversation.</p>
+                            <p className="text-xs text-muted-foreground/60 mt-4">Secure &bull; Private &bull; Real-time</p>
                         </div>
                     )}
                 </div>

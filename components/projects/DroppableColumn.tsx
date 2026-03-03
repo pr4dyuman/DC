@@ -23,7 +23,7 @@ export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTas
     const { setNodeRef } = useDroppable({ id });
 
     return (
-        <div ref={setNodeRef} className="flex h-full min-w-0 w-full flex-col rounded-lg bg-muted/50 p-4 border border-border/50 overflow-hidden">
+        <div ref={setNodeRef} className="flex h-full min-w-0 w-full flex-col rounded-lg bg-muted/50 p-4 border border-border/50">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-sm uppercase text-muted-foreground">{title}</h3>
                 <span className="text-xs font-bold bg-background text-foreground px-2 py-0.5 rounded-full border">

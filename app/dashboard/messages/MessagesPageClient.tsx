@@ -3,10 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { Message, Contact, getContacts, getMessages, sendMessage, markAsRead, deleteConversation } from "@/lib/chat";
-import { MessageBubble, ContactItem } from "@/components/chat/ChatComponents";
-import { ArrowLeft, Send, Search, Paperclip, MessageCircle, X, Trash2 } from "lucide-react";
+import { MessagesList, ContactItem } from "@/components/chat/ChatComponents";
+import { ArrowLeft, Send, Search, Paperclip, MessageCircle, X, Trash2, MessageSquare } from "lucide-react";
 import { useActivePolling } from "@/hooks/use-active-polling";
 import { format, isToday, isYesterday } from "date-fns";
+import { toast } from "sonner";
 
 export function MessagesPageClient({ currentUserId }: { currentUserId: string }) {
     const router = useRouter();
@@ -17,6 +18,7 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
     const [viewMode, setViewMode] = useState<'chats' | 'users'>('chats');
     const [searchQuery, setSearchQuery] = useState("");
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [mobileView, setMobileView] = useState<'sidebar' | 'chat'>('sidebar');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => { if (currentUserId) loadContacts(); }, [currentUserId]);
@@ -46,19 +48,34 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
         const optimistic: Message = { id: "temp-" + Date.now(), senderId: currentUserId, receiverId: activeContactId, content: newMessage, timestamp: new Date().toISOString(), read: false, type: 'text', agencyId: 'optimistic' };
         setMessages(prev => [...prev, optimistic]);
         setNewMessage("");
-        try { await sendMessage(currentUserId, activeContactId, optimistic.content); await loadMessages(); await loadContacts(); } catch { }
+        try {
+            await sendMessage(currentUserId, activeContactId, optimistic.content);
+            await loadMessages();
+            await loadContacts();
+        } catch {
+            toast.error("Failed to send message");
+        }
     }
     async function handleDeleteConversation(contactId?: string) {
         const targetId = contactId || activeContactId;
         if (!currentUserId || !targetId) return;
-        if (confirm("Are you sure you want to delete this conversation? This action cannot be undone.")) {
-            try {
-                await deleteConversation(currentUserId, targetId);
-                setMessages([]);
-                if (targetId === activeContactId) setActiveContactId(null);
-                await loadContacts();
-            } catch { }
+        try {
+            await deleteConversation(currentUserId, targetId);
+            setMessages([]);
+            if (targetId === activeContactId) {
+                setActiveContactId(null);
+                setMobileView('sidebar');
+            }
+            await loadContacts();
+            toast.success("Conversation deleted");
+        } catch {
+            toast.error("Failed to delete conversation");
         }
+    }
+
+    function selectContact(id: string) {
+        setActiveContactId(id);
+        setMobileView('chat');
     }
 
     const filteredContacts = searchQuery.trim()
@@ -73,7 +90,7 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
                 style={{ backdropFilter: 'blur(20px)' }}
             >
                 {/* Sidebar / Contact List */}
-                <div className="w-full md:w-80 border-r border-border flex flex-col bg-secondary">
+                <div className={`w-full md:w-80 border-r border-border flex flex-col bg-secondary ${mobileView === 'chat' ? 'hidden md:flex' : 'flex'}`}>
                     <div className="p-4 border-b border-border flex justify-between items-center">
                         <div className="flex items-center gap-3">
                             <button
@@ -112,30 +129,37 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
                         {viewMode === 'chats' ? (
                             filteredContacts.filter(c => c.lastMessage).length > 0 ? (
                                 filteredContacts.filter(c => c.lastMessage).map(contact => (
-                                    <ContactItem key={contact.id} contact={contact} isActive={contact.id === activeContactId} onClick={() => setActiveContactId(contact.id)}
+                                    <ContactItem key={contact.id} contact={contact} isActive={contact.id === activeContactId} onClick={() => selectContact(contact.id)}
                                         onDelete={async (id) => { await handleDeleteConversation(id); }}
                                     />
                                 ))
                             ) : (
                                 <div className="text-center py-8 text-muted-foreground text-sm">
                                     <p>No active chats.</p>
-                                    <p className="mt-1">Click "New Message" to start.</p>
+                                    <p className="mt-1">Click &quot;New Message&quot; to start.</p>
                                 </div>
                             )
                         ) : (
                             filteredContacts.map(contact => (
-                                <ContactItem key={contact.id} contact={contact} isActive={contact.id === activeContactId} onClick={() => { setActiveContactId(contact.id); setViewMode('chats'); }} />
+                                <ContactItem key={contact.id} contact={contact} isActive={contact.id === activeContactId} onClick={() => { selectContact(contact.id); setViewMode('chats'); }} />
                             ))
                         )}
                     </div>
                 </div>
 
                 {/* Main Chat Area */}
-                <div className="flex-1 flex flex-col bg-background">
+                <div className={`flex-1 flex flex-col bg-background ${mobileView === 'sidebar' ? 'hidden md:flex' : 'flex'}`}>
                     {activeContact ? (
                         <>
                             <div className="p-4 border-b border-border flex justify-between items-center bg-card/50 backdrop-blur-md">
                                 <div className="flex items-center">
+                                    {/* Mobile back button */}
+                                    <button
+                                        onClick={() => setMobileView('sidebar')}
+                                        className="md:hidden p-1.5 rounded-lg hover:bg-muted transition text-muted-foreground hover:text-foreground mr-2"
+                                    >
+                                        <ArrowLeft className="w-4 h-4" />
+                                    </button>
                                     <div className="relative">
                                         <img src={activeContact.avatar || "/placeholder-avatar.jpg"} alt={activeContact.name} className="w-10 h-10 rounded-full border border-border" />
                                         {activeContact.isOnline && <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card shadow-[0_0_8px_rgba(34,197,94,0.6)]" />}
@@ -188,18 +212,17 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
                                 </div>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-[url('/bg-pattern.svg')] lg:bg-none">
+                            <div className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
                                 {messages.length === 0 ? (
                                     <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50">
-                                        <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-4">
+                                        <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-4 border border-border">
                                             <Send className="w-8 h-8 text-muted-foreground" />
                                         </div>
-                                        <p>Start messaging with {activeContact.name}</p>
+                                        <p className="font-medium">Start messaging with {activeContact.name}</p>
+                                        <p className="text-xs mt-1">Send the first message to begin the conversation.</p>
                                     </div>
                                 ) : (
-                                    messages.map((msg, idx) => (
-                                        <MessageBubble key={msg.id || idx} message={msg} isOwn={msg.senderId === currentUserId} />
-                                    ))
+                                    <MessagesList messages={messages} currentUserId={currentUserId} />
                                 )}
                                 <div ref={messagesEndRef} />
                             </div>
@@ -225,11 +248,12 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
                         </>
                     ) : (
                         <div className="h-full flex flex-col items-center justify-center text-muted-foreground relative">
-                            <div className="w-20 h-20 bg-secondary rounded-3xl flex items-center justify-center mb-6 shadow-2xl border border-border rotate-12">
-                                <Send className="w-10 h-10 text-primary" />
+                            <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mb-6 shadow-2xl border border-primary/20">
+                                <MessageSquare className="w-10 h-10 text-primary" />
                             </div>
                             <h2 className="text-2xl font-bold text-foreground mb-2">Agency Messenger</h2>
-                            <p className="max-w-md text-center text-muted-foreground">Select a contact from the list to start a rich messaging session. Secure, private, and premium.</p>
+                            <p className="max-w-md text-center text-muted-foreground">Select a contact from the list to start a conversation.</p>
+                            <p className="text-xs text-muted-foreground/60 mt-4">Secure &bull; Private &bull; Real-time</p>
                         </div>
                     )}
                 </div>

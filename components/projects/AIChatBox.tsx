@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, X, Sparkles, User, Bot, CornerDownLeft, ArrowRight, Check } from "lucide-react";
-import { chatWithTaskAI, createAISession, sendAIMessage, closeAISession } from "@/lib/actions";
-import type { ChatMessage } from "@/lib/actions";
+import { Send, X, Sparkles, User, Bot, CornerDownLeft, ArrowRight, Check, Loader2 } from "lucide-react";
+import { chatWithTaskAI, createAISession, sendAIMessage, closeAISession, extractTaskFields } from "@/lib/actions";
+import type { ChatMessage, ExtractedTaskFields } from "@/lib/actions";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface AIChatBoxProps {
     projectId: string;
@@ -13,17 +14,25 @@ interface AIChatBoxProps {
         description: string;
     };
     userId: string;
+    availableCategories?: string[];
     onClose: () => void;
-    onApply: (content: string) => void;
+    onApply: (fields: ExtractedTaskFields) => void;
 }
 
-export function AIChatBox({ projectId, taskState, userId, onClose, onApply }: AIChatBoxProps) {
+export function AIChatBox({ projectId, taskState, userId, availableCategories = [], onClose, onApply }: AIChatBoxProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [isConnecting, setIsConnecting] = useState(true);
+    const [applyingIdx, setApplyingIdx] = useState<number | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const sessionRef = useRef<string | null>(null);
+
+    // Keep ref in sync with state
+    useEffect(() => {
+        sessionRef.current = sessionId;
+    }, [sessionId]);
 
     // Auto-scroll to bottom
     useEffect(() => {
@@ -47,24 +56,22 @@ export function AIChatBox({ projectId, taskState, userId, onClose, onApply }: AI
                 if (mounted) {
                     setSessionId(id);
                     setIsConnecting(false);
-                    console.log('[AIChatBox] Session created:', id);
                 }
             } catch (error) {
                 console.error('[AIChatBox] Failed to create session:', error);
                 if (mounted) {
                     setIsConnecting(false);
-                    // Fall back to legacy mode
                     setSessionId('legacy');
                 }
             }
         };
         initSession();
 
-        // Close session on unmount
+        // Close session on unmount using ref for latest value
         return () => {
             mounted = false;
-            if (sessionId && sessionId !== 'legacy') {
-                closeAISession(sessionId).catch(() => { });
+            if (sessionRef.current && sessionRef.current !== 'legacy') {
+                closeAISession(sessionRef.current).catch(() => { });
             }
         };
     }, []); // Only on mount
@@ -109,6 +116,22 @@ export function AIChatBox({ projectId, taskState, userId, onClose, onApply }: AI
         }
     };
 
+    const handleApply = async (content: string, msgIdx: number) => {
+        setApplyingIdx(msgIdx);
+        try {
+            const fields = await extractTaskFields(content, availableCategories);
+            onApply(fields);
+            toast.success("Task fields applied from AI response");
+        } catch (error) {
+            console.error('[AIChatBox] Apply error:', error);
+            // Fallback: just use as description
+            onApply({ description: content });
+            toast.success("Applied as description (AI extraction unavailable)");
+        } finally {
+            setApplyingIdx(null);
+        }
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -142,8 +165,8 @@ export function AIChatBox({ projectId, taskState, userId, onClose, onApply }: AI
             >
                 {isConnecting && (
                     <div className="flex flex-col items-center justify-center h-full text-center p-4 text-muted-foreground space-y-3 opacity-80">
-                        <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center mb-2">
-                            <Sparkles className="w-6 h-6 text-indigo-600 animate-spin" />
+                        <div className="w-12 h-12 rounded-full bg-indigo-500/15 flex items-center justify-center mb-2">
+                            <Sparkles className="w-6 h-6 text-indigo-500 animate-spin" />
                         </div>
                         <p className="text-sm font-medium text-foreground">Connecting to Singularity...</p>
                     </div>
@@ -151,12 +174,12 @@ export function AIChatBox({ projectId, taskState, userId, onClose, onApply }: AI
 
                 {!isConnecting && messages.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-full text-center p-4 text-muted-foreground space-y-3 opacity-80">
-                        <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center mb-2">
-                            <Sparkles className="w-6 h-6 text-indigo-600" />
+                        <div className="w-12 h-12 rounded-full bg-indigo-500/15 flex items-center justify-center mb-2">
+                            <Sparkles className="w-6 h-6 text-indigo-500" />
                         </div>
                         <p className="text-sm font-medium text-foreground">How can I help with this task?</p>
                         <p className="text-xs max-w-[200px]">
-                            Try "Critique my draft", "Add acceptance criteria", or "Summarize the assets".
+                            Try &quot;Write a complete task for this&quot;, &quot;Add acceptance criteria&quot;, or &quot;Break this down into steps&quot;.
                         </p>
                     </div>
                 )}
@@ -188,11 +211,20 @@ export function AIChatBox({ projectId, taskState, userId, onClose, onApply }: AI
                             {msg.role === 'model' && (
                                 <div className="mt-3 pt-2 border-t border-border/10 flex justify-end opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                                     <button
-                                        onClick={() => onApply(msg.content)}
-                                        className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-md transition-colors"
-                                        title="Replace Description with this content"
+                                        onClick={() => handleApply(msg.content, idx)}
+                                        disabled={applyingIdx !== null}
+                                        className="flex items-center gap-1.5 text-xs font-medium text-emerald-500 hover:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-2.5 py-1.5 rounded-md transition-colors disabled:opacity-50"
+                                        title="AI will extract title, description, category, and priority from this response"
                                     >
-                                        <Check className="w-3 h-3" /> Apply to Task
+                                        {applyingIdx === idx ? (
+                                            <>
+                                                <Loader2 className="w-3 h-3 animate-spin" /> Extracting...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Sparkles className="w-3 h-3" /> Apply to Task
+                                            </>
+                                        )}
                                     </button>
                                 </div>
                             )}
@@ -202,8 +234,8 @@ export function AIChatBox({ projectId, taskState, userId, onClose, onApply }: AI
 
                 {isLoading && (
                     <div className="flex gap-3">
-                        <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                            <Bot className="w-4 h-4 text-emerald-700" />
+                        <div className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+                            <Bot className="w-4 h-4 text-emerald-500" />
                         </div>
                         <div className="bg-card border border-border/60 rounded-2xl rounded-bl-none p-4 shadow-sm flex items-center gap-1.5">
                             <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
@@ -235,7 +267,7 @@ export function AIChatBox({ projectId, taskState, userId, onClose, onApply }: AI
                     </button>
                 </div>
                 <div className="text-center mt-2">
-                    <p className="text-[10px] text-muted-foreground">Singularity can help you write, format, and structure your task.</p>
+                    <p className="text-[10px] text-muted-foreground">Click &quot;Apply to Task&quot; on any response to auto-fill all task fields.</p>
                 </div>
             </div>
         </div>

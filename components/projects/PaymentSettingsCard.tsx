@@ -9,8 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateProjectPayment } from "@/lib/actions";
-import { Pencil, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Pencil, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { DateTimeInput } from "@/components/ui/DateTimeInput";
 
 interface PaymentSettingsCardProps {
     project: Project;
@@ -19,13 +21,10 @@ interface PaymentSettingsCardProps {
 export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
     const [editingConfig, setEditingConfig] = useState<ProjectServiceConfig | null>(null);
     const [loading, setLoading] = useState(false);
-
-    // Initial state for form when editing
     const [formConfig, setFormConfig] = useState<PaymentConfig | null>(null);
 
     const handleEdit = (config: ProjectServiceConfig) => {
         setEditingConfig(config);
-        // Ensure default payment config structure if missing
         setFormConfig(config.paymentConfig || {
             type: 'installment',
             paymentDetailsLater: false,
@@ -41,11 +40,13 @@ export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
         try {
             await updateProjectPayment(project.id, editingConfig.serviceId, {
                 ...formConfig,
-                paymentDetailsLater: false // Explicitly uncheck this since we are editing now
+                paymentDetailsLater: false
             });
+            toast.success(`Payment settings updated for ${editingConfig.name}`);
             setEditingConfig(null);
         } catch (error) {
             console.error("Failed to update payment", error);
+            toast.error("Failed to update payment settings");
         } finally {
             setLoading(false);
         }
@@ -73,16 +74,16 @@ export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
                                     <div className="flex items-center gap-2">
                                         <span className="font-semibold">{config.name}</span>
                                         {isPending ? (
-                                            <Badge variant="outline" className="text-amber-500 border-amber-200 bg-amber-50">Pending Setup</Badge>
+                                            <Badge variant="outline" className="text-amber-500 border-amber-500/30 bg-amber-500/10">Pending Setup</Badge>
                                         ) : (
-                                            <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
+                                            <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10">
                                                 {config.paymentConfig?.type === 'installment' ? 'Installments' : 'Monthly'}
                                             </Badge>
                                         )}
                                     </div>
                                     <div className="text-sm text-muted-foreground">
                                         {isPending ? (
-                                            <span className="flex items-center text-amber-600 text-xs">
+                                            <span className="flex items-center text-amber-500 text-xs">
                                                 <AlertCircle className="w-3 h-3 mr-1" />
                                                 Payment details need to be configured.
                                             </span>
@@ -162,7 +163,7 @@ export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
                                         </div>
                                         <div className="space-y-1 col-span-2">
                                             <Label className="text-xs">First Payment Date</Label>
-                                            <Input
+                                            <DateTimeInput
                                                 type="date"
                                                 value={formConfig.firstPaymentDate || ''}
                                                 onChange={(e) => setFormConfig({ ...formConfig, firstPaymentDate: e.target.value })}
@@ -181,7 +182,7 @@ export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="text-xs">Billing Start Date</Label>
-                                            <Input
+                                            <DateTimeInput
                                                 type="date"
                                                 value={formConfig.billingStartDate || ''}
                                                 onChange={(e) => setFormConfig({ ...formConfig, billingStartDate: e.target.value })}
@@ -196,7 +197,7 @@ export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setEditingConfig(null)}>Cancel</Button>
                         <Button onClick={handleSave} disabled={loading}>
-                            {loading ? "Saving..." : "Save Changes"}
+                            {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : "Save Changes"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

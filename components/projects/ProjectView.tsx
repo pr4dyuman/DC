@@ -8,8 +8,8 @@ import { ProjectSettingsModal } from "@/components/projects/ProjectSettingsModal
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ProjectFinanceSummary } from "@/components/finance/ProjectFinanceSummary";
-// import { TransactionList } from "@/components/finance/TransactionList";
-// import { AddTransactionModal } from "@/components/finance/AddTransactionModal";
+import { TransactionList } from "@/components/finance/TransactionList";
+import { AddTransactionModal } from "@/components/finance/AddTransactionModal";
 import { AssetList } from "@/components/projects/AssetList";
 import { AddAssetModal } from "@/components/projects/AddAssetModal";
 import { PaymentSettingsCard } from "@/components/projects/PaymentSettingsCard";
@@ -104,6 +104,9 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                                 )}
                             </div>
                         </TabsContent>
+                        <TabsContent value="finance" className="mt-0">
+                            {isAdmin && <AddTransactionModal projectId={project.id} projectName={project.name} users={users} />}
+                        </TabsContent>
                         <TabsContent value="assets" className="mt-0">
                             <AddAssetModal projectId={project.id} />
                         </TabsContent>
@@ -130,6 +133,11 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                     <TabsContent value="finance" className="flex-1 overflow-auto data-[state=inactive]:hidden text-left no-scrollbar">
                         <div className="container max-w-4xl py-6 space-y-6">
                             <ProjectFinanceSummary project={project} transactions={transactions} />
+                            <TransactionList
+                                transactions={transactions.filter(t => t.projectId === project.id)}
+                                title="Project Transactions"
+                                isAdmin={true}
+                            />
                             <PaymentSettingsCard project={project} />
                         </div>
                     </TabsContent>

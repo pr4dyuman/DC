@@ -27,8 +27,14 @@ export function AIExplanationModal({ taskId, open, onOpenChange, userId }: AIExp
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (open && taskId && !explanation) {
+        if (open && taskId) {
+            // Always fetch fresh when opening
             handleExplain();
+        }
+        if (!open) {
+            // Reset on close so next open gets fresh data
+            setExplanation(null);
+            setError(null);
         }
     }, [open, taskId]);
 
@@ -64,7 +70,9 @@ export function AIExplanationModal({ taskId, open, onOpenChange, userId }: AIExp
                 <div className="mt-4">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-10 space-y-3">
-                            <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                            <div className="p-3 rounded-full bg-primary/10">
+                                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                            </div>
                             <p className="text-sm text-muted-foreground">Analyzing task context...</p>
                         </div>
                     ) : error ? (

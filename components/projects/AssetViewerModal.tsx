@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Asset } from "@/lib/types";
 import { updateProjectAsset } from "@/lib/actions";
 import { useRouter } from "next/navigation";
-import { PencilIcon, SaveIcon, XIcon } from "lucide-react";
+import { PencilIcon, SaveIcon } from "lucide-react";
+import { toast } from "sonner";
 
 interface AssetViewerModalProps {
     asset: Asset;
@@ -21,11 +22,6 @@ export function AssetViewerModal({ asset, open, onClose }: AssetViewerModalProps
     const [loading, setLoading] = useState(false);
     const router = useRouter();
 
-    const isInternalImage = asset.type === 'image' && !asset.url.startsWith('blob:') && !asset.url.startsWith('/uploads/');
-    const isTextFile = asset.type === 'file' || asset.type === 'code' || (asset.type === 'link' && false); // Links aren't editable content usually
-
-    // Simple check if it's an image we can display directly
-    // Ideally we'd check mime type or extension
     const canViewImage = asset.type === 'image';
     const canEditText = ['file', 'code'].includes(asset.type) && asset.content !== undefined;
 
@@ -34,10 +30,11 @@ export function AssetViewerModal({ asset, open, onClose }: AssetViewerModalProps
         try {
             await updateProjectAsset(asset.id, { content });
             setIsEditing(false);
+            toast.success("Changes saved");
             router.refresh();
         } catch (error) {
             console.error("Failed to update asset", error);
-            alert("Failed to save changes");
+            toast.error("Failed to save changes");
         } finally {
             setLoading(false);
         }
@@ -58,7 +55,7 @@ export function AssetViewerModal({ asset, open, onClose }: AssetViewerModalProps
                         {isEditing && (
                             <Button size="sm" onClick={handleSave} disabled={loading}>
                                 <SaveIcon className="w-4 h-4 mr-2" />
-                                Save
+                                {loading ? "Saving..." : "Save"}
                             </Button>
                         )}
                     </div>

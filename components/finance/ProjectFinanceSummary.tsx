@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Wallet, Target, CalendarClock, CreditCard } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, Target, CalendarClock, CreditCard, BarChart3, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Project, Transaction } from "@/lib/types";
@@ -11,7 +11,6 @@ interface ProjectFinanceSummaryProps {
 export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceSummaryProps) {
     if (!project || !transactions) return null;
 
-    // 1. Calculate Actuals (From Transactions)
     const projectTransactions = transactions.filter(t => t.projectId === project.id);
     const totalPaid = projectTransactions
         .filter(t => t.type === 'income' && t.category === 'Project')
@@ -24,7 +23,7 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
     const netProfit = totalPaid - totalExpenses;
     const profitMargin = totalPaid > 0 ? (netProfit / totalPaid) * 100 : 0;
 
-    // 2. Calculate Planned / Budget (From Service Configs)
+    // Budget from service configs
     let totalFixedBudget = 0;
     let totalMonthlyRate = 0;
 
@@ -41,22 +40,29 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
         });
     }
 
-    // 3. Logic for "Remaining" and "Credit"
-    // We assume payments first clear the Fixed Budget, then apply to Monthly.
-    const remainingFixedBalance = Math.max(0, totalFixedBudget - totalPaid);
-    const excessPayment = Math.max(0, totalPaid - totalFixedBudget);
+    // Fallback: use project.budget if no service configs
+    const displayBudget = totalFixedBudget > 0 ? totalFixedBudget : project.budget || 0;
 
-    // If only monthly exists (no fixed), then entire amount is "Excess" / Credit towards months
-    // If both exist, excess applies to monthly.
-
+    const remainingFixedBalance = Math.max(0, displayBudget - totalPaid);
+    const excessPayment = Math.max(0, totalPaid - displayBudget);
     const monthsCovered = totalMonthlyRate > 0 ? (excessPayment / totalMonthlyRate) : 0;
 
     // Visual Helpers
     const totalVolume = totalPaid + totalExpenses;
-    const incomePercent = totalVolume > 0 ? (totalPaid / totalVolume) * 100 : 0;
+    const incomePercent = totalVolume > 0 ? (totalPaid / totalVolume) * 100 : 50; // 50% neutral when no data
+    const budgetProgress = displayBudget > 0 ? Math.min(100, (totalPaid / displayBudget) * 100) : 0;
+    const hasData = totalVolume > 0;
 
-    // Progress for Fixed Budget
-    const budgetProgress = totalFixedBudget > 0 ? Math.min(100, (totalPaid / totalFixedBudget) * 100) : 0;
+    const formatter = new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 0
+    });
+
+    // Recent transactions (last 3)
+    const recentTxns = projectTransactions
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 3);
 
     return (
         <div className="space-y-6">
@@ -64,123 +70,199 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
                 <h3 className="text-xl font-semibold tracking-tight">
                     Financial Overview
                 </h3>
-                {totalMonthlyRate > 0 && (
-                    <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium border border-blue-200 dark:border-blue-900">
-                        <CalendarClock className="w-4 h-4" />
-                        <span>Recurring: ₹{totalMonthlyRate.toLocaleString()}/mo</span>
-                    </div>
-                )}
+                <div className="flex items-center gap-2">
+                    {totalMonthlyRate > 0 && (
+                        <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-400 rounded-full text-sm font-medium border border-blue-500/20">
+                            <CalendarClock className="w-4 h-4" />
+                            <span>Recurring: {formatter.format(totalMonthlyRate)}/mo</span>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-4">
-                {/* 1. Total Deal Value (Fixed) */}
-                <Card className="border-muted bg-muted/20">
+                {/* 1. Total Deal Value / Budget */}
+                <Card className="bg-gradient-to-br from-purple-500/10 to-purple-900/5 border-purple-500/20">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Fixed Deal Value</CardTitle>
-                        <Target className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm font-medium text-purple-400">Deal Value</CardTitle>
+                        <Target className="h-4 w-4 text-purple-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">
-                            {totalFixedBudget > 0 ? `₹${totalFixedBudget.toLocaleString('en-IN')}` : '—'}
+                        <div className="text-2xl font-bold text-purple-300">
+                            {displayBudget > 0 ? formatter.format(displayBudget) : 'Not Set'}
                         </div>
-                        <p className="text-xs text-muted-foreground">Total agreed fixed cost</p>
-                    </CardContent>
-                </Card>
-
-                {/* 2. Total Paid (Real Income) */}
-                <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/20 dark:to-green-900/10 border-green-200 dark:border-green-900">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-green-700 dark:text-green-400">Total Received</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-green-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-green-700 dark:text-green-300">
-                            ₹{totalPaid.toLocaleString('en-IN')}
-                        </div>
-                        <p className="text-xs text-green-600/80 dark:text-green-500/80">From client transactions</p>
-                    </CardContent>
-                </Card>
-
-                {/* 3. Remaining / Due */}
-                <Card className={`border-l-4 ${remainingFixedBalance > 0 ? 'border-amber-500' : 'border-emerald-500'}`}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Remaining Fixed</CardTitle>
-                        <CreditCard className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">
-                            {remainingFixedBalance > 0 ? `₹${remainingFixedBalance.toLocaleString('en-IN')}` : 'Paid'}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                            {remainingFixedBalance > 0
-                                ? `${(100 - budgetProgress).toFixed(0)}% of fixed budget pending`
-                                : 'Fixed budget fully paid'}
+                        <p className="text-xs text-purple-400/70 mt-1">
+                            {totalFixedBudget > 0 ? 'From service configs' : displayBudget > 0 ? 'Project budget' : 'Configure payment settings below'}
                         </p>
                     </CardContent>
                 </Card>
 
-                {/* 4. Net Value (Profit) */}
-                <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/20 dark:to-blue-900/10 border-blue-200 dark:border-blue-900">
+                {/* 2. Total Received */}
+                <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-900/5 border-emerald-500/20">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-400">Net Profit</CardTitle>
-                        <Wallet className="h-4 w-4 text-blue-600" />
+                        <CardTitle className="text-sm font-medium text-emerald-400">Total Received</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-emerald-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                            ₹{netProfit.toLocaleString('en-IN')}
+                        <div className="text-2xl font-bold text-emerald-300">
+                            {formatter.format(totalPaid)}
                         </div>
-                        <p className="text-xs text-blue-600/80 dark:text-blue-500/80">
-                            Margin: {profitMargin.toFixed(1)}%
+                        <p className="text-xs text-emerald-400/70 mt-1">
+                            {projectTransactions.filter(t => t.type === 'income').length} payment{projectTransactions.filter(t => t.type === 'income').length !== 1 ? 's' : ''} received
+                        </p>
+                    </CardContent>
+                </Card>
+
+                {/* 3. Remaining */}
+                <Card className={`bg-gradient-to-br ${remainingFixedBalance > 0 ? 'from-amber-500/10 to-amber-900/5 border-amber-500/20' : 'from-emerald-500/5 to-emerald-900/5 border-emerald-500/15'}`}>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className={`text-sm font-medium ${remainingFixedBalance > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>Remaining</CardTitle>
+                        <CreditCard className={`h-4 w-4 ${remainingFixedBalance > 0 ? 'text-amber-400' : 'text-emerald-400'}`} />
+                    </CardHeader>
+                    <CardContent>
+                        <div className={`text-2xl font-bold ${remainingFixedBalance > 0 ? 'text-amber-300' : 'text-emerald-300'}`}>
+                            {displayBudget > 0
+                                ? (remainingFixedBalance > 0 ? formatter.format(remainingFixedBalance) : '✓ Paid')
+                                : '—'
+                            }
+                        </div>
+                        <p className={`text-xs mt-1 ${remainingFixedBalance > 0 ? 'text-amber-400/70' : 'text-emerald-400/70'}`}>
+                            {displayBudget > 0
+                                ? (remainingFixedBalance > 0 ? `${(100 - budgetProgress).toFixed(0)}% pending` : 'Fully collected')
+                                : 'Set deal value first'
+                            }
+                        </p>
+                    </CardContent>
+                </Card>
+
+                {/* 4. Net Profit */}
+                <Card className={`bg-gradient-to-br ${netProfit >= 0 ? 'from-blue-500/10 to-blue-900/5 border-blue-500/20' : 'from-red-500/10 to-red-900/5 border-red-500/20'}`}>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className={`text-sm font-medium ${netProfit >= 0 ? 'text-blue-400' : 'text-red-400'}`}>Net Profit</CardTitle>
+                        <Wallet className={`h-4 w-4 ${netProfit >= 0 ? 'text-blue-400' : 'text-red-400'}`} />
+                    </CardHeader>
+                    <CardContent>
+                        <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-blue-300' : 'text-red-300'}`}>
+                            {formatter.format(netProfit)}
+                        </div>
+                        <p className={`text-xs mt-1 ${netProfit >= 0 ? 'text-blue-400/70' : 'text-red-400/70'}`}>
+                            {totalPaid > 0 ? `Margin: ${profitMargin.toFixed(1)}%` : 'No income yet'}
                         </p>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Monthly Coverage Notice if Applicable */}
+            {/* Monthly Coverage Notice */}
             {(totalMonthlyRate > 0 && excessPayment > 0) && (
-                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900 rounded-lg p-4 flex items-start gap-3">
-                    <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
-                        <CalendarClock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 flex items-start gap-3">
+                    <div className="p-2 bg-blue-500/20 rounded-full">
+                        <CalendarClock className="w-5 h-5 text-blue-400" />
                     </div>
                     <div>
-                        <h4 className="font-semibold text-blue-900 dark:text-blue-300">Monthly Coverage</h4>
-                        <p className="text-sm text-blue-700 dark:text-blue-400 mt-1">
-                            The excess payment of <strong>₹{excessPayment.toLocaleString()}</strong> (after clearing fixed budget) covers approximately <strong>{monthsCovered.toFixed(1)} months</strong> of service.
+                        <h4 className="font-semibold text-blue-300">Monthly Coverage</h4>
+                        <p className="text-sm text-blue-400 mt-1">
+                            Excess payment of <strong>{formatter.format(excessPayment)}</strong> covers approximately <strong>{monthsCovered.toFixed(1)} months</strong> of recurring services.
                         </p>
                     </div>
                 </div>
             )}
 
-            {/* Progress Bar for Fixed Budget */}
-            {totalFixedBudget > 0 && (
-                <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                        <span>Fixed Budget Progress</span>
-                        <span className="font-medium">{budgetProgress.toFixed(0)}%</span>
-                    </div>
-                    <Progress value={budgetProgress} className="h-2" />
-                </div>
+            {/* Budget Progress */}
+            {displayBudget > 0 && (
+                <Card className="border-border/50">
+                    <CardContent className="pt-6">
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium">Collection Progress</span>
+                                <span className="text-sm font-bold text-primary">{budgetProgress.toFixed(0)}%</span>
+                            </div>
+                            <Progress value={budgetProgress} className="h-2.5" />
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>Collected: {formatter.format(totalPaid)}</span>
+                                <span>Target: {formatter.format(displayBudget)}</span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
             )}
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-sm font-medium">Expenditure Ratio</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-2">
-                        <div className="h-4 w-full rounded-full bg-red-100 dark:bg-red-950/30 overflow-hidden flex">
-                            <div
-                                className="h-full bg-green-500 transition-all duration-500 ease-in-out"
-                                style={{ width: `${incomePercent}%` }}
-                            />
+            {/* Expenditure Ratio — only show when there's actual data */}
+            {hasData ? (
+                <Card className="border-border/50">
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center gap-2">
+                            <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                            <CardTitle className="text-sm font-medium">Income vs Expenses</CardTitle>
                         </div>
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>Income ({incomePercent.toFixed(0)}%)</span>
-                            <span>Expenses ({(100 - incomePercent).toFixed(0)}%)</span>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            <div className="h-5 w-full rounded-full bg-muted overflow-hidden flex">
+                                <div
+                                    className="h-full bg-emerald-500 transition-all duration-500 ease-in-out rounded-l-full"
+                                    style={{ width: `${incomePercent}%` }}
+                                />
+                                <div
+                                    className="h-full bg-red-500/80 transition-all duration-500 ease-in-out rounded-r-full"
+                                    style={{ width: `${100 - incomePercent}%` }}
+                                />
+                            </div>
+                            <div className="flex justify-between text-xs">
+                                <span className="flex items-center gap-1.5">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                                    <span className="text-muted-foreground">Income</span>
+                                    <span className="font-semibold text-emerald-400">{formatter.format(totalPaid)}</span>
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
+                                    <span className="text-muted-foreground">Expenses</span>
+                                    <span className="font-semibold text-red-400">{formatter.format(totalExpenses)}</span>
+                                </span>
+                            </div>
                         </div>
-                    </div>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+            ) : (
+                <Card className="border-dashed border-border/50">
+                    <CardContent className="py-8">
+                        <div className="text-center space-y-2">
+                            <BarChart3 className="w-8 h-8 text-muted-foreground/40 mx-auto" />
+                            <p className="text-sm text-muted-foreground">No transaction data yet</p>
+                            <p className="text-xs text-muted-foreground/60">Income vs expense breakdown will appear once transactions are recorded.</p>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Recent Activity mini-list */}
+            {recentTxns.length > 0 && (
+                <Card className="border-border/50">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium">Recent Activity</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {recentTxns.map(txn => (
+                            <div key={txn.id} className="flex items-center gap-3">
+                                <div className={`p-1.5 rounded-full ${txn.type === 'income' ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
+                                    {txn.type === 'income'
+                                        ? <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" />
+                                        : <ArrowDownRight className="w-3.5 h-3.5 text-red-400" />
+                                    }
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{txn.description}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {new Date(txn.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                    </p>
+                                </div>
+                                <span className={`text-sm font-semibold ${txn.type === 'income' ? 'text-emerald-400' : 'text-red-400'}`}>
+                                    {txn.type === 'income' ? '+' : '-'}{formatter.format(txn.amount)}
+                                </span>
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 }

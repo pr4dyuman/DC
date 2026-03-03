@@ -1,6 +1,6 @@
 import { Message, Contact } from "@/lib/chat";
 import { cn } from "@/lib/utils";
-import { format, isToday, isYesterday } from "date-fns";
+import { format, isToday, isYesterday, isSameDay } from "date-fns";
 import { Check, CheckCheck, User, Image as ImageIcon, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -25,7 +25,7 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
                         </div>
                     </div>
                 ) : (
-                    <p className="text-sm leading-relaxed">{message.content}</p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
                 )}
 
                 <div className="flex items-center justify-end mt-1 space-x-1 opacity-70">
@@ -43,7 +43,69 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
     );
 }
 
-// Format lastActiveAt smartly
+// ── Date Separator ──────────────────────────────────────────
+interface DateSeparatorProps {
+    date: Date;
+}
+
+export function DateSeparator({ date }: DateSeparatorProps) {
+    let label: string;
+    if (isToday(date)) {
+        label = "Today";
+    } else if (isYesterday(date)) {
+        label = "Yesterday";
+    } else {
+        label = format(date, "d MMMM yyyy");
+    }
+
+    return (
+        <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-[11px] font-medium text-muted-foreground bg-background px-3 py-1 rounded-full border border-border shadow-sm">
+                {label}
+            </span>
+            <div className="flex-1 h-px bg-border" />
+        </div>
+    );
+}
+
+// ── Messages List with Date Grouping ────────────────────────
+interface MessagesListProps {
+    messages: Message[];
+    currentUserId: string;
+}
+
+export function MessagesList({ messages, currentUserId }: MessagesListProps) {
+    let lastDate: string | null = null;
+
+    return (
+        <>
+            {messages.map((msg, idx) => {
+                const msgDate = new Date(msg.timestamp);
+                const dateKey = format(msgDate, "yyyy-MM-dd");
+                let showSeparator = false;
+
+                if (dateKey !== lastDate) {
+                    showSeparator = true;
+                    lastDate = dateKey;
+                }
+
+                return (
+                    <div key={msg.id || idx}>
+                        {showSeparator && <DateSeparator date={msgDate} />}
+                        <MessageBubble
+                            message={msg}
+                            isOwn={msg.senderId === currentUserId}
+                        />
+                    </div>
+                );
+            })}
+        </>
+    );
+}
+
+
+// ── Contact Item ────────────────────────────────────────────
 function formatPresence(lastActiveAt: string): string {
     const date = new Date(lastActiveAt);
     if (isToday(date)) return `Last seen ${format(date, "HH:mm")}`;
@@ -167,7 +229,7 @@ export function ContactItem({ contact, isActive, onClick, onDelete }: ContactIte
                             className="w-6 h-6 flex items-center justify-center bg-muted hover:bg-muted/80 text-foreground rounded-lg transition"
                             title="Cancel"
                         >
-                            <span className="text-sm leading-none">✕</span>
+                            <span className="text-sm leading-none">&times;</span>
                         </button>
                     </div>
                 ) : (
@@ -183,5 +245,3 @@ export function ContactItem({ contact, isActive, onClick, onDelete }: ContactIte
         </div>
     );
 }
-
-

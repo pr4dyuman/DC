@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createTask, getServices, getUsers, getCurrentUser } from "@/lib/actions";
+import type { ExtractedTaskFields } from "@/lib/actions";
 import { AIChatBox } from "./AIChatBox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Loader2, Sparkles } from "lucide-react";
@@ -100,7 +101,7 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                 </DialogHeader>
                 <div className="relative flex flex-col lg:flex-row h-[85vh] sm:h-[580px] lg:gap-6 overflow-hidden">
                     {/* Left Side: Form */}
-                    <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto pr-1 no-scrollbar">
+                    <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto px-1 no-scrollbar">
                         {/* Title */}
                         <div className="space-y-1.5">
                             <label className={labelCls}>Task Title</label>
@@ -202,8 +203,16 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                             projectId={projectId}
                             taskState={{ title, description }}
                             userId={currentUserId}
+                            availableCategories={services.map(s => s.name)}
                             onClose={() => setShowChat(false)}
-                            onApply={(text) => setDescription(text)}
+                            onApply={(fields: ExtractedTaskFields) => {
+                                if (fields.title) setTitle(fields.title);
+                                if (fields.description) setDescription(fields.description);
+                                if (fields.category && services.some(s => s.name === fields.category)) {
+                                    setCategory(fields.category);
+                                }
+                                if (fields.priority) setPriority(fields.priority);
+                            }}
                         />
                     )}
                 </div>

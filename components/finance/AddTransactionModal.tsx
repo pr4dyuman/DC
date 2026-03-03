@@ -7,17 +7,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createTransaction } from "@/lib/actions";
-import { Plus } from "lucide-react";
+import { Plus, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { TransactionCategory, TransactionType, User, Project, TRANSACTION_CATEGORIES } from "@/lib/types";
+import { toast } from "sonner";
+import { DateTimeInput } from "@/components/ui/DateTimeInput";
+
+// Categories shown when inside a specific project
+const PROJECT_SCOPED_CATEGORIES: TransactionCategory[] = ["Project", "Refund", "Freelancer", "Retainer"];
 
 interface AddTransactionModalProps {
-    projectId?: string; // Pre-selected project context if any
+    projectId?: string;
+    projectName?: string;
     users?: User[];
     projects?: Project[];
 }
 
-export function AddTransactionModal({ projectId, users = [], projects = [] }: AddTransactionModalProps) {
+export function AddTransactionModal({ projectId, projectName, users = [], projects = [] }: AddTransactionModalProps) {
+    const isProjectScoped = !!projectId;
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const router = useRouter();
@@ -62,31 +69,33 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
 
     const handleCategoryChange = (val: string) => {
         const cat = val as TransactionCategory;
-        if (cat === selectedCategory) return; // Prevent reset if same category is selected
+        if (cat === selectedCategory) return;
         setSelectedCategory(cat);
-        // Reset defaults based on category
+        // In project-scoped mode, always keep the projectId locked
+        const lockedProjectId = isProjectScoped ? projectId! : "";
         if (cat === "Salary") {
-            setFormData(prev => ({ ...prev, type: "expense", projectId: "", description: "" }));
+            setFormData(prev => ({ ...prev, type: "expense", projectId: lockedProjectId, description: "" }));
         } else if (cat === "Refund") {
             setFormData(prev => ({ ...prev, type: "expense", projectId: projectId || prev.projectId || "", description: "" }));
         } else if (cat === "Internal Transfer") {
-            setFormData(prev => ({ ...prev, type: "expense", projectId: "", transferDirection: "to_member", description: "" }));
+            setFormData(prev => ({ ...prev, type: "expense", projectId: lockedProjectId, transferDirection: "to_member", description: "" }));
         } else if (cat === "Investor") {
-            setFormData(prev => ({ ...prev, type: "income", projectId: "", description: "" }));
+            setFormData(prev => ({ ...prev, type: "income", projectId: lockedProjectId, description: "" }));
         } else if (cat === "Freelancer") {
-            setFormData(prev => ({ ...prev, type: "expense", projectId: "", description: "", memberId: "" }));
+            setFormData(prev => ({ ...prev, type: "expense", projectId: projectId || prev.projectId || "", description: "", memberId: "" }));
         } else if (cat === "Tax") {
-            setFormData(prev => ({ ...prev, type: "expense", projectId: "", description: "", taxType: "" }));
+            setFormData(prev => ({ ...prev, type: "expense", projectId: lockedProjectId, description: "", taxType: "" }));
         } else if (cat === "Reimbursement") {
-            setFormData(prev => ({ ...prev, type: "expense", projectId: "", description: "", memberId: "", expenseType: "" }));
+            setFormData(prev => ({ ...prev, type: "expense", projectId: lockedProjectId, description: "", memberId: "", expenseType: "" }));
         } else if (cat === "Retainer") {
-            setFormData(prev => ({ ...prev, type: "income", projectId: projectId || prev.projectId || "", description: "" }));
+            const autoDesc = isProjectScoped && projectName
+                ? `Monthly Retainer - ${projectName} - ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`
+                : "";
+            setFormData(prev => ({ ...prev, type: "income", projectId: projectId || prev.projectId || "", description: autoDesc }));
         } else if (cat === "Project") {
-            // Just to be safe: If switching TO Project, act like init.
             setFormData(prev => ({ ...prev, projectId: projectId || prev.projectId || "", description: "" }));
         } else {
-            // Generic Categories (Other)
-            setFormData(prev => ({ ...prev, type: "expense", projectId: "", description: "" }));
+            setFormData(prev => ({ ...prev, type: "expense", projectId: lockedProjectId, description: "" }));
         }
     };
 
@@ -223,6 +232,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                 taxType: formData.taxType ? formData.taxType as any : undefined,
                 expenseType: formData.expenseType ? formData.expenseType as any : undefined
             });
+            toast.success("Transaction created successfully");
             setOpen(false);
             // Reset form
             setFormData({
@@ -244,6 +254,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
             router.refresh();
         } catch (error) {
             console.error("Failed to create transaction", error);
+            toast.error("Failed to create transaction");
             setErrors(prev => ({ ...prev, global: "Failed to create transaction. Please try again." }));
         } finally {
             setLoading(false);
@@ -261,9 +272,14 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
             <DialogContent className="sm:max-w-[600px]">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
-                        <DialogTitle>Add Transaction</DialogTitle>
+                        <DialogTitle>
+                            {isProjectScoped ? `Add Transaction — ${projectName || 'Project'}` : 'Add Transaction'}
+                        </DialogTitle>
                         <DialogDescription>
-                            Create a new transaction record.
+                            {isProjectScoped
+                                ? 'Create a transaction for this project.'
+                                : 'Create a new transaction record.'
+                            }
                         </DialogDescription>
                     </DialogHeader>
 
@@ -276,7 +292,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                                     <SelectValue placeholder="Select Category" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {TRANSACTION_CATEGORIES.map(cat => (
+                                    {(isProjectScoped ? PROJECT_SCOPED_CATEGORIES : TRANSACTION_CATEGORIES).map(cat => (
                                         <SelectItem key={cat} value={cat}>
                                             {cat === 'Salary' ? 'Salary (Employee)' : cat}
                                         </SelectItem>
@@ -292,20 +308,27 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                             <>
                                 <div className="grid grid-cols-4 items-center gap-4">
                                     <Label className="text-right">Project</Label>
-                                    <Select
-                                        value={formData.projectId}
-                                        onValueChange={(val) => setFormData(prev => ({ ...prev, projectId: val }))}
-                                    >
-                                        <SelectTrigger className="col-span-3">
-                                            <SelectValue placeholder="Select Project" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="" disabled>Select Project</SelectItem>
-                                            {projects.map(p => (
-                                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    {isProjectScoped ? (
+                                        <div className="col-span-3 flex items-center gap-2 h-10 px-3 rounded-md border border-input bg-muted/50">
+                                            <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+                                            <span className="text-sm">{projectName || 'Current Project'}</span>
+                                        </div>
+                                    ) : (
+                                        <Select
+                                            value={formData.projectId}
+                                            onValueChange={(val) => setFormData(prev => ({ ...prev, projectId: val }))}
+                                        >
+                                            <SelectTrigger className="col-span-3">
+                                                <SelectValue placeholder="Select Project" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="" disabled>Select Project</SelectItem>
+                                                {projects.map(p => (
+                                                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    )}
                                     {errors.projectId && <p className="col-span-4 text-right text-xs text-red-500">{errors.projectId}</p>}
                                 </div>
                                 <div className="grid grid-cols-4 items-center gap-4">
@@ -352,20 +375,27 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                             <>
                                 <div className="grid grid-cols-4 items-center gap-4">
                                     <Label className="text-right">Project</Label>
-                                    <Select
-                                        value={formData.projectId}
-                                        onValueChange={(val) => setFormData(prev => ({ ...prev, projectId: val }))}
-                                    >
-                                        <SelectTrigger className="col-span-3">
-                                            <SelectValue placeholder="Select Project" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="" disabled>Select Project</SelectItem>
-                                            {projects.map(p => (
-                                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    {isProjectScoped ? (
+                                        <div className="col-span-3 flex items-center gap-2 h-10 px-3 rounded-md border border-input bg-muted/50">
+                                            <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+                                            <span className="text-sm">{projectName || 'Current Project'}</span>
+                                        </div>
+                                    ) : (
+                                        <Select
+                                            value={formData.projectId}
+                                            onValueChange={(val) => setFormData(prev => ({ ...prev, projectId: val }))}
+                                        >
+                                            <SelectTrigger className="col-span-3">
+                                                <SelectValue placeholder="Select Project" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="" disabled>Select Project</SelectItem>
+                                                {projects.map(p => (
+                                                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    )}
                                     {errors.projectId && <p className="col-span-4 text-right text-xs text-red-500">{errors.projectId}</p>}
                                 </div>
                                 <div className="grid grid-cols-4 items-center gap-4">
@@ -607,7 +637,7 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                                                     required
                                                 />
                                             </div>
-                                            {projects.length > 0 && (
+                                            {(projects.length > 0 && !isProjectScoped) && (
                                                 <div className="grid grid-cols-4 items-center gap-4">
                                                     <Label className="text-right">Project <span className="text-xs text-muted-foreground">(Optional)</span></Label>
                                                     <Select value={formData.projectId || "none"} onValueChange={(val) => setFormData(prev => ({ ...prev, projectId: val === "none" ? "" : val }))}>
@@ -621,6 +651,15 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                                                             ))}
                                                         </SelectContent>
                                                     </Select>
+                                                </div>
+                                            )}
+                                            {isProjectScoped && (
+                                                <div className="grid grid-cols-4 items-center gap-4">
+                                                    <Label className="text-right">Project</Label>
+                                                    <div className="col-span-3 flex items-center gap-2 h-10 px-3 rounded-md border border-input bg-muted/50">
+                                                        <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+                                                        <span className="text-sm">{projectName || 'Current Project'}</span>
+                                                    </div>
                                                 </div>
                                             )}
                                             <div className="grid grid-cols-4 items-center gap-4">
@@ -820,33 +859,40 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
                             <>
                                 <div className="grid grid-cols-4 items-center gap-4">
                                     <Label className="text-right">Project</Label>
-                                    <Select
-                                        value={formData.projectId || "none"}
-                                        onValueChange={(val) => {
-                                            if (val === "none") {
-                                                setFormData(prev => ({ ...prev, projectId: "", description: "" }));
-                                                return;
-                                            }
-                                            const project = projects.find(p => p.id === val);
-                                            if (project) {
-                                                setFormData(prev => ({
-                                                    ...prev,
-                                                    projectId: project.id,
-                                                    description: `Monthly Retainer - ${project.name} - ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`
-                                                }));
-                                            }
-                                        }}
-                                    >
-                                        <SelectTrigger className="col-span-3">
-                                            <SelectValue placeholder="Select Project" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="none">Select Project</SelectItem>
-                                            {projects.map(p => (
-                                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    {isProjectScoped ? (
+                                        <div className="col-span-3 flex items-center gap-2 h-10 px-3 rounded-md border border-input bg-muted/50">
+                                            <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+                                            <span className="text-sm">{projectName || 'Current Project'}</span>
+                                        </div>
+                                    ) : (
+                                        <Select
+                                            value={formData.projectId || "none"}
+                                            onValueChange={(val) => {
+                                                if (val === "none") {
+                                                    setFormData(prev => ({ ...prev, projectId: "", description: "" }));
+                                                    return;
+                                                }
+                                                const project = projects.find(p => p.id === val);
+                                                if (project) {
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        projectId: project.id,
+                                                        description: `Monthly Retainer - ${project.name} - ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`
+                                                    }));
+                                                }
+                                            }}
+                                        >
+                                            <SelectTrigger className="col-span-3">
+                                                <SelectValue placeholder="Select Project" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">Select Project</SelectItem>
+                                                {projects.map(p => (
+                                                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    )}
                                 </div>
                                 {formData.projectId && (
                                     <>
@@ -908,13 +954,14 @@ export function AddTransactionModal({ projectId, users = [], projects = [] }: Ad
 
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label className="text-right">Date</Label>
-                            <Input
-                                type="date"
-                                value={formData.date}
-                                onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-                                className="col-span-3"
-                                required
-                            />
+                            <div className="col-span-3">
+                                <DateTimeInput
+                                    type="date"
+                                    value={formData.date}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+                                    required
+                                />
+                            </div>
                         </div>
 
                         {/* Status Selection */}
