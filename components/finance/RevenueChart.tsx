@@ -36,9 +36,19 @@ export function RevenueChart({ data }: RevenueChartProps) {
                         />
                         <Tooltip
                             cursor={{ fill: 'transparent' }}
-                            contentStyle={{ backgroundColor: 'var(--card)', color: 'var(--card-foreground)', borderRadius: '8px', border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}
+                            contentStyle={{
+                                backgroundColor: 'hsl(var(--card))',
+                                color: 'hsl(var(--card-foreground))',
+                                borderRadius: '8px',
+                                border: '1px solid hsl(var(--border))',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                            }}
+                            labelStyle={{ color: 'hsl(var(--card-foreground))' }}
+                            itemStyle={{ color: 'hsl(var(--card-foreground))' }}
                         />
-                        <Legend />
+                        <Legend
+                            formatter={(value) => <span style={{ color: 'hsl(var(--foreground))' }}>{value}</span>}
+                        />
                         <Bar dataKey="income" fill="#34d399" radius={[4, 4, 0, 0]} name="Income" />
                         <Bar dataKey="expense" fill="#fb7185" radius={[4, 4, 0, 0]} name="Expense" />
                     </BarChart>
