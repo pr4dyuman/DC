@@ -17,9 +17,8 @@ import {
     Mail, Briefcase, Phone, MapPin, Calendar, IndianRupee,
     CheckCircle2, Clock, Activity as ActivityIcon, ArrowLeft,
     PieChart as PieChartIcon, Zap, Trash2, Pencil, MessageCircle,
-    Eye, ListTodo
+    Eye, ListTodo, FolderOpen, Search, ChevronDown, Filter
 } from "lucide-react";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getUser, getUserTasks, getUserActivity, getUserByUsername, getUserProjects, getSessionId, getClientProjects, getClientCreatedTasks, getProjectTasks, getLeaveRequests, getUserContributionHistory } from "@/lib/actions";
@@ -29,14 +28,14 @@ import { LeaveRequest } from "@/lib/types";
 import { LeaveRequestDialog } from "@/components/leave-request-dialog";
 import { LeaveRequestsList } from "@/components/leave-requests-list";
 import { ContributionHeatmap, DailyStats } from "@/components/team/ContributionHeatmap";
+import { cn } from "@/lib/utils";
 
 export default function EmployeeProfilePage({ params }: { params: Promise<{ username: string }> }) {
-    // Correctly unwrap params using React.use()
     const { username } = use(params);
 
     const [user, setUser] = useState<User | null>(null);
-    const [tasks, setTasks] = useState<Task[]>([]); // Tasks list assigned TO user
-    const [clientCreatedTasks, setClientCreatedTasks] = useState<Task[]>([]); // Tasks created BY user (Client)
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [clientCreatedTasks, setClientCreatedTasks] = useState<Task[]>([]);
     const [userProjects, setUserProjects] = useState<any[]>([]);
     const [activities, setActivities] = useState<Activity[]>([]);
     const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
@@ -44,6 +43,13 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
     const [contributionHistory, setContributionHistory] = useState<Activity[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+
+    // Task filtering
+    const [taskStatusFilter, setTaskStatusFilter] = useState<string>("all");
+    const [taskSearch, setTaskSearch] = useState("");
+
+    // Activity pagination
+    const [activityLimit, setActivityLimit] = useState(15);
 
     const availableYears = useMemo(() => {
         const years = new Set<number>();
@@ -74,7 +80,6 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
         };
 
         if (user?.role === 'client') {
-            // Client View: Heatmap based on TASKS CREATED (Assigned)
             clientCreatedTasks.forEach(task => {
                 if (task.createdAt) {
                     const dateStr = task.createdAt.split('T')[0];
@@ -83,15 +88,12 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                 }
             });
         } else {
-            // Employee View: Heatmap based on COMPLETED TASKS
-            // 1. Identify Valid Done Tasks (Current State)
             const currentDoneTitles = new Set(
                 tasks
                     .filter(t => t.status === 'Done')
                     .map(t => t.title.toLowerCase().trim())
             );
 
-            // 2. Map Tasks to LATEST Done Timestamp
             const taskCompletionTimes = new Map<string, string>();
 
             if (Array.isArray(contributionHistory)) {
@@ -99,7 +101,6 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                     const action = activity.action.toLowerCase();
                     const title = activity.target.toLowerCase().trim();
 
-                    // Only consider if task is CURRENTLY Done
                     if (currentDoneTitles.has(title)) {
                         if (action.includes('done') || action.includes('completed') || action.includes('fixed') || action.includes('finished')) {
                             const currentStored = taskCompletionTimes.get(title);
@@ -111,7 +112,6 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                 });
             }
 
-            // 3. Populate Heatmap with UNIQUE completions
             taskCompletionTimes.forEach((timestamp) => {
                 const dateStr = timestamp.split('T')[0];
                 const day = getDay(dateStr);
@@ -123,12 +123,10 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
     }, [contributionHistory, tasks, clientCreatedTasks, user]);
 
 
-    // Function to re-fetch data after edit
     const loadData = async () => {
         if (!username) return;
         setLoading(true);
         try {
-            // Who is looking?
             const currentSessionId = await getSessionId();
             if (currentSessionId) {
                 const currentUser = await getUser(currentSessionId);
@@ -137,24 +135,19 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                 }
             }
 
-            // Who are we looking at?
             const userData = await getUserByUsername(decodeURIComponent(username));
             if (userData) {
                 setUser(userData);
-
-                // Check self AFTER we have the user object
                 setIsSelf(currentSessionId === userData.id);
 
                 let userTasks: Task[] = [];
                 let projects: any[] = [];
 
                 if (userData.role === 'client') {
-                    // Fetch Client specific data
                     projects = await getClientProjects(userData.id);
                     const createdTasks = await getClientCreatedTasks(userData.id);
                     setClientCreatedTasks(createdTasks);
 
-                    // NEW: Fetch all tasks for these projects to populate stats
                     if (projects.length > 0) {
                         const projectIds = projects.map(p => p.id);
                         const allProjectTasks = await getProjectTasks(projectIds);
@@ -166,7 +159,6 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                     setLeaveRequests([]);
                     setContributionHistory([]);
                 } else {
-                    // Standard Employee Data
                     userTasks = await getUserTasks(userData.id);
                     setTasks(userTasks);
                     projects = await getUserProjects(userData.id);
@@ -174,7 +166,6 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                     const leaves = await getLeaveRequests(userData.id);
                     setLeaveRequests(leaves);
 
-                    // Calculate approved leave dates for heatmap
                     const approvedLeaves = leaves.filter(l => l.status === 'Approved');
                     const dates: string[] = [];
                     approvedLeaves.forEach(leave => {
@@ -229,7 +220,18 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
     const pendingTasks = tasks.filter(t => t.status !== 'Done').length;
     const efficiency = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 100;
 
+    // Filtered/sorted tasks
+    const filteredTasks = tasks.filter(t => {
+        const matchesStatus = taskStatusFilter === "all" ? true : t.status === taskStatusFilter;
+        const matchesSearch = taskSearch.trim()
+            ? t.title.toLowerCase().includes(taskSearch.toLowerCase()) || t.description?.toLowerCase().includes(taskSearch.toLowerCase())
+            : true;
+        return matchesStatus && matchesSearch;
+    });
 
+    // Paginated activities
+    const visibleActivities = activities.slice(0, activityLimit);
+    const hasMoreActivities = activities.length > activityLimit;
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-10">
@@ -240,18 +242,27 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                 </Link>
                 <h1 className="text-2xl font-bold">{user.role === 'client' ? 'Client Profile' : 'Team Member Profile'}</h1>
 
-                <div className="ml-auto">
+                <div className="ml-auto flex items-center gap-2">
+                    {!isSelf && (
+                        <button
+                            onClick={() => openChat(user.id)}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-muted hover:bg-accent text-foreground rounded-lg transition-all border border-border"
+                        >
+                            <MessageCircle className="h-4 w-4" />
+                            Message
+                        </button>
+                    )}
                     {(isSelf || currentUserRole === 'admin' || currentUserRole === 'manager') && (
                         <button
                             onClick={() => setIsEditDialogOpen(true)}
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-black bg-yellow-500 hover:bg-yellow-400 rounded-lg shadow-lg hover:shadow-yellow-500/20 transition-all"
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg shadow-lg transition-all"
                         >
                             <Pencil className="h-4 w-4" />
                             Edit Profile
                         </button>
                     )}
                     {isSelf && user.role !== 'client' && (
-                        <div className="ml-2 inline-block">
+                        <div className="ml-1">
                             <LeaveRequestDialog userId={user.id} />
                         </div>
                     )}
@@ -269,8 +280,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
 
             {/* Profile Header Card */}
             <div className="relative rounded-xl overflow-hidden bg-gradient-to-r from-secondary to-muted border border-border shadow-2xl">
-                {/* Background Pattern */}
-                <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_30%_20%,_var(--tw-gradient-stops))] from-yellow-500 via-transparent to-transparent"></div>
+                <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_30%_20%,_var(--tw-gradient-stops))] from-primary via-transparent to-transparent"></div>
 
                 <div className="relative p-8 md:p-10 flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
                     <Avatar className="h-32 w-32 border-4 border-border shadow-xl ring-2 ring-primary/20">
@@ -284,39 +294,28 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                         <div>
                             <h2 className="text-3xl font-bold text-foreground tracking-tight">{user.name}</h2>
                             {user.username && <p className="text-muted-foreground font-medium text-lg">@{user.username}</p>}
-                            <p className="text-yellow-500 font-medium text-lg mt-1 flex items-center justify-center md:justify-start gap-2">
+                            <p className="text-primary font-medium text-lg mt-1 flex items-center justify-center md:justify-start gap-2">
                                 <Briefcase className="h-4 w-4" />
                                 {user.jobTitle || "Team Member"}
-                                <span className="text-neutral-500">•</span>
+                                <span className="text-muted-foreground">•</span>
                                 <span className="capitalize text-muted-foreground">{user.role}</span>
-
-                                {!isSelf && (
-                                    <button
-                                        onClick={() => openChat(user.id)}
-                                        className="ml-2 bg-yellow-500 hover:bg-yellow-400 text-black p-1.5 rounded-full shadow-lg hover:shadow-yellow-500/20 transition-all flex items-center justify-center group"
-                                        title="Send Message"
-                                    >
-                                        <MessageCircle className="h-4 w-4 group-hover:scale-110 transition-transform" />
-                                    </button>
-                                )}
                             </p>
                         </div>
 
                         <div className="flex flex-wrap justify-center md:justify-start gap-3">
                             <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-accent px-3 py-1">
-                                <Mail className="mr-2 h-3 w-3 text-yellow-500" />
+                                <Mail className="mr-2 h-3 w-3 text-primary" />
                                 {user.email}
                             </Badge>
-                            {/* Salary Logic: Only Show if Self or Admin/Manager */}
                             {user.salary && user.salary > 0 && (isSelf || currentUserRole === 'admin' || currentUserRole === 'manager') && (
-                                <Badge variant="secondary" className="bg-muted text-green-400 hover:bg-accent px-3 py-1">
+                                <Badge variant="secondary" className="bg-muted text-green-500 hover:bg-accent px-3 py-1">
                                     <IndianRupee className="mr-2 h-3 w-3" />
                                     {user.salary.toLocaleString()}/mo
                                 </Badge>
                             )}
                             {user.createdAt && (
                                 <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-accent px-3 py-1">
-                                    <Calendar className="mr-2 h-3 w-3 text-yellow-500" />
+                                    <Calendar className="mr-2 h-3 w-3 text-primary" />
                                     Joined {new Date(user.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
                                 </Badge>
                             )}
@@ -330,7 +329,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                 <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Done</div>
                             </Card>
                             <Card className="bg-muted/50 border-border p-4 text-center">
-                                <div className="text-2xl font-bold text-yellow-500">{efficiency}%</div>
+                                <div className="text-2xl font-bold text-primary">{efficiency}%</div>
                                 <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
                                     {user.role === 'client' ? 'Progress' : 'Efficiency'}
                                 </div>
@@ -342,18 +341,21 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
 
             {/* Content Tabs */}
             <Tabs defaultValue="overview" className="space-y-6">
-                <TabsList className="w-full h-auto grid grid-cols-2 lg:grid-cols-4 gap-2 bg-secondary border border-border p-2 rounded-lg">
-                    <TabsTrigger value="overview" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black text-sm py-2">
+                <TabsList className="w-full h-auto grid grid-cols-2 lg:grid-cols-5 gap-2 bg-secondary border border-border p-2 rounded-lg">
+                    <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-sm py-2">
                         Overview
                     </TabsTrigger>
-                    <TabsTrigger value="tasks" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black text-sm py-2">
+                    <TabsTrigger value="tasks" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-sm py-2">
                         Tasks ({tasks.length})
                     </TabsTrigger>
-                    <TabsTrigger value="activity" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black text-sm py-2">
+                    <TabsTrigger value="projects" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-sm py-2">
+                        Projects ({userProjects.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="activity" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-sm py-2">
                         Activity
                     </TabsTrigger>
                     {user.role !== 'client' && (
-                        <TabsTrigger value="leaves" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-black text-sm py-2">
+                        <TabsTrigger value="leaves" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-sm py-2">
                             Leaves
                         </TabsTrigger>
                     )}
@@ -366,7 +368,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                         <Card className="col-span-1 md:col-span-2 bg-card border-border">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="flex items-center gap-2">
-                                    <ActivityIcon className="h-5 w-5 text-yellow-500" />
+                                    <ActivityIcon className="h-5 w-5 text-primary" />
                                     Contribution Activity
                                 </CardTitle>
                                 <Select
@@ -398,7 +400,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                         <Card className="bg-card border-border">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <Zap className="h-5 w-5 text-yellow-500" />
+                                    <Zap className="h-5 w-5 text-primary" />
                                     Quick Stats
                                 </CardTitle>
                             </CardHeader>
@@ -416,7 +418,6 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
 
                                 {/* Task Grid */}
                                 <div className="grid grid-cols-2 gap-3">
-                                    {/* Done */}
                                     <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-xl flex flex-col gap-2 hover:bg-green-500/20 transition-colors">
                                         <div className="flex justify-between items-start">
                                             <div className="p-1.5 bg-green-500/20 text-green-500 rounded-lg">
@@ -424,10 +425,9 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                             </div>
                                             <span className="text-2xl font-bold text-green-500">{tasks.filter(t => t.status === 'Done').length}</span>
                                         </div>
-                                        <span className="text-xs font-medium text-green-400/80 uppercase tracking-wider">Done</span>
+                                        <span className="text-xs font-medium text-green-500/80 uppercase tracking-wider">Done</span>
                                     </div>
 
-                                    {/* In Progress */}
                                     <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl flex flex-col gap-2 hover:bg-blue-500/20 transition-colors">
                                         <div className="flex justify-between items-start">
                                             <div className="p-1.5 bg-blue-500/20 text-blue-500 rounded-lg">
@@ -435,10 +435,9 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                             </div>
                                             <span className="text-2xl font-bold text-blue-500">{tasks.filter(t => t.status === 'In Progress').length}</span>
                                         </div>
-                                        <span className="text-xs font-medium text-blue-400/80 uppercase tracking-wider">In Progress</span>
+                                        <span className="text-xs font-medium text-blue-500/80 uppercase tracking-wider">In Progress</span>
                                     </div>
 
-                                    {/* Review */}
                                     <div className="bg-purple-500/10 border border-purple-500/20 p-4 rounded-xl flex flex-col gap-2 hover:bg-purple-500/20 transition-colors">
                                         <div className="flex justify-between items-start">
                                             <div className="p-1.5 bg-purple-500/20 text-purple-500 rounded-lg">
@@ -446,10 +445,9 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                             </div>
                                             <span className="text-2xl font-bold text-purple-500">{tasks.filter(t => t.status === 'Review').length}</span>
                                         </div>
-                                        <span className="text-xs font-medium text-purple-400/80 uppercase tracking-wider">Review</span>
+                                        <span className="text-xs font-medium text-purple-500/80 uppercase tracking-wider">Review</span>
                                     </div>
 
-                                    {/* Todo */}
                                     <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex flex-col gap-2 hover:bg-amber-500/20 transition-colors">
                                         <div className="flex justify-between items-start">
                                             <div className="p-1.5 bg-amber-500/20 text-amber-500 rounded-lg">
@@ -457,7 +455,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                             </div>
                                             <span className="text-2xl font-bold text-amber-500">{tasks.filter(t => t.status === 'Todo').length}</span>
                                         </div>
-                                        <span className="text-xs font-medium text-amber-400/80 uppercase tracking-wider">Todo</span>
+                                        <span className="text-xs font-medium text-amber-500/80 uppercase tracking-wider">Todo</span>
                                     </div>
                                 </div>
                             </CardContent>
@@ -469,21 +467,54 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                 <TabsContent value="tasks" className="animate-in slide-in-from-bottom-2 duration-300" >
                     <Card className="bg-card border-border">
                         <CardHeader>
-                            <CardTitle>Assigned Tasks</CardTitle>
-                            <CardDescription>Current workload and status</CardDescription>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div>
+                                    <CardTitle>Assigned Tasks</CardTitle>
+                                    <CardDescription>Current workload and status</CardDescription>
+                                </div>
+                                <div className="flex gap-2">
+                                    <div className="relative">
+                                        <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-muted-foreground" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search tasks..."
+                                            value={taskSearch}
+                                            onChange={(e) => setTaskSearch(e.target.value)}
+                                            className="bg-secondary border border-border rounded-lg py-1.5 pl-8 pr-3 text-xs w-40 focus:outline-none focus:ring-1 focus:ring-primary text-foreground placeholder:text-muted-foreground"
+                                        />
+                                    </div>
+                                    <select
+                                        value={taskStatusFilter}
+                                        onChange={(e) => setTaskStatusFilter(e.target.value)}
+                                        className="bg-secondary border border-border rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary text-foreground"
+                                    >
+                                        <option value="all">All Status</option>
+                                        <option value="Todo">Todo</option>
+                                        <option value="In Progress">In Progress</option>
+                                        <option value="Review">Review</option>
+                                        <option value="Done">Done</option>
+                                    </select>
+                                </div>
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
-                                {tasks.length === 0 ? (
-                                    <div className="text-center py-10 text-muted-foreground">No tasks assigned yet.</div>
+                                {filteredTasks.length === 0 ? (
+                                    <div className="text-center py-10 text-muted-foreground">
+                                        {taskSearch || taskStatusFilter !== "all"
+                                            ? "No tasks match your filters."
+                                            : "No tasks assigned yet."
+                                        }
+                                    </div>
                                 ) : (
-                                    tasks.map(task => (
+                                    filteredTasks.map(task => (
                                         <Link href={`/dashboard/projects/${task.projectId}?task=${task.id}`} key={task.id} className="block">
                                             <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg group hover:bg-muted transition-colors border border-border hover:border-muted-foreground/30">
                                                 <div className="flex items-start gap-4">
                                                     <div className={`mt-1 h-3 w-3 rounded-full ${task.status === 'Done' ? 'bg-green-500' :
                                                         task.status === 'In Progress' ? 'bg-blue-500' :
-                                                            'bg-muted-foreground/50'
+                                                            task.status === 'Review' ? 'bg-purple-500' :
+                                                                'bg-muted-foreground/50'
                                                         }`} />
                                                     <div>
                                                         <h4 className="font-medium text-foreground group-hover:text-primary transition-colors">{task.title}</h4>
@@ -501,15 +532,18 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="text-right">
-                                                    <span className={`text-xs font-semibold px-2 py-1 rounded-full ${task.status === 'Done' ? 'bg-green-900/30 text-green-400' :
-                                                        task.status === 'In Progress' ? 'bg-blue-900/30 text-blue-400' :
-                                                            'bg-muted text-muted-foreground'
-                                                        }`}>
+                                                <div className="text-right shrink-0 ml-4">
+                                                    <span className={cn(
+                                                        "text-xs font-semibold px-2 py-1 rounded-full",
+                                                        task.status === 'Done' ? 'bg-green-500/10 text-green-500' :
+                                                            task.status === 'In Progress' ? 'bg-blue-500/10 text-blue-500' :
+                                                                task.status === 'Review' ? 'bg-purple-500/10 text-purple-500' :
+                                                                    'bg-muted text-muted-foreground'
+                                                    )}>
                                                         {task.status}
                                                     </span>
                                                     {task.dueDate && (
-                                                        <div className="text-xs text-neutral-500 mt-2">
+                                                        <div className="text-xs text-muted-foreground mt-2">
                                                             Due {new Date(task.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                         </div>
                                                     )}
@@ -519,6 +553,60 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                     ))
                                 )}
                             </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* PROJECTS TAB */}
+                <TabsContent value="projects" className="animate-in slide-in-from-bottom-2 duration-300">
+                    <Card className="bg-card border-border">
+                        <CardHeader>
+                            <CardTitle>Projects</CardTitle>
+                            <CardDescription>Projects {user.role === 'client' ? 'owned by' : 'assigned to'} {user.name}</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {userProjects.length === 0 ? (
+                                <div className="text-center py-10 text-muted-foreground">
+                                    <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <FolderOpen className="w-6 h-6 text-muted-foreground" />
+                                    </div>
+                                    <p>No projects yet.</p>
+                                </div>
+                            ) : (
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    {userProjects.map((project: any) => (
+                                        <Link href={`/dashboard/projects/${project.id}`} key={project.id} className="block">
+                                            <div className="p-4 bg-muted/50 rounded-lg border border-border hover:border-primary/30 hover:bg-muted transition-all group cursor-pointer">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">{project.name}</h4>
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className={cn(
+                                                            "text-[10px] capitalize",
+                                                            project.status === 'Active' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                                                                project.status === 'Completed' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                                                                    'bg-muted text-muted-foreground border-border'
+                                                        )}
+                                                    >
+                                                        {project.status}
+                                                    </Badge>
+                                                </div>
+                                                {project.description && (
+                                                    <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
+                                                )}
+                                                <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
+                                                    {project.startDate && (
+                                                        <span className="flex items-center gap-1">
+                                                            <Calendar className="w-3 h-3" />
+                                                            {new Date(project.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    ))}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -535,32 +623,43 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                 {activities.length === 0 ? (
                                     <div className="text-center py-10 text-muted-foreground">No recent activity found.</div>
                                 ) : (
-                                    activities.map((activity, i) => (
-                                        <div key={activity.id || i} className="flex gap-4 relative">
-                                            {/* Timeline Line */}
-                                            {i !== activities.length - 1 && (
-                                                <div className="absolute left-2.5 top-8 bottom-[-24px] w-px bg-border"></div>
-                                            )}
+                                    <>
+                                        {visibleActivities.map((activity, i) => (
+                                            <div key={activity.id || i} className="flex gap-4 relative">
+                                                {i !== visibleActivities.length - 1 && (
+                                                    <div className="absolute left-2.5 top-8 bottom-[-24px] w-px bg-border"></div>
+                                                )}
 
-                                            <div className="h-5 w-5 rounded-full bg-muted border-2 border-primary z-10 flex-shrink-0 mt-1"></div>
+                                                <div className="h-5 w-5 rounded-full bg-muted border-2 border-primary z-10 flex-shrink-0 mt-1"></div>
 
-                                            <div className="flex-1 pb-1">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <p className="text-sm font-medium text-foreground">
-                                                            <span className="text-yellow-500">{activity.action}</span> {activity.target}
-                                                        </p>
-                                                        <p className="text-xs text-neutral-500 mt-1">
-                                                            {new Date(activity.timestamp).toLocaleString('en-IN', {
-                                                                dateStyle: 'medium',
-                                                                timeStyle: 'short'
-                                                            })}
-                                                        </p>
+                                                <div className="flex-1 pb-1">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <p className="text-sm font-medium text-foreground">
+                                                                <span className="text-primary">{activity.action}</span> {activity.target}
+                                                            </p>
+                                                            <p className="text-xs text-muted-foreground mt-1">
+                                                                {new Date(activity.timestamp).toLocaleString('en-IN', {
+                                                                    dateStyle: 'medium',
+                                                                    timeStyle: 'short'
+                                                                })}
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))
+                                        ))}
+
+                                        {hasMoreActivities && (
+                                            <button
+                                                onClick={() => setActivityLimit(prev => prev + 15)}
+                                                className="w-full py-2.5 text-sm font-medium text-primary hover:text-primary/80 bg-muted hover:bg-accent rounded-lg transition flex items-center justify-center gap-2 border border-border"
+                                            >
+                                                <ChevronDown className="w-4 h-4" />
+                                                Load More ({activities.length - activityLimit} remaining)
+                                            </button>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </CardContent>

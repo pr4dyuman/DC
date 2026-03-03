@@ -5,6 +5,7 @@ import { User } from "@/lib/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, Trash2, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 import { createUser, updateUser, deleteUser, adminResetPassword, getServices, approveDocumentUpdate } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { DocumentManager } from "./DocumentManager";
@@ -158,8 +159,9 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
             }
             if (onSuccess) onSuccess();
             onOpenChange(false);
+            toast.success(user ? "Profile updated successfully" : "Member created successfully");
         } catch (error: any) {
-            alert(error.message);
+            toast.error(error.message || "Something went wrong");
         } finally {
             setSubmitting(false);
         }
@@ -176,8 +178,9 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
 
             if (onSuccess) onSuccess();
             onOpenChange(false);
+            toast.success("User deleted successfully");
         } catch (error: any) {
-            alert(error.message);
+            toast.error(error.message || "Failed to delete user");
         } finally {
             setDeleting(false);
         }
