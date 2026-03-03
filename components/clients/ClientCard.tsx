@@ -71,7 +71,7 @@ export function ClientCard({ client, onEdit, onUnarchive, onDelete, isArchived }
                 <CardHeader className="flex flex-row items-center gap-4">
                     <Avatar className="h-14 w-14 border-2 border-primary/10 transition-transform group-hover:scale-110">
                         <AvatarImage src={client.logo} alt={client.companyName} />
-                        <AvatarFallback>{client.companyName.substring(0, 2).toUpperCase()}</AvatarFallback>
+                        <AvatarFallback>{client.companyName ? client.companyName.substring(0, 2).toUpperCase() : "?"}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 overflow-hidden">
                         <CardTitle className="text-lg group-hover:text-pink-500 transition-colors truncate">{client.name}</CardTitle>

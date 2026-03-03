@@ -1,7 +1,7 @@
 "use client";
 
-import { use, useEffect, useState, useMemo } from "react";
-import { User, Task, Activity } from "@/lib/types";
+import { use, useEffect, useState, useMemo, useCallback } from "react";
+import { User, Task, Activity, Project } from "@/lib/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,10 +17,10 @@ import {
     Mail, Briefcase, Calendar, IndianRupee,
     CheckCircle2, Clock, Activity as ActivityIcon, ArrowLeft,
     Zap, Pencil, MessageCircle,
-    Eye, ListTodo, FolderOpen, Search, ChevronDown, ArrowUpDown
+    Eye, ListTodo, FolderOpen, Search, ChevronDown, Phone, AlertCircle, Flame, Share2, Download
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { getUser, getUserTasks, getUserActivity, getUserByUsername, getUserProjects, getSessionId, getClientProjects, getClientCreatedTasks, getProjectTasks, getLeaveRequests, getUserContributionHistory } from "@/lib/actions";
 import { EditUserDialog } from "@/components/team/EditUserDialog";
 import { useChat } from "@/context/ChatContext";
@@ -30,13 +30,134 @@ import { LeaveRequestsList } from "@/components/leave-requests-list";
 import { ContributionHeatmap, DailyStats } from "@/components/team/ContributionHeatmap";
 import { cn } from "@/lib/utils";
 
+// Helper: relative time for last active
+function timeAgo(dateStr?: string): string {
+    if (!dateStr) return "";
+    try {
+        const diff = Date.now() - new Date(dateStr).getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 5) return "Online";
+        if (mins < 60) return `${mins}m ago`;
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return `${hrs}h ago`;
+        const days = Math.floor(hrs / 24);
+        if (days < 30) return `${days}d ago`;
+        return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+    } catch {
+        return "";
+    }
+}
+
+// Helper: check if a task is overdue
+function isOverdue(task: Task): boolean {
+    if (!task.dueDate || task.status === "Done") return false;
+    return new Date(task.dueDate) < new Date();
+}
+
+// Helper: calculate task completion streak (consecutive days with completions)
+function calculateStreak(contributionStats: Record<string, DailyStats>): number {
+    const today = new Date();
+    let streak = 0;
+    let checkDate = new Date(today);
+
+    // Start from today and go backwards
+    for (let i = 0; i < 365; i++) {
+        const dateStr = checkDate.toISOString().split('T')[0];
+        if (contributionStats[dateStr] && contributionStats[dateStr].count > 0) {
+            streak++;
+        } else if (i > 0) {
+            // Allow today to be empty (day isn't over yet), but break on any past gap
+            break;
+        }
+        checkDate.setDate(checkDate.getDate() - 1);
+    }
+    return streak;
+}
+
+// Helper: download vCard
+function downloadVCard(user: User) {
+    const lines = [
+        'BEGIN:VCARD',
+        'VERSION:3.0',
+        `FN:${user.name}`,
+        `EMAIL:${user.email}`,
+    ];
+    if (user.contactNumber) lines.push(`TEL:${user.contactNumber}`);
+    if (user.jobTitle) lines.push(`TITLE:${user.jobTitle}`);
+    lines.push('END:VCARD');
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/vcard' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${user.name.replace(/\s+/g, '_')}.vcf`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// Skeleton loading component
+function ProfileSkeleton() {
+    return (
+        <div className="space-y-8 animate-in fade-in duration-300 pb-10">
+            {/* Header skeleton */}
+            <div className="flex items-center gap-4">
+                <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
+                <div className="h-7 w-52 rounded-md bg-muted animate-pulse" />
+            </div>
+
+            {/* Profile card skeleton */}
+            <div className="relative rounded-xl overflow-hidden bg-gradient-to-r from-secondary to-muted border border-border shadow-2xl">
+                <div className="p-8 md:p-10 flex flex-col md:flex-row gap-8 items-center md:items-start">
+                    {/* Avatar */}
+                    <div className="h-32 w-32 rounded-full bg-muted-foreground/10 animate-pulse" />
+
+                    <div className="flex-1 space-y-4 w-full">
+                        <div className="space-y-3">
+                            <div className="h-8 w-48 rounded-md bg-muted-foreground/10 animate-pulse mx-auto md:mx-0" />
+                            <div className="h-5 w-32 rounded-md bg-muted-foreground/10 animate-pulse mx-auto md:mx-0" />
+                            <div className="h-5 w-64 rounded-md bg-muted-foreground/10 animate-pulse mx-auto md:mx-0" />
+                        </div>
+                        <div className="flex flex-wrap justify-center md:justify-start gap-3">
+                            <div className="h-7 w-40 rounded-full bg-muted-foreground/10 animate-pulse" />
+                            <div className="h-7 w-32 rounded-full bg-muted-foreground/10 animate-pulse" />
+                            <div className="h-7 w-36 rounded-full bg-muted-foreground/10 animate-pulse" />
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3 min-w-[200px]">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="h-20 rounded-lg bg-muted-foreground/10 animate-pulse" />
+                            <div className="h-20 rounded-lg bg-muted-foreground/10 animate-pulse" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Tabs skeleton */}
+            <div className="h-12 w-full rounded-lg bg-muted animate-pulse" />
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="col-span-1 md:col-span-2 h-64 rounded-xl bg-muted/50 border border-border animate-pulse" />
+                <div className="h-64 rounded-xl bg-muted/50 border border-border animate-pulse" />
+            </div>
+        </div>
+    );
+}
+
 export default function EmployeeProfilePage({ params }: { params: Promise<{ username: string }> }) {
     const { username } = use(params);
+    // Tab state — read initial tab from URL, then manage locally
+    const [activeTab, setActiveTab] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            return url.searchParams.get('tab') || 'overview';
+        }
+        return 'overview';
+    });
 
     const [user, setUser] = useState<User | null>(null);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [clientCreatedTasks, setClientCreatedTasks] = useState<Task[]>([]);
-    const [userProjects, setUserProjects] = useState<any[]>([]);
+    const [userProjects, setUserProjects] = useState<Project[]>([]);
     const [activities, setActivities] = useState<Activity[]>([]);
     const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
     const [leaveDates, setLeaveDates] = useState<string[]>([]);
@@ -124,7 +245,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
     }, [contributionHistory, tasks, clientCreatedTasks, user]);
 
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         if (!username) return;
         setLoading(true);
         try {
@@ -142,10 +263,10 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                 setIsSelf(currentSessionId === userData.id);
 
                 let userTasks: Task[] = [];
-                let projects: any[] = [];
+                let projects: Project[] = [];
 
                 if (userData.role === 'client') {
-                    projects = await getClientProjects(userData.id);
+                    projects = await getClientProjects(userData.id) as Project[];
                     const createdTasks = await getClientCreatedTasks(userData.id);
                     setClientCreatedTasks(createdTasks);
 
@@ -162,7 +283,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                 } else {
                     userTasks = await getUserTasks(userData.id);
                     setTasks(userTasks);
-                    projects = await getUserProjects(userData.id);
+                    projects = await getUserProjects(userData.id) as Project[];
 
                     const leaves = await getLeaveRequests(userData.id);
                     setLeaveRequests(leaves);
@@ -192,18 +313,56 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
         } finally {
             setLoading(false);
         }
-    };
+    }, [username]);
 
     useEffect(() => {
         loadData();
-    }, [username]);
+    }, [loadData]);
+
+    // Paginated activities (must be before early returns to keep hook order stable)
+    const visibleActivities = activities.slice(0, activityLimit);
+    const hasMoreActivities = activities.length > activityLimit;
+
+    // Group activities by date for display
+    const groupedActivities = useMemo(() => {
+        const groups: { label: string; items: typeof visibleActivities }[] = [];
+        let currentLabel = "";
+        const today = new Date().toDateString();
+        const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+        visibleActivities.forEach(activity => {
+            const dateStr = new Date(activity.timestamp).toDateString();
+            let label: string;
+            if (dateStr === today) label = "Today";
+            else if (dateStr === yesterday) label = "Yesterday";
+            else label = new Date(activity.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+
+            if (label !== currentLabel) {
+                currentLabel = label;
+                groups.push({ label, items: [] });
+            }
+            groups[groups.length - 1].items.push(activity);
+        });
+        return groups;
+    }, [visibleActivities]);
+
+    // Task completion streak (must be before early returns)
+    const streak = useMemo(() => calculateStreak(contributionStats), [contributionStats]);
+
+    // Tab URL sync handler (must be before early returns)
+    const handleTabChange = useCallback((value: string) => {
+        setActiveTab(value);
+        const url = new URL(window.location.href);
+        if (value === 'overview') {
+            url.searchParams.delete('tab');
+        } else {
+            url.searchParams.set('tab', value);
+        }
+        window.history.replaceState({}, '', url.pathname + url.search);
+    }, []);
 
     if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-        );
+        return <ProfileSkeleton />;
     }
 
     if (!user) {
@@ -219,7 +378,14 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
 
     const completedTasks = tasks.filter(t => t.status === 'Done').length;
     const pendingTasks = tasks.filter(t => t.status !== 'Done').length;
-    const efficiency = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 100;
+    const overdueTasks = tasks.filter(t => isOverdue(t)).length;
+    const efficiency = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : null;
+
+    // Last active status
+    const lastActiveText = timeAgo(user.lastActiveAt);
+    const isOnline = lastActiveText === "Online";
+
+
 
     // Filtered/sorted tasks
     const filteredTasks = tasks
@@ -232,8 +398,8 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
         })
         .sort((a, b) => {
             if (taskSortBy === "priority") {
-                const order: Record<string, number> = { 'Urgent': 0, 'High': 1, 'Medium': 2, 'Normal': 3, 'Low': 4 };
-                return (order[a.priority || 'Normal'] ?? 3) - (order[b.priority || 'Normal'] ?? 3);
+                const order: Record<string, number> = { 'High': 0, 'Medium': 1, 'Low': 2 };
+                return (order[a.priority || 'Medium'] ?? 1) - (order[b.priority || 'Medium'] ?? 1);
             }
             if (taskSortBy === "dueDate") {
                 if (!a.dueDate && !b.dueDate) return 0;
@@ -247,9 +413,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
             return 0;
         });
 
-    // Paginated activities
-    const visibleActivities = activities.slice(0, activityLimit);
-    const hasMoreActivities = activities.length > activityLimit;
+
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-10">
@@ -261,13 +425,21 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                 <h1 className="text-2xl font-bold">{user.role === 'client' ? 'Client Profile' : 'Team Member Profile'}</h1>
 
                 <div className="ml-auto flex items-center gap-2">
+                    <button
+                        onClick={() => downloadVCard(user)}
+                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-muted hover:bg-accent text-foreground rounded-lg transition-all border border-border"
+                        title="Download contact card"
+                    >
+                        <Download className="h-4 w-4" />
+                        <span className="hidden sm:inline">vCard</span>
+                    </button>
                     {!isSelf && (
                         <button
                             onClick={() => openChat(user.id)}
                             className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-muted hover:bg-accent text-foreground rounded-lg transition-all border border-border"
                         >
                             <MessageCircle className="h-4 w-4" />
-                            Message
+                            <span className="hidden sm:inline">Message</span>
                         </button>
                     )}
                     {(isSelf || currentUserRole === 'admin' || currentUserRole === 'manager') && (
@@ -276,7 +448,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                             className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg shadow-lg transition-all"
                         >
                             <Pencil className="h-4 w-4" />
-                            Edit Profile
+                            <span className="hidden sm:inline">Edit Profile</span>
                         </button>
                     )}
                     {isSelf && user.role !== 'client' && (
@@ -301,22 +473,50 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                 <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_30%_20%,_var(--tw-gradient-stops))] from-primary via-transparent to-transparent"></div>
 
                 <div className="relative p-8 md:p-10 flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
-                    <Avatar className="h-32 w-32 border-4 border-border shadow-xl ring-2 ring-primary/20">
-                        <AvatarImage src={user.avatar} className="object-cover" />
-                        <AvatarFallback className="text-3xl bg-muted text-primary">
-                            {user.name.substring(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                    </Avatar>
+                    {/* Avatar with online indicator */}
+                    <div className="relative">
+                        <Avatar className="h-32 w-32 border-4 border-border shadow-xl ring-2 ring-primary/20">
+                            <AvatarImage src={user.avatar} className="object-cover" />
+                            <AvatarFallback className="text-3xl bg-muted text-primary">
+                                {user.name ? user.name.substring(0, 2).toUpperCase() : "?"}
+                            </AvatarFallback>
+                        </Avatar>
+                        {/* Online/Offline indicator dot */}
+                        {lastActiveText && (
+                            <div className={cn(
+                                "absolute bottom-2 right-2 h-4 w-4 rounded-full border-2 border-background",
+                                isOnline ? "bg-green-500" : "bg-muted-foreground/40"
+                            )} title={isOnline ? "Online now" : `Last active ${lastActiveText}`} />
+                        )}
+                    </div>
 
                     <div className="flex-1 space-y-4">
                         <div>
-                            <h2 className="text-3xl font-bold text-foreground tracking-tight">{user.name}</h2>
+                            <div className="flex items-center justify-center md:justify-start gap-3">
+                                <h2 className="text-3xl font-bold text-foreground tracking-tight">{user.name}</h2>
+                                {lastActiveText && !isOnline && (
+                                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                                        {lastActiveText}
+                                    </span>
+                                )}
+                                {isOnline && (
+                                    <span className="text-xs text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full font-medium">
+                                        Online
+                                    </span>
+                                )}
+                            </div>
                             {user.username && <p className="text-muted-foreground font-medium text-lg">@{user.username}</p>}
                             <p className="text-primary font-medium text-lg mt-1 flex items-center justify-center md:justify-start gap-2">
                                 <Briefcase className="h-4 w-4" />
                                 {user.jobTitle || "Team Member"}
                                 <span className="text-muted-foreground">•</span>
                                 <span className="capitalize text-muted-foreground">{user.role}</span>
+                                {user.employmentType && (
+                                    <>
+                                        <span className="text-muted-foreground">•</span>
+                                        <span className="text-muted-foreground text-sm">{user.employmentType}</span>
+                                    </>
+                                )}
                             </p>
                         </div>
 
@@ -325,6 +525,12 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                 <Mail className="mr-2 h-3 w-3 text-primary" />
                                 {user.email}
                             </Badge>
+                            {user.contactNumber && (
+                                <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-accent px-3 py-1">
+                                    <Phone className="mr-2 h-3 w-3 text-primary" />
+                                    {user.contactNumber}
+                                </Badge>
+                            )}
                             {user.salary && user.salary > 0 && (isSelf || currentUserRole === 'admin' || currentUserRole === 'manager') && (
                                 <Badge variant="secondary" className="bg-muted text-green-500 hover:bg-accent px-3 py-1">
                                     <IndianRupee className="mr-2 h-3 w-3" />
@@ -340,25 +546,39 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                         </div>
                     </div>
 
-                    <div className="flex flex-col gap-3 min-w-[200px]">
+                    <div className="flex flex-col gap-3 min-w-[160px] sm:min-w-[200px]">
                         <div className="grid grid-cols-2 gap-3">
                             <Card className="bg-muted/50 border-border p-4 text-center">
                                 <div className="text-2xl font-bold text-foreground">{completedTasks}</div>
                                 <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Done</div>
                             </Card>
                             <Card className="bg-muted/50 border-border p-4 text-center">
-                                <div className="text-2xl font-bold text-primary">{efficiency}%</div>
+                                <div className="text-2xl font-bold text-primary">
+                                    {efficiency !== null ? `${efficiency}%` : "—"}
+                                </div>
                                 <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
                                     {user.role === 'client' ? 'Progress' : 'Efficiency'}
                                 </div>
                             </Card>
                         </div>
+                        {streak > 1 && (
+                            <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-orange-500 bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-1.5">
+                                <Flame className="h-3 w-3" />
+                                {streak}-day streak
+                            </div>
+                        )}
+                        {overdueTasks > 0 && (
+                            <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-red-500 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-1.5">
+                                <AlertCircle className="h-3 w-3" />
+                                {overdueTasks} overdue
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
 
             {/* Content Tabs */}
-            <Tabs defaultValue="overview" className="space-y-6">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
                 <TabsList className="w-full h-auto grid grid-cols-2 lg:grid-cols-5 gap-2 bg-secondary border border-border p-2 rounded-lg">
                     <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-sm py-2">
                         Overview
@@ -476,6 +696,19 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                         <span className="text-xs font-medium text-amber-500/80 uppercase tracking-wider">Todo</span>
                                     </div>
                                 </div>
+
+                                {/* Overdue indicator */}
+                                {overdueTasks > 0 && (
+                                    <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-center justify-between hover:bg-red-500/20 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-1.5 bg-red-500/20 text-red-500 rounded-lg">
+                                                <AlertCircle className="h-4 w-4" />
+                                            </div>
+                                            <span className="text-red-500 font-medium">Overdue</span>
+                                        </div>
+                                        <span className="text-2xl font-bold text-red-500">{overdueTasks}</span>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     </div>
@@ -487,8 +720,12 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                         <CardHeader>
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div>
-                                    <CardTitle>Assigned Tasks</CardTitle>
-                                    <CardDescription>Current workload and status</CardDescription>
+                                    <CardTitle>
+                                        {user.role === 'client' ? 'Project Tasks' : 'Assigned Tasks'}
+                                    </CardTitle>
+                                    <CardDescription>
+                                        {user.role === 'client' ? 'Tasks across all projects' : 'Current workload and status'}
+                                    </CardDescription>
                                 </div>
                                 <div className="flex gap-2">
                                     <div className="relative">
@@ -535,50 +772,65 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                         }
                                     </div>
                                 ) : (
-                                    filteredTasks.map(task => (
-                                        <Link href={`/dashboard/projects/${task.projectId}?task=${task.id}`} key={task.id} className="block">
-                                            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg group hover:bg-muted transition-colors border border-border hover:border-muted-foreground/30">
-                                                <div className="flex items-start gap-4">
-                                                    <div className={`mt-1 h-3 w-3 rounded-full ${task.status === 'Done' ? 'bg-green-500' :
-                                                        task.status === 'In Progress' ? 'bg-blue-500' :
-                                                            task.status === 'Review' ? 'bg-purple-500' :
-                                                                'bg-muted-foreground/50'
-                                                        }`} />
-                                                    <div>
-                                                        <h4 className="font-medium text-foreground group-hover:text-primary transition-colors">{task.title}</h4>
-                                                        <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{task.description || "No description provided."}</p>
+                                    filteredTasks.map(task => {
+                                        const taskOverdue = isOverdue(task);
+                                        return (
+                                            <Link href={`/dashboard/projects/${task.projectId}?task=${task.id}`} key={task.id} className="block">
+                                                <div className={cn(
+                                                    "flex items-center justify-between p-4 bg-muted/50 rounded-lg group hover:bg-muted transition-colors border hover:border-muted-foreground/30",
+                                                    taskOverdue ? "border-red-500/30 bg-red-500/5" : "border-border"
+                                                )}>
+                                                    <div className="flex items-start gap-4">
+                                                        <div className={`mt-1 h-3 w-3 rounded-full ${task.status === 'Done' ? 'bg-green-500' :
+                                                            task.status === 'In Progress' ? 'bg-blue-500' :
+                                                                task.status === 'Review' ? 'bg-purple-500' :
+                                                                    'bg-muted-foreground/50'
+                                                            }`} />
+                                                        <div>
+                                                            <h4 className="font-medium text-foreground group-hover:text-primary transition-colors">{task.title}</h4>
+                                                            <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{task.description || "No description provided."}</p>
 
-                                                        <div className="flex gap-2 mt-2">
-                                                            <Badge variant="outline" className="text-xs border-border text-muted-foreground">
-                                                                {task.priority || 'Normal'}
-                                                            </Badge>
-                                                            {task.category && (
+                                                            <div className="flex gap-2 mt-2">
                                                                 <Badge variant="outline" className="text-xs border-border text-muted-foreground">
-                                                                    {task.category}
+                                                                    {task.priority || 'Medium'}
                                                                 </Badge>
-                                                            )}
+                                                                {task.category && (
+                                                                    <Badge variant="outline" className="text-xs border-border text-muted-foreground">
+                                                                        {task.category}
+                                                                    </Badge>
+                                                                )}
+                                                                {taskOverdue && (
+                                                                    <Badge variant="outline" className="text-xs border-red-500/30 text-red-500 bg-red-500/10">
+                                                                        <AlertCircle className="h-3 w-3 mr-1" />
+                                                                        Overdue
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
+                                                    <div className="text-right shrink-0 ml-4">
+                                                        <span className={cn(
+                                                            "text-xs font-semibold px-2 py-1 rounded-full",
+                                                            task.status === 'Done' ? 'bg-green-500/10 text-green-500' :
+                                                                task.status === 'In Progress' ? 'bg-blue-500/10 text-blue-500' :
+                                                                    task.status === 'Review' ? 'bg-purple-500/10 text-purple-500' :
+                                                                        'bg-muted text-muted-foreground'
+                                                        )}>
+                                                            {task.status}
+                                                        </span>
+                                                        {task.dueDate && (
+                                                            <div className={cn(
+                                                                "text-xs mt-2",
+                                                                taskOverdue ? "text-red-500 font-medium" : "text-muted-foreground"
+                                                            )}>
+                                                                Due {new Date(task.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className="text-right shrink-0 ml-4">
-                                                    <span className={cn(
-                                                        "text-xs font-semibold px-2 py-1 rounded-full",
-                                                        task.status === 'Done' ? 'bg-green-500/10 text-green-500' :
-                                                            task.status === 'In Progress' ? 'bg-blue-500/10 text-blue-500' :
-                                                                task.status === 'Review' ? 'bg-purple-500/10 text-purple-500' :
-                                                                    'bg-muted text-muted-foreground'
-                                                    )}>
-                                                        {task.status}
-                                                    </span>
-                                                    {task.dueDate && (
-                                                        <div className="text-xs text-muted-foreground mt-2">
-                                                            Due {new Date(task.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </Link>
-                                    ))
+                                            </Link>
+                                        );
+                                    })
                                 )}
                             </div>
                         </CardContent>
@@ -602,37 +854,44 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                 </div>
                             ) : (
                                 <div className="grid gap-4 md:grid-cols-2">
-                                    {userProjects.map((project: any) => (
-                                        <Link href={`/dashboard/projects/${project.id}`} key={project.id} className="block">
-                                            <div className="p-4 bg-muted/50 rounded-lg border border-border hover:border-primary/30 hover:bg-muted transition-all group cursor-pointer">
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">{project.name}</h4>
-                                                    <Badge
-                                                        variant="secondary"
-                                                        className={cn(
-                                                            "text-[10px] capitalize",
-                                                            project.status === 'Active' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
-                                                                project.status === 'Completed' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
-                                                                    'bg-muted text-muted-foreground border-border'
+                                    {userProjects.map((project) => {
+                                        const projectTaskCount = tasks.filter(t => t.projectId === project.id).length;
+                                        const projectDoneCount = tasks.filter(t => t.projectId === project.id && t.status === 'Done').length;
+                                        return (
+                                            <Link href={`/dashboard/projects/${project.id}`} key={project.id} className="block">
+                                                <div className="p-4 bg-muted/50 rounded-lg border border-border hover:border-primary/30 hover:bg-muted transition-all group cursor-pointer">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">{project.name}</h4>
+                                                        <Badge
+                                                            variant="secondary"
+                                                            className={cn(
+                                                                "text-[10px] capitalize",
+                                                                project.status === 'Active' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                                                                    project.status === 'Completed' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                                                                        'bg-muted text-muted-foreground border-border'
+                                                            )}
+                                                        >
+                                                            {project.status}
+                                                        </Badge>
+                                                    </div>
+                                                    <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
+                                                        {project.dueDate && (
+                                                            <span className="flex items-center gap-1">
+                                                                <Calendar className="w-3 h-3" />
+                                                                Due {new Date(project.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                            </span>
                                                         )}
-                                                    >
-                                                        {project.status}
-                                                    </Badge>
+                                                        {projectTaskCount > 0 && (
+                                                            <span className="flex items-center gap-1">
+                                                                <ListTodo className="w-3 h-3" />
+                                                                {projectDoneCount}/{projectTaskCount} tasks done
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                {project.description && (
-                                                    <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
-                                                )}
-                                                <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-                                                    {project.startDate && (
-                                                        <span className="flex items-center gap-1">
-                                                            <Calendar className="w-3 h-3" />
-                                                            {new Date(project.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </Link>
-                                    ))}
+                                            </Link>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </CardContent>
@@ -652,28 +911,38 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                     <div className="text-center py-10 text-muted-foreground">No recent activity found.</div>
                                 ) : (
                                     <>
-                                        {visibleActivities.map((activity, i) => (
-                                            <div key={activity.id || i} className="flex gap-4 relative">
-                                                {i !== visibleActivities.length - 1 && (
-                                                    <div className="absolute left-2.5 top-8 bottom-[-24px] w-px bg-border"></div>
-                                                )}
+                                        {groupedActivities.map((group, gi) => (
+                                            <div key={gi}>
+                                                {/* Date group label */}
+                                                <div className="flex items-center gap-3 mb-4">
+                                                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</span>
+                                                    <div className="flex-1 h-px bg-border" />
+                                                </div>
+                                                <div className="space-y-6 mb-6">
+                                                    {group.items.map((activity, i) => (
+                                                        <div key={activity.id || `${gi}-${i}`} className="flex gap-4 relative">
+                                                            {i !== group.items.length - 1 && (
+                                                                <div className="absolute left-2.5 top-8 bottom-[-24px] w-px bg-border"></div>
+                                                            )}
 
-                                                <div className="h-5 w-5 rounded-full bg-muted border-2 border-primary z-10 flex-shrink-0 mt-1"></div>
+                                                            <div className="h-5 w-5 rounded-full bg-muted border-2 border-primary z-10 flex-shrink-0 mt-1"></div>
 
-                                                <div className="flex-1 pb-1">
-                                                    <div className="flex justify-between items-start">
-                                                        <div>
-                                                            <p className="text-sm font-medium text-foreground">
-                                                                <span className="text-primary">{activity.action}</span> {activity.target}
-                                                            </p>
-                                                            <p className="text-xs text-muted-foreground mt-1">
-                                                                {new Date(activity.timestamp).toLocaleString('en-IN', {
-                                                                    dateStyle: 'medium',
-                                                                    timeStyle: 'short'
-                                                                })}
-                                                            </p>
+                                                            <div className="flex-1 pb-1">
+                                                                <div className="flex justify-between items-start">
+                                                                    <div>
+                                                                        <p className="text-sm font-medium text-foreground">
+                                                                            <span className="text-primary">{activity.action}</span> {activity.target}
+                                                                        </p>
+                                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                                            {new Date(activity.timestamp).toLocaleString('en-IN', {
+                                                                                timeStyle: 'short'
+                                                                            })}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                    </div>
+                                                    ))}
                                                 </div>
                                             </div>
                                         ))}
@@ -700,7 +969,9 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                         <Card className="bg-card border-border">
                             <CardHeader>
                                 <CardTitle>Leave History</CardTitle>
-                                <CardDescription>View your leave requests and status</CardDescription>
+                                <CardDescription>
+                                    {isSelf ? 'View your leave requests and status' : `Leave requests for ${user.name}`}
+                                </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <LeaveRequestsList requests={leaveRequests} mode="user" />
