@@ -1,9 +1,10 @@
 import { Message, Contact } from "@/lib/chat";
 import { cn } from "@/lib/utils";
-import { format, isToday, isYesterday, isSameDay } from "date-fns";
-import { Check, CheckCheck, User, Image as ImageIcon, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { format, isToday, isYesterday } from "date-fns";
+import { Check, CheckCheck, User, Image as ImageIcon, Trash2, Smile, X, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 
+// ── Message Bubble ──────────────────────────────────────────
 interface MessageBubbleProps {
     message: Message;
     isOwn: boolean;
@@ -13,7 +14,7 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
     return (
         <div className={cn("flex w-full mb-4", isOwn ? "justify-end" : "justify-start")}>
             <div className={cn(
-                "max-w-[70%] rounded-2xl px-4 py-3 shadow-sm",
+                "max-w-[70%] rounded-2xl px-4 py-3 shadow-sm transition-all",
                 isOwn
                     ? "bg-primary text-primary-foreground rounded-br-none"
                     : "bg-muted text-foreground rounded-bl-none border border-border"
@@ -25,7 +26,7 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
                         </div>
                     </div>
                 ) : (
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.content}</p>
                 )}
 
                 <div className="flex items-center justify-end mt-1 space-x-1 opacity-70">
@@ -101,6 +102,86 @@ export function MessagesList({ messages, currentUserId }: MessagesListProps) {
                 );
             })}
         </>
+    );
+}
+
+// ── Loading States ──────────────────────────────────────────
+export function ContactSkeleton() {
+    return (
+        <div className="flex items-center p-3 rounded-xl mb-1 animate-pulse">
+            <div className="w-10 h-10 rounded-full bg-muted shrink-0" />
+            <div className="ml-3 flex-1 space-y-2">
+                <div className="h-3.5 bg-muted rounded-md w-3/4" />
+                <div className="h-2.5 bg-muted/60 rounded-md w-1/2" />
+            </div>
+        </div>
+    );
+}
+
+export function MessagesSkeleton() {
+    return (
+        <div className="flex flex-col items-center justify-center h-full opacity-60">
+            <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
+            <p className="text-sm text-muted-foreground">Loading messages...</p>
+        </div>
+    );
+}
+
+// ── Emoji Picker ────────────────────────────────────────────
+const EMOJI_CATEGORIES = [
+    { label: "Smileys", emojis: ["😀", "😂", "🤣", "😊", "😍", "🥰", "😘", "😎", "🤔", "😏", "😢", "😭", "😤", "🤯", "🥳", "😴"] },
+    { label: "Gestures", emojis: ["👍", "👎", "👏", "🙌", "🤝", "✌️", "🤞", "💪", "🙏", "👋", "✋", "🤙", "👀", "🫡", "🫶", "❤️"] },
+    { label: "Objects", emojis: ["🔥", "⭐", "💡", "📌", "📎", "✅", "❌", "⚡", "🎯", "🚀", "💯", "🏆", "📈", "💰", "⏰", "🔔"] },
+];
+
+interface EmojiPickerProps {
+    onSelect: (emoji: string) => void;
+    onClose: () => void;
+}
+
+export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (ref.current && !ref.current.contains(e.target as Node)) {
+                onClose();
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [onClose]);
+
+    return (
+        <div
+            ref={ref}
+            className="absolute bottom-full left-0 mb-2 bg-card border border-border rounded-2xl shadow-2xl p-3 w-72 animate-in slide-in-from-bottom-2 fade-in duration-200 z-50"
+        >
+            <div className="flex items-center justify-between mb-2 pb-2 border-b border-border">
+                <span className="text-xs font-semibold text-foreground">Emoji</span>
+                <button onClick={onClose} className="p-0.5 hover:bg-muted rounded-md transition">
+                    <X className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
+            </div>
+            <div className="max-h-48 overflow-y-auto space-y-2 custom-scrollbar">
+                {EMOJI_CATEGORIES.map(cat => (
+                    <div key={cat.label}>
+                        <p className="text-[10px] font-medium text-muted-foreground mb-1 uppercase tracking-wider">{cat.label}</p>
+                        <div className="grid grid-cols-8 gap-0.5">
+                            {cat.emojis.map(emoji => (
+                                <button
+                                    key={emoji}
+                                    onClick={() => onSelect(emoji)}
+                                    className="w-8 h-8 flex items-center justify-center text-lg hover:bg-muted rounded-lg transition-colors"
+                                >
+                                    {emoji}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
     );
 }
 
@@ -211,7 +292,6 @@ export function ContactItem({ contact, isActive, onClick, onDelete }: ContactIte
             {/* Delete controls */}
             {onDelete && contact.lastMessage && (
                 confirming ? (
-                    // Inline confirm pill
                     <div
                         onClick={e => e.stopPropagation()}
                         className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-card border border-border shadow-lg rounded-xl px-2 py-1 text-xs"

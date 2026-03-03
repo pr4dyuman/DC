@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { Message, Contact, getContacts, getMessages, sendMessage, markAsRead, deleteConversation } from "@/lib/chat";
-import { MessagesList, ContactItem } from "@/components/chat/ChatComponents";
-import { ArrowLeft, Send, Search, Paperclip, MessageCircle, X, Trash2, MessageSquare } from "lucide-react";
+import { MessagesList, ContactItem, ContactSkeleton, MessagesSkeleton, EmojiPicker } from "@/components/chat/ChatComponents";
+import { ArrowLeft, Send, Search, Smile, MessageCircle, X, Trash2, MessageSquare, Loader2 } from "lucide-react";
 import { useActivePolling } from "@/hooks/use-active-polling";
 import { format, isToday, isYesterday } from "date-fns";
 import { toast } from "sonner";
@@ -19,10 +19,15 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
     const [searchQuery, setSearchQuery] = useState("");
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [mobileView, setMobileView] = useState<'sidebar' | 'chat'>('sidebar');
+    const [isLoadingContacts, setIsLoadingContacts] = useState(true);
+    const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+    const [isSending, setIsSending] = useState(false);
+    const [showEmoji, setShowEmoji] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => { if (currentUserId) loadContacts(); }, [currentUserId]);
-    useActivePolling(() => loadContacts(), 120000, !!currentUserId);
+    useActivePolling(() => loadContacts(true), 120000, !!currentUserId);
 
     useEffect(() => {
         if (currentUserId && activeContactId) {
@@ -31,29 +36,47 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
         }
         setShowDeleteConfirm(false);
     }, [currentUserId, activeContactId]);
-    useActivePolling(() => loadMessages(), 10000, !!currentUserId && !!activeContactId);
+    useActivePolling(() => loadMessages(true), 10000, !!currentUserId && !!activeContactId);
 
     useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-    async function loadContacts() {
+    // Auto-resize textarea
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
+        }
+    }, [newMessage]);
+
+    async function loadContacts(silent = false) {
         if (!currentUserId) return;
+        if (!silent) setIsLoadingContacts(true);
         try { setContacts(await getContacts(currentUserId)); } catch { }
+        finally { setIsLoadingContacts(false); }
     }
-    async function loadMessages() {
+    async function loadMessages(silent = false) {
         if (!currentUserId || !activeContactId) return;
+        if (!silent) setIsLoadingMessages(true);
         try { setMessages(await getMessages(currentUserId, activeContactId)); } catch { }
+        finally { setIsLoadingMessages(false); }
     }
     async function handleSend() {
-        if (!currentUserId || !activeContactId || !newMessage.trim()) return;
-        const optimistic: Message = { id: "temp-" + Date.now(), senderId: currentUserId, receiverId: activeContactId, content: newMessage, timestamp: new Date().toISOString(), read: false, type: 'text', agencyId: 'optimistic' };
+        if (!currentUserId || !activeContactId || !newMessage.trim() || isSending) return;
+        const content = newMessage.trim();
+        const optimistic: Message = { id: "temp-" + Date.now(), senderId: currentUserId, receiverId: activeContactId, content, timestamp: new Date().toISOString(), read: false, type: 'text', agencyId: 'optimistic' };
         setMessages(prev => [...prev, optimistic]);
         setNewMessage("");
+        setIsSending(true);
+        setShowEmoji(false);
         try {
-            await sendMessage(currentUserId, activeContactId, optimistic.content);
-            await loadMessages();
-            await loadContacts();
+            await sendMessage(currentUserId, activeContactId, content);
+            await loadMessages(true);
+            await loadContacts(true);
         } catch {
             toast.error("Failed to send message");
+        } finally {
+            setIsSending(false);
+            textareaRef.current?.focus();
         }
     }
     async function handleDeleteConversation(contactId?: string) {
@@ -66,7 +89,7 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
                 setActiveContactId(null);
                 setMobileView('sidebar');
             }
-            await loadContacts();
+            await loadContacts(true);
             toast.success("Conversation deleted");
         } catch {
             toast.error("Failed to delete conversation");
@@ -76,6 +99,18 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
     function selectContact(id: string) {
         setActiveContactId(id);
         setMobileView('chat');
+    }
+
+    function handleEmojiSelect(emoji: string) {
+        setNewMessage(prev => prev + emoji);
+        textareaRef.current?.focus();
+    }
+
+    function handleKeyDown(e: React.KeyboardEvent) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+        }
     }
 
     const filteredContacts = searchQuery.trim()
@@ -126,7 +161,14 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
                     </div>
 
                     <div className="flex-1 overflow-y-auto px-2 space-y-1 custom-scrollbar">
-                        {viewMode === 'chats' ? (
+                        {isLoadingContacts && contacts.length === 0 ? (
+                            <>
+                                <ContactSkeleton />
+                                <ContactSkeleton />
+                                <ContactSkeleton />
+                                <ContactSkeleton />
+                            </>
+                        ) : viewMode === 'chats' ? (
                             filteredContacts.filter(c => c.lastMessage).length > 0 ? (
                                 filteredContacts.filter(c => c.lastMessage).map(contact => (
                                     <ContactItem key={contact.id} contact={contact} isActive={contact.id === activeContactId} onClick={() => selectContact(contact.id)}
@@ -153,7 +195,6 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
                         <>
                             <div className="p-4 border-b border-border flex justify-between items-center bg-card/50 backdrop-blur-md">
                                 <div className="flex items-center">
-                                    {/* Mobile back button */}
                                     <button
                                         onClick={() => setMobileView('sidebar')}
                                         className="md:hidden p-1.5 rounded-lg hover:bg-muted transition text-muted-foreground hover:text-foreground mr-2"
@@ -213,7 +254,9 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
                             </div>
 
                             <div className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
-                                {messages.length === 0 ? (
+                                {isLoadingMessages && messages.length === 0 ? (
+                                    <MessagesSkeleton />
+                                ) : messages.length === 0 ? (
                                     <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50">
                                         <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-4 border border-border">
                                             <Send className="w-8 h-8 text-muted-foreground" />
@@ -227,23 +270,40 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
                                 <div ref={messagesEndRef} />
                             </div>
 
+                            {/* Input Area */}
                             <div className="p-4 bg-card border-t border-border">
-                                <div className="bg-secondary border border-border rounded-2xl p-2 flex items-center shadow-lg">
-                                    <button className="p-2 text-muted-foreground cursor-not-allowed" title="Attachments coming soon" disabled>
-                                        <Paperclip className="w-5 h-5" />
+                                <div className="relative bg-secondary border border-border rounded-2xl p-2 flex items-end gap-1 shadow-lg">
+                                    {showEmoji && (
+                                        <EmojiPicker
+                                            onSelect={handleEmojiSelect}
+                                            onClose={() => setShowEmoji(false)}
+                                        />
+                                    )}
+                                    <button
+                                        onClick={() => setShowEmoji(!showEmoji)}
+                                        className={`p-2 rounded-lg transition ${showEmoji ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                                        title="Emoji"
+                                    >
+                                        <Smile className="w-5 h-5" />
                                     </button>
-                                    <input
-                                        type="text"
+                                    <textarea
+                                        ref={textareaRef}
                                         value={newMessage}
                                         onChange={(e) => setNewMessage(e.target.value)}
-                                        onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                                        onKeyDown={handleKeyDown}
                                         placeholder="Type a message..."
-                                        className="flex-1 bg-transparent border-none focus:outline-none text-foreground placeholder:text-muted-foreground px-2 py-1"
+                                        rows={1}
+                                        className="flex-1 bg-transparent border-none focus:outline-none text-foreground placeholder:text-muted-foreground px-2 py-1.5 resize-none max-h-[120px] text-sm"
                                     />
-                                    <button onClick={handleSend} disabled={!newMessage.trim()} className="ml-2 bg-primary hover:bg-primary/90 text-primary-foreground p-2 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed">
-                                        <Send className="w-5 h-5" />
+                                    <button
+                                        onClick={handleSend}
+                                        disabled={!newMessage.trim() || isSending}
+                                        className="bg-primary hover:bg-primary/90 text-primary-foreground p-2 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                                    >
+                                        {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                                     </button>
                                 </div>
+                                <p className="text-center text-[10px] text-muted-foreground/50 mt-1.5">Press Enter to send, Shift + Enter for new line</p>
                             </div>
                         </>
                     ) : (
