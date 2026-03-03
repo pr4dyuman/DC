@@ -14,6 +14,7 @@ import { useState, useEffect } from "react";
 import { createInvoice, clientMarkInvoiceAsPaid, adminApproveInvoicePayment, adminRejectInvoicePayment } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 interface InvoiceManagerProps {
     invoices: Invoice[];
@@ -54,11 +55,13 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                 amount: parseFloat(formData.amount),
                 date: formData.date
             });
+            toast.success("Invoice created successfully");
             setOpen(false);
             setFormData({ projectId: "", amount: "", date: new Date().toISOString().split('T')[0] });
             router.refresh();
         } catch (error) {
             console.error(error);
+            toast.error("Failed to create invoice");
         } finally {
             setLoading(false);
         }
@@ -68,9 +71,11 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
         setActionLoadingId(invoiceId);
         try {
             await clientMarkInvoiceAsPaid(invoiceId);
+            toast.success("Payment submitted for review");
             router.refresh();
         } catch (error) {
             console.error(error);
+            toast.error("Failed to submit payment");
         } finally {
             setActionLoadingId(null);
         }
@@ -80,9 +85,11 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
         setActionLoadingId(invoiceId);
         try {
             await adminApproveInvoicePayment(invoiceId);
+            toast.success("Payment approved");
             router.refresh();
         } catch (error) {
             console.error(error);
+            toast.error("Failed to approve payment");
         } finally {
             setActionLoadingId(null);
         }
@@ -92,9 +99,11 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
         setActionLoadingId(invoiceId);
         try {
             await adminRejectInvoicePayment(invoiceId);
+            toast.success("Payment rejected");
             router.refresh();
         } catch (error) {
             console.error(error);
+            toast.error("Failed to reject payment");
         } finally {
             setActionLoadingId(null);
         }

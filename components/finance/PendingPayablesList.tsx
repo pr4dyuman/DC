@@ -21,17 +21,14 @@ export function PendingPayablesList({ transactions }: PendingPayablesListProps) 
     if (transactions.length === 0) return null;
 
     const handleMarkPaid = async (id: string, amount: number, type: string) => {
+        setLoadingId(id);
         try {
-            setLoadingId(id);
-            const action = type === 'income' ? 'Mark as Received' : 'Mark as Paid';
-            if (confirm(`${action}: ₹${amount.toLocaleString()}?`)) {
-                await markTransactionAsPaid(id);
-                toast.success("Marked as paid successfully");
-                router.refresh();
-            }
+            await markTransactionAsPaid(id);
+            toast.success(type === 'income' ? 'Marked as received' : 'Marked as paid');
+            router.refresh();
         } catch (error) {
             console.error("Failed to mark as paid", error);
-            toast.error("Failed to mark as paid");
+            toast.error("Failed to update transaction");
         } finally {
             setLoadingId(null);
         }

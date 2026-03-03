@@ -24,6 +24,7 @@ import { ArrowDownRight, ArrowUpRight, Search, MoreHorizontal, Trash, Loader2 } 
 import { deleteTransaction } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 interface TransactionListProps {
     transactions: Transaction[];
@@ -41,6 +42,7 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [visibleCount, setVisibleCount] = useState(20);
 
     const formatter = new Intl.NumberFormat('en-IN', {
         style: 'currency',
@@ -79,14 +81,18 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
 
         try {
             await deleteTransaction(selectedId, password);
+            toast.success("Transaction deleted");
             setVerifyOpen(false);
-            router.refresh(); // Recalculate stats
+            router.refresh();
         } catch (err: any) {
             setError(err.message || "Failed to delete transaction");
         } finally {
             setLoading(false);
         }
     };
+
+    const visibleTransactions = filteredTransactions.slice(0, visibleCount);
+    const hasMore = filteredTransactions.length > visibleCount;
 
     return (
         <Card className="col-span-3">
@@ -114,7 +120,7 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
                     {filteredTransactions.length === 0 ? (
                         <div className="text-center text-muted-foreground py-8">No transactions found.</div>
                     ) : (
-                        filteredTransactions.map((transaction) => (
+                        visibleTransactions.map((transaction) => (
                             <div key={transaction.id} className="flex items-center group">
                                 <div className={`h-9 w-9 rounded-full flex items-center justify-center border ${transaction.type === 'income'
                                     ? 'bg-emerald-100 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-900'
@@ -166,6 +172,13 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
                                 </div>
                             </div>
                         ))
+                    )}
+                    {hasMore && (
+                        <div className="text-center pt-2">
+                            <Button variant="outline" size="sm" onClick={() => setVisibleCount(prev => prev + 20)}>
+                                Load More ({filteredTransactions.length - visibleCount} remaining)
+                            </Button>
+                        </div>
                     )}
                 </div>
 

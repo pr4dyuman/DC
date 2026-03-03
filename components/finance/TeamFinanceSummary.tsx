@@ -31,7 +31,7 @@ export function TeamFinanceSummary({ stats, userName, salary }: TeamFinanceSumma
                 <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-950/20 dark:to-indigo-900/10 border-indigo-200 dark:border-indigo-900">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-indigo-700 dark:text-indigo-400">Total Earnings</CardTitle>
-                        <Briefcase className="h-4 w-4 text-indigo-600" />
+                        <Briefcase className="h-4 w-4 text-indigo-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-indigo-700 dark:text-indigo-300">

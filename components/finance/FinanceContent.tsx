@@ -213,7 +213,7 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
                     <div className="grid gap-6 md:grid-cols-2">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-indigo-600">Salary History</CardTitle>
+                                <CardTitle className="text-primary">Salary History</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <TransactionList
@@ -242,7 +242,7 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
                     <div className="grid gap-6 md:grid-cols-2">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-green-600">Incoming Payments</CardTitle>
+                                <CardTitle className="text-emerald-500">Incoming Payments</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <TransactionList
@@ -253,7 +253,7 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
                         </Card>
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-red-600">Project Expenses</CardTitle>
+                                <CardTitle className="text-red-500">Project Expenses</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <TransactionList

@@ -269,7 +269,7 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                     Add Transaction
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>

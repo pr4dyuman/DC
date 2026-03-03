@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { payEmployee } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { Check, DollarSign, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface PayrollItem {
     user: User;
@@ -34,9 +35,11 @@ export function PayrollManager({ items }: PayrollManagerProps) {
         setLoadingIds(prev => [...prev, userId]);
         try {
             await payEmployee(userId, salary, month, userName);
+            toast.success(`${userName} paid successfully`);
             router.refresh();
         } catch (error) {
             console.error(error);
+            toast.error(`Failed to pay ${userName}`);
         } finally {
             setLoadingIds(prev => prev.filter(id => id !== userId));
         }
@@ -82,7 +85,7 @@ export function PayrollManager({ items }: PayrollManagerProps) {
                                     <TableCell>{formatter.format(item.salary)}</TableCell>
                                     <TableCell>
                                         <Badge variant={item.status === 'Paid' ? 'secondary' : 'destructive'} className={
-                                            item.status === 'Paid' ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100' : 'bg-red-100 text-red-800 hover:bg-red-100'
+                                            item.status === 'Paid' ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/15' : 'bg-red-500/15 text-red-500 border border-red-500/20 hover:bg-red-500/15'
                                         }>
                                             {item.status}
                                         </Badge>
