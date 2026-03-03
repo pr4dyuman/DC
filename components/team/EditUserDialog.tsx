@@ -189,7 +189,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="sm:max-w-[550px] bg-card border-border p-6">
+                <DialogContent className="sm:max-w-[550px] bg-card border-border p-6 max-h-[85vh] overflow-y-auto">
                     <DialogHeader className="pr-10 pb-0 mb-4">
                         <DialogTitle>{user ? 'Edit Profile' : 'Add New Member'}</DialogTitle>
                         <DialogDescription>
@@ -350,6 +350,15 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                                     />
                                                 </div>
                                             </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-medium text-muted-foreground">Contact Number</label>
+                                                <input
+                                                    value={formData.contactNumber}
+                                                    onChange={e => setFormData({ ...formData, contactNumber: e.target.value })}
+                                                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary"
+                                                    placeholder="+91..."
+                                                />
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-2 gap-3">
@@ -409,7 +418,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                             </button>
                                         </div>
                                         {(user?.pendingAdharCardImage || user?.pendingPanCardImage || user?.pendingContracts || user?.pendingOtherDocuments) && (
-                                            <div className="text-xs text-yellow-600 dark:text-yellow-500 flex items-center justify-center gap-1.5 bg-yellow-500/10 px-3 py-1 rounded-full w-fit mx-auto">
+                                            <div className="text-xs text-amber-500 flex items-center justify-center gap-1.5 bg-amber-500/10 px-3 py-1 rounded-full w-fit mx-auto">
                                                 <AlertTriangle className="w-3 h-3" />
                                                 Pending updates require review
                                             </div>
