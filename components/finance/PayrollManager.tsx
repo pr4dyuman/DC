@@ -7,8 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { payEmployee } from "@/lib/actions";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Check, DollarSign, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Check, DollarSign, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface PayrollItem {
@@ -45,18 +45,47 @@ export function PayrollManager({ items }: PayrollManagerProps) {
         }
     };
 
+    const handlePayAll = async () => {
+        const pending = items.filter(i => i.status !== 'Paid');
+        if (pending.length === 0) return;
+        for (const item of pending) {
+            await handlePay(item.user.id, item.salary, item.month, item.user.name);
+        }
+    };
+
+    const paidCount = items.filter(i => i.status === 'Paid').length;
+    const pendingCount = items.length - paidCount;
+    const totalPayroll = items.reduce((sum, i) => sum + i.salary, 0);
+
     return (
         <Card>
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle>Payroll Management</CardTitle>
-                        <CardDescription>Manage monthly employee salaries.</CardDescription>
+                        <CardDescription>
+                            {items.length > 0 ? (
+                                <>
+                                    {items[0]?.month} · Total: {formatter.format(totalPayroll)} ·
+                                    <span className="text-emerald-500">{paidCount} paid</span>
+                                    {pendingCount > 0 && <>, <span className="text-amber-500">{pendingCount} pending</span></>}
+                                </>
+                            ) : 'Manage monthly employee salaries.'}
+                        </CardDescription>
                     </div>
-                    {items.length > 0 && (
-                        <div className="text-sm font-medium text-muted-foreground">
-                            {items[0]?.month}
-                        </div>
+                    {pendingCount > 1 && (
+                        <Button
+                            size="sm"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                            disabled={loadingIds.length > 0}
+                            onClick={handlePayAll}
+                        >
+                            {loadingIds.length > 0 ? (
+                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Paying...</>
+                            ) : (
+                                <><DollarSign className="mr-2 h-4 w-4" />Pay All ({pendingCount})</>
+                            )}
+                        </Button>
                     )}
                 </div>
             </CardHeader>
@@ -67,7 +96,6 @@ export function PayrollManager({ items }: PayrollManagerProps) {
                             <TableRow>
                                 <TableHead>Employee</TableHead>
                                 <TableHead>Role</TableHead>
-                                <TableHead>Month</TableHead>
                                 <TableHead>Salary</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Action</TableHead>
@@ -76,7 +104,7 @@ export function PayrollManager({ items }: PayrollManagerProps) {
                         <TableBody>
                             {items.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center">No employees found.</TableCell>
+                                    <TableCell colSpan={5} className="text-center">No employees found.</TableCell>
                                 </TableRow>
                             ) : (
                                 items.map((item) => (
@@ -91,7 +119,6 @@ export function PayrollManager({ items }: PayrollManagerProps) {
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-muted-foreground">{item.user.jobTitle || item.user.role}</TableCell>
-                                        <TableCell>{item.month}</TableCell>
                                         <TableCell>{formatter.format(item.salary)}</TableCell>
                                         <TableCell>
                                             <Badge variant={item.status === 'Paid' ? 'secondary' : 'destructive'} className={
