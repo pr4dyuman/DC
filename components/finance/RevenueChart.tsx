@@ -23,12 +23,14 @@ export function RevenueChart({ data }: RevenueChartProps) {
                         <XAxis
                             dataKey="name"
                             stroke="hsl(var(--muted-foreground))"
+                            tick={{ fill: '#a1a1aa', fontSize: 12 }}
                             fontSize={12}
                             tickLine={false}
                             axisLine={false}
                         />
                         <YAxis
                             stroke="hsl(var(--muted-foreground))"
+                            tick={{ fill: '#a1a1aa', fontSize: 12 }}
                             fontSize={12}
                             tickLine={false}
                             axisLine={false}
