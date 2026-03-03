@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Loader2, Plus, Trash2, Edit2, Users, Briefcase, ChevronDown, ChevronRight, Settings, Shield, Palette, Sun, Moon } from "lucide-react";
+import { toast } from "sonner";
 import { X } from "lucide-react";
 import PermissionSettings from "@/components/settings/PermissionSettings";
 import { SecuritySettings } from "@/components/settings/SecuritySettings";
@@ -86,24 +87,32 @@ export default function SettingsPage() {
                 // Optimistic Update
                 setServices(prev => prev.map(s => s.id === editingService.id ? { ...s, name, jobs: validJobs } : s));
                 await updateService(editingService.id, name, validJobs);
+                toast.success("Service updated");
             } else {
-                // For add, we need to wait for ID or just reload. Let's wait/reload for simplicity.
                 await addService(name, validJobs);
+                toast.success("Service created");
             }
             setIsDialogOpen(false);
             loadData();
         } catch (error) {
             console.error(error);
+            toast.error("Failed to save service");
         } finally {
             setSubmitting(false);
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this service?")) return;
+        const serviceName = services.find(s => s.id === id)?.name || 'Service';
         setServices(prev => prev.filter(c => c.id !== id)); // Optimistic
-        await deleteService(id);
-        loadData();
+        try {
+            await deleteService(id);
+            toast.success(`"${serviceName}" deleted`);
+            loadData();
+        } catch {
+            toast.error("Failed to delete service");
+            loadData();
+        }
     };
 
     const totalEmployees = (serviceJobs: Job[]) => serviceJobs.reduce((acc, curr) => acc + (Number(curr.count) || 0), 0);

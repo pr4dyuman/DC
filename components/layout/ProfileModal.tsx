@@ -14,8 +14,9 @@ import { Label } from "@/components/ui/label";
 import { User } from "@/lib/types";
 import { updateUser, getSystemSettings, updateSystemSettings } from "@/lib/actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, Upload, Lock, User as UserIcon, Shield, Camera, Building2 } from "lucide-react";
+import { Loader2, Upload, Lock, User as UserIcon, Shield, Camera, Building2, Phone, Briefcase } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
 
 interface ProfileModalProps {
     user: User;
@@ -32,10 +33,14 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
     const [name, setName] = useState(user.name);
     const [email, setEmail] = useState(user.email);
     const [avatar, setAvatar] = useState(user.avatar || "");
+    const [jobTitle, setJobTitle] = useState(user.jobTitle || "");
+    const [contactNumber, setContactNumber] = useState(user.contactNumber || "");
 
     // System State
     const [systemName, setSystemName] = useState("AgencyOS");
     const [systemLogo, setSystemLogo] = useState("");
+    const [initialSystemName, setInitialSystemName] = useState("AgencyOS");
+    const [initialSystemLogo, setInitialSystemLogo] = useState("");
 
     // Password State
     const [currentPassword, setCurrentPassword] = useState("");
@@ -44,21 +49,29 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
 
     const [error, setError] = useState("");
 
+    const isAdmin = user.role === 'admin';
+
     useEffect(() => {
         if (open) {
-            getSystemSettings().then(settings => {
-                if (settings) {
-                    setSystemName(settings.systemName);
-                    setSystemLogo(settings.logo);
-                }
-            });
+            if (isAdmin) {
+                getSystemSettings().then(settings => {
+                    if (settings) {
+                        setSystemName(settings.systemName);
+                        setSystemLogo(settings.logo);
+                        setInitialSystemName(settings.systemName);
+                        setInitialSystemLogo(settings.logo);
+                    }
+                });
+            }
             // Reset fields
             setName(user.name);
             setEmail(user.email);
             setAvatar(user.avatar || "");
+            setJobTitle(user.jobTitle || "");
+            setContactNumber(user.contactNumber || "");
             setError("");
         }
-    }, [open, user]);
+    }, [open, user, isAdmin]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (s: string) => void) => {
         const file = e.target.files?.[0];
@@ -91,14 +104,18 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
 
         startTransition(async () => {
             try {
-                // Update System Settings
-                await updateSystemSettings({ systemName, logo: systemLogo });
+                // Only update system settings if admin AND something changed
+                if (isAdmin && (systemName !== initialSystemName || systemLogo !== initialSystemLogo)) {
+                    await updateSystemSettings({ systemName, logo: systemLogo });
+                }
 
                 // Update User
                 const updates: Partial<User> = {
                     name,
                     email,
                     avatar,
+                    jobTitle,
+                    contactNumber,
                 };
 
                 if (newPassword) {
@@ -111,6 +128,7 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
                 setCurrentPassword("");
                 setNewPassword("");
                 setConfirmPassword("");
+                toast.success("Profile updated successfully");
                 setOpen(false);
             } catch (err: any) {
                 setError(err.message || "Failed to update profile");
@@ -120,45 +138,45 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden gap-0">
+            <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden gap-0 max-h-[85vh] flex flex-col">
                 <DialogHeader className="p-6 pb-2">
-                    <DialogTitle className="text-xl">Edit Profile & System</DialogTitle>
+                    <DialogTitle className="text-xl">Edit Profile{isAdmin ? ' & System' : ''}</DialogTitle>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit}>
-                    <Tabs defaultValue="general" className="w-full">
+                <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+                    <Tabs defaultValue="general" className="w-full flex flex-col flex-1 overflow-hidden">
                         <div className="border-b px-6">
                             <TabsList className="bg-transparent h-12 p-0 space-x-6">
                                 <TabsTrigger
                                     value="general"
-                                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none h-full px-0 font-medium"
+                                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-full px-0 font-medium"
                                 >
                                     General
                                 </TabsTrigger>
                                 <TabsTrigger
                                     value="security"
-                                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-indigo-600 rounded-none h-full px-0 font-medium"
+                                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-full px-0 font-medium"
                                 >
                                     Security
                                 </TabsTrigger>
                             </TabsList>
                         </div>
 
-                        <div className="p-6 min-h-[350px]">
+                        <div className="p-6 min-h-[350px] overflow-y-auto flex-1">
                             {error && (
-                                <div className="mb-4 p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-md">
+                                <div className="mb-4 p-3 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-md">
                                     {error}
                                 </div>
                             )}
 
                             <TabsContent value="general" className="space-y-8 mt-0">
-                                {/* User Avater & Name */}
+                                {/* User Avatar & Name */}
                                 <div className="flex items-start gap-6">
                                     <div className="flex flex-col items-center gap-2">
                                         <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                                             <Avatar className="h-20 w-20 border-2 border-border shadow-sm">
                                                 <AvatarImage src={avatar} className="object-cover" />
-                                                <AvatarFallback className="text-xl bg-indigo-100 text-indigo-700">
+                                                <AvatarFallback className="text-xl bg-primary/10 text-primary">
                                                     {name.substring(0, 2).toUpperCase()}
                                                 </AvatarFallback>
                                             </Avatar>
@@ -187,78 +205,115 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
                                             />
                                         </div>
                                         <div className="grid gap-2">
-                                            <Label className="text-muted-foreground">My Role</Label>
-                                            <div className="text-sm font-medium text-foreground capitalize flex items-center gap-2">
-                                                <Shield className="h-4 w-4 text-indigo-500" />
-                                                {user.role}
-                                            </div>
+                                            <Label htmlFor="email">Email Address</Label>
+                                            <Input
+                                                id="email"
+                                                type="email"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
+                                                required
+                                            />
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="h-px bg-border/60" />
 
-                                {/* System Branding */}
+                                {/* Job Title, Phone, Role */}
                                 <div className="space-y-4">
-                                    <h4 className="text-sm font-medium flex items-center gap-2 text-foreground/80">
-                                        <Building2 className="h-4 w-4" /> System Branding
-                                    </h4>
-
-                                    <div className="flex items-start gap-6">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <div
-                                                className="h-20 w-20 border-2 border-dashed border-border rounded-lg flex items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors relative group overflow-hidden"
-                                                onClick={() => systemLogoRef.current?.click()}
-                                            >
-                                                {systemLogo ? (
-                                                    <img src={systemLogo} alt="System Logo" className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <Upload className="h-6 w-6 text-muted-foreground" />
-                                                )}
-                                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <Camera className="h-6 w-6 text-white" />
-                                                </div>
-                                                <input
-                                                    type="file"
-                                                    ref={systemLogoRef}
-                                                    className="hidden"
-                                                    accept="image/*"
-                                                    onChange={(e) => handleFileChange(e, setSystemLogo)}
-                                                />
-                                            </div>
-                                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Logo</span>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="jobTitle" className="flex items-center gap-1.5">
+                                                <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+                                                Job Title
+                                            </Label>
+                                            <Input
+                                                id="jobTitle"
+                                                value={jobTitle}
+                                                onChange={(e) => setJobTitle(e.target.value)}
+                                                placeholder="e.g. Senior Developer"
+                                            />
                                         </div>
-
-                                        <div className="flex-1">
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="systemName">System Name</Label>
-                                                <Input
-                                                    id="systemName"
-                                                    value={systemName}
-                                                    onChange={(e) => setSystemName(e.target.value)}
-                                                    placeholder="e.g. AgencyOS"
-                                                />
-                                                <p className="text-xs text-muted-foreground">Appears in the sidebar and browser title.</p>
-                                            </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="contactNumber" className="flex items-center gap-1.5">
+                                                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                                                Phone
+                                            </Label>
+                                            <Input
+                                                id="contactNumber"
+                                                value={contactNumber}
+                                                onChange={(e) => setContactNumber(e.target.value)}
+                                                placeholder="e.g. +91 9876543210"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label className="text-muted-foreground">My Role</Label>
+                                        <div className="text-sm font-medium text-foreground capitalize flex items-center gap-2">
+                                            <Shield className="h-4 w-4 text-primary" />
+                                            {user.role}
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* System Branding — Admin only */}
+                                {isAdmin && (
+                                    <>
+                                        <div className="h-px bg-border/60" />
+                                        <div className="space-y-4">
+                                            <h4 className="text-sm font-medium flex items-center gap-2 text-foreground/80">
+                                                <Building2 className="h-4 w-4" /> System Branding
+                                            </h4>
+
+                                            <div className="flex items-start gap-6">
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <div
+                                                        className="h-20 w-20 border-2 border-dashed border-border rounded-lg flex items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors relative group overflow-hidden"
+                                                        onClick={() => systemLogoRef.current?.click()}
+                                                    >
+                                                        {systemLogo ? (
+                                                            <img src={systemLogo} alt="System Logo" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <Upload className="h-6 w-6 text-muted-foreground" />
+                                                        )}
+                                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <Camera className="h-6 w-6 text-white" />
+                                                        </div>
+                                                        <input
+                                                            type="file"
+                                                            ref={systemLogoRef}
+                                                            className="hidden"
+                                                            accept="image/*"
+                                                            onChange={(e) => handleFileChange(e, setSystemLogo)}
+                                                        />
+                                                    </div>
+                                                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Logo</span>
+                                                </div>
+
+                                                <div className="flex-1">
+                                                    <div className="grid gap-2">
+                                                        <Label htmlFor="systemName">System Name</Label>
+                                                        <Input
+                                                            id="systemName"
+                                                            value={systemName}
+                                                            onChange={(e) => setSystemName(e.target.value)}
+                                                            placeholder="e.g. AgencyOS"
+                                                        />
+                                                        <p className="text-xs text-muted-foreground">Appears in the sidebar and browser title.</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </TabsContent>
 
                             <TabsContent value="security" className="space-y-6 mt-0">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="email">Email Address</Label>
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        required
-                                    />
-                                </div>
-
-                                <div className="border-t pt-4">
-                                    <h4 className="text-sm font-medium mb-4">Change Password</h4>
+                                <div className="border-b pb-4">
+                                    <h4 className="text-sm font-medium mb-4 flex items-center gap-2">
+                                        <Lock className="h-4 w-4 text-muted-foreground" />
+                                        Change Password
+                                    </h4>
                                     <div className="space-y-4">
                                         <div className="grid gap-2">
                                             <Label htmlFor="current-password">Current Password</Label>
@@ -302,7 +357,7 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
 
                         <DialogFooter className="bg-muted/50 p-6">
                             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
-                            <Button type="submit" disabled={isLoading} className="bg-indigo-600 hover:bg-indigo-700 gap-2">
+                            <Button type="submit" disabled={isLoading} className="bg-primary hover:bg-primary/90 gap-2">
                                 {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                                 Save Changes
                             </Button>
