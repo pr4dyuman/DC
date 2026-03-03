@@ -112,8 +112,14 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
     };
 
     const getProjectName = (projectId: string) => {
-        return projects.find(p => p.id === projectId)?.name || projectId;
+        return projects.find(p => p.id === projectId)?.name || 'Unknown Project';
     };
+
+    const filteredInvoices = invoices.filter(inv => {
+        const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
+        const matchesSearch = !invoiceSearch || getProjectName(inv.projectId).toLowerCase().includes(invoiceSearch.toLowerCase()) || inv.amount.toString().includes(invoiceSearch);
+        return matchesStatus && matchesSearch;
+    });
 
     return (
         <Card className="col-span-3">
@@ -202,11 +208,11 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                                 key={status}
                                 onClick={() => setStatusFilter(status)}
                                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${statusFilter === status
-                                        ? status === 'Paid' ? 'bg-emerald-500/15 text-emerald-500'
-                                            : status === 'Pending' ? 'bg-amber-500/15 text-amber-500'
-                                                : status === 'Processing' ? 'bg-blue-500/15 text-blue-500'
-                                                    : 'bg-primary/10 text-primary'
-                                        : 'text-muted-foreground hover:text-foreground'
+                                    ? status === 'Paid' ? 'bg-emerald-500/15 text-emerald-500'
+                                        : status === 'Pending' ? 'bg-amber-500/15 text-amber-500'
+                                            : status === 'Processing' ? 'bg-blue-500/15 text-blue-500'
+                                                : 'bg-primary/10 text-primary'
+                                    : 'text-muted-foreground hover:text-foreground'
                                     }`}
                             >
                                 {status === 'all' ? 'All' : status}
@@ -224,15 +230,7 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                     </div>
                     {(statusFilter !== 'all' || invoiceSearch) && (
                         <span className="text-xs text-muted-foreground ml-auto">
-                            {invoices.filter(inv => {
-                                const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
-                                const matchesSearch = !invoiceSearch || getProjectName(inv.projectId).toLowerCase().includes(invoiceSearch.toLowerCase()) || inv.amount.toString().includes(invoiceSearch);
-                                return matchesStatus && matchesSearch;
-                            }).length} result{invoices.filter(inv => {
-                                const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
-                                const matchesSearch = !invoiceSearch || getProjectName(inv.projectId).toLowerCase().includes(invoiceSearch.toLowerCase()) || inv.amount.toString().includes(invoiceSearch);
-                                return matchesStatus && matchesSearch;
-                            }).length !== 1 ? 's' : ''}
+                            {filteredInvoices.length} result{filteredInvoices.length !== 1 ? 's' : ''}
                         </span>
                     )}
                 </div>
@@ -248,74 +246,75 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {(() => {
-                                const filtered = invoices.filter(inv => {
-                                    const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
-                                    const matchesSearch = !invoiceSearch || getProjectName(inv.projectId).toLowerCase().includes(invoiceSearch.toLowerCase()) || inv.amount.toString().includes(invoiceSearch);
-                                    return matchesStatus && matchesSearch;
-                                });
-                                return filtered.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={5} className="text-center">No invoices found.</TableCell>
-                                    </TableRow>
-                                ) : (
-                                    filtered.map((invoice) => (
-                                        <TableRow key={invoice.id}>
-                                            <TableCell className="font-medium">{getProjectName(invoice.projectId)}</TableCell>
-                                            <TableCell>{format(new Date(invoice.date), "MMM d, yyyy")}</TableCell>
-                                            <TableCell>{formatter.format(invoice.amount)}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={invoice.status === 'Paid' ? 'secondary' : 'default'} className={
-                                                    invoice.status === 'Paid' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' :
-                                                        invoice.status === 'Pending' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' :
-                                                            invoice.status === 'Processing' ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20' : 'bg-red-500/15 text-red-400 border border-red-500/20'
-                                                }>
-                                                    {invoice.status}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                {isClient ? (
-                                                    invoice.status === 'Pending' && (
+                            {filteredInvoices.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center">No invoices found.</TableCell>
+                                </TableRow>
+                            ) : (
+                                filteredInvoices.map((invoice) => (
+                                    <TableRow key={invoice.id}>
+                                        <TableCell className="font-medium">{getProjectName(invoice.projectId)}</TableCell>
+                                        <TableCell>{format(new Date(invoice.date), "MMM d, yyyy")}</TableCell>
+                                        <TableCell>{formatter.format(invoice.amount)}</TableCell>
+                                        <TableCell>
+                                            <Badge variant={invoice.status === 'Paid' ? 'secondary' : 'default'} className={
+                                                invoice.status === 'Paid' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' :
+                                                    invoice.status === 'Pending' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' :
+                                                        invoice.status === 'Processing' ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20' : 'bg-red-500/15 text-red-400 border border-red-500/20'
+                                            }>
+                                                {invoice.status}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            {isClient ? (
+                                                invoice.status === 'Pending' ? (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        disabled={actionLoadingId === invoice.id}
+                                                        onClick={() => handleClientSubmitPayment(invoice.id)}
+                                                    >
+                                                        {actionLoadingId === invoice.id ? (
+                                                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</>
+                                                        ) : "Submit Payment"}
+                                                    </Button>
+                                                ) : invoice.status === 'Paid' ? (
+                                                    <span className="text-xs text-emerald-500 font-medium">✓ Paid</span>
+                                                ) : invoice.status === 'Processing' ? (
+                                                    <span className="text-xs text-blue-400 font-medium">Under Review</span>
+                                                ) : null
+                                            ) : (
+                                                invoice.status === 'Processing' ? (
+                                                    <div className="flex gap-2">
                                                         <Button
                                                             size="sm"
-                                                            variant="outline"
+                                                            className="bg-emerald-600 hover:bg-emerald-700"
                                                             disabled={actionLoadingId === invoice.id}
-                                                            onClick={() => handleClientSubmitPayment(invoice.id)}
+                                                            onClick={() => handleAdminApprove(invoice.id)}
                                                         >
                                                             {actionLoadingId === invoice.id ? (
-                                                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</>
-                                                            ) : "Submit Payment"}
+                                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                            ) : "Approve"}
                                                         </Button>
-                                                    )
-                                                ) : (
-                                                    invoice.status === 'Processing' && (
-                                                        <div className="flex gap-2">
-                                                            <Button
-                                                                size="sm"
-                                                                className="bg-emerald-600 hover:bg-emerald-700"
-                                                                disabled={actionLoadingId === invoice.id}
-                                                                onClick={() => handleAdminApprove(invoice.id)}
-                                                            >
-                                                                {actionLoadingId === invoice.id ? (
-                                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                                ) : "Approve"}
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="destructive"
-                                                                disabled={actionLoadingId === invoice.id}
-                                                                onClick={() => handleAdminReject(invoice.id)}
-                                                            >
-                                                                Reject
-                                                            </Button>
-                                                        </div>
-                                                    )
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                );
-                            })()}
+                                                        <Button
+                                                            size="sm"
+                                                            variant="destructive"
+                                                            disabled={actionLoadingId === invoice.id}
+                                                            onClick={() => handleAdminReject(invoice.id)}
+                                                        >
+                                                            Reject
+                                                        </Button>
+                                                    </div>
+                                                ) : invoice.status === 'Paid' ? (
+                                                    <span className="text-xs text-emerald-500 font-medium">✓ Confirmed</span>
+                                                ) : invoice.status === 'Pending' ? (
+                                                    <span className="text-xs text-muted-foreground">Awaiting Client</span>
+                                                ) : null
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
                         </TableBody>
                     </Table>
                 </div>
