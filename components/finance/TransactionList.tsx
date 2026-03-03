@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { format } from "date-fns";
+import { format, isAfter, startOfMonth, subMonths, startOfYear } from "date-fns";
 import { Transaction, Project, User } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowDownRight, ArrowUpRight, Search, MoreHorizontal, Trash, Loader2 } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Search, MoreHorizontal, Trash, Loader2, Calendar, Filter } from "lucide-react";
 import { deleteTransaction } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
@@ -43,6 +43,8 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [visibleCount, setVisibleCount] = useState(20);
+    const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
+    const [dateRange, setDateRange] = useState<string>('all');
 
     const formatter = new Intl.NumberFormat('en-IN', {
         style: 'currency',
@@ -56,13 +58,29 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
         const projectName = t.projectId ? projects.find(p => p.id === t.projectId)?.name : "";
         const userName = t.userId ? users.find(u => u.id === t.userId)?.name : "";
 
-        return (
+        const matchesSearch = (
             t.description.toLowerCase().includes(query) ||
             t.amount.toString().includes(query) ||
             t.category.toLowerCase().includes(query) ||
             (projectName && projectName.toLowerCase().includes(query)) ||
             (userName && userName.toLowerCase().includes(query))
         );
+
+        // Type filter
+        const matchesType = typeFilter === 'all' || t.type === typeFilter;
+
+        // Date range filter
+        let matchesDate = true;
+        if (dateRange !== 'all') {
+            const txDate = new Date(t.date);
+            const now = new Date();
+            if (dateRange === 'this-month') matchesDate = isAfter(txDate, startOfMonth(now));
+            else if (dateRange === 'last-month') matchesDate = isAfter(txDate, startOfMonth(subMonths(now, 1))) && !isAfter(txDate, startOfMonth(now));
+            else if (dateRange === 'last-3-months') matchesDate = isAfter(txDate, startOfMonth(subMonths(now, 3)));
+            else if (dateRange === 'this-year') matchesDate = isAfter(txDate, startOfYear(now));
+        }
+
+        return matchesSearch && matchesType && matchesDate;
     });
 
     const handleDeleteClick = (id: string) => {
@@ -113,6 +131,38 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1 rounded-lg border p-1">
+                        {(['all', 'income', 'expense'] as const).map((type) => (
+                            <button
+                                key={type}
+                                onClick={() => { setTypeFilter(type); setVisibleCount(20); }}
+                                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${typeFilter === type
+                                        ? type === 'income' ? 'bg-emerald-500/15 text-emerald-500' : type === 'expense' ? 'bg-red-500/15 text-red-500' : 'bg-primary/10 text-primary'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                            >
+                                {type === 'all' ? 'All' : type === 'income' ? 'Income' : 'Expense'}
+                            </button>
+                        ))}
+                    </div>
+                    <select
+                        value={dateRange}
+                        onChange={(e) => { setDateRange(e.target.value); setVisibleCount(20); }}
+                        className="h-8 rounded-md border bg-transparent px-3 text-xs text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    >
+                        <option value="all">All Time</option>
+                        <option value="this-month">This Month</option>
+                        <option value="last-month">Last Month</option>
+                        <option value="last-3-months">Last 3 Months</option>
+                        <option value="this-year">This Year</option>
+                    </select>
+                    {(typeFilter !== 'all' || dateRange !== 'all') && (
+                        <span className="text-xs text-muted-foreground ml-auto">
+                            {filteredTransactions.length} result{filteredTransactions.length !== 1 ? 's' : ''}
+                        </span>
+                    )}
                 </div>
             </CardHeader>
             <CardContent>

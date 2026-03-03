@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,8 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
     const [loading, setLoading] = useState(false);
     const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
+    const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [invoiceSearch, setInvoiceSearch] = useState("");
     const router = useRouter();
     const formatter = new Intl.NumberFormat('en-IN', {
         style: 'currency',
@@ -193,80 +195,130 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                 )}
             </CardHeader>
             <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Project</TableHead>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {invoices.length === 0 ? (
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1 rounded-lg border p-1">
+                        {['all', 'Pending', 'Processing', 'Paid'].map((status) => (
+                            <button
+                                key={status}
+                                onClick={() => setStatusFilter(status)}
+                                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${statusFilter === status
+                                        ? status === 'Paid' ? 'bg-emerald-500/15 text-emerald-500'
+                                            : status === 'Pending' ? 'bg-amber-500/15 text-amber-500'
+                                                : status === 'Processing' ? 'bg-blue-500/15 text-blue-500'
+                                                    : 'bg-primary/10 text-primary'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                            >
+                                {status === 'all' ? 'All' : status}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="relative flex-1 min-w-[150px] max-w-[250px]">
+                        <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                        <input
+                            placeholder="Search invoices..."
+                            value={invoiceSearch}
+                            onChange={(e) => setInvoiceSearch(e.target.value)}
+                            className="h-7 w-full rounded-md border bg-transparent pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                        />
+                    </div>
+                    {(statusFilter !== 'all' || invoiceSearch) && (
+                        <span className="text-xs text-muted-foreground ml-auto">
+                            {invoices.filter(inv => {
+                                const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
+                                const matchesSearch = !invoiceSearch || getProjectName(inv.projectId).toLowerCase().includes(invoiceSearch.toLowerCase()) || inv.amount.toString().includes(invoiceSearch);
+                                return matchesStatus && matchesSearch;
+                            }).length} result{invoices.filter(inv => {
+                                const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
+                                const matchesSearch = !invoiceSearch || getProjectName(inv.projectId).toLowerCase().includes(invoiceSearch.toLowerCase()) || inv.amount.toString().includes(invoiceSearch);
+                                return matchesStatus && matchesSearch;
+                            }).length !== 1 ? 's' : ''}
+                        </span>
+                    )}
+                </div>
+                <div className="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
                             <TableRow>
-                                <TableCell colSpan={5} className="text-center">No invoices found.</TableCell>
+                                <TableHead>Project</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Amount</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Actions</TableHead>
                             </TableRow>
-                        ) : (
-                            invoices.map((invoice) => (
-                                <TableRow key={invoice.id}>
-                                    <TableCell className="font-medium">{getProjectName(invoice.projectId)}</TableCell>
-                                    <TableCell>{format(new Date(invoice.date), "MMM d, yyyy")}</TableCell>
-                                    <TableCell>{formatter.format(invoice.amount)}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={invoice.status === 'Paid' ? 'secondary' : 'default'} className={
-                                            invoice.status === 'Paid' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' :
-                                                invoice.status === 'Pending' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' :
-                                                    invoice.status === 'Processing' ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20' : 'bg-red-500/15 text-red-400 border border-red-500/20'
-                                        }>
-                                            {invoice.status}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        {isClient ? (
-                                            invoice.status === 'Pending' && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    disabled={actionLoadingId === invoice.id}
-                                                    onClick={() => handleClientSubmitPayment(invoice.id)}
-                                                >
-                                                    {actionLoadingId === invoice.id ? (
-                                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</>
-                                                    ) : "Submit Payment"}
-                                                </Button>
-                                            )
-                                        ) : (
-                                            invoice.status === 'Processing' && (
-                                                <div className="flex gap-2">
-                                                    <Button
-                                                        size="sm"
-                                                        className="bg-emerald-600 hover:bg-emerald-700"
-                                                        disabled={actionLoadingId === invoice.id}
-                                                        onClick={() => handleAdminApprove(invoice.id)}
-                                                    >
-                                                        {actionLoadingId === invoice.id ? (
-                                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                                        ) : "Approve"}
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="destructive"
-                                                        disabled={actionLoadingId === invoice.id}
-                                                        onClick={() => handleAdminReject(invoice.id)}
-                                                    >
-                                                        Reject
-                                                    </Button>
-                                                </div>
-                                            )
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
+                        </TableHeader>
+                        <TableBody>
+                            {(() => {
+                                const filtered = invoices.filter(inv => {
+                                    const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
+                                    const matchesSearch = !invoiceSearch || getProjectName(inv.projectId).toLowerCase().includes(invoiceSearch.toLowerCase()) || inv.amount.toString().includes(invoiceSearch);
+                                    return matchesStatus && matchesSearch;
+                                });
+                                return filtered.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center">No invoices found.</TableCell>
+                                    </TableRow>
+                                ) : (
+                                    filtered.map((invoice) => (
+                                        <TableRow key={invoice.id}>
+                                            <TableCell className="font-medium">{getProjectName(invoice.projectId)}</TableCell>
+                                            <TableCell>{format(new Date(invoice.date), "MMM d, yyyy")}</TableCell>
+                                            <TableCell>{formatter.format(invoice.amount)}</TableCell>
+                                            <TableCell>
+                                                <Badge variant={invoice.status === 'Paid' ? 'secondary' : 'default'} className={
+                                                    invoice.status === 'Paid' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' :
+                                                        invoice.status === 'Pending' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' :
+                                                            invoice.status === 'Processing' ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20' : 'bg-red-500/15 text-red-400 border border-red-500/20'
+                                                }>
+                                                    {invoice.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                {isClient ? (
+                                                    invoice.status === 'Pending' && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            disabled={actionLoadingId === invoice.id}
+                                                            onClick={() => handleClientSubmitPayment(invoice.id)}
+                                                        >
+                                                            {actionLoadingId === invoice.id ? (
+                                                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</>
+                                                            ) : "Submit Payment"}
+                                                        </Button>
+                                                    )
+                                                ) : (
+                                                    invoice.status === 'Processing' && (
+                                                        <div className="flex gap-2">
+                                                            <Button
+                                                                size="sm"
+                                                                className="bg-emerald-600 hover:bg-emerald-700"
+                                                                disabled={actionLoadingId === invoice.id}
+                                                                onClick={() => handleAdminApprove(invoice.id)}
+                                                            >
+                                                                {actionLoadingId === invoice.id ? (
+                                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                                ) : "Approve"}
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="destructive"
+                                                                disabled={actionLoadingId === invoice.id}
+                                                                onClick={() => handleAdminReject(invoice.id)}
+                                                            >
+                                                                Reject
+                                                            </Button>
+                                                        </div>
+                                                    )
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                );
+                            })()}
+                        </TableBody>
+                    </Table>
+                </div>
             </CardContent>
         </Card>
     );
