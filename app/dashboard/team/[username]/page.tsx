@@ -14,10 +14,10 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import {
-    Mail, Briefcase, Phone, MapPin, Calendar, IndianRupee,
+    Mail, Briefcase, Calendar, IndianRupee,
     CheckCircle2, Clock, Activity as ActivityIcon, ArrowLeft,
-    PieChart as PieChartIcon, Zap, Trash2, Pencil, MessageCircle,
-    Eye, ListTodo, FolderOpen, Search, ChevronDown, Filter
+    Zap, Pencil, MessageCircle,
+    Eye, ListTodo, FolderOpen, Search, ChevronDown, ArrowUpDown
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -47,6 +47,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
     // Task filtering
     const [taskStatusFilter, setTaskStatusFilter] = useState<string>("all");
     const [taskSearch, setTaskSearch] = useState("");
+    const [taskSortBy, setTaskSortBy] = useState<string>("default");
 
     // Activity pagination
     const [activityLimit, setActivityLimit] = useState(15);
@@ -221,13 +222,30 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
     const efficiency = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 100;
 
     // Filtered/sorted tasks
-    const filteredTasks = tasks.filter(t => {
-        const matchesStatus = taskStatusFilter === "all" ? true : t.status === taskStatusFilter;
-        const matchesSearch = taskSearch.trim()
-            ? t.title.toLowerCase().includes(taskSearch.toLowerCase()) || t.description?.toLowerCase().includes(taskSearch.toLowerCase())
-            : true;
-        return matchesStatus && matchesSearch;
-    });
+    const filteredTasks = tasks
+        .filter(t => {
+            const matchesStatus = taskStatusFilter === "all" ? true : t.status === taskStatusFilter;
+            const matchesSearch = taskSearch.trim()
+                ? t.title.toLowerCase().includes(taskSearch.toLowerCase()) || t.description?.toLowerCase().includes(taskSearch.toLowerCase())
+                : true;
+            return matchesStatus && matchesSearch;
+        })
+        .sort((a, b) => {
+            if (taskSortBy === "priority") {
+                const order: Record<string, number> = { 'Urgent': 0, 'High': 1, 'Medium': 2, 'Normal': 3, 'Low': 4 };
+                return (order[a.priority || 'Normal'] ?? 3) - (order[b.priority || 'Normal'] ?? 3);
+            }
+            if (taskSortBy === "dueDate") {
+                if (!a.dueDate && !b.dueDate) return 0;
+                if (!a.dueDate) return 1;
+                if (!b.dueDate) return -1;
+                return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+            }
+            if (taskSortBy === "newest") {
+                return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+            }
+            return 0;
+        });
 
     // Paginated activities
     const visibleActivities = activities.slice(0, activityLimit);
@@ -493,6 +511,16 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                         <option value="In Progress">In Progress</option>
                                         <option value="Review">Review</option>
                                         <option value="Done">Done</option>
+                                    </select>
+                                    <select
+                                        value={taskSortBy}
+                                        onChange={(e) => setTaskSortBy(e.target.value)}
+                                        className="bg-secondary border border-border rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary text-foreground"
+                                    >
+                                        <option value="default">Sort: Default</option>
+                                        <option value="priority">Sort: Priority</option>
+                                        <option value="dueDate">Sort: Due Date</option>
+                                        <option value="newest">Sort: Newest</option>
                                     </select>
                                 </div>
                             </div>
