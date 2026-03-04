@@ -1,38 +1,29 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getAgencySettings, updateEmailSettings } from "@/lib/actions";
+import { updateEmailSettings } from "@/lib/actions";
 import { toast } from "sonner";
 import { Loader2, Mail, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
-export function EmailSettings() {
-    const [enabled, setEnabled] = useState(true);
-    const [loading, setLoading] = useState(true);
+interface EmailSettingsProps {
+    initialEnabled?: boolean;
+    loading?: boolean;
+}
+
+export function EmailSettings({ initialEnabled = true, loading: parentLoading }: EmailSettingsProps) {
+    const [enabled, setEnabled] = useState(initialEnabled);
     const [updating, setUpdating] = useState(false);
 
+    // Sync from parent when data arrives
     useEffect(() => {
-        loadSettings();
-    }, []);
-
-    const loadSettings = async () => {
-        try {
-            const settings = await getAgencySettings();
-            if (settings) {
-                setEnabled(settings.emailNotificationsEnabled ?? true);
-            }
-            setLoading(false);
-        } catch (error) {
-            console.error("Failed to load email settings", error);
-            toast.error("Failed to load settings");
-            setLoading(false);
-        }
-    };
+        setEnabled(initialEnabled);
+    }, [initialEnabled]);
 
     const handleToggle = async (checked: boolean) => {
-        setEnabled(checked); // Optimistic update
+        setEnabled(checked); // Optimistic
         setUpdating(true);
         try {
             await updateEmailSettings(checked);
@@ -46,7 +37,7 @@ export function EmailSettings() {
         }
     };
 
-    if (loading) {
+    if (parentLoading) {
         return <div className="p-4 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
     }
 
@@ -67,7 +58,7 @@ export function EmailSettings() {
                 <div className="flex items-center justify-between space-x-4 rounded-lg border border-red-200/20 bg-background/50 p-4">
                     <div className="flex-1 space-y-1">
                         <div className="flex items-center gap-2">
-                             <Label htmlFor="email-switch" className="text-base font-medium">
+                            <Label htmlFor="email-switch" className="text-base font-medium">
                                 Send Emails
                             </Label>
                             {updating && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}

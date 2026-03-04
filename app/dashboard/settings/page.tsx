@@ -1,15 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { getServices, addService, deleteService, updateService, updateUser } from "@/lib/actions";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { useState, useEffect, useCallback } from "react";
+import { getServices, addService, deleteService, updateService, getAgencySettings } from "@/lib/actions";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, Plus, Trash2, Edit2, Users, Briefcase, ChevronDown, ChevronRight, Settings, Shield, Palette, Sun, Moon } from "lucide-react";
+import {
+    Dialog, DialogContent, DialogDescription, DialogFooter,
+    DialogHeader, DialogTitle
+} from "@/components/ui/dialog";
+import {
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog";
+import {
+    Loader2, Plus, Trash2, Edit2, Users, Briefcase,
+    ChevronDown, ChevronRight, Settings, Shield, Palette,
+    Sun, Moon, X, Lock
+} from "lucide-react";
 import { toast } from "sonner";
-import { X } from "lucide-react";
 import PermissionSettings from "@/components/settings/PermissionSettings";
 import { SecuritySettings } from "@/components/settings/SecuritySettings";
 import { AgencySettings } from "@/components/settings/AgencySettings";
@@ -19,17 +29,37 @@ import { useTheme } from "@/components/providers/ThemeProvider";
 type Job = { title: string; count: number };
 type Service = { id: string; name: string; jobs: Job[] };
 
+type AgencySettingsData = {
+    name: string;
+    logo: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+    emailNotificationsEnabled: boolean;
+};
+
 export default function SettingsPage() {
     const [services, setServices] = useState<Service[]>([]);
     const [loading, setLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingService, setEditingService] = useState<Service | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
-    // Section Visibility State
-    const [isServicesOpen, setIsServicesOpen] = useState(false);
-    const [isGeneralOpen, setIsGeneralOpen] = useState(false);
-    const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
-    const [isAppearanceOpen, setIsAppearanceOpen] = useState(false);
+    // Agency settings (shared between AgencySettings + EmailSettings)
+    const [agencySettings, setAgencySettings] = useState<AgencySettingsData | null>(null);
+    const [agencySettingsLoading, setAgencySettingsLoading] = useState(true);
+
+    // Section Visibility State — first section auto-opens
+    const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            const section = url.searchParams.get('section');
+            if (section) {
+                return { [section]: true };
+            }
+        }
+        return { appearance: true };
+    });
+
     const { theme, setTheme } = useTheme();
 
     // Form State
@@ -37,25 +67,66 @@ export default function SettingsPage() {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [submitting, setSubmitting] = useState(false);
 
-    useEffect(() => {
-        loadData();
+    const toggleSection = useCallback((key: string) => {
+        setOpenSections(prev => {
+            const newState = { ...prev, [key]: !prev[key] };
+            // Update URL
+            const url = new URL(window.location.href);
+            const openKeys = Object.entries(newState).filter(([, v]) => v).map(([k]) => k);
+            if (openKeys.length === 1) {
+                url.searchParams.set('section', openKeys[0]);
+            } else {
+                url.searchParams.delete('section');
+            }
+            window.history.replaceState({}, '', url.pathname + url.search);
+            return newState;
+        });
     }, []);
 
-    const loadData = async () => {
-        const servicesData = await getServices();
-        setServices(servicesData || []);
-        setLoading(false);
-    };
+    const loadServices = useCallback(async () => {
+        try {
+            const servicesData = await getServices();
+            setServices(servicesData || []);
+        } catch (error) {
+            console.error("Failed to load services", error);
+            toast.error("Failed to load services");
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const loadAgencySettings = useCallback(async () => {
+        try {
+            const settings = await getAgencySettings();
+            setAgencySettings(settings ? {
+                name: settings.name,
+                logo: settings.logo,
+                primaryColor: settings.primaryColor,
+                secondaryColor: settings.secondaryColor,
+                emailNotificationsEnabled: settings.emailNotificationsEnabled ?? true
+            } : null);
+        } catch (error) {
+            console.error("Failed to load agency settings", error);
+            toast.error("Failed to load agency settings");
+        } finally {
+            setAgencySettingsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadServices();
+        loadAgencySettings();
+    }, [loadServices, loadAgencySettings]);
 
     const handleOpenDialog = (service?: Service) => {
         if (service) {
             setEditingService(service);
             setName(service.name);
-            setJobs([...service.jobs]); // Clone
+            setJobs([...service.jobs]);
         } else {
             setEditingService(null);
             setName("");
-            setJobs([{ title: "", count: 1 }]); // Default one empty job
+            setJobs([{ title: "", count: 1 }]);
         }
         setIsDialogOpen(true);
     };
@@ -79,12 +150,12 @@ export default function SettingsPage() {
         if (!name.trim()) return;
 
         setSubmitting(true);
-        // Filter out empty jobs
         const validJobs = jobs.filter(j => j.title.trim() !== "");
+        const previousServices = [...services]; // For revert
 
         try {
             if (editingService) {
-                // Optimistic Update
+                // Optimistic update
                 setServices(prev => prev.map(s => s.id === editingService.id ? { ...s, name, jobs: validJobs } : s));
                 await updateService(editingService.id, name, validJobs);
                 toast.success("Service updated");
@@ -93,25 +164,28 @@ export default function SettingsPage() {
                 toast.success("Service created");
             }
             setIsDialogOpen(false);
-            loadData();
+            loadServices();
         } catch (error) {
             console.error(error);
             toast.error("Failed to save service");
+            // Revert optimistic update
+            setServices(previousServices);
         } finally {
             setSubmitting(false);
         }
     };
 
-    const handleDelete = async (id: string) => {
-        const serviceName = services.find(s => s.id === id)?.name || 'Service';
-        setServices(prev => prev.filter(c => c.id !== id)); // Optimistic
+    const handleConfirmDelete = async () => {
+        if (!deleteTarget) return;
+        const previousServices = [...services];
+        setServices(prev => prev.filter(c => c.id !== deleteTarget.id)); // Optimistic
+        setDeleteTarget(null);
         try {
-            await deleteService(id);
-            toast.success(`"${serviceName}" deleted`);
-            loadData();
+            await deleteService(deleteTarget.id);
+            toast.success(`"${deleteTarget.name}" deleted`);
         } catch {
             toast.error("Failed to delete service");
-            loadData();
+            setServices(previousServices); // Revert
         }
     };
 
@@ -125,214 +199,201 @@ export default function SettingsPage() {
             </div>
 
             {/* Appearance Section */}
-            <div className="border rounded-lg bg-card text-card-foreground shadow-sm">
-                <div
-                    onClick={() => setIsAppearanceOpen(!isAppearanceOpen)}
-                    className="flex flex-row items-center justify-between p-6 cursor-pointer hover:bg-accent/50 transition-colors"
-                >
-                    <div className="flex items-center gap-4">
-                        <div className="p-2 bg-sky-500/10 rounded-full">
-                            <Palette className="h-6 w-6 text-sky-500" />
+            <SectionAccordion
+                title="Appearance"
+                description="Customize the look and feel."
+                icon={<Palette className="h-6 w-6 text-sky-500" />}
+                iconBg="bg-sky-500/10"
+                isOpen={!!openSections.appearance}
+                onToggle={() => toggleSection('appearance')}
+            >
+                <Label className="text-sm font-medium mb-4 block">Theme</Label>
+                <div className="grid grid-cols-2 gap-4 max-w-md">
+                    {/* Dark Theme Card */}
+                    <button
+                        onClick={() => setTheme("dark")}
+                        className={`relative flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all duration-200 cursor-pointer hover:scale-[1.02] ${theme === "dark"
+                            ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
+                            : "border-border hover:border-muted-foreground/30"
+                            }`}
+                    >
+                        <div className="w-full aspect-[4/3] rounded-lg bg-black border border-neutral-800 p-2 flex flex-col gap-1">
+                            <div className="h-1.5 w-8 rounded bg-neutral-700" />
+                            <div className="h-1.5 w-12 rounded bg-neutral-800" />
+                            <div className="flex-1 rounded bg-neutral-900 mt-1" />
                         </div>
-                        <div>
-                            <h2 className="text-lg font-semibold">Appearance</h2>
-                            <p className="text-sm text-muted-foreground">Customize the look and feel.</p>
+                        <div className="flex items-center gap-2">
+                            <Moon className="h-4 w-4" />
+                            <span className="text-sm font-medium">Dark</span>
                         </div>
-                    </div>
-                    {isAppearanceOpen ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : <ChevronRight className="h-5 w-5 text-muted-foreground" />}
-                </div>
+                        {theme === "dark" && (
+                            <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
+                        )}
+                    </button>
 
-                <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isAppearanceOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-                    <div className="overflow-hidden">
-                        <div className="p-6 pt-0">
-                            <Label className="text-sm font-medium mb-4 block">Theme</Label>
-                            <div className="grid grid-cols-2 gap-4 max-w-md">
-                                {/* Dark Theme Card */}
-                                <button
-                                    onClick={() => setTheme("dark")}
-                                    className={`relative flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all duration-200 cursor-pointer hover:scale-[1.02] ${theme === "dark"
-                                        ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
-                                        : "border-border hover:border-muted-foreground/30"
-                                        }`}
-                                >
-                                    <div className="w-full aspect-[4/3] rounded-lg bg-black border border-neutral-800 p-2 flex flex-col gap-1">
-                                        <div className="h-1.5 w-8 rounded bg-neutral-700" />
-                                        <div className="h-1.5 w-12 rounded bg-neutral-800" />
-                                        <div className="flex-1 rounded bg-neutral-900 mt-1" />
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Moon className="h-4 w-4" />
-                                        <span className="text-sm font-medium">Dark</span>
-                                    </div>
-                                    {theme === "dark" && (
-                                        <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
-                                    )}
-                                </button>
-
-                                {/* Light Theme Card */}
-                                <button
-                                    onClick={() => setTheme("light")}
-                                    className={`relative flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all duration-200 cursor-pointer hover:scale-[1.02] ${theme === "light"
-                                        ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
-                                        : "border-border hover:border-muted-foreground/30"
-                                        }`}
-                                >
-                                    <div className="w-full aspect-[4/3] rounded-lg bg-gray-100 border border-gray-200 p-2 flex flex-col gap-1">
-                                        <div className="h-1.5 w-8 rounded bg-gray-300" />
-                                        <div className="h-1.5 w-12 rounded bg-gray-200" />
-                                        <div className="flex-1 rounded bg-white mt-1 border border-gray-200" />
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Sun className="h-4 w-4" />
-                                        <span className="text-sm font-medium">Light</span>
-                                    </div>
-                                    {theme === "light" && (
-                                        <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
-                                    )}
-                                </button>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-3">Your preference is saved automatically.</p>
+                    {/* Light Theme Card */}
+                    <button
+                        onClick={() => setTheme("light")}
+                        className={`relative flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all duration-200 cursor-pointer hover:scale-[1.02] ${theme === "light"
+                            ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
+                            : "border-border hover:border-muted-foreground/30"
+                            }`}
+                    >
+                        <div className="w-full aspect-[4/3] rounded-lg bg-gray-100 border border-gray-200 p-2 flex flex-col gap-1">
+                            <div className="h-1.5 w-8 rounded bg-gray-300" />
+                            <div className="h-1.5 w-12 rounded bg-gray-200" />
+                            <div className="flex-1 rounded bg-white mt-1 border border-gray-200" />
                         </div>
-                    </div>
+                        <div className="flex items-center gap-2">
+                            <Sun className="h-4 w-4" />
+                            <span className="text-sm font-medium">Light</span>
+                        </div>
+                        {theme === "light" && (
+                            <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
+                        )}
+                    </button>
                 </div>
-            </div>
+                <p className="text-xs text-muted-foreground mt-3">Your preference is saved automatically.</p>
+            </SectionAccordion>
 
             {/* Service Management Section */}
-            <div className="border rounded-lg bg-card text-card-foreground shadow-sm">
-                <div
-                    onClick={() => setIsServicesOpen(!isServicesOpen)}
-                    className="flex flex-row items-center justify-between p-6 cursor-pointer hover:bg-accent/50 transition-colors"
-                >
-                    <div className="flex items-center gap-4">
-                        <div className="p-2 bg-yellow-500/10 rounded-full">
-                            <Briefcase className="h-6 w-6 text-yellow-500" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-semibold">Service Management</h2>
-                            <p className="text-sm text-muted-foreground">Define services and resource allocation.</p>
-                        </div>
-                    </div>
-                    {isServicesOpen ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : <ChevronRight className="h-5 w-5 text-muted-foreground" />}
+            <SectionAccordion
+                title="Service Management"
+                description="Define services and resource allocation."
+                icon={<Briefcase className="h-6 w-6 text-yellow-500" />}
+                iconBg="bg-yellow-500/10"
+                isOpen={!!openSections.services}
+                onToggle={() => toggleSection('services')}
+            >
+                <div className="flex justify-end mb-4">
+                    <Button onClick={(e) => { e.stopPropagation(); handleOpenDialog(); }} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                        <Plus className="mr-2 h-4 w-4" /> Add Service
+                    </Button>
                 </div>
 
-                <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isServicesOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-                    <div className="overflow-hidden">
-                        <div className="p-6 pt-0">
-                            <div className="flex justify-end mb-4">
-                                <Button onClick={(e) => { e.stopPropagation(); handleOpenDialog(); }} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                                    <Plus className="mr-2 h-4 w-4" /> Add Service
-                                </Button>
-                            </div>
-
-                            {loading ? (
-                                <div className="flex items-center justify-center py-12">
-                                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                {loading ? (
+                    <div className="flex items-center justify-center py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                ) : (
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                        {services.map(service => (
+                            <div key={service.id} className="border rounded-lg p-4 bg-background/50 hover:bg-background/80 transition-all border-border hover:border-primary/50 group relative">
+                                <div className="flex justify-between items-start mb-3">
+                                    <div className="flex items-center gap-2 font-semibold">
+                                        {service.name}
+                                    </div>
+                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenDialog(service)}>
+                                            <Edit2 className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                            onClick={() => setDeleteTarget({ id: service.id, name: service.name })}
+                                        >
+                                            <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                    </div>
                                 </div>
-                            ) : (
-                                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                    {services.map(service => (
-                                        <div key={service.id} className="border rounded-lg p-4 bg-background/50 hover:bg-background/80 transition-all border-border hover:border-primary/50 group relative">
-                                            <div className="flex justify-between items-start mb-3">
-                                                <div className="flex items-center gap-2 font-semibold">
-                                                    {service.name}
-                                                </div>
-                                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenDialog(service)}>
-                                                        <Edit2 className="h-3 w-3" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(service.id)}>
-                                                        <Trash2 className="h-3 w-3" />
-                                                    </Button>
-                                                </div>
-                                            </div>
 
-                                            <div className="text-sm text-muted-foreground mb-4 flex items-center">
-                                                <Users className="mr-1.5 h-3.5 w-3.5" />
-                                                {totalEmployees(service.jobs)} Employees
-                                            </div>
+                                <div className="text-sm text-muted-foreground mb-4 flex items-center">
+                                    <Users className="mr-1.5 h-3.5 w-3.5" />
+                                    {totalEmployees(service.jobs)} Employees
+                                </div>
 
-                                            <div className="space-y-2">
-                                                {service.jobs.length > 0 ? service.jobs.map((job, idx) => (
-                                                    <div key={idx} className="flex justify-between items-center text-xs bg-muted/50 p-1.5 rounded">
-                                                        <span>{job.title}</span>
-                                                        <span className="font-mono bg-yellow-500/10 text-yellow-600 px-1.5 rounded">{job.count}</span>
-                                                    </div>
-                                                )) : (
-                                                    <div className="text-xs text-muted-foreground italic">No roles defined</div>
-                                                )}
-                                            </div>
+                                <div className="space-y-2">
+                                    {service.jobs.length > 0 ? service.jobs.map((job, idx) => (
+                                        <div key={idx} className="flex justify-between items-center text-xs bg-muted/50 p-1.5 rounded">
+                                            <span>{job.title}</span>
+                                            <span className="font-mono bg-yellow-500/10 text-yellow-600 px-1.5 rounded">{job.count}</span>
                                         </div>
-                                    ))}
-
-                                    {services.length === 0 && (
-                                        <div className="col-span-full text-center py-8 text-muted-foreground text-sm">
-                                            No services found.
-                                        </div>
+                                    )) : (
+                                        <div className="text-xs text-muted-foreground italic">No roles defined</div>
                                     )}
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        ))}
+
+                        {services.length === 0 && (
+                            <div className="col-span-full text-center py-8 text-muted-foreground text-sm">
+                                No services found.
+                            </div>
+                        )}
                     </div>
-                </div>
-            </div>
+                )}
+            </SectionAccordion>
 
             {/* Permission Management Section */}
-            <div className="border rounded-lg bg-card text-card-foreground shadow-sm">
-                <div
-                    onClick={() => setIsPermissionsOpen(!isPermissionsOpen)}
-                    className="flex flex-row items-center justify-between p-6 cursor-pointer hover:bg-accent/50 transition-colors"
-                >
-                    <div className="flex items-center gap-4">
-                        <div className="p-2 bg-purple-500/10 rounded-full">
-                            <Shield className="h-6 w-6 text-purple-500" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-semibold">Permission Management</h2>
-                            <p className="text-sm text-muted-foreground">Configure user access and roles.</p>
-                        </div>
-                    </div>
-                    {isPermissionsOpen ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : <ChevronRight className="h-5 w-5 text-muted-foreground" />}
-                </div>
+            <SectionAccordion
+                title="Permission Management"
+                description="Configure user access and roles."
+                icon={<Shield className="h-6 w-6 text-purple-500" />}
+                iconBg="bg-purple-500/10"
+                isOpen={!!openSections.permissions}
+                onToggle={() => toggleSection('permissions')}
+            >
+                <PermissionSettings />
+            </SectionAccordion>
 
-                <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isPermissionsOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-                    <div className="overflow-hidden">
-                        <div className="p-6 pt-0">
-                            <PermissionSettings />
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {/* Security Section (separated from General) */}
+            <SectionAccordion
+                title="Security"
+                description="Manage passwords and account security."
+                icon={<Lock className="h-6 w-6 text-red-500" />}
+                iconBg="bg-red-500/10"
+                isOpen={!!openSections.security}
+                onToggle={() => toggleSection('security')}
+            >
+                <SecuritySettings />
+            </SectionAccordion>
 
             {/* General Settings Section */}
-            <div className="border rounded-lg bg-card text-card-foreground shadow-sm">
-                <div
-                    onClick={() => setIsGeneralOpen(!isGeneralOpen)}
-                    className="flex flex-row items-center justify-between p-6 cursor-pointer hover:bg-accent/50 transition-colors"
-                >
-                    <div className="flex items-center gap-4">
-                        <div className="p-2 bg-gray-500/10 rounded-full">
-                            <Settings className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-semibold">General Settings</h2>
-                            <p className="text-sm text-muted-foreground">App-wide configuration.</p>
-                        </div>
-                    </div>
-                    {isGeneralOpen ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : <ChevronRight className="h-5 w-5 text-muted-foreground" />}
+            <SectionAccordion
+                title="General Settings"
+                description="Agency branding and system configuration."
+                icon={<Settings className="h-6 w-6 text-muted-foreground" />}
+                iconBg="bg-gray-500/10"
+                isOpen={!!openSections.general}
+                onToggle={() => toggleSection('general')}
+            >
+                <div className="space-y-6">
+                    <AgencySettings
+                        initialSettings={agencySettings}
+                        loading={agencySettingsLoading}
+                        onSaved={loadAgencySettings}
+                    />
+                    <EmailSettings
+                        initialEnabled={agencySettings?.emailNotificationsEnabled ?? true}
+                        loading={agencySettingsLoading}
+                    />
                 </div>
+            </SectionAccordion>
 
-                <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isGeneralOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-                    <div className="overflow-hidden">
-                        <div className="p-6 pt-0 space-y-6">
-                            <AgencySettings />
-                            <SecuritySettings />
-                            <EmailSettings />
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Service</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete <strong>"{deleteTarget?.name}"</strong>? This action cannot be undone.
+                            All job roles under this service will be removed.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleConfirmDelete}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
-            {/* Add/Edit Dialog */}
+            {/* Add/Edit Service Dialog */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent className="sm:max-w-[500px]">
                     <DialogHeader>
@@ -409,6 +470,47 @@ export default function SettingsPage() {
                     </form>
                 </DialogContent>
             </Dialog>
+        </div>
+    );
+}
+
+// Reusable collapsible section component
+function SectionAccordion({
+    title, description, icon, iconBg, isOpen, onToggle, children
+}: {
+    title: string;
+    description: string;
+    icon: React.ReactNode;
+    iconBg: string;
+    isOpen: boolean;
+    onToggle: () => void;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="border rounded-lg bg-card text-card-foreground shadow-sm">
+            <div
+                onClick={onToggle}
+                className="flex flex-row items-center justify-between p-6 cursor-pointer hover:bg-accent/50 transition-colors"
+            >
+                <div className="flex items-center gap-4">
+                    <div className={`p-2 ${iconBg} rounded-full`}>
+                        {icon}
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-semibold">{title}</h2>
+                        <p className="text-sm text-muted-foreground">{description}</p>
+                    </div>
+                </div>
+                {isOpen ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : <ChevronRight className="h-5 w-5 text-muted-foreground" />}
+            </div>
+
+            <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                <div className="overflow-hidden">
+                    <div className="p-6 pt-0">
+                        {children}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

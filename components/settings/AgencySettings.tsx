@@ -1,48 +1,46 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getAgencySettings, updateAgencyDetails } from "@/lib/actions";
+import { updateAgencyDetails } from "@/lib/actions";
 import { toast } from "sonner";
 import { Loader2, Building, Upload, Image as ImageIcon } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-export function AgencySettings() {
+interface AgencySettingsProps {
+    initialSettings?: {
+        name: string;
+        logo: string;
+        primaryColor?: string;
+        secondaryColor?: string;
+    } | null;
+    loading?: boolean;
+    onSaved?: () => void;
+}
+
+export function AgencySettings({ initialSettings, loading: parentLoading, onSaved }: AgencySettingsProps) {
     const [name, setName] = useState("");
     const [logo, setLogo] = useState("");
-    const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [logoPreview, setLogoPreview] = useState("");
 
+    // Sync from parent props
     useEffect(() => {
-        loadSettings();
-    }, []);
-
-    const loadSettings = async () => {
-        try {
-            const settings = await getAgencySettings();
-            if (settings) {
-                setName(settings.name);
-                setLogo(settings.logo);
-                setLogoPreview(settings.logo);
-            }
-            setLoading(false);
-        } catch (error) {
-            console.error("Failed to load agency settings", error);
-            toast.error("Failed to load settings");
-            setLoading(false);
+        if (initialSettings) {
+            setName(initialSettings.name);
+            setLogo(initialSettings.logo);
+            setLogoPreview(initialSettings.logo);
         }
-    };
+    }, [initialSettings]);
 
     const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Validation
-        if (file.size > 2 * 1024 * 1024) { // 2MB Limit
+        if (file.size > 2 * 1024 * 1024) {
             toast.error("Logo file is too large. Max 2MB.");
             return;
         }
@@ -62,6 +60,7 @@ export function AgencySettings() {
         try {
             await updateAgencyDetails(name, logo);
             toast.success("Agency details updated successfully!");
+            onSaved?.();
         } catch (error) {
             console.error("Failed to update agency details", error);
             toast.error("Failed to update details.");
@@ -70,7 +69,7 @@ export function AgencySettings() {
         }
     };
 
-    if (loading) {
+    if (parentLoading) {
         return <div className="p-4 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
     }
 

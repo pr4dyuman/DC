@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { User, UserPermissions, Client } from '@/lib/db';
+import { useState, useEffect, useCallback } from 'react';
+import { UserPermissions, DEFAULT_USER_PERMISSIONS } from '@/lib/types';
+import type { User, Client } from '@/lib/types';
 import { getUsers, getUserPermissions, updateUserPermissions, getClients } from '@/lib/actions';
 import { motion, AnimatePresence } from 'framer-motion';
-
-// --- Icons (Lucide) ---
-// Simulating imports if not available, but assuming lucide-react is installed
-import { Search, User as UserIcon, Building2, Check, X, ShieldAlert, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Search, User as UserIcon, Building2, Trash2, Sparkles, FolderPlus, Loader2 } from 'lucide-react';
 
 export default function PermissionSettings() {
     const [users, setUsers] = useState<User[]>([]);
@@ -17,35 +16,48 @@ export default function PermissionSettings() {
     const [activeTab, setActiveTab] = useState<'employees' | 'clients'>('employees');
     const [searchQuery, setSearchQuery] = useState('');
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         try {
             const [usersData, clientsData] = await Promise.all([getUsers(), getClients()]);
-            // Filter out admins/managers from employees list as they have full access usually? 
-            // Or allow restricting managers too? Let's show non-admins for safety.
-            const employees = usersData.filter(u => u.role !== 'admin');
+            const employees = usersData.filter((u: User) => u.role !== 'admin');
             setUsers(employees);
             setClients(clientsData);
 
-            // Fetch permissions for all
-            const allIds = [...employees.map(u => u.id), ...clientsData.map(c => c.id)];
+            // Fetch permissions in PARALLEL instead of sequentially
+            const allIds = [...employees.map((u: User) => u.id), ...clientsData.map((c: Client) => c.id)];
+            const permResults = await Promise.all(
+                allIds.map(async (id) => {
+                    try {
+                        const perm = await getUserPermissions(id);
+                        return [id, perm] as [string, UserPermissions];
+                    } catch {
+                        return [id, { ...DEFAULT_USER_PERMISSIONS }] as [string, UserPermissions];
+                    }
+                })
+            );
             const perms: Record<string, UserPermissions> = {};
-            for (const id of allIds) {
-                perms[id] = await getUserPermissions(id);
+            for (const [id, perm] of permResults) {
+                perms[id] = perm;
             }
             setPermissionsMap(perms);
         } catch (error) {
             console.error("Failed to load permission data", error);
+            toast.error("Failed to load permissions");
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    const handleUpdatePermission = async (userId: string, key: keyof UserPermissions, value: any) => {
-        const currentPerms = permissionsMap[userId] || { canCreateProject: false, canManageTasks: true, canUseAI: false, canMarkDone: true, deleteAccess: 'any' };
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
+
+    const handleUpdatePermission = async (
+        userId: string,
+        key: keyof UserPermissions,
+        value: boolean | string
+    ) => {
+        const currentPerms = permissionsMap[userId] || { ...DEFAULT_USER_PERMISSIONS };
         const newPerms = { ...currentPerms, [key]: value };
 
         // Optimistic UI
@@ -55,6 +67,7 @@ export default function PermissionSettings() {
             await updateUserPermissions(userId, newPerms);
         } catch (error) {
             console.error("Failed to update permissions", error);
+            toast.error("Failed to update permission");
             // Revert on error
             setPermissionsMap(prev => ({ ...prev, [userId]: currentPerms }));
         }
@@ -64,13 +77,17 @@ export default function PermissionSettings() {
         ? users.filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase()))
         : clients.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.email.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    if (loading) return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading permissions...</div>;
+    if (loading) return (
+        <div className="p-8 flex items-center justify-center gap-2 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span>Loading permissions...</span>
+        </div>
+    );
 
     return (
         <div className="space-y-6">
             {/* Tabs & Search Toolbar */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-white/5 pb-2">
-                {/* Tabs Left */}
                 <div className="flex gap-4">
                     <button
                         onClick={() => setActiveTab('employees')}
@@ -80,7 +97,7 @@ export default function PermissionSettings() {
                             <UserIcon className="w-4 h-4" />
                             Employees
                         </div>
-                        {activeTab === 'employees' && <motion.div layoutId="tab-underline" className="absolute bottom-[-9px] left-0 right-0 h-0.5 bg-yellow-400" />}
+                        {activeTab === 'employees' && <motion.div layoutId="perm-tab-underline" className="absolute bottom-[-9px] left-0 right-0 h-0.5 bg-yellow-400" />}
                     </button>
                     <button
                         onClick={() => setActiveTab('clients')}
@@ -90,11 +107,10 @@ export default function PermissionSettings() {
                             <Building2 className="w-4 h-4" />
                             Clients
                         </div>
-                        {activeTab === 'clients' && <motion.div layoutId="tab-underline" className="absolute bottom-[-9px] left-0 right-0 h-0.5 bg-yellow-400" />}
+                        {activeTab === 'clients' && <motion.div layoutId="perm-tab-underline" className="absolute bottom-[-9px] left-0 right-0 h-0.5 bg-yellow-400" />}
                     </button>
                 </div>
 
-                {/* Search Right */}
                 <div className="flex items-center gap-4 bg-secondary p-1 rounded-xl border border-border">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -103,17 +119,17 @@ export default function PermissionSettings() {
                             placeholder="Search users..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="bg-transparent border-none text-sm text-foreground pl-9 pr-4 py-1.5 focus:ring-0 w-40 md:w-56"
+                            className="bg-transparent border-none text-sm text-foreground pl-9 pr-4 py-1.5 focus:ring-0 focus:outline-none w-40 md:w-56"
                         />
                     </div>
                 </div>
             </div>
 
-            {/* List */}
+            {/* Permission List */}
             <div className="grid gap-4">
                 <AnimatePresence>
                     {filteredList.map((user) => {
-                        const perms = permissionsMap[user.id] || { canCreateProject: false, canManageTasks: true, canUseAI: false, canMarkDone: true, deleteAccess: 'any' };
+                        const perms = permissionsMap[user.id] || { ...DEFAULT_USER_PERMISSIONS };
 
                         return (
                             <motion.div
@@ -126,8 +142,12 @@ export default function PermissionSettings() {
                                 {/* User Info */}
                                 <div className="flex items-center gap-4 min-w-[200px]">
                                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden border border-border group-hover:border-primary/50 transition-colors">
-                                        {('avatar' in user && user.avatar) || ('logo' in user && user.logo) ? (
-                                            <img src={('avatar' in user && user.avatar) ? user.avatar : ('logo' in user ? user.logo : '')} alt={user.name} className="w-full h-full object-cover" />
+                                        {('avatar' in user && (user as any).avatar) || ('logo' in user && (user as any).logo) ? (
+                                            <img
+                                                src={('avatar' in user && (user as any).avatar) ? (user as any).avatar : ('logo' in user ? (user as any).logo : '')}
+                                                alt={user.name}
+                                                className="w-full h-full object-cover"
+                                            />
                                         ) : (
                                             <UserIcon className="w-5 h-5 text-muted-foreground" />
                                         )}
@@ -139,13 +159,28 @@ export default function PermissionSettings() {
                                 </div>
 
                                 {/* Controls */}
-                                <div className="flex flex-col md:flex-row gap-6 md:gap-12 w-full md:w-auto">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 w-full md:w-auto">
+
+                                    {/* Permission: Create Project */}
+                                    <div className="flex items-center justify-between gap-3 min-w-[160px]">
+                                        <div className="flex flex-col">
+                                            <div className="flex items-center gap-1.5">
+                                                <FolderPlus className="w-3 h-3 text-blue-400/70" />
+                                                <span className="text-sm text-foreground font-medium">Create Projects</span>
+                                            </div>
+                                            <span className="text-[10px] text-muted-foreground">Can create new projects</span>
+                                        </div>
+                                        <Toggle
+                                            enabled={perms.canCreateProject}
+                                            onChange={(val) => handleUpdatePermission(user.id, 'canCreateProject', val)}
+                                        />
+                                    </div>
 
                                     {/* Permission: Manage Tasks */}
-                                    <div className="flex items-center justify-between gap-4 min-w-[200px]">
+                                    <div className="flex items-center justify-between gap-3 min-w-[160px]">
                                         <div className="flex flex-col">
                                             <span className="text-sm text-foreground font-medium">Task Management</span>
-                                            <span className="text-[10px] text-muted-foreground">Create, edit, move pending tasks</span>
+                                            <span className="text-[10px] text-muted-foreground">Create, edit, move tasks</span>
                                         </div>
                                         <Toggle
                                             enabled={perms.canManageTasks}
@@ -154,7 +189,7 @@ export default function PermissionSettings() {
                                     </div>
 
                                     {/* Permission: Mark Done */}
-                                    <div className="flex items-center justify-between gap-4 min-w-[200px]">
+                                    <div className="flex items-center justify-between gap-3 min-w-[160px]">
                                         <div className="flex flex-col">
                                             <span className="text-sm text-foreground font-medium">Completion Rights</span>
                                             <span className="text-[10px] text-muted-foreground">Move tasks to &quot;Done&quot;</span>
@@ -165,10 +200,25 @@ export default function PermissionSettings() {
                                         />
                                     </div>
 
-                                    {/* Permission: Delete Access */}
-                                    <div className="flex items-center justify-between gap-4 min-w-[200px]">
+                                    {/* Permission: Use AI */}
+                                    <div className="flex items-center justify-between gap-3 min-w-[160px]">
                                         <div className="flex flex-col">
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1.5">
+                                                <Sparkles className="w-3 h-3 text-purple-400/70" />
+                                                <span className="text-sm text-foreground font-medium">AI Access</span>
+                                            </div>
+                                            <span className="text-[10px] text-muted-foreground">Use Singularity AI</span>
+                                        </div>
+                                        <Toggle
+                                            enabled={perms.canUseAI}
+                                            onChange={(val) => handleUpdatePermission(user.id, 'canUseAI', val)}
+                                        />
+                                    </div>
+
+                                    {/* Permission: Delete Access */}
+                                    <div className="flex items-center justify-between gap-3 min-w-[160px]">
+                                        <div className="flex flex-col">
+                                            <div className="flex items-center gap-1.5">
                                                 <Trash2 className="w-3 h-3 text-red-400/70" />
                                                 <span className="text-sm text-foreground font-medium">Delete Access</span>
                                             </div>
@@ -187,7 +237,6 @@ export default function PermissionSettings() {
                                                 <option value="own">Own Only</option>
                                                 <option value="any">Any Task</option>
                                             </select>
-                                            {/* Custom Arrow */}
                                             <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
                                                 <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
                                                     <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -216,7 +265,7 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (val: boole
     return (
         <button
             onClick={() => onChange(!enabled)}
-            className={`w-11 h-6 rounded-full relative transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-yellow-500/20 ${enabled ? 'bg-yellow-500' : 'bg-muted-foreground/30'}`}
+            className={`w-11 h-6 rounded-full relative transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-yellow-500/20 flex-shrink-0 ${enabled ? 'bg-yellow-500' : 'bg-muted-foreground/30'}`}
         >
             <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-300 shadow-sm ${enabled ? 'left-6' : 'left-1'}`} />
         </button>

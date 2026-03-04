@@ -1,14 +1,30 @@
-
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { updatePassword } from "@/lib/auth";
 import { toast } from "sonner";
-import { Loader2, Lock } from "lucide-react";
+import { Loader2, Lock, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+// Password strength calculator
+function getPasswordStrength(password: string): { score: number; label: string; color: string } {
+    if (!password) return { score: 0, label: "", color: "" };
+    let score = 0;
+    if (password.length >= 6) score++;
+    if (password.length >= 10) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/[0-9]/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
+
+    if (score <= 1) return { score: 1, label: "Weak", color: "bg-red-500" };
+    if (score <= 2) return { score: 2, label: "Fair", color: "bg-orange-500" };
+    if (score <= 3) return { score: 3, label: "Good", color: "bg-yellow-500" };
+    if (score <= 4) return { score: 4, label: "Strong", color: "bg-green-500" };
+    return { score: 5, label: "Very Strong", color: "bg-emerald-500" };
+}
 
 export function SecuritySettings() {
     const [currentPassword, setCurrentPassword] = useState("");
@@ -16,9 +32,22 @@ export function SecuritySettings() {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [loading, setLoading] = useState(false);
 
+    // Password visibility toggles
+    const [showCurrent, setShowCurrent] = useState(false);
+    const [showNew, setShowNew] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
+
+    const strength = useMemo(() => getPasswordStrength(password), [password]);
+
     const handleUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
+        // Validation in correct order
+        if (!currentPassword) {
+            toast.error("Please enter your current password.");
+            return;
+        }
+
         if (password.length < 6) {
             toast.error("New password must be at least 6 characters long.");
             return;
@@ -26,11 +55,6 @@ export function SecuritySettings() {
 
         if (password !== confirmPassword) {
             toast.error("New passwords do not match.");
-            return;
-        }
-
-        if (!currentPassword) {
-            toast.error("Please enter your current password.");
             return;
         }
 
@@ -44,9 +68,9 @@ export function SecuritySettings() {
                 setConfirmPassword("");
             } else {
                 if (result.error === "Incorrect current password") {
-                     toast.error("The current password provided is incorrect.");
+                    toast.error("The current password provided is incorrect.");
                 } else {
-                     toast.error(result.error || "Failed to update password.");
+                    toast.error(result.error || "Failed to update password.");
                 }
             }
         } catch (error) {
@@ -59,8 +83,8 @@ export function SecuritySettings() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Security Settings</CardTitle>
-                <CardDescription>Manage your password and account security.</CardDescription>
+                <CardTitle>Change Password</CardTitle>
+                <CardDescription>Update your account password. Use a strong, unique password.</CardDescription>
             </CardHeader>
             <CardContent>
                 <form onSubmit={handleUpdate} className="space-y-4 max-w-md">
@@ -70,13 +94,21 @@ export function SecuritySettings() {
                             <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
                                 id="current-password"
-                                type="password"
+                                type={showCurrent ? "text" : "password"}
                                 placeholder="Enter current password"
                                 value={currentPassword}
                                 onChange={(e) => setCurrentPassword(e.target.value)}
-                                className="pl-9"
+                                className="pl-9 pr-10"
                                 required
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowCurrent(!showCurrent)}
+                                className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors"
+                                tabIndex={-1}
+                            >
+                                {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
                         </div>
                     </div>
 
@@ -86,30 +118,66 @@ export function SecuritySettings() {
                             <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
                                 id="new-password"
-                                type="password"
+                                type={showNew ? "text" : "password"}
                                 placeholder="Enter new password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="pl-9"
+                                className="pl-9 pr-10"
                                 required
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowNew(!showNew)}
+                                className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors"
+                                tabIndex={-1}
+                            >
+                                {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
                         </div>
+                        {/* Password strength indicator */}
+                        {password && (
+                            <div className="space-y-1.5 pt-1">
+                                <div className="flex gap-1 h-1.5">
+                                    {[1, 2, 3, 4, 5].map((i) => (
+                                        <div
+                                            key={i}
+                                            className={`flex-1 rounded-full transition-colors duration-300 ${i <= strength.score ? strength.color : 'bg-muted'}`}
+                                        />
+                                    ))}
+                                </div>
+                                <p className={`text-xs font-medium ${strength.score <= 1 ? 'text-red-500' : strength.score <= 2 ? 'text-orange-500' : strength.score <= 3 ? 'text-yellow-500' : 'text-green-500'}`}>
+                                    {strength.label}
+                                </p>
+                            </div>
+                        )}
                     </div>
-                    
+
                     <div className="space-y-2">
                         <Label htmlFor="confirm-password">Confirm Password</Label>
                         <div className="relative">
                             <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
                                 id="confirm-password"
-                                type="password"
+                                type={showConfirm ? "text" : "password"}
                                 placeholder="Confirm new password"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
-                                className="pl-9"
+                                className="pl-9 pr-10"
                                 required
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowConfirm(!showConfirm)}
+                                className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors"
+                                tabIndex={-1}
+                            >
+                                {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
                         </div>
+                        {/* Mismatch warning */}
+                        {confirmPassword && password !== confirmPassword && (
+                            <p className="text-xs text-red-500">Passwords do not match.</p>
+                        )}
                     </div>
 
                     <Button type="submit" disabled={loading} className="w-full sm:w-auto">
