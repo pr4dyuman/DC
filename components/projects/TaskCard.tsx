@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef, useTransition } from "react";
 import { format } from "date-fns";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useDraggable } from "@dnd-kit/core";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Task, UserPermissions } from "@/lib/types";
@@ -28,12 +27,15 @@ interface TaskCardProps {
     readOnly?: boolean;
     permissions?: UserPermissions;
     onQuickEdit?: (taskId: string, patch: Partial<Task>) => void;
+    dragOverlay?: boolean;
 }
 
-export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEnabled, readOnly, permissions, onQuickEdit }: TaskCardProps & { onView: (task: Task) => void; onEdit: (task: Task) => void; currentUserId?: string }) {
-    const {
-        attributes, listeners, setNodeRef, transform, transition, isDragging
-    } = useSortable({ id: task.id, data: { task } });
+export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEnabled, readOnly, permissions, onQuickEdit, dragOverlay = false }: TaskCardProps & { onView: (task: Task) => void; onEdit: (task: Task) => void; currentUserId?: string }) {
+    const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+        id: task.id,
+        data: { task },
+        disabled: dragOverlay,
+    });
 
     const searchParams = useSearchParams();
     const shouldHighlight = searchParams.get("task") === task.id;
@@ -64,11 +66,9 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-    };
+    const style: React.CSSProperties = dragOverlay
+        ? { cursor: 'grabbing' }
+        : { opacity: isDragging ? 0.4 : 1, cursor: 'grab' };
 
     const assignee = users.find(u => u.id === task.assigneeId);
     const canEdit = !readOnly && ((permissions?.canManageTasks ?? true) || permissions?.deleteAccess === 'any' || (permissions?.deleteAccess === 'own' && task.createdBy === currentUserId));
@@ -119,7 +119,7 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
     const today = new Date(); today.setHours(0, 0, 0, 0);
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-none mb-3">
+        <div ref={dragOverlay ? undefined : setNodeRef} style={style} {...(dragOverlay ? {} : attributes)} {...(dragOverlay ? {} : listeners)} className="touch-none mb-3">
             <div ref={cardRef}>
                 <Card
                     onClick={() => onView(task)}
@@ -244,6 +244,17 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
                                 <div className="flex items-center gap-1.5 text-indigo-500/80 min-w-0 overflow-hidden">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-tag shrink-0"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" /><path d="M7 7h.01" /></svg>
                                     <span className="truncate">{task.category}</span>
+                                </div>
+                            )}
+
+                            {task.estimatedHours && task.estimatedHours > 0 && (
+                                <div className={`flex items-center gap-1 shrink-0 px-1.5 py-0.5 rounded-md font-semibold ${task.status === 'Done' ? 'bg-emerald-500/15 text-emerald-500' : 'bg-cyan-500/15 text-cyan-500 dark:text-cyan-400'}`}>
+                                    {task.status === 'Done' ? (
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+                                    ) : (
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                                    )}
+                                    <span>{task.estimatedHours}h</span>
                                 </div>
                             )}
 

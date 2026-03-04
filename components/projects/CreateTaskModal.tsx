@@ -5,7 +5,7 @@ import { createTask, getServices, getUsers, getCurrentUser } from "@/lib/actions
 import type { ExtractedTaskFields } from "@/lib/actions";
 import { AIChatBox } from "./AIChatBox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Loader2, Sparkles } from "lucide-react";
+import { Plus, Loader2, Sparkles, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Task } from "@/lib/types";
 import { toast } from "sonner";
@@ -34,6 +34,7 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
     const [assigneeId, setAssigneeId] = useState(defaultAssignee);
     const [category, setCategory] = useState("");
     const [priority, setPriority] = useState<TaskPriority>("Medium");
+    const [estimatedHours, setEstimatedHours] = useState<number>(0);
 
     const [users, setUsers] = useState<any[]>([]);
     const [services, setServices] = useState<any[]>([]);
@@ -57,6 +58,7 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
         setDueDate("");
         setCategory("");
         setPriority("Medium");
+        setEstimatedHours(0);
         setShowChat(false);
     };
 
@@ -73,6 +75,7 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                 category,
                 priority,
                 dueDate: dueDate || "",
+                estimatedHours: estimatedHours || undefined,
             });
             toast.success("Task created");
             setOpen(false);
@@ -154,6 +157,25 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                             </div>
                         </div>
 
+                        {/* Estimated Hours */}
+                        <div className="space-y-1.5">
+                            <label className={labelCls}>
+                                <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Estimated Hours</span>
+                            </label>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.5"
+                                    value={estimatedHours || ""}
+                                    onChange={e => setEstimatedHours(parseFloat(e.target.value) || 0)}
+                                    placeholder="e.g. 4"
+                                    className={`${inputCls} w-24`}
+                                />
+                                <span className="text-xs text-muted-foreground">hours</span>
+                            </div>
+                        </div>
+
                         {/* Description */}
                         <div className="space-y-1.5">
                             <div className="flex items-center justify-between">
@@ -212,6 +234,7 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                                     setCategory(fields.category);
                                 }
                                 if (fields.priority) setPriority(fields.priority);
+                                if (fields.estimatedHours) setEstimatedHours(fields.estimatedHours);
                             }}
                         />
                     )}

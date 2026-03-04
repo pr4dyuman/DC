@@ -379,6 +379,7 @@ const TaskSchema = new Schema<Task>({
     startDate: { type: String },
     category: { type: String },
     createdBy: { type: String },
+    estimatedHours: { type: Number },
     comments: [CommentSchema]
 }, { timestamps: true });
 

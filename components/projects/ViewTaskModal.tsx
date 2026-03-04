@@ -124,6 +124,12 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
                                     {task.category}
                                 </span>
                             )}
+                            {task.estimatedHours && task.estimatedHours > 0 && (
+                                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                                    <Clock className="w-3 h-3" />
+                                    {task.estimatedHours}h
+                                </span>
+                            )}
                             {isOverdue && (
                                 <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500/10 text-red-500 border border-red-500/20">
                                     <AlertCircle className="w-3 h-3" />
@@ -147,7 +153,7 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
                 <div className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar">
 
                     {/* Metadata Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-muted/30 p-5 rounded-xl border border-border/50">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bg-muted/30 p-5 rounded-xl border border-border/50">
                         {/* Assignee */}
                         <div className="flex flex-col space-y-3">
                             <div className="flex items-center gap-2 mb-1">
@@ -230,6 +236,34 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
                             ) : (
                                 <span className="text-sm text-muted-foreground italic pl-1">Unknown</span>
                             )}
+                        </div>
+
+                        {/* Estimated Hours */}
+                        <div className="flex flex-col space-y-3 md:border-l md:border-border/50 md:pl-6">
+                            <div className="flex items-center gap-2 mb-1">
+                                <div className="p-1.5 bg-background rounded-md border border-border shadow-sm">
+                                    <Clock className="w-3.5 h-3.5 text-cyan-500" />
+                                </div>
+                                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Est. Hours</label>
+                            </div>
+                            <div className="flex flex-col pl-1">
+                                {task.estimatedHours && task.estimatedHours > 0 ? (
+                                    <>
+                                        <span className="text-2xl font-bold text-cyan-500 dark:text-cyan-400 leading-none mb-1">
+                                            {task.estimatedHours}h
+                                        </span>
+                                        <span className="text-[11px] text-muted-foreground">
+                                            {task.status === 'Done' ? (
+                                                <span className="text-emerald-500 font-semibold flex items-center gap-1">
+                                                    <CheckCircle2 className="w-3 h-3" /> Completed
+                                                </span>
+                                            ) : 'Estimated'}
+                                        </span>
+                                    </>
+                                ) : (
+                                    <span className="text-sm text-muted-foreground italic">Not set</span>
+                                )}
+                            </div>
                         </div>
                     </div>
 

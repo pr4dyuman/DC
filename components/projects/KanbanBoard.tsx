@@ -1,19 +1,19 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
     DndContext,
     DragOverlay,
-    closestCorners,
     KeyboardSensor,
     PointerSensor,
     useSensor,
     useSensors,
     DragStartEvent,
-    DragOverEvent,
     DragEndEvent,
+    rectIntersection,
+    CollisionDetection,
 } from "@dnd-kit/core";
-import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Task, UserPermissions } from "@/lib/types";
 import { updateTaskStatus, updateTask } from "@/lib/actions";
 import { TaskCard } from "./TaskCard";
@@ -43,11 +43,43 @@ interface KanbanBoardProps {
     permissions?: UserPermissions;
 }
 
+// Custom collision detection: checks if pointer is within any column's bounding rect
+// Handles both desktop IDs ("Todo") and mobile IDs ("mobile-Todo")
+const kanbanCollision: CollisionDetection = (args) => {
+    const { pointerCoordinates, droppableContainers } = args;
+    if (!pointerCoordinates) return rectIntersection(args);
+
+    const { x, y } = pointerCoordinates;
+    const collisions: { id: string | number; data: { droppableContainer: any; value: number } }[] = [];
+
+    for (const container of droppableContainers) {
+        const id = container.id as string;
+        const colName = id.startsWith('mobile-') ? id.slice(7) : id;
+        if (!COLUMNS.includes(colName)) continue;
+
+        const rect = container.rect.current;
+        if (!rect || (rect.width === 0 && rect.height === 0)) continue;
+
+        if (
+            x >= rect.left && x <= rect.left + rect.width &&
+            y >= rect.top && y <= rect.top + rect.height
+        ) {
+            collisions.push({
+                id: container.id,
+                data: { droppableContainer: container, value: 0 },
+            });
+        }
+    }
+
+    return collisions;
+};
+
 export function KanbanBoard({ initialTasks, projectId, users, categories = [], currentUserId, aiEnabled, selectedCategory = "All", readOnly = false, permissions }: KanbanBoardProps) {
     const [mounted, setMounted] = useState(false);
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [activeTask, setActiveTask] = useState<Task | null>(null);
-    const [activeColumn, setActiveColumn] = useState(0); // mobile: which column tab is active
+    const [activeColumn, setActiveColumn] = useState(0);
+    const overlayRef = useRef<HTMLDivElement>(null);
 
     const [viewTaskId, setViewTaskId] = useState<string | null>(null);
     const [editTaskId, setEditTaskId] = useState<string | null>(null);
@@ -58,68 +90,84 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
     useEffect(() => { setMounted(true); }, []);
     useEffect(() => { setTasks(initialTasks); }, [initialTasks]);
 
-    const pointerSensor = useSensor(PointerSensor, {
-        activationConstraint: { distance: 5 },
-        disabled: readOnly
-    });
-    const keyboardSensor = useSensor(KeyboardSensor, {
-        coordinateGetter: sortableKeyboardCoordinates,
-        disabled: readOnly
-    });
-    const sensors = useSensors(pointerSensor, keyboardSensor);
+    // Track mouse position for custom drag overlay — direct DOM manipulation for smooth 60fps
+    useEffect(() => {
+        if (!activeTask) return;
+        let rafId: number;
+        const handler = (e: MouseEvent) => {
+            cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(() => {
+                if (overlayRef.current) {
+                    overlayRef.current.style.transform = `translate3d(${e.clientX - 140}px, ${e.clientY - 20}px, 0)`;
+                }
+            });
+        };
+        window.addEventListener('mousemove', handler, { passive: true });
+        return () => {
+            window.removeEventListener('mousemove', handler);
+            cancelAnimationFrame(rafId);
+        };
+    }, [activeTask]);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
+        useSensor(KeyboardSensor)
+    );
 
     const handleDragStart = (event: DragStartEvent) => {
         if (readOnly) return;
         if (permissions && !permissions.canManageTasks && !permissions.canMarkDone) return;
+        const pointerEvent = event.activatorEvent as MouseEvent;
+        if (pointerEvent && overlayRef.current) {
+            overlayRef.current.style.transform = `translate3d(${pointerEvent.clientX - 140}px, ${pointerEvent.clientY - 20}px, 0)`;
+        }
         setActiveTask(event.active.data.current?.task);
     };
 
-    const handleDragOver = (event: DragOverEvent) => { };
-
     const handleDragEnd = async (event: DragEndEvent) => {
-        if (readOnly) return;
-        const { active, over } = event;
+        const draggedTask = activeTask;
+        setActiveTask(null);
+        if (readOnly || !draggedTask) return;
+
+        const { over } = event;
         if (!over) return;
 
-        const taskId = active.id as string;
-        const overId = over.id as string;
+        const taskId = draggedTask.id;
+        const rawOverId = over.id as string;
+        // Strip mobile- prefix if present
+        const overId = rawOverId.startsWith('mobile-') ? rawOverId.slice(7) : rawOverId;
 
-        let newStatus = overId;
-        if (!COLUMNS.includes(overId)) {
-            const overTask = tasks.find(t => t.id === overId);
-            if (overTask) newStatus = overTask.status;
+        // Determine target column
+        let newStatus: string | null = null;
+        if (COLUMNS.includes(overId)) {
+            newStatus = overId;
         }
 
+        if (!newStatus || newStatus === draggedTask.status) return;
+
+        // Permission check
         if (permissions) {
-            if (newStatus === 'Done') {
-                if (!permissions.canMarkDone) {
-                    setActiveTask(null);
-                    toast.error("You don't have permission to mark tasks as Done.");
-                    return;
-                }
-            } else {
-                if (!permissions.canManageTasks) {
-                    setActiveTask(null);
-                    toast.error("You don't have permission to manage task status.");
-                    return;
-                }
+            if (newStatus === 'Done' && !permissions.canMarkDone) {
+                toast.error("You don't have permission to mark tasks as Done.");
+                return;
+            }
+            if (newStatus !== 'Done' && !permissions.canManageTasks) {
+                toast.error("You don't have permission to manage task status.");
+                return;
             }
         }
 
+        // Optimistic update
         setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus as Task['status'] } : t));
-        setActiveTask(null);
 
-        if (COLUMNS.includes(newStatus) || tasks.find(t => t.id === overId)) {
-            try {
-                await updateTaskStatus(taskId, newStatus as Task['status']);
-            } catch (e) {
-                setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: active.data.current?.task?.status } : t));
-                toast.error("Failed to move task");
-            }
+        try {
+            await updateTaskStatus(taskId, newStatus as Task['status']);
+        } catch (e) {
+            setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: draggedTask.status } : t));
+            toast.error("Failed to move task");
         }
     };
 
-    // Called from TaskCard for quick inline edits (priority / assignee)
     const handleQuickEdit = (taskId: string, patch: Partial<Task>) => {
         setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...patch } : t));
     };
@@ -170,9 +218,8 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
 
             <DndContext
                 sensors={sensors}
-                collisionDetection={closestCorners}
+                collisionDetection={kanbanCollision}
                 onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
             >
                 {/* Desktop: all 4 columns */}
@@ -195,11 +242,11 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                     ))}
                 </div>
 
-                {/* Mobile: single active column */}
+                {/* Mobile: single active column — uses 'mobile-' prefix to avoid ID conflict with desktop */}
                 <div className="flex md:hidden h-full pb-4">
                     <DroppableColumn
-                        key={COLUMNS[activeColumn]}
-                        id={COLUMNS[activeColumn]}
+                        key={`mobile-${COLUMNS[activeColumn]}`}
+                        id={`mobile-${COLUMNS[activeColumn]}`}
                         title={COLUMNS[activeColumn]}
                         tasks={filteredTasks.filter(t => t.status === COLUMNS[activeColumn])}
                         users={users || []}
@@ -213,8 +260,25 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                     />
                 </div>
 
-                <DragOverlay>
-                    {activeTask ? (
+                <DragOverlay dropAnimation={null} />
+            </DndContext>
+
+            {/* Custom drag overlay via portal to document.body */}
+            {mounted && createPortal(
+                <div
+                    ref={overlayRef}
+                    style={{
+                        position: 'fixed',
+                        left: 0,
+                        top: 0,
+                        width: 280,
+                        zIndex: 99999,
+                        pointerEvents: 'none',
+                        willChange: 'transform',
+                        display: activeTask ? 'block' : 'none',
+                    }}
+                >
+                    {activeTask && (
                         <TaskCard
                             task={activeTask}
                             users={users || []}
@@ -224,10 +288,12 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                             currentUserId={currentUserId}
                             permissions={permissions}
                             onQuickEdit={() => { }}
+                            dragOverlay={true}
                         />
-                    ) : null}
-                </DragOverlay>
-            </DndContext>
+                    )}
+                </div>,
+                document.body
+            )}
 
             {viewingTask && (
                 <ViewTaskModal

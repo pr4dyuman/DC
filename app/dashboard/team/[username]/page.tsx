@@ -381,6 +381,28 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
     const overdueTasks = tasks.filter(t => isOverdue(t)).length;
     const efficiency = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : null;
 
+    // Hours calculations
+    const totalHours = tasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
+    const completedHours = tasks.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
+    const inProgressHours = totalHours - completedHours;
+
+    // Project-wise hours breakdown
+    const projectHoursMap = new Map<string, { total: number; completed: number; projectName: string }>();
+    tasks.forEach(t => {
+        if (!t.estimatedHours || t.estimatedHours <= 0) return;
+        const key = t.projectId;
+        if (!projectHoursMap.has(key)) {
+            const project = userProjects.find((p: Project) => p.id === key);
+            projectHoursMap.set(key, { total: 0, completed: 0, projectName: project?.name || 'Unknown Project' });
+        }
+        const entry = projectHoursMap.get(key)!;
+        entry.total += t.estimatedHours;
+        if (t.status === 'Done') entry.completed += t.estimatedHours;
+    });
+    const projectHoursArray = Array.from(projectHoursMap.entries())
+        .map(([id, data]) => ({ id, ...data }))
+        .sort((a, b) => b.total - a.total);
+
     // Last active status
     const lastActiveText = timeAgo(user.lastActiveAt);
     const isOnline = lastActiveText === "Online";
@@ -561,6 +583,17 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                 </div>
                             </Card>
                         </div>
+                        {/* Hours stat */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <Card className="bg-cyan-500/10 border-cyan-500/20 p-4 text-center">
+                                <div className="text-2xl font-bold text-cyan-500">{completedHours}h</div>
+                                <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Completed</div>
+                            </Card>
+                            <Card className="bg-muted/50 border-border p-4 text-center">
+                                <div className="text-2xl font-bold text-foreground">{totalHours}h</div>
+                                <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total Hours</div>
+                            </Card>
+                        </div>
                         {streak > 1 && (
                             <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-orange-500 bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-1.5">
                                 <Flame className="h-3 w-3" />
@@ -711,6 +744,88 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                 )}
                             </CardContent>
                         </Card>
+
+                        {/* Hours Overview Card */}
+                        <Card className="col-span-1 md:col-span-2 lg:col-span-3 bg-card border-border">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Clock className="h-5 w-5 text-cyan-500" />
+                                    Hours Overview
+                                </CardTitle>
+                                <CardDescription>
+                                    {user.role === 'client' ? 'Total hours across all projects' : 'Estimated working hours across assigned tasks'}
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex flex-col lg:flex-row gap-8">
+                                    {/* Left: Circular Ring + Stats */}
+                                    <div className="flex items-center gap-8">
+                                        {/* SVG Circular Progress */}
+                                        <div className="relative w-28 h-28 shrink-0">
+                                            <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                                                <circle cx="50" cy="50" r="42" strokeWidth="8" className="fill-none stroke-muted" />
+                                                <circle
+                                                    cx="50" cy="50" r="42" strokeWidth="8"
+                                                    className="fill-none stroke-cyan-500"
+                                                    strokeLinecap="round"
+                                                    strokeDasharray={`${totalHours > 0 ? (completedHours / totalHours) * 263.89 : 0} 263.89`}
+                                                    style={{ transition: 'stroke-dasharray 0.8s ease' }}
+                                                />
+                                            </svg>
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                <span className="text-2xl font-bold text-foreground">
+                                                    {totalHours > 0 ? Math.round((completedHours / totalHours) * 100) : 0}%
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* 3-column stats */}
+                                        <div className="grid grid-cols-3 gap-4 min-w-[240px]">
+                                            <div className="text-center">
+                                                <div className="text-2xl font-bold text-cyan-500">{completedHours}h</div>
+                                                <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mt-1">Completed</div>
+                                            </div>
+                                            <div className="text-center border-x border-border px-3">
+                                                <div className="text-2xl font-bold text-blue-500">{inProgressHours}h</div>
+                                                <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mt-1">Remaining</div>
+                                            </div>
+                                            <div className="text-center">
+                                                <div className="text-2xl font-bold text-foreground">{totalHours}h</div>
+                                                <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mt-1">Total</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right: Project Breakdown Table */}
+                                    {projectHoursArray.length > 0 && (
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">By Project</h4>
+                                            <div className="space-y-3">
+                                                {projectHoursArray.map(p => {
+                                                    const pct = p.total > 0 ? Math.round((p.completed / p.total) * 100) : 0;
+                                                    return (
+                                                        <Link key={p.id} href={`/dashboard/projects/${p.id}`} className="block group">
+                                                            <div className="flex items-center justify-between mb-1.5">
+                                                                <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate max-w-[200px]">{p.projectName}</span>
+                                                                <span className="text-xs font-semibold text-muted-foreground shrink-0 ml-2">
+                                                                    <span className="text-cyan-500">{p.completed}h</span> / {p.total}h
+                                                                </span>
+                                                            </div>
+                                                            <div className="h-2 rounded-full bg-muted overflow-hidden">
+                                                                <div
+                                                                    className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-cyan-500' : 'bg-blue-500'}`}
+                                                                    style={{ width: `${pct}%` }}
+                                                                />
+                                                            </div>
+                                                        </Link>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
                 </TabsContent>
 
@@ -857,6 +972,8 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                     {userProjects.map((project) => {
                                         const projectTaskCount = tasks.filter(t => t.projectId === project.id).length;
                                         const projectDoneCount = tasks.filter(t => t.projectId === project.id && t.status === 'Done').length;
+                                        const projectTotalHours = tasks.filter(t => t.projectId === project.id).reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
+                                        const projectCompletedHours = tasks.filter(t => t.projectId === project.id && t.status === 'Done').reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
                                         return (
                                             <Link href={`/dashboard/projects/${project.id}`} key={project.id} className="block">
                                                 <div className="p-4 bg-muted/50 rounded-lg border border-border hover:border-primary/30 hover:bg-muted transition-all group cursor-pointer">
@@ -885,6 +1002,12 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                                             <span className="flex items-center gap-1">
                                                                 <ListTodo className="w-3 h-3" />
                                                                 {projectDoneCount}/{projectTaskCount} tasks done
+                                                            </span>
+                                                        )}
+                                                        {projectTotalHours > 0 && (
+                                                            <span className="flex items-center gap-1 text-cyan-500">
+                                                                <Clock className="w-3 h-3" />
+                                                                {projectCompletedHours}/{projectTotalHours}h
                                                             </span>
                                                         )}
                                                     </div>

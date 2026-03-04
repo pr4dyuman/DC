@@ -281,7 +281,7 @@ export type ProjectServiceConfig = {
 export type Project = { id: string; agencyId: string; slug?: string; name: string; client?: string; clientId?: string; services: string[]; serviceConfigs?: ProjectServiceConfig[]; status: 'Active' | 'Completed' | 'On Hold'; budget: number; dueDate: string; createdAt?: string; aiEnabled?: boolean };
 export type Invoice = { id: string; agencyId: string; projectId: string; amount: number; status: 'Paid' | 'Pending' | 'Overdue' | 'Processing'; date: string };
 export type Comment = { id: string; userId: string; text: string; timestamp: string };
-export type Task = { id: string; agencyId: string; projectId: string; title: string; description?: string; status: 'Todo' | 'In Progress' | 'Review' | 'Done'; priority?: 'Low' | 'Medium' | 'High'; assigneeId: string; dueDate: string; startDate?: string; category?: string; createdAt?: string; createdBy?: string; comments?: Comment[] };
+export type Task = { id: string; agencyId: string; projectId: string; title: string; description?: string; status: 'Todo' | 'In Progress' | 'Review' | 'Done'; priority?: 'Low' | 'Medium' | 'High'; assigneeId: string; dueDate: string; startDate?: string; category?: string; createdAt?: string; createdBy?: string; comments?: Comment[]; estimatedHours?: number };
 export type Notification = { id: string; agencyId: string; userId: string; message: string; read: boolean; timestamp: string; link?: string };
 export type Activity = { id: string; agencyId: string; user: string; action: string; target: string; timestamp: string; entityId?: string; entityType?: 'task' | 'project' | 'invoice' | 'client' | 'user' };
 

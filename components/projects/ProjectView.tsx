@@ -7,6 +7,7 @@ import { CreateTaskModal } from "@/components/projects/CreateTaskModal";
 import { ProjectSettingsModal } from "@/components/projects/ProjectSettingsModal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProjectFinanceSummary } from "@/components/finance/ProjectFinanceSummary";
 import { TransactionList } from "@/components/finance/TransactionList";
 import { AddTransactionModal } from "@/components/finance/AddTransactionModal";
@@ -28,6 +29,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
     const projectServices = project.services || [];
     const filteredCategories = categories.filter(c => projectServices.includes(c.id) || projectServices.includes(c.name));
     const [selectedCategory, setSelectedCategory] = useState<string>("All");
+    const [showTeamHours, setShowTeamHours] = useState(false);
 
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager'; // Helper
 
@@ -50,6 +52,30 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                                         <span className="font-medium text-foreground">{done}/{total} tasks done</span>
                                         {overdueTasks > 0 && <span className="text-red-500 font-semibold">⚠ {overdueTasks} overdue task{overdueTasks > 1 ? 's' : ''}</span>}
+                                        {(() => {
+                                            const totalHours = tasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
+                                            const completedHours = tasks.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
+                                            const hoursPct = totalHours > 0 ? Math.round((completedHours / totalHours) * 100) : 0;
+                                            return (
+                                                <span className="inline-flex items-center gap-2">
+                                                    <span className="text-cyan-500 dark:text-cyan-400 font-semibold">⏱ {completedHours}/{totalHours}h</span>
+                                                    {totalHours > 0 && (
+                                                        <span className="inline-flex items-center gap-1">
+                                                            <span className="inline-block w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                                                                <span className={`block h-full rounded-full transition-all ${hoursPct === 100 ? 'bg-emerald-500' : 'bg-cyan-500'}`} style={{ width: `${hoursPct}%` }} />
+                                                            </span>
+                                                            <span className="text-[10px] font-semibold text-muted-foreground">{hoursPct}%</span>
+                                                        </span>
+                                                    )}
+                                                    <button
+                                                        onClick={() => setShowTeamHours(v => !v)}
+                                                        className="text-[10px] font-semibold text-primary hover:underline ml-1"
+                                                    >
+                                                        {showTeamHours ? 'Hide' : 'Team'}
+                                                    </button>
+                                                </span>
+                                            );
+                                        })()}
                                         {project.budget > 0 && <span>Budget: ₹{project.budget.toLocaleString()}</span>}
                                         {project.dueDate && <span className={isDue ? 'text-red-500 font-semibold' : ''}>Due: {new Date(project.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}{isDue ? ' ⚠' : ''}</span>}
                                         {project.client && <span>Client: {project.client}</span>}
@@ -60,6 +86,52 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                                         </div>
                                         <span className="text-xs font-semibold text-muted-foreground">{pct}%</span>
                                     </div>
+
+                                    {/* Team Hours Breakdown */}
+                                    {showTeamHours && (() => {
+                                        const memberMap = new Map<string, { total: number; completed: number }>();
+                                        tasks.forEach(t => {
+                                            if (!t.estimatedHours || t.estimatedHours <= 0 || !t.assigneeId) return;
+                                            if (!memberMap.has(t.assigneeId)) memberMap.set(t.assigneeId, { total: 0, completed: 0 });
+                                            const entry = memberMap.get(t.assigneeId)!;
+                                            entry.total += t.estimatedHours;
+                                            if (t.status === 'Done') entry.completed += t.estimatedHours;
+                                        });
+                                        const memberArr = Array.from(memberMap.entries())
+                                            .map(([id, data]) => ({ id, ...data, user: users.find(u => u.id === id) }))
+                                            .sort((a, b) => b.total - a.total);
+                                        if (memberArr.length === 0) return null;
+                                        return (
+                                            <div className="mt-2 p-3 bg-muted/40 dark:bg-muted/20 rounded-lg border border-border space-y-2.5 animate-in slide-in-from-top-2 duration-200">
+                                                <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Team Hours</div>
+                                                {memberArr.map(m => {
+                                                    const mPct = m.total > 0 ? Math.round((m.completed / m.total) * 100) : 0;
+                                                    return (
+                                                        <div key={m.id} className="flex items-center gap-3">
+                                                            <Avatar className="h-6 w-6 border border-border shrink-0">
+                                                                <AvatarImage src={m.user?.avatar} />
+                                                                <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-bold">{m.user?.name?.substring(0, 2).toUpperCase() || '??'}</AvatarFallback>
+                                                            </Avatar>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center justify-between mb-1">
+                                                                    <span className="text-xs font-medium text-foreground truncate">{m.user?.name || 'Unknown'}</span>
+                                                                    <span className="text-[10px] font-semibold text-muted-foreground shrink-0 ml-2">
+                                                                        <span className="text-cyan-500 dark:text-cyan-400">{m.completed}h</span> / {m.total}h
+                                                                    </span>
+                                                                </div>
+                                                                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                                                    <div
+                                                                        className={`h-full rounded-full transition-all duration-500 ${mPct === 100 ? 'bg-emerald-500' : mPct >= 50 ? 'bg-cyan-500' : 'bg-blue-500'}`}
+                                                                        style={{ width: `${mPct}%` }}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        );
+                                    })()}
                                     <div className="flex flex-wrap gap-1 mt-1">
                                         {project.services && project.services.map((svc: string) => {
                                             const serviceObj = categories.find(c => c.id === svc || c.name === svc);

@@ -90,6 +90,7 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
                 priority: { type: "STRING", description: "Task priority: Low, Medium, or High", enum: ["Low", "Medium", "High"] },
                 dueDate: { type: "STRING", description: "Due date in YYYY-MM-DD format. Estimate based on task complexity if not specified." },
                 status: { type: "STRING", description: "Initial task status (default: Todo)", enum: ["Todo", "In Progress", "Review", "Done"] },
+                estimatedHours: { type: "NUMBER", description: "Estimated hours to complete this task (e.g. 2, 4, 8). Estimate based on task complexity." },
             },
             required: ["projectId", "title"],
         },
@@ -119,6 +120,7 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
                 category: { type: "STRING", description: "New category — must be a service name" },
                 dueDate: { type: "STRING", description: "New due date in YYYY-MM-DD format" },
                 status: { type: "STRING", description: "New task status", enum: ["Todo", "In Progress", "Review", "Done"] },
+                estimatedHours: { type: "NUMBER", description: "Estimated hours to complete the task" },
             },
             required: ["taskId"],
         },
@@ -204,6 +206,7 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
                             phase: { type: "STRING", description: "Project phase (e.g. 'Planning', 'Design', 'Development', 'Testing', 'Deployment')" },
                             status: { type: "STRING", description: "Task status — use 'Done' for completed historical tasks", enum: ["Todo", "In Progress", "Review", "Done"] },
                             dueDate: { type: "STRING", description: "For historical tasks, the actual completion date in YYYY-MM-DD format. Overrides auto-calculation." },
+                            estimatedHours: { type: "NUMBER", description: "Estimated hours for this task (e.g. 2, 4, 8)" },
                         },
                         required: ["title", "description", "category", "priority"],
                     },
@@ -449,6 +452,14 @@ Always follow these rules strictly. The system will reject invalid combinations.
             required: ["name"],
         },
     },
+    {
+        name: "bulk_estimate_hours",
+        description: "Automatically estimate hours for ALL tasks that don't have estimated hours set. Uses smart heuristics based on task title, description, priority, and subtasks. Admin only.",
+        parameters: {
+            type: "OBJECT",
+            properties: {},
+        },
+    },
 ];
 
 // =============================================================================
@@ -484,6 +495,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
     manage_leave_request: "📋 Processing leave",
     add_service: "➕ Adding service",
     update_service: "✏️ Updating service",
+    bulk_estimate_hours: "⏱️ Estimating task hours",
 };
 
 export function getToolDisplayName(toolName: string): string {

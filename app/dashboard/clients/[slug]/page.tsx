@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, use } from "react";
-import { getClientByUsername, getClientProjects, getClientFinanceData, getClientActivityLogs } from "@/lib/actions";
-import { Client, Project, Invoice, Transaction, Activity as ActivityType } from "@/lib/types";
+import { getClientByUsername, getClientProjects, getClientFinanceData, getClientActivityLogs, getProjectTasks } from "@/lib/actions";
+import { Client, Project, Invoice, Transaction, Activity as ActivityType, Task } from "@/lib/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -109,6 +109,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
         stats: { totalInvoiced: number; totalPaid: number; pendingAmount: number; ltv: number; };
     } | null>(null);
     const [activities, setActivities] = useState<ActivityType[]>([]);
+    const [allTasks, setAllTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
@@ -142,6 +143,15 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                 setProjects(clientProjects);
                 setFinanceData(finance);
                 setActivities(logs);
+
+                // Fetch tasks for all client projects to compute hours
+                if (clientProjects.length > 0) {
+                    const projectIds = clientProjects.map(p => p.id);
+                    const tasks = await getProjectTasks(projectIds);
+                    setAllTasks(tasks);
+                } else {
+                    setAllTasks([]);
+                }
             }
         } catch (error) {
             console.error("Failed to load client data", error);
@@ -326,6 +336,23 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                 <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Done</div>
                             </Card>
                         </div>
+                        {/* Hours stat cards */}
+                        {(() => {
+                            const totalHours = allTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
+                            const completedHours = allTasks.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
+                            return (
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Card className="bg-cyan-500/10 border-cyan-500/20 p-4 text-center">
+                                        <div className="text-2xl font-bold text-cyan-500">{completedHours}h</div>
+                                        <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Completed</div>
+                                    </Card>
+                                    <Card className="bg-muted/50 border-border p-4 text-center">
+                                        <div className="text-2xl font-bold text-foreground">{totalHours}h</div>
+                                        <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Total Hours</div>
+                                    </Card>
+                                </div>
+                            );
+                        })()}
                         {financeData && financeData.stats.pendingAmount > 0 && (
                             <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-1.5">
                                 <AlertCircle className="h-3 w-3" />

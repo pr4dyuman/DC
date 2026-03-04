@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { updateTask, getUsers, getServices, deleteTask } from "@/lib/actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, Trash2, AlertTriangle, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Task } from "@/lib/types";
 import { toast } from "sonner";
@@ -31,6 +31,7 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
     const [assigneeId, setAssigneeId] = useState(task.assigneeId);
     const [category, setCategory] = useState(task.category || "");
     const [priority, setPriority] = useState<Task['priority']>(task.priority || "Medium");
+    const [estimatedHours, setEstimatedHours] = useState<number>(task.estimatedHours || 0);
 
     const [users, setUsers] = useState<any[]>([]);
     const [services, setServices] = useState<any[]>([]);
@@ -58,6 +59,7 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
                 category,
                 priority,
                 dueDate: dueDate || undefined,
+                estimatedHours: estimatedHours || undefined,
             });
             toast.success("Task updated successfully");
             setOpen(false);
@@ -142,6 +144,25 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
                             <select disabled={!canEdit} value={status} onChange={e => setStatus(e.target.value as Task['status'])} className={inputCls}>
                                 {["Todo", "In Progress", "Review", "Done"].map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
+                        </div>
+                    </div>
+
+                    {/* Estimated Hours */}
+                    <div className="space-y-1.5">
+                        <label className={labelCls}>
+                            <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Estimated Hours</span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.5"
+                                value={estimatedHours || ""}
+                                onChange={e => setEstimatedHours(parseFloat(e.target.value) || 0)}
+                                placeholder="e.g. 4"
+                                className={`${inputCls} w-24`}
+                            />
+                            <span className="text-xs text-muted-foreground">hours</span>
                         </div>
                     </div>
 

@@ -25,11 +25,13 @@ import {
     addService,
     updateService,
     updateUser,
+    bulkEstimateTaskHours,
 } from "./actions";
 import {
     connectDB,
     TaskModel, ProjectModel, ClientModel, InvoiceModel,
     TransactionModel, ServiceModel, LeaveRequestModel,
+    UserModel,
 } from "./mongodb";
 
 // =============================================================================
@@ -37,6 +39,57 @@ import {
 // This file ONLY exports async functions (required because it imports from
 // actions.ts which has "use server", making Next.js treat this as a boundary).
 // =============================================================================
+
+// Role-based permission matrix for Singularity tools
+// Defines which roles can use each tool
+type RoleType = 'admin' | 'manager' | 'employee' | 'specialist' | 'client';
+
+const TOOL_PERMISSIONS: Record<string, RoleType[]> = {
+    // Read-only tools — accessible to everyone
+    search_agency: ['admin', 'manager', 'employee', 'specialist', 'client'],
+    get_project_tasks: ['admin', 'manager', 'employee', 'specialist', 'client'],
+    get_finance_summary: ['admin', 'manager'],
+    get_team_workload: ['admin', 'manager'],
+    get_recent_activity: ['admin', 'manager', 'employee', 'specialist'],
+    get_task_comments: ['admin', 'manager', 'employee', 'specialist', 'client'],
+    get_transactions: ['admin', 'manager'],
+    get_invoices: ['admin', 'manager', 'client'],
+    get_leave_requests: ['admin', 'manager', 'employee', 'specialist'],
+    get_employee_profile: ['admin', 'manager', 'employee', 'specialist'],
+
+    // Task actions — employees can update status & comment, but not create/delete
+    create_task: ['admin', 'manager'],
+    edit_task: ['admin', 'manager', 'employee', 'specialist'],
+    update_task_status: ['admin', 'manager', 'employee', 'specialist'],
+    reassign_task: ['admin', 'manager'],
+    delete_task: ['admin', 'manager'],
+    add_task_comment: ['admin', 'manager', 'employee', 'specialist', 'client'],
+    bulk_create_tasks: ['admin', 'manager'],
+
+    // Project actions — admin/manager only
+    create_project: ['admin', 'manager'],
+    update_project: ['admin', 'manager'],
+
+    // Finance actions — admin/manager only
+    create_invoice: ['admin', 'manager'],
+    add_transaction: ['admin', 'manager'],
+    bulk_add_transactions: ['admin', 'manager'],
+
+    // Client management — admin/manager only
+    create_client: ['admin', 'manager'],
+    update_client: ['admin', 'manager'],
+
+    // Employee management — admin only
+    update_employee: ['admin'],
+
+    // Service management — admin only
+    add_service: ['admin'],
+    update_service: ['admin'],
+
+    // Admin tools
+    manage_leave_request: ['admin', 'manager'],
+    bulk_estimate_hours: ['admin', 'manager'],
+};
 
 export interface RollbackAction {
     toolName: string;
@@ -66,12 +119,36 @@ async function snapshotEntity(entityType: string, entityId: string): Promise<any
     return doc || null;
 }
 
+/** Look up user role from userId */
+async function getUserRole(userId: string): Promise<RoleType> {
+    await connectDB();
+    // Check users first
+    const user = await UserModel.findOne({ id: userId }).select('role').lean() as any;
+    if (user?.role) return user.role as RoleType;
+    // Check if it's a client
+    const client = await ClientModel.findOne({ id: userId }).select('role').lean() as any;
+    if (client) return 'client';
+    return 'employee'; // Fallback
+}
+
 export async function executeTool(
     name: string,
     args: Record<string, any>,
     userId: string
 ): Promise<{ success: boolean; data: any; summary: string; rollbackData?: RollbackAction[] }> {
     try {
+        // ── Role-based permission check ──────────────────────────────
+        const userRole = await getUserRole(userId);
+        const allowedRoles = TOOL_PERMISSIONS[name];
+
+        if (allowedRoles && !allowedRoles.includes(userRole)) {
+            const roleLabel = userRole === 'client' ? 'Client' : userRole.charAt(0).toUpperCase() + userRole.slice(1);
+            return {
+                success: false,
+                data: null,
+                summary: `⛔ Permission denied — "${name.replace(/_/g, ' ')}" requires ${allowedRoles.join('/')} access. Your role (${roleLabel}) does not have this permission.`,
+            };
+        }
         switch (name) {
             case "create_project": {
                 const newProject = await createProject({
@@ -208,6 +285,7 @@ export async function executeTool(
                     priority: args.priority || "Medium",
                     dueDate,
                     status: (args.status as any) || "Todo",
+                    estimatedHours: args.estimatedHours || undefined,
                 });
 
                 const assignInfo = autoAssigned
@@ -254,6 +332,7 @@ export async function executeTool(
                 if (args.category) editUpdates.category = args.category;
                 if (args.dueDate) editUpdates.dueDate = args.dueDate;
                 if (args.status) editUpdates.status = args.status;
+                if (args.estimatedHours !== undefined) editUpdates.estimatedHours = args.estimatedHours;
 
                 if (Object.keys(editUpdates).length === 0) {
                     return { success: false, data: null, summary: "No changes specified" };
@@ -473,6 +552,7 @@ export async function executeTool(
                             priority: task.priority || "Medium",
                             dueDate: dueDateStr,
                             status: taskStatus,
+                            estimatedHours: task.estimatedHours || undefined,
                         });
 
                         const assigneeName = userNameMap.get(assigneeId) || "Unassigned";
@@ -870,6 +950,15 @@ export async function executeTool(
                         beforeSnapshot: svcSnapshot,
                         executedAt: new Date().toISOString(),
                     }] : undefined,
+                };
+            }
+
+            case "bulk_estimate_hours": {
+                const result = await bulkEstimateTaskHours();
+                return {
+                    success: true,
+                    data: result,
+                    summary: result.message,
                 };
             }
 

@@ -70,6 +70,7 @@ export async function getAgencyAIConfig(): Promise<AIConfig | null> {
 }
 
 export async function updateEmailSettings(enabled: boolean) {
+    await requireRole('admin', 'manager');
     const agency = await getCurrentAgency();
     if (!agency) throw new Error("Unauthorized");
 
@@ -87,6 +88,7 @@ export async function updateEmailSettings(enabled: boolean) {
 }
 
 export async function updateAgencyDetails(name: string, logo: string, primaryColor?: string, secondaryColor?: string) {
+    await requireRole('admin');
     const agency = await getCurrentAgency();
     if (!agency) throw new Error("Unauthorized");
 
@@ -111,6 +113,31 @@ export const getSessionId = authGetSessionId;
 export const login = authLogin;
 export const logout = authLogout;
 
+// =============================================================================
+// AUTH GUARD HELPERS — reusable role-based permission checks for server actions
+// =============================================================================
+
+type AllowedRole = 'admin' | 'manager' | 'employee' | 'specialist' | 'client' | 'superadmin';
+
+/** Ensure user is logged in. Returns the current user or throws. */
+async function requireAuth() {
+    const user = await getCurrentUser();
+    if (!user) throw new Error("Unauthorized: You must be logged in.");
+    return user;
+}
+
+/**
+ * Ensure user has one of the allowed roles. Returns the current user or throws.
+ * Usage: `const user = await requireRole('admin', 'manager');`
+ */
+async function requireRole(...roles: AllowedRole[]) {
+    const user = await requireAuth();
+    if (!roles.includes(user.role as AllowedRole)) {
+        const allowed = roles.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(' / ');
+        throw new Error(`Unauthorized: This action requires ${allowed} access. Your role (${user.role}) does not have permission.`);
+    }
+    return user;
+}
 
 export async function getAllUsers() {
     await connectDB();
@@ -649,6 +676,7 @@ export async function getUserContributionHistory(userId: string) {
 }
 
 export async function createUser(user: Omit<User, "id" | "agencyId">) {
+    await requireRole('admin', 'manager');
     // Generate/Validate username
     let username = user.username;
     if (!username) {
@@ -993,6 +1021,7 @@ export async function adminResetPassword(id: string, newPassword: string) {
 }
 
 export async function deleteUser(id: string, password: string) {
+    await requireRole('admin');
     await connectDB();
     const isValid = await verifyAdminPassword(password);
     if (!isValid) throw new Error('Invalid password');
@@ -1009,6 +1038,7 @@ export async function getServices() {
 }
 
 export async function addService(name: string, jobs: { title: string; count: number }[]) {
+    await requireRole('admin');
     await connectDB();
     const agency = await getCurrentAgency();
     const newService = { id: generateId(), agencyId: agency?.id, name, jobs };
@@ -1019,6 +1049,7 @@ export async function addService(name: string, jobs: { title: string; count: num
 }
 
 export async function deleteService(id: string) {
+    await requireRole('admin');
     await connectDB();
     const agency = await getCurrentAgency();
     const serviceToDelete = await ServiceModel.findOne({ id, agencyId: agency?.id }).lean();
@@ -1035,6 +1066,7 @@ export async function deleteService(id: string) {
 }
 
 export async function updateService(id: string, name: string, jobs: { title: string; count: number }[]) {
+    await requireRole('admin');
     await connectDB();
     const agency = await getCurrentAgency();
     await ServiceModel.updateOne({ id, agencyId: agency?.id }, { $set: { name, jobs } });
@@ -1165,6 +1197,7 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
 }
 
 export async function updateProjectPayment(projectId: string, serviceId: string, paymentConfig: PaymentConfig) {
+    await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
     await ProjectModel.updateOne(
@@ -1470,6 +1503,7 @@ export async function addComment(taskId: string, userId: string, text: string) {
 
 
 export async function createTask(task: Omit<Task, "id" | "agencyId">) {
+    await requireRole('admin', 'manager');
     await connectDB();
     const currentUser = await getCurrentUser();
     const agency = await getCurrentAgency();
@@ -1639,6 +1673,7 @@ export async function updateClient(id: string, updates: Partial<Client>) {
 
 // Project Actions
 export async function updateProject(id: string, updates: Partial<Project>) {
+    await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
     const oldProject = await ProjectModel.findOne({ id, agencyId: agency?.id }).lean();
@@ -1711,6 +1746,7 @@ export async function verifyAdminPassword(password: string): Promise<boolean> {
 }
 
 export async function deleteProject(id: string, password: string) {
+    await requireRole('admin');
     await connectDB();
     const isValid = await verifyAdminPassword(password);
     if (!isValid) throw new Error('Invalid password');
@@ -1841,6 +1877,7 @@ export async function getCategoryMemberSummary(category: string) {
 
 
 export async function createTransaction(transaction: Omit<Transaction, "id" | "status" | "agencyId"> & { status?: Transaction['status'] }) {
+    await requireRole('admin', 'manager');
     // STRICT SERVER-SIDE VALIDATION
     if (!transaction.amount || transaction.amount <= 0) {
         throw new Error("Validation Error: Amount must be greater than zero.");
@@ -2115,6 +2152,7 @@ export async function adminRejectInvoicePayment(invoiceId: string, reason?: stri
 
 // Legacy function - kept for backward compatibility
 export async function updateInvoiceStatus(invoiceId: string, status: 'Paid' | 'Pending' | 'Overdue' | 'Processing') {
+    await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
     await InvoiceModel.updateOne(
@@ -2160,6 +2198,7 @@ export async function getHighPriorityTasks(offset = 0, limit = 5) {
 }
 
 export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "agencyId">) {
+    await requireRole('admin', 'manager');
     await connectDB();
     if (!invoice.amount || invoice.amount <= 0) throw new Error('Validation Error: Invoice amount must be greater than zero.');
     if (!invoice.projectId) throw new Error('Validation Error: Invoice must be linked to a project.');
@@ -2328,6 +2367,7 @@ export async function getPayrollStatus(userId?: string) {
 }
 
 export async function payEmployee(userId: string, amount: number, month: string, userName: string) {
+    await requireRole('admin', 'manager');
     const description = `Salary Payment - ${month} - ${userName}`;
 
     await createTransaction({
@@ -2352,6 +2392,7 @@ export async function getSystemSettings() {
 }
 
 export async function updateSystemSettings(settings: { systemName: string; logo: string }) {
+    await requireRole('admin');
     await connectDB();
     const agency = await getCurrentAgency();
     await SettingsModel.updateOne(
@@ -2467,6 +2508,7 @@ export async function getProjectAssets(projectId: string) {
 }
 
 export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt" | "agencyId">) {
+    await requireRole('admin', 'manager', 'employee', 'specialist');
     // Server-Side Safety Check
     const FORBIDDEN_EXTENSIONS = ['.exe', '.bat', '.cmd', '.sh', '.vbs', '.msi', '.jar', '.com', '.scr', '.pif'];
     const fileName = asset.name.toLowerCase();
@@ -2490,6 +2532,7 @@ export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt" | "
 }
 
 export async function deleteProjectAsset(assetId: string) {
+    await requireRole('admin', 'manager');
     const currentUser = await getCurrentUser();
     const userName = currentUser ? currentUser.name : "System";
 
@@ -2538,6 +2581,7 @@ export interface ExtractedTaskFields {
     description?: string;
     category?: string;
     priority?: 'Low' | 'Medium' | 'High';
+    estimatedHours?: number;
 }
 
 /**
@@ -2558,9 +2602,10 @@ RULES:
 - "description": The full task description with details, acceptance criteria, steps, etc. Preserve formatting.
 - "category": Pick the BEST matching category from this list: [${availableCategories.join(', ')}]. If none match well, return empty string.
 - "priority": One of "Low", "Medium", "High". Infer from urgency/importance cues. Default to "Medium" if unclear.
+- "estimatedHours": Estimate the number of hours this task will take based on complexity and scope. Use increments of 0.5. Simple tasks: 0.5-2h, medium: 2-8h, complex: 8-40h. Return a number.
 
 Return ONLY valid JSON. No markdown fences, no extra text. Example:
-{"title":"Implement user login","description":"Create a login page with...","category":"Web Development","priority":"High"}`;
+{"title":"Implement user login","description":"Create a login page with...","category":"Web Development","priority":"High","estimatedHours":4}`;
 
     const prompt = `Extract task fields from this AI response:\n\n${aiResponseText}`;
 
@@ -3494,4 +3539,71 @@ export async function getProjectRefunds(projectId: string) {
         projectId, category: 'Refund', agencyId: agency?.id
     }).lean();
     return refunds.map(sanitizeDoc).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+// ============================================
+// BULK ESTIMATE TASK HOURS
+// ============================================
+export async function bulkEstimateTaskHours() {
+    await connectDB();
+    const currentUser = await getCurrentUser();
+    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+        throw new Error('Unauthorized: Only admins can bulk-estimate hours');
+    }
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error('No agency context');
+
+    // Find all tasks without estimatedHours
+    const tasks = await TaskModel.find({
+        agencyId: agency.id,
+        $or: [{ estimatedHours: { $exists: false } }, { estimatedHours: null }, { estimatedHours: 0 }]
+    }).lean();
+
+    if (tasks.length === 0) return { updated: 0, message: 'All tasks already have estimated hours' };
+
+    let updated = 0;
+    for (const task of tasks) {
+        const hours = estimateHoursFromTask(task as any);
+        await TaskModel.updateOne(
+            { id: (task as any).id, agencyId: agency.id },
+            { $set: { estimatedHours: hours } }
+        );
+        updated++;
+    }
+
+    revalidatePath('/dashboard');
+    return { updated, message: `Estimated hours for ${updated} tasks` };
+}
+
+// Smart heuristic for estimating hours from task metadata
+function estimateHoursFromTask(task: { title?: string; description?: string; priority?: string; category?: string; subtasks?: any[] }): number {
+    let hours = 2; // Base: 2 hours
+
+    const title = (task.title || '').toLowerCase();
+    const desc = (task.description || '').toLowerCase();
+    const combined = title + ' ' + desc;
+
+    // Keywords that suggest complexity
+    const complexKeywords = ['integration', 'migrate', 'architecture', 'refactor', 'database', 'authentication', 'security', 'payment', 'deploy', 'infrastructure', 'api', 'redesign', 'overhaul'];
+    const mediumKeywords = ['implement', 'create', 'build', 'develop', 'setup', 'configure', 'design', 'feature', 'page', 'component', 'module', 'dashboard'];
+    const simpleKeywords = ['fix', 'update', 'change', 'rename', 'typo', 'color', 'text', 'label', 'padding', 'margin', 'spacing', 'icon', 'button', 'tooltip'];
+
+    if (complexKeywords.some(k => combined.includes(k))) hours = 8;
+    else if (mediumKeywords.some(k => combined.includes(k))) hours = 4;
+    else if (simpleKeywords.some(k => combined.includes(k))) hours = 1;
+
+    // Priority multiplier
+    if (task.priority === 'High' || task.priority === 'Urgent') hours = Math.max(hours, 4);
+
+    // Description length adds complexity
+    if (desc.length > 500) hours = Math.ceil(hours * 1.5);
+    else if (desc.length > 200) hours = Math.ceil(hours * 1.2);
+
+    // Subtasks add time
+    if (task.subtasks && Array.isArray(task.subtasks) && task.subtasks.length > 0) {
+        hours += Math.ceil(task.subtasks.length * 0.5);
+    }
+
+    // Clamp to reasonable range
+    return Math.max(0.5, Math.min(hours, 40));
 }

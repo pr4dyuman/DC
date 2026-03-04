@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getServices, addService, deleteService, updateService, getAgencySettings } from "@/lib/actions";
+import { getServices, addService, deleteService, updateService, getAgencySettings, bulkEstimateTaskHours } from "@/lib/actions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import {
 import {
     Loader2, Plus, Trash2, Edit2, Users, Briefcase,
     ChevronDown, ChevronRight, Settings, Shield, Palette,
-    Sun, Moon, X, Lock
+    Sun, Moon, X, Lock, Clock
 } from "lucide-react";
 import { toast } from "sonner";
 import PermissionSettings from "@/components/settings/PermissionSettings";
@@ -368,6 +368,47 @@ export default function SettingsPage() {
                         initialEnabled={agencySettings?.emailNotificationsEnabled ?? true}
                         loading={agencySettingsLoading}
                     />
+                </div>
+            </SectionAccordion>
+
+            {/* Admin Tools Section */}
+            <SectionAccordion
+                title="Admin Tools"
+                description="Utilities and bulk operations."
+                icon={<Settings className="h-6 w-6 text-cyan-500" />}
+                iconBg="bg-cyan-500/10"
+                isOpen={!!openSections.tools}
+                onToggle={() => toggleSection('tools')}
+            >
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/30">
+                        <div>
+                            <h4 className="font-medium text-foreground">Bulk Estimate Task Hours</h4>
+                            <p className="text-sm text-muted-foreground mt-0.5">
+                                Automatically estimate hours for all tasks that don't have hours set, using smart heuristics based on task title, description, priority, and subtasks.
+                            </p>
+                        </div>
+                        <Button
+                            variant="outline"
+                            className="shrink-0 ml-4 border-cyan-500/30 text-cyan-500 hover:bg-cyan-500/10"
+                            disabled={submitting}
+                            onClick={async () => {
+                                setSubmitting(true);
+                                try {
+                                    // Assuming bulkEstimateTaskHours is imported or defined elsewhere
+                                    const result = await bulkEstimateTaskHours();
+                                    toast.success(result.message);
+                                } catch (e: any) {
+                                    toast.error(e.message || 'Failed to estimate hours');
+                                } finally {
+                                    setSubmitting(false);
+                                }
+                            }}
+                        >
+                            {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Clock className="h-4 w-4 mr-2" />}
+                            Estimate Hours
+                        </Button>
+                    </div>
                 </div>
             </SectionAccordion>
 
