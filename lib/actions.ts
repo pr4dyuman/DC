@@ -746,17 +746,30 @@ export async function getCurrentUser() {
     const session = await getSessionUser();
 
     if (session) {
+        const now = new Date().toISOString();
         if (session.role === 'superadmin') {
             const admin = await SuperAdminModel.findOne({ id: session.userId }).lean();
             if (admin) return sanitizeDoc(admin) as any;
         } else if (session.role === 'client') {
             const client = await ClientModel.findOne({ id: session.userId }).lean();
             if (client) {
+                // Throttled presence update (max once per 5 min)
+                const lastActive = (client as any).lastActiveAt ? new Date((client as any).lastActiveAt).getTime() : 0;
+                if (Date.now() - lastActive > 5 * 60 * 1000) {
+                    ClientModel.updateOne({ id: session.userId }, { $set: { lastActiveAt: now } }).catch(() => { });
+                }
                 return sanitizeDoc({ ...client, role: 'client' }) as any;
             }
         } else {
             const user = await UserModel.findOne({ id: session.userId }).lean();
-            if (user) return sanitizeDoc(user) as User;
+            if (user) {
+                // Throttled presence update (max once per 5 min)
+                const lastActive = (user as any).lastActiveAt ? new Date((user as any).lastActiveAt).getTime() : 0;
+                if (Date.now() - lastActive > 5 * 60 * 1000) {
+                    UserModel.updateOne({ id: session.userId }, { $set: { lastActiveAt: now } }).catch(() => { });
+                }
+                return sanitizeDoc(user) as User;
+            }
         }
     }
 

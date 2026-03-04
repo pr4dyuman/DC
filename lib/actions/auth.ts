@@ -26,6 +26,7 @@ export async function login(email: string, password: string) {
     if (user) {
         if (user.password && await bcrypt.compare(password, user.password)) {
             await authLogin(user.id, user.role, user.agencyId);
+            await UserModel.updateOne({ id: user.id }, { $set: { lastActiveAt: new Date().toISOString() } });
             return { success: true, user, isSuperAdmin: false };
         }
     }
@@ -35,6 +36,7 @@ export async function login(email: string, password: string) {
     if (client) {
         if (client.password && await bcrypt.compare(password, client.password)) {
             await authLogin(client.id, 'client', client.agencyId);
+            await ClientModel.updateOne({ id: client.id }, { $set: { lastActiveAt: new Date().toISOString() } });
             return { success: true, user: client, isSuperAdmin: false };
         }
     }
