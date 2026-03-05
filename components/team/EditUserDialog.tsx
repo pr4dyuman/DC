@@ -260,7 +260,6 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                                     className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed">
                                                     <option value="employee">Employee</option>
                                                     <option value="manager">Manager</option>
-                                                    <option value="specialist">Specialist</option>
                                                     <option value="admin">Admin</option>
                                                 </select>
                                             </div>

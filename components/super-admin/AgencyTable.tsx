@@ -28,9 +28,14 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
 
     const handleDelete = async (agencyId: string) => {
         if (!confirm("⚠️ WARNING: This will permanently delete the agency and ALL its data. This cannot be undone. Are you absolutely sure?")) return;
-        if (!confirm("Last chance! Type 'DELETE' to confirm.")) return;
-        await deleteAgency(agencyId);
-        window.location.reload();
+        const password = prompt("Enter your super-admin password to confirm deletion:");
+        if (!password) return;
+        try {
+            await deleteAgency(agencyId, password);
+            window.location.reload();
+        } catch (err: any) {
+            alert(err.message || 'Failed to delete agency');
+        }
     };
 
     return (

@@ -105,7 +105,7 @@ export default function TeamPage() {
     // Stats
     const totalMembers = users.length;
     const adminCount = users.filter(u => u.role === 'admin').length;
-    const employeeCount = users.filter(u => u.role === 'employee' || u.role === 'manager' || u.role === 'specialist').length;
+    const employeeCount = users.filter(u => u.role === 'employee' || u.role === 'manager').length;
     const clientCount = users.filter(u => u.role === 'client').length;
 
     return (

@@ -26,8 +26,14 @@ export default function AgencyActions({ agency }: { agency: any }) {
         if (!confirm("⚠️ WARNING: This will permanently delete the agency and ALL its data. This cannot be undone. Are you absolutely sure?")) return;
         const confirmation = prompt("Type 'DELETE' to confirm:");
         if (confirmation !== 'DELETE') return;
-        await deleteAgency(agency.id);
-        router.push('/super-admin/agencies');
+        const password = prompt("Enter your super-admin password to confirm deletion:");
+        if (!password) return;
+        try {
+            await deleteAgency(agency.id, password);
+            router.push('/super-admin/agencies');
+        } catch (err: any) {
+            alert(err.message || 'Failed to delete agency');
+        }
     };
 
     const handleUpdatePlan = async () => {

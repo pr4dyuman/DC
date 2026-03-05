@@ -363,7 +363,7 @@ Always follow these rules strictly. The system will reject invalid combinations.
                 name: { type: "STRING" },
                 email: { type: "STRING" },
                 jobTitle: { type: "STRING" },
-                role: { type: "STRING", description: "User role", enum: ["admin", "manager", "employee", "specialist"] },
+                role: { type: "STRING", description: "User role", enum: ["admin", "manager", "employee"] },
                 salary: { type: "NUMBER", description: "Monthly salary in INR" },
                 phone: { type: "STRING" },
             },
@@ -460,6 +460,206 @@ Always follow these rules strictly. The system will reject invalid combinations.
             properties: {},
         },
     },
+    // =========================================================================
+    // NEW PERMISSION-GATED TOOLS — These require explicit AI permission flags
+    // =========================================================================
+    {
+        name: "pay_employee",
+        description: "Pay an employee's salary. Creates a salary expense transaction. Use for importing historical salary data by setting a past month. Requires AI Payroll permission.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                userId: { type: "STRING", description: "Employee ID from the QUICK LOOKUP TABLE" },
+                amount: { type: "NUMBER", description: "Salary amount in INR" },
+                month: { type: "STRING", description: "Payment month in YYYY-MM format (e.g. '2024-01')" },
+                description: { type: "STRING", description: "Optional description (default: 'Salary for [month]')" },
+            },
+            required: ["userId", "amount", "month"],
+        },
+    },
+    {
+        name: "bulk_pay_employees",
+        description: "Pay multiple employees at once. Creates salary transactions for each. Great for importing months of historical salary data. Requires AI Payroll permission.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                payments: {
+                    type: "ARRAY",
+                    description: "List of employee payments",
+                    items: {
+                        type: "OBJECT",
+                        properties: {
+                            userId: { type: "STRING", description: "Employee ID" },
+                            amount: { type: "NUMBER", description: "Salary amount in INR" },
+                            description: { type: "STRING", description: "Optional description" },
+                        },
+                        required: ["userId", "amount"],
+                    },
+                },
+                month: { type: "STRING", description: "Payment month in YYYY-MM format" },
+            },
+            required: ["payments", "month"],
+        },
+    },
+    {
+        name: "approve_invoice_payment",
+        description: "Approve an invoice payment — sets invoice to 'Paid' and creates an income transaction. Requires AI Invoice Management permission.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                invoiceId: { type: "STRING", description: "Invoice ID to approve" },
+            },
+            required: ["invoiceId"],
+        },
+    },
+    {
+        name: "reject_invoice_payment",
+        description: "Reject an invoice payment — sets invoice back to 'Pending'. Requires AI Invoice Management permission.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                invoiceId: { type: "STRING", description: "Invoice ID to reject" },
+                reason: { type: "STRING", description: "Reason for rejection" },
+            },
+            required: ["invoiceId"],
+        },
+    },
+    {
+        name: "update_invoice_status",
+        description: "Update the status of an invoice manually. Requires AI Invoice Management permission.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                invoiceId: { type: "STRING", description: "Invoice ID to update" },
+                status: { type: "STRING", description: "New status", enum: ["Paid", "Pending", "Overdue", "Processing"] },
+            },
+            required: ["invoiceId", "status"],
+        },
+    },
+    {
+        name: "bulk_create_invoices",
+        description: "Create multiple invoices at once. Great for importing historical invoice data. Supports backdating via the date field. Requires AI Invoice Management permission.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                invoices: {
+                    type: "ARRAY",
+                    description: "List of invoices to create",
+                    items: {
+                        type: "OBJECT",
+                        properties: {
+                            projectId: { type: "STRING", description: "Project ID" },
+                            amount: { type: "NUMBER", description: "Invoice amount in INR" },
+                            date: { type: "STRING", description: "Invoice date in YYYY-MM-DD format" },
+                            status: { type: "STRING", description: "Invoice status", enum: ["Paid", "Pending", "Overdue", "Processing"] },
+                        },
+                        required: ["projectId", "amount", "date"],
+                    },
+                },
+            },
+            required: ["invoices"],
+        },
+    },
+    {
+        name: "create_refund",
+        description: "Create a refund transaction for a project. Records an expense transaction with 'Refund' category. Supports backdating. Requires AI Refund permission.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                projectId: { type: "STRING", description: "Project ID to refund against" },
+                amount: { type: "NUMBER", description: "Refund amount in INR" },
+                description: { type: "STRING", description: "Refund description/reason" },
+                date: { type: "STRING", description: "Refund date in YYYY-MM-DD format (default: today)" },
+            },
+            required: ["projectId", "amount", "description"],
+        },
+    },
+    {
+        name: "create_employee",
+        description: "Create a new employee/user in the agency. Use for onboarding new team members. Requires AI Employee Creation permission.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                name: { type: "STRING", description: "Employee full name" },
+                email: { type: "STRING", description: "Employee email address" },
+                role: { type: "STRING", description: "Employee role", enum: ["admin", "manager", "employee"] },
+                jobTitle: { type: "STRING", description: "Job title (e.g. 'Frontend Developer')" },
+                salary: { type: "NUMBER", description: "Monthly salary in INR" },
+                employmentType: { type: "STRING", description: "Employment type", enum: ["Salary", "Project Based", "Freelancer"] },
+                password: { type: "STRING", description: "Initial password for the account" },
+            },
+            required: ["name", "email", "role"],
+        },
+    },
+    {
+        name: "bulk_create_clients",
+        description: "Create multiple clients at once. Great for importing historical client data. Requires AI Invoice Management permission.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                clients: {
+                    type: "ARRAY",
+                    description: "List of clients to create",
+                    items: {
+                        type: "OBJECT",
+                        properties: {
+                            name: { type: "STRING", description: "Client name" },
+                            email: { type: "STRING", description: "Client email" },
+                            companyName: { type: "STRING", description: "Company name" },
+                            phone: { type: "STRING", description: "Phone number" },
+                            address: { type: "STRING", description: "Address" },
+                        },
+                        required: ["name", "email", "companyName"],
+                    },
+                },
+            },
+            required: ["clients"],
+        },
+    },
+    {
+        name: "delete_project",
+        description: "Permanently delete a project and all its associated data (tasks, invoices, etc). Use with extreme caution. Requires AI Delete permission.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                projectId: { type: "STRING", description: "Project ID to delete" },
+            },
+            required: ["projectId"],
+        },
+    },
+    {
+        name: "delete_client",
+        description: "Archive (soft-delete) a client. Their financial data is preserved but they are hidden. Requires AI Delete permission.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                clientId: { type: "STRING", description: "Client ID to archive" },
+            },
+            required: ["clientId"],
+        },
+    },
+    {
+        name: "delete_transaction",
+        description: "Permanently delete a financial transaction. Requires AI Delete permission.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                transactionId: { type: "STRING", description: "Transaction ID to delete" },
+            },
+            required: ["transactionId"],
+        },
+    },
+    {
+        name: "delete_service",
+        description: "Delete a service/category from the agency. Requires AI Delete permission.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                serviceId: { type: "STRING", description: "Service ID to delete" },
+            },
+            required: ["serviceId"],
+        },
+    },
 ];
 
 // =============================================================================
@@ -496,6 +696,20 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
     add_service: "➕ Adding service",
     update_service: "✏️ Updating service",
     bulk_estimate_hours: "⏱️ Estimating task hours",
+    // New permission-gated tools
+    pay_employee: "💰 Paying employee",
+    bulk_pay_employees: "💰 Processing bulk payroll",
+    approve_invoice_payment: "✅ Approving payment",
+    reject_invoice_payment: "❌ Rejecting payment",
+    update_invoice_status: "📄 Updating invoice",
+    bulk_create_invoices: "📄 Creating invoices",
+    create_refund: "💸 Issuing refund",
+    create_employee: "👤 Creating employee",
+    bulk_create_clients: "👥 Creating clients",
+    delete_project: "🗑️ Deleting project",
+    delete_client: "🗑️ Archiving client",
+    delete_transaction: "🗑️ Deleting transaction",
+    delete_service: "🗑️ Deleting service",
 };
 
 export function getToolDisplayName(toolName: string): string {

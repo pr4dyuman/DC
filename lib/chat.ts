@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { withAgencyId, getCurrentAgency } from "./agency-context";
 import { generateId } from "./utils-server";
 import { UserModel, ClientModel, MessageModel, connectDB } from "./mongodb";
+import { sanitizeString } from "./validation";
 
 export type { Message };
 
@@ -147,6 +148,9 @@ export async function getMessages(currentUserId: string, otherUserId: string): P
 
 export async function sendMessage(senderId: string, receiverId: string, content: string, type: 'text' | 'image' = 'text') {
     await connectDB();
+    // Input sanitization — prevent XSS in chat messages
+    content = sanitizeString(content, 10000);
+    if (!content) throw new Error('Message content is required');
 
     // Resolve agencyId
     let agencyId = 'default-agency';
@@ -204,8 +208,9 @@ export async function markAsRead(currentUserId: string, senderId: string) {
 export async function deleteConversation(currentUserId: string, otherUserId: string) {
     await connectDB();
     const agency = await getCurrentAgency();
+    if (!agency) throw new Error('No agency context — cannot delete conversation');
     await MessageModel.deleteMany({
-        agencyId: agency?.id,
+        agencyId: agency.id,
         $or: [
             { senderId: currentUserId, receiverId: otherUserId },
             { senderId: otherUserId, receiverId: currentUserId }

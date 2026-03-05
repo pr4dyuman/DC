@@ -5,10 +5,16 @@ import {
     analyzeRollback,
     executeRollback,
 } from "@/lib/singularity-history";
+import { getSessionUser } from "@/lib/auth";
 
 // GET /api/singularity/history/checkpoint?sessionId=xxx — List checkpoints
 export async function GET(req: NextRequest) {
     try {
+        const session = await getSessionUser();
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const { searchParams } = new URL(req.url);
         const sessionId = searchParams.get("sessionId");
 
@@ -20,13 +26,18 @@ export async function GET(req: NextRequest) {
         return NextResponse.json(checkpoints);
     } catch (error: any) {
         console.error("[Checkpoint API] GET error:", error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 }
 
 // POST /api/singularity/history/checkpoint — Create checkpoint or analyze rollback
 export async function POST(req: NextRequest) {
     try {
+        const session = await getSessionUser();
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const body = await req.json();
 
         // If analyzing rollback
@@ -49,13 +60,18 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ checkpointId });
     } catch (error: any) {
         console.error("[Checkpoint API] POST error:", error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 }
 
 // PUT /api/singularity/history/checkpoint — Execute rollback
 export async function PUT(req: NextRequest) {
     try {
+        const session = await getSessionUser();
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const body = await req.json();
         const { checkpointId, scope } = body;
 
@@ -67,6 +83,6 @@ export async function PUT(req: NextRequest) {
         return NextResponse.json(result);
     } catch (error: any) {
         console.error("[Checkpoint API] PUT error:", error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 }

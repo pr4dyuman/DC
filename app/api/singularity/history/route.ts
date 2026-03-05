@@ -7,74 +7,100 @@ import {
     updateSingularitySessionMode,
     deleteSingularitySession,
 } from "@/lib/singularity-history";
+import { getSessionUser } from "@/lib/auth";
 
-// GET /api/singularity/history?userId=xxx — List sessions
 // GET /api/singularity/history?sessionId=xxx — Load single session
+// GET /api/singularity/history — List current user's sessions
 export async function GET(req: NextRequest) {
     try {
+        // Authentication check
+        const session = await getSessionUser();
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const { searchParams } = new URL(req.url);
-        const userId = searchParams.get("userId");
         const sessionId = searchParams.get("sessionId");
 
         if (sessionId) {
-            const session = await getSingularitySession(sessionId);
-            if (!session) {
+            const chatSession = await getSingularitySession(sessionId);
+            if (!chatSession) {
                 return NextResponse.json({ error: "Session not found" }, { status: 404 });
             }
-            return NextResponse.json(session);
+            // IDOR protection: verify ownership
+            if ((chatSession as any).userId !== session.userId) {
+                return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+            }
+            return NextResponse.json(chatSession);
         }
 
-        if (userId) {
-            const sessions = await getSingularitySessions(userId);
-            return NextResponse.json(sessions);
-        }
-
-        return NextResponse.json({ error: "userId or sessionId required" }, { status: 400 });
+        // Only return sessions for the authenticated user (Fix IDOR)
+        const sessions = await getSingularitySessions(session.userId);
+        return NextResponse.json(sessions);
     } catch (error: any) {
         console.error("[History API] GET error:", error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 }
 
 // POST /api/singularity/history
-// — Create new session when body has { userId, mode }
+// — Create new session when body has { mode }
 // — Update existing session when body has { sessionId, messages } (used by sendBeacon emergency save)
 export async function POST(req: NextRequest) {
     try {
+        // Authentication check
+        const session = await getSessionUser();
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const body = await req.json();
-        const { userId, mode, sessionId, messages, title } = body;
+        const { mode, sessionId, messages, title } = body;
 
         // If sessionId is present — this is an emergency save from sendBeacon
         if (sessionId && messages) {
+            // Verify ownership before updating
+            const existingSession = await getSingularitySession(sessionId);
+            if (!existingSession || (existingSession as any).userId !== session.userId) {
+                return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+            }
             await updateSingularitySession(sessionId, messages, title);
             return NextResponse.json({ success: true });
         }
 
-        // Otherwise — create a new session
-        if (!userId) {
-            return NextResponse.json({ error: "userId required" }, { status: 400 });
-        }
-
-        const newSessionId = await createSingularitySession(userId, mode || "chat");
+        // Otherwise — create a new session for the authenticated user
+        const newSessionId = await createSingularitySession(session.userId, mode || "chat");
         return NextResponse.json({ sessionId: newSessionId });
     } catch (error: any) {
         console.error("[History API] POST error:", error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 }
 
 // PUT /api/singularity/history — Update session (save messages)
 export async function PUT(req: NextRequest) {
     try {
+        // Authentication check
+        const session = await getSessionUser();
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const body = await req.json();
-        const { sessionId, messages, title, mode } = body;
+        const { sessionId, messages, title, mode: newMode } = body;
 
         if (!sessionId) {
             return NextResponse.json({ error: "sessionId required" }, { status: 400 });
         }
 
-        if (mode) {
-            await updateSingularitySessionMode(sessionId, mode);
+        // Verify ownership before updating
+        const existingSession = await getSingularitySession(sessionId);
+        if (!existingSession || (existingSession as any).userId !== session.userId) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
+        if (newMode) {
+            await updateSingularitySessionMode(sessionId, newMode);
         }
 
         if (messages) {
@@ -84,13 +110,19 @@ export async function PUT(req: NextRequest) {
         return NextResponse.json({ success: true });
     } catch (error: any) {
         console.error("[History API] PUT error:", error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 }
 
 // DELETE /api/singularity/history?id=xxx — Delete session
 export async function DELETE(req: NextRequest) {
     try {
+        // Authentication check
+        const session = await getSessionUser();
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const { searchParams } = new URL(req.url);
         const id = searchParams.get("id");
 
@@ -98,10 +130,16 @@ export async function DELETE(req: NextRequest) {
             return NextResponse.json({ error: "id required" }, { status: 400 });
         }
 
+        // Verify ownership before deleting
+        const existingSession = await getSingularitySession(id);
+        if (!existingSession || (existingSession as any).userId !== session.userId) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
         await deleteSingularitySession(id);
         return NextResponse.json({ success: true });
     } catch (error: any) {
         console.error("[History API] DELETE error:", error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 }

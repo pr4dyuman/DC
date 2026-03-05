@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createTask, getServices, getUsers, getCurrentUser } from "@/lib/actions";
+import { createTask, getServices, getUsers, getCurrentUser, aiEstimateTaskHours } from "@/lib/actions";
 import type { ExtractedTaskFields } from "@/lib/actions";
 import { AIChatBox } from "./AIChatBox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -24,6 +24,7 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [estimating, setEstimating] = useState(false);
     const [showChat, setShowChat] = useState(false);
     const [currentUserId, setCurrentUserId] = useState("");
 
@@ -94,7 +95,7 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
     return (
         <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
             <DialogTrigger asChild>
-                <button className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 transition-colors">
+                <button className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-border bg-background text-foreground hover:bg-accent h-9 px-4 py-2 transition-colors">
                     <Plus className="mr-2 h-4 w-4" /> Add Task
                 </button>
             </DialogTrigger>
@@ -163,15 +164,37 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                                 <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Estimated Hours</span>
                             </label>
                             <div className="flex items-center gap-2">
-                                <input
-                                    type="number"
-                                    min="0"
-                                    step="0.5"
-                                    value={estimatedHours || ""}
-                                    onChange={e => setEstimatedHours(parseFloat(e.target.value) || 0)}
-                                    placeholder="e.g. 4"
-                                    className={`${inputCls} w-24`}
-                                />
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.5"
+                                        value={estimatedHours || ""}
+                                        onChange={e => setEstimatedHours(parseFloat(e.target.value) || 0)}
+                                        placeholder="e.g. 4"
+                                        className={`${inputCls} w-28 pr-9`}
+                                    />
+                                    <button
+                                        type="button"
+                                        disabled={!title.trim() || estimating}
+                                        title="AI Estimate"
+                                        onClick={async () => {
+                                            setEstimating(true);
+                                            try {
+                                                const hours = await aiEstimateTaskHours(projectId, title, description, priority);
+                                                setEstimatedHours(hours);
+                                                toast.success(`Estimated: ${hours}h`);
+                                            } catch (e: any) {
+                                                toast.error(e.message || 'Failed to estimate');
+                                            } finally {
+                                                setEstimating(false);
+                                            }
+                                        }}
+                                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 flex items-center justify-center rounded-md transition-all text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 disabled:opacity-40 disabled:pointer-events-none"
+                                    >
+                                        {estimating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                                    </button>
+                                </div>
                                 <span className="text-xs text-muted-foreground">hours</span>
                             </div>
                         </div>

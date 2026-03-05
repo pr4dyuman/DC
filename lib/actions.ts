@@ -4,9 +4,11 @@ import { db, User, Project, Invoice, Task, Notification, Activity, Client, Asset
 import { revalidatePath } from "next/cache";
 import { generateContent, generateContentWithParts, generateContentWithChat } from "./ai-provider";
 import { createSession, sendMessage, closeSession, isSessionActive } from "./live-session";
-import type { AIConfig } from "./types";
+import type { AIConfig, AIPermissions } from "./types";
+import { DEFAULT_AI_PERMISSIONS } from "./types";
 import { withAgencyId, getCurrentAgency } from "./agency-context";
 import { generateId, resolveUserOrClient } from "./utils-server";
+import { sanitizeName, sanitizeString, sanitizeUsername, validateEmail, validatePassword, sanitizePhone, sanitizeUrl, sanitizeColor, sanitizeMongoInput, sanitizeUpdates, validateId, validateAmount } from "./validation";
 
 // Authentication
 import { connectDB, AgencyModel, UserModel, ClientModel, SuperAdminModel, ProjectModel, TaskModel, InvoiceModel, TransactionModel, ServiceModel, NotificationModel, ActivityModel, AssetModel, MessageModel, LeaveRequestModel, SettingsModel, decryptApiKey } from "./mongodb";
@@ -69,6 +71,29 @@ export async function getAgencyAIConfig(): Promise<AIConfig | null> {
     return config;
 }
 
+// Get AI permissions for the current agency (what Singularity is allowed to do)
+export async function getAIPermissions(): Promise<AIPermissions> {
+    await connectDB();
+    const agency = await getCurrentAgency();
+    if (!agency) return DEFAULT_AI_PERMISSIONS;
+    return { ...DEFAULT_AI_PERMISSIONS, ...(agency as any).aiPermissions };
+}
+
+// Update AI permissions — admin only
+export async function updateAIPermissions(permissions: AIPermissions) {
+    await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+
+    await AgencyModel.updateOne(
+        { id: agency.id },
+        { $set: { aiPermissions: permissions } }
+    );
+
+    revalidatePath("/dashboard/settings");
+    return { success: true };
+}
+
 export async function updateEmailSettings(enabled: boolean) {
     await requireRole('admin', 'manager');
     const agency = await getCurrentAgency();
@@ -91,6 +116,12 @@ export async function updateAgencyDetails(name: string, logo: string, primaryCol
     await requireRole('admin');
     const agency = await getCurrentAgency();
     if (!agency) throw new Error("Unauthorized");
+    // Input sanitization
+    name = sanitizeName(name, 200);
+    logo = sanitizeUrl(logo);
+    if (primaryColor) primaryColor = sanitizeColor(primaryColor);
+    if (secondaryColor) secondaryColor = sanitizeColor(secondaryColor);
+    if (!name) throw new Error('Agency name is required');
 
     await AgencyModel.updateOne(
         { id: agency.id },
@@ -117,7 +148,7 @@ export const logout = authLogout;
 // AUTH GUARD HELPERS — reusable role-based permission checks for server actions
 // =============================================================================
 
-type AllowedRole = 'admin' | 'manager' | 'employee' | 'specialist' | 'client' | 'superadmin';
+type AllowedRole = 'admin' | 'manager' | 'employee' | 'client' | 'superadmin';
 
 /** Ensure user is logged in. Returns the current user or throws. */
 async function requireAuth() {
@@ -141,13 +172,19 @@ async function requireRole(...roles: AllowedRole[]) {
 
 export async function getAllUsers() {
     await connectDB();
-    const users = await UserModel.find({}).lean();
+    // Scope to current agency unless super-admin (who needs cross-agency view)
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const users = await UserModel.find(agencyFilter).lean();
     return users.map(u => ({ ...sanitizeDoc(u), agencyId: u.agencyId || 'default-agency' }));
 }
 
 export async function getAllClients() {
     await connectDB();
-    const clients = await ClientModel.find({}).lean();
+    // Scope to current agency unless super-admin (who needs cross-agency view)
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const clients = await ClientModel.find(agencyFilter).lean();
     return clients.map(c => ({ ...sanitizeDoc(c), agencyId: c.agencyId || 'default-agency' }));
 }
 
@@ -456,8 +493,8 @@ export async function getNotifications(userId: string, offset = 0, limit = 1000)
     const agencyFilter = agency ? { agencyId: agency.id } : {};
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    // Clean up old notifications efficiently — scoped to agency to avoid cross-tenant deletion
-    await NotificationModel.deleteMany({ ...agencyFilter, timestamp: { $lt: oneDayAgo } });
+    // Clean up old notifications — scoped to THIS USER only to avoid deleting other users' notifications
+    await NotificationModel.deleteMany({ userId, ...agencyFilter, timestamp: { $lt: oneDayAgo } });
 
     const notifications = await NotificationModel.find({ userId, ...agencyFilter })
         .sort({ timestamp: -1 })
@@ -553,15 +590,17 @@ export async function getUsers() {
 }
 
 export async function getUser(id: string) {
-    // 1. Resolve User
-    const targetUser = await resolveUserOrClient(id);
+    // 1. Resolve User — scoped to current agency
+    const agency = await getCurrentAgency();
+    const agencyId = agency?.id;
+    const targetUser = await resolveUserOrClient(id, agencyId);
     if (!targetUser) return undefined;
 
     // 2. Access Control
     const currentUserId = await getSessionId();
     if (!currentUserId) return undefined; // Require auth
 
-    const currentUser = await resolveUserOrClient(currentUserId);
+    const currentUser = await resolveUserOrClient(currentUserId, agencyId);
     const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
 
     if (isAdmin || currentUserId === id) {
@@ -575,8 +614,10 @@ export async function getUser(id: string) {
 
 
 export async function getUserByUsername(username: string) {
-    // 1. Resolve
-    const user = await resolveUserOrClient(username);
+    // 1. Resolve — scoped to current agency
+    const agency = await getCurrentAgency();
+    const agencyId = agency?.id;
+    const user = await resolveUserOrClient(username, agencyId);
     if (!user) return undefined;
 
     // 2. Access Control
@@ -595,13 +636,15 @@ export async function getUserByUsername(username: string) {
 
 export async function getUserTasks(userId: string, offset = 0, limit = 1000) {
     await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
 
-    // Fetch tasks for user
-    const tasksRaw = await TaskModel.find({ assigneeId: userId }).lean();
+    // Fetch tasks for user — scoped to agency
+    const tasksRaw = await TaskModel.find({ assigneeId: userId, ...agencyFilter }).lean();
 
     // Verify projects exist (equivalent to validProjectIds logic but faster)
     const projectIds = [...new Set(tasksRaw.map(t => t.projectId))];
-    const validProjects = await ProjectModel.find({ id: { $in: projectIds } }).select('id').lean();
+    const validProjects = await ProjectModel.find({ id: { $in: projectIds }, ...agencyFilter }).select('id').lean();
     const validProjectIdSet = new Set(validProjects.map(p => p.id));
 
     // Filter and slice
@@ -613,17 +656,20 @@ export async function getUserTasks(userId: string, offset = 0, limit = 1000) {
 // For Client Profile: Get projects they OWN
 export async function getClientProjects(clientId: string) {
     await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
 
-    const client = await resolveUserOrClient(clientId);
+    const client = await resolveUserOrClient(clientId, agency?.id);
     const clientName = client ? client.name : null;
 
-    let query: any = { clientId: clientId };
+    let query: any = { clientId: clientId, ...agencyFilter };
     if (clientName) {
         query = {
             $or: [
                 { clientId: clientId },
                 { client: clientName }
-            ]
+            ],
+            ...agencyFilter
         };
     }
 
@@ -633,24 +679,30 @@ export async function getClientProjects(clientId: string) {
 
 export async function getProjectTasks(projectIds: string[]) {
     await connectDB();
-    const tasks = await TaskModel.find({ projectId: { $in: projectIds } }).lean();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const tasks = await TaskModel.find({ projectId: { $in: projectIds }, ...agencyFilter }).lean();
     return tasks.map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' }));
 }
 
 // For Client Profile: Get tasks they CREATED (Assigned to others)
 export async function getClientCreatedTasks(userId: string) {
     await connectDB();
-    const tasks = await TaskModel.find({ createdBy: userId }).sort({ createdAt: -1 }).lean();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const tasks = await TaskModel.find({ createdBy: userId, ...agencyFilter }).sort({ createdAt: -1 }).lean();
     return tasks.map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' }));
 }
 
 export async function getUserActivity(userId: string) {
     await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
     const user = await getUser(userId);
     if (!user) return [];
 
-    // Limit to last 20 for dashboard
-    const activities = await ActivityModel.find({ user: user.name })
+    // Limit to last 20 for dashboard — scoped to agency
+    const activities = await ActivityModel.find({ user: user.name, ...agencyFilter })
         .sort({ timestamp: -1 })
         .limit(20)
         .lean();
@@ -660,6 +712,8 @@ export async function getUserActivity(userId: string) {
 
 export async function getUserContributionHistory(userId: string) {
     await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
     const user = await getUser(userId);
     if (!user) return [];
 
@@ -669,7 +723,8 @@ export async function getUserContributionHistory(userId: string) {
 
     const activities = await ActivityModel.find({
         user: user.name,
-        timestamp: { $gte: isoOneYearAgo }
+        timestamp: { $gte: isoOneYearAgo },
+        ...agencyFilter
     }).lean();
 
     return activities.map(a => sanitizeDoc(a));
@@ -677,11 +732,17 @@ export async function getUserContributionHistory(userId: string) {
 
 export async function createUser(user: Omit<User, "id" | "agencyId">) {
     await requireRole('admin', 'manager');
+    // Input sanitization
+    user = sanitizeMongoInput(user);
+    user.name = sanitizeName(user.name);
+    if (!user.name) throw new Error('Name is required');
+    if (user.email) user.email = validateEmail(user.email);
+    if (user.contactNumber) user.contactNumber = sanitizePhone(user.contactNumber);
+    if (user.password) validatePassword(user.password);
+    if (user.jobTitle) user.jobTitle = sanitizeName(user.jobTitle, 100);
     // Generate/Validate username
-    let username = user.username;
+    let username = user.username ? sanitizeUsername(user.username) : '';
     if (!username) {
-        // Auto-generate: lowercase, no spaces, random suffix if needed?
-        // Let's try name-based.
         username = user.name.toLowerCase().replace(/\s+/g, '');
     }
 
@@ -812,6 +873,13 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
     if (!isAdmin && !isSelf) {
         throw new Error("Unauthorized: You can only edit your own profile.");
     }
+    // Input sanitization
+    updates = sanitizeUpdates(updates) as Partial<User>;
+    if (updates.name) updates.name = sanitizeName(updates.name);
+    if (updates.email) updates.email = validateEmail(updates.email);
+    if (updates.contactNumber) updates.contactNumber = sanitizePhone(updates.contactNumber);
+    if (updates.username) updates.username = sanitizeUsername(updates.username);
+    if (updates.jobTitle) updates.jobTitle = sanitizeName(updates.jobTitle, 100);
 
     // Verify password if changing it
     if (updates.password) {
@@ -859,15 +927,14 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
     // For non-password updates, continuing with MongoDB update logic
     await connectDB();
 
-    // Check username uniqueness if updating username
+    // Check username uniqueness if updating username — scoped to current agency
     if (updates.username) {
-        // ... (Reimplement MongoDB uniqueness check if needed, or rely on unique index)
-        // For now, let's assume MongoDB unique index on username handles this, or skip strict check
-        const existingUser = await UserModel.findOne({ username: updates.username, id: { $ne: id } });
-        const existingClient = await ClientModel.findOne({ username: updates.username, id: { $ne: id } });
-        const existingSuperAdmin = await SuperAdminModel.findOne({ username: updates.username, id: { $ne: id } });
+        const agency = await getCurrentAgency();
+        const agencyFilter = agency ? { agencyId: agency.id } : {};
+        const existingUser = await UserModel.findOne({ username: updates.username, id: { $ne: id }, ...agencyFilter });
+        const existingClient = await ClientModel.findOne({ username: updates.username, id: { $ne: id }, ...agencyFilter });
 
-        if (existingUser || existingClient || existingSuperAdmin) {
+        if (existingUser || existingClient) {
             throw new Error(`Username "${updates.username}" is already taken.`);
         }
     }
@@ -1026,6 +1093,8 @@ export async function adminResetPassword(id: string, newPassword: string) {
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
         throw new Error("Unauthorized: Only Admins can reset passwords.");
     }
+    // Input validation
+    validatePassword(newPassword);
     await connectDB();
     const hashedPassword = await hashPassword(newPassword);
     const agency = await getCurrentAgency();
@@ -1052,6 +1121,10 @@ export async function getServices() {
 
 export async function addService(name: string, jobs: { title: string; count: number }[]) {
     await requireRole('admin');
+    // Input sanitization
+    name = sanitizeName(name, 200);
+    if (!name) throw new Error('Service name is required');
+    jobs = (jobs || []).map(j => ({ title: sanitizeName(j.title, 200), count: Math.max(0, Math.floor(Number(j.count) || 0)) }));
     await connectDB();
     const agency = await getCurrentAgency();
     const newService = { id: generateId(), agencyId: agency?.id, name, jobs };
@@ -1080,9 +1153,15 @@ export async function deleteService(id: string) {
 
 export async function updateService(id: string, name: string, jobs: { title: string; count: number }[]) {
     await requireRole('admin');
+    // Input sanitization
+    name = sanitizeName(name, 200);
+    if (!name) throw new Error('Service name is required');
+    jobs = (jobs || []).map(j => ({ title: sanitizeName(j.title, 200), count: Math.max(0, Math.floor(Number(j.count) || 0)) }));
     await connectDB();
     const agency = await getCurrentAgency();
-    await ServiceModel.updateOne({ id, agencyId: agency?.id }, { $set: { name, jobs } });
+    await ServiceModel.updateOne(
+        { id, agencyId: agency?.id },
+        { $set: { name, jobs } });
     revalidatePath('/dashboard/settings');
     revalidatePath('/dashboard/projects');
 }
@@ -1092,6 +1171,11 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
         throw new Error("Unauthorized: Only Admins and Managers can create projects.");
     }
+    // Input sanitization
+    project = sanitizeMongoInput(project);
+    project.name = sanitizeName(project.name, 300);
+    if (!project.name) throw new Error('Project name is required');
+    if ((project as any).description) (project as any).description = sanitizeString((project as any).description, 10000);
 
     // Slug Generation
     let slug = project.slug;
@@ -1213,6 +1297,8 @@ export async function updateProjectPayment(projectId: string, serviceId: string,
     await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
+    // Sanitize paymentConfig to prevent NoSQL injection
+    paymentConfig = sanitizeMongoInput(paymentConfig);
     await ProjectModel.updateOne(
         { id: projectId, agencyId: agency?.id, 'serviceConfigs.serviceId': serviceId },
         { $set: { 'serviceConfigs.$.paymentConfig': paymentConfig } }
@@ -1263,6 +1349,12 @@ export async function updateUserPermissions(targetUserId: string, permissions: U
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
         throw new Error("Unauthorized: Only Admins can manage permissions.");
     }
+    // Prevent NoSQL injection via key path manipulation
+    if (!/^[a-zA-Z0-9_-]+$/.test(targetUserId)) {
+        throw new Error('Invalid user ID format');
+    }
+    // Sanitize permissions object
+    permissions = sanitizeMongoInput(permissions);
 
     await connectDB();
     const agency = await getCurrentAgency();
@@ -1305,6 +1397,11 @@ export async function deleteTask(taskId: string) {
 }
 
 export async function updateTaskStatus(taskId: string, status: Task['status']) {
+    // Validate status against allowed values
+    const VALID_STATUSES = ['Todo', 'In Progress', 'Review', 'Done'];
+    if (!VALID_STATUSES.includes(status)) {
+        throw new Error(`Invalid task status: ${status}`);
+    }
     await connectDB();
     const currentUser = await getCurrentUser();
     const agency = await getCurrentAgency();
@@ -1393,6 +1490,10 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
 
 export async function updateTask(taskId: string, updates: Partial<Task>) {
     await connectDB();
+    // Input sanitization
+    updates = sanitizeUpdates(updates) as Partial<Task>;
+    if (updates.title) updates.title = sanitizeName(updates.title, 500);
+    if (updates.description) updates.description = sanitizeString(updates.description, 10000);
     const currentUser = await getCurrentUser();
     const agency = await getCurrentAgency();
     if (!agency) throw new Error('No agency context');
@@ -1453,6 +1554,9 @@ export async function addComment(taskId: string, userId: string, text: string) {
     await connectDB();
     const agency = await getCurrentAgency();
     if (!agency) throw new Error('No agency context');
+    // Input sanitization — prevent XSS in comments
+    text = sanitizeString(text, 5000);
+    if (!text) throw new Error('Comment text is required');
 
     const newComment = {
         id: generateId(),
@@ -1470,7 +1574,7 @@ export async function addComment(taskId: string, userId: string, text: string) {
         { $push: { comments: newComment } }
     );
 
-    const commenter = await resolveUserOrClient(userId);
+    const commenter = await resolveUserOrClient(userId, agency.id);
     await ActivityModel.create({
         id: generateId(), agencyId: agency.id,
         user: commenter?.name || 'Unknown User',
@@ -1521,6 +1625,11 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
     const currentUser = await getCurrentUser();
     const agency = await getCurrentAgency();
     if (!agency) throw new Error('No agency context');
+    // Input sanitization
+    task = sanitizeMongoInput(task);
+    task.title = sanitizeName(task.title, 500);
+    if (!task.title) throw new Error('Task title is required');
+    if (task.description) task.description = sanitizeString(task.description, 10000);
 
     const newTask = {
         ...task,
@@ -1603,9 +1712,18 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
         throw new Error("Unauthorized: Only Admins can create clients.");
     }
+    // Input sanitization
+    client = sanitizeMongoInput(client);
+    client.name = sanitizeName(client.name);
+    if (!client.name) throw new Error('Client name is required');
+    client.companyName = sanitizeName(client.companyName);
+    if (!client.companyName) throw new Error('Company name is required');
+    if (client.email) client.email = validateEmail(client.email);
+    if (client.phone) client.phone = sanitizePhone(client.phone);
+    if (client.password) validatePassword(client.password);
 
     // Generate username if not provided
-    let username = client.username;
+    let username = client.username ? sanitizeUsername(client.username) : '';
     if (!username) {
         username = client.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '');
     }
@@ -1672,6 +1790,13 @@ export async function updateClient(id: string, updates: Partial<Client>) {
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
         throw new Error('Unauthorized');
     }
+    // Input sanitization
+    updates = sanitizeUpdates(updates) as Partial<Client>;
+    if (updates.name) updates.name = sanitizeName(updates.name);
+    if (updates.companyName) updates.companyName = sanitizeName(updates.companyName);
+    if (updates.email) updates.email = validateEmail(updates.email);
+    if (updates.phone) updates.phone = sanitizePhone(updates.phone);
+    if (updates.username) updates.username = sanitizeUsername(updates.username);
     const agency = await getCurrentAgency();
     await ClientModel.updateOne(
         { id, agencyId: agency?.id },
@@ -1688,6 +1813,10 @@ export async function updateClient(id: string, updates: Partial<Client>) {
 export async function updateProject(id: string, updates: Partial<Project>) {
     await requireRole('admin', 'manager');
     await connectDB();
+    // Input sanitization
+    updates = sanitizeUpdates(updates) as Partial<Project>;
+    if (updates.name) updates.name = sanitizeName(updates.name, 300);
+    if ((updates as any).description) (updates as any).description = sanitizeString((updates as any).description, 10000);
     const agency = await getCurrentAgency();
     const oldProject = await ProjectModel.findOne({ id, agencyId: agency?.id }).lean();
 
@@ -1765,10 +1894,13 @@ export async function deleteProject(id: string, password: string) {
     if (!isValid) throw new Error('Invalid password');
     const agency = await getCurrentAgency();
 
-    // Delete project and all its tasks atomically
+    // Delete project and ALL related data atomically
     await Promise.all([
         ProjectModel.deleteOne({ id, agencyId: agency?.id }),
-        TaskModel.deleteMany({ projectId: id, agencyId: agency?.id })
+        TaskModel.deleteMany({ projectId: id, agencyId: agency?.id }),
+        AssetModel.deleteMany({ projectId: id, agencyId: agency?.id }),
+        InvoiceModel.deleteMany({ projectId: id, agencyId: agency?.id }),
+        ActivityModel.deleteMany({ target: id, agencyId: agency?.id }),
     ]);
 
     revalidatePath('/dashboard/projects');
@@ -1891,6 +2023,9 @@ export async function getCategoryMemberSummary(category: string) {
 
 export async function createTransaction(transaction: Omit<Transaction, "id" | "status" | "agencyId"> & { status?: Transaction['status'] }) {
     await requireRole('admin', 'manager');
+    // Input sanitization
+    transaction = sanitizeMongoInput(transaction);
+    if (transaction.description) transaction.description = sanitizeString(transaction.description, 2000);
     // STRICT SERVER-SIDE VALIDATION
     if (!transaction.amount || transaction.amount <= 0) {
         throw new Error("Validation Error: Amount must be greater than zero.");
@@ -1950,7 +2085,7 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
     if (newTransaction.category === 'Salary' && newTransaction.userId && newTransaction.type === 'expense') {
         await NotificationModel.create({
             id: generateId(), agencyId: agency?.id, userId: newTransaction.userId,
-            message: `Salary Payment Received: ₹${newTransaction.amount.toLocaleString()}`,
+            message: `Salary Payment Received: ₹${newTransaction.amount.toLocaleString()} `,
             read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
         });
         try {
@@ -1961,7 +2096,7 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
                     amount: newTransaction.amount,
                     month: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
                     paymentDate: newTransaction.date,
-                    financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/finance`,
+                    financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'} /dashboard/finance`,
                 });
             }
         } catch (emailError) {
@@ -1971,7 +2106,7 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
 
     revalidatePath('/dashboard/finance');
     if (transaction.projectId) {
-        revalidatePath(`/dashboard/projects/${transaction.projectId}`);
+        revalidatePath(`/ dashboard / projects / ${transaction.projectId} `);
     }
     return newTransaction;
 }
@@ -2048,7 +2183,7 @@ export async function clientMarkInvoiceAsPaid(invoiceId: string) {
                 clientName: currentUser.name,
                 amount: invoice.amount,
                 projectName: project.name,
-                financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/finance`,
+                financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'} /dashboard/finance`,
             });
         }
     } catch (emailError) {
@@ -2068,7 +2203,7 @@ export async function adminApproveInvoicePayment(invoiceId: string) {
 
     const invoice = await InvoiceModel.findOne({ id: invoiceId, agencyId: agency.id }).lean();
     if (!invoice) throw new Error('Invoice not found');
-    if (invoice.status !== 'Processing') throw new Error(`Can only approve Processing invoices, this is ${invoice.status}`);
+    if (invoice.status !== 'Processing') throw new Error(`Can only approve Processing invoices, this is ${invoice.status} `);
 
     // Calculate installment number for description
     const projectInvoices = await InvoiceModel.find({ projectId: invoice.projectId, agencyId: agency.id })
@@ -2124,6 +2259,8 @@ export async function adminRejectInvoicePayment(invoiceId: string, reason?: stri
     await connectDB();
     const currentUser = await getCurrentUser();
     if (!currentUser || currentUser.role !== 'admin') throw new Error('Unauthorized: Only admins can reject payments');
+    // Input sanitization
+    if (reason) reason = sanitizeString(reason, 1000);
     const agency = await getCurrentAgency();
     if (!agency) throw new Error('No agency context');
 
@@ -2213,6 +2350,8 @@ export async function getHighPriorityTasks(offset = 0, limit = 5) {
 export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "agencyId">) {
     await requireRole('admin', 'manager');
     await connectDB();
+    // Input sanitization
+    invoice = sanitizeMongoInput(invoice);
     if (!invoice.amount || invoice.amount <= 0) throw new Error('Validation Error: Invoice amount must be greater than zero.');
     if (!invoice.projectId) throw new Error('Validation Error: Invoice must be linked to a project.');
 
@@ -2381,6 +2520,9 @@ export async function getPayrollStatus(userId?: string) {
 
 export async function payEmployee(userId: string, amount: number, month: string, userName: string) {
     await requireRole('admin', 'manager');
+    // Input sanitization
+    userName = sanitizeName(userName, 200);
+    month = sanitizeString(month, 50);
     const description = `Salary Payment - ${month} - ${userName}`;
 
     await createTransaction({
@@ -2406,6 +2548,9 @@ export async function getSystemSettings() {
 
 export async function updateSystemSettings(settings: { systemName: string; logo: string }) {
     await requireRole('admin');
+    // Input sanitization
+    settings.systemName = sanitizeName(settings.systemName, 200);
+    settings.logo = sanitizeUrl(settings.logo);
     await connectDB();
     const agency = await getCurrentAgency();
     await SettingsModel.updateOne(
@@ -2521,7 +2666,13 @@ export async function getProjectAssets(projectId: string) {
 }
 
 export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt" | "agencyId">) {
-    await requireRole('admin', 'manager', 'employee', 'specialist');
+    await requireRole('admin', 'manager', 'employee');
+    // Input sanitization
+    asset = sanitizeMongoInput(asset);
+    asset.name = sanitizeName(asset.name, 500);
+    if (!asset.name) throw new Error('Asset name is required');
+    if (asset.description) asset.description = sanitizeString(asset.description, 2000);
+    if (asset.url) asset.url = sanitizeUrl(asset.url);
     // Server-Side Safety Check
     const FORBIDDEN_EXTENSIONS = ['.exe', '.bat', '.cmd', '.sh', '.vbs', '.msi', '.jar', '.com', '.scr', '.pif'];
     const fileName = asset.name.toLowerCase();
@@ -2565,6 +2716,11 @@ export async function deleteProjectAsset(assetId: string) {
 export async function updateProjectAsset(assetId: string, updates: Partial<Asset>) {
     const currentUser = await getCurrentUser();
     const userName = currentUser ? currentUser.name : "System";
+    // Input sanitization
+    updates = sanitizeUpdates(updates) as Partial<Asset>;
+    if (updates.name) updates.name = sanitizeName(updates.name, 500);
+    if (updates.description) updates.description = sanitizeString(updates.description, 2000);
+    if (updates.url) updates.url = sanitizeUrl(updates.url);
 
     await connectDB();
     const agency = await getCurrentAgency();
@@ -3133,6 +3289,9 @@ export async function requestLeave(leaveData: Omit<LeaveRequest, 'id' | 'status'
     if (!currentUser) {
         throw new Error("Unauthorized: You must be logged in to submit leave requests");
     }
+    // Input sanitization
+    leaveData = sanitizeMongoInput(leaveData);
+    if (leaveData.reason) leaveData.reason = sanitizeString(leaveData.reason, 2000);
 
     // Validate dates
     const startDate = new Date(leaveData.startDate);
@@ -3267,6 +3426,8 @@ export async function rejectLeaveRequest(leaveRequestId: string, rejectionReason
     if (!currentUser || currentUser.role !== 'admin') {
         throw new Error("Unauthorized: Only admins can reject leave requests");
     }
+    // Input sanitization
+    if (rejectionReason) rejectionReason = sanitizeString(rejectionReason, 1000);
 
     await connectDB();
     const agency = await getCurrentAgency();
@@ -3456,6 +3617,10 @@ export async function createRefund(refund: {
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
         throw new Error("Unauthorized: Only Admins and Managers can create refunds.");
     }
+    // Input sanitization
+    refund.description = sanitizeString(refund.description, 2000);
+    refund.refundReason = sanitizeString(refund.refundReason, 2000);
+    if (refund.amount <= 0) throw new Error('Refund amount must be greater than zero');
 
     await connectDB();
     const agency = await getCurrentAgency();
@@ -3619,4 +3784,67 @@ function estimateHoursFromTask(task: { title?: string; description?: string; pri
 
     // Clamp to reasonable range
     return Math.max(0.5, Math.min(hours, 40));
+}
+
+// ============================================
+// AI-POWERED TASK HOUR ESTIMATION
+// ============================================
+export async function aiEstimateTaskHours(
+    projectId: string,
+    title: string,
+    description: string,
+    priority: string
+): Promise<number> {
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
+
+    const aiConfig = await getAgencyAIConfig();
+    if (!aiConfig) throw new Error('Singularity is not configured.');
+
+    // Fetch completed tasks from this project for historical context
+    const completedTasks = await TaskModel.find({
+        projectId,
+        status: 'Done',
+        ...agencyFilter,
+    }).lean();
+
+    const historyLines = completedTasks
+        .filter((t: any) => t.estimatedHours && t.estimatedHours > 0)
+        .slice(0, 30) // cap at 30 for token efficiency
+        .map((t: any) => `- "${t.title}" → ${t.estimatedHours}h (Priority: ${t.priority || 'Medium'})`)
+        .join('\n');
+
+    const prompt = `You are a project estimation expert. Estimate the hours needed for this task.
+
+### TASK TO ESTIMATE
+**Title**: ${title}
+**Description**: ${description || '(No description)'}
+**Priority**: ${priority || 'Medium'}
+
+### COMPLETED TASKS FROM THIS PROJECT (for reference)
+${historyLines || '(No historical data available)'}
+
+### RULES
+- Compare with similar completed tasks above when available.
+- If a similar task was completed before, use that as a baseline and adjust.
+- Use 0.5h increments. Range: 0.5 – 40 hours.
+- Simple tasks (typo, text, icon): 0.5–1h
+- Small tasks (fix, button, tooltip): 1–2h
+- Medium tasks (feature, form, component): 2–8h
+- Complex tasks (integration, refactor, architecture): 8–24h
+- Major tasks (migration, full redesign): 24–40h
+- Return ONLY a single number. No text, no explanation, no units.`;
+
+    try {
+        const result = await generateContent(aiConfig, prompt);
+        const cleaned = result.trim().replace(/[^0-9.]/g, '');
+        const hours = parseFloat(cleaned);
+        if (isNaN(hours) || hours <= 0) return estimateHoursFromTask({ title, description, priority });
+        return Math.max(0.5, Math.min(Math.round(hours * 2) / 2, 40)); // round to 0.5 increments, clamp
+    } catch (error: any) {
+        console.error('[aiEstimateTaskHours] Error:', error.message);
+        // Fallback to heuristic
+        return estimateHoursFromTask({ title, description, priority });
+    }
 }

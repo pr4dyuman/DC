@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { updateTask, getUsers, getServices, deleteTask } from "@/lib/actions";
+import { updateTask, getUsers, getServices, deleteTask, aiEstimateTaskHours } from "@/lib/actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Trash2, AlertTriangle, Clock } from "lucide-react";
+import { Loader2, Trash2, AlertTriangle, Clock, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Task } from "@/lib/types";
 import { toast } from "sonner";
@@ -23,6 +23,7 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
+    const [estimating, setEstimating] = useState(false);
 
     const [title, setTitle] = useState(task.title);
     const [description, setDescription] = useState(task.description || "");
@@ -153,15 +154,37 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
                             <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Estimated Hours</span>
                         </label>
                         <div className="flex items-center gap-2">
-                            <input
-                                type="number"
-                                min="0"
-                                step="0.5"
-                                value={estimatedHours || ""}
-                                onChange={e => setEstimatedHours(parseFloat(e.target.value) || 0)}
-                                placeholder="e.g. 4"
-                                className={`${inputCls} w-24`}
-                            />
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.5"
+                                    value={estimatedHours || ""}
+                                    onChange={e => setEstimatedHours(parseFloat(e.target.value) || 0)}
+                                    placeholder="e.g. 4"
+                                    className={`${inputCls} w-28 pr-9`}
+                                />
+                                <button
+                                    type="button"
+                                    disabled={!title.trim() || estimating}
+                                    title="AI Estimate"
+                                    onClick={async () => {
+                                        setEstimating(true);
+                                        try {
+                                            const hours = await aiEstimateTaskHours(task.projectId, title, description, priority || 'Medium');
+                                            setEstimatedHours(hours);
+                                            toast.success(`Estimated: ${hours}h`);
+                                        } catch (e: any) {
+                                            toast.error(e.message || 'Failed to estimate');
+                                        } finally {
+                                            setEstimating(false);
+                                        }
+                                    }}
+                                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 flex items-center justify-center rounded-md transition-all text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 disabled:opacity-40 disabled:pointer-events-none"
+                                >
+                                    {estimating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                                </button>
+                            </div>
                             <span className="text-xs text-muted-foreground">hours</span>
                         </div>
                     </div>

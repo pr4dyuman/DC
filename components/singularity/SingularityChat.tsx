@@ -83,8 +83,28 @@ const AGENT_SUGGESTIONS = [
 ];
 
 // Simple markdown-to-HTML renderer
+function sanitizeHtml(text: string): string {
+    // Strip dangerous tags entirely
+    text = text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    text = text.replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, '');
+    text = text.replace(/<object\b[^>]*>[\s\S]*?<\/object>/gi, '');
+    text = text.replace(/<embed\b[^>]*\/?>/gi, '');
+    text = text.replace(/<form\b[^>]*>[\s\S]*?<\/form>/gi, '');
+    text = text.replace(/<link\b[^>]*\/?>/gi, '');
+    text = text.replace(/<meta\b[^>]*\/?>/gi, '');
+    text = text.replace(/<base\b[^>]*\/?>/gi, '');
+    // Strip event handlers (onerror, onclick, onload, onmouseover, etc.)
+    text = text.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+    // Strip javascript: and data: URLs in attributes
+    text = text.replace(/\b(href|src|action)\s*=\s*["']?\s*javascript:/gi, '$1="');
+    text = text.replace(/\b(href|src|action)\s*=\s*["']?\s*data:text\/html/gi, '$1="');
+    return text;
+}
+
 function renderMarkdown(text: string): string {
     if (!text) return '';
+    // Sanitize first to prevent XSS
+    text = sanitizeHtml(text);
     return text
         .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="bg-muted border border-border rounded-lg p-3 my-2 overflow-x-auto text-xs font-mono"><code>$2</code></pre>')
         .replace(/`([^`]+)`/g, '<code class="bg-muted px-1.5 py-0.5 rounded text-xs font-mono text-violet-600 dark:text-violet-300">$1</code>')
@@ -95,8 +115,8 @@ function renderMarkdown(text: string): string {
         .replace(/^# (.+)$/gm, '<h1 class="text-lg font-bold mt-4 mb-2 text-foreground">$1</h1>')
         .replace(/^[\-\*] (.+)$/gm, '<li class="ml-4 list-disc list-inside">$1</li>')
         .replace(/^\d+\. (.+)$/gm, '<li class="ml-4 list-decimal list-inside">$1</li>')
-        .replace(/^- \[x\] (.+)$/gm, '<li class="ml-4 flex items-center gap-1.5"><span class="text-emerald-400">Ã¢Å“â€œ</span> <span class="line-through opacity-60">$1</span></li>')
-        .replace(/^- \[ \] (.+)$/gm, '<li class="ml-4 flex items-center gap-1.5"><span class="text-muted-foreground">Ã¢â€”â€¹</span> $1</li>')
+        .replace(/^- \[x\] (.+)$/gm, '<li class="ml-4 flex items-center gap-1.5"><span class="text-emerald-400">✓</span> <span class="line-through opacity-60">$1</span></li>')
+        .replace(/^- \[ \] (.+)$/gm, '<li class="ml-4 flex items-center gap-1.5"><span class="text-muted-foreground">○</span> $1</li>')
         .replace(/\n\n/g, '<div class="h-2"></div>')
         .replace(/\n/g, '<br/>');
 }

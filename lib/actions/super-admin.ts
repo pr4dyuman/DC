@@ -1,11 +1,12 @@
 "use server";
 
-import { AgencyModel, UserModel, SuperAdminModel, ProjectModel, ClientModel, InvoiceModel, TransactionModel, connectDB, encryptApiKey, decryptApiKey } from "../mongodb";
+import { AgencyModel, UserModel, SuperAdminModel, ProjectModel, ClientModel, InvoiceModel, TransactionModel, TaskModel, AssetModel, ActivityModel, NotificationModel, ServiceModel, SettingsModel, LeaveRequestModel, MessageModel, SingularityChatSessionModel, SingularityCheckpointModel, connectDB, encryptApiKey, decryptApiKey } from "../mongodb";
 import { Agency, User, AGENCY_PLANS, AIConfig } from "../types";
 import { getSessionUser } from "../auth";
 import { generateId } from "../utils-server";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
+import { sanitizeName, sanitizeString, sanitizeMongoInput, sanitizeUpdates, validateEmail, validatePassword } from "../validation";
 
 /**
  * Verify current user is super admin
@@ -160,6 +161,12 @@ export async function createAgency(data: {
     const sa = await verifySuperAdmin();
     await connectDB();
 
+    // Input sanitization
+    data.name = sanitizeName(data.name, 200);
+    if (!data.name) throw new Error('Agency name is required');
+    data.ownerEmail = validateEmail(data.ownerEmail);
+    validatePassword(data.ownerPassword);
+
     // Check if email already exists
     const existingUser = await UserModel.findOne({ email: data.ownerEmail });
     if (existingUser) {
@@ -247,6 +254,9 @@ export async function createAgency(data: {
 export async function updateAgency(agencyId: string, updates: Partial<Agency>) {
     await verifySuperAdmin();
     await connectDB();
+    // Input sanitization — strip NoSQL operators
+    updates = sanitizeUpdates(updates) as Partial<Agency>;
+    if (updates.name) updates.name = sanitizeName(updates.name, 200);
 
     const result = await AgencyModel.updateOne(
         { id: agencyId },
@@ -321,21 +331,44 @@ export async function activateAgency(agencyId: string) {
 }
 
 /**
- * Delete agency (dangerous!)
+ * Delete agency (dangerous!) — requires super-admin password confirmation
  */
-export async function deleteAgency(agencyId: string) {
-    await verifySuperAdmin();
+export async function deleteAgency(agencyId: string, password: string) {
+    const sa = await verifySuperAdmin();
     await connectDB();
 
-    // Delete all agency data
+    // Verify super-admin password before destructive operation
+    const superAdmin = await SuperAdminModel.findOne({ id: sa.userId }).lean();
+    if (!superAdmin || !superAdmin.password) {
+        throw new Error('Super admin account not found or has no password set');
+    }
+    const isMatch = await bcrypt.compare(password, superAdmin.password);
+    if (!isMatch) {
+        throw new Error('Invalid password — agency deletion requires correct super-admin password');
+    }
+
+    // Verify agency exists
+    const agency = await AgencyModel.findOne({ id: agencyId }).lean();
+    if (!agency) throw new Error('Agency not found');
+
+    // Delete ALL agency data from every collection — prevents orphaned data
     await Promise.all([
         AgencyModel.deleteOne({ id: agencyId }),
         UserModel.deleteMany({ agencyId }),
         ClientModel.deleteMany({ agencyId }),
         ProjectModel.deleteMany({ agencyId }),
+        TaskModel.deleteMany({ agencyId }),
         InvoiceModel.deleteMany({ agencyId }),
-        TransactionModel.deleteMany({ agencyId })
-        // Add other models as needed
+        TransactionModel.deleteMany({ agencyId }),
+        AssetModel.deleteMany({ agencyId }),
+        ActivityModel.deleteMany({ agencyId }),
+        NotificationModel.deleteMany({ agencyId }),
+        ServiceModel.deleteMany({ agencyId }),
+        SettingsModel.deleteMany({ agencyId }),
+        LeaveRequestModel.deleteMany({ agencyId }),
+        MessageModel.deleteMany({ agencyId }),
+        SingularityChatSessionModel.deleteMany({ agencyId }),
+        SingularityCheckpointModel.deleteMany({ agencyId }),
     ]);
 
     revalidatePath('/super-admin/agencies');
@@ -409,6 +442,9 @@ export async function updateAgencyAIConfigSuperAdmin(agencyId: string, config: A
     if (!validProviders.includes(config.provider)) {
         throw new Error(`Invalid provider: ${config.provider}`);
     }
+    // Input sanitization
+    config.model = sanitizeString(config.model, 200);
+    if (config.customModelId) config.customModelId = sanitizeString(config.customModelId, 200);
 
     const result = await AgencyModel.updateOne(
         { id: agencyId },

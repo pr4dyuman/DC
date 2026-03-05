@@ -3,6 +3,35 @@ import { getAgencyAIConfig } from "@/lib/actions";
 import { buildSingularityContext } from "@/lib/singularity-context";
 import { SINGULARITY_TOOL_DECLARATIONS, getToolDisplayName } from "@/lib/singularity-tool-defs";
 import { executeTool } from "@/lib/singularity-tools";
+import { getSessionUser } from "@/lib/auth";
+import { getAIPermissions } from "@/lib/actions";
+import type { AIPermissions } from "@/lib/types";
+
+// Tool name → AI permission flag mapping (must stay in sync with singularity-tools.ts)
+const TOOL_PERMISSION_FLAGS: Record<string, keyof AIPermissions> = {
+    pay_employee: 'canPayroll',
+    bulk_pay_employees: 'canPayroll',
+    approve_invoice_payment: 'canManageInvoices',
+    reject_invoice_payment: 'canManageInvoices',
+    update_invoice_status: 'canManageInvoices',
+    bulk_create_invoices: 'canManageInvoices',
+    create_refund: 'canRefund',
+    create_employee: 'canCreateEmployee',
+    bulk_create_clients: 'canManageInvoices',
+    delete_project: 'canDelete',
+    delete_client: 'canDelete',
+    delete_transaction: 'canDelete',
+    delete_service: 'canDelete',
+};
+
+/** Filter tool declarations, removing tools whose AI permissions are disabled */
+function filterToolsByPermissions(tools: typeof SINGULARITY_TOOL_DECLARATIONS, aiPerms: AIPermissions) {
+    return tools.filter(tool => {
+        const requiredFlag = TOOL_PERMISSION_FLAGS[tool.name];
+        if (!requiredFlag) return true; // Not permission-gated → always include
+        return aiPerms[requiredFlag]; // Only include if the flag is enabled
+    });
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,7 +73,15 @@ async function checkAndContinue(
 
 export async function POST(req: NextRequest) {
     try {
+        // Authentication check
+        const session = await getSessionUser();
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         const { history, message, images, documents, mode, userId } = await req.json();
+        // Use authenticated userId, not user-supplied one
+        const authenticatedUserId = session.userId;
 
         const aiConfig = await getAgencyAIConfig();
         if (!aiConfig) {
@@ -85,13 +122,23 @@ export async function POST(req: NextRequest) {
             // Build agency context
             let systemInstruction = '';
             try {
-                systemInstruction = await buildSingularityContext(userId || '');
+                systemInstruction = await buildSingularityContext(authenticatedUserId);
                 console.log('[Singularity Agent] Context built, length:', systemInstruction.length);
             } catch (ctxErr: any) {
                 console.error('[Singularity Agent] Context build failed:', ctxErr?.message || ctxErr);
                 systemInstruction = 'You are Singularity Agent — an AI assistant for agency management. Agency data could not be loaded.';
             }
             const agentPrompt = systemInstruction + '\n\n---\n\n' + fullPrompt;
+
+            // Fetch AI permissions and filter tool declarations
+            let filteredTools = SINGULARITY_TOOL_DECLARATIONS;
+            try {
+                const aiPerms = await getAIPermissions();
+                filteredTools = filterToolsByPermissions(SINGULARITY_TOOL_DECLARATIONS, aiPerms);
+                console.log(`[Singularity Agent] Tools: ${SINGULARITY_TOOL_DECLARATIONS.length} total, ${filteredTools.length} after permission filter`);
+            } catch (err) {
+                console.error('[Singularity Agent] Failed to filter tools by permissions:', err);
+            }
 
             if (!isLive) {
                 // Non-live model: single response with context (no tool calling)
@@ -153,7 +200,7 @@ export async function POST(req: NextRequest) {
                                     }
                                 },
                                 outputAudioTranscription: {},
-                                tools: [{ functionDeclarations: SINGULARITY_TOOL_DECLARATIONS }],
+                                tools: [{ functionDeclarations: filteredTools }],
                             } as any,
                             callbacks: {
                                 onopen: () => {
@@ -251,7 +298,7 @@ export async function POST(req: NextRequest) {
                                     ));
 
                                     // Execute the tool
-                                    const result = await executeTool(fc.name, fc.args || {}, userId || '');
+                                    const result = await executeTool(fc.name, fc.args || {}, authenticatedUserId);
                                     console.log('[Singularity Agent] Tool result:', fc.name, result.success, result.summary);
 
                                     // Stream tool_result event to UI (include rollback data for checkpoint system)
@@ -528,6 +575,6 @@ export async function POST(req: NextRequest) {
         });
     } catch (error: any) {
         console.error('[Singularity API] Error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 }

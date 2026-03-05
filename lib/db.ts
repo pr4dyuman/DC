@@ -57,6 +57,23 @@ function withLock<T>(fn: () => Promise<T>): Promise<T> {
         .finally(() => resolve!());
 }
 
+// Deep equality check that is key-order-independent (avoids JSON.stringify false positives)
+function deepEqual(a: any, b: any): boolean {
+    if (a === b) return true;
+    if (a == null || b == null) return a === b;
+    if (typeof a !== typeof b) return false;
+    if (typeof a !== 'object') return false;
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    if (Array.isArray(a)) {
+        if (a.length !== b.length) return false;
+        return a.every((item: any, i: number) => deepEqual(item, b[i]));
+    }
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    return keysA.every(key => key in b && deepEqual(a[key], b[key]));
+}
+
 // Fallback agencyId for legacy data that predates multi-tenancy
 const FALLBACK_AGENCY_ID = 'default-agency';
 
@@ -180,7 +197,7 @@ export const db = {
                     const toUpdate = newItems.filter(item => {
                         const oldItem = oldMap.get(item.id);
                         if (!oldItem) return false;
-                        return JSON.stringify(oldItem) !== JSON.stringify(item);
+                        return !deepEqual(oldItem, item);
                     });
 
                     const ops: Promise<any>[] = [];
@@ -207,11 +224,10 @@ export const db = {
                 logo: newData.settings.logo || '',
                 userPermissions: newData.settings.userPermissions || {}
             };
-            // Include agencyId in settings if present
-            if (newData.settings.agencyId) {
-                settingsToSave.agencyId = newData.settings.agencyId;
-            }
-            await SettingsModel.updateOne({}, { $set: settingsToSave }, { upsert: true });
+            // Include agencyId in settings for multi-tenancy scoping
+            const settingsAgencyId = newData.settings.agencyId || 'default-agency';
+            settingsToSave.agencyId = settingsAgencyId;
+            await SettingsModel.updateOne({ agencyId: settingsAgencyId }, { $set: settingsToSave }, { upsert: true });
 
             return newData;
         });

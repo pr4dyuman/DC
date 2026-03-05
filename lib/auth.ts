@@ -4,6 +4,30 @@ import { cookies } from "next/headers";
 import { SuperAdminModel, UserModel, ClientModel, connectDB } from "./mongodb";
 import bcrypt from "bcryptjs";
 import { signToken, verifyToken, AuthSession } from "./auth-utils";
+import { validatePassword } from "./validation";
+
+// --- Rate limiting for login (in-memory, per-process) ---
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+const MAX_LOGIN_ATTEMPTS = 10;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function checkLoginRateLimit(email: string): void {
+    const now = Date.now();
+    const key = email.toLowerCase().trim();
+    const record = loginAttempts.get(key);
+    if (record && now < record.resetAt) {
+        if (record.count >= MAX_LOGIN_ATTEMPTS) {
+            throw new Error('Too many login attempts. Please try again later.');
+        }
+        record.count++;
+    } else {
+        loginAttempts.set(key, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+    }
+}
+
+function resetLoginRateLimit(email: string): void {
+    loginAttempts.delete(email.toLowerCase().trim());
+}
 
 // --- Password Utilities ---
 
@@ -20,15 +44,13 @@ export async function comparePassword(plain: string, hashed: string): Promise<bo
 
 export async function getSessionId() {
     const cookieStore = await cookies();
-    // Prioritize checking JWT
+    // Only accept JWT — legacy cookie fallback removed for security
     const token = cookieStore.get("auth_token")?.value;
     if (token) {
         const session = await verifyToken(token);
         if (session) return session.userId;
     }
-
-    // Fallback to legacy cookie (migration phase)
-    return cookieStore.get("userId")?.value;
+    return undefined;
 }
 
 export async function login(userId: string, role: string, agencyId?: string): Promise<void> {
@@ -44,9 +66,9 @@ export async function login(userId: string, role: string, agencyId?: string): Pr
         maxAge: 60 * 60 * 24 // 24 hours
     });
 
-    // Legacy cookies for backward compatibility (httpOnly for security)
-    cookieStore.set("userId", userId, { httpOnly: true, path: "/" });
-    cookieStore.set("userRole", role, { httpOnly: true, path: "/" });
+    // Legacy cookies for backward compatibility (secured)
+    cookieStore.set("userId", userId, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
+    cookieStore.set("userRole", role, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
 }
 
 export async function logout() {
@@ -76,21 +98,7 @@ export async function getSessionUser(): Promise<AuthSession | null> {
         return verifyToken(token);
     }
 
-    // Fallback Legacy Logic
-    const userId = cookieStore.get("userId")?.value;
-    if (!userId) return null;
-
-    await connectDB();
-
-    const superAdmin = await SuperAdminModel.findOne({ id: userId }).lean();
-    if (superAdmin) return { userId, role: 'superadmin' };
-
-    const user = await UserModel.findOne({ id: userId }).lean();
-    if (user) return { userId, role: user.role as string, agencyId: user.agencyId };
-
-    const client = await ClientModel.findOne({ id: userId }).lean();
-    if (client) return { userId, role: 'client', agencyId: client.agencyId };
-
+    // No JWT token = not authenticated (legacy fallback removed for security)
     return null;
 }
 
@@ -101,6 +109,8 @@ export type LoginResult = {
 };
 
 export async function authenticateUser(email: string, password: string): Promise<LoginResult> {
+    // Rate limiting check
+    checkLoginRateLimit(email);
     await connectDB();
 
     // 1. Check Super Admin
@@ -108,6 +118,7 @@ export async function authenticateUser(email: string, password: string): Promise
     if (superAdmin) {
         // Migration: If no password set, assume migration is pending or use default
         if (superAdmin.password && await comparePassword(password, superAdmin.password)) {
+            resetLoginRateLimit(email);
             await login(superAdmin.id, 'superadmin');
             return { success: true, redirectTo: '/super-admin' };
         }
@@ -117,6 +128,7 @@ export async function authenticateUser(email: string, password: string): Promise
     const user = await UserModel.findOne({ email }).lean();
     if (user) {
         if (user.password && await comparePassword(password, user.password)) {
+            resetLoginRateLimit(email);
             await login(user.id, user.role, user.agencyId);
             return { success: true, redirectTo: '/dashboard' };
         }
@@ -126,6 +138,7 @@ export async function authenticateUser(email: string, password: string): Promise
     const client = await ClientModel.findOne({ email }).lean();
     if (client) {
         if (client.password && await comparePassword(password, client.password)) {
+            resetLoginRateLimit(email);
             await login(client.id, 'client', client.agencyId);
             return { success: true, redirectTo: '/dashboard' };
         }
@@ -138,6 +151,13 @@ export async function updatePassword(currentPassword: string, newPassword: strin
     const session = await getSessionUser();
 
     if (!session) return { success: false, error: "Unauthorized" };
+
+    // Validate new password
+    try {
+        validatePassword(newPassword);
+    } catch (e: any) {
+        return { success: false, error: e.message || 'Invalid password' };
+    }
 
     await connectDB();
 

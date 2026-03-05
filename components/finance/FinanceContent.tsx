@@ -59,8 +59,8 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
     // Optimization: Use getUser which handles both Users and Clients tables
     // getUsers() ONLY returns employees, which is why the previous check failed for clients.
     const currentUser = currentUserId ? await getUser(currentUserId) : null;
-    const isUserAdmin = currentUser?.role === 'admin';
-    const isRestricted = currentUser?.role === 'employee' || currentUser?.role === 'specialist';
+    const isUserAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager';
+    const isRestricted = currentUser?.role === 'employee';
 
     if (isRestricted) {
         redirect("/dashboard");

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getServices, addService, deleteService, updateService, getAgencySettings, bulkEstimateTaskHours } from "@/lib/actions";
+import { getServices, addService, deleteService, updateService, getAgencySettings } from "@/lib/actions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import {
 import {
     Loader2, Plus, Trash2, Edit2, Users, Briefcase,
     ChevronDown, ChevronRight, Settings, Shield, Palette,
-    Sun, Moon, X, Lock, Clock
+    Sun, Moon, X, Lock, Bot
 } from "lucide-react";
 import { toast } from "sonner";
 import PermissionSettings from "@/components/settings/PermissionSettings";
@@ -25,6 +25,7 @@ import { SecuritySettings } from "@/components/settings/SecuritySettings";
 import { AgencySettings } from "@/components/settings/AgencySettings";
 import { EmailSettings } from "@/components/settings/EmailSettings";
 import { useTheme } from "@/components/providers/ThemeProvider";
+import { AISettings } from "@/components/settings/AISettings";
 
 type Job = { title: string; count: number };
 type Service = { id: string; name: string; jobs: Job[] };
@@ -70,15 +71,18 @@ export default function SettingsPage() {
     const toggleSection = useCallback((key: string) => {
         setOpenSections(prev => {
             const newState = { ...prev, [key]: !prev[key] };
-            // Update URL
-            const url = new URL(window.location.href);
-            const openKeys = Object.entries(newState).filter(([, v]) => v).map(([k]) => k);
-            if (openKeys.length === 1) {
-                url.searchParams.set('section', openKeys[0]);
-            } else {
-                url.searchParams.delete('section');
-            }
-            window.history.replaceState({}, '', url.pathname + url.search);
+            // Defer URL update to avoid side effects inside setState updater
+            // (calling history.replaceState during render triggers React Router re-render)
+            queueMicrotask(() => {
+                const url = new URL(window.location.href);
+                const openKeys = Object.entries(newState).filter(([, v]) => v).map(([k]) => k);
+                if (openKeys.length === 1) {
+                    url.searchParams.set('section', openKeys[0]);
+                } else {
+                    url.searchParams.delete('section');
+                }
+                window.history.replaceState({}, '', url.pathname + url.search);
+            });
             return newState;
         });
     }, []);
@@ -337,6 +341,18 @@ export default function SettingsPage() {
                 <PermissionSettings />
             </SectionAccordion>
 
+            {/* AI Settings Section */}
+            <SectionAccordion
+                title="AI Settings"
+                description="Control Singularity permissions and capabilities."
+                icon={<Bot className="h-6 w-6 text-violet-500" />}
+                iconBg="bg-violet-500/10"
+                isOpen={!!openSections.ai}
+                onToggle={() => toggleSection('ai')}
+            >
+                <AISettings />
+            </SectionAccordion>
+
             {/* Security Section (separated from General) */}
             <SectionAccordion
                 title="Security"
@@ -371,46 +387,6 @@ export default function SettingsPage() {
                 </div>
             </SectionAccordion>
 
-            {/* Admin Tools Section */}
-            <SectionAccordion
-                title="Admin Tools"
-                description="Utilities and bulk operations."
-                icon={<Settings className="h-6 w-6 text-cyan-500" />}
-                iconBg="bg-cyan-500/10"
-                isOpen={!!openSections.tools}
-                onToggle={() => toggleSection('tools')}
-            >
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/30">
-                        <div>
-                            <h4 className="font-medium text-foreground">Bulk Estimate Task Hours</h4>
-                            <p className="text-sm text-muted-foreground mt-0.5">
-                                Automatically estimate hours for all tasks that don't have hours set, using smart heuristics based on task title, description, priority, and subtasks.
-                            </p>
-                        </div>
-                        <Button
-                            variant="outline"
-                            className="shrink-0 ml-4 border-cyan-500/30 text-cyan-500 hover:bg-cyan-500/10"
-                            disabled={submitting}
-                            onClick={async () => {
-                                setSubmitting(true);
-                                try {
-                                    // Assuming bulkEstimateTaskHours is imported or defined elsewhere
-                                    const result = await bulkEstimateTaskHours();
-                                    toast.success(result.message);
-                                } catch (e: any) {
-                                    toast.error(e.message || 'Failed to estimate hours');
-                                } finally {
-                                    setSubmitting(false);
-                                }
-                            }}
-                        >
-                            {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Clock className="h-4 w-4 mr-2" />}
-                            Estimate Hours
-                        </Button>
-                    </div>
-                </div>
-            </SectionAccordion>
 
             {/* Delete Confirmation Dialog */}
             <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>

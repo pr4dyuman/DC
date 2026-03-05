@@ -26,13 +26,21 @@ import {
     updateService,
     updateUser,
     bulkEstimateTaskHours,
+    getAIPermissions,
+    payEmployee,
+    createRefund,
+    adminApproveInvoicePayment,
+    adminRejectInvoicePayment,
+    createUser,
 } from "./actions";
 import {
     connectDB,
     TaskModel, ProjectModel, ClientModel, InvoiceModel,
     TransactionModel, ServiceModel, LeaveRequestModel,
-    UserModel,
+    UserModel, ActivityModel, NotificationModel, AssetModel,
 } from "./mongodb";
+import { generateId } from "./utils-server";
+import type { AIPermissions } from "./types";
 
 // =============================================================================
 // TOOL EXECUTOR — Calls existing server actions
@@ -42,28 +50,28 @@ import {
 
 // Role-based permission matrix for Singularity tools
 // Defines which roles can use each tool
-type RoleType = 'admin' | 'manager' | 'employee' | 'specialist' | 'client';
+type RoleType = 'admin' | 'manager' | 'employee' | 'client';
 
 const TOOL_PERMISSIONS: Record<string, RoleType[]> = {
     // Read-only tools — accessible to everyone
-    search_agency: ['admin', 'manager', 'employee', 'specialist', 'client'],
-    get_project_tasks: ['admin', 'manager', 'employee', 'specialist', 'client'],
+    search_agency: ['admin', 'manager', 'employee', 'client'],
+    get_project_tasks: ['admin', 'manager', 'employee', 'client'],
     get_finance_summary: ['admin', 'manager'],
     get_team_workload: ['admin', 'manager'],
-    get_recent_activity: ['admin', 'manager', 'employee', 'specialist'],
-    get_task_comments: ['admin', 'manager', 'employee', 'specialist', 'client'],
+    get_recent_activity: ['admin', 'manager', 'employee'],
+    get_task_comments: ['admin', 'manager', 'employee', 'client'],
     get_transactions: ['admin', 'manager'],
     get_invoices: ['admin', 'manager', 'client'],
-    get_leave_requests: ['admin', 'manager', 'employee', 'specialist'],
-    get_employee_profile: ['admin', 'manager', 'employee', 'specialist'],
+    get_leave_requests: ['admin', 'manager', 'employee'],
+    get_employee_profile: ['admin', 'manager', 'employee'],
 
     // Task actions — employees can update status & comment, but not create/delete
     create_task: ['admin', 'manager'],
-    edit_task: ['admin', 'manager', 'employee', 'specialist'],
-    update_task_status: ['admin', 'manager', 'employee', 'specialist'],
+    edit_task: ['admin', 'manager', 'employee'],
+    update_task_status: ['admin', 'manager', 'employee'],
     reassign_task: ['admin', 'manager'],
     delete_task: ['admin', 'manager'],
-    add_task_comment: ['admin', 'manager', 'employee', 'specialist', 'client'],
+    add_task_comment: ['admin', 'manager', 'employee', 'client'],
     bulk_create_tasks: ['admin', 'manager'],
 
     // Project actions — admin/manager only
@@ -89,6 +97,38 @@ const TOOL_PERMISSIONS: Record<string, RoleType[]> = {
     // Admin tools
     manage_leave_request: ['admin', 'manager'],
     bulk_estimate_hours: ['admin', 'manager'],
+
+    // Permission-gated tools — admin only (also require AI permission flags)
+    pay_employee: ['admin'],
+    bulk_pay_employees: ['admin'],
+    approve_invoice_payment: ['admin'],
+    reject_invoice_payment: ['admin'],
+    update_invoice_status: ['admin'],
+    bulk_create_invoices: ['admin'],
+    create_refund: ['admin'],
+    create_employee: ['admin'],
+    bulk_create_clients: ['admin'],
+    delete_project: ['admin'],
+    delete_client: ['admin'],
+    delete_transaction: ['admin'],
+    delete_service: ['admin'],
+};
+
+// AI Permission flag → tool name mapping for permission-gated tools
+const AI_PERMISSION_MAP: Record<string, keyof AIPermissions> = {
+    pay_employee: 'canPayroll',
+    bulk_pay_employees: 'canPayroll',
+    approve_invoice_payment: 'canManageInvoices',
+    reject_invoice_payment: 'canManageInvoices',
+    update_invoice_status: 'canManageInvoices',
+    bulk_create_invoices: 'canManageInvoices',
+    create_refund: 'canRefund',
+    create_employee: 'canCreateEmployee',
+    bulk_create_clients: 'canManageInvoices',
+    delete_project: 'canDelete',
+    delete_client: 'canDelete',
+    delete_transaction: 'canDelete',
+    delete_service: 'canDelete',
 };
 
 export interface RollbackAction {
@@ -959,6 +999,307 @@ export async function executeTool(
                     success: true,
                     data: result,
                     summary: result.message,
+                };
+            }
+
+            // =================================================================
+            // PERMISSION-GATED TOOLS — require AI permission flags
+            // =================================================================
+
+            case "pay_employee": {
+                const aiPerms = await getAIPermissions();
+                if (!aiPerms.canPayroll) return { success: false, data: null, summary: '⛔ AI Payroll permission is disabled. Enable it in Settings → AI Settings.' };
+
+                const empUser = await getUser(args.userId);
+                const payDate = `${args.month}-15`; // Mid-month date
+                await payEmployee(args.userId, args.amount, args.month, empUser?.name || 'Employee');
+                return {
+                    success: true,
+                    data: { userId: args.userId, amount: args.amount, month: args.month },
+                    summary: `Salary of ₹${args.amount.toLocaleString('en-IN')} paid to ${empUser?.name || 'employee'} for ${args.month}`,
+                    rollbackData: [{
+                        toolName: 'pay_employee', actionType: 'create', entityType: 'transaction',
+                        entityId: '', executedAt: new Date().toISOString(),
+                    }],
+                };
+            }
+
+            case "bulk_pay_employees": {
+                const aiPerms = await getAIPermissions();
+                if (!aiPerms.canPayroll) return { success: false, data: null, summary: '⛔ AI Payroll permission is disabled. Enable it in Settings → AI Settings.' };
+
+                const results: string[] = [];
+                for (const pay of args.payments) {
+                    const emp = await getUser(pay.userId);
+                    await payEmployee(pay.userId, pay.amount, args.month, emp?.name || 'Employee');
+                    results.push(`${emp?.name || pay.userId}: ₹${pay.amount.toLocaleString('en-IN')}`);
+                }
+                return {
+                    success: true,
+                    data: { count: args.payments.length, month: args.month },
+                    summary: `Bulk payroll for ${args.month}: ${args.payments.length} employee(s) paid — ${results.join(', ')}`,
+                };
+            }
+
+            case "approve_invoice_payment": {
+                const aiPerms = await getAIPermissions();
+                if (!aiPerms.canManageInvoices) return { success: false, data: null, summary: '⛔ AI Invoice Management permission is disabled. Enable it in Settings → AI Settings.' };
+
+                const invSnapshot = await snapshotEntity('invoice', args.invoiceId);
+                await adminApproveInvoicePayment(args.invoiceId);
+                return {
+                    success: true,
+                    data: { invoiceId: args.invoiceId },
+                    summary: `Invoice payment approved ✅ — now marked as Paid`,
+                    rollbackData: invSnapshot ? [{
+                        toolName: 'approve_invoice_payment', actionType: 'update', entityType: 'invoice',
+                        entityId: args.invoiceId, beforeSnapshot: invSnapshot, executedAt: new Date().toISOString(),
+                    }] : undefined,
+                };
+            }
+
+            case "reject_invoice_payment": {
+                const aiPerms = await getAIPermissions();
+                if (!aiPerms.canManageInvoices) return { success: false, data: null, summary: '⛔ AI Invoice Management permission is disabled. Enable it in Settings → AI Settings.' };
+
+                const rejSnapshot = await snapshotEntity('invoice', args.invoiceId);
+                await adminRejectInvoicePayment(args.invoiceId, args.reason || '');
+                return {
+                    success: true,
+                    data: { invoiceId: args.invoiceId, reason: args.reason },
+                    summary: `Invoice payment rejected ❌${args.reason ? ` — ${args.reason}` : ''}`,
+                    rollbackData: rejSnapshot ? [{
+                        toolName: 'reject_invoice_payment', actionType: 'update', entityType: 'invoice',
+                        entityId: args.invoiceId, beforeSnapshot: rejSnapshot, executedAt: new Date().toISOString(),
+                    }] : undefined,
+                };
+            }
+
+            case "update_invoice_status": {
+                const aiPerms = await getAIPermissions();
+                if (!aiPerms.canManageInvoices) return { success: false, data: null, summary: '⛔ AI Invoice Management permission is disabled. Enable it in Settings → AI Settings.' };
+
+                await connectDB();
+                const { getCurrentAgency } = await import('./agency-context');
+                const agency = await getCurrentAgency();
+                const invStatusSnapshot = await snapshotEntity('invoice', args.invoiceId);
+                await InvoiceModel.updateOne(
+                    { id: args.invoiceId, agencyId: agency?.id },
+                    { $set: { status: args.status } }
+                );
+                return {
+                    success: true,
+                    data: { invoiceId: args.invoiceId, status: args.status },
+                    summary: `Invoice status updated to "${args.status}"`,
+                    rollbackData: invStatusSnapshot ? [{
+                        toolName: 'update_invoice_status', actionType: 'update', entityType: 'invoice',
+                        entityId: args.invoiceId, beforeSnapshot: invStatusSnapshot, executedAt: new Date().toISOString(),
+                    }] : undefined,
+                };
+            }
+
+            case "bulk_create_invoices": {
+                const aiPerms = await getAIPermissions();
+                if (!aiPerms.canManageInvoices) return { success: false, data: null, summary: '⛔ AI Invoice Management permission is disabled. Enable it in Settings → AI Settings.' };
+
+                const createdIds: string[] = [];
+                for (const inv of args.invoices) {
+                    const result = await createInvoice({
+                        projectId: inv.projectId,
+                        amount: inv.amount,
+                        date: inv.date,
+                    });
+                    // Update status if provided (createInvoice defaults to 'Pending')
+                    if (inv.status && inv.status !== 'Pending') {
+                        await connectDB();
+                        const { getCurrentAgency } = await import('./agency-context');
+                        const agency = await getCurrentAgency();
+                        await InvoiceModel.updateOne(
+                            { id: result.id, agencyId: agency?.id },
+                            { $set: { status: inv.status } }
+                        );
+                    }
+                    createdIds.push(result.id);
+                }
+                return {
+                    success: true,
+                    data: { count: createdIds.length, ids: createdIds },
+                    summary: `${createdIds.length} invoice(s) created`,
+                    rollbackData: [{
+                        toolName: 'bulk_create_invoices', actionType: 'create', entityType: 'invoice',
+                        entityId: createdIds[0] || '', createdEntityIds: createdIds, executedAt: new Date().toISOString(),
+                    }],
+                };
+            }
+
+            case "create_refund": {
+                const aiPerms = await getAIPermissions();
+                if (!aiPerms.canRefund) return { success: false, data: null, summary: '⛔ AI Refund permission is disabled. Enable it in Settings → AI Settings.' };
+
+                const refundResult = await createRefund({
+                    projectId: args.projectId,
+                    amount: args.amount,
+                    description: args.description,
+                    refundReason: args.description, // Use description as reason
+                    date: args.date || new Date().toISOString().split('T')[0],
+                });
+                return {
+                    success: true,
+                    data: { id: refundResult.id, amount: args.amount },
+                    summary: `Refund of ₹${args.amount.toLocaleString('en-IN')} created — ${args.description}`,
+                    rollbackData: [{
+                        toolName: 'create_refund', actionType: 'create', entityType: 'transaction',
+                        entityId: refundResult.id, executedAt: new Date().toISOString(),
+                    }],
+                };
+            }
+
+            case "create_employee": {
+                const aiPerms = await getAIPermissions();
+                if (!aiPerms.canCreateEmployee) return { success: false, data: null, summary: '⛔ AI Employee Creation permission is disabled. Enable it in Settings → AI Settings.' };
+
+                const newEmp = await createUser({
+                    name: args.name,
+                    email: args.email,
+                    role: args.role || 'employee',
+                    jobTitle: args.jobTitle,
+                    salary: args.salary,
+                    employmentType: args.employmentType || 'Salary',
+                    password: args.password || 'Welcome@123',
+                });
+                return {
+                    success: true,
+                    data: { id: newEmp.id, name: newEmp.name, email: newEmp.email, role: newEmp.role },
+                    summary: `Employee "${newEmp.name}" created (${newEmp.role}) — email: ${newEmp.email}`,
+                };
+            }
+
+            case "bulk_create_clients": {
+                const aiPerms = await getAIPermissions();
+                if (!aiPerms.canManageInvoices) return { success: false, data: null, summary: '⛔ AI Invoice Management permission is disabled. Enable it in Settings → AI Settings.' };
+
+                const clientIds: string[] = [];
+                const clientNames: string[] = [];
+                for (const cl of args.clients) {
+                    const newCl = await createClient({
+                        name: cl.name,
+                        email: cl.email,
+                        companyName: cl.companyName,
+                        phone: cl.phone || '',
+                        address: cl.address || '',
+                    });
+                    clientIds.push(newCl.id);
+                    clientNames.push(newCl.name);
+                }
+                return {
+                    success: true,
+                    data: { count: clientIds.length, ids: clientIds },
+                    summary: `${clientIds.length} client(s) created: ${clientNames.join(', ')}`,
+                    rollbackData: [{
+                        toolName: 'bulk_create_clients', actionType: 'create', entityType: 'client',
+                        entityId: clientIds[0] || '', createdEntityIds: clientIds, executedAt: new Date().toISOString(),
+                    }],
+                };
+            }
+
+            case "delete_project": {
+                const aiPerms = await getAIPermissions();
+                if (!aiPerms.canDelete) return { success: false, data: null, summary: '⛔ AI Delete permission is disabled. Enable it in Settings → AI Settings.' };
+
+                await connectDB();
+                const { getCurrentAgency } = await import('./agency-context');
+                const agency = await getCurrentAgency();
+                const projSnapshot = await snapshotEntity('project', args.projectId);
+                const proj = await ProjectModel.findOne({ id: args.projectId, agencyId: agency?.id }).lean();
+                if (!proj) return { success: false, data: null, summary: 'Project not found' };
+
+                // Delete project and all related data
+                await Promise.all([
+                    ProjectModel.deleteOne({ id: args.projectId, agencyId: agency?.id }),
+                    TaskModel.deleteMany({ projectId: args.projectId, agencyId: agency?.id }),
+                    InvoiceModel.deleteMany({ projectId: args.projectId, agencyId: agency?.id }),
+                    AssetModel.deleteMany({ projectId: args.projectId, agencyId: agency?.id }),
+                ]);
+                return {
+                    success: true,
+                    data: { projectId: args.projectId },
+                    summary: `Project "${(proj as any).name}" and all its data deleted permanently`,
+                    rollbackData: projSnapshot ? [{
+                        toolName: 'delete_project', actionType: 'delete', entityType: 'project',
+                        entityId: args.projectId, beforeSnapshot: projSnapshot, executedAt: new Date().toISOString(),
+                    }] : undefined,
+                };
+            }
+
+            case "delete_client": {
+                const aiPerms = await getAIPermissions();
+                if (!aiPerms.canDelete) return { success: false, data: null, summary: '⛔ AI Delete permission is disabled. Enable it in Settings → AI Settings.' };
+
+                await connectDB();
+                const { getCurrentAgency } = await import('./agency-context');
+                const agency = await getCurrentAgency();
+                const clientSnapshot = await snapshotEntity('client', args.clientId);
+                const cl = await ClientModel.findOne({ id: args.clientId, agencyId: agency?.id }).lean();
+                if (!cl) return { success: false, data: null, summary: 'Client not found' };
+
+                await ClientModel.updateOne(
+                    { id: args.clientId, agencyId: agency?.id },
+                    { $set: { archived: true, archivedAt: new Date().toISOString() } }
+                );
+                return {
+                    success: true,
+                    data: { clientId: args.clientId },
+                    summary: `Client "${(cl as any).name}" archived (financial data preserved)`,
+                    rollbackData: clientSnapshot ? [{
+                        toolName: 'delete_client', actionType: 'update', entityType: 'client',
+                        entityId: args.clientId, beforeSnapshot: clientSnapshot, executedAt: new Date().toISOString(),
+                    }] : undefined,
+                };
+            }
+
+            case "delete_transaction": {
+                const aiPerms = await getAIPermissions();
+                if (!aiPerms.canDelete) return { success: false, data: null, summary: '⛔ AI Delete permission is disabled. Enable it in Settings → AI Settings.' };
+
+                await connectDB();
+                const { getCurrentAgency } = await import('./agency-context');
+                const agency = await getCurrentAgency();
+                const txnSnapshot = await snapshotEntity('transaction', args.transactionId);
+                const txn = await TransactionModel.findOne({ id: args.transactionId, agencyId: agency?.id }).lean();
+                if (!txn) return { success: false, data: null, summary: 'Transaction not found' };
+
+                await TransactionModel.deleteOne({ id: args.transactionId, agencyId: agency?.id });
+                return {
+                    success: true,
+                    data: { transactionId: args.transactionId },
+                    summary: `Transaction deleted: ₹${(txn as any).amount.toLocaleString('en-IN')} (${(txn as any).category})`,
+                    rollbackData: txnSnapshot ? [{
+                        toolName: 'delete_transaction', actionType: 'delete', entityType: 'transaction',
+                        entityId: args.transactionId, beforeSnapshot: txnSnapshot, executedAt: new Date().toISOString(),
+                    }] : undefined,
+                };
+            }
+
+            case "delete_service": {
+                const aiPerms = await getAIPermissions();
+                if (!aiPerms.canDelete) return { success: false, data: null, summary: '⛔ AI Delete permission is disabled. Enable it in Settings → AI Settings.' };
+
+                await connectDB();
+                const { getCurrentAgency } = await import('./agency-context');
+                const agency = await getCurrentAgency();
+                const svcDelSnapshot = await snapshotEntity('service', args.serviceId);
+                const svc = await ServiceModel.findOne({ id: args.serviceId, agencyId: agency?.id }).lean();
+                if (!svc) return { success: false, data: null, summary: 'Service not found' };
+
+                await ServiceModel.deleteOne({ id: args.serviceId, agencyId: agency?.id });
+                return {
+                    success: true,
+                    data: { serviceId: args.serviceId },
+                    summary: `Service "${(svc as any).name}" deleted`,
+                    rollbackData: svcDelSnapshot ? [{
+                        toolName: 'delete_service', actionType: 'delete', entityType: 'service',
+                        entityId: args.serviceId, beforeSnapshot: svcDelSnapshot, executedAt: new Date().toISOString(),
+                    }] : undefined,
                 };
             }
 

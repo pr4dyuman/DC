@@ -227,8 +227,8 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
                     </div>
 
                     {/* Footer */}
-                    <div className="px-4 pb-4 pt-0 overflow-hidden">
-                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium min-w-0 flex-wrap">
+                    <div className="px-4 pb-3 pt-0 overflow-hidden">
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium min-w-0 flex-wrap pt-2.5 border-t border-border/40">
                             {task.dueDate && (() => {
                                 const due = new Date(task.dueDate); due.setHours(0, 0, 0, 0);
                                 const isOverdue = due < today && task.status !== 'Done';
@@ -241,7 +241,7 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
                             })()}
 
                             {task.category && (
-                                <div className="flex items-center gap-1.5 text-indigo-500/80 min-w-0 overflow-hidden">
+                                <div className="flex items-center gap-1.5 text-muted-foreground/70 min-w-0 overflow-hidden">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-tag shrink-0"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" /><path d="M7 7h.01" /></svg>
                                     <span className="truncate">{task.category}</span>
                                 </div>
@@ -258,12 +258,12 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
                                 </div>
                             )}
 
-                            <div className="flex items-center shrink-0">
+                            <div className="flex items-center shrink-0 ml-auto">
                                 <button
                                     onClick={handleExplainClick}
                                     className={`flex items-center gap-1 transition-colors px-1.5 py-0.5 rounded-md ${isAiDisabled
-                                        ? "text-muted-foreground/50 cursor-not-allowed"
-                                        : "text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"}`}
+                                        ? "text-muted-foreground/30 cursor-not-allowed"
+                                        : "text-muted-foreground/60 hover:text-foreground hover:bg-accent"}`}
                                     title={isAiDisabled ? "AI Disabled in Settings" : "Explain this task with AI"}
                                 >
                                     <Sparkles className="w-3 h-3 shrink-0" />

@@ -395,6 +395,9 @@ async function rollbackAction(action: CheckpointAction) {
     const Model = getModelForEntity(action.entityType);
     if (!Model) throw new Error(`Unknown entity type: ${action.entityType}`);
 
+    // Derive agencyId from beforeSnapshot or existing entity for safety
+    const agencyId = action.beforeSnapshot?.agencyId;
+
     switch (action.actionType) {
         case 'create': {
             // Rollback a create = delete the entity
@@ -404,7 +407,10 @@ async function rollbackAction(action: CheckpointAction) {
                 : [action.entityId];
 
             for (const id of idsToDelete) {
-                await Model.deleteOne({ id });
+                // Include agencyId when available to prevent cross-tenant deletion
+                const filter: any = { id };
+                if (agencyId) filter.agencyId = agencyId;
+                await Model.deleteOne(filter);
             }
             break;
         }

@@ -9,15 +9,20 @@ export function generateId(): string {
 /**
  * Resolves a User or Client by ID or Username.
  * If found as a Client, adapts it to the User type.
+ * @param agencyId - Optional agency scope. When provided, User/Client queries are
+ *                   restricted to that agency to prevent cross-tenant data access.
  */
-export async function resolveUserOrClient(identifier: string): Promise<User | undefined> {
+export async function resolveUserOrClient(identifier: string, agencyId?: string): Promise<User | undefined> {
     await connectDB();
+
+    // Build agency-scoped filter for multi-tenancy safety
+    const agencyScope = agencyId ? { agencyId } : {};
 
     // Parallel lookup for maximum performance
     const [user, client, superAdmin] = await Promise.all([
-        UserModel.findOne({ $or: [{ id: identifier }, { username: identifier }] }).lean(),
-        ClientModel.findOne({ $or: [{ id: identifier }, { username: identifier }] }).lean(),
-        SuperAdminModel.findOne({ id: identifier }).lean()
+        UserModel.findOne({ $or: [{ id: identifier }, { username: identifier }], ...agencyScope }).lean(),
+        ClientModel.findOne({ $or: [{ id: identifier }, { username: identifier }], ...agencyScope }).lean(),
+        SuperAdminModel.findOne({ id: identifier }).lean() // SuperAdmin is global, not tenant-scoped
     ]);
 
     // 1. Check User

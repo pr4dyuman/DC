@@ -34,6 +34,23 @@ export type AIConfig = {
     customModelId?: string;
 };
 
+// AI Permission Flags — controls what Singularity is allowed to do
+export type AIPermissions = {
+    canPayroll: boolean;          // pay_employee, bulk_pay_employees
+    canManageInvoices: boolean;   // approve/reject invoice payments, update status, bulk create
+    canRefund: boolean;           // create_refund
+    canCreateEmployee: boolean;   // create_employee (onboarding)
+    canDelete: boolean;           // delete_project, delete_client, delete_transaction, delete_service
+};
+
+export const DEFAULT_AI_PERMISSIONS: AIPermissions = {
+    canPayroll: false,
+    canManageInvoices: false,
+    canRefund: false,
+    canCreateEmployee: false,
+    canDelete: false,
+};
+
 export type AgencyUsage = {
     users: number;
     projects: number;
@@ -94,6 +111,7 @@ export type Agency = {
 
     // AI Configuration (Singularity)
     aiConfig?: AIConfig;
+    aiPermissions?: AIPermissions;
 
     // Features
     features: AgencyFeatures;
@@ -210,7 +228,7 @@ export type User = {
     username?: string; // New: Unique handle for URLs
     name: string;
     email: string;
-    role: 'admin' | 'specialist' | 'manager' | 'employee' | 'client';
+    role: 'admin' | 'manager' | 'employee' | 'client';
     jobTitle?: string;
     salary?: number;
     avatar?: string;

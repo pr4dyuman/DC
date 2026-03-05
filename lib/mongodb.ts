@@ -185,6 +185,15 @@ const AIConfigSchema = new Schema({
     customModelId: { type: String }
 }, { _id: false });
 
+// AI Permissions Schema (Embedded in Agency)
+const AIPermissionsSchema = new Schema({
+    canPayroll: { type: Boolean, default: false },
+    canManageInvoices: { type: Boolean, default: false },
+    canRefund: { type: Boolean, default: false },
+    canCreateEmployee: { type: Boolean, default: false },
+    canDelete: { type: Boolean, default: false },
+}, { _id: false });
+
 // Agency Schema
 const AgencySchema = new Schema({
     id: { type: String, required: true, unique: true },
@@ -244,7 +253,8 @@ const AgencySchema = new Schema({
     features: { type: AgencyFeaturesSchema, required: true },
 
     // AI Configuration (Singularity)
-    aiConfig: { type: AIConfigSchema }
+    aiConfig: { type: AIConfigSchema },
+    aiPermissions: { type: AIPermissionsSchema },
 }, { timestamps: true });
 
 // Indexes for Agency
@@ -292,7 +302,7 @@ const UserSchema = new Schema<User>({
     username: { type: String, sparse: true },
     name: { type: String, required: true },
     email: { type: String, required: true },
-    role: { type: String, enum: ['admin', 'specialist', 'manager', 'employee', 'client'], required: true },
+    role: { type: String, enum: ['admin', 'manager', 'employee', 'client'], required: true },
     jobTitle: { type: String },
     salary: { type: Number },
     avatar: { type: String },
