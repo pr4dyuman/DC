@@ -309,3 +309,15 @@ export async function clearAgencySelection(): Promise<boolean> {
         return false;
     }
 }
+
+/**
+ * Check if the current agency's trial has expired.
+ * Returns false if agency is on a paid plan (status !== 'trial').
+ */
+export async function checkTrialExpired(agency: Agency | null): Promise<boolean> {
+    if (!agency) return false;
+    if (agency.status !== 'trial') return false;
+    if (!agency.trialEndsAt) return false;
+    return new Date(agency.trialEndsAt) < new Date();
+}
+

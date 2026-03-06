@@ -1,0 +1,365 @@
+import Image from "next/image";
+
+
+import Link from "next/link";
+export default function VideoProduction() {
+  return (
+    <div className="min-h-screen bg-black text-white">
+      
+      <div className="max-w-7xl mx-auto px-6 pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12">
+        {/* Header Section */}
+       <div className="text-center mb-16">
+              <Link href="/services">
+                <h2 className="text-4xl md:text-5xl font-bold uppercase tracking-wide mb-4 cursor-pointer">
+                  SERVICES
+                </h2>
+              </Link>
+
+              <p className="text-white font-glacial-bold text-sm md:text-base uppercase tracking-wider">
+            <Link href="/services" className="text-white hover:text-[#F5EE30] transition-colors">
+              SERVICES
+            </Link>
+            <span className="text-gray-500 mx-2">|</span>
+            <span className="text-[#3E3E3E] font-glacial-bold">VideoProduction</span>
+            </p>
+          </div>
+
+        {/* First Section - Video Production */}
+        <div className="flex flex-col lg:flex-row items-center justify-between mb-20 lg:mb-32">
+          {/* Left - Image */}
+          <div className="w-full lg:w-1/2 flex justify-center mb-8 lg:mb-0 lg:pr-12">
+            <div className="relative">
+              <Image
+                src="/vpd1.svg"
+                alt="Video Production Illustration"
+                width={400}
+                height={400}
+                className="max-w-full h-auto"
+              />
+            </div>
+          </div>
+
+          {/* Right - Text Content */}
+          <div className="w-full lg:w-1/2 lg:pl-12">
+            <p className="text-white text-sm font-glacial-bold mb-4 uppercase tracking-wide">
+              CRAFTING CINEMATIC STORIES THAT CAPTIVATE, CONNECT, AND LEAVE A LEGACY
+            </p>
+            <h2 className="text-3xl md:text-4xl font-bold mb-6 text-[#F5EE30]">
+              VIDEO PRODUCTION & AD FILMS
+            </h2>
+            <h4 className="text-xl font-glacial-bold mb-4 text-white">OUR MISSION</h4>
+            <p className="text-white mb-6 leading-relaxed text-lg">
+              To produce impactful, emotionally rich video content that not only tells your story but also drives engagement, builds emotional connections, and strengthens brand presence across all digital platforms.
+            </p>
+            <h4 className="text-xl font-glacial-bold mb-4 text-white">OUR VISION</h4>
+            <p className="text-white leading-relaxed text-lg">
+              To redefine visual storytelling by blending creativity, technical excellence, and strategic thinking—delivering immersive experiences that inspire action, drive results, and leave lasting impressions.
+            </p>
+          </div>
+        </div>
+
+        {/* Second Section - Pre-Production Planning */}
+        <div className="flex flex-col lg:flex-row-reverse items-center justify-between mb-20 lg:mb-32">
+          {/* Right - Image */}
+          <div className="w-full lg:w-1/2 flex justify-center mb-8 lg:mb-0 lg:pl-12">
+            <div className="relative">
+              <Image
+                src="/vpd2.svg"
+                alt="Pre-Production Planning Illustration"
+                width={500}
+                height={400}
+                className="max-w-full h-auto"
+              />
+            </div>
+          </div>
+
+          {/* Left - Text Content */}
+          <div className="w-full lg:w-1/2 lg:pr-12">
+            <p className="text-white text-sm font-glacial-bold mb-4 uppercase tracking-wide">
+              Every detail matters. We lay the groundwork for seamless, stress-free shoots!
+            </p>
+           <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 uppercase leading-tight">
+              <span className="block text-white">Pre-Production </span>
+              <span className="block text-[#3E3E3E]">Planning</span>
+            </h2>
+            <p className="text-white mb-6 leading-relaxed text-lg">
+              Great videos begin with meticulous planning. Our pre-production process ensures every element—creative direction, logistics, and timelines—is strategically aligned before the cameras roll.
+            </p>
+            <ul className="space-y-3 text-white text-lg">
+              <li className="flex items-start">
+                <span className="text-[#F5EE30] mr-3">•</span>
+                Concept Development & Creative Briefs
+              </li>
+              <li className="flex items-start">
+                <span className="text-[#F5EE30] mr-3">•</span>
+                Scriptwriting & Storyboarding
+              </li>
+              <li className="flex items-start">
+                <span className="text-[#F5EE30] mr-3">•</span>
+                Location Scouting & Casting
+              </li>
+              <li className="flex items-start">
+                <span className="text-[#F5EE30] mr-3">•</span>
+                Shot Lists & Production Schedules
+              </li>
+              <li className="flex items-start">
+                <span className="text-[#F5EE30] mr-3">•</span>
+                Budget Planning & Resource Allocation
+              </li>
+            </ul>
+          </div>
+        </div>
+        
+        {/* High-Impact Production Section */}
+        <div className="mt-24 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          {/* Left - Image */}
+          <div className="w-full flex justify-center">
+            <div className="relative">
+              <Image
+                src="/vpd3.svg"
+                alt="High-Impact Production illustration"
+                width={400}
+                height={400}
+                className="max-w-full h-auto"
+              />
+            </div>
+          </div>
+          {/* Right - Text */}
+          <div className="w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="w-2 h-2 bg-[#F5EE30] rounded-full"></span>
+              <span className="uppercase tracking-widest font-glacial-bold text-sm text-white">
+                LIGHTS, CAMERA, ACTION: WE BRING YOUR VISION TO LIFE WITH BLOCKBUSTER-LEVEL FINESSE
+              </span>
+            </div>
+            <h2 className="text-3xl md:text-5xl font-extrabold leading-tight mb-6">
+              <span className="text-white">HIGH-IMPACT</span><br />
+              <span className="text-[#3E3E3E]">PRODUCTION</span>
+            </h2>
+            <p className="text-white mb-6 leading-relaxed text-lg">
+              From concept to screen, our production crew brings expertise, state-of-the-art equipment, and creative vision to capture stunning visuals that resonate emotionally and deliver on your brand&apos;s message.
+            </p>
+            <ul className="space-y-3 text-white text-lg">
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>Multi-Camera Shoots & Cinematography</li>
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>Professional Lighting & Sound Design</li>
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>Drone & Aerial Videography</li>
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>On-Set Direction & Talent Management</li>
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>Live Event Coverage</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Post-Production & Editing Section */}
+        <div className="mt-24 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          {/* Image - Top on mobile, Right on desktop */}
+          <div className="w-full flex justify-center order-1 lg:order-2">
+            <div className="relative">
+              <Image
+                src="/vpd4.svg"
+                alt="Post-Production & Editing illustration"
+                width={400}
+                height={400}
+                className="max-w-full h-auto"
+              />
+            </div>
+          </div>
+          
+          {/* Text - Bottom on mobile, Left on desktop */}
+          <div className="w-full order-2 lg:order-1">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="w-2 h-2 bg-[#F5EE30] rounded-full"></span>
+              <span className="uppercase tracking-widest text-sm font-glacial-bold text-white">
+                Where raw footage becomes magic—we add the soul, sound, and spark that elevates your story.
+              </span>
+            </div>
+            <h2 className="text-3xl md:text-5xl font-extrabold leading-tight mb-6">
+              <span className="text-white">POST-PRODUCTION</span><br />
+              <span className="text-[#3E3E3E]">& EDITING</span>
+            </h2>
+            <p className="text-white mb-6 leading-relaxed text-lg">
+              Our post-production team refines every frame with precision—cutting, color grading, sound mixing, and adding visual effects to elevate your video from good to exceptional.
+            </p>
+            <ul className="space-y-3 text-white text-lg">
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>Video Editing & Story Assembly</li>
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>Color Grading & Cinematic Enhancement</li>
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>Motion Graphics & Animation</li>
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>Sound Design & Audio Mixing</li>
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>VFX & Special Effects Integration</li>
+            </ul>
+          </div>
+        </div>
+        
+        {/* Ad Films & Commercials Section */}
+        <div className="mt-24 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          {/* Left - Image */}
+          <div className="w-full flex justify-center">
+            <div className="relative">
+               <Image
+                src="/vpd5.svg"
+                alt="Ad Films & Commercials illustration"
+                width={400}
+                height={400}
+                className="max-w-full h-auto"
+              />
+            </div>
+          </div>
+          {/* Right - Text */}
+          <div className="w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="w-2 h-2 bg-[#F5EE30] rounded-full"></span>
+              <span className="uppercase tracking-widest text-sm text-white font-glacial-bold">
+                ADS THAT DON&apos;T JUST SELL—BUT STICK IN MINDS & HEARTS LIKE YOUR FAVORITE CHORUS
+              </span>
+            </div>
+            <h2 className="text-3xl md:text-5xl font-extrabold leading-tight mb-6">
+              <span className="text-white">AD FILMS</span><br />
+              <span className="text-[#3E3E3E]">& COMMERCIALS</span>
+            </h2>
+            <p className="text-white mb-6 leading-relaxed text-lg">
+              We craft advertising campaigns that don&apos;t just reach audiences—they move them. Every frame is designed to inspire action, strengthen brand recall, and deliver measurable ROI.
+            </p>
+            <ul className="space-y-3 text-white text-lg">
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>TV Commercials & Broadcast Ads</li>
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>Social Media Video Campaigns</li>
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>Product Demos & Explainer Videos</li>
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>Testimonials & Brand Storytelling</li>
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>Influencer & Partnership Content</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Distribution Strategy Section */}
+        <div className="mt-24 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-20">
+          {/* Image - Top on mobile, Right on desktop */}
+          <div className="w-full flex justify-center order-1 lg:order-2">
+            <div className="relative">
+              <Image
+                src="/vpd6.svg"
+                alt="Distribution Strategy illustration"
+                width={400}
+                height={400}
+                className="max-w-full h-auto"
+              />
+            </div>
+          </div>
+          
+          {/* Text - Bottom on mobile, Left on desktop */}
+          <div className="w-full order-2 lg:order-1">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="w-2 h-2 bg-[#F5EE30] rounded-full"></span>
+              <span className="uppercase tracking-widest text-sm text-white font-glacial-bold">
+                YOUR VIDEO DESERVES AN AUDIENCE—WE MAKE SURE IT REACHES THE RIGHT EYES AT THE RIGHT TIME
+              </span>
+            </div>
+            <h2 className="text-3xl md:text-5xl font-extrabold leading-tight mb-6">
+              <span className="text-white">DISTRIBUTION</span><br />
+              <span className="text-[#3E3E3E]">STRATEGY</span>
+            </h2>
+            <p className="text-white mb-6 leading-relaxed text-lg">
+              Creating exceptional content is only half the battle. Our strategic distribution ensures your video reaches the right audience across the most effective channels for maximum engagement and impact.
+            </p>
+            <ul className="space-y-3 text-white text-lg">
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>Platform-Specific Optimization (YouTube, Instagram, LinkedIn)</li>
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>Paid Media Campaigns & Targeting</li>
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>SEO & Video Marketing Strategy</li>
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>Analytics & Performance Tracking</li>
+              <li className="flex items-start"><span className="text-[#F5EE30] mr-3">•</span>Cross-Channel Content Repurposing</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* Why Choose Us Section */}
+         <div className="bg-black text-white w-full">
+  
+  {/* Title */}
+  <h2
+    className="text-3xl md:text-4xl font-bold text-center text-black py-4"
+    style={{ backgroundColor: "#F5EE30" }}
+  >
+    WHY CHOOSE US
+  </h2>
+
+  {/* Features Section */}
+<div className="grid grid-cols-3 lg:grid-cols-5 gap-6 text-center py-10 px-4">
+  
+  {/* Card 1 */}
+  <div className="flex flex-col items-center px-2">
+    <h3 className="text-xs sm:text-sm md:text-base font-bold uppercase tracking-wide">
+     Award-Winning Team
+    </h3>
+    <p className="text-[10px] sm:text-xs md:text-sm text-gray-300 mt-2 leading-relaxed max-w-[200px]">
+     Our team of directors, editors, and animators boasts more than 50 industry accolades, bringing world-class expertise to every project regardless of size or budget.
+    </p>
+  </div>
+
+  {/* Card 2 */}
+  <div className="flex flex-col items-center px-2">
+    <h3 className="text-xs sm:text-sm md:text-base font-bold uppercase tracking-wide">
+     Speed & Precision
+    </h3>
+    <p className="text-[10px] sm:text-xs md:text-sm text-gray-300 mt-2 leading-relaxed max-w-[200px]">
+      We deliver high-quality video content in 15 days or less without cutting creative corners, meeting tight deadlines without sacrificing production value.
+    </p>
+  </div>
+
+  {/* Card 3 */}
+  <div className="flex flex-col items-center px-2">
+    <h3 className="text-xs sm:text-sm md:text-base font-bold uppercase tracking-wide">
+      End-to-End Control
+    </h3>
+    <p className="text-[10px] sm:text-xs md:text-sm text-gray-300 mt-2 leading-relaxed max-w-[200px]">
+     Our collaborative workflow includes real-time editing portals where you can provide feedback during production, ensuring your vision is perfectly executed.
+    </p>
+  </div>
+
+  {/* Card 4 */}
+  <div className="flex flex-col items-center px-2">
+    <h3 className="text-xs sm:text-sm md:text-base font-bold uppercase tracking-wide">
+      Data-Backed Creativity
+    </h3>
+    <p className="text-[10px] sm:text-xs md:text-sm text-gray-300 mt-2 leading-relaxed max-w-[200px]">
+      We optimize every video for engagement metrics and conversion rates, blending artistic excellence with performance analytics to create content that performs.
+    </p>
+  </div>
+
+  {/* Card 5 */}
+  <div className="flex flex-col items-center px-2">
+    <h3 className="text-xs sm:text-sm md:text-base font-bold uppercase tracking-wide">
+      Proven Impact
+    </h3>
+    <p className="text-[10px] sm:text-xs md:text-sm text-gray-300 mt-2 leading-relaxed max-w-[200px]">
+     Our video campaigns achieve an average 70% increase in social shares compared to industry standards, helping your content break through digital noise.
+    </p>
+  </div>
+
+</div>
+
+
+  {/* Transform Section */}
+  <div className="flex flex-col md:flex-row items-center justify-between gap-10 px-6 md:px-16 pb-12 mt-4">
+    
+    <div className="text-center md:text-left max-w-xl">
+      <h3 className="text-2xl md:text-3xl font-extrabold leading-snug">
+        READY TO DOMINATE <br />
+        <span className="text-gray-400">GOOGLE SEARCH RESULTS?</span>
+      </h3>
+      <p className="text-sm md:text-base mt-3 text-gray-400 leading-relaxed">
+        Let&apos;s discuss how our proven SEO strategies can help you outrank competitors and drive qualified organic traffic.
+      </p>
+    </div>
+
+    {/* Circle Button */}
+    <div className="flex justify-center md:justify-end">
+      <a href="/get-started" class="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white text-black font-bold flex items-center justify-center shadow-lg hover:bg-yellow-400 transition-all">GET STARTED</a>
+    </div>
+  </div>
+</div>
+      
+      {/* Footer Section */}
+      
+    </div>
+  );
+}
+
+

@@ -1,0 +1,10 @@
+# Allow all search engines to crawl the site
+User-agent: *
+Allow: /
+
+# Disallow crawling of admin and API routes
+Disallow: /admin
+Disallow: /api/
+
+# Sitemap location
+Sitemap: https://digitalcorvids.com/sitemap.xml

@@ -379,22 +379,27 @@ export async function deleteAgency(agencyId: string, password: string) {
 /**
  * Update agency plan
  */
-export async function updateAgencyPlan(agencyId: string, plan: 'free' | 'pro' | 'enterprise') {
+export async function updateAgencyPlan(agencyId: string, plan: 'free' | 'starter' | 'pro' | 'enterprise') {
     await verifySuperAdmin();
     await connectDB();
 
     const planDefaults = AGENCY_PLANS[plan];
 
+    const updateFields: Record<string, any> = {
+        plan,
+        limits: planDefaults.limits,
+        features: planDefaults.features,
+        updatedAt: new Date().toISOString()
+    };
+
+    // When upgrading to a paid plan, activate the agency (ends trial)
+    if (plan !== 'free') {
+        updateFields.status = 'active';
+    }
+
     await AgencyModel.updateOne(
         { id: agencyId },
-        {
-            $set: {
-                plan,
-                limits: planDefaults.limits,
-                features: planDefaults.features,
-                updatedAt: new Date().toISOString()
-            }
-        }
+        { $set: updateFields }
     );
 
     revalidatePath('/super-admin/agencies');

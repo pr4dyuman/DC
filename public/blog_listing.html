@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog Listing - Digital Corvids</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @font-face {
+            font-family: "Etna";
+            src: url("/fonts/etna.otf") format("opentype");
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: "Glacial Indifference";
+            src: url("/fonts/Glacial.otf") format("opentype");
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: "Glacial Indifference";
+            src: url("/fonts/Glacial-bold.otf") format("opentype");
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: "Suifak";
+            src: url("/fonts/Suifak.otf") format("truetype");
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        
+        .font-etna { font-family: "Etna", sans-serif; }
+        .font-glacial { font-family: "Glacial Indifference", sans-serif; }
+        .font-suifak { font-family: "Suifak", sans-serif; }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        accent: '#F5EE30',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 dark:bg-black text-gray-900 dark:text-white font-glacial min-h-screen flex flex-col transition-colors duration-300">
+
+    <!-- Navigation -->
+    <nav class="bg-white dark:bg-black text-black dark:text-white shadow-md py-6 md:py-7 relative z-50 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto flex items-center justify-between px-6">
+            <div class="flex items-center space-x-3">
+                <span class="text-[#F5EE30] text-5xl font-suifak tracking-tight drop-shadow-md dark:drop-shadow-none">DC</span>
+                <span class="text-lg font-suifak leading-tight">Digital <br /> Corvids</span>
+            </div>
+            <ul class="hidden md:flex space-x-14 text-md font-bold tracking-wide">
+                <li><a href="#" class="hover:text-[#F5EE30] transition-colors">HOME</a></li>
+                <li><a href="#" class="hover:text-[#F5EE30] transition-colors">SERVICES</a></li>
+                <li><a href="#" class="hover:text-[#F5EE30] transition-colors">ABOUT US</a></li>
+            </ul>
+            <div class="flex items-center gap-6">
+                <!-- Theme Toggle Button -->
+                <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors" aria-label="Toggle Theme">
+                    <i data-lucide="sun" class="w-6 h-6 hidden dark:block text-[#F5EE30]"></i>
+                    <i data-lucide="moon" class="w-6 h-6 block dark:hidden text-gray-800"></i>
+                </button>
+                
+                <div class="hidden md:block">
+                    <a href="#" class="text-2xl font-bold hover:text-[#F5EE30] transition-colors font-etna">GET IN TOUCH</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="pt-32 pb-12 px-4 sm:px-6 md:px-10 lg:px-16 relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-[500px] h-[500px] bg-[#F5EE30] opacity-10 dark:opacity-5 blur-[150px] rounded-full pointer-events-none"></div>
+        
+        <div class="max-w-7xl mx-auto relative z-10">
+            <h1 class="text-gray-900 dark:text-white text-[clamp(3.5rem,9vw,8rem)] font-etna leading-[0.85] mb-8 tracking-tight">
+                LATEST <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#F5EE30] to-yellow-600 dark:to-white">INSIGHTS</span>
+            </h1>
+            <p class="text-gray-600 dark:text-gray-400 text-lg md:text-xl max-w-2xl leading-relaxed mb-12 font-medium">
+                Explore our thoughts on digital innovation, design strategy, and the future of technology.
+            </p>
+
+            <!-- Category Filter -->
+            <div class="flex flex-wrap gap-4 mb-8">
+                <button class="px-6 py-2 rounded-full text-sm font-bold tracking-wider transition-all duration-300 border bg-[#F5EE30] text-black border-[#F5EE30] shadow-md hover:shadow-lg">ALL</button>
+                <button class="px-6 py-2 rounded-full text-sm font-bold tracking-wider transition-all duration-300 border bg-white dark:bg-transparent text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-800 hover:border-[#F5EE30] hover:text-black dark:hover:text-white shadow-sm hover:shadow-md">SEO</button>
+                <button class="px-6 py-2 rounded-full text-sm font-bold tracking-wider transition-all duration-300 border bg-white dark:bg-transparent text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-800 hover:border-[#F5EE30] hover:text-black dark:hover:text-white shadow-sm hover:shadow-md">MARKETING</button>
+                <button class="px-6 py-2 rounded-full text-sm font-bold tracking-wider transition-all duration-300 border bg-white dark:bg-transparent text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-800 hover:border-[#F5EE30] hover:text-black dark:hover:text-white shadow-sm hover:shadow-md">DESIGN</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Blog Grid -->
+    <section class="px-4 sm:px-6 md:px-10 lg:px-16 pb-32">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                
+                <!-- Blog Card 1 -->
+                <a href="blog_read.html" class="group block h-full w-full">
+                    <div class="relative h-[450px] w-full overflow-hidden rounded-2xl bg-white dark:bg-gray-900 isolate shadow-xl dark:shadow-none border border-gray-200 dark:border-gray-800 hover:shadow-2xl transition-all duration-300">
+                        <div class="absolute inset-0 w-full h-full">
+                            <img src="/home1.svg" alt="Blog 1" class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-90"></div>
+                        </div>
+                        <div class="absolute top-6 left-6 z-10">
+                            <span class="bg-[#F5EE30] text-black px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-full shadow-lg transform transition-transform duration-300 group-hover:-translate-y-1">SEO</span>
+                        </div>
+                        <div class="absolute bottom-0 left-0 w-full p-8 z-10 flex flex-col justify-end h-full">
+                            <div class="transform transition-all duration-500 translate-y-4 group-hover:translate-y-0">
+                                <div class="flex items-center justify-between mb-3 opacity-80">
+                                    <span class="text-gray-300 text-xs uppercase tracking-widest font-bold">NOV 22, 2025</span>
+                                </div>
+                                <h3 class="text-2xl md:text-3xl text-white font-etna mb-4 leading-tight group-hover:text-[#F5EE30] transition-colors duration-300 drop-shadow-md">THE FUTURE OF SEO IN 2025</h3>
+                                <p class="text-gray-200 text-sm md:text-base line-clamp-2 mb-6 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100 transform translate-y-4 group-hover:translate-y-0 font-medium">
+                                    Discover the emerging trends in Search Engine Optimization and how AI is reshaping the landscape of digital visibility.
+                                </p>
+                                <div class="flex items-center text-[#F5EE30] font-bold uppercase tracking-wider text-sm border-b-2 border-transparent group-hover:border-[#F5EE30] w-fit pb-1 transition-all duration-300">
+                                    Read Article <i data-lucide="arrow-up-right" class="ml-2 w-4 h-4 transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+
+                <!-- Blog Card 2 -->
+                <a href="blog_read.html" class="group block h-full w-full">
+                    <div class="relative h-[450px] w-full overflow-hidden rounded-2xl bg-white dark:bg-gray-900 isolate shadow-xl dark:shadow-none border border-gray-200 dark:border-gray-800 hover:shadow-2xl transition-all duration-300">
+                        <div class="absolute inset-0 w-full h-full">
+                            <img src="/s1.png" alt="Blog 2" class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-90"></div>
+                        </div>
+                        <div class="absolute top-6 left-6 z-10">
+                            <span class="bg-[#F5EE30] text-black px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-full shadow-lg transform transition-transform duration-300 group-hover:-translate-y-1">MARKETING</span>
+                        </div>
+                        <div class="absolute bottom-0 left-0 w-full p-8 z-10 flex flex-col justify-end h-full">
+                            <div class="transform transition-all duration-500 translate-y-4 group-hover:translate-y-0">
+                                <div class="flex items-center justify-between mb-3 opacity-80">
+                                    <span class="text-gray-300 text-xs uppercase tracking-widest font-bold">NOV 20, 2025</span>
+                                </div>
+                                <h3 class="text-2xl md:text-3xl text-white font-etna mb-4 leading-tight group-hover:text-[#F5EE30] transition-colors duration-300 drop-shadow-md">MASTERING DIGITAL STORYTELLING</h3>
+                                <p class="text-gray-200 text-sm md:text-base line-clamp-2 mb-6 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100 transform translate-y-4 group-hover:translate-y-0 font-medium">
+                                    Learn how to craft compelling narratives that resonate with your audience and build lasting brand loyalty.
+                                </p>
+                                <div class="flex items-center text-[#F5EE30] font-bold uppercase tracking-wider text-sm border-b-2 border-transparent group-hover:border-[#F5EE30] w-fit pb-1 transition-all duration-300">
+                                    Read Article <i data-lucide="arrow-up-right" class="ml-2 w-4 h-4 transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+
+                <!-- Blog Card 3 -->
+                <a href="blog_read.html" class="group block h-full w-full">
+                    <div class="relative h-[450px] w-full overflow-hidden rounded-2xl bg-white dark:bg-gray-900 isolate shadow-xl dark:shadow-none border border-gray-200 dark:border-gray-800 hover:shadow-2xl transition-all duration-300">
+                        <div class="absolute inset-0 w-full h-full">
+                            <img src="/s2.png" alt="Blog 3" class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-90"></div>
+                        </div>
+                        <div class="absolute top-6 left-6 z-10">
+                            <span class="bg-[#F5EE30] text-black px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-full shadow-lg transform transition-transform duration-300 group-hover:-translate-y-1">ANALYTICS</span>
+                        </div>
+                        <div class="absolute bottom-0 left-0 w-full p-8 z-10 flex flex-col justify-end h-full">
+                            <div class="transform transition-all duration-500 translate-y-4 group-hover:translate-y-0">
+                                <div class="flex items-center justify-between mb-3 opacity-80">
+                                    <span class="text-gray-300 text-xs uppercase tracking-widest font-bold">NOV 18, 2025</span>
+                                </div>
+                                <h3 class="text-2xl md:text-3xl text-white font-etna mb-4 leading-tight group-hover:text-[#F5EE30] transition-colors duration-300 drop-shadow-md">DATA-DRIVEN CREATIVITY</h3>
+                                <p class="text-gray-200 text-sm md:text-base line-clamp-2 mb-6 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100 transform translate-y-4 group-hover:translate-y-0 font-medium">
+                                    Why the best creative campaigns are built on a foundation of solid data and user insights.
+                                </p>
+                                <div class="flex items-center text-[#F5EE30] font-bold uppercase tracking-wider text-sm border-b-2 border-transparent group-hover:border-[#F5EE30] w-fit pb-1 transition-all duration-300">
+                                    Read Article <i data-lucide="arrow-up-right" class="ml-2 w-4 h-4 transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-1"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="relative bg-white dark:bg-black text-black dark:text-white w-full border-t-[5px] border-gray-200 dark:border-white/30 mt-auto transition-colors duration-300">
+        <div class="container mx-auto px-6 py-16 relative z-10">
+            <div class="flex flex-col lg:flex-row justify-between items-start gap-12">
+                <div class="flex flex-col max-w-md">
+                    <h2 class="text-5xl md:text-6xl font-suifak mb-4">Digital Corvids</h2>
+                    <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-6">
+                        A digital marketing agency specializing in SEO, social media, content, and ads—helping brands grow through smart, creative strategy.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        // Theme Toggle Logic
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const htmlElement = document.documentElement;
+
+        // Check saved theme
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            htmlElement.classList.add('dark');
+        } else {
+            htmlElement.classList.remove('dark');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            if (htmlElement.classList.contains('dark')) {
+                htmlElement.classList.remove('dark');
+                localStorage.theme = 'light';
+            } else {
+                htmlElement.classList.add('dark');
+                localStorage.theme = 'dark';
+            }
+        });
+    </script>
+</body>
+</html>

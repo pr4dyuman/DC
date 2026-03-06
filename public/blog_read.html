@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mastering Digital Storytelling - Digital Corvids</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @font-face {
+            font-family: "Etna";
+            src: url("/fonts/etna.otf") format("opentype");
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: "Glacial Indifference";
+            src: url("/fonts/Glacial.otf") format("opentype");
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: "Glacial Indifference";
+            src: url("/fonts/Glacial-bold.otf") format("opentype");
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: "Suifak";
+            src: url("/fonts/Suifak.otf") format("truetype");
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        
+        .font-etna { font-family: "Etna", sans-serif; }
+        .font-glacial { font-family: "Glacial Indifference", sans-serif; }
+        .font-suifak { font-family: "Suifak", sans-serif; }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        accent: '#F5EE30',
+                    },
+                    typography: {
+                        DEFAULT: {
+                            css: {
+                                color: '#374151', // Gray-700 for light mode
+                                h1: { color: '#111827', fontFamily: 'Etna' },
+                                h2: { color: '#111827', fontFamily: 'Etna' },
+                                h3: { color: '#111827', fontFamily: 'Etna' },
+                                strong: { color: '#111827' },
+                                a: { color: '#F5EE30', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } },
+                                blockquote: { borderLeftColor: '#F5EE30', color: '#111827', fontStyle: 'italic' },
+                            },
+                        },
+                        invert: {
+                            css: {
+                                color: '#D1D5DB', // Gray-300 for dark mode
+                                h1: { color: '#FFF' },
+                                h2: { color: '#FFF' },
+                                h3: { color: '#FFF' },
+                                strong: { color: '#FFF' },
+                                blockquote: { color: '#FFF' },
+                            }
+                        }
+                    },
+                }
+            },
+            plugins: [
+                function({ addBase, theme }) {
+                    addBase({
+                        'h1': { fontSize: theme('fontSize.4xl') },
+                        'h2': { fontSize: theme('fontSize.3xl') },
+                        'h3': { fontSize: theme('fontSize.2xl') },
+                    })
+                }
+            ]
+        }
+    </script>
+</head>
+<body class="bg-gray-50 dark:bg-black text-gray-900 dark:text-white font-glacial min-h-screen flex flex-col selection:bg-[#F5EE30] selection:text-black transition-colors duration-300">
+
+    <!-- Navigation -->
+    <nav class="bg-white dark:bg-black text-black dark:text-white shadow-md py-6 md:py-7 relative z-50 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto flex items-center justify-between px-6">
+            <div class="flex items-center space-x-3">
+                <span class="text-[#F5EE30] text-5xl font-suifak tracking-tight drop-shadow-md dark:drop-shadow-none">DC</span>
+                <span class="text-lg font-suifak leading-tight">Digital <br /> Corvids</span>
+            </div>
+            <ul class="hidden md:flex space-x-14 text-md font-bold tracking-wide">
+                <li><a href="#" class="hover:text-[#F5EE30] transition-colors">HOME</a></li>
+                <li><a href="#" class="hover:text-[#F5EE30] transition-colors">SERVICES</a></li>
+                <li><a href="#" class="hover:text-[#F5EE30] transition-colors">ABOUT US</a></li>
+            </ul>
+            <div class="flex items-center gap-6">
+                <!-- Theme Toggle Button -->
+                <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors" aria-label="Toggle Theme">
+                    <i data-lucide="sun" class="w-6 h-6 hidden dark:block text-[#F5EE30]"></i>
+                    <i data-lucide="moon" class="w-6 h-6 block dark:hidden text-gray-800"></i>
+                </button>
+                
+                <div class="hidden md:block">
+                    <a href="#" class="text-2xl font-bold hover:text-[#F5EE30] transition-colors font-etna">GET IN TOUCH</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <article class="flex-grow">
+        <!-- Immersive Hero Section -->
+        <div class="relative w-full h-[70vh] min-h-[500px]">
+            <img src="/home1.svg" alt="Mastering Digital Storytelling" class="w-full h-full object-cover">
+            <!-- Gradient Overlay -->
+            <div class="absolute inset-0 bg-gradient-to-t from-gray-50 dark:from-black via-black/40 to-transparent"></div>
+            
+            <div class="absolute bottom-0 left-0 w-full px-4 sm:px-6 md:px-10 lg:px-16 pb-12 md:pb-16">
+                <div class="max-w-5xl mx-auto">
+                    <a href="blog_listing.html" class="inline-flex items-center text-white hover:text-[#F5EE30] transition-colors mb-6 font-bold tracking-widest uppercase text-sm group drop-shadow-md">
+                        <i data-lucide="arrow-left" class="w-4 h-4 mr-2 transition-transform group-hover:-translate-x-1"></i>
+                        Back to Insights
+                    </a>
+                    
+                    <div class="flex items-center gap-4 mb-6">
+                        <span class="bg-[#F5EE30] text-black px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-full shadow-[0_0_20px_rgba(245,238,48,0.3)]">
+                            MARKETING
+                        </span>
+                    </div>
+
+                    <h1 class="text-4xl md:text-6xl lg:text-7xl font-etna leading-[1.1] mb-8 text-white drop-shadow-2xl max-w-4xl">
+                        MASTERING DIGITAL STORYTELLING
+                    </h1>
+
+                    <div class="flex flex-wrap items-center gap-6 md:gap-8 text-gray-200 text-sm font-bold tracking-wide uppercase border-t border-white/20 pt-6">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-gray-800/50 backdrop-blur-sm flex items-center justify-center border border-white/20">
+                                <i data-lucide="user" class="w-4 h-4 text-[#F5EE30]"></i>
+                            </div>
+                            <span class="drop-shadow-md">John Doe</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="calendar" class="w-4 h-4 text-[#F5EE30] drop-shadow-md"></i>
+                            <span class="drop-shadow-md">NOV 22, 2025</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="clock" class="w-4 h-4 text-[#F5EE30] drop-shadow-md"></i>
+                            <span class="drop-shadow-md">5 MIN READ</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Section -->
+        <div class="px-4 sm:px-6 md:px-10 lg:px-16 py-16 md:py-24 bg-gray-50 dark:bg-black relative transition-colors duration-300">
+            <!-- Background Glow -->
+            <div class="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-[#F5EE30] opacity-[0.03] blur-[120px] rounded-full pointer-events-none"></div>
+
+            <div class="max-w-3xl mx-auto relative z-10">
+                <!-- Article Content -->
+                <div class="prose prose-lg md:prose-xl max-w-none dark:prose-invert prose-headings:font-etna prose-a:text-[#F5EE30] prose-a:no-underline hover:prose-a:underline prose-blockquote:not-italic prose-blockquote:border-none prose-blockquote:p-0">
+                    <p class="lead text-xl md:text-2xl leading-relaxed text-gray-700 dark:text-gray-200 mb-8 font-light">
+                        In the digital age, storytelling isn't just about words—it's about creating an immersive experience that resonates with your audience on an emotional level. As brands compete for attention in an increasingly crowded marketplace, the ability to weave a compelling narrative has become a critical differentiator.
+                    </p>
+                    
+                    <h2 class="text-3xl md:text-5xl mt-12 mb-6 leading-tight">THE ART OF CONNECTION</h2>
+                    <p class="mb-6 text-lg leading-relaxed">
+                        Effective digital storytelling bridges the gap between business goals and human needs. It transforms abstract concepts into relatable experiences. When we talk about "connection," we're not just referring to likes and shares, but to the genuine engagement that occurs when a user sees themselves in your brand's story.
+                    </p>
+                    
+                    <div class="my-12 relative pl-6 border-l-4 border-[#F5EE30]">
+                        <blockquote class="italic text-2xl md:text-3xl font-etna leading-normal">
+                            "Stories are the currency of human contact. In marketing, they are the bridge to trust."
+                        </blockquote>
+                    </div>
+
+                    <h2 class="text-3xl md:text-5xl mt-12 mb-6 leading-tight">VISUAL NARRATIVES</h2>
+                    <p class="mb-6 text-lg leading-relaxed">
+                        Visuals play a pivotal role in modern storytelling. From striking typography to cinematic video, every visual element should serve the narrative. The "Digital Corvids" aesthetic—high contrast, bold typography, and vibrant accents—is designed to arrest attention and communicate confidence immediately.
+                    </p>
+
+                    <p class="mb-6 text-lg leading-relaxed">
+                        By integrating motion graphics and interactive elements, we can guide the user through the story at their own pace, making them an active participant rather than a passive observer.
+                    </p>
+                </div>
+                
+                <!-- Share Section -->
+                <div class="mt-20 pt-10 border-t border-gray-200 dark:border-gray-800 flex flex-col md:flex-row items-center justify-between gap-6 transition-colors duration-300">
+                    <span class="font-etna text-2xl text-gray-500 dark:text-gray-400">SHARE THIS ARTICLE</span>
+                    <div class="flex gap-4">
+                        <button class="px-6 py-3 rounded-full border border-gray-300 dark:border-gray-700 hover:border-[#F5EE30] hover:bg-[#F5EE30] hover:text-black transition-all duration-300 font-bold uppercase text-sm tracking-wider text-gray-700 dark:text-white">Twitter</button>
+                        <button class="px-6 py-3 rounded-full border border-gray-300 dark:border-gray-700 hover:border-[#F5EE30] hover:bg-[#F5EE30] hover:text-black transition-all duration-300 font-bold uppercase text-sm tracking-wider text-gray-700 dark:text-white">LinkedIn</button>
+                        <button class="px-6 py-3 rounded-full border border-gray-300 dark:border-gray-700 hover:border-[#F5EE30] hover:bg-[#F5EE30] hover:text-black transition-all duration-300 font-bold uppercase text-sm tracking-wider text-gray-700 dark:text-white">Facebook</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <!-- Footer -->
+    <footer class="relative bg-white dark:bg-black text-black dark:text-white w-full border-t-[5px] border-gray-200 dark:border-white/30 mt-auto transition-colors duration-300">
+        <div class="container mx-auto px-6 py-16 relative z-10">
+            <div class="flex flex-col lg:flex-row justify-between items-start gap-12">
+                <div class="flex flex-col max-w-md">
+                    <h2 class="text-5xl md:text-6xl font-suifak mb-4">Digital Corvids</h2>
+                    <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed mb-6">
+                        A digital marketing agency specializing in SEO, social media, content, and ads—helping brands grow through smart, creative strategy.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        // Theme Toggle Logic
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const htmlElement = document.documentElement;
+
+        // Check saved theme
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            htmlElement.classList.add('dark');
+        } else {
+            htmlElement.classList.remove('dark');
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            if (htmlElement.classList.contains('dark')) {
+                htmlElement.classList.remove('dark');
+                localStorage.theme = 'light';
+            } else {
+                htmlElement.classList.add('dark');
+                localStorage.theme = 'dark';
+            }
+        });
+    </script>
+</body>
+</html>

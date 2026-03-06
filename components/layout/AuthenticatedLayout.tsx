@@ -4,6 +4,7 @@ import { Topbar } from "@/components/layout/Topbar";
 import { getCurrentUser, getAgencySettings } from "@/lib/actions";
 import { redirect } from "next/navigation";
 import { DashboardChatProvider } from "@/components/providers/DashboardChatProvider";
+import { getCurrentAgency, checkTrialExpired } from "@/lib/agency-context";
 
 export async function AuthenticatedLayout({
     children
@@ -22,7 +23,13 @@ export async function AuthenticatedLayout({
         redirect("/super-admin");
     }
 
-    const dashboardUser = user as any; // Cast for now to satisfy component props until stricter types
+    // Check if agency trial has expired
+    const agency = await getCurrentAgency();
+    if (await checkTrialExpired(agency)) {
+        redirect("/trial-expired");
+    }
+
+    const dashboardUser = user as any;
 
     const agencyName = agencySettings?.name || "Agency OS";
     const agencyLogo = agencySettings?.logo;

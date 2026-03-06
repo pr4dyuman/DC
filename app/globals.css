@@ -1,6 +1,83 @@
 @import "tailwindcss";
 @custom-variant dark (&:is(.dark *));
 
+/* =========================
+   DC Marketing Site Fonts
+   ========================= */
+@font-face {
+  font-family: "Etna";
+  src: url("/fonts/etna.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Glacial Indifference";
+  src: url("/fonts/Glacial.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Glacial Indifference";
+  src: url("/fonts/Glacial-bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Advent Pro";
+  src: url("/fonts/AdventPro.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Architects Daughter";
+  src: url("/fonts/ArchitectsDaughter.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Suifak";
+  src: url("/fonts/Suifak.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* DC Marketing Utility Classes */
+.font-glacial {
+  font-family: "Glacial Indifference", sans-serif;
+}
+
+.font-glacial-bold {
+  font-family: "Glacial Indifference";
+  font-weight: 700;
+}
+
+.font-etna {
+  font-family: "Etna", sans-serif;
+}
+
+.font-advent {
+  font-family: "Advent Pro", sans-serif;
+}
+
+.font-architects {
+  font-family: "Architects Daughter", sans-serif;
+}
+
+.font-suifak {
+  font-family: "Suifak", sans-serif;
+}
+
 input[type=number]::-webkit-outer-spin-button,
 input[type=number]::-webkit-inner-spin-button {
   -webkit-appearance: none;
