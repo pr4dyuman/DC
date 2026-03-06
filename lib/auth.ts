@@ -69,6 +69,9 @@ export async function login(userId: string, role: string, agencyId?: string): Pr
     // Legacy cookies for backward compatibility (secured)
     cookieStore.set("userId", userId, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
     cookieStore.set("userRole", role, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
+
+    // Client-readable indicator (NOT the token itself) so Navigation can show Dashboard vs Login
+    cookieStore.set("logged_in", "1", { httpOnly: false, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 });
 }
 
 export async function logout() {
@@ -77,6 +80,7 @@ export async function logout() {
     cookieStore.delete("userId");
     cookieStore.delete("userRole");
     cookieStore.delete("selectedAgencyId");
+    cookieStore.delete("logged_in");
 }
 
 /**

@@ -92,9 +92,17 @@ export default function LoginPage() {
                         Sign In
                     </button>
                 </form>
-                
-                <div className="text-center text-xs text-muted-foreground">
-                    <p>Protected by Agency OS Auth</p>
+
+                <div className="text-center space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                        Don&apos;t have an account?{" "}
+                        <a href="/get-started" className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline">
+                            Get Started — Free 7-day trial
+                        </a>
+                    </p>
+                    <a href="/" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                        ← Back to Home
+                    </a>
                 </div>
             </div>
         </div>

@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { X, Menu } from "lucide-react"; // clean icons
+import { X, Menu, LogIn, LayoutDashboard } from "lucide-react";
 
 export default function Navigation() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const pathname = usePathname();
 
   const servicesList = [
@@ -20,8 +21,13 @@ export default function Navigation() {
     { name: "Manage Company", href: "/services/manage-company" },
   ];
 
+  // Check if user is logged in by looking for logged_in cookie (set on login/signup)
   useEffect(() => {
-    // Lock body scroll when mobile menu is open
+    const hasToken = document.cookie.split(";").some((c) => c.trim().startsWith("logged_in="));
+    setIsLoggedIn(hasToken);
+  }, [pathname]);
+
+  useEffect(() => {
     if (mobileOpen) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "";
     return () => {
@@ -59,8 +65,8 @@ export default function Navigation() {
             <Link
               href="/services"
               className={`transition-all duration-200 ${isActive("/services")
-                  ? "text-[#F5EE30]"
-                  : "hover:text-[#F5EE30]"
+                ? "text-[#F5EE30]"
+                : "hover:text-[#F5EE30]"
                 }`}
             >
               SERVICES
@@ -93,8 +99,18 @@ export default function Navigation() {
           </li>
         </ul>
 
-        {/* Desktop CTA */}
-        <div className="hidden md:block">
+        {/* Desktop CTA area */}
+        <div className="hidden md:flex items-center gap-6">
+          <Link
+            href={isLoggedIn ? "/dashboard" : "/login"}
+            className="flex items-center gap-2 px-5 py-2 bg-[#F5EE30] text-black font-glacial-bold text-sm uppercase tracking-wider rounded-none hover:bg-white transition-all duration-300"
+          >
+            {isLoggedIn ? (
+              <><LayoutDashboard className="w-4 h-4" /> DASHBOARD</>
+            ) : (
+              <><LogIn className="w-4 h-4" /> LOGIN</>
+            )}
+          </Link>
           <Link
             href="/contact"
             className="text-4xl font-bold hover:text-[#F5EE30] transition-all duration-200 font-etna"
@@ -150,8 +166,8 @@ export default function Navigation() {
             <div>
               <button
                 className={`w-full text-left py-2 border-b border-white/10 flex items-center justify-between ${pathname.startsWith("/services")
-                    ? "text-[#F5EE30]"
-                    : "hover:text-[#F5EE30]"
+                  ? "text-[#F5EE30]"
+                  : "hover:text-[#F5EE30]"
                   }`}
                 onClick={() => setMobileServicesOpen(!mobileServicesOpen)}
               >
@@ -178,8 +194,8 @@ export default function Navigation() {
                       key={service.href}
                       href={service.href}
                       className={`block py-2 text-lg ${isActive(service.href)
-                          ? "text-[#F5EE30]"
-                          : "hover:text-[#F5EE30]"
+                        ? "text-[#F5EE30]"
+                        : "hover:text-[#F5EE30]"
                         }`}
                       onClick={() => setMobileOpen(false)}
                     >
@@ -197,6 +213,13 @@ export default function Navigation() {
               onClick={() => setMobileOpen(false)}
             >
               ABOUT US
+            </Link>
+            <Link
+              href={isLoggedIn ? "/dashboard" : "/login"}
+              className="block py-2 text-[#F5EE30] border-b border-white/10"
+              onClick={() => setMobileOpen(false)}
+            >
+              {isLoggedIn ? "DASHBOARD" : "LOGIN"}
             </Link>
             <Link
               href="/contact"

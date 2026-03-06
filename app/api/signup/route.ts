@@ -155,6 +155,14 @@ export async function POST(request: Request) {
             sameSite: 'lax',
             path: '/'
         });
+        // Client-readable indicator for Navigation
+        cookieStore.set('logged_in', '1', {
+            httpOnly: false,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/',
+            maxAge: 60 * 60 * 24
+        });
 
         return NextResponse.json({
             success: true,
