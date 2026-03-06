@@ -97,20 +97,19 @@ export default function Navigation() {
               ABOUT US
             </Link>
           </li>
+          <li>
+            <Link
+              href={isLoggedIn ? "/dashboard" : "/login"}
+              className={`transition-all duration-200 ${isActive("/login") || isActive("/dashboard") ? "text-[#F5EE30]" : "hover:text-[#F5EE30]"
+                }`}
+            >
+              {isLoggedIn ? "DASHBOARD" : "LOGIN"}
+            </Link>
+          </li>
         </ul>
 
-        {/* Desktop CTA area */}
-        <div className="hidden md:flex items-center gap-6">
-          <Link
-            href={isLoggedIn ? "/dashboard" : "/login"}
-            className="flex items-center gap-2 px-5 py-2 bg-[#F5EE30] text-black font-glacial-bold text-sm uppercase tracking-wider rounded-none hover:bg-white transition-all duration-300"
-          >
-            {isLoggedIn ? (
-              <><LayoutDashboard className="w-4 h-4" /> DASHBOARD</>
-            ) : (
-              <><LogIn className="w-4 h-4" /> LOGIN</>
-            )}
-          </Link>
+        {/* Desktop CTA */}
+        <div className="hidden md:block">
           <Link
             href="/contact"
             className="text-4xl font-bold hover:text-[#F5EE30] transition-all duration-200 font-etna"

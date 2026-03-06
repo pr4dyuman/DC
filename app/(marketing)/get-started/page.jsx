@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     ArrowRight,
     BarChart3,
@@ -128,24 +128,104 @@ export default function GetStartedPage() {
         password: "",
         confirmPassword: "",
         phone: "",
-        industry: "",
-        teamSize: "",
     });
+    const [logo, setLogo] = useState(null); // base64 data URI
+    const [logoPreview, setLogoPreview] = useState(null);
     const [submitting, setSubmitting] = useState(false);
+    const [sendingOtp, setSendingOtp] = useState(false);
     const [error, setError] = useState("");
     const [showPassword, setShowPassword] = useState(false);
+    const [otpSent, setOtpSent] = useState(false);
+    const [otp, setOtp] = useState("");
+    const [otpTimer, setOtpTimer] = useState(0);
 
-    const handleSubmit = async (e) => {
+    // OTP countdown timer
+    useEffect(() => {
+        if (otpTimer <= 0) return;
+        const interval = setInterval(() => {
+            setOtpTimer((t) => {
+                if (t <= 1) { clearInterval(interval); return 0; }
+                return t - 1;
+            });
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [otpTimer]);
+
+    // Handle logo file selection
+    const handleLogoChange = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 2 * 1024 * 1024) {
+            setError("Logo must be under 2MB");
+            return;
+        }
+        if (!file.type.startsWith("image/")) {
+            setError("Please select an image file");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            setLogo(ev.target.result);
+            setLogoPreview(ev.target.result);
+            setError("");
+        };
+        reader.readAsDataURL(file);
+    };
+
+    // Step 1: Send OTP
+    const handleSendOtp = async (e) => {
         e.preventDefault();
         setError("");
 
         // Client-side validation
+        if (!formData.agencyName || !formData.ownerName || !formData.email || !formData.password) {
+            setError("Please fill in all required fields");
+            return;
+        }
         if (formData.password !== formData.confirmPassword) {
             setError("Passwords do not match");
             return;
         }
         if (formData.password.length < 6) {
             setError("Password must be at least 6 characters");
+            return;
+        }
+        if (!/[a-zA-Z]/.test(formData.password) || !/[0-9]/.test(formData.password)) {
+            setError("Password must contain at least 1 letter and 1 number");
+            return;
+        }
+
+        setSendingOtp(true);
+        try {
+            const res = await fetch("/api/signup/send-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: formData.email }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                setOtpSent(true);
+                setOtpTimer(300); // 5 minutes
+                setOtp("");
+            } else {
+                setError(data.error || "Failed to send verification code");
+            }
+        } catch (err) {
+            setError("Network error. Please try again.");
+        } finally {
+            setSendingOtp(false);
+        }
+    };
+
+    // Step 2: Verify OTP + Create account
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError("");
+
+        if (!otp || otp.length !== 6) {
+            setError("Please enter the 6-digit verification code");
             return;
         }
 
@@ -160,8 +240,8 @@ export default function GetStartedPage() {
                     email: formData.email,
                     password: formData.password,
                     phone: formData.phone,
-                    industry: formData.industry,
-                    teamSize: formData.teamSize,
+                    otp: otp,
+                    logo: logo || "",
                 }),
             });
             const data = await res.json();
@@ -449,7 +529,7 @@ export default function GetStartedPage() {
                     </div>
 
                     <form
-                        onSubmit={handleSubmit}
+                        onSubmit={handleSendOtp}
                         className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 sm:p-10"
                     >
                         {/* Error display */}
@@ -561,42 +641,33 @@ export default function GetStartedPage() {
                                 />
                             </div>
 
-                            {/* Industry & Team Size */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                <div>
-                                    <label className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
-                                        Industry
-                                    </label>
-                                    <select
-                                        value={formData.industry}
-                                        onChange={(e) => setFormData((p) => ({ ...p, industry: e.target.value }))}
-                                        className={inputClass + " appearance-none"}
-                                    >
-                                        <option value="" className="bg-black">Select industry</option>
-                                        <option value="marketing" className="bg-black">Marketing Agency</option>
-                                        <option value="tech" className="bg-black">Tech / Software</option>
-                                        <option value="design" className="bg-black">Design Studio</option>
-                                        <option value="media" className="bg-black">Media / Production</option>
-                                        <option value="consulting" className="bg-black">Consulting</option>
-                                        <option value="ecommerce" className="bg-black">E-Commerce</option>
-                                        <option value="other" className="bg-black">Other</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
-                                        Team Size
-                                    </label>
-                                    <select
-                                        value={formData.teamSize}
-                                        onChange={(e) => setFormData((p) => ({ ...p, teamSize: e.target.value }))}
-                                        className={inputClass + " appearance-none"}
-                                    >
-                                        <option value="" className="bg-black">Select team size</option>
-                                        <option value="1-5" className="bg-black">1–5 people</option>
-                                        <option value="6-15" className="bg-black">6–15 people</option>
-                                        <option value="16-50" className="bg-black">16–50 people</option>
-                                        <option value="50+" className="bg-black">50+ people</option>
-                                    </select>
+                            {/* Logo Upload */}
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
+                                    Agency Logo (Optional)
+                                </label>
+                                <div className="flex items-center gap-4">
+                                    {logoPreview ? (
+                                        <div className="w-16 h-16 rounded-xl border border-white/10 overflow-hidden bg-white/5 flex-shrink-0">
+                                            <img src={logoPreview} alt="Logo preview" className="w-full h-full object-contain" />
+                                        </div>
+                                    ) : (
+                                        <div className="w-16 h-16 rounded-xl border border-dashed border-white/20 bg-white/5 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-gray-600 text-xs">Logo</span>
+                                        </div>
+                                    )}
+                                    <div className="flex-1">
+                                        <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-gray-400 hover:border-[#F5EE30]/30 hover:text-white transition-all">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleLogoChange}
+                                                className="hidden"
+                                            />
+                                            {logoPreview ? "Change Logo" : "Upload Logo"}
+                                        </label>
+                                        <p className="text-xs text-gray-600 mt-1.5">PNG, JPG, or SVG — max 2MB</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -609,21 +680,74 @@ export default function GetStartedPage() {
                             </div>
                         </div>
 
-                        {/* Submit */}
-                        <button
-                            type="submit"
-                            disabled={submitting}
-                            className="w-full group inline-flex items-center justify-center gap-3 bg-[#F5EE30] text-black font-bold uppercase text-base px-10 py-4 rounded-full hover:bg-yellow-300 transition-all duration-300 hover:shadow-[0_0_40px_rgba(245,238,48,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {submitting ? (
-                                "Creating Your Account..."
-                            ) : (
-                                <>
-                                    Create Account & Start Trial
-                                    <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-                                </>
-                            )}
-                        </button>
+                        {/* OTP Verification Section */}
+                        {otpSent ? (
+                            <div className="space-y-4">
+                                <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-green-400 text-sm text-center">
+                                    ✓ Verification code sent to <strong>{formData.email}</strong>
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide text-center">
+                                        Enter 6-Digit Verification Code
+                                    </label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        maxLength={6}
+                                        value={otp}
+                                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                        className="w-full bg-black/50 border-2 border-[#F5EE30]/30 rounded-xl px-4 py-4 text-white text-center text-2xl tracking-[0.5em] font-bold placeholder-gray-600 focus:outline-none focus:border-[#F5EE30] transition-colors"
+                                        placeholder="000000"
+                                        autoFocus
+                                    />
+                                    <div className="flex items-center justify-between mt-2">
+                                        <p className="text-xs text-gray-500">
+                                            {otpTimer > 0
+                                                ? `Expires in ${Math.floor(otpTimer / 60)}:${String(otpTimer % 60).padStart(2, "0")}`
+                                                : "Code expired"}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={handleSendOtp}
+                                            disabled={sendingOtp || otpTimer > 240}
+                                            className="text-xs text-[#F5EE30] hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            {sendingOtp ? "Sending..." : "Resend Code"}
+                                        </button>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleSubmit}
+                                    disabled={submitting || otp.length !== 6}
+                                    className="w-full group inline-flex items-center justify-center gap-3 bg-[#F5EE30] text-black font-bold uppercase text-base px-10 py-4 rounded-full hover:bg-yellow-300 transition-all duration-300 hover:shadow-[0_0_40px_rgba(245,238,48,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {submitting ? (
+                                        "Creating Your Account..."
+                                    ) : (
+                                        <>
+                                            Verify & Create Account
+                                            <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                type="submit"
+                                disabled={sendingOtp}
+                                className="w-full group inline-flex items-center justify-center gap-3 bg-[#F5EE30] text-black font-bold uppercase text-base px-10 py-4 rounded-full hover:bg-yellow-300 transition-all duration-300 hover:shadow-[0_0_40px_rgba(245,238,48,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {sendingOtp ? (
+                                    "Sending Verification Code..."
+                                ) : (
+                                    <>
+                                        Continue — Verify Email
+                                        <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                                    </>
+                                )}
+                            </button>
+                        )}
 
                         <p className="text-center text-sm text-gray-600 mt-4">
                             Already have an account?{" "}

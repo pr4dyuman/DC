@@ -4,9 +4,11 @@
 import { useState } from "react";
 import { authenticateUser } from "@/lib/auth";
 import { useRouter } from "next/navigation";
-import { Loader2, Lock, Mail } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import Image from "next/image";
+import Link from "next/link";
+import Navigation from "@/components/marketing/Navigation";
+import Footer from "@/components/marketing/footer";
 
 export default function LoginPage() {
     const router = useRouter();
@@ -36,25 +38,32 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-slate-900 dark:to-slate-900 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-950 p-8 rounded-2xl shadow-xl border border-indigo-100 dark:border-slate-800 w-full max-w-md space-y-8">
-                <div className="text-center space-y-2">
-                    <div className="mx-auto w-12 h-12 bg-indigo-100 dark:bg-indigo-900/50 rounded-full flex items-center justify-center mb-4">
-                        <Lock className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-                    </div>
-                    <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Sign in to your account</h1>
-                    <p className="text-sm text-muted-foreground">Enter your credentials to access the agency portal</p>
-                </div>
+        <div className="min-h-screen bg-black text-white flex flex-col font-glacial">
+            <Navigation />
 
-                <form onSubmit={handleLogin} className="space-y-6">
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="email">
-                            Email
-                        </label>
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <main className="flex-1 flex items-center justify-center px-4 py-16 sm:py-24">
+                <div className="w-full max-w-md">
+                    {/* Header */}
+                    <div className="text-center mb-10">
+                        <Link href="/" className="inline-block mb-6">
+                            <span className="text-[#F5EE30] text-6xl font-suifak tracking-tight">DC</span>
+                        </Link>
+                        <h1 className="text-3xl sm:text-4xl font-etna uppercase tracking-wider mb-2">
+                            Welcome Back
+                        </h1>
+                        <p className="text-gray-400 text-sm">
+                            Sign in to access your agency portal
+                        </p>
+                    </div>
+
+                    {/* Login Form */}
+                    <form onSubmit={handleLogin} className="space-y-6">
+                        <div>
+                            <label className="block text-sm font-glacial-bold uppercase tracking-wider text-gray-300 mb-2" htmlFor="email">
+                                Email
+                            </label>
                             <input
-                                className="flex h-10 w-full rounded-md border border-input bg-background pl-10 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="w-full bg-transparent border-2 border-white/20 px-4 py-3 text-white placeholder-gray-500 focus:border-[#F5EE30] focus:outline-none transition-colors duration-300"
                                 id="email"
                                 type="email"
                                 placeholder="name@example.com"
@@ -63,48 +72,57 @@ export default function LoginPage() {
                                 required
                             />
                         </div>
-                    </div>
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="password">
+
+                        <div>
+                            <label className="block text-sm font-glacial-bold uppercase tracking-wider text-gray-300 mb-2" htmlFor="password">
                                 Password
                             </label>
-                        </div>
-                        <div className="relative">
-                            <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                             <input
-                                className="flex h-10 w-full rounded-md border border-input bg-background pl-10 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="w-full bg-transparent border-2 border-white/20 px-4 py-3 text-white placeholder-gray-500 focus:border-[#F5EE30] focus:outline-none transition-colors duration-300"
                                 id="password"
                                 type="password"
+                                placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                             />
                         </div>
+
+                        <button
+                            className="w-full py-3 bg-[#F5EE30] text-black font-glacial-bold uppercase tracking-widest text-sm hover:bg-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            type="submit"
+                            disabled={loading}
+                        >
+                            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                            {loading ? "Signing In..." : "Sign In"}
+                        </button>
+                    </form>
+
+                    {/* Divider */}
+                    <div className="flex items-center gap-4 my-8">
+                        <div className="flex-1 h-px bg-white/10"></div>
+                        <span className="text-gray-500 text-xs uppercase tracking-widest">or</span>
+                        <div className="flex-1 h-px bg-white/10"></div>
                     </div>
 
-                    <button
-                        className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-700 h-10 px-4 py-2 w-full"
-                        type="submit"
-                        disabled={loading}
+                    {/* Get Started */}
+                    <Link
+                        href="/get-started"
+                        className="block w-full py-3 border-2 border-[#F5EE30] text-[#F5EE30] font-glacial-bold uppercase tracking-widest text-sm text-center hover:bg-[#F5EE30] hover:text-black transition-all duration-300"
                     >
-                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Sign In
-                    </button>
-                </form>
+                        Get Started — Free 7-Day Trial
+                    </Link>
 
-                <div className="text-center space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                        Don&apos;t have an account?{" "}
-                        <a href="/get-started" className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline">
-                            Get Started — Free 7-day trial
-                        </a>
-                    </p>
-                    <a href="/" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                        ← Back to Home
-                    </a>
+                    {/* Back to home */}
+                    <div className="text-center mt-8">
+                        <Link href="/" className="text-gray-500 text-sm hover:text-[#F5EE30] transition-colors">
+                            ← Back to Home
+                        </Link>
+                    </div>
                 </div>
-            </div>
+            </main>
+
+            <Footer />
         </div>
     );
 }
