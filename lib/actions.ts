@@ -2569,6 +2569,48 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
     const results: SearchResult[] = [];
+
+    // ── Keyword detection: generic category queries ──────────────
+    const q = query.toLowerCase().trim();
+    const isProjectQuery = /^(all\s+)?projects?$|^list\s+projects?$/i.test(q);
+    const isClientQuery = /^(all\s+)?clients?$|^list\s+clients?$/i.test(q);
+    const isTaskQuery = /^(all\s+)?tasks?$|^list\s+tasks?$/i.test(q);
+    const isTeamQuery = /^(all\s+)?(team|employees?|members?|staff|people)$|^list\s+(team|employees?)$/i.test(q);
+
+    if (isProjectQuery) {
+        const allProjects = await ProjectModel.find(agencyFilter).sort({ createdAt: -1 }).limit(15).lean();
+        for (const p of allProjects) {
+            const proj = sanitizeDoc(p) as any;
+            results.push({ id: proj.id, type: 'project', title: proj.name, subtitle: `Status: ${proj.status || 'Active'}`, url: `/dashboard/projects/${proj.slug || proj.id}` });
+        }
+        return results;
+    }
+    if (isClientQuery) {
+        const allClients = await ClientModel.find(agencyFilter).sort({ createdAt: -1 }).limit(15).lean();
+        for (const c of allClients) {
+            const client = sanitizeDoc(c) as any;
+            results.push({ id: client.id, type: 'client', title: client.name, subtitle: client.companyName, url: `/dashboard/clients/${client.slug || client.id}` });
+        }
+        return results;
+    }
+    if (isTaskQuery) {
+        const allTasks = await TaskModel.find(agencyFilter).sort({ createdAt: -1 }).limit(15).lean();
+        for (const t of allTasks) {
+            const task = sanitizeDoc(t) as any;
+            results.push({ id: task.id, type: 'task', title: task.title, subtitle: task.status, url: `/dashboard/projects/${task.projectId}?task=${task.id}` });
+        }
+        return results;
+    }
+    if (isTeamQuery) {
+        const allUsers = await UserModel.find(agencyFilter).sort({ createdAt: -1 }).limit(15).lean();
+        for (const u of allUsers) {
+            const user = sanitizeDoc(u) as any;
+            results.push({ id: user.id, type: 'user', title: user.name, subtitle: user.role, url: `/dashboard/team/${user.username || user.id}` });
+        }
+        return results;
+    }
+
+    // ── Normal regex search ─────────────────────────────────────
     const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(escapedQuery, 'i');
 

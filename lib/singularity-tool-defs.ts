@@ -24,7 +24,7 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
     },
     {
         name: "search_agency",
-        description: "Search across all agency data — projects, clients, tasks, and team members. Use this when the user asks to find or look up something.",
+        description: "Search across all agency data — projects, clients, tasks, and team members. Supports generic queries like 'projects', 'clients', 'tasks', 'team' to list all entities of that type. For specific lookups, use a name or keyword. NOTE: If the data is already available in your context (QUICK LOOKUP TABLE), prefer using that directly instead of calling this tool.",
         parameters: {
             type: "OBJECT",
             properties: {

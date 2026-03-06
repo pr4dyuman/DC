@@ -4,8 +4,16 @@ import {
     getCheckpoints,
     analyzeRollback,
     executeRollback,
+    getSingularitySession,
+    getCheckpointSessionId,
 } from "@/lib/singularity-history";
 import { getSessionUser } from "@/lib/auth";
+
+// Helper: verify session ownership
+async function verifySessionOwnership(sessionId: string, authUserId: string): Promise<boolean> {
+    const chatSession = await getSingularitySession(sessionId);
+    return !!chatSession && (chatSession as any).userId === authUserId;
+}
 
 // GET /api/singularity/history/checkpoint?sessionId=xxx — List checkpoints
 export async function GET(req: NextRequest) {
@@ -20,6 +28,11 @@ export async function GET(req: NextRequest) {
 
         if (!sessionId) {
             return NextResponse.json({ error: "sessionId required" }, { status: 400 });
+        }
+
+        // Verify ownership
+        if (!(await verifySessionOwnership(sessionId, session.userId))) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
         const checkpoints = await getCheckpoints(sessionId);
@@ -42,6 +55,11 @@ export async function POST(req: NextRequest) {
 
         // If analyzing rollback
         if (body.action === "analyze") {
+            // Verify ownership via checkpoint's session
+            const cpSessionId = await getCheckpointSessionId(body.checkpointId);
+            if (!cpSessionId || !(await verifySessionOwnership(cpSessionId, session.userId))) {
+                return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+            }
             const analysis = await analyzeRollback(body.checkpointId);
             if (!analysis) {
                 return NextResponse.json({ error: "Checkpoint not found" }, { status: 404 });
@@ -54,6 +72,11 @@ export async function POST(req: NextRequest) {
 
         if (!sessionId || messageIndex === undefined || !actions) {
             return NextResponse.json({ error: "sessionId, messageIndex, and actions required" }, { status: 400 });
+        }
+
+        // Verify ownership
+        if (!(await verifySessionOwnership(sessionId, session.userId))) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
         const checkpointId = await createCheckpoint(sessionId, messageIndex, actions, label || "Checkpoint");
@@ -77,6 +100,12 @@ export async function PUT(req: NextRequest) {
 
         if (!checkpointId || !scope) {
             return NextResponse.json({ error: "checkpointId and scope ('safe' or 'all') required" }, { status: 400 });
+        }
+
+        // Verify ownership via the checkpoint's parent session
+        const cpSessionId = await getCheckpointSessionId(checkpointId);
+        if (!cpSessionId || !(await verifySessionOwnership(cpSessionId, session.userId))) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
         const result = await executeRollback(checkpointId, scope);

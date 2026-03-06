@@ -127,7 +127,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
     const [isLoading, setIsLoading] = useState(false);
     const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
     const [copiedId, setCopiedId] = useState<string | null>(null);
-    const [streamingPhase, setStreamingPhase] = useState<'idle' | 'thinking' | 'responding'>('idle');
+    const [streamingPhase, setStreamingPhase] = useState<'idle' | 'thinking' | 'responding' | 'rechecking'>('idle');
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [isDragOver, setIsDragOver] = useState(false);
     const [mode, setMode] = useState<'chat' | 'agent'>('agent');
@@ -337,13 +337,16 @@ export function SingularityChat({ userId }: { userId?: string }) {
         const payload = buildSavePayload(msgs, sid);
         if (!payload) return;
         try {
-            await fetch('/api/singularity/history', {
+            const res = await fetch('/api/singularity/history', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: payload,
             });
+            if (!res.ok) {
+                console.error('[Singularity Save] Server error:', res.status);
+            }
         } catch (err) {
-            console.error('Failed to save messages:', err);
+            console.error('[Singularity Save] Network error:', err);
         }
     }, [userId]);
 
@@ -586,17 +589,9 @@ export function SingularityChat({ userId }: { userId?: string }) {
         const msg = (overrideMessage || inputValue).trim();
         if ((!msg && attachments.length === 0) || isLoading) return;
 
-        // Lazily create session on first message
-        let currentSessionId = sessionId;
-        if (!currentSessionId && userId) {
-            currentSessionId = await createNewSession();
-            if (currentSessionId) setSessionId(currentSessionId);
-        }
-
         const currentAttachments = [...attachments];
         setInputValue("");
         setAttachments([]);
-        const msgId = `model-${Date.now()}`;
 
         const userMsg: Message = {
             id: `user-${Date.now()}`,
@@ -606,10 +601,20 @@ export function SingularityChat({ userId }: { userId?: string }) {
             timestamp: new Date(),
         };
 
+        // Add user message and switch to chat view BEFORE session creation
+        // This prevents the welcome screen from staying visible during the network call
         setMessages(prev => [...prev, userMsg]);
         setIsLoading(true);
         setStreamingPhase(mode === 'chat' ? 'thinking' : 'responding');
 
+        // Lazily create session on first message (after UI is already in chat state)
+        let currentSessionId = sessionId;
+        if (!currentSessionId && userId) {
+            currentSessionId = await createNewSession();
+            if (currentSessionId) setSessionId(currentSessionId);
+        }
+
+        const msgId = `model-${Date.now()}`;
         const aiMsg: Message = {
             id: msgId,
             role: 'model',
@@ -730,6 +735,8 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                     next.delete(msgId);
                                     return next;
                                 });
+                            } else if (data.type === 'rechecking') {
+                                setStreamingPhase('rechecking');
                             } else if (data.type === 'error') {
                                 setMessages(prev => prev.map(m =>
                                     m.id === msgId ? { ...m, content: 'An error occurred. Please try again.', isStreaming: false } : m
@@ -779,39 +786,12 @@ export function SingularityChat({ userId }: { userId?: string }) {
             setStreamingPhase('idle');
             inputRef.current?.focus();
 
-            // --- Guaranteed save via sendBeacon (survives ANY navigation type) ---
-            // This uses locally tracked content, NOT React state, so timing is irrelevant.
+            // Explicit save using local currentSessionId (avoids React state timing issues)
+            // The useEffect may also fire, but duplicate saves are harmless (idempotent PUT).
             if (currentSessionId) {
-                const prevMsgs = messages.filter(m => !m.isStreaming).map(m => ({
-                    role: m.role,
-                    content: m.content,
-                    thinking: m.thinking,
-                    images: m.images,
-                    timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
-                }));
-                const toSave = [
-                    ...prevMsgs,
-                    {
-                        role: 'user' as const,
-                        content: msg,
-                        images: currentAttachments.filter(a => a.fileType === 'image').map(a => a.preview),
-                        timestamp: userMsg.timestamp.toISOString(),
-                    },
-                    ...(accumContent ? [{
-                        role: 'model' as const,
-                        content: accumContent,
-                        thinking: accumThinking || undefined,
-                        timestamp: new Date().toISOString(),
-                    }] : []),
-                ];
-                if (toSave.length > 0) {
-                    const title = msg.slice(0, 60);
-                    const beaconPayload = JSON.stringify({ sessionId: currentSessionId, messages: toSave, title });
-                    navigator.sendBeacon(
-                        '/api/singularity/history',
-                        new Blob([beaconPayload], { type: 'application/json' })
-                    );
-                }
+                setTimeout(() => {
+                    saveMessages(messagesRef.current, currentSessionId!);
+                }, 100);
             }
 
             // Save checkpoint if there were tool actions with rollback data
@@ -1622,6 +1602,23 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                     </div>
                                 )}
 
+                                {/* Rechecking Indicator — shows when AI is refining a short response */}
+                                {streamingPhase === 'rechecking' && (
+                                    <div className="flex gap-2 sm:gap-3 singularity-msg-enter">
+                                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300">
+                                            {isAgent ? <Bot className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+                                        </div>
+                                        <div className="flex items-center gap-2 pt-2">
+                                            <div className="flex gap-1 text-neutral-400">
+                                                <span className="singularity-typing-dot" />
+                                                <span className="singularity-typing-dot" />
+                                                <span className="singularity-typing-dot" />
+                                            </div>
+                                            <span className="text-xs text-neutral-400 ml-1">Refining response...</span>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div ref={messagesEndRef} />
                             </div>
                         </div>
@@ -1658,7 +1655,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                         placeholder={isAgent ? "Ask Singularity Agent..." : "Ask Singularity..."}
                                         className="w-full bg-transparent border-none focus:ring-0 focus:outline-none resize-none py-3 px-4 text-sm text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 min-h-[40px] max-h-32"
                                         rows={1}
-                                        disabled={isLoading}
+
                                     />
                                     <div className="flex items-center justify-between px-3 pb-2">
                                         <div className="flex items-center gap-1">

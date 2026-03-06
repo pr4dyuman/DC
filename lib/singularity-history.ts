@@ -85,6 +85,7 @@ export async function getSingularitySession(sessionId: string) {
     if (!session) return null;
     return {
         id: (session as any).id,
+        userId: (session as any).userId,
         title: (session as any).title,
         mode: (session as any).mode,
         messages: (session as any).messages || [],
@@ -160,6 +161,11 @@ export async function deleteSingularitySession(sessionId: string) {
 // CHECKPOINT SYSTEM
 // ============================================================================
 
+export async function getCheckpointSessionId(checkpointId: string): Promise<string | null> {
+    await connectDB();
+    const cp = await SingularityCheckpointModel.findOne({ id: checkpointId }).select('sessionId').lean();
+    return cp ? (cp as any).sessionId : null;
+}
 export async function createCheckpoint(
     sessionId: string,
     messageIndex: number,
