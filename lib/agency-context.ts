@@ -6,6 +6,12 @@ import { AgencyModel, UserModel, ClientModel, SuperAdminModel } from "./mongodb"
 import { Agency, User, Client, AGENCY_PLANS, SuperAdmin } from "./types";
 import { getSessionUser } from "./auth";
 
+// Serialize Mongoose lean objects to plain JS objects (strips ObjectId, __v, etc.)
+function serialize<T>(doc: T): T {
+    if (!doc) return doc;
+    return JSON.parse(JSON.stringify(doc));
+}
+
 /**
  * Get the current user's agency — memoized per request via React cache().
  * This ensures even if called from 10 different server actions in the same request,
@@ -37,7 +43,7 @@ export const getCurrentAgency = cache(async (): Promise<Agency | null> => {
         // If we already have agencyId from JWT, use it directly
         if (agencyId) {
             const agency = await AgencyModel.findOne({ id: agencyId }).lean();
-            return agency as Agency | null;
+            return serialize(agency) as Agency | null;
         }
 
         // Super admin: use selected agency cookie
@@ -45,7 +51,7 @@ export const getCurrentAgency = cache(async (): Promise<Agency | null> => {
             const selectedAgencyId = cookieStore.get('selectedAgencyId')?.value;
             if (selectedAgencyId) {
                 const agency = await AgencyModel.findOne({ id: selectedAgencyId }).lean();
-                return agency as Agency | null;
+                return serialize(agency) as Agency | null;
             }
             return null; // Super admin must select an agency
         }
@@ -56,7 +62,7 @@ export const getCurrentAgency = cache(async (): Promise<Agency | null> => {
         if (user) {
             const userAgencyId = user.agencyId || 'default-agency';
             const agency = await AgencyModel.findOne({ id: userAgencyId }).lean();
-            return agency as Agency | null;
+            return serialize(agency) as Agency | null;
         }
 
         // 2. Check if user is a super admin (legacy path)
@@ -65,7 +71,7 @@ export const getCurrentAgency = cache(async (): Promise<Agency | null> => {
             const selectedAgencyId = cookieStore.get('selectedAgencyId')?.value;
             if (selectedAgencyId) {
                 const agency = await AgencyModel.findOne({ id: selectedAgencyId }).lean();
-                return agency as Agency | null;
+                return serialize(agency) as Agency | null;
             }
             return null;
         }
@@ -75,7 +81,7 @@ export const getCurrentAgency = cache(async (): Promise<Agency | null> => {
         if (client) {
             const clientAgencyId = client.agencyId || 'default-agency';
             const agency = await AgencyModel.findOne({ id: clientAgencyId }).lean();
-            return agency as Agency | null;
+            return serialize(agency) as Agency | null;
         }
 
         return null;
@@ -92,7 +98,7 @@ export const getCurrentAgency = cache(async (): Promise<Agency | null> => {
 export async function getAgencyById(agencyId: string): Promise<Agency | null> {
     try {
         const agency = await AgencyModel.findOne({ id: agencyId }).lean();
-        return agency as Agency | null;
+        return serialize(agency) as Agency | null;
     } catch (error) {
         console.error('Error getting agency by ID:', error);
         return null;
@@ -105,7 +111,7 @@ export async function getAgencyById(agencyId: string): Promise<Agency | null> {
 export async function getAgencyBySlug(slug: string): Promise<Agency | null> {
     try {
         const agency = await AgencyModel.findOne({ slug }).lean();
-        return agency as Agency | null;
+        return serialize(agency) as Agency | null;
     } catch (error) {
         console.error('Error getting agency by slug:', error);
         return null;
