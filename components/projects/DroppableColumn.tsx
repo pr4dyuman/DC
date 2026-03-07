@@ -16,9 +16,11 @@ interface DroppableColumnProps {
     readOnly?: boolean;
     permissions?: any;
     onQuickEdit?: (taskId: string, patch: Partial<Task>) => void;
+    disableDrag?: boolean;
+    onStatusChange?: (taskId: string, newStatus: Task['status']) => void;
 }
 
-export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTask, currentUserId, aiEnabled, readOnly, permissions, onQuickEdit }: DroppableColumnProps) {
+export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTask, currentUserId, aiEnabled, readOnly, permissions, onQuickEdit, disableDrag, onStatusChange }: DroppableColumnProps) {
     const { setNodeRef, isOver } = useDroppable({ id });
 
     return (
@@ -48,7 +50,7 @@ export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTas
                     <div className={`flex-1 flex items-center justify-center rounded-md border border-dashed min-h-[80px] transition-colors ${isOver ? 'border-primary/40 bg-primary/5' : 'border-border/50'
                         }`}>
                         <p className="text-xs text-muted-foreground/50 select-none">
-                            {isOver ? 'Drop here' : 'Drop tasks here'}
+                            {disableDrag ? 'No tasks' : isOver ? 'Drop here' : 'Drop tasks here'}
                         </p>
                     </div>
                 ) : tasks.map((task) => (
@@ -63,6 +65,8 @@ export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTas
                         readOnly={readOnly}
                         permissions={permissions}
                         onQuickEdit={onQuickEdit}
+                        disableDrag={disableDrag}
+                        onStatusChange={onStatusChange}
                     />
                 ))}
             </div>

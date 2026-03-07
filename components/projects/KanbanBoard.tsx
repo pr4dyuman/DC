@@ -182,6 +182,37 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
         setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...patch } : t));
     };
 
+    // Mobile: direct status change (replaces drag-and-drop)
+    const handleMobileStatusChange = async (taskId: string, newStatus: Task['status']) => {
+        if (readOnly) return;
+        const task = tasks.find(t => t.id === taskId);
+        if (!task || task.status === newStatus) return;
+
+        // Permission check
+        if (permissions) {
+            if (newStatus === 'Done' && !permissions.canMarkDone) {
+                toast.error("You don't have permission to mark tasks as Done.");
+                return;
+            }
+            if (newStatus !== 'Done' && !permissions.canManageTasks) {
+                toast.error("You don't have permission to manage task status.");
+                return;
+            }
+        }
+
+        const oldStatus = task.status;
+        // Optimistic update
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+
+        try {
+            await updateTaskStatus(taskId, newStatus);
+            toast.success(`Moved to ${newStatus}`);
+        } catch {
+            setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: oldStatus } : t));
+            toast.error("Failed to move task");
+        }
+    };
+
     const filteredTasks = selectedCategory === "All"
         ? tasks
         : tasks.filter(t => t.category === selectedCategory);
@@ -267,6 +298,8 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                         readOnly={readOnly}
                         permissions={permissions}
                         onQuickEdit={handleQuickEdit}
+                        disableDrag={true}
+                        onStatusChange={handleMobileStatusChange}
                     />
                 </div>
 

@@ -6,7 +6,9 @@ import { useDraggable } from "@dnd-kit/core";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Task, UserPermissions } from "@/lib/types";
-import { Sparkles, Calendar, Flag } from "lucide-react";
+import { Sparkles, Calendar, Flag, ArrowRightLeft } from "lucide-react";
+
+const STATUS_ORDER = ['Todo', 'In Progress', 'Review', 'Done'] as const;
 import { AIExplanationModal } from "./AIExplanationModal";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -28,13 +30,15 @@ interface TaskCardProps {
     permissions?: UserPermissions;
     onQuickEdit?: (taskId: string, patch: Partial<Task>) => void;
     dragOverlay?: boolean;
+    disableDrag?: boolean;
+    onStatusChange?: (taskId: string, newStatus: Task['status']) => void;
 }
 
-export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEnabled, readOnly, permissions, onQuickEdit, dragOverlay = false }: TaskCardProps & { onView: (task: Task) => void; onEdit: (task: Task) => void; currentUserId?: string }) {
+export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEnabled, readOnly, permissions, onQuickEdit, dragOverlay = false, disableDrag = false, onStatusChange }: TaskCardProps & { onView: (task: Task) => void; onEdit: (task: Task) => void; currentUserId?: string }) {
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id: task.id,
         data: { task },
-        disabled: dragOverlay,
+        disabled: dragOverlay || disableDrag,
     });
 
     const searchParams = useSearchParams();
@@ -43,7 +47,9 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
     const cardRef = useRef<HTMLDivElement>(null);
     const [showAIModal, setShowAIModal] = useState(false);
     const [showAssigneeMenu, setShowAssigneeMenu] = useState(false);
+    const [showStatusMenu, setShowStatusMenu] = useState(false);
     const assigneeMenuRef = useRef<HTMLDivElement>(null);
+    const statusMenuRef = useRef<HTMLDivElement>(null);
     const [isPending, startTransition] = useTransition();
 
     useEffect(() => {
@@ -55,11 +61,14 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
         }
     }, [shouldHighlight]);
 
-    // Close assignee menu on outside click
+    // Close menus on outside click
     useEffect(() => {
         const handler = (e: MouseEvent) => {
             if (assigneeMenuRef.current && !assigneeMenuRef.current.contains(e.target as Node)) {
                 setShowAssigneeMenu(false);
+            }
+            if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) {
+                setShowStatusMenu(false);
             }
         };
         document.addEventListener('mousedown', handler);
@@ -68,7 +77,9 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
 
     const style: React.CSSProperties = dragOverlay
         ? { cursor: 'grabbing' }
-        : { opacity: isDragging ? 0.4 : 1, cursor: 'grab' };
+        : disableDrag
+            ? { opacity: 1 }
+            : { opacity: isDragging ? 0.4 : 1, cursor: 'grab' };
 
     const assignee = users.find(u => u.id === task.assigneeId);
     const canEdit = !readOnly && ((permissions?.canManageTasks ?? true) || permissions?.deleteAccess === 'any' || (permissions?.deleteAccess === 'own' && task.createdBy === currentUserId));
@@ -108,6 +119,15 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
         });
     };
 
+    // ── Quick: change status (mobile) ──────────────────────────────────────────
+    const handleStatusChange = (e: React.MouseEvent, newStatus: string) => {
+        e.stopPropagation();
+        setShowStatusMenu(false);
+        if (!canEdit || newStatus === task.status) return;
+        onQuickEdit?.(task.id, { status: newStatus as Task['status'] });
+        onStatusChange?.(task.id, newStatus as Task['status']);
+    };
+
     const handleEditClick = (e: React.MouseEvent) => { e.stopPropagation(); onEdit(task); };
     const handleExplainClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -119,7 +139,7 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
     const today = new Date(); today.setHours(0, 0, 0, 0);
 
     return (
-        <div ref={dragOverlay ? undefined : setNodeRef} style={style} {...(dragOverlay ? {} : attributes)} {...(dragOverlay ? {} : listeners)} className="touch-none mb-3">
+        <div ref={dragOverlay ? undefined : setNodeRef} style={style} {...(dragOverlay ? {} : attributes)} {...(dragOverlay || disableDrag ? {} : listeners)} className={`mb-3 ${disableDrag ? '' : 'touch-none'}`}>
             <div ref={cardRef}>
                 <Card
                     onClick={() => onView(task)}
@@ -258,7 +278,45 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
                                 </div>
                             )}
 
-                            <div className="flex items-center shrink-0 ml-auto">
+                            <div className="flex items-center shrink-0 ml-auto gap-1">
+                                {/* Mobile: quick status change */}
+                                {disableDrag && canEdit && (
+                                    <div className="relative" ref={statusMenuRef}>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setShowStatusMenu(v => !v); }}
+                                            className="flex items-center gap-1 transition-colors px-1.5 py-0.5 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-accent"
+                                            title="Move to..."
+                                        >
+                                            <ArrowRightLeft className="w-3 h-3 shrink-0" />
+                                            <span className="text-[9px] font-medium">Move</span>
+                                        </button>
+                                        {showStatusMenu && (
+                                            <div
+                                                className="absolute bottom-7 right-0 z-50 w-36 rounded-lg border border-border bg-popover shadow-lg py-1"
+                                                onClick={e => e.stopPropagation()}
+                                            >
+                                                <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-border mb-1">
+                                                    Move to
+                                                </div>
+                                                {STATUS_ORDER.map(s => (
+                                                    <button
+                                                        key={s}
+                                                        onClick={(e) => handleStatusChange(e, s)}
+                                                        className={`w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors ${s === task.status ? 'bg-primary/5 text-primary font-semibold' : 'text-foreground'}`}
+                                                    >
+                                                        <span className={`inline-block w-1.5 h-1.5 rounded-full mr-2 ${s === 'Done' ? 'bg-emerald-500' :
+                                                            s === 'In Progress' ? 'bg-blue-500' :
+                                                                s === 'Review' ? 'bg-yellow-500' :
+                                                                    'bg-muted-foreground/40'
+                                                            }`} />
+                                                        {s}
+                                                        {s === task.status && <span className="ml-1 text-primary">✓</span>}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                                 <button
                                     onClick={handleExplainClick}
                                     className={`flex items-center gap-1 transition-colors px-1.5 py-0.5 rounded-md ${isAiDisabled
