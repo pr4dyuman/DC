@@ -192,7 +192,7 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: Topbar
                     {mounted ? (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <button className="relative p-2 rounded-full hover:bg-accent transition-colors outline-none">
+                                <button aria-label="Notifications" className="relative p-2 rounded-full hover:bg-accent transition-colors outline-none">
                                     <Bell className="h-5 w-5 text-muted-foreground" />
                                     {unreadCount > 0 && (
                                         <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-600 border border-background" />
@@ -246,7 +246,7 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: Topbar
                             </DropdownMenuContent>
                         </DropdownMenu>
                     ) : (
-                        <button className="relative p-2 rounded-full hover:bg-accent transition-colors outline-none">
+                        <button aria-label="Notifications" className="relative p-2 rounded-full hover:bg-accent transition-colors outline-none">
                             <Bell className="h-5 w-5 text-muted-foreground" />
                         </button>
                     )}
@@ -254,8 +254,8 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: Topbar
                     {mounted ? (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Avatar className="h-9 w-9 cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-indigo-600 transition-all">
-                                    <AvatarImage src={user.avatar} className="object-cover" />
+                                <Avatar className="h-9 w-9 cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-indigo-600 transition-all" role="button" aria-label="User menu">
+                                    <AvatarImage src={user.avatar} alt={user.name || 'User avatar'} className="object-cover" />
                                     <AvatarFallback className="bg-indigo-600 text-white text-sm font-medium">
                                         {user.name?.substring(0, 2).toUpperCase()}
                                     </AvatarFallback>
@@ -305,8 +305,8 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: Topbar
                             </DropdownMenuContent>
                         </DropdownMenu>
                     ) : (
-                        <Avatar className="h-9 w-9 cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-indigo-600 transition-all">
-                            <AvatarImage src={user.avatar} className="object-cover" />
+                        <Avatar className="h-9 w-9 cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-indigo-600 transition-all" role="button" aria-label="User menu">
+                            <AvatarImage src={user.avatar} alt={user.name || 'User avatar'} className="object-cover" />
                             <AvatarFallback className="bg-indigo-600 text-white text-sm font-medium">
                                 {user.name?.substring(0, 2).toUpperCase()}
                             </AvatarFallback>

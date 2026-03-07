@@ -37,7 +37,7 @@ function TaskStatusPills({ todo, inProgress, done }: { todo: number; inProgress:
     return (
         <div className="flex items-center gap-2 text-[10px] font-medium">
             {todo > 0 && <span className="text-muted-foreground">{todo} Todo</span>}
-            {inProgress > 0 && <span className="text-indigo-500">{inProgress} In Progress</span>}
+            {inProgress > 0 && <span className="text-indigo-400">{inProgress} In Progress</span>}
             {done > 0 && <span className="text-emerald-500">{done} Done</span>}
         </div>
     );
@@ -127,7 +127,7 @@ export function ProjectsContent({
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
                                 {project.isOverdue && <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
-                                <CardTitle className="text-base truncate group-hover:text-primary transition-colors">{project.name}</CardTitle>
+                                <CardTitle asChild className="text-base truncate group-hover:text-primary transition-colors"><h2>{project.name}</h2></CardTitle>
                             </div>
                             <div className="flex flex-wrap gap-1 mt-1.5">
                                 {project.client && project.client !== project.name && (
@@ -174,7 +174,7 @@ export function ProjectsContent({
                             <div className="flex -space-x-2">
                                 {project.assignees.length > 0 ? project.assignees.map((u: any) => (
                                     <Avatar key={u.id} className="h-6 w-6 border-2 border-background" title={u.name}>
-                                        <AvatarImage src={u.avatar} />
+                                        <AvatarImage src={u.avatar} alt={u.name || 'Team member'} />
                                         <AvatarFallback className="text-[8px] bg-primary/10 text-primary font-bold">
                                             {u.name?.substring(0, 2).toUpperCase()}
                                         </AvatarFallback>
@@ -231,7 +231,7 @@ export function ProjectsContent({
                 <div className="hidden md:flex -space-x-1.5">
                     {project.assignees.map((u: any) => (
                         <Avatar key={u.id} className="h-5 w-5 border border-background" title={u.name}>
-                            <AvatarImage src={u.avatar} />
+                            <AvatarImage src={u.avatar} alt={u.name || 'Team member'} />
                             <AvatarFallback className="text-[7px] bg-primary/10 text-primary font-bold">{u.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
                         </Avatar>
                     ))}
@@ -266,7 +266,7 @@ export function ProjectsContent({
                 <div className="flex items-center gap-2 flex-wrap">
                     {/* Search */}
                     <div className={`flex items-center transition-all duration-200 border border-input rounded-md bg-background overflow-hidden ${searchExpanded ? 'w-52' : 'w-9'} h-9`}>
-                        <button className="p-2 shrink-0" onClick={() => setSearchExpanded(v => !v)}>
+                        <button aria-label="Search projects" className="p-2 shrink-0" onClick={() => setSearchExpanded(v => !v)}>
                             <Search className="h-4 w-4 text-muted-foreground" />
                         </button>
                         {searchExpanded && (
@@ -282,6 +282,7 @@ export function ProjectsContent({
 
                     {/* Sort */}
                     <select
+                        aria-label="Sort projects"
                         value={sortBy}
                         onChange={e => setSortBy(e.target.value as any)}
                         className="h-9 rounded-md border border-input bg-background px-3 text-sm text-muted-foreground cursor-pointer"
@@ -294,10 +295,10 @@ export function ProjectsContent({
 
                     {/* View toggle */}
                     <div className="flex items-center border border-input rounded-md overflow-hidden h-9">
-                        <button onClick={() => setViewMode('grid')} className={`px-2.5 h-full flex items-center transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'}`}>
+                        <button aria-label="Grid view" onClick={() => setViewMode('grid')} className={`px-2.5 h-full flex items-center transition-colors ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'}`}>
                             <LayoutGrid className="h-4 w-4" />
                         </button>
-                        <button onClick={() => setViewMode('list')} className={`px-2.5 h-full flex items-center transition-colors ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'}`}>
+                        <button aria-label="List view" onClick={() => setViewMode('list')} className={`px-2.5 h-full flex items-center transition-colors ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted text-muted-foreground'}`}>
                             <List className="h-4 w-4" />
                         </button>
                     </div>
