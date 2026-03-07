@@ -192,7 +192,7 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
                     <span className="hidden sm:inline">Settings</span>
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[700px] gap-0 p-0 overflow-hidden h-[80vh] flex flex-col">
+            <DialogContent className="max-w-[95vw] sm:max-w-[700px] gap-0 p-0 overflow-hidden max-h-[85dvh] flex flex-col">
                 <DialogHeader className="px-6 py-4 border-b shrink-0">
                     <DialogTitle className="text-xl">Project Settings</DialogTitle>
                 </DialogHeader>

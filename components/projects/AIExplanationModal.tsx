@@ -56,7 +56,7 @@ export function AIExplanationModal({ taskId, open, onOpenChange, userId }: AIExp
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="max-w-[95vw] sm:max-w-[600px] max-h-[85dvh] flex flex-col overflow-hidden">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Sparkles className="h-5 w-5 text-primary" />
@@ -83,7 +83,7 @@ export function AIExplanationModal({ taskId, open, onOpenChange, userId }: AIExp
                             </Button>
                         </div>
                     ) : (
-                        <ScrollArea className="h-[400px] w-full rounded-md border p-4 bg-secondary">
+                        <ScrollArea className="max-h-[50dvh] sm:h-[400px] w-full rounded-md border p-4 bg-secondary">
                             <div className="prose dark:prose-invert text-sm max-w-none">
                                 <ReactMarkdown>{explanation || ""}</ReactMarkdown>
                             </div>

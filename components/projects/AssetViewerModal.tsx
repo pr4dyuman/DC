@@ -42,7 +42,7 @@ export function AssetViewerModal({ asset, open, onClose }: AssetViewerModalProps
 
     return (
         <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
-            <DialogContent className={`flex flex-col ${canViewImage ? 'max-w-4xl max-h-[90vh]' : 'max-w-3xl h-[80vh]'}`}>
+            <DialogContent className={`flex flex-col max-w-[95vw] ${canViewImage ? 'sm:max-w-4xl max-h-[90dvh]' : 'sm:max-w-3xl h-[80vh] max-h-[85dvh]'}`}>
                 <DialogHeader className="flex flex-row items-center justify-between">
                     <DialogTitle className="truncate pr-8">{asset.name}</DialogTitle>
                     <div className="flex items-center gap-2">

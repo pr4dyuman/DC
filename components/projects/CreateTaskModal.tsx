@@ -103,7 +103,7 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                 <DialogHeader>
                     <DialogTitle>Create New Task</DialogTitle>
                 </DialogHeader>
-                <div className="relative flex flex-col lg:flex-row h-[85vh] sm:h-[580px] lg:gap-6 overflow-hidden">
+                <div className="relative flex flex-col lg:flex-row max-h-[75dvh] sm:h-[580px] lg:gap-6 overflow-hidden">
                     {/* Left Side: Form */}
                     <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto px-1 no-scrollbar">
                         {/* Title */}

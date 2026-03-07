@@ -96,11 +96,11 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
 
     return (
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setConfirmDelete(false); }}>
-            <DialogContent className="max-w-[95vw] sm:max-w-[520px]">
-                <DialogHeader>
+            <DialogContent className="max-w-[95vw] sm:max-w-[520px] max-h-[85dvh] flex flex-col overflow-hidden">
+                <DialogHeader className="shrink-0">
                     <DialogTitle>Edit Task</DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+                <form onSubmit={handleSubmit} className="space-y-4 pt-1 overflow-y-auto flex-1 px-1 -mx-1">
                     {/* Title */}
                     <div className="space-y-1.5">
                         <label className={labelCls}>Task Title</label>

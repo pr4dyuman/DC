@@ -228,18 +228,18 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                     Add Asset
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
+            <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[85dvh] flex flex-col overflow-hidden">
+                <DialogHeader className="shrink-0">
                     <DialogTitle>Add Project Asset</DialogTitle>
                 </DialogHeader>
 
-                <Tabs defaultValue="link" value={inputMode} onValueChange={(v) => handleModeChange(v as "link" | "file")} className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
+                <Tabs defaultValue="link" value={inputMode} onValueChange={(v) => handleModeChange(v as "link" | "file")} className="w-full flex-1 flex flex-col overflow-hidden min-h-0">
+                    <TabsList className="grid w-full grid-cols-2 shrink-0">
                         <TabsTrigger value="link">External Link</TabsTrigger>
                         <TabsTrigger value="file">Secure Upload</TabsTrigger>
                     </TabsList>
 
-                    <form onSubmit={onSubmit} className="space-y-4 pt-4">
+                    <form onSubmit={onSubmit} className="space-y-4 pt-4 overflow-y-auto flex-1 px-1 -mx-1">
                         {error && (
                             <div className="bg-destructive/15 text-destructive p-3 rounded-md flex items-center gap-2 text-sm border border-destructive/20">
                                 <AlertTriangle className="h-4 w-4" />
