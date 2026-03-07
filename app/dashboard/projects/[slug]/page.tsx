@@ -1,28 +1,29 @@
+import { Suspense } from 'react';
 import { getTasks, getUsers, getTransactions, getServices, getProjectBySlug, getProjectAssets, getUser, getClients, getUserPermissions } from "@/lib/actions";
 import { ProjectView } from "@/components/projects/ProjectView";
+import { ProjectDetailSkeleton } from "@/components/projects/ProjectDetailSkeleton";
 import { getSessionId } from "@/lib/auth";
 import { User } from "@/lib/types";
 
-export default async function ProjectDetailPage({ params }: { params: Promise<{ slug: string }> }) {
-    const { slug } = await params;
-
-    // Fetch by Slug instead of ID
-    console.log("DEBUG: Page Slug Params:", slug);
+async function ProjectData({ slug }: { slug: string }) {
     const project = await getProjectBySlug(slug);
-    console.log("DEBUG: Project Found:", project?.name, project?.id);
 
     if (!project) {
-        console.log("DEBUG: Project NOT found for slug:", slug);
         return <div>Project not found: {slug}</div>;
     }
 
-    // We still need to fetch tasks/transactions using the PROJECT ID, not the slug.
-    // The project object (fetched by slug) contains the ID.
     const projectId = project.id;
 
-    const tasks = await getTasks(projectId);
-    const users = await getUsers();
-    const clients = await getClients();
+    // Parallelize independent fetches
+    const [tasks, users, clients, transactions, assets, allCategories, userId] = await Promise.all([
+        getTasks(projectId),
+        getUsers(),
+        getClients(),
+        getTransactions(projectId),
+        getProjectAssets(projectId),
+        getServices(),
+        getSessionId(),
+    ]);
 
     // Merge clients into users list for lookup
     const clientUsers: User[] = clients.map(c => ({
@@ -37,15 +38,12 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     }));
 
     const allUsers = [...users, ...clientUsers];
-    const transactions = await getTransactions(projectId);
-    const assets = await getProjectAssets(projectId);
-    const allCategories = await getServices();
 
-    const userId = await getSessionId();
-    const currentUser = userId ? await getUser(userId) : undefined;
-
-    // Fetch Permissions
-    const permissions = userId ? await getUserPermissions(userId) : undefined;
+    // These depend on userId
+    const [currentUser, permissions] = await Promise.all([
+        userId ? getUser(userId) : Promise.resolve(undefined),
+        userId ? getUserPermissions(userId) : Promise.resolve(undefined),
+    ]);
 
     return (
         <ProjectView
@@ -58,5 +56,15 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             currentUser={currentUser}
             permissions={permissions}
         />
+    );
+}
+
+export default async function ProjectDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+    const { slug } = await params;
+
+    return (
+        <Suspense fallback={<ProjectDetailSkeleton />}>
+            <ProjectData slug={slug} />
+        </Suspense>
     );
 }

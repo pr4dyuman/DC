@@ -5,7 +5,8 @@ import { getClients, getArchivedClients, unarchiveClient, deleteClient } from "@
 import { Client } from "@/lib/types";
 import { ClientCard } from "@/components/clients/ClientCard";
 import { EditClientDialog } from "@/components/clients/EditClientDialog";
-import { Plus, Loader2, Archive, ArchiveRestore, Search } from "lucide-react";
+import { Plus, Archive, ArchiveRestore, Search } from "lucide-react";
+import { ClientsSkeleton } from "@/components/clients/ClientsSkeleton";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -122,7 +123,7 @@ export default function ClientsPage() {
             </div>
 
             {loading ? (
-                <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+                <ClientsSkeleton />
             ) : filteredClients.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                     {searchQuery.trim()

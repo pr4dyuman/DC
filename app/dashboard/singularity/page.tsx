@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/actions";
 import { redirect } from "next/navigation";
 import { SingularityChat } from "@/components/singularity/SingularityChat";
+import { SingularitySkeleton } from "@/components/singularity/SingularitySkeleton";
 
-export default async function SingularityPage() {
+async function SingularityData() {
     const currentUser = await getCurrentUser();
     if (!currentUser) redirect("/login");
 
@@ -12,5 +14,13 @@ export default async function SingularityPage() {
 
     return (
         <SingularityChat userId={currentUser.id} />
+    );
+}
+
+export default function SingularityPage() {
+    return (
+        <Suspense fallback={<SingularitySkeleton />}>
+            <SingularityData />
+        </Suspense>
     );
 }

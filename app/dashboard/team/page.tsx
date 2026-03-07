@@ -7,7 +7,8 @@ import { getSessionId } from "@/lib/auth";
 import { LeaveRequestsList } from "@/components/leave-requests-list";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Link from "next/link";
-import { Loader2, Plus, Mail, IndianRupee, Briefcase, Search, Users, Shield, UserCheck, MessageCircle, Phone } from "lucide-react";
+import { Plus, Mail, IndianRupee, Briefcase, Search, Users, Shield, UserCheck, MessageCircle, Phone } from "lucide-react";
+import { TeamPageSkeleton } from "@/components/team/TeamPageSkeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EditUserDialog } from "@/components/team/EditUserDialog";
 import { useChat } from "@/context/ChatContext";
@@ -22,23 +23,7 @@ const ROLE_FILTERS = [
     { key: "client", label: "Client", icon: Briefcase },
 ] as const;
 
-function TeamCardSkeleton() {
-    return (
-        <div className="bg-card border border-border rounded-xl p-5 animate-pulse">
-            <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-muted" />
-                <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-muted rounded w-3/4" />
-                    <div className="h-3 bg-muted/60 rounded w-1/2" />
-                </div>
-            </div>
-            <div className="mt-4 space-y-2">
-                <div className="h-3 bg-muted/50 rounded w-full" />
-                <div className="h-3 bg-muted/50 rounded w-2/3" />
-            </div>
-        </div>
-    );
-}
+
 
 export default function TeamPage() {
     const [users, setUsers] = useState<User[]>([]);
@@ -213,14 +198,7 @@ export default function TeamPage() {
 
             {/* Cards Grid */}
             {loading ? (
-                <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                    <TeamCardSkeleton />
-                    <TeamCardSkeleton />
-                    <TeamCardSkeleton />
-                    <TeamCardSkeleton />
-                    <TeamCardSkeleton />
-                    <TeamCardSkeleton />
-                </div>
+                <TeamPageSkeleton />
             ) : filteredUsers.length === 0 ? (
                 <div className="text-center py-16 text-muted-foreground">
                     <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
