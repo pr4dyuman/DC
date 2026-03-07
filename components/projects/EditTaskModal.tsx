@@ -203,7 +203,7 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
 
                     {/* Due Date */}
                     <div className="space-y-1.5">
-                        <label className={labelCls}>Due Date &amp; Time <span className="text-muted-foreground font-normal">(optional)</span></label>
+                        <label className={labelCls}>Due Date &amp; Time</label>
                         <DateTimeInput
                             type="datetime-local"
                             value={dueDate}

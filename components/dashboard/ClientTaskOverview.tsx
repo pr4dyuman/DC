@@ -22,8 +22,8 @@ export function ClientTaskOverview({ tasks, projects }: ClientTaskOverviewProps)
 
     // Get upcoming deadlines
     const upcomingTasks = tasks
-        .filter(t => t.status !== 'Done' && new Date(t.dueDate) > new Date())
-        .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+        .filter(t => t.status !== 'Done' && t.dueDate && new Date(t.dueDate) > new Date())
+        .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime())
         .slice(0, 5);
 
     const getProjectName = (projectId: string) => {
@@ -134,7 +134,7 @@ export function ClientTaskOverview({ tasks, projects }: ClientTaskOverviewProps)
                                                         </p>
                                                     </div>
                                                     <div className="text-xs text-amber-400 ml-2">
-                                                        {new Date(task.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                        {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
                                                     </div>
                                                 </div>
                                             </div>

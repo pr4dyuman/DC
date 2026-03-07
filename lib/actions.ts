@@ -1665,7 +1665,7 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
                     taskTitle: task.title,
                     taskDescription: task.description || '',
                     projectName: project.name,
-                    dueDate: task.dueDate,
+                    dueDate: task.dueDate || '',
                     priority: task.priority || 'Medium',
                     taskLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${task.projectId}?task=${newTask.id}`,
                 });

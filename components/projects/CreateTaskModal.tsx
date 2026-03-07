@@ -75,7 +75,7 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                 assigneeId,
                 category,
                 priority,
-                dueDate: dueDate || "",
+                dueDate: dueDate || undefined,
                 estimatedHours: estimatedHours || undefined,
             });
             toast.success("Task created");
@@ -103,7 +103,7 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                 <DialogHeader>
                     <DialogTitle>Create New Task</DialogTitle>
                 </DialogHeader>
-                <div className="relative flex flex-col lg:flex-row max-h-[75dvh] sm:h-[580px] lg:gap-6 overflow-hidden">
+                <div className="relative flex flex-col lg:flex-row max-h-[75dvh] sm:h-[580px] lg:gap-6 overflow-hidden min-h-0">
                     {/* Left Side: Form */}
                     <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto px-1 no-scrollbar">
                         {/* Title */}
@@ -225,7 +225,7 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                         </div>
 
                         <div className="space-y-1.5">
-                            <label className={labelCls}>Due Date &amp; Time <span className="text-muted-foreground font-normal">(optional)</span></label>
+                            <label className={labelCls}>Due Date &amp; Time</label>
                             <DateTimeInput
                                 type="datetime-local"
                                 value={dueDate}

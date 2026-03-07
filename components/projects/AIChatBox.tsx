@@ -140,7 +140,7 @@ export function AIChatBox({ projectId, taskState, userId, availableCategories = 
     };
 
     return (
-        <div className="flex flex-col h-full bg-background/95 backdrop-blur-sm shadow-2xl z-50 animate-in slide-in-from-right duration-300 w-full lg:w-[400px] absolute inset-0 lg:static lg:border-l border-border">
+        <div className="flex flex-col h-full bg-background/95 backdrop-blur-sm shadow-2xl z-50 animate-in slide-in-from-bottom lg:slide-in-from-right duration-300 w-full lg:w-[400px] inset-0 max-sm:absolute lg:static lg:border-l border-border min-h-0">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border/50 bg-muted/30">
                 <div className="flex items-center gap-2 text-primary">
