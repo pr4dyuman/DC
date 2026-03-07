@@ -66,7 +66,7 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                 <h3 className="text-xl font-semibold tracking-tight">
                     Financial Overview
                 </h3>

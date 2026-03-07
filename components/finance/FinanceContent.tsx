@@ -340,11 +340,11 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
                     <TabsContent value="overview" className="space-y-4">
                         <StatsCards stats={stats} />
                         <PendingPayablesList transactions={pendingPayables} />
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                            <div className="col-span-4">
+                        <div className="grid gap-4 grid-cols-1 lg:grid-cols-7">
+                            <div className="lg:col-span-4">
                                 <RevenueChart data={chartData} />
                             </div>
-                            <div className="col-span-3">
+                            <div className="lg:col-span-3">
                                 <TransactionList transactions={transactions.slice(0, 5)} title="Recent Activity" isAdmin={isUserAdmin} projects={rawProjects} users={users} />
                             </div>
                         </div>

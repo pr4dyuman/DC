@@ -269,7 +269,7 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                     Add Transaction
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+            <DialogContent className="max-w-[95vw] sm:max-w-[600px] max-h-[85dvh] overflow-y-auto">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>
@@ -285,8 +285,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
 
                     <div className="grid gap-4 py-4">
                         {/* 1. Category Selection */}
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right">Category</Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                            <Label className="sm:text-right">Category</Label>
                             <Select value={selectedCategory} onValueChange={handleCategoryChange}>
                                 <SelectTrigger className="col-span-3">
                                     <SelectValue placeholder="Select Category" />
@@ -306,8 +306,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                         {/* --- PROJECT CATEGORY --- */}
                         {selectedCategory === "Project" && (
                             <>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Project</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Project</Label>
                                     {isProjectScoped ? (
                                         <div className="col-span-3 flex items-center gap-2 h-10 px-3 rounded-md border border-input bg-muted/50">
                                             <Lock className="w-3.5 h-3.5 text-muted-foreground" />
@@ -331,8 +331,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                     )}
                                     {errors.projectId && <p className="col-span-4 text-right text-xs text-red-500">{errors.projectId}</p>}
                                 </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Payment Direction</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Payment Direction</Label>
                                     <Select
                                         value={formData.type === "income" ? "client_to_company" : "company_to_client"}
                                         onValueChange={(val) => setFormData(prev => ({ ...prev, type: val === "client_to_company" ? "income" : "expense" }))}
@@ -346,8 +346,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Description</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Description</Label>
                                     <Input
                                         value={formData.description}
                                         onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -356,8 +356,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                         required
                                     />
                                 </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Amount</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Amount</Label>
                                     <Input
                                         type="number"
                                         min="1"
@@ -373,8 +373,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                         {/* --- REFUND CATEGORY --- */}
                         {selectedCategory === "Refund" && (
                             <>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Project</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Project</Label>
                                     {isProjectScoped ? (
                                         <div className="col-span-3 flex items-center gap-2 h-10 px-3 rounded-md border border-input bg-muted/50">
                                             <Lock className="w-3.5 h-3.5 text-muted-foreground" />
@@ -398,8 +398,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                     )}
                                     {errors.projectId && <p className="col-span-4 text-right text-xs text-red-500">{errors.projectId}</p>}
                                 </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Refund Reason</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Refund Reason</Label>
                                     <Input
                                         value={formData.description}
                                         onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -408,8 +408,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                         required
                                     />
                                 </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Refund Amount</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Refund Amount</Label>
                                     <Input
                                         type="number"
                                         min="1"
@@ -429,8 +429,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                         {/* --- EMPLOYEE CATEGORY --- */}
                         {selectedCategory === "Salary" && (
                             <>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Employee</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Employee</Label>
                                     <Select value={formData.memberId} onValueChange={handleMemberChange}>
                                         <SelectTrigger className="col-span-3">
                                             <SelectValue placeholder="Select Employee" />
@@ -444,8 +444,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                     </Select>
                                     {errors.memberId && <p className="col-span-4 text-right text-xs text-red-500">{errors.memberId}</p>}
                                 </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Base Salary</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Base Salary</Label>
                                     <Input
                                         type="number"
                                         value={formData.baseSalary}
@@ -453,8 +453,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                         className="col-span-3 bg-muted"
                                     />
                                 </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Bonus (+)</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Bonus (+)</Label>
                                     <Input
                                         type="number"
                                         value={formData.bonus}
@@ -463,8 +463,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                         className="col-span-3"
                                     />
                                 </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Deduction (-)</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Deduction (-)</Label>
                                     <Input
                                         type="number"
                                         value={formData.deduction}
@@ -473,8 +473,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                         className="col-span-3"
                                     />
                                 </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right font-bold">Total Pay</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right font-bold">Total Pay</Label>
                                     <Input
                                         type="number"
                                         min="1"
@@ -483,8 +483,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                         className="col-span-3 font-bold"
                                     />
                                 </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Description</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Description</Label>
                                     <Input
                                         value={formData.description}
                                         onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -498,8 +498,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                         {/* --- INTERNAL TRANSFER CATEGORY --- */}
                         {selectedCategory === "Internal Transfer" && (
                             <>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Direction</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Direction</Label>
                                     <Select
                                         value={formData.transferDirection}
                                         onValueChange={(val: any) => handleDirectionChange(val)}
@@ -513,8 +513,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Employee</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Employee</Label>
                                     <Select value={formData.memberId} onValueChange={handleMemberChange}>
                                         <SelectTrigger className="col-span-3">
                                             <SelectValue placeholder="Select Employee" />
@@ -528,8 +528,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                     </Select>
                                     {errors.memberId && <p className="col-span-4 text-right text-xs text-red-500">{errors.memberId}</p>}
                                 </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Amount</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Amount</Label>
                                     <Input
                                         type="number"
                                         min="1"
@@ -539,8 +539,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                         required
                                     />
                                 </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Description</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Description</Label>
                                     <Input
                                         value={formData.description}
                                         onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -553,8 +553,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                         {/* --- INVESTOR CATEGORY --- */}
                         {selectedCategory === "Investor" && (
                             <>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Investor / Source</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Investor / Source</Label>
                                     <Input
                                         value={formData.description}
                                         onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -563,8 +563,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                         required
                                     />
                                 </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Amount</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Amount</Label>
                                     <Input
                                         type="number"
                                         min="1"
@@ -586,8 +586,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                             const freelancers = users.filter(u => u.employmentType === 'Freelancer');
                             return (
                                 <>
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <Label className="text-right">Freelancer</Label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                        <Label className="sm:text-right">Freelancer</Label>
                                         {freelancers.length > 0 ? (
                                             <Select
                                                 value={formData.memberId || "none"}
@@ -627,8 +627,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                     </div>
                                     {formData.memberId && (
                                         <>
-                                            <div className="grid grid-cols-4 items-center gap-4">
-                                                <Label className="text-right">Description</Label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                                <Label className="sm:text-right">Description</Label>
                                                 <Input
                                                     value={formData.description}
                                                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -638,8 +638,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                                 />
                                             </div>
                                             {(projects.length > 0 && !isProjectScoped) && (
-                                                <div className="grid grid-cols-4 items-center gap-4">
-                                                    <Label className="text-right">Project <span className="text-xs text-muted-foreground">(Optional)</span></Label>
+                                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                                    <Label className="sm:text-right">Project <span className="text-xs text-muted-foreground">(Optional)</span></Label>
                                                     <Select value={formData.projectId || "none"} onValueChange={(val) => setFormData(prev => ({ ...prev, projectId: val === "none" ? "" : val }))}>
                                                         <SelectTrigger className="col-span-3">
                                                             <SelectValue placeholder="Link to Project (Optional)" />
@@ -654,16 +654,16 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                                 </div>
                                             )}
                                             {isProjectScoped && (
-                                                <div className="grid grid-cols-4 items-center gap-4">
-                                                    <Label className="text-right">Project</Label>
+                                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                                    <Label className="sm:text-right">Project</Label>
                                                     <div className="col-span-3 flex items-center gap-2 h-10 px-3 rounded-md border border-input bg-muted/50">
                                                         <Lock className="w-3.5 h-3.5 text-muted-foreground" />
                                                         <span className="text-sm">{projectName || 'Current Project'}</span>
                                                     </div>
                                                 </div>
                                             )}
-                                            <div className="grid grid-cols-4 items-center gap-4">
-                                                <Label className="text-right">Amount</Label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                                <Label className="sm:text-right">Amount</Label>
                                                 <Input
                                                     type="number"
                                                     min="1"
@@ -684,8 +684,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                         {/* --- TAX CATEGORY --- */}
                         {selectedCategory === "Tax" && (
                             <>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Tax Type</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Tax Type</Label>
                                     <Select
                                         value={formData.taxType || "none"}
                                         onValueChange={(val) => {
@@ -712,8 +712,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                 </div>
                                 {formData.taxType && (
                                     <>
-                                        <div className="grid grid-cols-4 items-center gap-4">
-                                            <Label className="text-right">Description</Label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                            <Label className="sm:text-right">Description</Label>
                                             <Input
                                                 value={formData.description}
                                                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -722,8 +722,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                                 required
                                             />
                                         </div>
-                                        <div className="grid grid-cols-4 items-center gap-4">
-                                            <Label className="text-right">Amount</Label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                            <Label className="sm:text-right">Amount</Label>
                                             <Input
                                                 type="number"
                                                 min="1"
@@ -746,8 +746,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                             const employees = users.filter(u => u.role !== 'client');
                             return (
                                 <>
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <Label className="text-right">Employee</Label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                        <Label className="sm:text-right">Employee</Label>
                                         <Select
                                             value={formData.memberId || "none"}
                                             onValueChange={(val) => {
@@ -781,8 +781,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                     </div>
                                     {formData.memberId && (
                                         <>
-                                            <div className="grid grid-cols-4 items-center gap-4">
-                                                <Label className="text-right">Expense Type</Label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                                <Label className="sm:text-right">Expense Type</Label>
                                                 <Select
                                                     value={formData.expenseType || "none"}
                                                     onValueChange={(val) => {
@@ -808,8 +808,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                                     </SelectContent>
                                                 </Select>
                                             </div>
-                                            <div className="grid grid-cols-4 items-center gap-4">
-                                                <Label className="text-right">Description</Label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                                <Label className="sm:text-right">Description</Label>
                                                 <Input
                                                     value={formData.description}
                                                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -819,8 +819,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                                 />
                                             </div>
                                             {projects.length > 0 && (
-                                                <div className="grid grid-cols-4 items-center gap-4">
-                                                    <Label className="text-right">Project <span className="text-xs text-muted-foreground">(Optional)</span></Label>
+                                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                                    <Label className="sm:text-right">Project <span className="text-xs text-muted-foreground">(Optional)</span></Label>
                                                     <Select value={formData.projectId || "none"} onValueChange={(val) => setFormData(prev => ({ ...prev, projectId: val === "none" ? "" : val }))}>
                                                         <SelectTrigger className="col-span-3">
                                                             <SelectValue placeholder="Link to Project (Optional)" />
@@ -834,8 +834,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                                     </Select>
                                                 </div>
                                             )}
-                                            <div className="grid grid-cols-4 items-center gap-4">
-                                                <Label className="text-right">Amount</Label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                                <Label className="sm:text-right">Amount</Label>
                                                 <Input
                                                     type="number"
                                                     min="1"
@@ -857,8 +857,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                         {/* --- RETAINER CATEGORY --- */}
                         {selectedCategory === "Retainer" && (
                             <>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Project</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Project</Label>
                                     {isProjectScoped ? (
                                         <div className="col-span-3 flex items-center gap-2 h-10 px-3 rounded-md border border-input bg-muted/50">
                                             <Lock className="w-3.5 h-3.5 text-muted-foreground" />
@@ -896,8 +896,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                 </div>
                                 {formData.projectId && (
                                     <>
-                                        <div className="grid grid-cols-4 items-center gap-4">
-                                            <Label className="text-right">Description</Label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                            <Label className="sm:text-right">Description</Label>
                                             <Input
                                                 value={formData.description}
                                                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -906,8 +906,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                                 required
                                             />
                                         </div>
-                                        <div className="grid grid-cols-4 items-center gap-4">
-                                            <Label className="text-right">Amount</Label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                            <Label className="sm:text-right">Amount</Label>
                                             <Input
                                                 type="number"
                                                 min="1"
@@ -928,8 +928,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                         {/* --- GENERIC CATEGORY (Other) --- */}
                         {selectedCategory !== "Project" && selectedCategory !== "Salary" && selectedCategory !== "Internal Transfer" && selectedCategory !== "Refund" && selectedCategory !== "Investor" && selectedCategory !== "Freelancer" && selectedCategory !== "Tax" && selectedCategory !== "Reimbursement" && selectedCategory !== "Retainer" && (
                             <>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Description</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Description</Label>
                                     <Input
                                         value={formData.description}
                                         onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -938,8 +938,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                         required
                                     />
                                 </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label className="text-right">Amount</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                    <Label className="sm:text-right">Amount</Label>
                                     <Input
                                         type="number"
                                         min="1"
@@ -952,8 +952,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                             </>
                         )}
 
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right">Date</Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                            <Label className="sm:text-right">Date</Label>
                             <div className="col-span-3">
                                 <DateTimeInput
                                     type="date"
@@ -965,8 +965,8 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                         </div>
 
                         {/* Status Selection */}
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right">Status</Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                            <Label className="sm:text-right">Status</Label>
                             <Select
                                 value={formData.status}
                                 onValueChange={(val: "completed" | "pending") => setFormData(prev => ({ ...prev, status: val }))}

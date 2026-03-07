@@ -39,7 +39,7 @@ export function PendingPayablesList({ transactions }: PendingPayablesListProps) 
     return (
         <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
             <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                     <CardTitle className="text-amber-700 dark:text-amber-500 flex items-center gap-2">
                         <Clock className="h-5 w-5" /> Pending Transactions
                     </CardTitle>

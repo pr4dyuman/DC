@@ -113,7 +113,7 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
     const hasMore = filteredTransactions.length > visibleCount;
 
     return (
-        <Card className="col-span-3">
+        <Card>
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
@@ -139,8 +139,8 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
                                 key={type}
                                 onClick={() => { setTypeFilter(type); setVisibleCount(20); }}
                                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${typeFilter === type
-                                        ? type === 'income' ? 'bg-emerald-500/15 text-emerald-500' : type === 'expense' ? 'bg-red-500/15 text-red-500' : 'bg-primary/10 text-primary'
-                                        : 'text-muted-foreground hover:text-foreground'
+                                    ? type === 'income' ? 'bg-emerald-500/15 text-emerald-500' : type === 'expense' ? 'bg-red-500/15 text-red-500' : 'bg-primary/10 text-primary'
+                                    : 'text-muted-foreground hover:text-foreground'
                                     }`}
                             >
                                 {type === 'all' ? 'All' : type === 'income' ? 'Income' : 'Expense'}

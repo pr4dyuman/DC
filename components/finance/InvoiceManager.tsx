@@ -122,8 +122,8 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
     });
 
     return (
-        <Card className="col-span-3">
-            <CardHeader className="flex flex-row items-center justify-between">
+        <Card>
+            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                     <CardTitle>Invoices</CardTitle>
                     <CardDescription>Manage your sent invoices.</CardDescription>
@@ -137,15 +137,15 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                                     Create Invoice
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent>
+                            <DialogContent className="max-w-[95vw] sm:max-w-lg">
                                 <form onSubmit={handleSubmit}>
                                     <DialogHeader>
                                         <DialogTitle>Create Invoice</DialogTitle>
                                         <DialogDescription>Create a new invoice for a project.</DialogDescription>
                                     </DialogHeader>
                                     <div className="grid gap-4 py-4">
-                                        <div className="grid grid-cols-4 items-center gap-4">
-                                            <Label className="text-right">Project</Label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
+                                            <Label className="sm:text-right">Project</Label>
                                             <Select
                                                 value={formData.projectId}
                                                 onValueChange={(val) => setFormData({ ...formData, projectId: val })}
@@ -160,7 +160,7 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                                                 </SelectContent>
                                             </Select>
                                         </div>
-                                        <div className="grid grid-cols-4 items-center gap-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
                                             <Label htmlFor="amount" className="text-right">Amount</Label>
                                             <Input
                                                 id="amount"
@@ -172,7 +172,7 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                                                 required
                                             />
                                         </div>
-                                        <div className="grid grid-cols-4 items-center gap-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
                                             <Label htmlFor="date" className="text-right">Date</Label>
                                             <Input
                                                 id="date"
@@ -235,7 +235,7 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                     )}
                 </div>
                 <div className="overflow-x-auto">
-                    <Table>
+                    <Table className="min-w-[550px]">
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Project</TableHead>

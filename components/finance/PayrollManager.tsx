@@ -60,7 +60,7 @@ export function PayrollManager({ items }: PayrollManagerProps) {
     return (
         <Card>
             <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div>
                         <CardTitle>Payroll Management</CardTitle>
                         <CardDescription>
@@ -91,7 +91,7 @@ export function PayrollManager({ items }: PayrollManagerProps) {
             </CardHeader>
             <CardContent>
                 <div className="overflow-x-auto">
-                    <Table>
+                    <Table className="min-w-[550px]">
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Employee</TableHead>

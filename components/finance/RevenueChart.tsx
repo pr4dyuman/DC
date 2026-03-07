@@ -13,7 +13,7 @@ interface RevenueChartProps {
 
 export function RevenueChart({ data }: RevenueChartProps) {
     return (
-        <Card className="col-span-3">
+        <Card>
             <CardHeader>
                 <CardTitle>Overview</CardTitle>
             </CardHeader>
