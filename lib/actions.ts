@@ -486,15 +486,15 @@ export async function getEmployeeDashboardData(userId: string) {
     };
 }
 
-// Auto-clear notifications older than 24 hours
+// Auto-clear notifications older than 30 days
 export async function getNotifications(userId: string, offset = 0, limit = 1000): Promise<Notification[]> {
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
     // Clean up old notifications — scoped to THIS USER only to avoid deleting other users' notifications
-    await NotificationModel.deleteMany({ userId, ...agencyFilter, timestamp: { $lt: oneDayAgo } });
+    await NotificationModel.deleteMany({ userId, ...agencyFilter, timestamp: { $lt: thirtyDaysAgo } });
 
     const notifications = await NotificationModel.find({ userId, ...agencyFilter })
         .sort({ timestamp: -1 })
@@ -788,6 +788,19 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
         }
     } catch (emailError) {
         console.error('[Email] Failed to send employee account creation email:', emailError);
+    }
+
+    // Welcome in-app notification
+    try {
+        const agency = await getCurrentAgency();
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency?.id, userId: newUser.id,
+            message: `Welcome to the team, ${newUser.name}! Your account has been set up. Explore your dashboard to get started.`,
+            read: false, timestamp: new Date().toISOString(),
+            link: '/dashboard'
+        });
+    } catch (notifError) {
+        console.error('[Notification] Failed to create welcome notification:', notifError);
     }
 
     revalidatePath('/dashboard/team');
@@ -1099,6 +1112,15 @@ export async function adminResetPassword(id: string, newPassword: string) {
     const hashedPassword = await hashPassword(newPassword);
     const agency = await getCurrentAgency();
     await UserModel.updateOne({ id, agencyId: agency?.id }, { $set: { password: hashedPassword } });
+
+    // Security notification — password was reset by admin
+    await NotificationModel.create({
+        id: generateId(), agencyId: agency?.id, userId: id,
+        message: `Your password was reset by ${currentUser.name}. If you did not request this, please contact your admin immediately.`,
+        read: false, timestamp: new Date().toISOString(),
+        link: '/dashboard/settings'
+    });
+
     revalidatePath('/dashboard/team');
 }
 
@@ -1433,6 +1455,16 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
         timestamp: new Date().toISOString()
     });
 
+    // In-app notification for task status change — notify assignee if someone else changed it
+    if (task.assigneeId && task.assigneeId !== userId) {
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency.id, userId: task.assigneeId,
+            message: `${userName} moved your task "${task.title}" to ${status}`,
+            read: false, timestamp: new Date().toISOString(),
+            link: `/dashboard/projects/${task.projectId}?task=${taskId}`
+        });
+    }
+
     // Auto-complete project if all tasks are done
     if (status === 'Done') {
         const projectTasks = await TaskModel.find({ projectId: task.projectId, agencyId: agency.id }).lean();
@@ -1613,6 +1645,28 @@ export async function addComment(taskId: string, userId: string, text: string) {
         console.error('[Email] Failed to send task comment email:', emailError);
     }
 
+    // In-app notifications for task comment — notify all participants except commenter
+    try {
+        const participantIds = new Set<string>();
+        if (task.assigneeId) participantIds.add(task.assigneeId);
+        if (task.createdBy) participantIds.add(task.createdBy);
+        task.comments?.forEach(c => participantIds.add(c.userId));
+        participantIds.delete(userId);
+
+        if (participantIds.size > 0) {
+            const commenterDoc = await getUser(userId);
+            const commenterName = commenterDoc?.name || 'Someone';
+            await NotificationModel.insertMany([...participantIds].map(pid => ({
+                id: generateId(), agencyId: agency.id, userId: pid,
+                message: `${commenterName} commented on "${task.title}": ${text.substring(0, 80)}${text.length > 80 ? '...' : ''}`,
+                read: false, timestamp: new Date().toISOString(),
+                link: `/dashboard/projects/${task.projectId}?task=${taskId}`
+            })));
+        }
+    } catch (notifError) {
+        console.error('[Notification] Failed to create comment notifications:', notifError);
+    }
+
     revalidatePath('/dashboard/projects/[id]', 'page');
     revalidatePath('/dashboard/projects');
     return newComment;
@@ -1673,6 +1727,14 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
         } catch (emailError) {
             console.error('[Email] Failed to send task assignment email:', emailError);
         }
+
+        // In-app notification for task assignment
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency.id, userId: task.assigneeId,
+            message: `You've been assigned a new task: "${task.title}"`,
+            read: false, timestamp: new Date().toISOString(),
+            link: `/dashboard/projects/${task.projectId}?task=${newTask.id}`
+        });
     }
 
     revalidatePath('/dashboard/projects/[id]', 'page');
@@ -1777,6 +1839,19 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
         }
     } catch (emailError) {
         console.error('[Email] Failed to send client account creation email:', emailError);
+    }
+
+    // Welcome in-app notification for client
+    try {
+        const agency = await getCurrentAgency();
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency?.id, userId: newClient.id,
+            message: `Welcome, ${newClient.name}! Your client portal is ready. Check your projects and invoices here.`,
+            read: false, timestamp: new Date().toISOString(),
+            link: '/dashboard'
+        });
+    } catch (notifError) {
+        console.error('[Notification] Failed to create client welcome notification:', notifError);
     }
 
     revalidatePath('/dashboard/clients');
@@ -2096,7 +2171,7 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
                     amount: newTransaction.amount,
                     month: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
                     paymentDate: newTransaction.date,
-                    financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'} /dashboard/finance`,
+                    financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/finance`,
                 });
             }
         } catch (emailError) {
