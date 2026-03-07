@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { updateEmailSettings, updateEmailCategorySettings } from "@/lib/actions";
+import { updateEmailSettings, updateEmailCategorySettings, updateTaskEmailPriorities } from "@/lib/actions";
 import { toast } from "sonner";
 import { Loader2, Mail, AlertTriangle, Shield, Zap } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,9 +13,11 @@ import type { EmailCategory } from "@/lib/email-constants";
 
 interface EmailSettingsProps {
     initialEnabled?: boolean;
-    initialCategories?: Record<string, boolean>;
+    initialCategories?: Record<string, any>;
     loading?: boolean;
 }
+
+const DEFAULT_TASK_PRIORITIES = { high: true, medium: false, low: false };
 
 export function EmailSettings({ initialEnabled = true, initialCategories, loading: parentLoading }: EmailSettingsProps) {
     const [enabled, setEnabled] = useState(initialEnabled);
@@ -23,7 +25,11 @@ export function EmailSettings({ initialEnabled = true, initialCategories, loadin
     const [categories, setCategories] = useState<Record<string, boolean>>(
         initialCategories || { ...DEFAULT_EMAIL_CATEGORIES }
     );
+    const [taskPriorities, setTaskPriorities] = useState<Record<string, boolean>>(
+        initialCategories?.taskEmailPriorities || { ...DEFAULT_TASK_PRIORITIES }
+    );
     const [updatingCategory, setUpdatingCategory] = useState<string | null>(null);
+    const [updatingPriority, setUpdatingPriority] = useState<string | null>(null);
 
     useEffect(() => {
         setEnabled(initialEnabled);
@@ -32,6 +38,9 @@ export function EmailSettings({ initialEnabled = true, initialCategories, loadin
     useEffect(() => {
         if (initialCategories) {
             setCategories({ ...DEFAULT_EMAIL_CATEGORIES, ...initialCategories });
+            if (initialCategories.taskEmailPriorities) {
+                setTaskPriorities({ ...DEFAULT_TASK_PRIORITIES, ...initialCategories.taskEmailPriorities });
+            }
         }
     }, [initialCategories]);
 
@@ -63,6 +72,21 @@ export function EmailSettings({ initialEnabled = true, initialCategories, loadin
             setCategories(prev => ({ ...prev, [category]: !checked }));
         } finally {
             setUpdatingCategory(null);
+        }
+    };
+
+    const handlePriorityToggle = async (priority: string, checked: boolean) => {
+        setTaskPriorities(prev => ({ ...prev, [priority]: checked }));
+        setUpdatingPriority(priority);
+        try {
+            await updateTaskEmailPriorities({ [priority]: checked });
+            toast.success(`${priority.charAt(0).toUpperCase() + priority.slice(1)} priority task emails ${checked ? 'enabled' : 'disabled'}`);
+        } catch (error) {
+            console.error("Failed to update priority", error);
+            toast.error("Failed to update");
+            setTaskPriorities(prev => ({ ...prev, [priority]: !checked }));
+        } finally {
+            setUpdatingPriority(null);
         }
     };
 
@@ -117,32 +141,62 @@ export function EmailSettings({ initialEnabled = true, initialCategories, loadin
                             const isUpdating = updatingCategory === key;
 
                             return (
-                                <div key={key} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-muted/50 transition-colors">
-                                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        <div className={`p-1.5 rounded-md ${info.priority === 'critical' ? 'bg-amber-500/10' : 'bg-blue-500/10'}`}>
-                                            {info.priority === 'critical'
-                                                ? <Shield className="h-4 w-4 text-amber-500" />
-                                                : <Zap className="h-4 w-4 text-blue-500" />
-                                            }
-                                        </div>
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <Label className="text-sm font-medium cursor-pointer">{info.label}</Label>
-                                                <Badge variant={info.priority === 'critical' ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0">
-                                                    {info.priority}
-                                                </Badge>
+                                <div key={key}>
+                                    <div className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-muted/50 transition-colors">
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                            <div className={`p-1.5 rounded-md ${info.priority === 'critical' ? 'bg-amber-500/10' : 'bg-blue-500/10'}`}>
+                                                {info.priority === 'critical'
+                                                    ? <Shield className="h-4 w-4 text-amber-500" />
+                                                    : <Zap className="h-4 w-4 text-blue-500" />
+                                                }
                                             </div>
-                                            <p className="text-xs text-muted-foreground truncate">{info.description}</p>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <Label className="text-sm font-medium cursor-pointer">{info.label}</Label>
+                                                    <Badge variant={info.priority === 'critical' ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0">
+                                                        {info.priority}
+                                                    </Badge>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground truncate">{info.description}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 ml-2">
+                                            {isUpdating && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                                            <Switch
+                                                checked={isOn}
+                                                onCheckedChange={(checked) => handleCategoryToggle(key, checked)}
+                                                disabled={isUpdating}
+                                            />
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 ml-2">
-                                        {isUpdating && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-                                        <Switch
-                                            checked={isOn}
-                                            onCheckedChange={(checked) => handleCategoryToggle(key, checked)}
-                                            disabled={isUpdating}
-                                        />
-                                    </div>
+
+                                    {/* Task Priority Sub-toggles */}
+                                    {key === 'taskUpdates' && isOn && (
+                                        <div className="ml-12 pl-3 border-l-2 border-blue-500/20 space-y-1 py-1 mb-1">
+                                            <p className="text-xs text-muted-foreground mb-1">Send emails by task priority:</p>
+                                            {([['high', 'High', 'bg-red-500'], ['medium', 'Medium', 'bg-yellow-500'], ['low', 'Low', 'bg-green-500']] as const).map(([pKey, pLabel, pColor]) => {
+                                                const pOn = taskPriorities[pKey] ?? DEFAULT_TASK_PRIORITIES[pKey as keyof typeof DEFAULT_TASK_PRIORITIES];
+                                                const pUpdating = updatingPriority === pKey;
+                                                return (
+                                                    <div key={pKey} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/30 transition-colors">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`w-2 h-2 rounded-full ${pColor}`} />
+                                                            <span className="text-xs font-medium">{pLabel} Priority</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            {pUpdating && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                                                            <Switch
+                                                                checked={pOn}
+                                                                onCheckedChange={(checked) => handlePriorityToggle(pKey, checked)}
+                                                                disabled={pUpdating}
+                                                                className="scale-[0.8]"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}

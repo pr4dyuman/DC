@@ -137,6 +137,30 @@ export async function updateEmailCategorySettings(categories: Record<string, boo
     return { success: true };
 }
 
+export async function updateTaskEmailPriorities(priorities: Record<string, boolean>) {
+    await requireRole('admin', 'manager');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+
+    const updates: Record<string, boolean> = {};
+    const validPriorities = ['high', 'medium', 'low'];
+    for (const [key, value] of Object.entries(priorities)) {
+        if (validPriorities.includes(key) && typeof value === 'boolean') {
+            updates[`settings.emailCategories.taskEmailPriorities.${key}`] = value;
+        }
+    }
+
+    if (Object.keys(updates).length === 0) throw new Error("No valid priorities provided");
+
+    await AgencyModel.updateOne(
+        { id: agency.id },
+        { $set: updates }
+    );
+
+    revalidatePath("/dashboard/settings");
+    return { success: true };
+}
+
 export async function updateAgencyDetails(name: string, logo: string, primaryColor?: string, secondaryColor?: string) {
     await requireRole('admin');
     const agency = await getCurrentAgency();
@@ -1513,6 +1537,50 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
         });
     }
 
+    // Email notifications for task status change (gated by priority)
+    const taskPriority = (task.priority || 'Medium').toLowerCase() as 'high' | 'medium' | 'low';
+    const emailCats = agency.settings?.emailCategories || {} as any;
+    const taskPriorities = emailCats.taskEmailPriorities || { high: true, medium: false, low: false };
+    const shouldSendTaskEmail = emailCats.taskUpdates !== false && (taskPriorities[taskPriority] ?? false);
+
+    if (shouldSendTaskEmail) {
+        try {
+            // Email to assignee about status change
+            if (task.assigneeId && task.assigneeId !== userId) {
+                const assignee = await getUser(task.assigneeId);
+                if (assignee?.email) {
+                    await sendTaskStatusChangedEmail({
+                        recipientEmail: assignee.email,
+                        recipientName: assignee.name,
+                        taskTitle: task.title,
+                        oldStatus: task.status,
+                        newStatus: status,
+                        updatedBy: userName,
+                        taskLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${task.projectId}?task=${taskId}`,
+                    });
+                }
+            }
+
+            // Email to project client about task progress
+            if (projectForNotif?.clientId) {
+                const clientDoc = await ClientModel.findOne({ id: projectForNotif.clientId, agencyId: agency.id }).lean();
+                if (clientDoc?.email) {
+                    await sendTaskStatusChangedEmail({
+                        recipientEmail: clientDoc.email,
+                        recipientName: clientDoc.name,
+                        taskTitle: task.title,
+                        oldStatus: task.status,
+                        newStatus: status,
+                        updatedBy: userName,
+                        taskLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${task.projectId}`,
+                    });
+                }
+            }
+        } catch (emailError) {
+            console.error('[Email] Failed to send task status change email:', emailError);
+        }
+    }
+
     // Auto-complete project if all tasks are done
     if (status === 'Done') {
         const projectTasks = await TaskModel.find({ projectId: task.projectId, agencyId: agency.id }).lean();
@@ -1663,34 +1731,41 @@ export async function addComment(taskId: string, userId: string, text: string) {
         timestamp: new Date().toISOString()
     });
 
-    // Send email notification to task participants
-    try {
-        const commenterUser = await getUser(userId);
-        if (task && commenterUser) {
-            const participantIds = new Set<string>();
-            if (task.assigneeId) participantIds.add(task.assigneeId);
-            if (task.createdBy) participantIds.add(task.createdBy);
-            task.comments?.forEach(c => participantIds.add(c.userId));
-            participantIds.delete(userId);
+    // Send email notification to task participants (gated by priority)
+    const taskPriority = (task.priority || 'Medium').toLowerCase() as 'high' | 'medium' | 'low';
+    const emailCats = agency.settings?.emailCategories || {} as any;
+    const taskPriorities = emailCats.taskEmailPriorities || { high: true, medium: false, low: false };
+    const shouldSendTaskEmail = emailCats.taskUpdates !== false && (taskPriorities[taskPriority] ?? false);
 
-            const participantEmails: string[] = [];
-            for (const pid of participantIds) {
-                const user = await getUser(pid);
-                if (user?.email) participantEmails.push(user.email);
-            }
+    if (shouldSendTaskEmail) {
+        try {
+            const commenterUser = await getUser(userId);
+            if (task && commenterUser) {
+                const participantIds = new Set<string>();
+                if (task.assigneeId) participantIds.add(task.assigneeId);
+                if (task.createdBy) participantIds.add(task.createdBy);
+                task.comments?.forEach(c => participantIds.add(c.userId));
+                participantIds.delete(userId);
 
-            if (participantEmails.length > 0) {
-                await sendTaskCommentEmail({
-                    recipientEmails: participantEmails,
-                    taskTitle: task.title,
-                    commenterName: commenterUser.name,
-                    commentText: text,
-                    taskLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${task.projectId}?task=${taskId}`,
-                });
+                const participantEmails: string[] = [];
+                for (const pid of participantIds) {
+                    const user = await getUser(pid);
+                    if (user?.email) participantEmails.push(user.email);
+                }
+
+                if (participantEmails.length > 0) {
+                    await sendTaskCommentEmail({
+                        recipientEmails: participantEmails,
+                        taskTitle: task.title,
+                        commenterName: commenterUser.name,
+                        commentText: text,
+                        taskLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${task.projectId}?task=${taskId}`,
+                    });
+                }
             }
+        } catch (emailError) {
+            console.error('[Email] Failed to send task comment email:', emailError);
         }
-    } catch (emailError) {
-        console.error('[Email] Failed to send task comment email:', emailError);
     }
 
     // In-app notifications for task comment — notify all participants except commenter
@@ -1754,8 +1829,13 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
         timestamp: new Date().toISOString()
     });
 
-    // Send email notification to assignee
-    if (task.assigneeId) {
+    // Send email notification to assignee (gated by priority)
+    const taskPriority = (task.priority || 'Medium').toLowerCase() as 'high' | 'medium' | 'low';
+    const emailCats = agency.settings?.emailCategories || {} as any;
+    const taskPriorities = emailCats.taskEmailPriorities || { high: true, medium: false, low: false };
+    const shouldSendTaskEmail = emailCats.taskUpdates !== false && (taskPriorities[taskPriority] ?? false);
+
+    if (task.assigneeId && shouldSendTaskEmail) {
         try {
             const assignee = await getUser(task.assigneeId);
             const project = await getProject(task.projectId);

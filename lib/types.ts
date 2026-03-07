@@ -110,6 +110,11 @@ export type Agency = {
             taskUpdates?: boolean;
             leaveManagement?: boolean;
             documentApproval?: boolean;
+            taskEmailPriorities?: {
+                high?: boolean;
+                medium?: boolean;
+                low?: boolean;
+            };
         };
     };
 

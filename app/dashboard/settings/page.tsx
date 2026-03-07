@@ -36,7 +36,7 @@ type AgencySettingsData = {
     primaryColor?: string;
     secondaryColor?: string;
     emailNotificationsEnabled: boolean;
-    emailCategories?: Record<string, boolean>;
+    emailCategories?: Record<string, any>;
 };
 
 export default function SettingsPage() {

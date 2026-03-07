@@ -156,6 +156,12 @@ const AgencyUsageSchema = new Schema({
 }, { _id: false });
 
 // Agency Settings Schema (Embedded)
+const TaskEmailPrioritiesSchema = new Schema({
+    high: { type: Boolean, default: true },
+    medium: { type: Boolean, default: false },
+    low: { type: Boolean, default: false },
+}, { _id: false });
+
 const EmailCategoriesSchema = new Schema({
     accountCreation: { type: Boolean, default: true },
     invoicePayment: { type: Boolean, default: true },
@@ -165,6 +171,7 @@ const EmailCategoriesSchema = new Schema({
     taskUpdates: { type: Boolean, default: false },
     leaveManagement: { type: Boolean, default: false },
     documentApproval: { type: Boolean, default: false },
+    taskEmailPriorities: { type: TaskEmailPrioritiesSchema, default: () => ({}) },
 }, { _id: false });
 
 const AgencySettingsSchema = new Schema({

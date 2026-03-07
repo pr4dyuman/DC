@@ -101,25 +101,47 @@ export default function SystemSettingsPage() {
 
                 <div className="space-y-1">
                     {emailCategories.map((cat) => (
-                        <div key={cat.name} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/30 transition-colors">
-                            <div className="flex items-center gap-3">
-                                <div className={`w-2 h-2 rounded-full ${cat.priority === "critical" ? "bg-amber-500" : "bg-blue-500"}`} />
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-medium text-foreground">{cat.name}</span>
-                                        <span className={`text-[10px] px-1.5 py-0 rounded-full border ${cat.priority === "critical"
+                        <div key={cat.name}>
+                            <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/30 transition-colors">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-2 h-2 rounded-full ${cat.priority === "critical" ? "bg-amber-500" : "bg-blue-500"}`} />
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-medium text-foreground">{cat.name}</span>
+                                            <span className={`text-[10px] px-1.5 py-0 rounded-full border ${cat.priority === "critical"
                                                 ? "border-amber-500/30 text-amber-500 bg-amber-500/10"
                                                 : "border-blue-500/30 text-blue-500 bg-blue-500/10"
-                                            }`}>
-                                            {cat.priority}
-                                        </span>
+                                                }`}>
+                                                {cat.priority}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">{cat.description}</p>
                                     </div>
-                                    <p className="text-xs text-muted-foreground">{cat.description}</p>
                                 </div>
+                                <span className={`text-xs font-medium ${cat.defaultOn ? "text-green-500" : "text-muted-foreground"}`}>
+                                    {cat.defaultOn ? "ON" : "OFF"}
+                                </span>
                             </div>
-                            <span className={`text-xs font-medium ${cat.defaultOn ? "text-green-500" : "text-muted-foreground"}`}>
-                                {cat.defaultOn ? "ON" : "OFF"}
-                            </span>
+                            {cat.name === "Task Updates" && (
+                                <div className="ml-8 pl-3 border-l-2 border-blue-500/20 py-1 mb-1 space-y-0.5">
+                                    <p className="text-[10px] text-muted-foreground mb-1">By priority (agency can toggle per-level):</p>
+                                    {[
+                                        { label: "High", color: "bg-red-500", on: true },
+                                        { label: "Medium", color: "bg-yellow-500", on: false },
+                                        { label: "Low", color: "bg-green-500", on: false },
+                                    ].map(p => (
+                                        <div key={p.label} className="flex items-center justify-between py-0.5 px-2">
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-1.5 h-1.5 rounded-full ${p.color}`} />
+                                                <span className="text-[11px] text-muted-foreground">{p.label}</span>
+                                            </div>
+                                            <span className={`text-[10px] font-medium ${p.on ? "text-green-500" : "text-muted-foreground"}`}>
+                                                {p.on ? "ON" : "OFF"}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
