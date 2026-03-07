@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Plus, Search, AlertCircle, LayoutGrid, List } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { differenceInCalendarDays } from "date-fns";
@@ -127,7 +127,7 @@ export function ProjectsContent({
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
                                 {project.isOverdue && <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
-                                <CardTitle asChild className="text-base truncate group-hover:text-primary transition-colors"><h2>{project.name}</h2></CardTitle>
+                                <h2 className="font-semibold leading-none tracking-tight text-base truncate group-hover:text-primary transition-colors">{project.name}</h2>
                             </div>
                             <div className="flex flex-wrap gap-1 mt-1.5">
                                 {project.client && project.client !== project.name && (
