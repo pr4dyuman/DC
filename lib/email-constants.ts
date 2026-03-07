@@ -38,3 +38,65 @@ export const EMAIL_TEMPLATES = {
   CLIENT_ACCOUNT_CREATED: 20,
   EMPLOYEE_ACCOUNT_CREATED: 21,
 } as const;
+
+/**
+ * Email categories — each can be toggled on/off in agency settings.
+ * 'critical' = recommended always-on (credentials, money)
+ * 'optional' = can be turned off to reduce volume
+ */
+export type EmailCategory =
+  | 'accountCreation'
+  | 'invoicePayment'
+  | 'salaryPayroll'
+  | 'refund'
+  | 'projectUpdates'
+  | 'taskUpdates'
+  | 'leaveManagement'
+  | 'documentApproval';
+
+export const EMAIL_CATEGORY_INFO: Record<EmailCategory, { label: string; description: string; priority: 'critical' | 'optional' }> = {
+  accountCreation: { label: 'Account Creation', description: 'Login credentials for new employees & clients', priority: 'critical' },
+  invoicePayment: { label: 'Invoice & Payment', description: 'Invoice created, payment approved/rejected', priority: 'critical' },
+  salaryPayroll: { label: 'Salary & Payroll', description: 'Salary payment confirmations to employees', priority: 'critical' },
+  refund: { label: 'Refund', description: 'Refund issued notifications to clients', priority: 'critical' },
+  projectUpdates: { label: 'Project Updates', description: 'Project created, status changed, completed', priority: 'optional' },
+  taskUpdates: { label: 'Task Updates', description: 'Task assigned, status changed, comments', priority: 'optional' },
+  leaveManagement: { label: 'Leave Management', description: 'Leave requested, approved, rejected, cancelled', priority: 'optional' },
+  documentApproval: { label: 'Document Approval', description: 'Document update requests and responses', priority: 'optional' },
+};
+
+/** Map each template ID to its category */
+export const TEMPLATE_TO_CATEGORY: Record<number, EmailCategory> = {
+  [EMAIL_TEMPLATES.CLIENT_ACCOUNT_CREATED]: 'accountCreation',
+  [EMAIL_TEMPLATES.EMPLOYEE_ACCOUNT_CREATED]: 'accountCreation',
+  [EMAIL_TEMPLATES.INVOICE_CREATED]: 'invoicePayment',
+  [EMAIL_TEMPLATES.PAYMENT_PENDING_APPROVAL]: 'invoicePayment',
+  [EMAIL_TEMPLATES.PAYMENT_APPROVED]: 'invoicePayment',
+  [EMAIL_TEMPLATES.PAYMENT_REJECTED]: 'invoicePayment',
+  [EMAIL_TEMPLATES.SALARY_PAID]: 'salaryPayroll',
+  [EMAIL_TEMPLATES.REFUND_ISSUED]: 'refund',
+  [EMAIL_TEMPLATES.PROJECT_CREATED]: 'projectUpdates',
+  [EMAIL_TEMPLATES.PROJECT_STATUS_CHANGED]: 'projectUpdates',
+  [EMAIL_TEMPLATES.PROJECT_COMPLETED]: 'projectUpdates',
+  [EMAIL_TEMPLATES.TASK_ASSIGNED]: 'taskUpdates',
+  [EMAIL_TEMPLATES.TASK_STATUS_CHANGED]: 'taskUpdates',
+  [EMAIL_TEMPLATES.TASK_COMMENT_ADDED]: 'taskUpdates',
+  [EMAIL_TEMPLATES.LEAVE_REQUESTED]: 'leaveManagement',
+  [EMAIL_TEMPLATES.LEAVE_APPROVED]: 'leaveManagement',
+  [EMAIL_TEMPLATES.LEAVE_REJECTED]: 'leaveManagement',
+  [EMAIL_TEMPLATES.LEAVE_CANCELLED]: 'leaveManagement',
+  [EMAIL_TEMPLATES.DOCUMENT_UPDATE_REQUESTED]: 'documentApproval',
+  [EMAIL_TEMPLATES.DOCUMENT_UPDATE_RESPONSE]: 'documentApproval',
+};
+
+/** Default category states — critical ON, optional OFF */
+export const DEFAULT_EMAIL_CATEGORIES: Record<EmailCategory, boolean> = {
+  accountCreation: true,
+  invoicePayment: true,
+  salaryPayroll: true,
+  refund: true,
+  projectUpdates: false,
+  taskUpdates: false,
+  leaveManagement: false,
+  documentApproval: false,
+};

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, Shield, Bell, Database, Globe, Check } from "lucide-react";
+import { Settings, Shield, Bell, Database, Globe, Check, Mail, AlertTriangle } from "lucide-react";
 
 export default function SystemSettingsPage() {
     const [saved, setSaved] = useState("");
@@ -10,6 +10,17 @@ export default function SystemSettingsPage() {
         setSaved(section);
         setTimeout(() => setSaved(""), 2500);
     };
+
+    const emailCategories = [
+        { name: "Account Creation", description: "Login credentials for new employees & clients", priority: "critical", defaultOn: true },
+        { name: "Invoice & Payment", description: "Invoice created, payment approved/rejected", priority: "critical", defaultOn: true },
+        { name: "Salary & Payroll", description: "Salary payment confirmations", priority: "critical", defaultOn: true },
+        { name: "Refund", description: "Refund issued notifications", priority: "critical", defaultOn: true },
+        { name: "Project Updates", description: "Project created, status changed, completed", priority: "optional", defaultOn: false },
+        { name: "Task Updates", description: "Task assigned, status changed, comments", priority: "optional", defaultOn: false },
+        { name: "Leave Management", description: "Leave requested, approved, rejected", priority: "optional", defaultOn: false },
+        { name: "Document Approval", description: "Document update requests and responses", priority: "optional", defaultOn: false },
+    ];
 
     return (
         <div className="space-y-6">
@@ -68,6 +79,64 @@ export default function SystemSettingsPage() {
                     >
                         {saved === "platform" ? <><Check className="w-4 h-4" /> Saved!</> : "Save Changes"}
                     </button>
+                </div>
+            </div>
+
+            {/* Email Services */}
+            <div className="bg-card rounded-lg shadow border border-border p-6 space-y-4">
+                <div className="flex items-center gap-3 mb-2">
+                    <Mail className="w-5 h-5 text-emerald-500" />
+                    <div>
+                        <h2 className="text-lg font-bold text-foreground">Email Services</h2>
+                        <p className="text-xs text-muted-foreground">Each agency can toggle these categories independently from their Settings page</p>
+                    </div>
+                </div>
+
+                <div className="border border-amber-500/20 bg-amber-500/5 rounded-lg p-3 flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <div className="text-xs text-amber-200/80">
+                        <strong>Brevo Free Tier:</strong> 300 emails/day. Critical categories (credentials, payments) are ON by default. Optional categories (task/project/leave updates) are OFF to conserve volume.
+                    </div>
+                </div>
+
+                <div className="space-y-1">
+                    {emailCategories.map((cat) => (
+                        <div key={cat.name} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/30 transition-colors">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-2 h-2 rounded-full ${cat.priority === "critical" ? "bg-amber-500" : "bg-blue-500"}`} />
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium text-foreground">{cat.name}</span>
+                                        <span className={`text-[10px] px-1.5 py-0 rounded-full border ${cat.priority === "critical"
+                                                ? "border-amber-500/30 text-amber-500 bg-amber-500/10"
+                                                : "border-blue-500/30 text-blue-500 bg-blue-500/10"
+                                            }`}>
+                                            {cat.priority}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">{cat.description}</p>
+                                </div>
+                            </div>
+                            <span className={`text-xs font-medium ${cat.defaultOn ? "text-green-500" : "text-muted-foreground"}`}>
+                                {cat.defaultOn ? "ON" : "OFF"}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="border-t border-border pt-3 space-y-2">
+                    <p className="text-xs font-medium text-foreground">Anti-Spam Setup (DNS)</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {["SPF Record", "DKIM Signing", "DMARC Policy"].map((dns) => (
+                            <div key={dns} className="flex items-center gap-2 px-3 py-2 bg-muted/30 rounded-lg">
+                                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                                <span className="text-xs text-muted-foreground">{dns}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        Configure these in your Brevo dashboard → Settings → Senders & Domains → Authenticate domain
+                    </p>
                 </div>
             </div>
 

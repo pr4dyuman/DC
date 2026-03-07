@@ -36,6 +36,7 @@ type AgencySettingsData = {
     primaryColor?: string;
     secondaryColor?: string;
     emailNotificationsEnabled: boolean;
+    emailCategories?: Record<string, boolean>;
 };
 
 export default function SettingsPage() {
@@ -107,7 +108,8 @@ export default function SettingsPage() {
                 logo: settings.logo,
                 primaryColor: settings.primaryColor,
                 secondaryColor: settings.secondaryColor,
-                emailNotificationsEnabled: settings.emailNotificationsEnabled ?? true
+                emailNotificationsEnabled: settings.emailNotificationsEnabled ?? true,
+                emailCategories: settings.emailCategories || {}
             } : null);
         } catch (error) {
             console.error("Failed to load agency settings", error);
@@ -391,6 +393,7 @@ export default function SettingsPage() {
                     />
                     <EmailSettings
                         initialEnabled={agencySettings?.emailNotificationsEnabled ?? true}
+                        initialCategories={agencySettings?.emailCategories}
                         loading={agencySettingsLoading}
                     />
                 </div>

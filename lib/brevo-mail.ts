@@ -5,7 +5,8 @@
  * Handles all email notifications for the agency-os application
  */
 
-import { EMAIL_TEMPLATES } from "./email-constants";
+import { EMAIL_TEMPLATES, TEMPLATE_TO_CATEGORY, DEFAULT_EMAIL_CATEGORIES } from "./email-constants";
+import type { EmailCategory } from "./email-constants";
 import { getCurrentAgency } from "./agency-context";
 
 interface EmailParams {
@@ -33,9 +34,19 @@ export async function sendEmail({ to, templateId, params, subject }: EmailParams
     // CHECK: Global Kill Switch
     const agency = await getCurrentAgency();
     if (agency?.settings?.emailNotificationsEnabled === false) {
-       console.warn('[Brevo] Email sending is globally disabled via settings.');
-       // We return true to simulate success so we don't block the UI/Action flow
-       return true; 
+      console.warn('[Brevo] Email sending is globally disabled via settings.');
+      return true;
+    }
+
+    // CHECK: Per-category toggle
+    const category = TEMPLATE_TO_CATEGORY[templateId];
+    if (category) {
+      const categories = agency?.settings?.emailCategories || {};
+      const isEnabled = (categories as any)[category] ?? DEFAULT_EMAIL_CATEGORIES[category];
+      if (!isEnabled) {
+        console.log(`[Brevo] Email category "${category}" is disabled. Skipping template ${templateId}.`);
+        return true;
+      }
     }
 
     const recipients = Array.isArray(to) ? to.map(email => ({ email })) : [{ email: to }];

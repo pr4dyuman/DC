@@ -101,6 +101,16 @@ export type Agency = {
         requireEmailVerification: boolean;
         enableTwoFactor: boolean;
         emailNotificationsEnabled: boolean;
+        emailCategories?: {
+            accountCreation?: boolean;
+            invoicePayment?: boolean;
+            salaryPayroll?: boolean;
+            refund?: boolean;
+            projectUpdates?: boolean;
+            taskUpdates?: boolean;
+            leaveManagement?: boolean;
+            documentApproval?: boolean;
+        };
     };
 
     // Metadata

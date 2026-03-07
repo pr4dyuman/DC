@@ -156,6 +156,17 @@ const AgencyUsageSchema = new Schema({
 }, { _id: false });
 
 // Agency Settings Schema (Embedded)
+const EmailCategoriesSchema = new Schema({
+    accountCreation: { type: Boolean, default: true },
+    invoicePayment: { type: Boolean, default: true },
+    salaryPayroll: { type: Boolean, default: true },
+    refund: { type: Boolean, default: true },
+    projectUpdates: { type: Boolean, default: false },
+    taskUpdates: { type: Boolean, default: false },
+    leaveManagement: { type: Boolean, default: false },
+    documentApproval: { type: Boolean, default: false },
+}, { _id: false });
+
 const AgencySettingsSchema = new Schema({
     systemName: { type: String, required: true },
     timezone: { type: String, default: 'UTC' },
@@ -164,7 +175,8 @@ const AgencySettingsSchema = new Schema({
     allowClientRegistration: { type: Boolean, default: false },
     requireEmailVerification: { type: Boolean, default: false },
     enableTwoFactor: { type: Boolean, default: false },
-    emailNotificationsEnabled: { type: Boolean, default: true }
+    emailNotificationsEnabled: { type: Boolean, default: true },
+    emailCategories: { type: EmailCategoriesSchema, default: () => ({}) }
 }, { _id: false });
 
 // Agency Features Schema (Embedded)

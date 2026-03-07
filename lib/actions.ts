@@ -48,7 +48,8 @@ export async function getAgencySettings() {
         logo: agency.logo || "",
         primaryColor: agency.primaryColor,
         secondaryColor: agency.secondaryColor,
-        emailNotificationsEnabled: agency.settings?.emailNotificationsEnabled ?? true
+        emailNotificationsEnabled: agency.settings?.emailNotificationsEnabled ?? true,
+        emailCategories: agency.settings?.emailCategories || {}
     };
 }
 
@@ -109,6 +110,30 @@ export async function updateEmailSettings(enabled: boolean) {
     );
 
     revalidatePath("/dashboard");
+    return { success: true };
+}
+
+export async function updateEmailCategorySettings(categories: Record<string, boolean>) {
+    await requireRole('admin', 'manager');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+
+    const updates: Record<string, boolean> = {};
+    const validCategories = ['accountCreation', 'invoicePayment', 'salaryPayroll', 'refund', 'projectUpdates', 'taskUpdates', 'leaveManagement', 'documentApproval'];
+    for (const [key, value] of Object.entries(categories)) {
+        if (validCategories.includes(key) && typeof value === 'boolean') {
+            updates[`settings.emailCategories.${key}`] = value;
+        }
+    }
+
+    if (Object.keys(updates).length === 0) throw new Error("No valid categories provided");
+
+    await AgencyModel.updateOne(
+        { id: agency.id },
+        { $set: updates }
+    );
+
+    revalidatePath("/dashboard/settings");
     return { success: true };
 }
 
