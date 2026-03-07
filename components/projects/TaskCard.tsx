@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { format } from "date-fns";
 import { useDraggable } from "@dnd-kit/core";
 import { Card } from "@/components/ui/card";
@@ -49,8 +50,10 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
     const [showAssigneeMenu, setShowAssigneeMenu] = useState(false);
     const [showStatusMenu, setShowStatusMenu] = useState(false);
     const assigneeMenuRef = useRef<HTMLDivElement>(null);
-    const statusMenuRef = useRef<HTMLDivElement>(null);
     const [isPending, startTransition] = useTransition();
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => { setMounted(true); }, []);
 
     useEffect(() => {
         if (shouldHighlight) {
@@ -61,14 +64,11 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
         }
     }, [shouldHighlight]);
 
-    // Close menus on outside click
+    // Close assignee menu on outside click
     useEffect(() => {
         const handler = (e: MouseEvent) => {
             if (assigneeMenuRef.current && !assigneeMenuRef.current.contains(e.target as Node)) {
                 setShowAssigneeMenu(false);
-            }
-            if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) {
-                setShowStatusMenu(false);
             }
         };
         document.addEventListener('mousedown', handler);
@@ -155,7 +155,7 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
                                     <button
                                         onClick={handlePriorityClick}
                                         title={canEdit ? `Priority: ${priority || 'None'} — click to change` : `Priority: ${priority || 'None'}`}
-                                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full transition-colors ${priority ? PRIORITY_STYLES[priority] : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                                        className={`text-[10px] sm:text-[9px] font-bold px-2 py-1 sm:px-1.5 sm:py-0.5 rounded-full transition-colors ${priority ? PRIORITY_STYLES[priority] : 'bg-muted text-muted-foreground hover:bg-muted/80'
                                             } ${canEdit ? 'cursor-pointer' : 'cursor-default'}`}
                                     >
                                         {priority || '—'}
@@ -165,7 +165,7 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
                                     {canEdit && (
                                         <button
                                             onClick={handleEditClick}
-                                            className="max-sm:opacity-100 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground shrink-0"
+                                            className="max-sm:opacity-100 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 sm:p-1 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground shrink-0"
                                             title="Edit task"
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
@@ -247,8 +247,8 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
                     </div>
 
                     {/* Footer */}
-                    <div className="px-4 pb-3 pt-0 overflow-hidden">
-                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium min-w-0 flex-wrap pt-2.5 border-t border-border/40">
+                    <div className="px-4 pb-3 pt-0">
+                        <div className="flex items-center gap-2 text-[11px] sm:text-[10px] text-muted-foreground font-medium min-w-0 flex-wrap pt-2.5 border-t border-border/40">
                             {task.dueDate && (() => {
                                 const due = new Date(task.dueDate); due.setHours(0, 0, 0, 0);
                                 const isOverdue = due < today && task.status !== 'Done';
@@ -278,54 +278,27 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
                                 </div>
                             )}
 
-                            <div className="flex items-center shrink-0 ml-auto gap-1">
+                            <div className="flex items-center shrink-0 ml-auto gap-1.5">
                                 {/* Mobile: quick status change */}
                                 {disableDrag && canEdit && (
-                                    <div className="relative" ref={statusMenuRef}>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); setShowStatusMenu(v => !v); }}
-                                            className="flex items-center gap-1 transition-colors px-1.5 py-0.5 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-accent"
-                                            title="Move to..."
-                                        >
-                                            <ArrowRightLeft className="w-3 h-3 shrink-0" />
-                                            <span className="text-[9px] font-medium">Move</span>
-                                        </button>
-                                        {showStatusMenu && (
-                                            <div
-                                                className="absolute bottom-7 right-0 z-50 w-36 rounded-lg border border-border bg-popover shadow-lg py-1"
-                                                onClick={e => e.stopPropagation()}
-                                            >
-                                                <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-border mb-1">
-                                                    Move to
-                                                </div>
-                                                {STATUS_ORDER.map(s => (
-                                                    <button
-                                                        key={s}
-                                                        onClick={(e) => handleStatusChange(e, s)}
-                                                        className={`w-full text-left px-3 py-2 text-xs hover:bg-accent transition-colors ${s === task.status ? 'bg-primary/5 text-primary font-semibold' : 'text-foreground'}`}
-                                                    >
-                                                        <span className={`inline-block w-1.5 h-1.5 rounded-full mr-2 ${s === 'Done' ? 'bg-emerald-500' :
-                                                            s === 'In Progress' ? 'bg-blue-500' :
-                                                                s === 'Review' ? 'bg-yellow-500' :
-                                                                    'bg-muted-foreground/40'
-                                                            }`} />
-                                                        {s}
-                                                        {s === task.status && <span className="ml-1 text-primary">✓</span>}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setShowStatusMenu(v => !v); }}
+                                        className="flex items-center gap-1 transition-colors px-2 py-1 rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-accent active:bg-accent"
+                                        title="Move to..."
+                                    >
+                                        <ArrowRightLeft className="w-3.5 h-3.5 shrink-0" />
+                                        <span className="text-[10px] font-semibold">Move</span>
+                                    </button>
                                 )}
                                 <button
                                     onClick={handleExplainClick}
-                                    className={`flex items-center gap-1 transition-colors px-1.5 py-0.5 rounded-md ${isAiDisabled
+                                    className={`flex items-center gap-1 transition-colors px-2 py-1 sm:px-1.5 sm:py-0.5 rounded-md ${isAiDisabled
                                         ? "text-muted-foreground/30 cursor-not-allowed"
                                         : "text-muted-foreground/60 hover:text-foreground hover:bg-accent"}`}
                                     title={isAiDisabled ? "AI Disabled in Settings" : "Explain this task with AI"}
                                 >
-                                    <Sparkles className="w-3 h-3 shrink-0" />
-                                    <span className="text-[9px] font-medium">Explain</span>
+                                    <Sparkles className="w-3.5 h-3.5 sm:w-3 sm:h-3 shrink-0" />
+                                    <span className="text-[10px] sm:text-[9px] font-medium">Explain</span>
                                 </button>
                             </div>
                         </div>
@@ -339,6 +312,45 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
                     userId={currentUserId}
                 />
             </div>
+
+            {/* Portal: Status change bottom sheet (renders outside all overflow containers) */}
+            {mounted && showStatusMenu && createPortal(
+                <div
+                    className="fixed inset-0 z-[99999] flex items-end justify-center bg-black/40 backdrop-blur-[2px]"
+                    onClick={(e) => { e.stopPropagation(); setShowStatusMenu(false); }}
+                >
+                    <div
+                        className="w-full max-w-sm mx-4 mb-6 rounded-xl border border-border bg-popover shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-200"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="px-4 py-3 text-xs font-bold uppercase tracking-widest text-muted-foreground border-b border-border bg-muted/30">
+                            Move &ldquo;{task.title.length > 30 ? task.title.slice(0, 30) + '…' : task.title}&rdquo;
+                        </div>
+                        {STATUS_ORDER.map(s => (
+                            <button
+                                key={s}
+                                onClick={(e) => handleStatusChange(e, s)}
+                                className={`w-full text-left px-4 py-3.5 text-sm flex items-center gap-3 transition-colors active:bg-accent/80 ${s === task.status ? 'bg-primary/5 text-primary font-semibold' : 'text-foreground hover:bg-accent'}`}
+                            >
+                                <span className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${s === 'Done' ? 'bg-emerald-500' :
+                                    s === 'In Progress' ? 'bg-blue-500' :
+                                        s === 'Review' ? 'bg-yellow-500' :
+                                            'bg-muted-foreground/40'
+                                    }`} />
+                                <span className="flex-1">{s}</span>
+                                {s === task.status && <span className="text-primary text-base">✓</span>}
+                            </button>
+                        ))}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setShowStatusMenu(false); }}
+                            className="w-full text-center px-4 py-3 text-sm font-medium text-muted-foreground border-t border-border hover:bg-accent transition-colors"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>,
+                document.body
+            )}
         </div>
     );
 }
