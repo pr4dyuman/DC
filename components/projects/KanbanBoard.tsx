@@ -7,6 +7,7 @@ import {
     DragOverlay,
     KeyboardSensor,
     PointerSensor,
+    TouchSensor,
     useSensor,
     useSensors,
     DragStartEvent,
@@ -90,27 +91,36 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
     useEffect(() => { setMounted(true); }, []);
     useEffect(() => { setTasks(initialTasks); }, [initialTasks]);
 
-    // Track mouse position for custom drag overlay — direct DOM manipulation for smooth 60fps
+    // Track mouse/touch position for custom drag overlay — direct DOM manipulation for smooth 60fps
     useEffect(() => {
         if (!activeTask) return;
         let rafId: number;
-        const handler = (e: MouseEvent) => {
+        const updateOverlay = (clientX: number, clientY: number) => {
             cancelAnimationFrame(rafId);
             rafId = requestAnimationFrame(() => {
                 if (overlayRef.current) {
-                    overlayRef.current.style.transform = `translate3d(${e.clientX - 140}px, ${e.clientY - 20}px, 0)`;
+                    overlayRef.current.style.transform = `translate3d(${clientX - 140}px, ${clientY - 20}px, 0)`;
                 }
             });
         };
-        window.addEventListener('mousemove', handler, { passive: true });
+        const mouseHandler = (e: MouseEvent) => updateOverlay(e.clientX, e.clientY);
+        const touchHandler = (e: TouchEvent) => {
+            if (e.touches.length > 0) {
+                updateOverlay(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        };
+        window.addEventListener('mousemove', mouseHandler, { passive: true });
+        window.addEventListener('touchmove', touchHandler, { passive: true });
         return () => {
-            window.removeEventListener('mousemove', handler);
+            window.removeEventListener('mousemove', mouseHandler);
+            window.removeEventListener('touchmove', touchHandler);
             cancelAnimationFrame(rafId);
         };
     }, [activeTask]);
 
     const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
         useSensor(KeyboardSensor)
     );
 
@@ -271,7 +281,7 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                         position: 'fixed',
                         left: 0,
                         top: 0,
-                        width: 280,
+                        width: 'min(280px, 85vw)',
                         zIndex: 99999,
                         pointerEvents: 'none',
                         willChange: 'transform',

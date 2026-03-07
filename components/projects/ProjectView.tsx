@@ -34,12 +34,28 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager'; // Helper
 
     return (
-        <div className="h-[calc(100vh-8rem)] flex flex-col overflow-hidden">
+        <div className="h-[calc(100dvh-4rem)] md:h-[calc(100vh-8rem)] flex flex-col overflow-hidden">
             <Tabs defaultValue="board" className="flex-1 flex flex-col overflow-hidden">
-                {/* Row 1: Title + Tabs + Actions */}
-                <div className="flex items-center justify-between gap-4 mb-3">
-                    <h1 className="text-xl font-bold truncate">{project.name}</h1>
-                    <div className="flex items-center gap-3 shrink-0">
+                {/* Header: stacks on mobile, single row on md+ */}
+                <div className="flex flex-col gap-2 mb-3 md:flex-row md:items-center md:justify-between md:gap-4">
+                    {/* Title row */}
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                        <h1 className="text-xl font-bold truncate">{project.name}</h1>
+                        {/* Settings gear (mobile only, next to title) */}
+                        <div className="flex items-center gap-2 md:hidden shrink-0">
+                            {isAdmin && (
+                                <ProjectSettingsModal
+                                    projectId={project.id}
+                                    currentSlug={project.slug}
+                                    currentClientId={project.clientId}
+                                    currentUserId={currentUser?.id}
+                                />
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Tabs + Actions row */}
+                    <div className="flex items-center justify-between gap-2 md:gap-3 shrink-0">
                         <TabsList className="h-9">
                             <TabsTrigger value="board">Board</TabsTrigger>
                             {isAdmin && <TabsTrigger value="finance">Finance</TabsTrigger>}
@@ -50,14 +66,17 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                             <TabsContent value="board" className="mt-0">
                                 <div className="flex items-center gap-2">
                                     {(permissions?.canManageTasks ?? true) && <CreateTaskModal projectId={project.id} />}
-                                    {isAdmin && (
-                                        <ProjectSettingsModal
-                                            projectId={project.id}
-                                            currentSlug={project.slug}
-                                            currentClientId={project.clientId}
-                                            currentUserId={currentUser?.id}
-                                        />
-                                    )}
+                                    {/* Settings gear (desktop only, in header row) */}
+                                    <div className="hidden md:flex">
+                                        {isAdmin && (
+                                            <ProjectSettingsModal
+                                                projectId={project.id}
+                                                currentSlug={project.slug}
+                                                currentClientId={project.clientId}
+                                                currentUserId={currentUser?.id}
+                                            />
+                                        )}
+                                    </div>
                                 </div>
                             </TabsContent>
                             <TabsContent value="finance" className="mt-0">

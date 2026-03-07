@@ -96,7 +96,7 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
 
     return (
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setConfirmDelete(false); }}>
-            <DialogContent className="sm:max-w-[520px]">
+            <DialogContent className="max-w-[95vw] sm:max-w-[520px]">
                 <DialogHeader>
                     <DialogTitle>Edit Task</DialogTitle>
                 </DialogHeader>
@@ -115,7 +115,7 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
                     </div>
 
                     {/* Category + Assignee */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                             <label className={labelCls}>Category</label>
                             <select disabled={!canEdit} value={category} onChange={e => setCategory(e.target.value)} className={inputCls}>
@@ -133,7 +133,7 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
                     </div>
 
                     {/* Priority + Status */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                             <label className={labelCls}>Priority</label>
                             <select disabled={!canEdit} value={priority} onChange={e => setPriority(e.target.value as Task['priority'])} className={inputCls}>

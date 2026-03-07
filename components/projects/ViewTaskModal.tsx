@@ -102,7 +102,7 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden border-none shadow-2xl bg-background h-[85vh] flex flex-col">
+            <DialogContent className="max-w-3xl max-w-[95vw] sm:max-w-3xl p-0 gap-0 overflow-hidden border-none shadow-2xl bg-background h-[85vh] flex flex-col">
 
                 {/* Fixed Header */}
                 <DialogHeader className="p-6 pb-4 border-b border-border bg-background shrink-0">

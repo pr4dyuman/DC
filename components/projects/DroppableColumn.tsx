@@ -24,7 +24,7 @@ export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTas
     return (
         <div
             ref={setNodeRef}
-            className={`flex h-full min-w-0 w-full flex-col rounded-lg p-4 border transition-colors duration-200 overflow-hidden ${isOver
+            className={`flex h-full min-h-0 min-w-0 w-full flex-col rounded-lg p-4 border transition-colors duration-200 overflow-hidden ${isOver
                 ? 'bg-primary/5 border-primary/40 ring-2 ring-primary/20'
                 : 'bg-muted/50 border-border/50'
                 }`}
@@ -32,9 +32,9 @@ export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTas
             <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-sm uppercase text-muted-foreground flex items-center gap-2">
                     <span className={`inline-block w-2 h-2 rounded-full ${title === 'Done' ? 'bg-emerald-500' :
-                            title === 'In Progress' ? 'bg-blue-500' :
-                                title === 'Review' ? 'bg-yellow-500' :
-                                    'bg-muted-foreground/40'
+                        title === 'In Progress' ? 'bg-blue-500' :
+                            title === 'Review' ? 'bg-yellow-500' :
+                                'bg-muted-foreground/40'
                         }`} />
                     {title}
                 </h3>

@@ -145,7 +145,7 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
                                     {canEdit && (
                                         <button
                                             onClick={handleEditClick}
-                                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground shrink-0"
+                                            className="max-sm:opacity-100 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground shrink-0"
                                             title="Edit task"
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
