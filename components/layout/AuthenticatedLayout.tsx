@@ -11,8 +11,12 @@ export async function AuthenticatedLayout({
 }: {
     children: React.ReactNode;
 }) {
-    const user = await getCurrentUser();
-    const agencySettings = await getAgencySettings();
+    // Parallelize independent DB calls — this was the main LCP bottleneck
+    const [user, agencySettings, agency] = await Promise.all([
+        getCurrentUser(),
+        getAgencySettings(),
+        getCurrentAgency(),
+    ]);
 
     if (!user) {
         redirect("/login");
@@ -23,8 +27,7 @@ export async function AuthenticatedLayout({
         redirect("/super-admin");
     }
 
-    // Check if agency trial has expired
-    const agency = await getCurrentAgency();
+    // Check if agency trial has expired (sync comparison, no DB call)
     if (await checkTrialExpired(agency)) {
         redirect("/trial-expired");
     }
