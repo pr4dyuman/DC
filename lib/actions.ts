@@ -1465,6 +1465,29 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
         });
     }
 
+    // Notify admins about task status change (exclude the user who made the change)
+    const adminsForTask = await UserModel.find({ agencyId: agency.id, role: { $in: ['admin', 'manager'] } }).lean();
+    const adminNotifs = adminsForTask
+        .filter((a: any) => a.id !== userId)
+        .map((admin: any) => ({
+            id: generateId(), agencyId: agency.id, userId: admin.id,
+            message: `${userName} moved task "${task.title}" to ${status}`,
+            read: false, timestamp: new Date().toISOString(),
+            link: `/dashboard/projects/${task.projectId}?task=${taskId}`
+        }));
+    if (adminNotifs.length > 0) await NotificationModel.insertMany(adminNotifs);
+
+    // Notify project client about task progress
+    const projectForNotif = await ProjectModel.findOne({ id: task.projectId, agencyId: agency.id }).lean();
+    if (projectForNotif?.clientId) {
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency.id, userId: projectForNotif.clientId,
+            message: `Task "${task.title}" has been moved to ${status}`,
+            read: false, timestamp: new Date().toISOString(),
+            link: `/dashboard/projects/${task.projectId}`
+        });
+    }
+
     // Auto-complete project if all tasks are done
     if (status === 'Done') {
         const projectTasks = await TaskModel.find({ projectId: task.projectId, agencyId: agency.id }).lean();
@@ -1736,6 +1759,20 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
             link: `/dashboard/projects/${task.projectId}?task=${newTask.id}`
         });
     }
+
+    // Notify admins about new task creation (exclude the creator)
+    const adminsForNewTask = await UserModel.find({ agencyId: agency.id, role: { $in: ['admin', 'manager'] } }).lean();
+    const creatorId = currentUser ? currentUser.id : 'system';
+    const creatorName = currentUser ? currentUser.name : 'System';
+    const adminNewTaskNotifs = adminsForNewTask
+        .filter((a: any) => a.id !== creatorId)
+        .map((admin: any) => ({
+            id: generateId(), agencyId: agency.id, userId: admin.id,
+            message: `${creatorName} created a new task: "${task.title}"`,
+            read: false, timestamp: new Date().toISOString(),
+            link: `/dashboard/projects/${task.projectId}?task=${newTask.id}`
+        }));
+    if (adminNewTaskNotifs.length > 0) await NotificationModel.insertMany(adminNewTaskNotifs);
 
     revalidatePath('/dashboard/projects/[id]', 'page');
     revalidatePath('/dashboard/projects');
