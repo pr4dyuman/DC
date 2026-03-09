@@ -225,7 +225,7 @@ export async function createAgency(data: {
     };
 
     // Create owner user
-    const hashedPassword = await bcrypt.hash(data.ownerPassword, 10);
+    const hashedPassword = await bcrypt.hash(data.ownerPassword, 12);
     const owner: User = {
         id: userId,
         agencyId,

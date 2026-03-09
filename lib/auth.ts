@@ -35,7 +35,7 @@ async function resetLoginRateLimit(email: string): Promise<void> {
 // --- Password Utilities ---
 
 export async function hashPassword(password: string): Promise<string> {
-    const salt = await bcrypt.genSalt(10);
+    const salt = await bcrypt.genSalt(12);
     return bcrypt.hash(password, salt);
 }
 

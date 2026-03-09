@@ -890,7 +890,6 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
                 employeeEmail: newUser.email,
                 employeeName: newUser.name,
                 username: newUser.username,
-                password: user.password || 'Please contact admin for password',
                 role: newUser.role,
                 dashboardLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`,
                 agencyName: agency?.name || 'Agency',
@@ -2059,7 +2058,6 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
                 clientName: newClient.name,
                 companyName: newClient.companyName,
                 username: newClient.username || '',
-                password: client.password || 'Please contact admin for password',
                 dashboardLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`,
                 agencyName: agency?.name || 'Agency',
             });

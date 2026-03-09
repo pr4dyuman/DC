@@ -522,7 +522,6 @@ export async function sendClientAccountCreatedEmail(params: {
   clientName: string;
   companyName: string;
   username: string;
-  password: string;
   dashboardLink: string;
   agencyName: string;
 }) {
@@ -530,12 +529,11 @@ export async function sendClientAccountCreatedEmail(params: {
     to: params.clientEmail,
     templateId: EMAIL_TEMPLATES.CLIENT_ACCOUNT_CREATED,
     params: {
-      CLIENT_NAME: params.clientName,
-      COMPANY_NAME: params.companyName,
-      USERNAME: params.username,
-      PASSWORD: params.password,
-      DASHBOARD_LINK: params.dashboardLink,
-      AGENCY_NAME: params.agencyName,
+      CLIENT_NAME: params.clientName || 'Valued Client',
+      COMPANY_NAME: params.companyName || '',
+      USERNAME: params.username || '',
+      DASHBOARD_LINK: params.dashboardLink || '',
+      AGENCY_NAME: params.agencyName || 'Agency',
     },
   });
 }
@@ -544,7 +542,6 @@ export async function sendEmployeeAccountCreatedEmail(params: {
   employeeEmail: string;
   employeeName: string;
   username: string;
-  password: string;
   role: string;
   dashboardLink: string;
   agencyName: string;
@@ -553,12 +550,11 @@ export async function sendEmployeeAccountCreatedEmail(params: {
     to: params.employeeEmail,
     templateId: EMAIL_TEMPLATES.EMPLOYEE_ACCOUNT_CREATED,
     params: {
-      EMPLOYEE_NAME: params.employeeName,
-      USERNAME: params.username,
-      PASSWORD: params.password,
-      ROLE: params.role,
-      DASHBOARD_LINK: params.dashboardLink,
-      AGENCY_NAME: params.agencyName,
+      EMPLOYEE_NAME: params.employeeName || 'Team Member',
+      USERNAME: params.username || '',
+      ROLE: params.role || '',
+      DASHBOARD_LINK: params.dashboardLink || '',
+      AGENCY_NAME: params.agencyName || 'Agency',
     },
   });
 }
