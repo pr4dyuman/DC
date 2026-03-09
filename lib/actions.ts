@@ -652,7 +652,7 @@ export async function getUsers() {
 
     if (currentUser?.role === 'client') {
         return users.map(user => {
-            const { salary, password, ...redacted } = user as any;
+            const { salary, password, adharCardImage, panCardImage, pendingAdharCardImage, pendingPanCardImage, contracts, otherDocuments, ...redacted } = user as any;
             return redacted as User;
         });
     }
@@ -661,7 +661,7 @@ export async function getUsers() {
         if (isAdmin || user.id === currentUserId) {
             return user as User;
         }
-        const { salary, ...redacted } = user as any;
+        const { salary, adharCardImage, panCardImage, pendingAdharCardImage, pendingPanCardImage, contracts, otherDocuments, ...redacted } = user as any;
         return redacted as User;
     });
 }
@@ -685,7 +685,7 @@ export async function getUser(id: string) {
     }
 
     // 3. Redact
-    const { salary, ...redacted } = targetUser;
+    const { salary, adharCardImage, panCardImage, pendingAdharCardImage, pendingPanCardImage, contracts, otherDocuments, ...redacted } = targetUser;
     return sanitizeDoc(redacted as User);
 }
 
@@ -707,7 +707,7 @@ export async function getUserByUsername(username: string) {
     }
 
     // 3. Redact
-    const { salary, password, ...redacted } = user;
+    const { salary, password, adharCardImage, panCardImage, pendingAdharCardImage, pendingPanCardImage, contracts, otherDocuments, ...redacted } = user;
     return sanitizeDoc(redacted as User);
 }
 

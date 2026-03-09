@@ -3,6 +3,21 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifyToken } from './lib/auth-utils';
 
+// Role → allowed dashboard route prefixes
+const ROLE_ROUTES: Record<string, string[]> = {
+    client: ['/dashboard', '/dashboard/projects', '/dashboard/messages', '/dashboard/singularity'],
+    employee: ['/dashboard', '/dashboard/projects', '/dashboard/messages', '/dashboard/singularity', '/dashboard/team'],
+    manager: ['/dashboard', '/dashboard/projects', '/dashboard/messages', '/dashboard/singularity', '/dashboard/team', '/dashboard/finance', '/dashboard/clients', '/dashboard/settings'],
+    admin: ['*'],
+};
+
+function isRouteAllowed(role: string, pathname: string): boolean {
+    const allowed = ROLE_ROUTES[role];
+    if (!allowed) return false;
+    if (allowed.includes('*')) return true;
+    return allowed.some(route => pathname === route || pathname.startsWith(route + '/'));
+}
+
 export default async function proxy(request: NextRequest) {
   const token = request.cookies.get('auth_token')?.value;
   
@@ -32,6 +47,11 @@ export default async function proxy(request: NextRequest) {
       // Redirect Super Admins accessing root dashboard to their portal
       if (session.role === 'superadmin' && request.nextUrl.pathname === '/dashboard') {
           return NextResponse.redirect(new URL('/super-admin', request.url));
+      }
+
+      // Role-based route protection
+      if (!isRouteAllowed(session.role, request.nextUrl.pathname)) {
+          return NextResponse.redirect(new URL('/dashboard', request.url));
       }
   }
 

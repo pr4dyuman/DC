@@ -339,7 +339,8 @@ compiler: {
 
 ## PRIORITY 3 — FIX SOON (RBAC, data leaks, business logic)
 
-### Group 3A: Systemic RBAC — Add Role Checks to Server Actions
+### Group 3A: Systemic RBAC — Add Role Checks to Server Actions ✅ DONE
+**Status:** COMPLETED — Added auth guards to 52 server action functions.
 **Files:** `lib/actions.ts` (main file — ~111 functions)
 **Bugs:** BUG-140 (systemic), BUG-142, BUG-143, BUG-144, BUG-145, BUG-146, BUG-147, BUG-148, BUG-149, BUG-153, BUG-157, BUG-158, BUG-159, BUG-160, BUG-161, BUG-162, BUG-163, BUG-164, BUG-175, BUG-176, BUG-178, BUG-179, BUG-180, BUG-181, BUG-182, BUG-183, BUG-184, BUG-185, BUG-187, BUG-294
 **Time:** 3-4 hours
