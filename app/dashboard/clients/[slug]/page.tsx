@@ -10,7 +10,7 @@ import {
     Mail, Phone, MapPin, Building, ExternalLink, Calendar,
     CreditCard, TrendingUp, Activity, FileText, CheckCircle2, Clock,
     ArrowUpRight, ArrowDownRight, Download, ArrowLeft, Pencil,
-    MessageCircle, ChevronDown, AlertCircle
+    MessageCircle, ChevronDown, AlertCircle, Loader2
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ import { EditClientDialog } from "@/components/clients/EditClientDialog";
 import { useChat } from "@/context/ChatContext";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 
 // Helper: relative time for last active
 function timeAgo(dateStr?: string): string {
@@ -123,7 +124,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
     });
 
     // Activity pagination
-    const [activityLimit, setActivityLimit] = useState(15);
+    const { visibleCount: activityLimit, sentinelRef: activitySentinelRef, hasMore: hasMoreActivities } = useProgressiveList(activities.length, 15, [slug]);
 
     const { openChat } = useChat();
 
@@ -179,7 +180,6 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
 
     // Activity pagination (before early returns)
     const visibleActivities = activities.slice(0, activityLimit);
-    const hasMoreActivities = activities.length > activityLimit;
 
     // Group activities by date (before early returns)
     const groupedActivities = useMemo(() => {
@@ -653,13 +653,9 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                         ))}
 
                                         {hasMoreActivities && (
-                                            <button
-                                                onClick={() => setActivityLimit(prev => prev + 15)}
-                                                className="w-full py-2.5 text-sm font-medium text-primary hover:text-primary/80 bg-muted hover:bg-accent rounded-lg transition flex items-center justify-center gap-2 border border-border"
-                                            >
-                                                <ChevronDown className="w-4 h-4" />
-                                                Load More ({activities.length - activityLimit} remaining)
-                                            </button>
+                                            <div ref={activitySentinelRef} className="flex justify-center py-4">
+                                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                            </div>
                                         )}
                                     </>
                                 )}

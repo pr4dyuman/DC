@@ -3,11 +3,12 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Plus, Search, AlertCircle, LayoutGrid, List } from "lucide-react";
+import { Plus, Search, AlertCircle, LayoutGrid, List, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { differenceInCalendarDays } from "date-fns";
 import { CreateProjectWizard } from "@/components/projects/CreateProjectWizard";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 
 const STATUS_STYLES: Record<string, string> = {
     Active: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
@@ -111,6 +112,8 @@ export function ProjectsContent({
     }, [projectData, statusFilter, search, sortBy]);
 
     const statuses = ['All', ...Array.from(new Set(projects.map(p => p.status)))];
+
+    const { visibleCount, sentinelRef, hasMore } = useProgressiveList(filtered.length, 12, [statusFilter, search, sortBy]);
 
     const handleProjectCreated = async () => {
         // Re-fetch projects from the server after creation
@@ -336,21 +339,35 @@ export function ProjectsContent({
                     <p className="text-sm mt-1">Try a different filter or search term</p>
                 </div>
             ) : viewMode === 'grid' ? (
-                <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                    {filtered.map(project => <ProjectCard key={project.id} project={project} />)}
-                </div>
-            ) : (
-                <div className="flex flex-col gap-2">
-                    {/* List header */}
-                    <div className="hidden sm:grid grid-cols-[1fr_140px_80px_100px_80px] gap-4 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        <span>Project</span>
-                        <span>Progress</span>
-                        <span>Team</span>
-                        <span>Status</span>
-                        <span className="text-right">Due</span>
+                <>
+                    <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                        {filtered.slice(0, visibleCount).map(project => <ProjectCard key={project.id} project={project} />)}
                     </div>
-                    {filtered.map(project => <ProjectRow key={project.id} project={project} />)}
-                </div>
+                    {hasMore && (
+                        <div ref={sentinelRef} className="flex justify-center py-6">
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        </div>
+                    )}
+                </>
+            ) : (
+                <>
+                    <div className="flex flex-col gap-2">
+                        {/* List header */}
+                        <div className="hidden sm:grid grid-cols-[1fr_140px_80px_100px_80px] gap-4 px-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            <span>Project</span>
+                            <span>Progress</span>
+                            <span>Team</span>
+                            <span>Status</span>
+                            <span className="text-right">Due</span>
+                        </div>
+                        {filtered.slice(0, visibleCount).map(project => <ProjectRow key={project.id} project={project} />)}
+                    </div>
+                    {hasMore && (
+                        <div ref={sentinelRef} className="flex justify-center py-6">
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );

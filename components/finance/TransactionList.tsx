@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { format, isAfter, startOfMonth, subMonths, startOfYear } from "date-fns";
 import { Transaction, Project, User } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +25,7 @@ import { deleteTransaction } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 
 interface TransactionListProps {
     transactions: Transaction[];
@@ -42,7 +43,6 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [visibleCount, setVisibleCount] = useState(20);
     const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
     const [dateRange, setDateRange] = useState<string>('all');
 
@@ -109,8 +109,8 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
         }
     };
 
+    const { visibleCount, sentinelRef, hasMore } = useProgressiveList(filteredTransactions.length, 20, [search, typeFilter, dateRange]);
     const visibleTransactions = filteredTransactions.slice(0, visibleCount);
-    const hasMore = filteredTransactions.length > visibleCount;
 
     return (
         <Card>
@@ -137,7 +137,7 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
                         {(['all', 'income', 'expense'] as const).map((type) => (
                             <button
                                 key={type}
-                                onClick={() => { setTypeFilter(type); setVisibleCount(20); }}
+                                onClick={() => { setTypeFilter(type); }}
                                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${typeFilter === type
                                     ? type === 'income' ? 'bg-emerald-500/15 text-emerald-500' : type === 'expense' ? 'bg-red-500/15 text-red-500' : 'bg-primary/10 text-primary'
                                     : 'text-muted-foreground hover:text-foreground'
@@ -149,7 +149,7 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
                     </div>
                     <select
                         value={dateRange}
-                        onChange={(e) => { setDateRange(e.target.value); setVisibleCount(20); }}
+                        onChange={(e) => { setDateRange(e.target.value); }}
                         className="h-8 rounded-md border bg-transparent px-3 text-xs text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     >
                         <option value="all">All Time</option>
@@ -224,10 +224,8 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
                         ))
                     )}
                     {hasMore && (
-                        <div className="text-center pt-2">
-                            <Button variant="outline" size="sm" onClick={() => setVisibleCount(prev => prev + 20)}>
-                                Load More ({filteredTransactions.length - visibleCount} remaining)
-                            </Button>
+                        <div ref={sentinelRef} className="flex justify-center py-4">
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                         </div>
                     )}
                 </div>

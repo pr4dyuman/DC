@@ -17,7 +17,7 @@ import {
     Mail, Briefcase, Calendar, IndianRupee,
     CheckCircle2, Clock, Activity as ActivityIcon, ArrowLeft,
     Zap, Pencil, MessageCircle,
-    Eye, ListTodo, FolderOpen, Search, ChevronDown, Phone, AlertCircle, Flame, Share2, Download
+    Eye, ListTodo, FolderOpen, Search, ChevronDown, Phone, AlertCircle, Flame, Share2, Download, Loader2
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -29,6 +29,7 @@ import { LeaveRequestDialog } from "@/components/leave-request-dialog";
 import { LeaveRequestsList } from "@/components/leave-requests-list";
 import { ContributionHeatmap, DailyStats } from "@/components/team/ContributionHeatmap";
 import { cn } from "@/lib/utils";
+import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 
 // Helper: relative time for last active
 function timeAgo(dateStr?: string): string {
@@ -171,7 +172,35 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
     const [taskSortBy, setTaskSortBy] = useState<string>("default");
 
     // Activity pagination
-    const [activityLimit, setActivityLimit] = useState(15);
+    const { visibleCount: activityLimit, sentinelRef: activitySentinelRef, hasMore: hasMoreActivities } = useProgressiveList(activities.length, 15, [user?.id]);
+
+    // Task pagination
+    // filteredTasks must be computed before hooks (which can't be after early returns)
+    const filteredTasks = tasks
+        .filter(t => {
+            const matchesStatus = taskStatusFilter === "all" ? true : t.status === taskStatusFilter;
+            const matchesSearch = taskSearch.trim()
+                ? t.title.toLowerCase().includes(taskSearch.toLowerCase()) || t.description?.toLowerCase().includes(taskSearch.toLowerCase())
+                : true;
+            return matchesStatus && matchesSearch;
+        })
+        .sort((a, b) => {
+            if (taskSortBy === "priority") {
+                const order: Record<string, number> = { 'High': 0, 'Medium': 1, 'Low': 2 };
+                return (order[a.priority || 'Medium'] ?? 1) - (order[b.priority || 'Medium'] ?? 1);
+            }
+            if (taskSortBy === "dueDate") {
+                if (!a.dueDate && !b.dueDate) return 0;
+                if (!a.dueDate) return 1;
+                if (!b.dueDate) return -1;
+                return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+            }
+            if (taskSortBy === "newest") {
+                return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+            }
+            return 0;
+        });
+    const { visibleCount: taskVisibleCount, sentinelRef: taskSentinelRef, hasMore: hasMoreTasks } = useProgressiveList(filteredTasks.length, 20, [taskStatusFilter, taskSearch, taskSortBy]);
 
     const availableYears = useMemo(() => {
         const years = new Set<number>();
@@ -321,7 +350,6 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
 
     // Paginated activities (must be before early returns to keep hook order stable)
     const visibleActivities = activities.slice(0, activityLimit);
-    const hasMoreActivities = activities.length > activityLimit;
 
     // Group activities by date for display
     const groupedActivities = useMemo(() => {
@@ -406,36 +434,6 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
     // Last active status
     const lastActiveText = timeAgo(user.lastActiveAt);
     const isOnline = lastActiveText === "Online";
-
-
-
-    // Filtered/sorted tasks
-    const filteredTasks = tasks
-        .filter(t => {
-            const matchesStatus = taskStatusFilter === "all" ? true : t.status === taskStatusFilter;
-            const matchesSearch = taskSearch.trim()
-                ? t.title.toLowerCase().includes(taskSearch.toLowerCase()) || t.description?.toLowerCase().includes(taskSearch.toLowerCase())
-                : true;
-            return matchesStatus && matchesSearch;
-        })
-        .sort((a, b) => {
-            if (taskSortBy === "priority") {
-                const order: Record<string, number> = { 'High': 0, 'Medium': 1, 'Low': 2 };
-                return (order[a.priority || 'Medium'] ?? 1) - (order[b.priority || 'Medium'] ?? 1);
-            }
-            if (taskSortBy === "dueDate") {
-                if (!a.dueDate && !b.dueDate) return 0;
-                if (!a.dueDate) return 1;
-                if (!b.dueDate) return -1;
-                return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-            }
-            if (taskSortBy === "newest") {
-                return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-            }
-            return 0;
-        });
-
-
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-10">
@@ -887,7 +885,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                         }
                                     </div>
                                 ) : (
-                                    filteredTasks.map(task => {
+                                    filteredTasks.slice(0, taskVisibleCount).map(task => {
                                         const taskOverdue = isOverdue(task);
                                         return (
                                             <Link href={`/dashboard/projects/${task.projectId}?task=${task.id}`} key={task.id} className="block">
@@ -946,6 +944,11 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                             </Link>
                                         );
                                     })
+                                )}
+                                {hasMoreTasks && (
+                                    <div ref={taskSentinelRef} className="flex justify-center py-4">
+                                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                    </div>
                                 )}
                             </div>
                         </CardContent>
@@ -1071,13 +1074,9 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                         ))}
 
                                         {hasMoreActivities && (
-                                            <button
-                                                onClick={() => setActivityLimit(prev => prev + 15)}
-                                                className="w-full py-2.5 text-sm font-medium text-primary hover:text-primary/80 bg-muted hover:bg-accent rounded-lg transition flex items-center justify-center gap-2 border border-border"
-                                            >
-                                                <ChevronDown className="w-4 h-4" />
-                                                Load More ({activities.length - activityLimit} remaining)
-                                            </button>
+                                            <div ref={activitySentinelRef} className="flex justify-center py-4">
+                                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                            </div>
                                         )}
                                     </>
                                 )}

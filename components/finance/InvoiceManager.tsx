@@ -15,6 +15,7 @@ import { createInvoice, clientMarkInvoiceAsPaid, adminApproveInvoicePayment, adm
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 
 interface InvoiceManagerProps {
     invoices: Invoice[];
@@ -120,6 +121,9 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
         const matchesSearch = !invoiceSearch || getProjectName(inv.projectId).toLowerCase().includes(invoiceSearch.toLowerCase()) || inv.amount.toString().includes(invoiceSearch);
         return matchesStatus && matchesSearch;
     });
+
+    const { visibleCount, sentinelRef, hasMore } = useProgressiveList(filteredInvoices.length, 20, [statusFilter, invoiceSearch]);
+    const visibleInvoices = filteredInvoices.slice(0, visibleCount);
 
     return (
         <Card>
@@ -251,7 +255,7 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                                     <TableCell colSpan={5} className="text-center">No invoices found.</TableCell>
                                 </TableRow>
                             ) : (
-                                filteredInvoices.map((invoice) => (
+                                visibleInvoices.map((invoice) => (
                                     <TableRow key={invoice.id}>
                                         <TableCell className="font-medium">{getProjectName(invoice.projectId)}</TableCell>
                                         <TableCell>{format(new Date(invoice.date), "MMM d, yyyy")}</TableCell>
@@ -318,6 +322,11 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                         </TableBody>
                     </Table>
                 </div>
+                {hasMore && (
+                    <div ref={sentinelRef} className="flex justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                )}
             </CardContent>
         </Card>
     );

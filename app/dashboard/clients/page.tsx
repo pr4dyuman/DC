@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { getClients, getArchivedClients, unarchiveClient, deleteClient } from "@/lib/actions";
 import { Client } from "@/lib/types";
 import { ClientCard } from "@/components/clients/ClientCard";
@@ -9,6 +9,8 @@ import { Plus, Archive, ArchiveRestore, Search } from "lucide-react";
 import { ClientsSkeleton } from "@/components/clients/ClientsSkeleton";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useProgressiveList } from "@/hooks/use-infinite-scroll";
+import { Loader2 } from "lucide-react";
 
 export default function ClientsPage() {
     const [clients, setClients] = useState<Client[]>([]);
@@ -45,6 +47,8 @@ export default function ClientsPage() {
             (c.phone && c.phone.includes(q))
         );
     }, [clients, searchQuery]);
+
+    const { visibleCount, sentinelRef, hasMore } = useProgressiveList(filteredClients.length, 12, [searchQuery, showArchived]);
 
     const handleOpenDialog = (client?: Client) => {
         setEditingClient(client || null);
@@ -134,18 +138,25 @@ export default function ClientsPage() {
                     }
                 </div>
             ) : (
-                <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                    {filteredClients.map(client => (
-                        <ClientCard
-                            key={client.id}
-                            client={client}
-                            onEdit={handleOpenDialog}
-                            onUnarchive={showArchived ? handleUnarchive : undefined}
-                            onDelete={!showArchived ? handleDelete : undefined}
-                            isArchived={showArchived}
-                        />
-                    ))}
-                </div>
+                <>
+                    <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                        {filteredClients.slice(0, visibleCount).map(client => (
+                            <ClientCard
+                                key={client.id}
+                                client={client}
+                                onEdit={handleOpenDialog}
+                                onUnarchive={showArchived ? handleUnarchive : undefined}
+                                onDelete={!showArchived ? handleDelete : undefined}
+                                isArchived={showArchived}
+                            />
+                        ))}
+                    </div>
+                    {hasMore && (
+                        <div ref={sentinelRef} className="flex justify-center py-6">
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        </div>
+                    )}
+                </>
             )}
 
             <EditClientDialog

@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, Edit, Ban, CheckCircle, Trash2 } from "lucide-react";
+import { Eye, Edit, Ban, CheckCircle, Trash2, Loader2 } from "lucide-react";
 import { suspendAgency, activateAgency, deleteAgency } from "@/lib/actions/super-admin";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 
 export default function AgencyTable({ agencies }: { agencies: any[] }) {
     const router = useRouter();
@@ -16,6 +17,8 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
         const matchesSearch = agency.name.toLowerCase().includes(search.toLowerCase());
         return matchesFilter && matchesSearch;
     });
+
+    const { visibleCount, sentinelRef, hasMore } = useProgressiveList(filteredAgencies.length, 20, [filter, search]);
 
     const handleSuspend = async (agencyId: string) => {
         if (!confirm("Are you sure you want to suspend this agency?")) return;
@@ -81,7 +84,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                         </tr>
                     </thead>
                     <tbody className="bg-card divide-y divide-border">
-                        {filteredAgencies.map((agency) => (
+                        {filteredAgencies.slice(0, visibleCount).map((agency) => (
                             <tr key={agency.id} className="hover:bg-muted/50">
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div>
@@ -156,6 +159,12 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                     </tbody>
                 </table>
             </div>
+
+            {hasMore && (
+                <div ref={sentinelRef} className="flex justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+            )}
 
             {filteredAgencies.length === 0 && (
                 <div className="text-center py-12">

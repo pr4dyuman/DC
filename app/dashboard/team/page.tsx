@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getUsers, createUser, updateUser, deleteUser, getUser, getLeaveRequests } from "@/lib/actions";
 import { User, LeaveRequest } from "@/lib/types";
 import { getSessionId } from "@/lib/auth";
@@ -14,6 +14,8 @@ import { EditUserDialog } from "@/components/team/EditUserDialog";
 import { useChat } from "@/context/ChatContext";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useProgressiveList } from "@/hooks/use-infinite-scroll";
+import { Loader2 } from "lucide-react";
 
 const ROLE_FILTERS = [
     { key: "all", label: "All", icon: Users },
@@ -92,6 +94,8 @@ export default function TeamPage() {
     const adminCount = users.filter(u => u.role === 'admin').length;
     const employeeCount = users.filter(u => u.role === 'employee' || u.role === 'manager').length;
     const clientCount = users.filter(u => u.role === 'client').length;
+
+    const { visibleCount, sentinelRef, hasMore } = useProgressiveList(filteredUsers.length, 12, [searchQuery, roleFilter]);
 
     return (
         <div className="space-y-6">
@@ -217,8 +221,9 @@ export default function TeamPage() {
                     )}
                 </div>
             ) : (
-                <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                    {filteredUsers.map(user => (
+                <>
+                    <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                        {filteredUsers.slice(0, visibleCount).map(user => (
                         <Link href={`/dashboard/team/${user.username || user.id}`} key={user.id} className="block h-full">
                             <Card className="group relative overflow-hidden transition-all hover:shadow-lg h-full border-border hover:border-primary/50 hover:bg-muted cursor-pointer">
                                 {/* Quick Actions (hover) */}
@@ -283,7 +288,13 @@ export default function TeamPage() {
                             </Card>
                         </Link>
                     ))}
-                </div>
+                    </div>
+                    {hasMore && (
+                        <div ref={sentinelRef} className="flex justify-center py-6">
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        </div>
+                    )}
+                </>
             )}
 
             <EditUserDialog
