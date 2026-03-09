@@ -534,11 +534,11 @@ Also add rate limiting to the actions/auth.ts login() function.
 
 ---
 
-### Group 4G: Fix CSRF Protection
+### Group 4G: Fix CSRF Protection ✅ DONE
 **Files:** API route handlers
 **Bugs:** BUG-268
 **Time:** 1 hour
-**Fix:** Add Origin/Referer header validation to all API routes, or create a shared middleware wrapper that validates the origin before processing. Server actions already have built-in CSRF protection in Next.js 16.
+**Fix:** Added `validateCsrfOrigin()` helper in `lib/validation.ts`. Applied CSRF Origin header validation to all 11 API route files (POST/PUT/DELETE handlers). Commit: `8a8163f`.
 
 ---
 
