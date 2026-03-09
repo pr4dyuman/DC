@@ -6,6 +6,8 @@ import bcrypt from "bcryptjs";
 import { signToken, verifyToken, AuthSession } from "./auth-utils";
 import { validatePassword } from "./validation";
 
+import { validateEmail } from "./validation";
+
 // --- Rate limiting for login (MongoDB-backed) ---
 const MAX_LOGIN_ATTEMPTS = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
@@ -69,10 +71,6 @@ export async function login(userId: string, role: string, agencyId?: string): Pr
         maxAge: 60 * 60 * 24 // 24 hours
     });
 
-    // Legacy cookies for backward compatibility (secured)
-    cookieStore.set("userId", userId, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
-    cookieStore.set("userRole", role, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
-
     // Client-readable indicator (NOT the token itself) so Navigation can show Dashboard vs Login
     cookieStore.set("logged_in", "1", { httpOnly: false, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 });
 }
@@ -80,10 +78,11 @@ export async function login(userId: string, role: string, agencyId?: string): Pr
 export async function logout() {
     const cookieStore = await cookies();
     cookieStore.delete("auth_token");
-    cookieStore.delete("userId");
-    cookieStore.delete("userRole");
     cookieStore.delete("selectedAgencyId");
     cookieStore.delete("logged_in");
+    // Also clean up any remaining legacy cookies
+    cookieStore.delete("userId");
+    cookieStore.delete("userRole");
 }
 
 /**
@@ -116,6 +115,11 @@ export type LoginResult = {
 };
 
 export async function authenticateUser(email: string, password: string): Promise<LoginResult> {
+    // Validate email format before DB queries
+    if (!email || !validateEmail(email)) {
+        return { success: false, error: "Invalid email or password" };
+    }
+
     // Rate limiting check
     await checkLoginRateLimit(email);
     await connectDB();

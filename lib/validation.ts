@@ -79,7 +79,7 @@ export function validateEmail(input: string): string {
  */
 export function validatePassword(input: string): string {
     if (typeof input !== 'string') throw new Error('Password must be a string');
-    if (input.length < 6) throw new Error('Password must be at least 6 characters');
+    if (input.length < 8) throw new Error('Password must be at least 8 characters');
     if (input.length > 128) throw new Error('Password must be at most 128 characters');
     if (!/[a-zA-Z]/.test(input)) throw new Error('Password must contain at least 1 letter');
     if (!/[0-9]/.test(input)) throw new Error('Password must contain at least 1 number');

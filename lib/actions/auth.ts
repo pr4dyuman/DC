@@ -2,9 +2,9 @@
 
 import { User } from "../db";
 import { getSessionId } from "../auth";
-import { resolveUserOrClient } from "../utils-server";
 import { SuperAdminModel, UserModel, ClientModel, connectDB, RateLimitModel } from "../mongodb";
 import { login as authLogin } from "../auth";
+import { validateEmail } from "../validation";
 import bcrypt from "bcryptjs";
 
 export { getSessionId };
@@ -13,6 +13,11 @@ const MAX_LOGIN_ATTEMPTS = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
 export async function login(email: string, password: string) {
+    // Validate email format before DB queries
+    if (!email || !validateEmail(email)) {
+        return { success: false, error: 'Invalid credentials' };
+    }
+
     await connectDB();
 
     // Rate limiting (MongoDB-backed)
@@ -68,22 +73,4 @@ export async function login(email: string, password: string) {
     }
 
     return { success: false, error: "Invalid credentials" };
-}
-
-export async function getCurrentUser() {
-    const userId = await getSessionId();
-    if (!userId) return null;
-
-    const targetUser = await resolveUserOrClient(userId);
-    if (!targetUser) return undefined;
-
-    const isAdmin = targetUser.role === 'admin' || targetUser.role === 'manager';
-
-    if (isAdmin) {
-        return targetUser;
-    }
-
-    // Redact salary for non-admin users viewing their own profile
-    const { salary, ...redacted } = targetUser;
-    return redacted as User;
 }
