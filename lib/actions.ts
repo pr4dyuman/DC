@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { db, User, Project, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig, LeaveRequest, LeaveType, LeaveStatus, UserPermissions, Transaction, TransactionType, TransactionCategory } from "./db";
 import { revalidatePath } from "next/cache";
@@ -54,13 +54,13 @@ export async function getAgencySettings() {
     };
 }
 
-// Internal — returns full config with decrypted API key for server-side AI calls only
+// Internal â€” returns full config with decrypted API key for server-side AI calls only
 async function getAgencyAIConfigInternal(): Promise<AIConfig | null> {
     const { getAgencyAIConfigServer } = await import("./utils-server");
     return getAgencyAIConfigServer();
 }
 
-// Get the AI config for the current user's agency — API key is masked (safe for client)
+// Get the AI config for the current user's agency â€” API key is masked (safe for client)
 export async function getAgencyAIConfig(): Promise<AIConfig | null> {
     await requireAuth();
     const config = await getAgencyAIConfigInternal();
@@ -82,7 +82,7 @@ export async function getAIPermissions(): Promise<AIPermissions> {
     return { ...DEFAULT_AI_PERMISSIONS, ...(agency as any).aiPermissions };
 }
 
-// Update AI permissions — admin only
+// Update AI permissions â€” admin only
 export async function updateAIPermissions(permissions: AIPermissions) {
     await requireRole('admin');
     const agency = await getCurrentAgency();
@@ -196,7 +196,7 @@ export const login = authLogin;
 export const logout = authLogout;
 
 // =============================================================================
-// AUTH GUARD HELPERS — reusable role-based permission checks for server actions
+// AUTH GUARD HELPERS â€” reusable role-based permission checks for server actions
 // =============================================================================
 
 type AllowedRole = 'admin' | 'manager' | 'employee' | 'client' | 'superadmin';
@@ -221,12 +221,18 @@ async function requireRole(...roles: AllowedRole[]) {
     return user;
 }
 
+/** Require agency context for data isolation. Throws if no agency found. */
+function requireAgencyFilter(agency: any): { agencyId: string } {
+    if (!agency?.id) throw new Error('Agency context required');
+    return { agencyId: agency.id };
+}
+
 export async function getAllUsers() {
     await requireRole('admin', 'manager');
     await connectDB();
     // Scope to current agency unless super-admin (who needs cross-agency view)
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const users = await UserModel.find(agencyFilter).select('-password').lean();
     return users.map(u => ({ ...sanitizeDoc(u), agencyId: u.agencyId || 'default-agency' }));
 }
@@ -236,7 +242,7 @@ export async function getAllClients() {
     await connectDB();
     // Scope to current agency unless super-admin (who needs cross-agency view)
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const clients = await ClientModel.find(agencyFilter).select('-password').lean();
     return clients.map(c => ({ ...sanitizeDoc(c), agencyId: c.agencyId || 'default-agency' }));
 }
@@ -264,7 +270,7 @@ export async function getDashboardMetrics() {
 
     // Get current agency for filtering
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
 
     // Parallel fetch for dashboard data
     const [transactions, pendingInvoicesList, activeProjectsCount, projects, tasks, allUsers, pendingLeaves] = await Promise.all([
@@ -359,7 +365,7 @@ export async function getRevenueData() {
     await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const transactions = await TransactionModel.find(agencyFilter).lean();
 
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -402,7 +408,7 @@ export async function getProjectDistribution() {
     await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const [projects, services] = await Promise.all([
         ProjectModel.find(agencyFilter).lean(),
         ServiceModel.find(agencyFilter).lean()
@@ -426,7 +432,7 @@ export async function getRecentActivity(offset = 0, limit = 5): Promise<Activity
     await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const activities = await ActivityModel.find(agencyFilter).sort({ timestamp: -1 }).skip(offset).limit(limit).lean();
     return activities.map(a => sanitizeDoc(a));
 }
@@ -435,7 +441,7 @@ export async function getUrgentTasks(limit = 5) {
     await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const tasks = await TaskModel.find({ agencyId: agency?.id, status: { $ne: 'Done' } })
         .sort({ dueDate: 1 })
         .limit(limit)
@@ -460,9 +466,9 @@ export async function getClientDashboardData(clientId: string) {
     await connectDB();
 
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
 
-    // Parallel Fetch — scope invoices/tasks/assets to client's project IDs, not all data
+    // Parallel Fetch â€” scope invoices/tasks/assets to client's project IDs, not all data
     const clientProjects = await ProjectModel.find({ clientId, ...agencyFilter }).lean();
     const projectIds = clientProjects.map((p: any) => p.id);
 
@@ -532,7 +538,7 @@ export async function getEmployeeDashboardData(userId: string) {
     }
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const [tasks, user, leaveRequests] = await Promise.all([
         TaskModel.find({ assigneeId: userId, ...agencyFilter }).lean(),
         UserModel.findOne({ id: userId, ...agencyFilter }).select('-password').lean(),
@@ -564,10 +570,10 @@ export async function getNotifications(userId: string, offset = 0, limit = 1000)
     }
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Clean up old notifications — scoped to THIS USER only to avoid deleting other users' notifications
+    // Clean up old notifications â€” scoped to THIS USER only to avoid deleting other users' notifications
     await NotificationModel.deleteMany({ userId, ...agencyFilter, timestamp: { $lt: thirtyDaysAgo } });
 
     const notifications = await NotificationModel.find({ userId, ...agencyFilter })
@@ -590,7 +596,7 @@ export async function getProjects(offset = 0, limit = 1000) {
 
     // Always scope to current agency
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
 
     let query: any = { ...agencyFilter };
     if (currentUser.role === 'client') {
@@ -606,7 +612,7 @@ export async function getUserProjects(userId: string) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
 
     // Check if user is a client
     const isClient = await ClientModel.exists({ id: userId, ...agencyFilter });
@@ -622,7 +628,7 @@ export async function getProject(id: string) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const project = await ProjectModel.findOne({ id, ...agencyFilter }).lean();
     if (!project) return undefined;
     return { ...sanitizeDoc(project), agencyId: project.agencyId || 'default-agency' };
@@ -632,7 +638,7 @@ export async function getProjectBySlug(slug: string) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const project = await ProjectModel.findOne({ $or: [{ slug }, { id: slug }], ...agencyFilter }).lean();
     if (!project) return undefined;
     return { ...sanitizeDoc(project), agencyId: project.agencyId || 'default-agency' };
@@ -646,7 +652,7 @@ export async function getUsers() {
 
     // Fetch users scoped to current agency
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const usersRaw = await UserModel.find(agencyFilter).select('-password').lean();
     const users = usersRaw.map(u => ({ ...sanitizeDoc(u), agencyId: u.agencyId || 'default-agency' }));
 
@@ -667,7 +673,7 @@ export async function getUsers() {
 }
 
 export async function getUser(id: string) {
-    // 1. Resolve User — scoped to current agency
+    // 1. Resolve User â€” scoped to current agency
     const agency = await getCurrentAgency();
     const agencyId = agency?.id;
     const targetUser = await resolveUserOrClient(id, agencyId);
@@ -691,7 +697,7 @@ export async function getUser(id: string) {
 
 
 export async function getUserByUsername(username: string) {
-    // 1. Resolve — scoped to current agency
+    // 1. Resolve â€” scoped to current agency
     const agency = await getCurrentAgency();
     const agencyId = agency?.id;
     const user = await resolveUserOrClient(username, agencyId);
@@ -715,9 +721,9 @@ export async function getUserTasks(userId: string, offset = 0, limit = 1000) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
 
-    // Fetch tasks for user — scoped to agency
+    // Fetch tasks for user â€” scoped to agency
     const tasksRaw = await TaskModel.find({ assigneeId: userId, ...agencyFilter }).lean();
 
     // Verify projects exist (equivalent to validProjectIds logic but faster)
@@ -736,7 +742,7 @@ export async function getClientProjects(clientId: string) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
 
     const client = await resolveUserOrClient(clientId, agency?.id);
     const clientName = client ? client.name : null;
@@ -760,7 +766,7 @@ export async function getProjectTasks(projectIds: string[]) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const tasks = await TaskModel.find({ projectId: { $in: projectIds }, ...agencyFilter }).lean();
     return tasks.map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' }));
 }
@@ -770,7 +776,7 @@ export async function getClientCreatedTasks(userId: string) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const tasks = await TaskModel.find({ createdBy: userId, ...agencyFilter }).sort({ createdAt: -1 }).lean();
     return tasks.map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' }));
 }
@@ -779,11 +785,11 @@ export async function getUserActivity(userId: string) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const user = await getUser(userId);
     if (!user) return [];
 
-    // Limit to last 20 for dashboard — scoped to agency
+    // Limit to last 20 for dashboard â€” scoped to agency
     const activities = await ActivityModel.find({ user: user.name, ...agencyFilter })
         .sort({ timestamp: -1 })
         .limit(20)
@@ -796,7 +802,7 @@ export async function getUserContributionHistory(userId: string) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const user = await getUser(userId);
     if (!user) return [];
 
@@ -832,7 +838,7 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
     // Ensure username uniqueness via DB query
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     let uniqueUsername = username;
     let counter = 1;
     while (
@@ -1023,10 +1029,10 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
     // For non-password updates, continuing with MongoDB update logic
     await connectDB();
 
-    // Check username uniqueness if updating username — scoped to current agency
+    // Check username uniqueness if updating username â€” scoped to current agency
     if (updates.username) {
         const agency = await getCurrentAgency();
-        const agencyFilter = agency ? { agencyId: agency.id } : {};
+        const agencyFilter = requireAgencyFilter(agency);
         const existingUser = await UserModel.findOne({ username: updates.username, id: { $ne: id }, ...agencyFilter });
         const existingClient = await ClientModel.findOne({ username: updates.username, id: { $ne: id }, ...agencyFilter });
 
@@ -1062,7 +1068,7 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
 
     // Try User first, then Client
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
 
     const userExists = await UserModel.exists({ id, ...agencyFilter });
     if (userExists) {
@@ -1196,7 +1202,7 @@ export async function adminResetPassword(id: string, newPassword: string) {
     const agency = await getCurrentAgency();
     await UserModel.updateOne({ id, agencyId: agency?.id }, { $set: { password: hashedPassword } });
 
-    // Security notification — password was reset by admin
+    // Security notification â€” password was reset by admin
     await NotificationModel.create({
         id: generateId(), agencyId: agency?.id, userId: id,
         message: `Your password was reset by ${currentUser.name}. If you did not request this, please contact your admin immediately.`,
@@ -1221,7 +1227,7 @@ export async function getServices() {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const services = await ServiceModel.find(agency ? { agencyId: agency.id } : {}).lean();
+    const services = await ServiceModel.find(requireAgencyFilter(agency)).lean();
     return services.map(sanitizeDoc);
 }
 
@@ -1426,7 +1432,7 @@ export async function getAllProjectTasks() {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const tasks = await TaskModel.find(agencyFilter)
         .select('projectId status assigneeId')
         .lean();
@@ -1438,7 +1444,7 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const settingsDoc = await SettingsModel.findOne(agency ? { agencyId: agency.id } : {}).lean();
+    const settingsDoc = await SettingsModel.findOne(requireAgencyFilter(agency)).lean();
     const settings = settingsDoc as any;
 
     const defaultPermissions: UserPermissions = {
@@ -1542,7 +1548,7 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
         timestamp: new Date().toISOString()
     });
 
-    // In-app notification for task status change — notify assignee if someone else changed it
+    // In-app notification for task status change â€” notify assignee if someone else changed it
     if (task.assigneeId && task.assigneeId !== userId) {
         await NotificationModel.create({
             id: generateId(), agencyId: agency.id, userId: task.assigneeId,
@@ -1740,7 +1746,7 @@ export async function addComment(taskId: string, userId: string, text: string) {
     await connectDB();
     const agency = await getCurrentAgency();
     if (!agency) throw new Error('No agency context');
-    // Input sanitization — prevent XSS in comments
+    // Input sanitization â€” prevent XSS in comments
     text = sanitizeString(text, 5000);
     if (!text) throw new Error('Comment text is required');
 
@@ -1754,7 +1760,7 @@ export async function addComment(taskId: string, userId: string, text: string) {
     const task = await TaskModel.findOne({ id: taskId, agencyId: agency.id }).lean();
     if (!task) throw new Error('Task not found');
 
-    // Append comment directly with $push — no full read required
+    // Append comment directly with $push â€” no full read required
     await TaskModel.updateOne(
         { id: taskId, agencyId: agency.id },
         { $push: { comments: newComment } }
@@ -1806,7 +1812,7 @@ export async function addComment(taskId: string, userId: string, text: string) {
         }
     }
 
-    // In-app notifications for task comment — notify all participants except commenter
+    // In-app notifications for task comment â€” notify all participants except commenter
     try {
         const participantIds = new Set<string>();
         if (task.assigneeId) participantIds.add(task.assigneeId);
@@ -2174,7 +2180,7 @@ export async function getTransactions(projectId?: string, userId?: string, categ
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const query: any = { ...agencyFilter };
     if (projectId) query.projectId = projectId;
     if (category) query.category = category;
@@ -2217,7 +2223,7 @@ export async function getClientFinanceData(clientId: string) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const clientProjectIds = await ProjectModel.distinct('id', { clientId, ...agencyFilter });
 
     const [invoices, transactions] = await Promise.all([
@@ -2251,7 +2257,7 @@ export async function getCategoryMemberSummary(category: string) {
     await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const transactions = await TransactionModel.find({ category, ...agencyFilter }).lean() as any[];
 
     const summaryMap = new Map<string, { id: string; name: string; total: number; count: number; avatar?: string }>();
@@ -2347,7 +2353,7 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
     if (newTransaction.category === 'Salary' && newTransaction.userId && newTransaction.type === 'expense') {
         await NotificationModel.create({
             id: generateId(), agencyId: agency?.id, userId: newTransaction.userId,
-            message: `Salary Payment Received: ₹${newTransaction.amount.toLocaleString()} `,
+            message: `Salary Payment Received: â‚¹${newTransaction.amount.toLocaleString()} `,
             read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
         });
         try {
@@ -2393,7 +2399,7 @@ export async function getInvoices(projectId?: string) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const query: any = { ...agencyFilter };
     if (projectId) query.projectId = projectId;
 
@@ -2431,7 +2437,7 @@ export async function clientMarkInvoiceAsPaid(invoiceId: string) {
     const admins = await UserModel.find({ agencyId: agency.id, role: 'admin' }).select('-password').lean();
     await NotificationModel.insertMany(admins.map(admin => ({
         id: generateId(), agencyId: agency.id, userId: admin.id,
-        message: `${currentUser.name} marked invoice ₹${invoice.amount.toLocaleString()} as paid - Awaiting approval`,
+        message: `${currentUser.name} marked invoice â‚¹${invoice.amount.toLocaleString()} as paid - Awaiting approval`,
         read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
     })));
 
@@ -2493,7 +2499,7 @@ export async function adminApproveInvoicePayment(invoiceId: string) {
     if ((project as any)?.clientId) {
         await NotificationModel.create({
             id: generateId(), agencyId: agency.id, userId: (project as any).clientId,
-            message: `Payment approved! ₹${invoice.amount.toLocaleString()} received for ${(project as any).name}`,
+            message: `Payment approved! â‚¹${invoice.amount.toLocaleString()} received for ${(project as any).name}`,
             read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
         });
     }
@@ -2537,7 +2543,7 @@ export async function adminRejectInvoicePayment(invoiceId: string, reason?: stri
     if ((project as any)?.clientId) {
         const message = reason
             ? `Payment rejected: ${reason}. Please mark as paid again.`
-            : `Payment rejected for ₹${invoice.amount.toLocaleString()}. Please mark as paid again.`;
+            : `Payment rejected for â‚¹${invoice.amount.toLocaleString()}. Please mark as paid again.`;
         await NotificationModel.create({
             id: generateId(), agencyId: agency.id, userId: (project as any).clientId,
             message, read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
@@ -2632,7 +2638,7 @@ export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "ag
     if (project.clientId) {
         await NotificationModel.create({
             id: generateId(), agencyId: agency.id, userId: project.clientId,
-            message: `New Invoice Generated: ₹${invoice.amount.toLocaleString()}`,
+            message: `New Invoice Generated: â‚¹${invoice.amount.toLocaleString()}`,
             read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
         });
     }
@@ -2661,7 +2667,7 @@ export async function getFinanceStats(projectId?: string, userId?: string, categ
     await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const txQuery: any = { ...agencyFilter };
     const invQuery: any = { ...agencyFilter };
     if (projectId) { txQuery.projectId = projectId; invQuery.projectId = projectId; }
@@ -2698,7 +2704,7 @@ export async function getFinanceChartData(projectId?: string, userId?: string, c
     await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const query: any = { ...agencyFilter };
     if (projectId) query.projectId = projectId;
     if (category) query.category = category;
@@ -2717,7 +2723,7 @@ export async function getFinanceChartData(projectId?: string, userId?: string, c
         }
     }
 
-    // Group by month (last 6 months) — include year to prevent cross-year matching
+    // Group by month (last 6 months) â€” include year to prevent cross-year matching
     const monthKeys: string[] = [];
     const monthLabels: string[] = [];
     for (let i = 5; i >= 0; i--) {
@@ -2753,7 +2759,7 @@ export async function getPayrollStatus(userId?: string) {
     await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const userQuery: any = { role: { $ne: 'admin' }, ...agencyFilter };
     if (userId && userId !== 'all') userQuery.id = userId;
 
@@ -2809,7 +2815,7 @@ export async function getSystemSettings() {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const settingsDoc = await SettingsModel.findOne(agency ? { agencyId: agency.id } : {}).lean() as any;
+    const settingsDoc = await SettingsModel.findOne(requireAgencyFilter(agency)).lean() as any;
     if (!settingsDoc) return { systemName: 'AgencyOS', logo: '', userPermissions: {} };
     return sanitizeDoc(settingsDoc);
 }
@@ -2836,10 +2842,10 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const results: SearchResult[] = [];
 
-    // ── Keyword detection: generic category queries ──────────────
+    // â”€â”€ Keyword detection: generic category queries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const q = query.toLowerCase().trim();
     const isProjectQuery = /^(all\s+)?projects?$|^list\s+projects?$/i.test(q);
     const isClientQuery = /^(all\s+)?clients?$|^list\s+clients?$/i.test(q);
@@ -2879,7 +2885,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
         return results;
     }
 
-    // ── Normal regex search ─────────────────────────────────────
+    // â”€â”€ Normal regex search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(escapedQuery, 'i');
 
@@ -3119,7 +3125,7 @@ export async function explainTask(taskId: string, userId: string) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
 
     const task = await TaskModel.findOne({ id: taskId, ...agencyFilter }).lean() as any;
     if (!task) throw new Error('Task not found');
@@ -3262,7 +3268,7 @@ export async function enhanceTaskDescription(projectId: string, title: string, c
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
 
     const [project, allProjectTasks, projectAssets] = await Promise.all([
         ProjectModel.findOne({ id: projectId, ...agencyFilter }).lean(),
@@ -3396,7 +3402,7 @@ export async function createAISession(
 
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const [tasks, users, assets] = await Promise.all([
         TaskModel.find({ projectId, ...agencyFilter }).lean(),
         UserModel.find(agencyFilter).select('-password').lean(),
@@ -3454,7 +3460,7 @@ export async function closeAISession(sessionId: string): Promise<void> {
 }
 
 /**
- * Legacy chat function — used as fallback for non-Live models.
+ * Legacy chat function â€” used as fallback for non-Live models.
  * Sends full context + history each time.
  */
 export async function chatWithTaskAI(
@@ -3468,7 +3474,7 @@ export async function chatWithTaskAI(
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const [tasks, users, assets] = await Promise.all([
         projectId ? TaskModel.find({ projectId, ...agencyFilter }).lean() : Promise.resolve([]),
         UserModel.find(agencyFilter).select('-password').lean(),
@@ -3489,7 +3495,7 @@ export async function chatWithTaskAI(
 }
 
 // ============================================================================
-// SINGULARITY — Standalone AI Chatbot (No system prompt)
+// SINGULARITY â€” Standalone AI Chatbot (No system prompt)
 // ============================================================================
 
 export async function singularityChat(
@@ -3514,7 +3520,7 @@ export async function singularityChat(
     const isLive = modelId.includes('native-audio');
 
     if (isLive) {
-        // Use the Live API directly — same approach as liveGenerateContent
+        // Use the Live API directly â€” same approach as liveGenerateContent
         const { GoogleGenAI, Modality } = await import("@google/genai");
         const ai = new GoogleGenAI({ apiKey: aiConfig.apiKey });
         const messageQueue: any[] = [];
@@ -3595,7 +3601,7 @@ export async function getLeaveRequests(userId?: string) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const query: any = agency ? { agencyId: agency.id } : {};
+    const query: any = requireAgencyFilter(agency);
     if (userId) query.userId = userId;
     const requests = await LeaveRequestModel.find(query).lean();
     return requests
@@ -3960,7 +3966,7 @@ export async function createRefund(refund: {
     const projectIncome = incomeAgg[0]?.total || 0;
     const existingRefunds = refundAgg[0]?.total || 0;
     if (existingRefunds + refund.amount > projectIncome) {
-        throw new Error(`Refund amount exceeds project income. Project income: ₹${projectIncome.toLocaleString()}, Existing refunds: ₹${existingRefunds.toLocaleString()}, Attempted refund: ₹${refund.amount.toLocaleString()}`);
+        throw new Error(`Refund amount exceeds project income. Project income: â‚¹${projectIncome.toLocaleString()}, Existing refunds: â‚¹${existingRefunds.toLocaleString()}, Attempted refund: â‚¹${refund.amount.toLocaleString()}`);
     }
 
     const newRefund = {
@@ -3976,7 +3982,7 @@ export async function createRefund(refund: {
     if ((project as any).clientId) {
         await NotificationModel.create({
             id: generateId(), agencyId: agency?.id, userId: (project as any).clientId,
-            message: `Refund of ₹${refund.amount.toLocaleString()} has been issued for ${(project as any).name}`,
+            message: `Refund of â‚¹${refund.amount.toLocaleString()} has been issued for ${(project as any).name}`,
             read: false, timestamp: new Date().toISOString(),
             link: `/dashboard/projects/${(project as any).slug || (project as any).id}`
         });
@@ -4012,7 +4018,7 @@ export async function getClientFinancialSummary(clientId: string) {
     await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
     const projectIds = await ProjectModel.distinct('id', { clientId, ...agencyFilter });
     const projectIdSet = new Set(projectIds);
     const clientProjectsAll = await ProjectModel.find({ clientId, ...agencyFilter }).lean() as any[];
@@ -4125,7 +4131,7 @@ export async function aiEstimateTaskHours(
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    const agencyFilter = requireAgencyFilter(agency);
 
     const aiConfig = await getAgencyAIConfigInternal();
     if (!aiConfig) throw new Error('Singularity is not configured.');
@@ -4140,7 +4146,7 @@ export async function aiEstimateTaskHours(
     const historyLines = completedTasks
         .filter((t: any) => t.estimatedHours && t.estimatedHours > 0)
         .slice(0, 30) // cap at 30 for token efficiency
-        .map((t: any) => `- "${t.title}" → ${t.estimatedHours}h (Priority: ${t.priority || 'Medium'})`)
+        .map((t: any) => `- "${t.title}" â†’ ${t.estimatedHours}h (Priority: ${t.priority || 'Medium'})`)
         .join('\n');
 
     const prompt = `You are a project estimation expert. Estimate the hours needed for this task.
@@ -4156,12 +4162,12 @@ ${historyLines || '(No historical data available)'}
 ### RULES
 - Compare with similar completed tasks above when available.
 - If a similar task was completed before, use that as a baseline and adjust.
-- Use 0.5h increments. Range: 0.5 – 40 hours.
-- Simple tasks (typo, text, icon): 0.5–1h
-- Small tasks (fix, button, tooltip): 1–2h
-- Medium tasks (feature, form, component): 2–8h
-- Complex tasks (integration, refactor, architecture): 8–24h
-- Major tasks (migration, full redesign): 24–40h
+- Use 0.5h increments. Range: 0.5 â€“ 40 hours.
+- Simple tasks (typo, text, icon): 0.5â€“1h
+- Small tasks (fix, button, tooltip): 1â€“2h
+- Medium tasks (feature, form, component): 2â€“8h
+- Complex tasks (integration, refactor, architecture): 8â€“24h
+- Major tasks (migration, full redesign): 24â€“40h
 - Return ONLY a single number. No text, no explanation, no units.`;
 
     try {
