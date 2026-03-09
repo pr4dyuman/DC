@@ -41,6 +41,7 @@ import {
 } from "./brevo-mail";
 
 export async function getAgencySettings() {
+    await requireAuth();
     const agency = await getCurrentAgency();
     if (!agency) return null;
     return {
@@ -61,6 +62,7 @@ async function getAgencyAIConfigInternal(): Promise<AIConfig | null> {
 
 // Get the AI config for the current user's agency — API key is masked (safe for client)
 export async function getAgencyAIConfig(): Promise<AIConfig | null> {
+    await requireAuth();
     const config = await getAgencyAIConfigInternal();
     if (!config) return null;
     return {
@@ -73,6 +75,7 @@ export async function getAgencyAIConfig(): Promise<AIConfig | null> {
 
 // Get AI permissions for the current agency (what Singularity is allowed to do)
 export async function getAIPermissions(): Promise<AIPermissions> {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     if (!agency) return DEFAULT_AI_PERMISSIONS;
@@ -219,6 +222,7 @@ async function requireRole(...roles: AllowedRole[]) {
 }
 
 export async function getAllUsers() {
+    await requireRole('admin', 'manager');
     await connectDB();
     // Scope to current agency unless super-admin (who needs cross-agency view)
     const agency = await getCurrentAgency();
@@ -228,6 +232,7 @@ export async function getAllUsers() {
 }
 
 export async function getAllClients() {
+    await requireRole('admin', 'manager');
     await connectDB();
     // Scope to current agency unless super-admin (who needs cross-agency view)
     const agency = await getCurrentAgency();
@@ -237,6 +242,7 @@ export async function getAllClients() {
 }
 
 export async function getSuperAdmins() {
+    await requireRole('admin');
     await connectDB();
     const admins = await SuperAdminModel.find({}).select('-password').lean();
     return admins.map(a => sanitizeDoc(a));
@@ -251,6 +257,7 @@ export type SearchResult = {
 };
 
 export async function getDashboardMetrics() {
+    await requireRole('admin', 'manager');
     await connectDB();
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth(); // 0-11
@@ -349,6 +356,7 @@ export async function getDashboardMetrics() {
 }
 
 export async function getRevenueData() {
+    await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -391,6 +399,7 @@ export async function getRevenueData() {
 }
 
 export async function getProjectDistribution() {
+    await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -414,6 +423,7 @@ export async function getProjectDistribution() {
 }
 
 export async function getRecentActivity(offset = 0, limit = 5): Promise<Activity[]> {
+    await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -422,10 +432,11 @@ export async function getRecentActivity(offset = 0, limit = 5): Promise<Activity
 }
 
 export async function getUrgentTasks(limit = 5) {
+    await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
-    const tasks = await TaskModel.find({ ...agencyFilter, status: { $ne: 'Done' }, priority: 'High' })
+    const tasks = await TaskModel.find({ agencyId: agency?.id, status: { $ne: 'Done' } })
         .sort({ dueDate: 1 })
         .limit(limit)
         .lean();
@@ -441,6 +452,11 @@ export async function getUrgentTasks(limit = 5) {
 }
 
 export async function getClientDashboardData(clientId: string) {
+    const caller = await requireAuth();
+    // IDOR prevention: clients can only view their own dashboard
+    if (caller.role === 'client' && caller.id !== clientId) {
+        throw new Error('Unauthorized: You can only view your own dashboard.');
+    }
     await connectDB();
 
     const agency = await getCurrentAgency();
@@ -509,6 +525,11 @@ export async function getClientDashboardData(clientId: string) {
 }
 
 export async function getEmployeeDashboardData(userId: string) {
+    const caller = await requireAuth();
+    // IDOR prevention: employees can only view their own dashboard
+    if (caller.role === 'employee' && caller.id !== userId) {
+        throw new Error('Unauthorized: You can only view your own dashboard.');
+    }
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -536,6 +557,11 @@ export async function getEmployeeDashboardData(userId: string) {
 
 // Auto-clear notifications older than 30 days
 export async function getNotifications(userId: string, offset = 0, limit = 1000): Promise<Notification[]> {
+    const caller = await requireAuth();
+    // IDOR prevention: users can only view their own notifications
+    if (caller.id !== userId && caller.role !== 'admin' && caller.role !== 'manager') {
+        throw new Error('Unauthorized: You can only view your own notifications.');
+    }
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -577,6 +603,7 @@ export async function getProjects(offset = 0, limit = 1000) {
 }
 
 export async function getUserProjects(userId: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -592,6 +619,7 @@ export async function getUserProjects(userId: string) {
 }
 
 export async function getProject(id: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -601,6 +629,7 @@ export async function getProject(id: string) {
 }
 
 export async function getProjectBySlug(slug: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -683,6 +712,7 @@ export async function getUserByUsername(username: string) {
 }
 
 export async function getUserTasks(userId: string, offset = 0, limit = 1000) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -703,6 +733,7 @@ export async function getUserTasks(userId: string, offset = 0, limit = 1000) {
 
 // For Client Profile: Get projects they OWN
 export async function getClientProjects(clientId: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -726,6 +757,7 @@ export async function getClientProjects(clientId: string) {
 }
 
 export async function getProjectTasks(projectIds: string[]) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -735,6 +767,7 @@ export async function getProjectTasks(projectIds: string[]) {
 
 // For Client Profile: Get tasks they CREATED (Assigned to others)
 export async function getClientCreatedTasks(userId: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -743,6 +776,7 @@ export async function getClientCreatedTasks(userId: string) {
 }
 
 export async function getUserActivity(userId: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -759,6 +793,7 @@ export async function getUserActivity(userId: string) {
 }
 
 export async function getUserContributionHistory(userId: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -1183,6 +1218,7 @@ export async function deleteUser(id: string, password: string) {
 }
 
 export async function getServices() {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const services = await ServiceModel.find(agency ? { agencyId: agency.id } : {}).lean();
@@ -1378,6 +1414,7 @@ export async function updateProjectPayment(projectId: string, serviceId: string,
 }
 
 export async function getTasks(projectId: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const tasks = await TaskModel.find({ projectId, agencyId: agency?.id }).lean();
@@ -1386,6 +1423,7 @@ export async function getTasks(projectId: string) {
 
 /** Lightweight: fetch all tasks for every project in the agency (for list-page progress bars) */
 export async function getAllProjectTasks() {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -1397,6 +1435,7 @@ export async function getAllProjectTasks() {
 
 
 export async function getUserPermissions(userId: string): Promise<UserPermissions> {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const settingsDoc = await SettingsModel.findOne(agency ? { agencyId: agency.id } : {}).lean();
@@ -1887,6 +1926,7 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
 // --- Client Actions ---
 
 export async function getClients() {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const clients = await ClientModel.find({ agencyId: agency?.id, archived: { $ne: true } }).select('-password').lean();
@@ -1894,6 +1934,7 @@ export async function getClients() {
 }
 
 export async function getClientByUsername(username: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const client = await ClientModel.findOne({
@@ -1904,6 +1945,7 @@ export async function getClientByUsername(username: string) {
 }
 
 export async function getClientById(id: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const client = await ClientModel.findOne({ id, agencyId: agency?.id }).select('-password').lean();
@@ -2129,6 +2171,7 @@ export async function deleteProject(id: string, password: string) {
 
 
 export async function getTransactions(projectId?: string, userId?: string, category?: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -2171,6 +2214,7 @@ export async function getTransactions(projectId?: string, userId?: string, categ
 }
 
 export async function getClientFinanceData(clientId: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -2195,6 +2239,7 @@ export async function getClientFinanceData(clientId: string) {
 }
 
 export async function getClientActivityLogs(clientId: string, limit = 20) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const acts = await ActivityModel.find({ user: clientId, agencyId: agency?.id })
@@ -2203,6 +2248,7 @@ export async function getClientActivityLogs(clientId: string, limit = 20) {
 }
 
 export async function getCategoryMemberSummary(category: string) {
+    await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -2344,6 +2390,7 @@ export async function markTransactionAsPaid(transactionId: string) {
 
 
 export async function getInvoices(projectId?: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -2548,6 +2595,7 @@ export async function deleteTransaction(transactionId: string, password: string)
 }
 
 export async function getHighPriorityTasks(offset = 0, limit = 5) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const tasks = await TaskModel.find({ agencyId: agency?.id, status: { $ne: 'Done' } })
@@ -2610,6 +2658,7 @@ export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "ag
 }
 
 export async function getFinanceStats(projectId?: string, userId?: string, category?: string) {
+    await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -2646,6 +2695,7 @@ export async function getFinanceStats(projectId?: string, userId?: string, categ
 }
 
 export async function getFinanceChartData(projectId?: string, userId?: string, category?: string) {
+    await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -2700,6 +2750,7 @@ export async function getFinanceChartData(projectId?: string, userId?: string, c
 }
 
 export async function getPayrollStatus(userId?: string) {
+    await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -2755,6 +2806,7 @@ export async function payEmployee(userId: string, amount: number, month: string,
 }
 
 export async function getSystemSettings() {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const settingsDoc = await SettingsModel.findOne(agency ? { agencyId: agency.id } : {}).lean() as any;
@@ -2781,6 +2833,7 @@ export async function updateSystemSettings(settings: { systemName: string; logo:
 export async function globalSearch(query: string): Promise<SearchResult[]> {
     if (!query || query.length < 2) return [];
 
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -2907,6 +2960,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
 
 
 export async function markNotificationAsRead(id: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     await NotificationModel.updateOne({ id, agencyId: agency?.id }, { $set: { read: true } });
@@ -2917,6 +2971,7 @@ export async function markNotificationAsRead(id: string) {
 // ----------------------------------------------------------------------
 
 export async function getProjectAssets(projectId: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const assets = await AssetModel.find({ projectId, agencyId: agency?.id }).lean();
@@ -2972,6 +3027,7 @@ export async function deleteProjectAsset(assetId: string) {
 }
 
 export async function updateProjectAsset(assetId: string, updates: Partial<Asset>) {
+    await requireAuth();
     const currentUser = await getCurrentUser();
     const userName = currentUser ? currentUser.name : "System";
     // Input sanitization
@@ -2993,6 +3049,7 @@ export async function updateProjectAsset(assetId: string, updates: Partial<Asset
 }
 
 export async function toggleAssetAI(assetId: string, enabled: boolean) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     await AssetModel.updateOne({ id: assetId, agencyId: agency?.id }, { $set: { aiEnabled: enabled } });
@@ -3019,6 +3076,7 @@ export async function extractTaskFields(
     aiResponseText: string,
     availableCategories: string[],
 ): Promise<ExtractedTaskFields> {
+    await requireAuth();
     const aiConfig = await getAgencyAIConfigInternal();
     if (!aiConfig) throw new Error('Singularity is not configured.');
 
@@ -3058,6 +3116,7 @@ Return ONLY valid JSON. No markdown fences, no extra text. Example:
 }
 
 export async function explainTask(taskId: string, userId: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -3200,6 +3259,7 @@ ${context.comments.length > 0 ? context.comments.map((c: any) => `- ${c.text}`).
 }
 
 export async function enhanceTaskDescription(projectId: string, title: string, content: string, userId: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -3323,6 +3383,7 @@ export async function createAISession(
     currentDescription: string,
     userId: string
 ): Promise<string> {
+    await requireAuth();
     const aiConfig = await getAgencyAIConfigInternal();
     if (!aiConfig) throw new Error("Singularity is not configured.");
 
@@ -3364,6 +3425,7 @@ export async function sendAIMessage(
     history?: ChatMessage[],
     userId?: string
 ): Promise<string> {
+    await requireAuth();
     // Legacy flow for non-Live models
     if (sessionId === 'legacy') {
         return chatWithTaskAI(
@@ -3385,6 +3447,7 @@ export async function sendAIMessage(
  * Close an AI chat session when the chat box is closed.
  */
 export async function closeAISession(sessionId: string): Promise<void> {
+    await requireAuth();
     if (sessionId === 'legacy') return;
     closeSession(sessionId);
     console.log(`[AI Session] Closed ${sessionId}`);
@@ -3402,6 +3465,7 @@ export async function chatWithTaskAI(
     userMessage: string,
     userId: string
 ) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -3432,6 +3496,7 @@ export async function singularityChat(
     history: Array<{ role: 'user' | 'model'; content: string }>,
     userMessage: string
 ): Promise<{ response: string; thinking: string }> {
+    await requireAuth();
     const aiConfig = await getAgencyAIConfigInternal();
     if (!aiConfig) throw new Error("Singularity is not configured.");
 
@@ -3527,6 +3592,7 @@ export async function singularityChat(
 
 
 export async function getLeaveRequests(userId?: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const query: any = agency ? { agencyId: agency.id } : {};
@@ -3793,6 +3859,7 @@ export async function cancelLeaveRequest(leaveRequestId: string) {
 
 // Get leave statistics for an employee
 export async function getEmployeeLeaveStats(userId: string) {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const currentYear = new Date().getFullYear();
@@ -3942,6 +4009,7 @@ export async function createRefund(refund: {
 }
 
 export async function getClientFinancialSummary(clientId: string) {
+    await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
@@ -3969,6 +4037,7 @@ export async function getClientFinancialSummary(clientId: string) {
 }
 
 export async function getProjectRefunds(projectId: string) {
+    await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
     const refunds = await TransactionModel.find({
@@ -4053,6 +4122,7 @@ export async function aiEstimateTaskHours(
     description: string,
     priority: string
 ): Promise<number> {
+    await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
