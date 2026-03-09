@@ -53,23 +53,22 @@ export async function getAgencySettings() {
     };
 }
 
-// Get the AI config for the current user's agency
+// Internal — returns full config with decrypted API key for server-side AI calls only
+async function getAgencyAIConfigInternal(): Promise<AIConfig | null> {
+    const { getAgencyAIConfigServer } = await import("./utils-server");
+    return getAgencyAIConfigServer();
+}
+
+// Get the AI config for the current user's agency — API key is masked (safe for client)
 export async function getAgencyAIConfig(): Promise<AIConfig | null> {
-    await connectDB();
-    const agency = await getCurrentAgency();
-    if (!agency) {
-        console.log('[getAgencyAIConfig] No agency found for current user');
-        return null;
-    }
-    if (!agency.aiConfig) {
-        console.log('[getAgencyAIConfig] Agency found but no aiConfig:', agency.id);
-        return null;
-    }
-    console.log('[getAgencyAIConfig] Found config for agency:', agency.id, 'provider:', (agency.aiConfig as any).provider);
-    const config = agency.aiConfig as AIConfig;
-    // Decrypt the API key before passing to AI provider
-    if (config?.apiKey) config.apiKey = decryptApiKey(config.apiKey);
-    return config;
+    const config = await getAgencyAIConfigInternal();
+    if (!config) return null;
+    return {
+        ...config,
+        apiKey: config.apiKey
+            ? (config.apiKey.length >= 4 ? '****' + config.apiKey.slice(-4) : '****')
+            : config.apiKey,
+    };
 }
 
 // Get AI permissions for the current agency (what Singularity is allowed to do)
@@ -224,7 +223,7 @@ export async function getAllUsers() {
     // Scope to current agency unless super-admin (who needs cross-agency view)
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
-    const users = await UserModel.find(agencyFilter).lean();
+    const users = await UserModel.find(agencyFilter).select('-password').lean();
     return users.map(u => ({ ...sanitizeDoc(u), agencyId: u.agencyId || 'default-agency' }));
 }
 
@@ -233,13 +232,13 @@ export async function getAllClients() {
     // Scope to current agency unless super-admin (who needs cross-agency view)
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
-    const clients = await ClientModel.find(agencyFilter).lean();
+    const clients = await ClientModel.find(agencyFilter).select('-password').lean();
     return clients.map(c => ({ ...sanitizeDoc(c), agencyId: c.agencyId || 'default-agency' }));
 }
 
 export async function getSuperAdmins() {
     await connectDB();
-    const admins = await SuperAdminModel.find({}).lean();
+    const admins = await SuperAdminModel.find({}).select('-password').lean();
     return admins.map(a => sanitizeDoc(a));
 }
 
@@ -515,7 +514,7 @@ export async function getEmployeeDashboardData(userId: string) {
     const agencyFilter = agency ? { agencyId: agency.id } : {};
     const [tasks, user, leaveRequests] = await Promise.all([
         TaskModel.find({ assigneeId: userId, ...agencyFilter }).lean(),
-        UserModel.findOne({ id: userId, ...agencyFilter }).lean(),
+        UserModel.findOne({ id: userId, ...agencyFilter }).select('-password').lean(),
         LeaveRequestModel.find({ userId, ...agencyFilter }).sort({ createdAt: -1 }).limit(5).lean()
     ]);
 
@@ -619,7 +618,7 @@ export async function getUsers() {
     // Fetch users scoped to current agency
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
-    const usersRaw = await UserModel.find(agencyFilter).lean();
+    const usersRaw = await UserModel.find(agencyFilter).select('-password').lean();
     const users = usersRaw.map(u => ({ ...sanitizeDoc(u), agencyId: u.agencyId || 'default-agency' }));
 
     if (currentUser?.role === 'client') {
@@ -871,10 +870,10 @@ export async function getCurrentUser() {
     if (session) {
         const now = new Date().toISOString();
         if (session.role === 'superadmin') {
-            const admin = await SuperAdminModel.findOne({ id: session.userId }).lean();
+            const admin = await SuperAdminModel.findOne({ id: session.userId }).select('-password').lean();
             if (admin) return sanitizeDoc(admin) as any;
         } else if (session.role === 'client') {
-            const client = await ClientModel.findOne({ id: session.userId }).lean();
+            const client = await ClientModel.findOne({ id: session.userId }).select('-password').lean();
             if (client) {
                 // Throttled presence update (max once per 5 min)
                 const lastActive = (client as any).lastActiveAt ? new Date((client as any).lastActiveAt).getTime() : 0;
@@ -884,7 +883,7 @@ export async function getCurrentUser() {
                 return sanitizeDoc({ ...client, role: 'client' }) as any;
             }
         } else {
-            const user = await UserModel.findOne({ id: session.userId }).lean();
+            const user = await UserModel.findOne({ id: session.userId }).select('-password').lean();
             if (user) {
                 // Throttled presence update (max once per 5 min)
                 const lastActive = (user as any).lastActiveAt ? new Date((user as any).lastActiveAt).getTime() : 0;
@@ -901,13 +900,13 @@ export async function getCurrentUser() {
     if (!userId) return null;
 
     // Check for Super Admin
-    const superAdmin = await SuperAdminModel.findOne({ id: userId }).lean();
+    const superAdmin = await SuperAdminModel.findOne({ id: userId }).select('-password').lean();
     if (superAdmin) return sanitizeDoc(superAdmin) as any;
 
-    const user = await UserModel.findOne({ id: userId }).lean();
+    const user = await UserModel.findOne({ id: userId }).select('-password').lean();
     if (user) return sanitizeDoc(user) as User;
 
-    const client = await ClientModel.findOne({ id: userId }).lean();
+    const client = await ClientModel.findOne({ id: userId }).select('-password').lean();
     if (client) {
         return sanitizeDoc({
             id: client.id,
@@ -1041,9 +1040,9 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
 
     // Notify Admins if document request
     if (notifyAdmin) {
-        const admins = await UserModel.find({ ...agencyFilter, $or: [{ role: 'admin' }, { role: 'manager' }] }).lean();
-        const currentUserDoc = await UserModel.findOne({ id, ...agencyFilter }).lean() ||
-            await ClientModel.findOne({ id, ...agencyFilter }).lean();
+        const admins = await UserModel.find({ ...agencyFilter, $or: [{ role: 'admin' }, { role: 'manager' }] }).select('-password').lean();
+        const currentUserDoc = await UserModel.findOne({ id, ...agencyFilter }).select('-password').lean() ||
+            await ClientModel.findOne({ id, ...agencyFilter }).select('-password').lean();
         await NotificationModel.insertMany(admins.map(admin => ({
             id: generateId(), agencyId: agency?.id, userId: admin.id,
             message: `${(currentUserDoc as any)?.name || 'User'} has requested to update their identity documents.`,
@@ -1061,7 +1060,7 @@ export async function deleteClient(id: string) {
         throw new Error('Unauthorized');
     }
     const agency = await getCurrentAgency();
-    const client = await ClientModel.findOne({ id, agencyId: agency?.id }).lean();
+    const client = await ClientModel.findOne({ id, agencyId: agency?.id }).select('-password').lean();
     if (!client) throw new Error('Client not found');
 
     // Soft-delete: mark as archived to preserve financial history
@@ -1077,7 +1076,7 @@ export async function getArchivedClients() {
     if (!currentUser || currentUser.role !== 'admin') throw new Error('Unauthorized');
     await connectDB();
     const agency = await getCurrentAgency();
-    const clients = await ClientModel.find({ agencyId: agency?.id, archived: true }).lean();
+    const clients = await ClientModel.find({ agencyId: agency?.id, archived: true }).select('-password').lean();
     return clients.map(sanitizeDoc);
 }
 
@@ -1089,7 +1088,7 @@ export async function unarchiveClient(id: string) {
 
     await connectDB();
     const agency = await getCurrentAgency();
-    const client = await ClientModel.findOne({ id, agencyId: agency?.id }).lean();
+    const client = await ClientModel.findOne({ id, agencyId: agency?.id }).select('-password').lean();
     if (!client) throw new Error('Client not found');
     if (!client.archived) throw new Error('Client is not archived');
 
@@ -1109,7 +1108,7 @@ export async function approveDocumentUpdate(userId: string, type: 'adhar' | 'pan
 
     await connectDB();
     const agency = await getCurrentAgency();
-    const user = await UserModel.findOne({ id: userId, agencyId: agency?.id }).lean();
+    const user = await UserModel.findOne({ id: userId, agencyId: agency?.id }).select('-password').lean();
     if (!user) { revalidatePath('/dashboard/team'); return; }
 
     let updates: any = {};
@@ -1515,7 +1514,7 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
     }
 
     // Notify admins about task status change (exclude the user who made the change)
-    const adminsForTask = await UserModel.find({ agencyId: agency.id, role: { $in: ['admin', 'manager'] } }).lean();
+    const adminsForTask = await UserModel.find({ agencyId: agency.id, role: { $in: ['admin', 'manager'] } }).select('-password').lean();
     const adminNotifs = adminsForTask
         .filter((a: any) => a.id !== userId)
         .map((admin: any) => ({
@@ -1563,7 +1562,7 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
 
             // Email to project client about task progress
             if (projectForNotif?.clientId) {
-                const clientDoc = await ClientModel.findOne({ id: projectForNotif.clientId, agencyId: agency.id }).lean();
+                const clientDoc = await ClientModel.findOne({ id: projectForNotif.clientId, agencyId: agency.id }).select('-password').lean();
                 if (clientDoc?.email) {
                     await sendTaskStatusChangedEmail({
                         recipientEmail: clientDoc.email,
@@ -1604,7 +1603,7 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
                 }
 
                 // Notify admins
-                const admins = await UserModel.find({ agencyId: agency.id, role: 'admin' }).lean();
+                const admins = await UserModel.find({ agencyId: agency.id, role: 'admin' }).select('-password').lean();
                 await NotificationModel.insertMany(admins.map(admin => ({
                     id: generateId(), agencyId: agency.id, userId: admin.id,
                     message: `Project "${project.name}" auto-completed - all tasks done`,
@@ -1866,7 +1865,7 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
     }
 
     // Notify admins about new task creation (exclude the creator)
-    const adminsForNewTask = await UserModel.find({ agencyId: agency.id, role: { $in: ['admin', 'manager'] } }).lean();
+    const adminsForNewTask = await UserModel.find({ agencyId: agency.id, role: { $in: ['admin', 'manager'] } }).select('-password').lean();
     const creatorId = currentUser ? currentUser.id : 'system';
     const creatorName = currentUser ? currentUser.name : 'System';
     const adminNewTaskNotifs = adminsForNewTask
@@ -1890,7 +1889,7 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
 export async function getClients() {
     await connectDB();
     const agency = await getCurrentAgency();
-    const clients = await ClientModel.find({ agencyId: agency?.id, archived: { $ne: true } }).lean();
+    const clients = await ClientModel.find({ agencyId: agency?.id, archived: { $ne: true } }).select('-password').lean();
     return clients.map(sanitizeDoc);
 }
 
@@ -1900,14 +1899,14 @@ export async function getClientByUsername(username: string) {
     const client = await ClientModel.findOne({
         agencyId: agency?.id,
         $or: [{ username }, { id: username }]
-    }).lean();
+    }).select('-password').lean();
     return client ? sanitizeDoc(client) : null;
 }
 
 export async function getClientById(id: string) {
     await connectDB();
     const agency = await getCurrentAgency();
-    const client = await ClientModel.findOne({ id, agencyId: agency?.id }).lean();
+    const client = await ClientModel.findOne({ id, agencyId: agency?.id }).select('-password').lean();
     return client ? sanitizeDoc(client) : null;
 }
 
@@ -2149,7 +2148,7 @@ export async function getTransactions(projectId?: string, userId?: string, categ
 
     // userId filter: use the userId DB field directly for reliable matching
     if (userId) {
-        const user = await UserModel.findOne({ id: userId, ...agencyFilter }).lean() as any;
+        const user = await UserModel.findOne({ id: userId, ...agencyFilter }).select('-password').lean() as any;
         if (user) {
             const lower = user.name.toLowerCase();
             // Primary: filter by userId field (set for Salary, Freelancer, Reimbursement, Internal Transfer)
@@ -2212,7 +2211,7 @@ export async function getCategoryMemberSummary(category: string) {
     const summaryMap = new Map<string, { id: string; name: string; total: number; count: number; avatar?: string }>();
 
     if (category === 'Internal Transfer') {
-        const users = await UserModel.find(agencyFilter).lean() as any[];
+        const users = await UserModel.find(agencyFilter).select('-password').lean() as any[];
         transactions.forEach((t: any) => {
             const user = users.find((u: any) => t.description?.toLowerCase().includes(u.name.toLowerCase()));
             if (user) {
@@ -2306,7 +2305,7 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
             read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
         });
         try {
-            const employee = await UserModel.findOne({ id: newTransaction.userId, agencyId: agency?.id }).lean();
+            const employee = await UserModel.findOne({ id: newTransaction.userId, agencyId: agency?.id }).select('-password').lean();
             if ((employee as any)?.email) {
                 await sendSalaryPaidEmail({
                     employeeEmail: (employee as any).email, employeeName: (employee as any).name,
@@ -2382,7 +2381,7 @@ export async function clientMarkInvoiceAsPaid(invoiceId: string) {
     await InvoiceModel.updateOne({ id: invoiceId, agencyId: agency.id }, { $set: { status: 'Processing' } });
 
     // Notify admins
-    const admins = await UserModel.find({ agencyId: agency.id, role: 'admin' }).lean();
+    const admins = await UserModel.find({ agencyId: agency.id, role: 'admin' }).select('-password').lean();
     await NotificationModel.insertMany(admins.map(admin => ({
         id: generateId(), agencyId: agency.id, userId: admin.id,
         message: `${currentUser.name} marked invoice ₹${invoice.amount.toLocaleString()} as paid - Awaiting approval`,
@@ -2622,7 +2621,7 @@ export async function getFinanceStats(projectId?: string, userId?: string, categ
     let [transactions, invoices, userForFilter] = await Promise.all([
         TransactionModel.find(txQuery).lean(),
         InvoiceModel.find(invQuery).lean(),
-        userId ? UserModel.findOne({ id: userId, ...agencyFilter }).lean() : Promise.resolve(null)
+        userId ? UserModel.findOne({ id: userId, ...agencyFilter }).select('-password').lean() : Promise.resolve(null)
     ]);
 
     if (userId && userForFilter) {
@@ -2657,7 +2656,7 @@ export async function getFinanceChartData(projectId?: string, userId?: string, c
     let transactions = await TransactionModel.find(query).lean();
 
     if (userId) {
-        const user = await UserModel.findOne({ id: userId, ...agencyFilter }).lean() as any;
+        const user = await UserModel.findOne({ id: userId, ...agencyFilter }).select('-password').lean() as any;
         if (user) {
             const lower = user.name.toLowerCase();
             // Primary: match by userId DB field; fallback: description match for legacy transactions
@@ -2714,7 +2713,7 @@ export async function getPayrollStatus(userId?: string) {
     const currentMonth = now.toLocaleString('default', { month: 'long', year: 'numeric' });
 
     const [users, transactions] = await Promise.all([
-        UserModel.find(userQuery).lean(),
+        UserModel.find(userQuery).select('-password').lean(),
         TransactionModel.find({
             category: 'Salary',
             type: 'expense',
@@ -2803,7 +2802,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
         return results;
     }
     if (isClientQuery) {
-        const allClients = await ClientModel.find(agencyFilter).sort({ createdAt: -1 }).limit(15).lean();
+        const allClients = await ClientModel.find(agencyFilter).sort({ createdAt: -1 }).limit(15).select('-password').lean();
         for (const c of allClients) {
             const client = sanitizeDoc(c) as any;
             results.push({ id: client.id, type: 'client', title: client.name, subtitle: client.companyName, url: `/dashboard/clients/${client.slug || client.id}` });
@@ -2819,7 +2818,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
         return results;
     }
     if (isTeamQuery) {
-        const allUsers = await UserModel.find(agencyFilter).sort({ createdAt: -1 }).limit(15).lean();
+        const allUsers = await UserModel.find(agencyFilter).sort({ createdAt: -1 }).limit(15).select('-password').lean();
         for (const u of allUsers) {
             const user = sanitizeDoc(u) as any;
             results.push({ id: user.id, type: 'user', title: user.name, subtitle: user.role, url: `/dashboard/team/${user.username || user.id}` });
@@ -2839,7 +2838,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
 
     for (const p of projects) {
         const proj = sanitizeDoc(p) as any;
-        const clientDoc = proj.clientId ? await ClientModel.findOne({ id: proj.clientId, ...agencyFilter }).lean() : null;
+        const clientDoc = proj.clientId ? await ClientModel.findOne({ id: proj.clientId, ...agencyFilter }).select('-password').lean() : null;
         const clientName = clientDoc ? (clientDoc as any).name : (proj.client || '');
         results.push({
             id: proj.id,
@@ -2854,7 +2853,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
     const clients = await ClientModel.find({
         ...agencyFilter,
         $or: [{ name: regex }, { companyName: regex }]
-    }).limit(5).lean();
+    }).limit(5).select('-password').lean();
 
     for (const c of clients) {
         const client = sanitizeDoc(c) as any;
@@ -2890,7 +2889,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
     const users = await UserModel.find({
         ...agencyFilter,
         $or: [{ name: regex }, { email: regex }]
-    }).limit(5).lean();
+    }).limit(5).select('-password').lean();
 
     for (const u of users) {
         const user = sanitizeDoc(u) as any;
@@ -3020,7 +3019,7 @@ export async function extractTaskFields(
     aiResponseText: string,
     availableCategories: string[],
 ): Promise<ExtractedTaskFields> {
-    const aiConfig = await getAgencyAIConfig();
+    const aiConfig = await getAgencyAIConfigInternal();
     if (!aiConfig) throw new Error('Singularity is not configured.');
 
     const systemInstruction = `You are a task field extractor. Given an AI-generated task description or discussion, extract structured fields for creating a project task.
@@ -3068,14 +3067,14 @@ export async function explainTask(taskId: string, userId: string) {
 
     const [project, assignee, allProjectTasks, projectAssetsRaw] = await Promise.all([
         ProjectModel.findOne({ id: task.projectId, ...agencyFilter }).lean(),
-        task.assigneeId ? UserModel.findOne({ id: task.assigneeId, ...agencyFilter }).lean() : Promise.resolve(null),
+        task.assigneeId ? UserModel.findOne({ id: task.assigneeId, ...agencyFilter }).select('-password').lean() : Promise.resolve(null),
         TaskModel.find({ projectId: task.projectId, ...agencyFilter }).lean(),
         AssetModel.find({ projectId: task.projectId, aiEnabled: true, ...agencyFilter }).lean()
     ]);
 
     // Build user name map for board summary
     const userIds = [...new Set(allProjectTasks.map((t: any) => t.assigneeId).filter(Boolean))];
-    const users = await UserModel.find({ id: { $in: userIds }, ...agencyFilter }).lean();
+    const users = await UserModel.find({ id: { $in: userIds }, ...agencyFilter }).select('-password').lean();
     const userMap = Object.fromEntries(users.map((u: any) => [u.id, u.name]));
 
     const tasksByStatus = {
@@ -3160,7 +3159,7 @@ ${context.comments.length > 0 ? context.comments.map((c: any) => `- ${c.text}`).
     }
 
     // Get AI config from agency (set by super-admin)
-    const aiConfig = await getAgencyAIConfig();
+    const aiConfig = await getAgencyAIConfigInternal();
     if (!aiConfig) {
         return "Singularity is not configured. Please contact your administrator to set up AI.";
     }
@@ -3218,7 +3217,7 @@ export async function enhanceTaskDescription(projectId: string, title: string, c
     });
 
 
-    const aiConfig = await getAgencyAIConfig();
+    const aiConfig = await getAgencyAIConfigInternal();
     if (!aiConfig) throw new Error("Singularity is not configured. Contact your administrator.");
 
     const isEnhancement = content.length > 20;
@@ -3324,7 +3323,7 @@ export async function createAISession(
     currentDescription: string,
     userId: string
 ): Promise<string> {
-    const aiConfig = await getAgencyAIConfig();
+    const aiConfig = await getAgencyAIConfigInternal();
     if (!aiConfig) throw new Error("Singularity is not configured.");
 
     // Only use persistent sessions for Live API models
@@ -3339,7 +3338,7 @@ export async function createAISession(
     const agencyFilter = agency ? { agencyId: agency.id } : {};
     const [tasks, users, assets] = await Promise.all([
         TaskModel.find({ projectId, ...agencyFilter }).lean(),
-        UserModel.find(agencyFilter).lean(),
+        UserModel.find(agencyFilter).select('-password').lean(),
         AssetModel.find({ projectId, aiEnabled: true, ...agencyFilter }).lean()
     ]);
     const data = { tasks, users, assets };
@@ -3408,11 +3407,11 @@ export async function chatWithTaskAI(
     const agencyFilter = agency ? { agencyId: agency.id } : {};
     const [tasks, users, assets] = await Promise.all([
         projectId ? TaskModel.find({ projectId, ...agencyFilter }).lean() : Promise.resolve([]),
-        UserModel.find(agencyFilter).lean(),
+        UserModel.find(agencyFilter).select('-password').lean(),
         projectId ? AssetModel.find({ projectId, aiEnabled: true, ...agencyFilter }).lean() : Promise.resolve([])
     ]);
     const data = { tasks, users, assets };
-    const aiConfig = await getAgencyAIConfig();
+    const aiConfig = await getAgencyAIConfigInternal();
     if (!aiConfig) throw new Error('Singularity is not configured.');
     const systemInstruction = buildChatSystemInstruction(projectId || '', currentTitle || '', currentDescription || '', data);
 
@@ -3433,7 +3432,7 @@ export async function singularityChat(
     history: Array<{ role: 'user' | 'model'; content: string }>,
     userMessage: string
 ): Promise<{ response: string; thinking: string }> {
-    const aiConfig = await getAgencyAIConfig();
+    const aiConfig = await getAgencyAIConfigInternal();
     if (!aiConfig) throw new Error("Singularity is not configured.");
 
     // Build a simple prompt with history (no system instruction)
@@ -3591,7 +3590,7 @@ export async function requestLeave(leaveData: Omit<LeaveRequest, 'id' | 'status'
     await LeaveRequestModel.create({ ...newLeaveRequest, agencyId: agency?.id });
 
     // Notify admins
-    const adminUsers = await UserModel.find({ agencyId: agency?.id, role: 'admin' }).lean();
+    const adminUsers = await UserModel.find({ agencyId: agency?.id, role: 'admin' }).select('-password').lean();
     await NotificationModel.insertMany(adminUsers.map((admin: any) => ({
         id: generateId(), agencyId: agency?.id, userId: admin.id,
         message: `${currentUser.name} requested ${leaveData.type} leave (${daysDiff} day${daysDiff > 1 ? 's' : ''})`,
@@ -3644,7 +3643,7 @@ export async function approveLeaveRequest(leaveRequestId: string) {
     const endDate = new Date((leaveRequest as any).endDate);
     const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
-    const employee = await UserModel.findOne({ id: (leaveRequest as any).userId, agencyId: agency?.id }).lean();
+    const employee = await UserModel.findOne({ id: (leaveRequest as any).userId, agencyId: agency?.id }).select('-password').lean();
     if (employee) {
         await NotificationModel.create({
             id: generateId(), agencyId: agency?.id, userId: (leaveRequest as any).userId,
@@ -3702,7 +3701,7 @@ export async function rejectLeaveRequest(leaveRequestId: string, rejectionReason
     const startDate2 = new Date((leaveRequest as any).startDate);
     const endDate2 = new Date((leaveRequest as any).endDate);
     const daysDiff2 = Math.ceil((endDate2.getTime() - startDate2.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    const employee2 = await UserModel.findOne({ id: (leaveRequest as any).userId, agencyId: agency?.id }).lean();
+    const employee2 = await UserModel.findOne({ id: (leaveRequest as any).userId, agencyId: agency?.id }).select('-password').lean();
 
     if (employee2) {
         const message = rejectionReason
@@ -3767,7 +3766,7 @@ export async function cancelLeaveRequest(leaveRequestId: string) {
     });
 
     if (currentUser.role !== 'admin') {
-        const adminUsers2 = await UserModel.find({ agencyId: agency?.id, role: 'admin' }).lean();
+        const adminUsers2 = await UserModel.find({ agencyId: agency?.id, role: 'admin' }).select('-password').lean();
         await NotificationModel.insertMany(adminUsers2.map((admin: any) => ({
             id: generateId(), agencyId: agency?.id, userId: admin.id,
             message: `${currentUser.name} cancelled their ${(leaveRequest as any).type} leave request`,
@@ -3852,7 +3851,7 @@ export async function updateLeaveStatus(requestId: string, status: LeaveStatus) 
         { id: requestId, agencyId: agency?.id },
         { $set: { status, reviewedBy: currentUser?.id, reviewedAt: new Date().toISOString() } }
     );
-    const userDoc = await UserModel.findOne({ id: (request as any).userId, agencyId: agency?.id }).lean();
+    const userDoc = await UserModel.findOne({ id: (request as any).userId, agencyId: agency?.id }).select('-password').lean();
     await NotificationModel.create({
         id: generateId(), agencyId: agency?.id, userId: (request as any).userId,
         message: `Your leave request for ${new Date((request as any).startDate).toLocaleDateString()} has been ${status}`,
@@ -4058,7 +4057,7 @@ export async function aiEstimateTaskHours(
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
 
-    const aiConfig = await getAgencyAIConfig();
+    const aiConfig = await getAgencyAIConfigInternal();
     if (!aiConfig) throw new Error('Singularity is not configured.');
 
     // Fetch completed tasks from this project for historical context

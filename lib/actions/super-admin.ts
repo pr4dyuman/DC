@@ -92,7 +92,7 @@ export async function getAgencyDetails(agencyId: string) {
 
     // Only fetch users list for management purposes (e.g. to see who is the admin)
     // But for now, we'll return the Owner info or just the list of users to help with support.
-    const users = await UserModel.find({ agencyId }).lean();
+    const users = await UserModel.find({ agencyId }).select('-password').lean();
 
     return toSerializable({
         agency,

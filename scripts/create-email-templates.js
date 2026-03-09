@@ -1,6 +1,16 @@
 
-const apiKey = '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';
-const sender = { name: 'Digital corvids', email: 'pradyumanvn@gmail.com' };
+require('dotenv').config();
+
+const apiKey = process.env.BREVO_API_KEY;
+const senderEmail = process.env.BREVO_SENDER_EMAIL || 'noreply@agency.com';
+const senderName = process.env.BREVO_SENDER_NAME || 'Digital corvids';
+
+if (!apiKey) {
+  console.error('❌ BREVO_API_KEY not found in .env');
+  process.exit(1);
+}
+
+const sender = { name: senderName, email: senderEmail };
 
 const templates = [
   {

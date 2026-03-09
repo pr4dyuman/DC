@@ -19,26 +19,14 @@ function serialize<T>(doc: T): T {
  */
 export const getCurrentAgency = cache(async (): Promise<Agency | null> => {
     try {
-        // 1. Try JWT session first (primary auth)
         const session = await getSessionUser();
         const cookieStore = await cookies();
 
-        let userId: string | undefined;
-        let role: string | undefined;
-        let agencyId: string | undefined;
-
-        if (session) {
-            userId = session.userId;
-            role = session.role;
-            agencyId = session.agencyId;
-        } else {
-            // Fallback to legacy cookie
-            userId = cookieStore.get('userId')?.value;
-        }
-
-        if (!userId) {
+        if (!session) {
             return null;
         }
+
+        const { userId, role, agencyId } = session;
 
         // If we already have agencyId from JWT, use it directly
         if (agencyId) {
@@ -97,6 +85,8 @@ export const getCurrentAgency = cache(async (): Promise<Agency | null> => {
  */
 export async function getAgencyById(agencyId: string): Promise<Agency | null> {
     try {
+        const session = await getSessionUser();
+        if (!session) return null;
         const agency = await AgencyModel.findOne({ id: agencyId }).lean();
         return serialize(agency) as Agency | null;
     } catch (error) {
@@ -110,6 +100,8 @@ export async function getAgencyById(agencyId: string): Promise<Agency | null> {
  */
 export async function getAgencyBySlug(slug: string): Promise<Agency | null> {
     try {
+        const session = await getSessionUser();
+        if (!session) return null;
         const agency = await AgencyModel.findOne({ slug }).lean();
         return serialize(agency) as Agency | null;
     } catch (error) {
@@ -179,6 +171,9 @@ export async function updateAgencyUsage(
     }>
 ): Promise<boolean> {
     try {
+        const session = await getSessionUser();
+        if (!session) return false;
+
         const setUpdates: Record<string, number> = {};
 
         for (const [key, value] of Object.entries(updates)) {
@@ -208,6 +203,8 @@ export async function incrementAgencyUsage(
     amount: number = 1
 ): Promise<boolean> {
     try {
+        const session = await getSessionUser();
+        if (!session) return false;
         await AgencyModel.updateOne(
             { id: agencyId },
             { $inc: { [`usage.${field}`]: amount } }
@@ -228,6 +225,8 @@ export async function decrementAgencyUsage(
     amount: number = 1
 ): Promise<boolean> {
     try {
+        const session = await getSessionUser();
+        if (!session) return false;
         await AgencyModel.updateOne(
             { id: agencyId },
             { $inc: { [`usage.${field}`]: -amount } }
@@ -262,6 +261,8 @@ export async function isFeatureEnabled(
  */
 export async function getAllAgencies(): Promise<Agency[]> {
     try {
+        const session = await getSessionUser();
+        if (!session || session.role !== 'superadmin') return [];
         const agencies = await AgencyModel.find({}).lean();
         return agencies as Agency[];
     } catch (error) {
@@ -275,14 +276,8 @@ export async function getAllAgencies(): Promise<Agency[]> {
  */
 export async function switchAgency(agencyId: string): Promise<boolean> {
     try {
-        const cookieStore = await cookies();
-        const userId = cookieStore.get('userId')?.value;
-
-        if (!userId) return false;
-
-        // Verify user is super admin
-        const superAdmin = await SuperAdminModel.findOne({ id: userId }).lean();
-        if (!superAdmin) {
+        const session = await getSessionUser();
+        if (!session || session.role !== 'superadmin') {
             throw new Error('Only super admins can switch agencies');
         }
 
@@ -293,6 +288,7 @@ export async function switchAgency(agencyId: string): Promise<boolean> {
         }
 
         // Set selected agency cookie
+        const cookieStore = await cookies();
         cookieStore.set('selectedAgencyId', agencyId);
 
         return true;
@@ -307,6 +303,8 @@ export async function switchAgency(agencyId: string): Promise<boolean> {
  */
 export async function clearAgencySelection(): Promise<boolean> {
     try {
+        const session = await getSessionUser();
+        if (!session || session.role !== 'superadmin') return false;
         const cookieStore = await cookies();
         cookieStore.delete('selectedAgencyId');
         return true;

@@ -1,5 +1,3 @@
-"use server";
-
 /**
  * Brevo Email Service
  * Handles all email notifications for the agency-os application

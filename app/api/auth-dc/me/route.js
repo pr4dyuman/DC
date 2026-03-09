@@ -1,15 +1,12 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { checkAuth } from '@/lib/authMiddleware';
 
 export async function GET() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('admin_token');
+  const auth = await checkAuth();
 
-  if (token && token.value === 'logged_in_secret_value') {
+  if (auth.authorized) {
     return NextResponse.json({ authenticated: true }, { status: 200 });
   }
 
   return NextResponse.json({ authenticated: false }, { status: 401 });
 }
-
-

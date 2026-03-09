@@ -3,6 +3,7 @@
 import { connectDB, SingularityChatSessionModel, SingularityCheckpointModel, TaskModel, ProjectModel, ClientModel, InvoiceModel, TransactionModel, ServiceModel, LeaveRequestModel } from "./mongodb";
 import { getCurrentAgency } from "./agency-context";
 import { generateId } from "./utils-server";
+import { getSessionUser } from "./auth";
 
 // ============================================================================
 // TYPES
@@ -60,7 +61,11 @@ export interface RollbackAnalysis {
 // CHAT SESSION CRUD
 // ============================================================================
 
-export async function getSingularitySessions(userId: string): Promise<ChatSessionSummary[]> {
+export async function getSingularitySessions(_userId?: string): Promise<ChatSessionSummary[]> {
+    const session = await getSessionUser();
+    if (!session) throw new Error('Unauthorized');
+    const userId = session.userId;
+
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyId = agency?.id || 'default-agency';
@@ -80,21 +85,30 @@ export async function getSingularitySessions(userId: string): Promise<ChatSessio
 }
 
 export async function getSingularitySession(sessionId: string) {
+    const session = await getSessionUser();
+    if (!session) throw new Error('Unauthorized');
+
     await connectDB();
-    const session = await SingularityChatSessionModel.findOne({ id: sessionId }).lean();
-    if (!session) return null;
+    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId }).lean();
+    if (!chatSession) return null;
+    // Verify ownership
+    if ((chatSession as any).userId !== session.userId) throw new Error('Unauthorized: Session does not belong to you');
     return {
-        id: (session as any).id,
-        userId: (session as any).userId,
-        title: (session as any).title,
-        mode: (session as any).mode,
-        messages: (session as any).messages || [],
-        createdAt: (session as any).createdAt,
-        updatedAt: (session as any).updatedAt,
+        id: (chatSession as any).id,
+        userId: (chatSession as any).userId,
+        title: (chatSession as any).title,
+        mode: (chatSession as any).mode,
+        messages: (chatSession as any).messages || [],
+        createdAt: (chatSession as any).createdAt,
+        updatedAt: (chatSession as any).updatedAt,
     };
 }
 
-export async function createSingularitySession(userId: string, mode: 'chat' | 'agent'): Promise<string> {
+export async function createSingularitySession(_userId: string, mode: 'chat' | 'agent'): Promise<string> {
+    const session = await getSessionUser();
+    if (!session) throw new Error('Unauthorized');
+    const userId = session.userId;
+
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyId = agency?.id || 'default-agency';
@@ -122,7 +136,14 @@ export async function updateSingularitySession(
     messages: ChatMessage[],
     title?: string
 ) {
+    const authSession = await getSessionUser();
+    if (!authSession) throw new Error('Unauthorized');
+
     await connectDB();
+    // Verify ownership
+    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId }).select('userId').lean();
+    if (!chatSession || (chatSession as any).userId !== authSession.userId) throw new Error('Unauthorized: Session does not belong to you');
+
     const now = new Date().toISOString();
 
     // Cap to prevent MongoDB 16MB document limit
@@ -141,7 +162,14 @@ export async function updateSingularitySession(
 }
 
 export async function updateSingularitySessionMode(sessionId: string, mode: 'chat' | 'agent') {
+    const authSession = await getSessionUser();
+    if (!authSession) throw new Error('Unauthorized');
+
     await connectDB();
+    // Verify ownership
+    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId }).select('userId').lean();
+    if (!chatSession || (chatSession as any).userId !== authSession.userId) throw new Error('Unauthorized: Session does not belong to you');
+
     await SingularityChatSessionModel.updateOne(
         { id: sessionId },
         { $set: { mode, updatedAt: new Date().toISOString() } }
@@ -149,7 +177,14 @@ export async function updateSingularitySessionMode(sessionId: string, mode: 'cha
 }
 
 export async function deleteSingularitySession(sessionId: string) {
+    const authSession = await getSessionUser();
+    if (!authSession) throw new Error('Unauthorized');
+
     await connectDB();
+    // Verify ownership
+    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId }).select('userId').lean();
+    if (!chatSession || (chatSession as any).userId !== authSession.userId) throw new Error('Unauthorized: Session does not belong to you');
+
     // Delete session and all associated checkpoints
     await Promise.all([
         SingularityChatSessionModel.deleteOne({ id: sessionId }),
@@ -162,6 +197,9 @@ export async function deleteSingularitySession(sessionId: string) {
 // ============================================================================
 
 export async function getCheckpointSessionId(checkpointId: string): Promise<string | null> {
+    const authSession = await getSessionUser();
+    if (!authSession) throw new Error('Unauthorized');
+
     await connectDB();
     const cp = await SingularityCheckpointModel.findOne({ id: checkpointId }).select('sessionId').lean();
     return cp ? (cp as any).sessionId : null;
@@ -172,7 +210,14 @@ export async function createCheckpoint(
     actions: CheckpointAction[],
     label: string
 ): Promise<string> {
+    const authSession = await getSessionUser();
+    if (!authSession) throw new Error('Unauthorized');
+
     await connectDB();
+    // Verify session ownership
+    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId }).select('userId').lean();
+    if (!chatSession || (chatSession as any).userId !== authSession.userId) throw new Error('Unauthorized: Session does not belong to you');
+
     const agency = await getCurrentAgency();
     const agencyId = agency?.id || 'default-agency';
     const id = generateId();
@@ -192,7 +237,14 @@ export async function createCheckpoint(
 }
 
 export async function getCheckpoints(sessionId: string) {
+    const authSession = await getSessionUser();
+    if (!authSession) throw new Error('Unauthorized');
+
     await connectDB();
+    // Verify session ownership
+    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId }).select('userId').lean();
+    if (!chatSession || (chatSession as any).userId !== authSession.userId) throw new Error('Unauthorized: Session does not belong to you');
+
     const checkpoints = await SingularityCheckpointModel
         .find({ sessionId, status: 'active' })
         .sort({ createdAt: -1 })
@@ -316,9 +368,16 @@ async function checkEntityConflict(action: CheckpointAction): Promise<ConflictIn
 }
 
 export async function analyzeRollback(checkpointId: string): Promise<RollbackAnalysis | null> {
+    const authSession = await getSessionUser();
+    if (!authSession) throw new Error('Unauthorized');
+
     await connectDB();
     const checkpoint = await SingularityCheckpointModel.findOne({ id: checkpointId }).lean() as any;
     if (!checkpoint) return null;
+
+    // Verify ownership via the parent session
+    const chatSession = await SingularityChatSessionModel.findOne({ id: checkpoint.sessionId }).select('userId').lean();
+    if (!chatSession || (chatSession as any).userId !== authSession.userId) throw new Error('Unauthorized: Checkpoint does not belong to you');
 
     const safeActions: CheckpointAction[] = [];
     const conflictedActions: { action: CheckpointAction; conflict: ConflictInfo }[] = [];
@@ -351,7 +410,17 @@ export async function executeRollback(
     checkpointId: string,
     scope: 'safe' | 'all'
 ): Promise<{ success: boolean; rolledBack: number; skipped: number; errors: string[] }> {
+    const authSession = await getSessionUser();
+    if (!authSession) throw new Error('Unauthorized');
+
     await connectDB();
+
+    // Verify ownership via the parent session
+    const cpDoc = await SingularityCheckpointModel.findOne({ id: checkpointId }).select('sessionId').lean();
+    if (cpDoc) {
+        const chatSession = await SingularityChatSessionModel.findOne({ id: (cpDoc as any).sessionId }).select('userId').lean();
+        if (!chatSession || (chatSession as any).userId !== authSession.userId) throw new Error('Unauthorized: Checkpoint does not belong to you');
+    }
 
     const analysis = await analyzeRollback(checkpointId);
     if (!analysis) return { success: false, rolledBack: 0, skipped: 0, errors: ['Checkpoint not found'] };

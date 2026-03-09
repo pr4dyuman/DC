@@ -2,56 +2,74 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/marketing-db';
 import Admin from '@/models/marketing/Admin';
 import { cookies } from 'next/headers';
+import { SignJWT } from 'jose';
 
-// Hardcoded for initial setup if DB is empty - or just check directly
-const ADMIN_EMAIL = 'godigitalwithus0@gmail.com';
+const JWT_SECRET = process.env.JWT_SECRET;
+const encodedKey = new TextEncoder().encode(JWT_SECRET);
+
+// In-memory rate limiting
+const loginAttempts = new Map();
+const MAX_ATTEMPTS = 10;
+const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function checkRateLimit(email) {
+  const now = Date.now();
+  const key = email.toLowerCase().trim();
+  const record = loginAttempts.get(key);
+  if (record && now < record.resetAt) {
+    if (record.count >= MAX_ATTEMPTS) return false;
+    record.count++;
+  } else {
+    loginAttempts.set(key, { count: 1, resetAt: now + WINDOW_MS });
+  }
+  return true;
+}
 
 export async function POST(req) {
   try {
+    if (!JWT_SECRET) {
+      return NextResponse.json({ success: false, error: 'Server misconfiguration' }, { status: 500 });
+    }
+
     await dbConnect();
     const { email, password } = await req.json();
 
-    if (email !== ADMIN_EMAIL) {
-      return NextResponse.json({ success: false, error: 'Invalid email' }, { status: 401 });
+    if (!email || !password) {
+      return NextResponse.json({ success: false, error: 'Email and password are required' }, { status: 400 });
     }
 
-    // In a real app, verify password hash. 
-    // For this specific request "make sure to validate from db", 
-    // I entered a placeholder logic. 
-    // The user didn't give a password, so I will auto-create the admin if not exists with a default password for the FIRST time,
-    // OR just checks if he exists. 
-    // Let's assume the user WILL create the admin manually or I should seed it.
-    // Given the prompt "validate from db", I'll query the DB.
-    
-    const admin = await Admin.findOne({ email });
+    if (!checkRateLimit(email)) {
+      return NextResponse.json({ success: false, error: 'Too many login attempts. Try again later.' }, { status: 429 });
+    }
 
+    const admin = await Admin.findOne({ email: email.toLowerCase().trim() });
     if (!admin) {
-      // Lazy Seed: If no admin exists with this email, create one with the provided password.
-      // This is for initial setup convenience.
-      await Admin.create({ email, password });
-      
-      // Proceed to login success
-      const cookieStore = await cookies();
-      cookieStore.set('admin_token', 'logged_in_secret_value', {
-        httpOnly: true,
-        path: '/',
-        maxAge: 60 * 60 * 24, // 1 day
-      });
-      return NextResponse.json({ success: true, message: 'Admin created and logged in' }, { status: 200 });
+      return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 });
     }
 
-    if (admin.password !== password) {
-       return NextResponse.json({ success: false, error: 'Invalid password' }, { status: 401 });
+    const valid = await admin.comparePassword(password);
+    if (!valid) {
+      return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // Set cookie
-    // Next.js App Router cookies
+    // Issue JWT
+    const token = await new SignJWT({ adminId: admin._id.toString(), email: admin.email, role: 'marketing-admin' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('24h')
+      .sign(encodedKey);
+
     const cookieStore = await cookies();
-    cookieStore.set('admin_token', 'logged_in_secret_value', {
+    cookieStore.set('admin_token', token, {
       httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24, // 1 day
     });
+
+    // Clear rate limit on success
+    loginAttempts.delete(email.toLowerCase().trim());
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
@@ -59,5 +77,3 @@ export async function POST(req) {
     return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });
   }
 }
-
-

@@ -6,6 +6,7 @@ import { withAgencyId, getCurrentAgency } from "./agency-context";
 import { generateId } from "./utils-server";
 import { UserModel, ClientModel, MessageModel, connectDB } from "./mongodb";
 import { sanitizeString } from "./validation";
+import { getSessionUser } from "./auth";
 
 export type { Message };
 
@@ -41,43 +42,55 @@ function serializeMessage(m: any): Message {
     };
 }
 
-export async function heartbeat(userId: string) {
+export async function heartbeat(_userId?: string) {
+    const session = await getSessionUser();
+    if (!session) return;
+    const authedUserId = session.userId;
+
     await connectDB();
     const now = new Date().toISOString();
 
     // Direct targeted update — avoids loading all collections just to update one field
     const userResult = await UserModel.updateOne(
-        { id: userId },
+        { id: authedUserId },
         { $set: { lastActiveAt: now } }
     );
 
     // If no user was found, try clients
     if (userResult.matchedCount === 0) {
         await ClientModel.updateOne(
-            { id: userId },
+            { id: authedUserId },
             { $set: { lastActiveAt: now } }
         );
     }
 }
 
-export async function getTotalUnreadCount(currentUserId: string): Promise<number> {
+export async function getTotalUnreadCount(_currentUserId?: string): Promise<number> {
+    const session = await getSessionUser();
+    if (!session) return 0;
+    const authedUserId = session.userId;
+
     await connectDB();
     const agency = await getCurrentAgency();
     return MessageModel.countDocuments({
-        receiverId: currentUserId, read: false,
+        receiverId: authedUserId, read: false,
         ...(agency ? { agencyId: agency.id } : {})
     });
 }
 
-export async function getContacts(currentUserId: string): Promise<Contact[]> {
+export async function getContacts(_currentUserId?: string): Promise<Contact[]> {
+    const session = await getSessionUser();
+    if (!session) throw new Error('Unauthorized');
+    const currentUserId = session.userId;
+
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = agency ? { agencyId: agency.id } : {};
     const now = new Date().getTime();
 
     const [users, clients, allMessages] = await Promise.all([
-        UserModel.find({ id: { $ne: currentUserId }, ...agencyFilter }).lean(),
-        ClientModel.find({ ...agencyFilter }).lean(),
+        UserModel.find({ id: { $ne: currentUserId }, ...agencyFilter }).select('-password').lean(),
+        ClientModel.find({ ...agencyFilter }).select('-password').lean(),
         MessageModel.find({
             $or: [{ senderId: currentUserId }, { receiverId: currentUserId }],
             ...agencyFilter
@@ -131,7 +144,11 @@ export async function getContacts(currentUserId: string): Promise<Contact[]> {
     });
 }
 
-export async function getMessages(currentUserId: string, otherUserId: string): Promise<Message[]> {
+export async function getMessages(_currentUserId: string, otherUserId: string): Promise<Message[]> {
+    const session = await getSessionUser();
+    if (!session) throw new Error('Unauthorized');
+    const currentUserId = session.userId;
+
     await connectDB();
     const agency = await getCurrentAgency();
     const msgs = await MessageModel.find({
@@ -146,7 +163,11 @@ export async function getMessages(currentUserId: string, otherUserId: string): P
         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) as Message[];
 }
 
-export async function sendMessage(senderId: string, receiverId: string, content: string, type: 'text' | 'image' = 'text') {
+export async function sendMessage(_senderId: string, receiverId: string, content: string, type: 'text' | 'image' = 'text') {
+    const session = await getSessionUser();
+    if (!session) throw new Error('Unauthorized');
+    const senderId = session.userId;
+
     await connectDB();
     // Input sanitization — prevent XSS in chat messages
     content = sanitizeString(content, 10000);
@@ -160,7 +181,7 @@ export async function sendMessage(senderId: string, receiverId: string, content:
             agencyId = agency.id;
         } else {
             // Fallback: look up user directly from DB
-            const userData = await UserModel.findOne({ id: senderId }).lean();
+            const userData = await UserModel.findOne({ id: senderId }).select('-password').lean();
             if (userData && (userData as any).agencyId) {
                 agencyId = (userData as any).agencyId;
             }
@@ -185,14 +206,18 @@ export async function sendMessage(senderId: string, receiverId: string, content:
     await MessageModel.create(newMessage);
 
     // Also update sender's presence
-    await heartbeat(senderId);
+    await heartbeat();
 
     revalidatePath('/dashboard');
 
     return newMessage;
 }
 
-export async function markAsRead(currentUserId: string, senderId: string) {
+export async function markAsRead(_currentUserId: string, senderId: string) {
+    const session = await getSessionUser();
+    if (!session) return;
+    const currentUserId = session.userId;
+
     await connectDB();
     const agency = await getCurrentAgency();
     await MessageModel.updateMany(
@@ -205,7 +230,11 @@ export async function markAsRead(currentUserId: string, senderId: string) {
     );
 }
 
-export async function deleteConversation(currentUserId: string, otherUserId: string) {
+export async function deleteConversation(_currentUserId: string, otherUserId: string) {
+    const session = await getSessionUser();
+    if (!session) throw new Error('Unauthorized');
+    const currentUserId = session.userId;
+
     await connectDB();
     const agency = await getCurrentAgency();
     if (!agency) throw new Error('No agency context — cannot delete conversation');

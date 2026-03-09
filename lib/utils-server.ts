@@ -1,6 +1,7 @@
-import { connectDB, UserModel, ClientModel, SuperAdminModel } from "./mongodb";
-import { User } from "./types"; // Ensure User type is imported
+import { connectDB, UserModel, ClientModel, SuperAdminModel, decryptApiKey } from "./mongodb";
+import { User, AIConfig } from "./types";
 import { randomUUID } from "crypto";
+import { getCurrentAgency } from "./agency-context";
 
 export function generateId(): string {
     return randomUUID();
@@ -20,9 +21,9 @@ export async function resolveUserOrClient(identifier: string, agencyId?: string)
 
     // Parallel lookup for maximum performance
     const [user, client, superAdmin] = await Promise.all([
-        UserModel.findOne({ $or: [{ id: identifier }, { username: identifier }], ...agencyScope }).lean(),
-        ClientModel.findOne({ $or: [{ id: identifier }, { username: identifier }], ...agencyScope }).lean(),
-        SuperAdminModel.findOne({ id: identifier }).lean() // SuperAdmin is global, not tenant-scoped
+        UserModel.findOne({ $or: [{ id: identifier }, { username: identifier }], ...agencyScope }).select('-password').lean(),
+        ClientModel.findOne({ $or: [{ id: identifier }, { username: identifier }], ...agencyScope }).select('-password').lean(),
+        SuperAdminModel.findOne({ id: identifier }).select('-password').lean() // SuperAdmin is global, not tenant-scoped
     ]);
 
     // 1. Check User
@@ -63,4 +64,14 @@ export async function resolveUserOrClient(identifier: string, agencyId?: string)
     }
 
     return undefined;
+}
+
+// Server-only: returns AI config with real decrypted key (NOT a server action)
+export async function getAgencyAIConfigServer(): Promise<AIConfig | null> {
+    await connectDB();
+    const agency = await getCurrentAgency();
+    if (!agency || !agency.aiConfig) return null;
+    const config = agency.aiConfig as AIConfig;
+    if (config?.apiKey) config.apiKey = decryptApiKey(config.apiKey);
+    return config;
 }

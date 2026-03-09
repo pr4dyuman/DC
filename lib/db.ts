@@ -95,9 +95,9 @@ export const db = {
 
         const [agencies, superAdmins, users, clients, projects, tasks, invoices, transactions, services, notifications, activities, assets, messages, leaveRequests, settingsDoc] = await Promise.all([
             AgencyModel.find({}).lean(),
-            SuperAdminModel.find({}).lean(),
-            UserModel.find(agencyFilter).lean(),
-            ClientModel.find(agencyFilter).lean(),
+            SuperAdminModel.find({}).select('-password').lean(),
+            UserModel.find(agencyFilter).select('-password').lean(),
+            ClientModel.find(agencyFilter).select('-password').lean(),
             ProjectModel.find(agencyFilter).lean(),
             TaskModel.find(agencyFilter).lean(),
             InvoiceModel.find(agencyFilter).lean(),

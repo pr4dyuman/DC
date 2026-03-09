@@ -1,5 +1,3 @@
-"use server";
-
 /**
  * Brevo (Sendinblue) transactional email utility.
  * Uses the Brevo REST API v3 to send emails.

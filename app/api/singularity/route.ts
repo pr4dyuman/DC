@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAgencyAIConfig } from "@/lib/actions";
+import { getAgencyAIConfigServer } from "@/lib/utils-server";
 import { buildSingularityContext } from "@/lib/singularity-context";
 import { SINGULARITY_TOOL_DECLARATIONS, getToolDisplayName } from "@/lib/singularity-tool-defs";
 import { executeTool } from "@/lib/singularity-tools";
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
         // Use authenticated userId, not user-supplied one
         const authenticatedUserId = session.userId;
 
-        const aiConfig = await getAgencyAIConfig();
+        const aiConfig = await getAgencyAIConfigServer();
         if (!aiConfig) {
             return NextResponse.json({ error: "AI not configured" }, { status: 500 });
         }

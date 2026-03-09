@@ -17,7 +17,8 @@ export async function login(email: string, password: string) {
     if (superAdmin) {
         if (superAdmin.password && await bcrypt.compare(password, superAdmin.password)) {
             await authLogin(superAdmin.id, 'superadmin');
-            return { success: true, user: superAdmin, isSuperAdmin: true };
+            const { password: _, ...safeAdmin } = superAdmin;
+            return { success: true, user: safeAdmin, isSuperAdmin: true };
         }
     }
 
@@ -27,7 +28,8 @@ export async function login(email: string, password: string) {
         if (user.password && await bcrypt.compare(password, user.password)) {
             await authLogin(user.id, user.role, user.agencyId);
             await UserModel.updateOne({ id: user.id }, { $set: { lastActiveAt: new Date().toISOString() } });
-            return { success: true, user, isSuperAdmin: false };
+            const { password: _, ...safeUser } = user;
+            return { success: true, user: safeUser, isSuperAdmin: false };
         }
     }
 
@@ -37,7 +39,8 @@ export async function login(email: string, password: string) {
         if (client.password && await bcrypt.compare(password, client.password)) {
             await authLogin(client.id, 'client', client.agencyId);
             await ClientModel.updateOne({ id: client.id }, { $set: { lastActiveAt: new Date().toISOString() } });
-            return { success: true, user: client, isSuperAdmin: false };
+            const { password: _, ...safeClient } = client;
+            return { success: true, user: safeClient, isSuperAdmin: false };
         }
     }
 
