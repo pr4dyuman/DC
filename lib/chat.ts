@@ -1,6 +1,6 @@
 "use server";
 
-import { db, Message, User, Client } from "./db";
+import { Message, User, Client } from "./db";
 import { revalidatePath } from "next/cache";
 import { withAgencyId, getCurrentAgency } from "./agency-context";
 import { generateId } from "./utils-server";
@@ -88,14 +88,27 @@ export async function getContacts(_currentUserId?: string): Promise<Contact[]> {
     const agencyFilter = agency ? { agencyId: agency.id } : {};
     const now = new Date().getTime();
 
-    const [users, clients, allMessages] = await Promise.all([
+    // Fetch users/clients, and use aggregation for message stats instead of loading ALL messages
+    const [users, clients, lastMessages, unreadCounts] = await Promise.all([
         UserModel.find({ id: { $ne: currentUserId }, ...agencyFilter }).select('-password').lean(),
         ClientModel.find({ ...agencyFilter }).select('-password').lean(),
-        MessageModel.find({
-            $or: [{ senderId: currentUserId }, { receiverId: currentUserId }],
-            ...agencyFilter
-        }).lean()
+        // Aggregation: get last message per contact (sent or received)
+        MessageModel.aggregate([
+            { $match: { $or: [{ senderId: currentUserId }, { receiverId: currentUserId }], ...agencyFilter } },
+            { $addFields: { contactId: { $cond: [{ $eq: ['$senderId', currentUserId] }, '$receiverId', '$senderId'] } } },
+            { $sort: { timestamp: -1 } },
+            { $group: { _id: '$contactId', lastMsg: { $first: '$$ROOT' } } },
+        ]),
+        // Aggregation: count unread messages per sender
+        MessageModel.aggregate([
+            { $match: { receiverId: currentUserId, read: false, ...agencyFilter } },
+            { $group: { _id: '$senderId', count: { $sum: 1 } } },
+        ]),
     ]);
+
+    // Build lookup maps
+    const lastMsgMap = new Map<string, any>(lastMessages.map((r: any) => [r._id, r.lastMsg]));
+    const unreadMap = new Map<string, number>(unreadCounts.map((r: any) => [r._id, r.count]));
 
     const isClient = clients.some((c: any) => c.id === currentUserId);
     const contacts: Contact[] = [];
@@ -103,11 +116,14 @@ export async function getContacts(_currentUserId?: string): Promise<Contact[]> {
     for (const user of users) {
         const u = user as any;
         const lastActive = u.lastActiveAt ? new Date(u.lastActiveAt).getTime() : 0;
+        const lastMsg = lastMsgMap.get(u.id);
         contacts.push({
             id: u.id, username: u.username, name: u.name, email: u.email,
             avatar: u.avatar, role: u.role, jobTitle: u.jobTitle, type: 'user',
-            unreadCount: 0, isOnline: (now - lastActive) < ONLINE_THRESHOLD_MS,
-            lastActiveAt: u.lastActiveAt
+            unreadCount: unreadMap.get(u.id) || 0,
+            isOnline: (now - lastActive) < ONLINE_THRESHOLD_MS,
+            lastActiveAt: u.lastActiveAt,
+            lastMessage: lastMsg ? serializeMessage(lastMsg) : undefined,
         });
     }
 
@@ -115,27 +131,17 @@ export async function getContacts(_currentUserId?: string): Promise<Contact[]> {
         for (const client of clients) {
             const c = client as any;
             const lastActive = c.lastActiveAt ? new Date(c.lastActiveAt).getTime() : 0;
+            const lastMsg = lastMsgMap.get(c.id);
             contacts.push({
                 id: c.id, username: c.username, name: c.name, email: c.email,
                 companyName: c.companyName, avatar: c.logo, role: 'Client', type: 'client',
-                unreadCount: 0, isOnline: (now - lastActive) < ONLINE_THRESHOLD_MS,
-                lastActiveAt: c.lastActiveAt
+                unreadCount: unreadMap.get(c.id) || 0,
+                isOnline: (now - lastActive) < ONLINE_THRESHOLD_MS,
+                lastActiveAt: c.lastActiveAt,
+                lastMessage: lastMsg ? serializeMessage(lastMsg) : undefined,
             } as any);
         }
     }
-
-    contacts.forEach(contact => {
-        const discussion = (allMessages as any[])
-            .filter((m: any) =>
-                (m.senderId === currentUserId && m.receiverId === contact.id) ||
-                (m.senderId === contact.id && m.receiverId === currentUserId)
-            )
-            .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-        if (discussion.length > 0) contact.lastMessage = serializeMessage(discussion[discussion.length - 1]);
-        contact.unreadCount = (allMessages as any[]).filter((m: any) =>
-            m.senderId === contact.id && m.receiverId === currentUserId && !m.read
-        ).length;
-    });
 
     return contacts.sort((a, b) => {
         const timeA = a.lastMessage ? new Date(a.lastMessage.timestamp).getTime() : 0;

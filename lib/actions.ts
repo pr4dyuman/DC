@@ -1,6 +1,6 @@
 ﻿"use server";
 
-import { db, User, Project, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig, LeaveRequest, LeaveType, LeaveStatus, UserPermissions, Transaction, TransactionType, TransactionCategory } from "./db";
+import { User, Project, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig, LeaveRequest, LeaveType, LeaveStatus, UserPermissions, Transaction, TransactionType, TransactionCategory } from "./db";
 import { revalidatePath } from "next/cache";
 import { generateContent, generateContentWithParts, generateContentWithChat } from "./ai-provider";
 import { createSession, sendMessage, closeSession, isSessionActive } from "./live-session";
@@ -272,9 +272,48 @@ export async function getDashboardMetrics() {
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
 
-    // Parallel fetch for dashboard data
-    const [transactions, pendingInvoicesList, activeProjectsCount, projects, tasks, allUsers, pendingLeaves] = await Promise.all([
-        TransactionModel.find(agencyFilter).lean(),
+    // Previous month calculation
+    const prevMonthDate = new Date();
+    prevMonthDate.setMonth(currentMonth - 1);
+    const prevMonth = prevMonthDate.getMonth();
+    const prevMonthYear = prevMonthDate.getFullYear();
+
+    // Use aggregation pipelines for financial metrics instead of fetching all transactions
+    const [revenuePipeline, pendingInvoicesList, activeProjectsCount, projects, tasks, allUsers, pendingLeaves] = await Promise.all([
+        TransactionModel.aggregate([
+            { $match: { ...agencyFilter, status: 'completed' } },
+            {
+                $group: {
+                    _id: null,
+                    totalIncome: { $sum: { $cond: [{ $eq: ['$type', 'income'] }, '$amount', 0] } },
+                    totalRefunds: { $sum: { $cond: [{ $eq: ['$category', 'Refund'] }, '$amount', 0] } },
+                    currentMonthRevenue: {
+                        $sum: {
+                            $cond: [
+                                { $and: [
+                                    { $eq: ['$type', 'income'] },
+                                    { $eq: [{ $year: { $toDate: '$date' } }, currentYear] },
+                                    { $eq: [{ $month: { $toDate: '$date' } }, currentMonth + 1] }
+                                ] },
+                                '$amount', 0
+                            ]
+                        }
+                    },
+                    prevMonthRevenue: {
+                        $sum: {
+                            $cond: [
+                                { $and: [
+                                    { $eq: ['$type', 'income'] },
+                                    { $eq: [{ $year: { $toDate: '$date' } }, prevMonthYear] },
+                                    { $eq: [{ $month: { $toDate: '$date' } }, prevMonth + 1] }
+                                ] },
+                                '$amount', 0
+                            ]
+                        }
+                    },
+                }
+            }
+        ]),
         InvoiceModel.find({ ...agencyFilter, status: { $in: ['Pending', 'Overdue', 'Processing'] } }).lean(),
         ProjectModel.countDocuments({ ...agencyFilter, status: 'Active' }),
         ProjectModel.find({ ...agencyFilter, status: 'Active' }).select('id').lean(),
@@ -283,41 +322,14 @@ export async function getDashboardMetrics() {
         LeaveRequestModel.countDocuments({ ...agencyFilter, status: 'Pending' })
     ]);
 
-    // 1. Revenue & Growth
-    // Total Revenue = All completed income transactions (client payments) - Refunds
-    const incomeTransactions = transactions.filter((t: any) => t.type === 'income' && t.status === 'completed');
-    const totalIncome = incomeTransactions.reduce((acc: number, curr: any) => acc + curr.amount, 0);
-
-    // Subtract refunds from revenue
-    const refundTransactions = transactions.filter((t: any) => t.category === 'Refund' && t.status === 'completed');
-    const totalRefunds = refundTransactions.reduce((acc: number, curr: any) => acc + curr.amount, 0);
-
-    const totalRevenue = totalIncome - totalRefunds;
-
-    // Calculate generic "Growth" (Current Month vs Previous Month)
-    const currentMonthRevenue = incomeTransactions
-        .filter(t => {
-            const d = new Date(t.date);
-            return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
-        })
-        .reduce((acc, curr) => acc + curr.amount, 0);
-
-    const prevMonthDate = new Date();
-    prevMonthDate.setMonth(currentMonth - 1);
-    const prevMonth = prevMonthDate.getMonth();
-    const prevMonthYear = prevMonthDate.getFullYear();
-
-    const prevMonthRevenue = incomeTransactions
-        .filter(t => {
-            const d = new Date(t.date);
-            return d.getFullYear() === prevMonthYear && d.getMonth() === prevMonth;
-        })
-        .reduce((acc, curr) => acc + curr.amount, 0);
+    // Extract aggregation results (default to 0 if no transactions)
+    const agg = revenuePipeline[0] || { totalIncome: 0, totalRefunds: 0, currentMonthRevenue: 0, prevMonthRevenue: 0 };
+    const totalRevenue = agg.totalIncome - agg.totalRefunds;
 
     let growthPercentage = 0;
-    if (prevMonthRevenue > 0) {
-        growthPercentage = Math.round(((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100);
-    } else if (currentMonthRevenue > 0) {
+    if (agg.prevMonthRevenue > 0) {
+        growthPercentage = Math.round(((agg.currentMonthRevenue - agg.prevMonthRevenue) / agg.prevMonthRevenue) * 100);
+    } else if (agg.currentMonthRevenue > 0) {
         growthPercentage = 100;
     }
 
@@ -366,7 +378,16 @@ export async function getRevenueData() {
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
-    const transactions = await TransactionModel.find(agencyFilter).lean();
+
+    // Only fetch transactions from the last 6 months instead of ALL transactions
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+    sixMonthsAgo.setDate(1);
+    const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0];
+    const transactions = await TransactionModel.find({
+        ...agencyFilter,
+        date: { $gte: sixMonthsAgoStr },
+    }).select('date type amount').lean();
 
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const currentYear = new Date().getFullYear();
