@@ -2,7 +2,7 @@
 
 import { cache } from 'react';
 import { cookies } from "next/headers";
-import { AgencyModel, UserModel, ClientModel, SuperAdminModel } from "./mongodb";
+import { AgencyModel, UserModel, ClientModel, SuperAdminModel, connectDB } from "./mongodb";
 import { Agency, User, Client, AGENCY_PLANS, SuperAdmin } from "./types";
 import { getSessionUser } from "./auth";
 
@@ -19,6 +19,7 @@ function serialize<T>(doc: T): T {
  */
 export const getCurrentAgency = cache(async (): Promise<Agency | null> => {
     try {
+        await connectDB();
         const session = await getSessionUser();
         const cookieStore = await cookies();
 
@@ -85,6 +86,7 @@ export const getCurrentAgency = cache(async (): Promise<Agency | null> => {
  */
 export async function getAgencyById(agencyId: string): Promise<Agency | null> {
     try {
+        await connectDB();
         const session = await getSessionUser();
         if (!session) return null;
         const agency = await AgencyModel.findOne({ id: agencyId }).lean();
@@ -100,6 +102,7 @@ export async function getAgencyById(agencyId: string): Promise<Agency | null> {
  */
 export async function getAgencyBySlug(slug: string): Promise<Agency | null> {
     try {
+        await connectDB();
         const session = await getSessionUser();
         if (!session) return null;
         const agency = await AgencyModel.findOne({ slug }).lean();
@@ -136,6 +139,7 @@ export async function checkAgencyLimit(
     limitType: 'users' | 'projects' | 'clients' | 'storage' | 'monthlyInvoices'
 ): Promise<{ allowed: boolean; current: number; limit: number }> {
     try {
+        await connectDB();
         const agency = await AgencyModel.findOne({ id: agencyId }).lean();
         if (!agency) {
             throw new Error('Agency not found');
@@ -171,6 +175,7 @@ export async function updateAgencyUsage(
     }>
 ): Promise<boolean> {
     try {
+        await connectDB();
         const session = await getSessionUser();
         if (!session) return false;
 
@@ -203,6 +208,7 @@ export async function incrementAgencyUsage(
     amount: number = 1
 ): Promise<boolean> {
     try {
+        await connectDB();
         const session = await getSessionUser();
         if (!session) return false;
         await AgencyModel.updateOne(
@@ -225,6 +231,7 @@ export async function decrementAgencyUsage(
     amount: number = 1
 ): Promise<boolean> {
     try {
+        await connectDB();
         const session = await getSessionUser();
         if (!session) return false;
         await AgencyModel.updateOne(
@@ -246,6 +253,7 @@ export async function isFeatureEnabled(
     feature: 'aiAssistant' | 'advancedReporting' | 'apiAccess' | 'whiteLabel' | 'customDomain' | 'ssoEnabled'
 ): Promise<boolean> {
     try {
+        await connectDB();
         const agency = await AgencyModel.findOne({ id: agencyId }).lean();
         if (!agency) return false;
 
@@ -261,6 +269,7 @@ export async function isFeatureEnabled(
  */
 export async function getAllAgencies(): Promise<Agency[]> {
     try {
+        await connectDB();
         const session = await getSessionUser();
         if (!session || session.role !== 'superadmin') return [];
         const agencies = await AgencyModel.find({}).lean();
@@ -276,6 +285,7 @@ export async function getAllAgencies(): Promise<Agency[]> {
  */
 export async function switchAgency(agencyId: string): Promise<boolean> {
     try {
+        await connectDB();
         const session = await getSessionUser();
         if (!session || session.role !== 'superadmin') {
             throw new Error('Only super admins can switch agencies');
