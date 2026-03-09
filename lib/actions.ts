@@ -1342,6 +1342,10 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
                     const monthlyAmount = paymentConfig.monthlyAmount;
                     const startDate = new Date(paymentConfig.billingStartDate);
                     const projectDueDate = new Date(project.dueDate);
+                    // BUG-047: Validate billing dates
+                    if (isNaN(startDate.getTime())) throw new Error('Validation Error: Invalid billing start date.');
+                    if (isNaN(projectDueDate.getTime())) throw new Error('Validation Error: Invalid project due date.');
+                    if (startDate >= projectDueDate) throw new Error('Validation Error: Billing start date must be before project due date.');
                     const monthsDiff = Math.ceil((projectDueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
                     const numberOfInvoices = Math.min(monthsDiff, 12);
                     for (let i = 0; i < numberOfInvoices; i++) {
@@ -2295,8 +2299,12 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
     transaction = sanitizeMongoInput(transaction);
     if (transaction.description) transaction.description = sanitizeString(transaction.description, 2000);
     // STRICT SERVER-SIDE VALIDATION
-    if (!transaction.amount || transaction.amount <= 0) {
-        throw new Error("Validation Error: Amount must be greater than zero.");
+    // BUG-046/265: Strict amount validation (NaN, negative, max)
+    if (!transaction.amount || !Number.isFinite(transaction.amount) || transaction.amount <= 0) {
+        throw new Error("Validation Error: Amount must be a valid positive number.");
+    }
+    if (transaction.amount > 100_000_000) {
+        throw new Error("Validation Error: Amount exceeds maximum allowed value.");
     }
     if (transaction.category === 'Project' && !transaction.projectId) {
         throw new Error("Validation Error: Projects must have a Project ID.");
@@ -2335,6 +2343,7 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
 
     await connectDB();
     const agency = await getCurrentAgency();
+    const currentUser = await getCurrentUser();
 
     // Validate project exists if provided
     if (transaction.projectId) {
@@ -2342,10 +2351,12 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
         if (!projectExists) throw new Error(`Project with ID ${transaction.projectId} not found`);
     }
 
+    // BUG-291: Add performedBy audit trail
     const newTransaction: Transaction = {
         ...transaction, id: generateId(),
-        status: transaction.status || 'completed', agencyId: agency?.id || 'default-agency'
-    };
+        status: transaction.status || 'completed', agencyId: agency?.id || 'default-agency',
+        ...(currentUser ? { performedBy: currentUser.id } : {}),
+    } as Transaction;
     await TransactionModel.create(newTransaction);
 
 
@@ -2374,7 +2385,7 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
 
     revalidatePath('/dashboard/finance');
     if (transaction.projectId) {
-        revalidatePath(`/ dashboard / projects / ${transaction.projectId} `);
+        revalidatePath(`/dashboard/projects/${transaction.projectId}`);
     }
     return newTransaction;
 }
@@ -2574,6 +2585,18 @@ export async function updateInvoiceStatus(invoiceId: string, status: 'Paid' | 'P
     await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
+
+    // BUG-044: Invoice state machine — prevent invalid transitions
+    const invoice = await InvoiceModel.findOne({ id: invoiceId, agencyId: agency?.id }).lean();
+    if (!invoice) throw new Error('Invoice not found');
+    const currentStatus = (invoice as any).status;
+    const invalidTransitions: Record<string, string[]> = {
+        'Paid': ['Pending'], // Cannot revert paid invoice to pending
+    };
+    if (invalidTransitions[currentStatus]?.includes(status)) {
+        throw new Error(`Cannot change invoice status from ${currentStatus} to ${status}.`);
+    }
+
     await InvoiceModel.updateOne(
         { id: invoiceId, agencyId: agency?.id },
         { $set: { status } }
@@ -2622,7 +2645,9 @@ export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "ag
     await connectDB();
     // Input sanitization
     invoice = sanitizeMongoInput(invoice);
-    if (!invoice.amount || invoice.amount <= 0) throw new Error('Validation Error: Invoice amount must be greater than zero.');
+    // BUG-265: Strict amount validation (NaN, negative, max)
+    if (!invoice.amount || !Number.isFinite(invoice.amount) || invoice.amount <= 0) throw new Error('Validation Error: Invoice amount must be a valid positive number.');
+    if (invoice.amount > 100_000_000) throw new Error('Validation Error: Invoice amount exceeds maximum allowed value.');
     if (!invoice.projectId) throw new Error('Validation Error: Invoice must be linked to a project.');
 
     const agency = await getCurrentAgency();
@@ -2796,6 +2821,19 @@ export async function payEmployee(userId: string, amount: number, month: string,
     // Input sanitization
     userName = sanitizeName(userName, 200);
     month = sanitizeString(month, 50);
+
+    // BUG-043: Prevent duplicate salary payment for same user+month
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const existingPayment = await TransactionModel.findOne({
+        userId, category: 'Salary', agencyId: agency?.id,
+        description: { $regex: new RegExp(`^Salary Payment - ${month.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i') },
+        status: 'completed'
+    }).lean();
+    if (existingPayment) {
+        throw new Error(`Salary for ${userName} has already been paid for ${month}.`);
+    }
+
     const description = `Salary Payment - ${month} - ${userName}`;
 
     await createTransaction({
@@ -3951,7 +3989,8 @@ export async function createRefund(refund: {
     // Input sanitization
     refund.description = sanitizeString(refund.description, 2000);
     refund.refundReason = sanitizeString(refund.refundReason, 2000);
-    if (refund.amount <= 0) throw new Error('Refund amount must be greater than zero');
+    if (!refund.amount || !Number.isFinite(refund.amount) || refund.amount <= 0) throw new Error('Refund amount must be a valid positive number');
+    if (refund.amount > 100_000_000) throw new Error('Refund amount exceeds maximum allowed value');
 
     await connectDB();
     const agency = await getCurrentAgency();
@@ -3972,7 +4011,8 @@ export async function createRefund(refund: {
     const newRefund = {
         id: generateId(), agencyId: agency?.id,
         date: refund.date, amount: refund.amount, type: 'expense' as const, category: 'Refund' as const,
-        description: refund.description, status: 'completed' as const, projectId: refund.projectId
+        description: refund.description, status: 'completed' as const, projectId: refund.projectId,
+        performedBy: currentUser.id
     };
     await TransactionModel.create(newRefund);
     await ActivityModel.create({

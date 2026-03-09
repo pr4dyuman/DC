@@ -446,7 +446,8 @@ const TransactionSchema = new Schema<Transaction>({
     userId: { type: String },
     taxType: { type: String, enum: ['GST', 'TDS', 'Income Tax', 'Professional Tax', 'Other'] },
     expenseType: { type: String, enum: ['Travel', 'Meals', 'Client Meeting', 'Equipment', 'Other'] },
-    invoiceId: { type: String }
+    invoiceId: { type: String },
+    performedBy: { type: String }
 }, { timestamps: true });
 
 // Note: id already has index from unique constraint

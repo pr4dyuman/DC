@@ -384,6 +384,7 @@ export type Transaction = {
     taxType?: 'GST' | 'TDS' | 'Income Tax' | 'Professional Tax' | 'Other';
     expenseType?: 'Travel' | 'Meals' | 'Client Meeting' | 'Equipment' | 'Other';
     invoiceId?: string; // Links back to the invoice that generated this transaction
+    performedBy?: string; // User ID of who performed the transaction (audit trail)
 };
 
 export type UserPermissions = {
