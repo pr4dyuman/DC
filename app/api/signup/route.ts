@@ -92,7 +92,7 @@ export async function POST(request: Request) {
 
         // --- Verify OTP ---
         try {
-            verifyOtp(validatedEmail, otp.toString().trim());
+            await verifyOtp(validatedEmail, otp.toString().trim());
         } catch (e: any) {
             return NextResponse.json({ error: e.message }, { status: 400 });
         }

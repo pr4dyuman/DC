@@ -646,3 +646,20 @@ export const SettingsModel = (mongoose.models.Settings as Model<Settings>) || mo
 // Singularity AI Chat models
 export const SingularityChatSessionModel = (mongoose.models.SingularityChatSession as Model<any>) || mongoose.model('SingularityChatSession', SingularityChatSessionSchema);
 export const SingularityCheckpointModel = (mongoose.models.SingularityCheckpoint as Model<any>) || mongoose.model('SingularityCheckpoint', SingularityCheckpointSchema);
+
+// OTP Schema with TTL auto-expiry
+const OtpSchema = new Schema({
+    email: { type: String, required: true, index: true },
+    otp: { type: String, required: true },
+    attempts: { type: Number, default: 0 },
+    expiresAt: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
+});
+export const OtpModel = (mongoose.models.Otp as Model<any>) || mongoose.model('Otp', OtpSchema);
+
+// Rate Limit Schema with TTL auto-expiry
+const RateLimitSchema = new Schema({
+    key: { type: String, required: true, unique: true },
+    count: { type: Number, default: 1 },
+    expiresAt: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
+});
+export const RateLimitModel = (mongoose.models.RateLimit as Model<any>) || mongoose.model('RateLimit', RateLimitSchema);
