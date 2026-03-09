@@ -3,6 +3,7 @@ import { getCurrentAgency, checkTrialExpired } from '@/lib/agency-context';
 import { redirect } from 'next/navigation';
 import { getSessionUser } from '@/lib/auth';
 import { connectDB } from '@/lib/mongodb';
+import { fmtDateLong } from '@/lib/date-utils';
 
 export default async function TrialExpiredPage() {
     await connectDB();
@@ -17,9 +18,7 @@ export default async function TrialExpiredPage() {
     }
 
     const trialEndDate = agency?.trialEndsAt
-        ? new Date(agency.trialEndsAt).toLocaleDateString('en-IN', {
-            year: 'numeric', month: 'long', day: 'numeric'
-        })
+        ? fmtDateLong(agency.trialEndsAt, 'UTC', 'en-US')
         : 'N/A';
 
     return (

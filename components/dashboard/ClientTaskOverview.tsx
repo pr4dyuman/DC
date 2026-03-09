@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CheckCircle2, Clock, AlertCircle, Calendar } from "lucide-react";
 import { Task } from "@/lib/types";
+import { useDateFormat } from "@/context/TimezoneContext";
 import Link from "next/link";
 
 interface ClientTaskOverviewProps {
@@ -12,6 +13,7 @@ interface ClientTaskOverviewProps {
 }
 
 export function ClientTaskOverview({ tasks, projects }: ClientTaskOverviewProps) {
+    const fmt = useDateFormat();
     const todoTasks = tasks.filter(t => t.status === 'Todo').length;
     const inProgressTasks = tasks.filter(t => t.status === 'In Progress').length;
     const reviewTasks = tasks.filter(t => t.status === 'Review').length;
@@ -134,7 +136,7 @@ export function ClientTaskOverview({ tasks, projects }: ClientTaskOverviewProps)
                                                         </p>
                                                     </div>
                                                     <div className="text-xs text-amber-400 ml-2">
-                                                        {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                                                        {task.dueDate ? fmt.date(task.dueDate) : ''}
                                                     </div>
                                                 </div>
                                             </div>

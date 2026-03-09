@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Download, Loader2, X, FileSpreadsheet, Calendar } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { getExportData } from "@/lib/exportActions";
+import { useDateFormat } from "@/context/TimezoneContext";
 
 function toCSV(rows: (string | number)[][]): string {
     return rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -31,6 +32,7 @@ function defaultDates() {
 }
 
 export function ExportReportButton() {
+    const fmt = useDateFormat();
     const [open, setOpen] = useState(false);
     const [exporting, setExporting] = useState(false);
     const [error, setError] = useState("");
@@ -53,7 +55,7 @@ export function ExportReportButton() {
                 const rows: (string | number)[][] = [
                     ["Dashboard Summary Report"],
                     [`Period: ${startDate} to ${endDate}`],
-                    [`Generated: ${new Date().toLocaleString("en-IN")}`],
+                    [`Generated: ${fmt.dateTime(new Date())}`],
                     [],
                     ["FINANCES"],
                     ["Total Income", `Rs ${data.summary.totalIncome.toLocaleString()}`],

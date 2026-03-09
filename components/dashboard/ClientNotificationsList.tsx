@@ -7,6 +7,7 @@ import { useInView } from "react-intersection-observer";
 import { getNotifications } from "@/lib/actions";
 import { Loader2, Activity } from "lucide-react";
 import { Notification } from "@/lib/types";
+import { useDateFormat } from "@/context/TimezoneContext";
 
 interface ClientNotificationsListProps {
     initialNotifications: Notification[];
@@ -14,6 +15,7 @@ interface ClientNotificationsListProps {
 }
 
 export function ClientNotificationsList({ initialNotifications, userId }: ClientNotificationsListProps) {
+    const fmt = useDateFormat();
     const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
     const [offset, setOffset] = useState(initialNotifications.length);
     const [hasMore, setHasMore] = useState(true);
@@ -65,7 +67,7 @@ export function ClientNotificationsList({ initialNotifications, userId }: Client
                                     <div>
                                         <p className="text-sm text-foreground">{n.message}</p>
                                         <p className="text-xs text-muted-foreground mt-1">
-                                            {new Date(n.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                            {fmt.date(n.timestamp)}
                                         </p>
                                     </div>
                                 </div>

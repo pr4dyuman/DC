@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { format } from "date-fns";
+import { useDateFormat } from "@/context/TimezoneContext";
 import { useDraggable } from "@dnd-kit/core";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -36,6 +36,7 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEnabled, readOnly, permissions, onQuickEdit, dragOverlay = false, disableDrag = false, onStatusChange }: TaskCardProps & { onView: (task: Task) => void; onEdit: (task: Task) => void; currentUserId?: string }) {
+    const fmt = useDateFormat();
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id: task.id,
         data: { task },
@@ -255,7 +256,7 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
                                 return (
                                     <div className={`flex items-center gap-1.5 shrink-0 ${isOverdue ? 'text-red-500' : ''}`}>
                                         <Calendar className={`w-3 h-3 shrink-0 ${isOverdue ? 'text-red-500' : 'text-yellow-500'}`} />
-                                        <span className={isOverdue ? 'font-semibold' : ''}>{format(new Date(task.dueDate), "MMM d")}{isOverdue ? ' ⚠' : ''}</span>
+                                        <span className={isOverdue ? 'font-semibold' : ''}>{fmt.dateShort(task.dueDate)}{isOverdue ? ' ⚠' : ''}</span>
                                     </div>
                                 );
                             })()}

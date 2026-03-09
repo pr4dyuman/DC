@@ -6,10 +6,11 @@ import { Message, Contact, getContacts, getMessages, sendMessage, markAsRead, de
 import { MessagesList, ContactItem, ContactSkeleton, MessagesSkeleton, EmojiPicker } from "@/components/chat/ChatComponents";
 import { ArrowLeft, Send, Search, Smile, MessageCircle, X, Trash2, MessageSquare, Loader2 } from "lucide-react";
 import { useActivePolling } from "@/hooks/use-active-polling";
-import { format, isToday, isYesterday } from "date-fns";
+import { useDateFormat } from "@/context/TimezoneContext";
 import { toast } from "sonner";
 
 export function MessagesPageClient({ currentUserId }: { currentUserId: string }) {
+    const fmt = useDateFormat();
     const router = useRouter();
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [activeContactId, setActiveContactId] = useState<string | null>(null);
@@ -216,11 +217,7 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
                                             ) : (
                                                 <span className="text-muted-foreground">
                                                     {activeContact.lastActiveAt
-                                                        ? (isToday(new Date(activeContact.lastActiveAt))
-                                                            ? `Last seen ${format(new Date(activeContact.lastActiveAt), "HH:mm")}`
-                                                            : isYesterday(new Date(activeContact.lastActiveAt))
-                                                                ? `Last seen Yesterday ${format(new Date(activeContact.lastActiveAt), "HH:mm")}`
-                                                                : `Last seen ${format(new Date(activeContact.lastActiveAt), "d MMM HH:mm")}`)
+                                                        ? fmt.presence(activeContact.lastActiveAt)
                                                         : (activeContact.jobTitle || activeContact.role)}
                                                 </span>
                                             )}

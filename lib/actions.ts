@@ -13,6 +13,7 @@ import { sanitizeName, sanitizeString, sanitizeUsername, validateEmail, validate
 // Authentication
 import { connectDB, AgencyModel, UserModel, ClientModel, SuperAdminModel, ProjectModel, TaskModel, InvoiceModel, TransactionModel, ServiceModel, NotificationModel, ActivityModel, AssetModel, MessageModel, LeaveRequestModel, SettingsModel, decryptApiKey } from "./mongodb";
 import { getSessionUser } from "@/lib/auth";
+import { fmtDate } from "@/lib/date-utils";
 import { getSessionId as authGetSessionId, login as authLogin, logout as authLogout } from "@/lib/auth";
 import { hashPassword, comparePassword } from "@/lib/auth";
 
@@ -1025,6 +1026,21 @@ export async function getCurrentUser() {
 
 }
 
+export async function updateUserTimezone(timezone: string) {
+    "use server";
+    await connectDB();
+    const session = await getSessionUser();
+    if (!session || !timezone) return;
+    // Validate timezone string with Intl
+    try { Intl.DateTimeFormat(undefined, { timeZone: timezone }); } catch { return; }
+    if (session.role === 'client') {
+        await ClientModel.updateOne({ id: session.userId }, { $set: { timezone } });
+    } else if (session.role === 'superadmin') {
+        await SuperAdminModel.updateOne({ id: session.userId }, { $set: { timezone } });
+    } else {
+        await UserModel.updateOne({ id: session.userId }, { $set: { timezone } });
+    }
+}
 
 export async function updateUser(id: string, updates: Partial<User>, oldPassword?: string) {
     // Permission Check
@@ -4071,7 +4087,7 @@ export async function updateLeaveStatus(requestId: string, status: LeaveStatus) 
     const userDoc = await UserModel.findOne({ id: (request as any).userId, agencyId: agency?.id }).select('-password').lean();
     await NotificationModel.create({
         id: generateId(), agencyId: agency?.id, userId: (request as any).userId,
-        message: `Your leave request for ${new Date((request as any).startDate).toLocaleDateString()} has been ${status}`,
+        message: `Your leave request for ${fmtDate((request as any).startDate, 'UTC', 'en-US')} has been ${status}`,
         read: false, timestamp: new Date().toISOString(),
         link: `/dashboard/team/${(userDoc as any)?.username || (request as any).userId}?tab=leaves`
     });

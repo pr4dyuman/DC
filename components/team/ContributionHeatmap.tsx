@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useDateFormat } from "@/context/TimezoneContext";
 
 export type DailyStats = {
     date: string; // YYYY-MM-DD
@@ -26,6 +27,7 @@ const COLORS = {
 };
 
 export function ContributionHeatmap({ data, className, leaveDates = [], tooltipLabel = "completed", year = new Date().getFullYear() }: ContributionHeatmapProps & { year?: number }) {
+    const fmt = useDateFormat();
     // 1. Generate Calendar Grid (Fixed Year)
     const calendarData = useMemo(() => {
         const dates: Date[] = [];
@@ -121,7 +123,7 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
 
             if (hasFirstOfMonth) {
                 const d = week.find(d => d.getDate() === 1)!;
-                monthLabels.push({ label: d.toLocaleString('default', { month: 'short' }), index });
+                monthLabels.push({ label: fmt.monthShort(d), index });
             }
         });
         return monthLabels;
@@ -144,7 +146,7 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
                         <div key={wIndex} className="flex flex-col gap-1 sm:gap-1 flex-1 min-w-0">
                             {week.map((day, dIndex) => {
                                 const { colorClass, count, dateStr, isLeave, isCurrentYear } = getCellProps(day);
-                                const niceDate = day.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                                const niceDate = fmt.dateWithDay(day);
 
                                 if (!isCurrentYear) {
                                     // Render invisible placeholder - scale with flex

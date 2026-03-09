@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 import { createInvoice, clientMarkInvoiceAsPaid, adminApproveInvoicePayment, adminRejectInvoicePayment } from "@/lib/actions";
 import { useRouter } from "next/navigation";
-import { format } from "date-fns";
+import { useDateFormat } from "@/context/TimezoneContext";
 import { toast } from "sonner";
 import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 
@@ -24,6 +24,7 @@ interface InvoiceManagerProps {
 }
 
 export function InvoiceManager({ invoices, isClient = false, projects = [] }: InvoiceManagerProps) {
+    const fmt = useDateFormat();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -258,7 +259,7 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                                 visibleInvoices.map((invoice) => (
                                     <TableRow key={invoice.id}>
                                         <TableCell className="font-medium">{getProjectName(invoice.projectId)}</TableCell>
-                                        <TableCell>{format(new Date(invoice.date), "MMM d, yyyy")}</TableCell>
+                                        <TableCell>{fmt.date(invoice.date)}</TableCell>
                                         <TableCell>{formatter.format(invoice.amount)}</TableCell>
                                         <TableCell>
                                             <Badge variant={invoice.status === 'Paid' ? 'secondary' : 'default'} className={

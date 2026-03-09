@@ -1,4 +1,5 @@
 import { getSystemAnalytics } from "@/lib/actions/super-admin";
+import { fmtDate, getLocaleForTimezone } from "@/lib/date-utils";
 import Link from "next/link";
 import { Building2, Users, FolderKanban, DollarSign, TrendingUp, AlertCircle } from "lucide-react";
 
@@ -102,7 +103,7 @@ export default async function SuperAdminDashboard() {
                                 <div>
                                     <h3 className="font-semibold text-foreground">{agency.name}</h3>
                                     <p className="text-sm text-muted-foreground mt-1">
-                                        Created {new Date(agency.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                        Created {fmtDate(agency.createdAt, 'UTC', 'en-US')}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">

@@ -30,24 +30,7 @@ import { LeaveRequestsList } from "@/components/leave-requests-list";
 import { ContributionHeatmap, DailyStats } from "@/components/team/ContributionHeatmap";
 import { cn } from "@/lib/utils";
 import { useProgressiveList } from "@/hooks/use-infinite-scroll";
-
-// Helper: relative time for last active
-function timeAgo(dateStr?: string): string {
-    if (!dateStr) return "";
-    try {
-        const diff = Date.now() - new Date(dateStr).getTime();
-        const mins = Math.floor(diff / 60000);
-        if (mins < 5) return "Online";
-        if (mins < 60) return `${mins}m ago`;
-        const hrs = Math.floor(mins / 60);
-        if (hrs < 24) return `${hrs}h ago`;
-        const days = Math.floor(hrs / 24);
-        if (days < 30) return `${days}d ago`;
-        return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-    } catch {
-        return "";
-    }
-}
+import { useDateFormat } from "@/context/TimezoneContext";
 
 // Helper: check if a task is overdue
 function isOverdue(task: Task): boolean {
@@ -146,6 +129,7 @@ function ProfileSkeleton() {
 
 export default function EmployeeProfilePage({ params }: { params: Promise<{ username: string }> }) {
     const { username } = use(params);
+    const fmt = useDateFormat();
     // Tab state — read initial tab from URL, then manage locally
     const [activeTab, setActiveTab] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -363,7 +347,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
             let label: string;
             if (dateStr === today) label = "Today";
             else if (dateStr === yesterday) label = "Yesterday";
-            else label = new Date(activity.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+            else label = fmt.dateLong(activity.timestamp);
 
             if (label !== currentLabel) {
                 currentLabel = label;
@@ -432,7 +416,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
         .sort((a, b) => b.total - a.total);
 
     // Last active status
-    const lastActiveText = timeAgo(user.lastActiveAt);
+    const lastActiveText = fmt.presence(user.lastActiveAt);
     const isOnline = lastActiveText === "Online";
 
     return (
@@ -560,7 +544,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                             {user.createdAt && (
                                 <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-accent px-3 py-1">
                                     <Calendar className="mr-2 h-3 w-3 text-primary" />
-                                    Joined {new Date(user.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+                                    Joined {fmt.monthYear(user.createdAt)}
                                 </Badge>
                             )}
                         </div>
@@ -936,7 +920,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                                                 "text-xs mt-2",
                                                                 taskOverdue ? "text-red-500 font-medium" : "text-muted-foreground"
                                                             )}>
-                                                                Due {new Date(task.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                                Due {fmt.date(task.dueDate)}
                                                             </div>
                                                         )}
                                                     </div>
@@ -998,7 +982,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                                         {project.dueDate && (
                                                             <span className="flex items-center gap-1">
                                                                 <Calendar className="w-3 h-3" />
-                                                                Due {new Date(project.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                                Due {fmt.date(project.dueDate)}
                                                             </span>
                                                         )}
                                                         {projectTaskCount > 0 && (
@@ -1060,9 +1044,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                                                                             <span className="text-primary">{activity.action}</span> {activity.target}
                                                                         </p>
                                                                         <p className="text-xs text-muted-foreground mt-1">
-                                                                            {new Date(activity.timestamp).toLocaleString('en-IN', {
-                                                                                timeStyle: 'short'
-                                                                            })}
+                                                                            {fmt.time12(activity.timestamp)}
                                                                         </p>
                                                                     </div>
                                                                 </div>

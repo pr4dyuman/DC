@@ -9,6 +9,7 @@ import {
     getServices,
     getUserTasks,
 } from "./actions";
+import { fmtDate } from "./date-utils";
 
 /**
  * Build a rich system instruction for Singularity Agent Mode.
@@ -163,7 +164,7 @@ Pending Invoices: ${finance.pendingInvoicesCount || 0} (₹${(finance.pendingInv
         if (recentActivity.length > 0) {
             activitySection = recentActivity
                 .slice(0, 8)
-                .map((a: any) => `- ${a.user}: ${a.action} → ${a.target} (${new Date(a.timestamp).toLocaleDateString()})`)
+                .map((a: any) => `- ${a.user}: ${a.action} → ${a.target} (${fmtDate(a.timestamp, 'UTC', 'en-US')})`)
                 .join("\n");
         } else {
             activitySection = "(No recent activity)";

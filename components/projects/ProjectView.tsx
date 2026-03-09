@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Project, Task, User, Transaction, Asset, Service, UserPermissions } from "@/lib/types";
+import { useDateFormat } from "@/context/TimezoneContext";
 import { KanbanBoard } from "@/components/projects/KanbanBoard";
 import { CreateTaskModal } from "@/components/projects/CreateTaskModal";
 import { ProjectSettingsModal } from "@/components/projects/ProjectSettingsModal";
@@ -26,6 +27,7 @@ type ProjectViewProps = {
 };
 
 export function ProjectView({ project, tasks, users, transactions, assets, categories, currentUser, permissions }: ProjectViewProps & { currentUser?: User }) {
+    const fmt = useDateFormat();
     const projectServices = project.services || [];
     const filteredCategories = categories.filter(c => projectServices.includes(c.id) || projectServices.includes(c.name));
     const [selectedCategory, setSelectedCategory] = useState<string>("All");
@@ -130,7 +132,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                                     </button>
                                 </span>
                                 {project.budget > 0 && <span>Budget: ₹{project.budget.toLocaleString()}</span>}
-                                {project.dueDate && <span className={isDue ? 'text-red-500 font-semibold' : ''}>Due: {new Date(project.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}{isDue ? ' ⚠' : ''}</span>}
+                                {project.dueDate && <span className={isDue ? 'text-red-500 font-semibold' : ''}>Due: {fmt.date(project.dueDate)}{isDue ? ' ⚠' : ''}</span>}
                                 {project.client && <span className="text-muted-foreground/80">Client: {project.client}</span>}
                             </div>
 

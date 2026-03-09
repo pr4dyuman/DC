@@ -27,6 +27,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, Upload, Lock, Shield, Camera, Building2, Phone, Briefcase, Eye, EyeOff, AtSign, Calendar, Clock } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { useDateFormat } from "@/context/TimezoneContext";
 
 interface ProfileModalProps {
     user: User;
@@ -42,40 +43,11 @@ function validatePassword(password: string): string | null {
     return null;
 }
 
-// Format date helper
-function formatDate(dateStr?: string): string {
-    if (!dateStr) return "—";
-    try {
-        return new Date(dateStr).toLocaleDateString("en-US", {
-            year: "numeric", month: "short", day: "numeric"
-        });
-    } catch {
-        return "—";
-    }
-}
-
-// Relative time helper
-function timeAgo(dateStr?: string): string {
-    if (!dateStr) return "Never";
-    try {
-        const diff = Date.now() - new Date(dateStr).getTime();
-        const mins = Math.floor(diff / 60000);
-        if (mins < 1) return "Just now";
-        if (mins < 60) return `${mins}m ago`;
-        const hrs = Math.floor(mins / 60);
-        if (hrs < 24) return `${hrs}h ago`;
-        const days = Math.floor(hrs / 24);
-        if (days < 30) return `${days}d ago`;
-        return formatDate(dateStr);
-    } catch {
-        return "Never";
-    }
-}
-
 const tabTriggerClass =
     "data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-full px-0 font-medium";
 
 export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
+    const fmt = useDateFormat();
     const [isLoading, startTransition] = useTransition();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const systemLogoRef = useRef<HTMLInputElement>(null);
@@ -555,13 +527,13 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
                                             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                                                 <Calendar className="h-3 w-3" /> Member Since
                                             </p>
-                                            <p className="text-sm font-medium">{formatDate(user.createdAt)}</p>
+                                            <p className="text-sm font-medium">{fmt.date(user.createdAt)}</p>
                                         </div>
                                         <div className="space-y-1">
                                             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                                                 <Clock className="h-3 w-3" /> Last Active
                                             </p>
-                                            <p className="text-sm font-medium">{timeAgo(user.lastActiveAt)}</p>
+                                            <p className="text-sm font-medium">{fmt.relative(user.lastActiveAt)}</p>
                                         </div>
                                     </div>
                                 </div>

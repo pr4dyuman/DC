@@ -8,6 +8,7 @@ import { ClientNotificationsList } from "./ClientNotificationsList";
 import { ClientFinancialOverview } from "./ClientFinancialOverview";
 import { ClientTaskOverview } from "./ClientTaskOverview";
 import { ClientAssetsSection } from "./ClientAssetsSection";
+import { useDateFormat } from "@/context/TimezoneContext";
 import Link from "next/link";
 
 
@@ -44,6 +45,7 @@ export function ClientDashboard({
     invoices = [],
     assets = []
 }: ClientDashboardProps) {
+    const fmt = useDateFormat();
     const pendingAmount = invoices
         .filter(i => i.status === 'Pending' || i.status === 'Overdue')
         .reduce((sum, inv) => sum + inv.amount, 0);
@@ -53,7 +55,7 @@ export function ClientDashboard({
         .filter(i => i.status === 'Pending' || i.status === 'Overdue')
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const nextInvoiceDue = pendingInvoices[0]?.date
-        ? new Date(pendingInvoices[0].date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+        ? fmt.dateShort(pendingInvoices[0].date)
         : null;
 
     // Per-project progress

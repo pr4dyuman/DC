@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { Settings, Shield, Bell, Database, Globe, Check, Mail, AlertTriangle } from "lucide-react";
+import { useDateFormat } from "@/context/TimezoneContext";
 
 export default function SystemSettingsPage() {
+    const fmt = useDateFormat();
     const [saved, setSaved] = useState("");
 
     const handleSave = (section: string) => {
@@ -240,7 +242,7 @@ export default function SystemSettingsPage() {
                         { label: "Framework", value: "Next.js 15" },
                         { label: "Database", value: "MongoDB" },
                         { label: "Environment", value: "Production" },
-                        { label: "Last Restart", value: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) },
+                        { label: "Last Restart", value: fmt.date(new Date()) },
                     ].map((item) => (
                         <div key={item.label} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                             <span className="text-sm text-muted-foreground">{item.label}</span>

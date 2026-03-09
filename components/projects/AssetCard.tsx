@@ -5,6 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useState } from "react";
 import { AssetViewerModal } from "./AssetViewerModal";
 import { Badge } from "@/components/ui/badge";
+import { useDateFormat } from "@/context/TimezoneContext";
 
 interface AssetCardProps {
     asset: Asset;
@@ -34,6 +35,7 @@ const getTypeLabel = (type: Asset['type']) => {
 };
 
 export function AssetCard({ asset, onDelete }: AssetCardProps) {
+    const fmt = useDateFormat();
     const [viewerOpen, setViewerOpen] = useState(false);
 
     // Can view images and text/code files
@@ -75,7 +77,7 @@ export function AssetCard({ asset, onDelete }: AssetCardProps) {
 
                         <div className="flex items-center text-[11px] text-muted-foreground">
                             <CalendarIcon className="mr-1 h-3 w-3 text-yellow-500 opacity-70" />
-                            {new Date(asset.uploadedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                            {fmt.dateShort(asset.uploadedAt)}
                         </div>
 
                         <div className="flex items-center text-[11px] text-muted-foreground">

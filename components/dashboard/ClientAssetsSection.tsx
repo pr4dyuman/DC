@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FileText, Image, Code, Link as LinkIcon, Download } from "lucide-react";
 import { Asset } from "@/lib/types";
+import { useDateFormat } from "@/context/TimezoneContext";
 
 interface ClientAssetsSectionProps {
     assets: Asset[];
@@ -11,6 +12,7 @@ interface ClientAssetsSectionProps {
 }
 
 export function ClientAssetsSection({ assets, projects }: ClientAssetsSectionProps) {
+    const fmt = useDateFormat();
     const recentAssets = assets
         .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
         .slice(0, 10);
@@ -92,7 +94,7 @@ export function ClientAssetsSection({ assets, projects }: ClientAssetsSectionPro
                                                 {getProjectName(asset.projectId)}
                                             </p>
                                             <p className="text-xs text-muted-foreground mt-1">
-                                                {asset.size} • {new Date(asset.uploadedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                {asset.size} • {fmt.date(asset.uploadedAt)}
                                             </p>
                                         </div>
                                         <button

@@ -1,4 +1,5 @@
 import { Project, Invoice, Notification as AppNotification, Transaction, Task, Asset, User } from "@/lib/types";
+import { fmtDateShort, getLocaleForTimezone } from "@/lib/date-utils";
 import { getDashboardMetrics, getRevenueData, getProjectDistribution, getRecentActivity, getUrgentTasks, getClientDashboardData, getEmployeeDashboardData } from "@/lib/actions";
 
 import { MetricCard } from "@/components/dashboard/MetricCard";
@@ -54,7 +55,7 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="hidden md:flex h-9 items-center rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm whitespace-nowrap">
-                            <span className="text-muted-foreground">{new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} — {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                            <span className="text-muted-foreground">{fmtDateShort(new Date(new Date().getFullYear(), new Date().getMonth(), 1), currentUser.timezone || 'UTC', getLocaleForTimezone(currentUser.timezone || 'UTC'))} — {fmtDateShort(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0), currentUser.timezone || 'UTC', getLocaleForTimezone(currentUser.timezone || 'UTC'))}</span>
                         </div>
                         <ExportReportButton />
                     </div>

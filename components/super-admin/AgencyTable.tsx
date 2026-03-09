@@ -6,8 +6,10 @@ import { suspendAgency, activateAgency, deleteAgency } from "@/lib/actions/super
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProgressiveList } from "@/hooks/use-infinite-scroll";
+import { useDateFormat } from "@/context/TimezoneContext";
 
 export default function AgencyTable({ agencies }: { agencies: any[] }) {
+    const fmt = useDateFormat();
     const router = useRouter();
     const [filter, setFilter] = useState<string>("all");
     const [search, setSearch] = useState("");
@@ -117,7 +119,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                                     ${(agency.stats?.revenue || 0).toLocaleString()}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                                    {new Date(agency.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    {fmt.date(agency.createdAt)}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <div className="flex items-center justify-end gap-2">

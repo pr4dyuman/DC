@@ -2,6 +2,7 @@ import { TrendingUp, TrendingDown, Wallet, Target, CalendarClock, CreditCard, Ba
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Project, Transaction } from "@/lib/types";
+import { useDateFormat } from "@/context/TimezoneContext";
 
 interface ProjectFinanceSummaryProps {
     project: Project;
@@ -9,6 +10,7 @@ interface ProjectFinanceSummaryProps {
 }
 
 export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceSummaryProps) {
+    const fmt = useDateFormat();
     if (!project || !transactions) return null;
 
     const projectTransactions = transactions.filter(t => t.projectId === project.id);
@@ -252,7 +254,7 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium truncate">{txn.description}</p>
                                     <p className="text-xs text-muted-foreground">
-                                        {new Date(txn.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                        {fmt.dateShort(txn.date)}
                                     </p>
                                 </div>
                                 <span className={`text-sm font-semibold ${txn.type === 'income' ? 'text-emerald-400' : 'text-red-400'}`}>

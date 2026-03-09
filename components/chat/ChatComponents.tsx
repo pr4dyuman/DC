@@ -1,6 +1,6 @@
 import { Message, Contact } from "@/lib/chat";
 import { cn } from "@/lib/utils";
-import { format, isToday, isYesterday } from "date-fns";
+import { useDateFormat } from "@/context/TimezoneContext";
 import { Check, CheckCheck, User, Image as ImageIcon, Trash2, Smile, X, Loader2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
@@ -11,6 +11,7 @@ interface MessageBubbleProps {
 }
 
 export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
+    const fmt = useDateFormat();
     return (
         <div className={cn("flex w-full mb-4", isOwn ? "justify-end" : "justify-start")}>
             <div className={cn(
@@ -31,7 +32,7 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
 
                 <div className="flex items-center justify-end mt-1 space-x-1 opacity-70">
                     <span className="text-[10px] font-medium">
-                        {format(new Date(message.timestamp), "HH:mm")}
+                        {fmt.time(message.timestamp)}
                     </span>
                     {isOwn && (
                         <span>
@@ -50,13 +51,14 @@ interface DateSeparatorProps {
 }
 
 export function DateSeparator({ date }: DateSeparatorProps) {
+    const fmt = useDateFormat();
     let label: string;
-    if (isToday(date)) {
+    if (fmt.isToday(date)) {
         label = "Today";
-    } else if (isYesterday(date)) {
+    } else if (fmt.isYesterday(date)) {
         label = "Yesterday";
     } else {
-        label = format(date, "d MMMM yyyy");
+        label = fmt.dateLong(date);
     }
 
     return (
@@ -77,13 +79,14 @@ interface MessagesListProps {
 }
 
 export function MessagesList({ messages, currentUserId }: MessagesListProps) {
+    const fmt = useDateFormat();
     let lastDate: string | null = null;
 
     return (
         <>
             {messages.map((msg, idx) => {
                 const msgDate = new Date(msg.timestamp);
-                const dateKey = format(msgDate, "yyyy-MM-dd");
+                const dateKey = fmt.dateKey(msgDate);
                 let showSeparator = false;
 
                 if (dateKey !== lastDate) {
@@ -187,12 +190,6 @@ export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
 
 
 // ── Contact Item ────────────────────────────────────────────
-function formatPresence(lastActiveAt: string): string {
-    const date = new Date(lastActiveAt);
-    if (isToday(date)) return `Last seen ${format(date, "HH:mm")}`;
-    if (isYesterday(date)) return `Last seen Yesterday ${format(date, "HH:mm")}`;
-    return `Last seen ${format(date, "d MMM HH:mm")}`;
-}
 
 interface ContactItemProps {
     contact: Contact;
@@ -202,13 +199,14 @@ interface ContactItemProps {
 }
 
 export function ContactItem({ contact, isActive, onClick, onDelete }: ContactItemProps) {
+    const fmt = useDateFormat();
     const isOnline = contact.isOnline;
     const [confirming, setConfirming] = useState(false);
 
     const presenceText = isOnline
         ? "Online"
         : contact.lastActiveAt
-            ? formatPresence(contact.lastActiveAt)
+            ? fmt.presence(contact.lastActiveAt)
             : contact.jobTitle || contact.role || "";
 
     function handleDeleteClick(e: React.MouseEvent) {
@@ -254,11 +252,11 @@ export function ContactItem({ contact, isActive, onClick, onDelete }: ContactIte
                     </h4>
                     {contact.lastMessage && !confirming && (
                         <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-2 shrink-0">
-                            {isToday(new Date(contact.lastMessage.timestamp))
-                                ? format(new Date(contact.lastMessage.timestamp), "HH:mm")
-                                : isYesterday(new Date(contact.lastMessage.timestamp))
+                            {fmt.isToday(contact.lastMessage.timestamp)
+                                ? fmt.time(contact.lastMessage.timestamp)
+                                : fmt.isYesterday(contact.lastMessage.timestamp)
                                     ? "Yesterday"
-                                    : format(new Date(contact.lastMessage.timestamp), "d MMM")}
+                                    : fmt.dateShort(contact.lastMessage.timestamp)}
                         </span>
                     )}
                 </div>

@@ -140,6 +140,7 @@ export type SuperAdmin = {
     role: 'superadmin';
     avatar?: string;
     phone?: string;
+    timezone?: string;
     twoFactorEnabled?: boolean;
     twoFactorSecret?: string;
     createdAt: string;
@@ -248,6 +249,7 @@ export type User = {
     salary?: number;
     avatar?: string;
     password?: string;
+    timezone?: string; // IANA timezone (e.g. 'Asia/Kolkata')
     lastActiveAt?: string; // ISO Date string for presence
     employmentType?: 'Salary' | 'Project Based' | 'Freelancer';
     contactNumber?: string;
@@ -274,6 +276,7 @@ export type Client = {
     phone?: string;
     address?: string;
     password?: string;
+    timezone?: string; // IANA timezone (e.g. 'Asia/Kolkata')
     lastActiveAt?: string;
     // Archive fields - preserve financial data when client is "deleted"
     archived?: boolean;

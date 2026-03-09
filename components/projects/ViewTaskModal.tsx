@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition, useOptimistic } from "react";
-import { format, differenceInCalendarDays } from "date-fns";
+import { differenceInCalendarDays } from "date-fns";
+import { useDateFormat } from "@/context/TimezoneContext";
 import {
     Dialog,
     DialogContent,
@@ -55,6 +56,7 @@ const STATUS_CONFIGS: Record<string, { color: string; icon: any }> = {
 };
 
 export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnly, permissions, currentUserId }: ViewTaskModalProps) {
+    const fmt = useDateFormat();
     const assignee = users.find(u => u.id === task.assigneeId);
     // Fix: use actual logged-in user, not first user in array
     const currentUser = users.find(u => u.id === currentUserId) || { id: currentUserId || "", name: "You", avatar: "" };
@@ -192,11 +194,11 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
                                 {task.dueDate ? (
                                     <>
                                         <span className={`text-sm font-semibold leading-none mb-1 ${isOverdue ? 'text-red-500' : 'text-foreground'}`}>
-                                            {format(new Date(task.dueDate), "MMMM do, yyyy")}
+                                            {fmt.dateLong(task.dueDate)}
                                         </span>
                                         <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
                                             <Clock className="w-3 h-3" />
-                                            {format(new Date(task.dueDate), "h:mm a")}
+                                            {fmt.time12(task.dueDate)}
                                             {dueDiff !== null && (
                                                 <span className={isOverdue ? 'text-red-500 font-semibold' : dueDiff <= 3 ? 'text-amber-500 font-semibold' : ''}>
                                                     {isOverdue ? ` • ${Math.abs(dueDiff)}d overdue` : dueDiff === 0 ? ' • Due today' : ` • ${dueDiff}d left`}
@@ -221,10 +223,10 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
                             {task.createdAt ? (
                                 <div className="flex flex-col pl-1">
                                     <span className="text-sm font-semibold text-foreground leading-none mb-1">
-                                        {format(new Date(task.createdAt), "MMMM do, yyyy")}
+                                        {fmt.dateLong(task.createdAt)}
                                     </span>
                                     <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                                        <span>{format(new Date(task.createdAt), "h:mm a")}</span>
+                                        <span>{fmt.time12(task.createdAt)}</span>
                                         {task.createdBy && (
                                             <>
                                                 <span className="w-1 h-1 rounded-full bg-border" />
@@ -314,7 +316,7 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
                                                     {isMe ? 'You' : (commentUser?.name || "Unknown")}
                                                 </span>
                                                 <span className="text-[10px] text-muted-foreground">
-                                                    {format(new Date(comment.timestamp), "MMM d, p")}
+                                                    {fmt.dateTimeShort(comment.timestamp)}
                                                 </span>
                                             </div>
                                             <div className={`text-sm text-foreground p-3 rounded-lg border border-border ${isMe ? 'bg-indigo-500/10 rounded-tr-none ml-8' : 'bg-muted/50 rounded-tl-none mr-8'}`}>

@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, ArrowRight, Check, Calendar, CreditCard, Layers, User, Banknote } from "lucide-react";
-import { format } from "date-fns";
+import { useDateFormat } from "@/context/TimezoneContext";
 import { getClients, getServices, createProject } from "@/lib/actions";
 import { ProjectServiceConfig, PaymentConfig } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,7 @@ interface CreateProjectWizardProps {
 }
 
 export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: CreateProjectWizardProps) {
+    const fmt = useDateFormat();
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -437,7 +438,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
                 </div>
                 <div className="flex justify-between border-b pb-2">
                     <span className="text-muted-foreground">Due Date</span>
-                    <span className="font-medium">{formData.dueDate ? format(new Date(formData.dueDate), "MMM d, yyyy") : "-"}</span>
+                    <span className="font-medium">{formData.dueDate ? fmt.date(formData.dueDate) : "-"}</span>
                 </div>
                 <div className="space-y-1 pt-2">
                     <span className="text-muted-foreground block text-sm">Services & Payments</span>

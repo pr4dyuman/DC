@@ -7,7 +7,7 @@ import { X, Send, Search, Smile, MessageCircle, Trash2, ArrowLeft, MessageSquare
 import { cn } from "@/lib/utils";
 import { useActivePolling } from "@/hooks/use-active-polling";
 import { toast } from "sonner";
-import { format, isToday, isYesterday } from "date-fns";
+import { useDateFormat } from "@/context/TimezoneContext";
 
 interface ChatOverlayProps {
     isOpen: boolean;
@@ -17,6 +17,7 @@ interface ChatOverlayProps {
 }
 
 export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }: ChatOverlayProps) {
+    const fmt = useDateFormat();
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [activeContactId, setActiveContactId] = useState<string | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
@@ -288,11 +289,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                                             ) : (
                                                 <span>
                                                     {activeContact.lastActiveAt
-                                                        ? (isToday(new Date(activeContact.lastActiveAt))
-                                                            ? `Last seen ${format(new Date(activeContact.lastActiveAt), "HH:mm")}`
-                                                            : isYesterday(new Date(activeContact.lastActiveAt))
-                                                                ? `Last seen Yesterday ${format(new Date(activeContact.lastActiveAt), "HH:mm")}`
-                                                                : `Last seen ${format(new Date(activeContact.lastActiveAt), "d MMM HH:mm")}`)
+                                                        ? fmt.presence(activeContact.lastActiveAt)
                                                         : (activeContact.jobTitle || activeContact.role)}
                                                 </span>
                                             )}

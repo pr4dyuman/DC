@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { IndianRupee, Wallet, CreditCard, DollarSign } from "lucide-react";
 import { Transaction } from "@/lib/types";
+import { useDateFormat } from "@/context/TimezoneContext";
 
 interface ClientFinancialOverviewProps {
     transactions: Transaction[];
@@ -18,6 +19,7 @@ export function ClientFinancialOverview({
     totalBudget,
     pendingAmount
 }: ClientFinancialOverviewProps) {
+    const fmt = useDateFormat();
     const recentTransactions = transactions.slice(0, 5);
     const remainingBudget = totalBudget - totalSpent;
 
@@ -111,7 +113,7 @@ export function ClientFinancialOverview({
                                             <div className="flex-1">
                                                 <p className="text-sm font-medium">{transaction.description}</p>
                                                 <p className="text-xs text-muted-foreground mt-1">
-                                                    {new Date(transaction.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} • {transaction.category}
+                                                    {fmt.date(transaction.date)} • {transaction.category}
                                                 </p>
                                             </div>
                                             <div className={`text-sm font-semibold ${isIncome ? 'text-emerald-500' : 'text-red-500'

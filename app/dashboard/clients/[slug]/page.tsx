@@ -20,24 +20,7 @@ import { useChat } from "@/context/ChatContext";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useProgressiveList } from "@/hooks/use-infinite-scroll";
-
-// Helper: relative time for last active
-function timeAgo(dateStr?: string): string {
-    if (!dateStr) return "";
-    try {
-        const diff = Date.now() - new Date(dateStr).getTime();
-        const mins = Math.floor(diff / 60000);
-        if (mins < 5) return "Online";
-        if (mins < 60) return `${mins}m ago`;
-        const hrs = Math.floor(mins / 60);
-        if (hrs < 24) return `${hrs}h ago`;
-        const days = Math.floor(hrs / 24);
-        if (days < 30) return `${days}d ago`;
-        return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-    } catch {
-        return "";
-    }
-}
+import { useDateFormat } from "@/context/TimezoneContext";
 
 // Helper: download vCard for client
 function downloadVCard(client: Client) {
@@ -102,6 +85,7 @@ function ClientDetailSkeleton() {
 
 export default function ClientDetailPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = use(params);
+    const fmt = useDateFormat();
     const [client, setClient] = useState<Client | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     const [financeData, setFinanceData] = useState<{
@@ -193,7 +177,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
             let label: string;
             if (dateStr === today) label = "Today";
             else if (dateStr === yesterday) label = "Yesterday";
-            else label = new Date(activity.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+            else label = fmt.dateLong(activity.timestamp);
 
             if (label !== currentLabel) {
                 currentLabel = label;
@@ -216,7 +200,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
 
     const activeProjects = projects.filter(p => p.status === 'Active').length;
     const completedProjects = projects.filter(p => p.status === 'Completed').length;
-    const lastActiveText = timeAgo(client.lastActiveAt);
+    const lastActiveText = fmt.presence(client.lastActiveAt);
     const isOnline = lastActiveText === "Online";
 
     return (
@@ -476,7 +460,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                                         <span className="text-yellow-500">{activity.action}</span> {activity.target}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground mt-1">
-                                                        {new Date(activity.timestamp).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                                                        {fmt.dateTime(activity.timestamp)}
                                                     </p>
                                                 </div>
                                             </div>
@@ -516,7 +500,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                         {project.dueDate && (
                                             <div className="flex justify-between text-sm pt-2">
                                                 <span className="text-muted-foreground">Due Date</span>
-                                                <span>{new Date(project.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                                <span>{fmt.date(project.dueDate)}</span>
                                             </div>
                                         )}
                                     </CardContent>
@@ -551,7 +535,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                                         }`} />
                                                     <div>
                                                         <p className="text-sm font-medium text-foreground">#{invoice.id.slice(0, 8)}</p>
-                                                        <p className="text-xs text-muted-foreground">{new Date(invoice.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                                                        <p className="text-xs text-muted-foreground">{fmt.date(invoice.date)}</p>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
@@ -591,7 +575,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                                     </div>
                                                     <div>
                                                         <p className="text-sm font-medium text-foreground">{tx.description}</p>
-                                                        <p className="text-xs text-muted-foreground">{new Date(tx.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                                                        <p className="text-xs text-muted-foreground">{fmt.date(tx.date)}</p>
                                                     </div>
                                                 </div>
                                                 <p className={`text-sm font-bold ${tx.type?.toLowerCase() === 'income' ? 'text-green-500' : 'text-foreground'
@@ -642,7 +626,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                                                         <span className="text-yellow-500">{activity.action}</span> {activity.target}
                                                                     </p>
                                                                     <span className="text-xs text-muted-foreground ml-2 shrink-0">
-                                                                        {new Date(activity.timestamp).toLocaleString('en-IN', { timeStyle: 'short' })}
+                                                                        {fmt.time12(activity.timestamp)}
                                                                     </span>
                                                                 </div>
                                                             </div>

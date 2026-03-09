@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { format, isAfter, startOfMonth, subMonths, startOfYear } from "date-fns";
+import { isAfter, startOfMonth, subMonths, startOfYear } from "date-fns";
+import { useDateFormat } from "@/context/TimezoneContext";
 import { Transaction, Project, User } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,7 @@ interface TransactionListProps {
 }
 
 export function TransactionList({ transactions, title = "Recent Transactions", isAdmin = false, projects = [], users = [] }: TransactionListProps) {
+    const fmt = useDateFormat();
     const router = useRouter();
     const [search, setSearch] = useState("");
     const [verifyOpen, setVerifyOpen] = useState(false);
@@ -192,7 +194,7 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
                                             if (projectName) return projectName;
                                             if (userName) return `${transaction.category} - ${userName}`;
                                             return transaction.category;
-                                        })()} • {format(new Date(transaction.date), "MMM d, yyyy")}
+                                        })()} • {fmt.date(transaction.date)}
                                     </p>
                                 </div>
                                 <div className="ml-auto font-medium flex items-center gap-4">

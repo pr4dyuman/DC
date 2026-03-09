@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useInView } from "react-intersection-observer";
 import { getRecentActivity } from "@/lib/actions";
 import { Loader2, ArrowUpRight } from "lucide-react";
-import { format } from "date-fns";
+import { useDateFormat } from "@/context/TimezoneContext";
 import { Activity } from "@/lib/types";
 import Link from "next/link";
 
@@ -48,6 +48,7 @@ function buildActivityLink(activity: Activity): string | null {
 }
 
 export function RecentActivityList({ initialActivities }: RecentActivityListProps) {
+    const fmt = useDateFormat();
     const [activities, setActivities] = useState<Activity[]>(initialActivities);
     const [offset, setOffset] = useState(initialActivities.length);
     const [hasMore, setHasMore] = useState(true);
@@ -109,7 +110,7 @@ export function RecentActivityList({ initialActivities }: RecentActivityListProp
                                             <span className="font-semibold text-foreground">{activity.target}</span>
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                            {format(new Date(activity.timestamp), "MMM d, yyyy")}
+                                            {fmt.date(activity.timestamp)}
                                         </p>
                                     </div>
                                     {link && (

@@ -1,4 +1,5 @@
 import { getAllAgenciesWithStats } from "@/lib/actions/super-admin";
+import { fmtDate, fmtTime } from "@/lib/date-utils";
 import { FileText, Building2, Users, CheckCircle, XCircle, Clock } from "lucide-react";
 
 export default async function SystemLogsPage() {
@@ -119,17 +120,10 @@ export default async function SystemLogsPage() {
                                 </div>
                                 <div className="flex-shrink-0 text-right">
                                     <p className="text-xs text-muted-foreground">
-                                        {new Date(log.timestamp).toLocaleDateString("en-IN", {
-                                            day: "numeric",
-                                            month: "short",
-                                            year: "numeric",
-                                        })}
+                                        {fmtDate(log.timestamp, 'UTC', 'en-US')}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        {new Date(log.timestamp).toLocaleTimeString("en-IN", {
-                                            hour: "2-digit",
-                                            minute: "2-digit",
-                                        })}
+                                        {fmtTime(log.timestamp, 'UTC')}
                                     </p>
                                 </div>
                             </div>

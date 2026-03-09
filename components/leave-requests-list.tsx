@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Loader2, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { useDateFormat } from "@/context/TimezoneContext";
 
 interface LeaveRequestsListProps {
     requests: LeaveRequest[];
@@ -17,6 +18,7 @@ interface LeaveRequestsListProps {
 }
 
 export function LeaveRequestsList({ requests, mode, users = [] }: LeaveRequestsListProps) {
+    const fmt = useDateFormat();
     const router = useRouter();
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [processedIds, setProcessedIds] = useState<Set<string>>(new Set());
@@ -90,7 +92,7 @@ export function LeaveRequestsList({ requests, mode, users = [] }: LeaveRequestsL
                                         )}
                                     </div>
                                     <div className="text-sm text-muted-foreground">
-                                        {new Date(request.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} - {new Date(request.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                        {fmt.date(request.startDate)} - {fmt.date(request.endDate)}
                                     </div>
                                     <p className="text-sm text-muted-foreground mt-2">
                                         {request.reason}

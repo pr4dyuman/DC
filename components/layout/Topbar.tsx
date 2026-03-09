@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Bell, Search, Settings, LogOut, User as UserIcon, Loader2, Check, X, FileText, Briefcase, Users, Building2 } from "lucide-react";
 import { MobileSidebar } from "./MobileSidebar";
 import { User, Notification } from "@/lib/types";
+import { useDateFormat } from "@/context/TimezoneContext";
 
 import { getUsers, getNotifications, globalSearch, markNotificationAsRead, SearchResult } from "@/lib/actions";
 import { logout } from "@/lib/auth";
@@ -28,6 +29,7 @@ interface TopbarProps {
 }
 
 export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: TopbarProps) {
+    const fmt = useDateFormat();
     const router = useRouter();
 
     const [user, setUser] = useState<User | undefined>(propUser);
@@ -249,7 +251,7 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: Topbar
                                                         )}
                                                     </div>
                                                     <p className="text-xs text-muted-foreground mt-1">
-                                                        {new Date(notification.timestamp).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                                                        {fmt.dateTime(notification.timestamp)}
                                                     </p>
                                                 </div>
                                             ))}
