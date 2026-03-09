@@ -73,7 +73,7 @@ export function CategoryMemberSummary({ category, data }: CategoryMemberSummaryP
                                     <div className="h-1 w-full bg-muted mt-1 rounded-full overflow-hidden">
                                         <div
                                             className="h-full bg-primary"
-                                            style={{ width: `${(item.total / totalAmount) * 100}%` }}
+                                            style={{ width: `${totalAmount > 0 ? (item.total / totalAmount) * 100 : 0}%` }}
                                         />
                                     </div>
                                 </div>

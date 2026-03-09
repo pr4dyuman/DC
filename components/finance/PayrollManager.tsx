@@ -48,9 +48,11 @@ export function PayrollManager({ items }: PayrollManagerProps) {
     const handlePayAll = async () => {
         const pending = items.filter(i => i.status !== 'Paid');
         if (pending.length === 0) return;
-        for (const item of pending) {
-            await handlePay(item.user.id, item.salary, item.month, item.user.name);
-        }
+        const results = await Promise.allSettled(
+            pending.map(item => handlePay(item.user.id, item.salary, item.month, item.user.name))
+        );
+        const failed = results.filter(r => r.status === 'rejected').length;
+        if (failed > 0) toast.error(`${failed} of ${pending.length} payments failed`);
     };
 
     const paidCount = items.filter(i => i.status === 'Paid').length;

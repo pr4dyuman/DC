@@ -7,6 +7,7 @@ import { getUsers, getUserPermissions, updateUserPermissions, getClients } from 
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Search, User as UserIcon, Building2, Trash2, Sparkles, FolderPlus, Loader2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 export default function PermissionSettings() {
     const [users, setUsers] = useState<User[]>([]);
@@ -170,9 +171,9 @@ export default function PermissionSettings() {
                                             </div>
                                             <span className="text-[10px] text-muted-foreground">Can create new projects</span>
                                         </div>
-                                        <Toggle
-                                            enabled={perms.canCreateProject}
-                                            onChange={(val) => handleUpdatePermission(user.id, 'canCreateProject', val)}
+                                        <Switch
+                                            checked={perms.canCreateProject}
+                                            onCheckedChange={(val) => handleUpdatePermission(user.id, 'canCreateProject', val)}
                                         />
                                     </div>
 
@@ -182,9 +183,9 @@ export default function PermissionSettings() {
                                             <span className="text-sm text-foreground font-medium">Task Management</span>
                                             <span className="text-[10px] text-muted-foreground">Create, edit, move tasks</span>
                                         </div>
-                                        <Toggle
-                                            enabled={perms.canManageTasks}
-                                            onChange={(val) => handleUpdatePermission(user.id, 'canManageTasks', val)}
+                                        <Switch
+                                            checked={perms.canManageTasks}
+                                            onCheckedChange={(val) => handleUpdatePermission(user.id, 'canManageTasks', val)}
                                         />
                                     </div>
 
@@ -194,9 +195,9 @@ export default function PermissionSettings() {
                                             <span className="text-sm text-foreground font-medium">Completion Rights</span>
                                             <span className="text-[10px] text-muted-foreground">Move tasks to &quot;Done&quot;</span>
                                         </div>
-                                        <Toggle
-                                            enabled={perms.canMarkDone ?? true}
-                                            onChange={(val) => handleUpdatePermission(user.id, 'canMarkDone', val)}
+                                        <Switch
+                                            checked={perms.canMarkDone ?? true}
+                                            onCheckedChange={(val) => handleUpdatePermission(user.id, 'canMarkDone', val)}
                                         />
                                     </div>
 
@@ -209,9 +210,9 @@ export default function PermissionSettings() {
                                             </div>
                                             <span className="text-[10px] text-muted-foreground">Use Singularity AI</span>
                                         </div>
-                                        <Toggle
-                                            enabled={perms.canUseAI}
-                                            onChange={(val) => handleUpdatePermission(user.id, 'canUseAI', val)}
+                                        <Switch
+                                            checked={perms.canUseAI}
+                                            onCheckedChange={(val) => handleUpdatePermission(user.id, 'canUseAI', val)}
                                         />
                                     </div>
 
@@ -261,13 +262,3 @@ export default function PermissionSettings() {
     );
 }
 
-function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (val: boolean) => void }) {
-    return (
-        <button
-            onClick={() => onChange(!enabled)}
-            className={`w-11 h-6 rounded-full relative transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-yellow-500/20 flex-shrink-0 ${enabled ? 'bg-yellow-500' : 'bg-muted-foreground/30'}`}
-        >
-            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-300 shadow-sm ${enabled ? 'left-6' : 'left-1'}`} />
-        </button>
-    );
-}

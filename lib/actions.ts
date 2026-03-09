@@ -1585,7 +1585,10 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
         timestamp: new Date().toISOString()
     });
 
-    // In-app notification for task status change â€” notify assignee if someone else changed it
+    // Collect unique notification recipients to avoid duplicates
+    const notifiedUserIds = new Set<string>();
+
+    // In-app notification for task status change - notify assignee if someone else changed it
     if (task.assigneeId && task.assigneeId !== userId) {
         await NotificationModel.create({
             id: generateId(), agencyId: agency.id, userId: task.assigneeId,
@@ -1593,23 +1596,27 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
             read: false, timestamp: new Date().toISOString(),
             link: `/dashboard/projects/${task.projectId}?task=${taskId}`
         });
+        notifiedUserIds.add(task.assigneeId);
     }
 
-    // Notify admins about task status change (exclude the user who made the change)
+    // Notify admins about task status change (exclude already-notified users)
     const adminsForTask = await UserModel.find({ agencyId: agency.id, role: { $in: ['admin', 'manager'] } }).select('-password').lean();
     const adminNotifs = adminsForTask
-        .filter((a: any) => a.id !== userId)
-        .map((admin: any) => ({
-            id: generateId(), agencyId: agency.id, userId: admin.id,
-            message: `${userName} moved task "${task.title}" to ${status}`,
-            read: false, timestamp: new Date().toISOString(),
-            link: `/dashboard/projects/${task.projectId}?task=${taskId}`
-        }));
+        .filter((a: any) => a.id !== userId && !notifiedUserIds.has(a.id))
+        .map((admin: any) => {
+            notifiedUserIds.add(admin.id);
+            return {
+                id: generateId(), agencyId: agency.id, userId: admin.id,
+                message: `${userName} moved task "${task.title}" to ${status}`,
+                read: false, timestamp: new Date().toISOString(),
+                link: `/dashboard/projects/${task.projectId}?task=${taskId}`
+            };
+        });
     if (adminNotifs.length > 0) await NotificationModel.insertMany(adminNotifs);
 
-    // Notify project client about task progress
+    // Notify project client about task progress (skip if already notified)
     const projectForNotif = await ProjectModel.findOne({ id: task.projectId, agencyId: agency.id }).lean();
-    if (projectForNotif?.clientId) {
+    if (projectForNotif?.clientId && !notifiedUserIds.has(projectForNotif.clientId)) {
         await NotificationModel.create({
             id: generateId(), agencyId: agency.id, userId: projectForNotif.clientId,
             message: `Task "${task.title}" has been moved to ${status}`,

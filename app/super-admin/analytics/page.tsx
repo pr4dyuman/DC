@@ -46,7 +46,7 @@ export default async function AnalyticsPage() {
                             </div>
                         </div>
                         <p className="text-sm text-muted-foreground mt-3">
-                            {((analytics.agenciesByPlan.free || 0) / analytics.totalAgencies * 100).toFixed(1)}%
+                            {(analytics.totalAgencies > 0 ? (analytics.agenciesByPlan.free || 0) / analytics.totalAgencies * 100 : 0).toFixed(1)}%
                         </p>
                     </div>
 
@@ -58,7 +58,7 @@ export default async function AnalyticsPage() {
                             </div>
                         </div>
                         <p className="text-sm text-muted-foreground mt-3">
-                            {((analytics.agenciesByPlan.pro || 0) / analytics.totalAgencies * 100).toFixed(1)}%
+                            {(analytics.totalAgencies > 0 ? (analytics.agenciesByPlan.pro || 0) / analytics.totalAgencies * 100 : 0).toFixed(1)}%
                         </p>
                     </div>
 
@@ -70,7 +70,7 @@ export default async function AnalyticsPage() {
                             </div>
                         </div>
                         <p className="text-sm text-muted-foreground mt-3">
-                            {((analytics.agenciesByPlan.enterprise || 0) / analytics.totalAgencies * 100).toFixed(1)}%
+                            {(analytics.totalAgencies > 0 ? (analytics.agenciesByPlan.enterprise || 0) / analytics.totalAgencies * 100 : 0).toFixed(1)}%
                         </p>
                     </div>
                 </div>
@@ -87,7 +87,7 @@ export default async function AnalyticsPage() {
                                 <div className="w-full sm:w-48 bg-muted rounded-full h-2">
                                     <div
                                         className="bg-green-500 h-2 rounded-full"
-                                        style={{ width: `${(analytics.activeAgencies / analytics.totalAgencies * 100)}%` }}
+                                        style={{ width: `${analytics.totalAgencies > 0 ? (analytics.activeAgencies / analytics.totalAgencies * 100) : 0}%` }}
                                     />
                                 </div>
                                 <span className="font-bold text-foreground w-12 text-right">{analytics.activeAgencies}</span>
@@ -99,7 +99,7 @@ export default async function AnalyticsPage() {
                                 <div className="w-full sm:w-48 bg-muted rounded-full h-2">
                                     <div
                                         className="bg-red-500 h-2 rounded-full"
-                                        style={{ width: `${(analytics.suspendedAgencies / analytics.totalAgencies * 100)}%` }}
+                                        style={{ width: `${analytics.totalAgencies > 0 ? (analytics.suspendedAgencies / analytics.totalAgencies * 100) : 0}%` }}
                                     />
                                 </div>
                                 <span className="font-bold text-foreground w-12 text-right">{analytics.suspendedAgencies}</span>
@@ -114,7 +114,7 @@ export default async function AnalyticsPage() {
                         <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">Avg Users per Agency</span>
                             <span className="font-bold text-foreground">
-                                {(analytics.totalUsers / analytics.totalAgencies).toFixed(1)}
+                                {(analytics.totalAgencies > 0 ? analytics.totalUsers / analytics.totalAgencies : 0).toFixed(1)}
                             </span>
                         </div>
                     </div>

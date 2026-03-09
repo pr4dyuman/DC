@@ -57,7 +57,10 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
     async function loadMessages(silent = false) {
         if (!currentUserId || !activeContactId) return;
         if (!silent) setIsLoadingMessages(true);
-        try { setMessages(await getMessages(currentUserId, activeContactId)); } catch { }
+        try {
+            const serverMessages = await getMessages(currentUserId, activeContactId);
+            setMessages(serverMessages);
+        } catch { }
         finally { setIsLoadingMessages(false); }
     }
     async function handleSend() {

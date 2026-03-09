@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2 } from "lucide-react";
 import { createClient, updateClient } from "@/lib/actions";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 interface EditClientDialogProps {
     client?: Client | null;
@@ -77,7 +78,7 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
             if (onSuccess) onSuccess();
             onOpenChange(false);
         } catch (error: any) {
-            alert(error.message);
+            toast.error(error.message || 'An error occurred');
         } finally {
             setSubmitting(false);
         }

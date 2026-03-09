@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Building2, ChevronDown, Menu } from "lucide-react";
 import { getAllAgencies, switchAgency, clearAgencySelection } from "@/lib/agency-context";
 
@@ -9,6 +10,7 @@ interface SuperAdminTopbarProps {
 }
 
 export default function SuperAdminTopbar({ onMenuClick }: SuperAdminTopbarProps) {
+    const router = useRouter();
     const [agencies, setAgencies] = useState<any[]>([]);
     const [selectedAgency, setSelectedAgency] = useState<string | null>(null);
     const [isOpen, setIsOpen] = useState(false);
@@ -45,7 +47,7 @@ export default function SuperAdminTopbar({ onMenuClick }: SuperAdminTopbarProps)
                 setSelectedAgency(null);
             }
             setIsOpen(false);
-            window.location.reload(); // Refresh to show new agency data
+            router.refresh();
         } catch (error) {
             console.error('Error switching agency:', error);
         }

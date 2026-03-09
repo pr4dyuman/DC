@@ -567,15 +567,10 @@ Also add rate limiting to the actions/auth.ts login() function.
 
 ---
 
-### Group 5B: Fix Scripts & Data Files
+### Group 5B: Fix Scripts & Data Files ✅ DONE
 **Files:** `scripts/*`, `data/backup/`, `.gitignore`
 **Bugs:** BUG-204, BUG-205, BUG-207, BUG-208, BUG-209, BUG-241, BUG-282
-**Time:** 1 hour
-**Fix:**
-1. Add `data/backup/` to `.gitignore`
-2. Remove hardcoded passwords from scripts (use env vars)
-3. Add confirmation prompt to import-db.js before dropping collections
-4. Remove check-env.js or move to dev-only
+**Fix:** Added data/backup/ to .gitignore and untracked 15 backup files. Replaced hardcoded passwords in fix-db.js and seed-accounts.js with env vars. Added confirmation prompt to import-db.js. Added sensitive field redaction to export-db.js. Standardized bcrypt to 12 rounds. Commit: `95955ae`.
 
 ---
 

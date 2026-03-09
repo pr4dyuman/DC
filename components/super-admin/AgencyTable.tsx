@@ -4,8 +4,10 @@ import Link from "next/link";
 import { Eye, Edit, Ban, CheckCircle, Trash2 } from "lucide-react";
 import { suspendAgency, activateAgency, deleteAgency } from "@/lib/actions/super-admin";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function AgencyTable({ agencies }: { agencies: any[] }) {
+    const router = useRouter();
     const [filter, setFilter] = useState<string>("all");
     const [search, setSearch] = useState("");
 
@@ -18,12 +20,12 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
     const handleSuspend = async (agencyId: string) => {
         if (!confirm("Are you sure you want to suspend this agency?")) return;
         await suspendAgency(agencyId, "Suspended by super admin");
-        window.location.reload();
+        router.refresh();
     };
 
     const handleActivate = async (agencyId: string) => {
         await activateAgency(agencyId);
-        window.location.reload();
+        router.refresh();
     };
 
     const handleDelete = async (agencyId: string) => {
@@ -32,7 +34,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
         if (!password) return;
         try {
             await deleteAgency(agencyId, password);
-            window.location.reload();
+            router.refresh();
         } catch (err: any) {
             alert(err.message || 'Failed to delete agency');
         }

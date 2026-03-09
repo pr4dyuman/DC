@@ -62,12 +62,6 @@ export function PendingPayablesList({ transactions }: PendingPayablesListProps) 
             </CardHeader>
             <CardContent>
                 <div className="space-y-4">
-                    {transactions.length === 0 && (
-                        <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-lg border border-dashed hover:bg-muted/30 transition-colors">
-                            <p>No pending payables.</p>
-                            <p className="text-xs mt-1">Add a transaction with "Pending" status to see it here.</p>
-                        </div>
-                    )}
                     {transactions.map((t) => (
                         <div key={t.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white dark:bg-black/20 rounded-lg border border-amber-100 dark:border-amber-900/50 shadow-sm gap-3">
                             <div className="flex items-start gap-3">
