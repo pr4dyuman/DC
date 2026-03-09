@@ -553,9 +553,8 @@ Also add rate limiting to the actions/auth.ts login() function.
 
 ### Group 5A: Fix UI/UX Issues ✅ PARTIALLY DONE
 **Bugs:** BUG-036, BUG-038, BUG-039, BUG-041, BUG-052, BUG-053, BUG-054, BUG-055, BUG-056, BUG-057, BUG-069, BUG-078, BUG-084, BUG-085, BUG-088, BUG-093, BUG-094, BUG-095, BUG-096, BUG-130, BUG-132, BUG-233, BUG-267
-**Fixed (9 bugs):** BUG-036 (error boundaries), BUG-052 (deduplicate notifications), BUG-084 (analytics div/0), BUG-088 (router.refresh), BUG-093 (parallel Pay All), BUG-094 (CategoryMemberSummary div/0), BUG-095 (alert→toast), BUG-096 (dead code), BUG-132 (Switch component). Commit: `413eb23`.
-**Remaining (14 bugs):** BUG-038 (loading states), BUG-039 (optimistic msgs — already handled by full replace), BUG-041 (empty states), BUG-053 (mobile polling), BUG-054 (mobile nav), BUG-055 (shared ChatContext), BUG-056 (heartbeat visibility), BUG-057 (touch DnD), BUG-069 (pagination), BUG-078 (super-admin settings), BUG-085 (fabricated logs), BUG-130 (confirm UX), BUG-233 (informational), BUG-267 (hardcoded INR). These require larger refactors or are informational.
-- Fix hardcoded INR currency — read from agency settings
+**Fixed (10 bugs):** BUG-036 (error boundaries), BUG-052 (deduplicate notifications), BUG-084 (analytics div/0), BUG-088 (router.refresh), BUG-093 (parallel Pay All), BUG-094 (CategoryMemberSummary div/0), BUG-095 (alert→toast), BUG-096 (dead code), BUG-132 (Switch component), BUG-138 (endDate>=startDate validation). Commits: `413eb23`, `0d68241`.
+**Remaining (13 bugs):** BUG-038 (loading states), BUG-039 (optimistic msgs), BUG-041 (empty states), BUG-053 (mobile polling), BUG-054 (mobile nav), BUG-055 (shared ChatContext), BUG-056 (heartbeat visibility), BUG-057 (touch DnD), BUG-069 (pagination), BUG-078 (super-admin settings), BUG-085 (fabricated logs), BUG-130 (confirm UX), BUG-233 (informational), BUG-267 (hardcoded INR). These require larger refactors.
 
 ---
 
@@ -567,11 +566,11 @@ Also add rate limiting to the actions/auth.ts login() function.
 ---
 
 ### Group 5C: Fix Miscellaneous Code Quality ✅ PARTIALLY DONE
-**Bugs:** BUG-021, BUG-030, BUG-033, BUG-034, BUG-040, BUG-047, BUG-062, BUG-063, BUG-064, BUG-066, BUG-067, BUG-068, BUG-070, BUG-072, BUG-073, BUG-074, BUG-075, BUG-077, BUG-081, BUG-087, BUG-089, BUG-090, BUG-091, BUG-092, BUG-097, BUG-098, BUG-099, BUG-100, BUG-101, BUG-102, BUG-103, BUG-104, BUG-106, BUG-109, BUG-110, BUG-112, BUG-113, BUG-115, BUG-116, BUG-117, BUG-122, BUG-124, BUG-127, BUG-133, BUG-134, BUG-138, BUG-222, BUG-236, BUG-237, BUG-264, BUG-271, BUG-272, BUG-277, BUG-281, BUG-287, BUG-288, BUG-293
-**Fixed:** BUG-030 (userId from body), BUG-062 (URI log), BUG-106 (hardcoded password), BUG-115 (timestamps typo), BUG-133 (empty file), BUG-277 (data: URI XSS)
-**Already fixed:** BUG-070 (regex escaping already done), BUG-081 (password min 8 already done), BUG-272 (login already strips password)
-**Skipped (larger refactors/infra):** BUG-021, 033, 034, 040, 047, 063, 064, 066, 067, 068, 072, 073, 074, 075, 077, 087, 089-104, 109, 110, 112, 113, 116, 117, 122, 124, 127, 134, 138, 222, 236, 237, 264, 271, 281, 287, 288, 293
-**Time:** Multiple sessions
+**Bugs:** BUG-021, BUG-030, BUG-033, BUG-034, BUG-040, BUG-047, BUG-062, BUG-063, BUG-064, BUG-066, BUG-067, BUG-068, BUG-070, BUG-072, BUG-073, BUG-074, BUG-075, BUG-077, BUG-081, BUG-087, BUG-089, BUG-090, BUG-091, BUG-092, BUG-097, BUG-098, BUG-099, BUG-100, BUG-101, BUG-102, BUG-103, BUG-104, BUG-106, BUG-107, BUG-109, BUG-110, BUG-111, BUG-112, BUG-113, BUG-114, BUG-115, BUG-116, BUG-117, BUG-122, BUG-124, BUG-127, BUG-133, BUG-134, BUG-138, BUG-222, BUG-236, BUG-237, BUG-264, BUG-271, BUG-272, BUG-277, BUG-281, BUG-287, BUG-288, BUG-293
+**Fixed (Round 1 - commit e530578):** BUG-030 (userId from body), BUG-062 (URI log), BUG-106 (hardcoded password→crypto.randomBytes), BUG-115 (timestamps typo), BUG-133 (empty file removed), BUG-277 (data: URI restricted to images)
+**Fixed (Round 2 - commit 0d68241):** BUG-067 (trial check on singularity+upload APIs), BUG-089 (email enumeration fix), BUG-090 (2MB upload limits on avatars/logos), BUG-092 (50K char message limit), BUG-098 (requireRole on updateProjectAsset), BUG-099 (requireRole on toggleAssetAI), BUG-103 (leave status state machine), BUG-104 (snapshotEntity agencyId filter), BUG-107 (permission message fix), BUG-111 (encrypt key validation), BUG-112 (Cancelled status in Project type), BUG-114 (ActivitySchema entityId/entityType fields), BUG-138 (leave date validation)
+**Already fixed/false positive:** BUG-040 (typeof window checks are correct for SSR), BUG-070 (regex already escaped), BUG-081 (password min 8 done), BUG-100 (already has agencyId filter), BUG-272 (login already strips password)
+**Remaining (larger refactors/infra):** BUG-021, 033, 034, 047, 063, 064, 066, 068, 072, 073, 074, 075, 077, 087, 091, 097, 101, 102, 109, 110, 113, 116, 117, 122, 124, 127, 134, 222, 236, 237, 264, 271, 281, 287, 288, 293
 **These can be done incrementally as part of regular maintenance.**
 
 ---
