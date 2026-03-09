@@ -49,6 +49,7 @@ export async function getAgencySettings() {
         logo: agency.logo || "",
         primaryColor: agency.primaryColor,
         secondaryColor: agency.secondaryColor,
+        currency: agency.settings?.currency || "INR",
         emailNotificationsEnabled: agency.settings?.emailNotificationsEnabled ?? true,
         emailCategories: agency.settings?.emailCategories || {}
     };
@@ -879,7 +880,28 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
         newUser.password = await hashPassword(newUser.password);
     }
     await connectDB();
-    await UserModel.create(newUser);
+    try {
+        await UserModel.create(newUser);
+    } catch (err: any) {
+        // Handle duplicate username race condition
+        if (err?.code === 11000 && err?.keyPattern?.username) {
+            let retryUsername = uniqueUsername;
+            let retryCounter = counter;
+            for (let i = 0; i < 5; i++) {
+                retryUsername = `${username}${retryCounter}`;
+                retryCounter++;
+                newUser.username = retryUsername;
+                try {
+                    await UserModel.create(newUser);
+                    break;
+                } catch (retryErr: any) {
+                    if (retryErr?.code !== 11000 || i === 4) throw retryErr;
+                }
+            }
+        } else {
+            throw err;
+        }
+    }
 
     // Send welcome email to employee
     try {
@@ -2053,7 +2075,28 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
     }
 
     await connectDB();
-    await ClientModel.create(newClient);
+    try {
+        await ClientModel.create(newClient);
+    } catch (err: any) {
+        // Handle duplicate username race condition
+        if (err?.code === 11000 && err?.keyPattern?.username) {
+            let retryUsername = uniqueUsername;
+            let retryCounter = counter;
+            for (let i = 0; i < 5; i++) {
+                retryUsername = `${username}${retryCounter}`;
+                retryCounter++;
+                newClient.username = retryUsername;
+                try {
+                    await ClientModel.create(newClient);
+                    break;
+                } catch (retryErr: any) {
+                    if (retryErr?.code !== 11000 || i === 4) throw retryErr;
+                }
+            }
+        } else {
+            throw err;
+        }
+    }
 
     // Send welcome email to client
     try {
@@ -3101,13 +3144,12 @@ export async function deleteProjectAsset(assetId: string) {
     await connectDB();
     const agency = await getCurrentAgency();
     const asset = await AssetModel.findOne({ id: assetId, agencyId: agency?.id }).lean();
+    if (!asset) throw new Error('Asset not found');
     await AssetModel.deleteOne({ id: assetId, agencyId: agency?.id });
-    if (asset) {
-        await ActivityModel.create({
-            id: generateId(), agencyId: agency?.id, user: userName,
-            action: 'deleted asset', target: (asset as any).name, timestamp: new Date().toISOString()
-        });
-    }
+    await ActivityModel.create({
+        id: generateId(), agencyId: agency?.id, user: userName,
+        action: 'deleted asset', target: (asset as any).name, timestamp: new Date().toISOString()
+    });
     revalidatePath('/dashboard/projects/[id]', 'page');
 }
 
@@ -3124,6 +3166,7 @@ export async function updateProjectAsset(assetId: string, updates: Partial<Asset
     await connectDB();
     const agency = await getCurrentAgency();
     const asset = await AssetModel.findOne({ id: assetId, agencyId: agency?.id }).lean();
+    if (!asset) throw new Error('Asset not found');
     await AssetModel.updateOne({ id: assetId, agencyId: agency?.id }, { $set: updates });
     await ActivityModel.create({
         id: generateId(), agencyId: agency?.id, user: userName,

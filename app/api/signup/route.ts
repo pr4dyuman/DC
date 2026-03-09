@@ -176,6 +176,16 @@ export async function POST(request: Request) {
 
         // --- Create Admin User ---
         const hashedPassword = await bcrypt.hash(password, 12); // Increased from 10 to 12 rounds
+
+        // Generate unique username from email prefix
+        let baseUsername = validatedEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+        let username = baseUsername;
+        let counter = 1;
+        while (await UserModel.exists({ username, agencyId }) || await ClientModel.exists({ username, agencyId })) {
+            username = `${baseUsername}${counter}`;
+            counter++;
+        }
+
         await UserModel.create({
             id: userId,
             agencyId,
@@ -183,7 +193,7 @@ export async function POST(request: Request) {
             email: validatedEmail,
             password: hashedPassword,
             role: 'admin',
-            username: validatedEmail.split('@')[0],
+            username,
             contactNumber: sanitizedPhone,
             jobTitle: 'Agency Owner',
             salary: 0,

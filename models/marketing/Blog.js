@@ -44,15 +44,22 @@ const BlogSchema = new mongoose.Schema({
   },
 });
 
-// Simple slug generator pre-save
+// Simple slug generator pre-save with duplicate handling
 BlogSchema.pre('save', async function() {
   if (this.title && !this.slug) {
-    this.slug = this.title
+    let baseSlug = this.title
       .toLowerCase()
       .trim()
       .replace(/[^\w\s-]/g, '')
       .replace(/[\s_-]+/g, '-')
       .replace(/^-+|-+$/g, '');
+    let slug = baseSlug;
+    let counter = 1;
+    while (await mongoose.models.Blog?.exists({ slug, _id: { $ne: this._id } })) {
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+    this.slug = slug;
   }
 });
 

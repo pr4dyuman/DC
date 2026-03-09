@@ -5,6 +5,9 @@ import { User, Client } from "@/lib/types";
 import { approveDocumentUpdate, updateUser } from "@/lib/actions";
 import { AlertCircle, FileText, CheckCircle2, Clock, Trash2, Eye, Upload, ShieldAlert, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 
 interface DocumentManagerProps {
     user: User | Client;
@@ -21,6 +24,12 @@ export function DocumentManager({ user, open, onOpenChange, isAdmin, onSuccess }
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'adhar' | 'pan' | 'contracts' | 'other' | 'contracts_add' | 'other_add') => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        if (file.size > MAX_FILE_SIZE) {
+            toast.error("File size must be under 2MB.");
+            e.target.value = '';
+            return;
+        }
 
         const reader = new FileReader();
         reader.onloadend = async () => {

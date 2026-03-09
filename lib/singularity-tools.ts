@@ -1105,6 +1105,10 @@ export async function executeTool(
                 const aiPerms = await getAIPermissions();
                 if (!aiPerms.canManageInvoices) return { success: false, data: null, summary: '⛔ AI Invoice Management permission is disabled. Enable it in Settings → AI Settings.' };
 
+                await connectDB();
+                const { getCurrentAgency } = await import('./agency-context');
+                const agency = await getCurrentAgency();
+
                 const createdIds: string[] = [];
                 for (const inv of args.invoices) {
                     const result = await createInvoice({
@@ -1114,9 +1118,6 @@ export async function executeTool(
                     });
                     // Update status if provided (createInvoice defaults to 'Pending')
                     if (inv.status && inv.status !== 'Pending') {
-                        await connectDB();
-                        const { getCurrentAgency } = await import('./agency-context');
-                        const agency = await getCurrentAgency();
                         await InvoiceModel.updateOne(
                             { id: result.id, agencyId: agency?.id },
                             { $set: { status: inv.status } }

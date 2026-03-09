@@ -341,6 +341,8 @@ const UserSchema = new Schema<User>({
 
 // Compound unique index: each email is unique within an agency
 UserSchema.index({ email: 1, agencyId: 1 }, { unique: true });
+// Compound unique index: each username is unique within an agency
+UserSchema.index({ username: 1, agencyId: 1 }, { unique: true, sparse: true });
 
 // Client Schema
 const ClientSchema = new Schema<Client>({
@@ -369,7 +371,8 @@ const ClientSchema = new Schema<Client>({
 }, { timestamps: true });
 
 // Note: id and username already have indexes from unique constraint
-ClientSchema.index({ email: 1 });
+ClientSchema.index({ email: 1, agencyId: 1 }, { unique: true });
+ClientSchema.index({ username: 1, agencyId: 1 }, { unique: true, sparse: true });
 ClientSchema.index({ archived: 1 });
 
 // Project Schema
@@ -404,7 +407,7 @@ const TaskSchema = new Schema<Task>({
     status: { type: String, enum: ['Todo', 'In Progress', 'Review', 'Done'], required: true },
     priority: { type: String, enum: ['Low', 'Medium', 'High'] },
     assigneeId: { type: String, required: true },
-    dueDate: { type: String, required: true },
+    dueDate: { type: String },
     startDate: { type: String },
     category: { type: String },
     createdBy: { type: String },

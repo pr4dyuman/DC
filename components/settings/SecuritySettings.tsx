@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 function getPasswordStrength(password: string): { score: number; label: string; color: string } {
     if (!password) return { score: 0, label: "", color: "" };
     let score = 0;
-    if (password.length >= 6) score++;
+    if (password.length >= 8) score++;
     if (password.length >= 10) score++;
     if (/[A-Z]/.test(password)) score++;
     if (/[0-9]/.test(password)) score++;
@@ -48,8 +48,8 @@ export function SecuritySettings() {
             return;
         }
 
-        if (password.length < 6) {
-            toast.error("New password must be at least 6 characters long.");
+        if (password.length < 8) {
+            toast.error("New password must be at least 8 characters long.");
             return;
         }
 

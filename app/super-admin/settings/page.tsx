@@ -239,7 +239,7 @@ export default function SystemSettingsPage() {
                         { label: "Version", value: "1.0.0" },
                         { label: "Framework", value: "Next.js 15" },
                         { label: "Database", value: "MongoDB" },
-                        { label: "Environment", value: process.env.NODE_ENV || "development" },
+                        { label: "Environment", value: "Production" },
                         { label: "Last Restart", value: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) },
                     ].map((item) => (
                         <div key={item.label} className="flex items-center justify-between py-2 border-b border-border last:border-0">
