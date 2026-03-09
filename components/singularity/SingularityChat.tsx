@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import DOMPurify from "dompurify";
 import { cn } from "@/lib/utils";
+import { verifyAgentPassword } from "@/lib/actions";
 
 interface Attachment {
     id: string;
@@ -125,6 +126,12 @@ export function SingularityChat({ userId }: { userId?: string }) {
     const [showNavMenu, setShowNavMenu] = useState(false);
     const [showModeDropdown, setShowModeDropdown] = useState(false);
     const [undoingCheckpoint, setUndoingCheckpoint] = useState<string | null>(null);
+    const [agentUnlocked, setAgentUnlocked] = useState(false);
+    const [showPasswordGate, setShowPasswordGate] = useState(false);
+    const [passwordInput, setPasswordInput] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    const [passwordVerifying, setPasswordVerifying] = useState(false);
+    const pendingMessageRef = useRef<string | null>(null); // Stores message while waiting for password
     const pendingRollbackRef = useRef<any[]>([]); // Accumulates rollback data during a single agent response
 
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -571,6 +578,15 @@ export function SingularityChat({ userId }: { userId?: string }) {
         const msg = (overrideMessage || inputValue).trim();
         if ((!msg && attachments.length === 0) || isLoading) return;
 
+        // Agent mode requires password verification (once per session)
+        if (mode === 'agent' && !agentUnlocked) {
+            pendingMessageRef.current = msg;
+            setShowPasswordGate(true);
+            setPasswordInput('');
+            setPasswordError('');
+            return;
+        }
+
         const currentAttachments = [...attachments];
         setInputValue("");
         setAttachments([]);
@@ -786,6 +802,33 @@ export function SingularityChat({ userId }: { userId?: string }) {
         }
     };
 
+    const handlePasswordVerify = async () => {
+        if (!passwordInput.trim() || passwordVerifying) return;
+        setPasswordVerifying(true);
+        setPasswordError('');
+        try {
+            const result = await verifyAgentPassword(passwordInput);
+            if (result.success) {
+                setAgentUnlocked(true);
+                setShowPasswordGate(false);
+                setPasswordInput('');
+                // Send the pending message
+                if (pendingMessageRef.current) {
+                    const msg = pendingMessageRef.current;
+                    pendingMessageRef.current = null;
+                    // Small delay so state updates propagate
+                    setTimeout(() => handleSend(msg), 50);
+                }
+            } else {
+                setPasswordError(result.error || 'Incorrect password');
+            }
+        } catch {
+            setPasswordError('Verification failed. Try again.');
+        } finally {
+            setPasswordVerifying(false);
+        }
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -809,6 +852,53 @@ export function SingularityChat({ userId }: { userId?: string }) {
                     <div className="text-center space-y-2">
                         <ImageIcon className="w-12 h-12 text-neutral-400 mx-auto" />
                         <p className="text-neutral-600 dark:text-neutral-300 font-medium">Drop files here</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Agent Password Gate */}
+            {showPasswordGate && (
+                <div className="absolute inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-full bg-amber-100 dark:bg-amber-900/30">
+                                <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-neutral-900 dark:text-white">Agent Mode Verification</h3>
+                                <p className="text-xs text-neutral-500 dark:text-neutral-400">Enter your password to allow AI tool execution</p>
+                            </div>
+                        </div>
+                        <div>
+                            <input
+                                type="password"
+                                placeholder="Enter your password"
+                                value={passwordInput}
+                                onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(''); }}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handlePasswordVerify(); }}
+                                className="w-full h-10 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                autoFocus
+                            />
+                            {passwordError && (
+                                <p className="text-xs text-red-500 mt-1.5">{passwordError}</p>
+                            )}
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => { setShowPasswordGate(false); pendingMessageRef.current = null; }}
+                                className="flex-1 h-9 rounded-lg border border-neutral-300 dark:border-neutral-600 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handlePasswordVerify}
+                                disabled={!passwordInput.trim() || passwordVerifying}
+                                className="flex-1 h-9 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                            >
+                                {passwordVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
+                                {passwordVerifying ? 'Verifying...' : 'Confirm'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

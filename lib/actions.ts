@@ -98,6 +98,25 @@ export async function updateAIPermissions(permissions: AIPermissions) {
     return { success: true };
 }
 
+// Verify password before allowing AI agent tool calls
+export async function verifyAgentPassword(password: string): Promise<{ success: boolean; error?: string }> {
+    const session = await requireAuth();
+    if (!password || typeof password !== 'string') return { success: false, error: 'Password required' };
+    await connectDB();
+
+    const user = await UserModel.findOne({ id: session.userId }).select('password').lean();
+    if (!user?.password) {
+        // Check ClientModel as fallback
+        const client = await ClientModel.findOne({ id: session.userId }).select('password').lean();
+        if (!client?.password) return { success: false, error: 'User not found' };
+        const valid = await comparePassword(password, client.password);
+        return valid ? { success: true } : { success: false, error: 'Incorrect password' };
+    }
+
+    const valid = await comparePassword(password, user.password);
+    return valid ? { success: true } : { success: false, error: 'Incorrect password' };
+}
+
 export async function updateEmailSettings(enabled: boolean) {
     await requireRole('admin', 'manager');
     const agency = await getCurrentAgency();
