@@ -16,6 +16,7 @@ const AI_ENCRYPT_KEY = process.env.AI_ENCRYPT_KEY;
 export function encryptApiKey(plaintext: string): string {
     if (!AI_ENCRYPT_KEY) return plaintext; // Dev fallback — no-op
     const key = Buffer.from(AI_ENCRYPT_KEY, 'hex');
+    if (key.length !== 32) throw new Error('AI_ENCRYPT_KEY must be exactly 32 bytes (64 hex characters)');
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
     const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
@@ -487,7 +488,9 @@ const ActivitySchema = new Schema<Activity>({
     user: { type: String, required: true },
     action: { type: String, required: true },
     target: { type: String, required: true },
-    timestamp: { type: String, required: true }
+    timestamp: { type: String, required: true },
+    entityId: { type: String },
+    entityType: { type: String, enum: ['task', 'project', 'invoice', 'client', 'user'] }
 }, { timestamps: true });
 
 // Note: id already has index from unique constraint

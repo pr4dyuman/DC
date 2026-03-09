@@ -145,6 +145,8 @@ export interface RollbackAction {
 /** Snapshot an entity from MongoDB before modifying it */
 async function snapshotEntity(entityType: string, entityId: string): Promise<any> {
     await connectDB();
+    const { getCurrentAgency } = await import('./agency-context');
+    const agency = await getCurrentAgency();
     const modelMap: Record<string, any> = {
         task: TaskModel,
         project: ProjectModel,
@@ -156,7 +158,7 @@ async function snapshotEntity(entityType: string, entityId: string): Promise<any
     };
     const Model = modelMap[entityType];
     if (!Model) return null;
-    const doc = await Model.findOne({ id: entityId }).lean();
+    const doc = await Model.findOne({ id: entityId, agencyId: agency?.id }).lean();
     return doc || null;
 }
 
@@ -1178,7 +1180,7 @@ export async function executeTool(
 
             case "bulk_create_clients": {
                 const aiPerms = await getAIPermissions();
-                if (!aiPerms.canManageInvoices) return { success: false, data: null, summary: '⛔ AI Invoice Management permission is disabled. Enable it in Settings → AI Settings.' };
+                if (!aiPerms.canManageInvoices) return { success: false, data: null, summary: '⛔ AI Client Management permission is disabled. Enable Invoice Management in Settings → AI Settings to allow client creation.' };
 
                 const clientIds: string[] = [];
                 const clientNames: string[] = [];

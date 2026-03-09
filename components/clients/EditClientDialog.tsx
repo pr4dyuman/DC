@@ -115,6 +115,10 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
                                         onChange={(e) => {
                                             const file = e.target.files?.[0];
                                             if (file) {
+                                                if (file.size > 2 * 1024 * 1024) {
+                                                    toast.error('Image must be under 2MB');
+                                                    return;
+                                                }
                                                 const reader = new FileReader();
                                                 reader.onloadend = () => {
                                                     setFormData({ ...formData, logo: reader.result as string });
@@ -175,6 +179,10 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
                                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                                     const file = e.target.files?.[0];
                                                     if (file) {
+                                                        if (file.size > 2 * 1024 * 1024) {
+                                                            toast.error('Image must be under 2MB');
+                                                            return;
+                                                        }
                                                         const reader = new FileReader();
                                                         reader.onloadend = () => setFormData({ ...formData, adharCardImage: reader.result as string });
                                                         reader.readAsDataURL(file);
@@ -198,6 +206,10 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
                                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                                     const file = e.target.files?.[0];
                                                     if (file) {
+                                                        if (file.size > 2 * 1024 * 1024) {
+                                                            toast.error('Image must be under 2MB');
+                                                            return;
+                                                        }
                                                         const reader = new FileReader();
                                                         reader.onloadend = () => setFormData({ ...formData, panCardImage: reader.result as string });
                                                         reader.readAsDataURL(file);

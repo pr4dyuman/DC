@@ -27,6 +27,12 @@ export function LeaveRequestDialog({ userId }: { userId: string }) {
         const endDate = formData.get("endDate") as string;
         const reason = formData.get("reason") as string;
 
+        if (endDate < startDate) {
+            setError('End date must be on or after start date');
+            setLoading(false);
+            return;
+        }
+
         try {
             await requestLeave({
                 userId,

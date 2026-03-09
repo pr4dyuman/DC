@@ -5,6 +5,7 @@ import { SINGULARITY_TOOL_DECLARATIONS, getToolDisplayName } from "@/lib/singula
 import { executeTool } from "@/lib/singularity-tools";
 import { getSessionUser } from "@/lib/auth";
 import { getAIPermissions } from "@/lib/actions";
+import { getCurrentAgency, checkTrialExpired } from "@/lib/agency-context";
 import { validateCsrfOrigin } from "@/lib/validation";
 import type { AIPermissions } from "@/lib/types";
 
@@ -83,8 +84,19 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        // Trial expiration check
+        const agency = await getCurrentAgency();
+        if (await checkTrialExpired(agency)) {
+            return NextResponse.json({ error: "Trial expired. Please upgrade your plan." }, { status: 403 });
+        }
+
         const { history, message, images, documents, mode } = await req.json();
         const authenticatedUserId = session.userId;
+
+        // Limit message size to prevent abuse
+        if (typeof message === 'string' && message.length > 50000) {
+            return NextResponse.json({ error: 'Message too long (max 50,000 characters)' }, { status: 400 });
+        }
 
         const aiConfig = await getAgencyAIConfigServer();
         if (!aiConfig) {

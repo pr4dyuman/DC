@@ -84,9 +84,10 @@ export async function POST(request: Request) {
         ]);
 
         if (existingUser || existingSuperAdmin || existingClient) {
+            // Return same success-like response to prevent email enumeration
             return NextResponse.json(
-                { error: 'An account with this email already exists' },
-                { status: 409 }
+                { message: 'If this email is not already registered, you will receive an OTP shortly.' },
+                { status: 200 }
             );
         }
 

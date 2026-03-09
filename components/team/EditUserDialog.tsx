@@ -218,6 +218,10 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
                                                 if (file) {
+                                                    if (file.size > 2 * 1024 * 1024) {
+                                                        toast.error('Avatar must be under 2MB');
+                                                        return;
+                                                    }
                                                     const reader = new FileReader();
                                                     reader.onloadend = () => {
                                                         setFormData({ ...formData, avatar: reader.result as string });

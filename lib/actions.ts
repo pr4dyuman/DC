@@ -3112,7 +3112,7 @@ export async function deleteProjectAsset(assetId: string) {
 }
 
 export async function updateProjectAsset(assetId: string, updates: Partial<Asset>) {
-    await requireAuth();
+    await requireRole('admin', 'manager');
     const currentUser = await getCurrentUser();
     const userName = currentUser ? currentUser.name : "System";
     // Input sanitization
@@ -3134,7 +3134,7 @@ export async function updateProjectAsset(assetId: string, updates: Partial<Asset
 }
 
 export async function toggleAssetAI(assetId: string, enabled: boolean) {
-    await requireAuth();
+    await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
     await AssetModel.updateOne({ id: assetId, agencyId: agency?.id }, { $set: { aiEnabled: enabled } });
@@ -3999,6 +3999,7 @@ export async function updateLeaveStatus(requestId: string, status: LeaveStatus) 
     const agency = await getCurrentAgency();
     const request = await LeaveRequestModel.findOne({ id: requestId, agencyId: agency?.id }).lean();
     if (!request) throw new Error('Request not found');
+    if ((request as any).status !== 'Pending') throw new Error('Only pending requests can be updated');
     await LeaveRequestModel.updateOne(
         { id: requestId, agencyId: agency?.id },
         { $set: { status, reviewedBy: currentUser?.id, reviewedAt: new Date().toISOString() } }

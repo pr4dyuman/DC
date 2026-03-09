@@ -3,6 +3,7 @@ import path from 'path';
 import { writeFile } from 'fs/promises';
 import fs from 'fs';
 import { getSessionUser } from '@/lib/auth';
+import { getCurrentAgency, checkTrialExpired } from '@/lib/agency-context';
 import { validateCsrfOrigin } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
@@ -22,6 +23,12 @@ export async function POST(req) {
     const session = await getSessionUser();
     if (!session) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Trial expiration check
+    const agency = await getCurrentAgency();
+    if (await checkTrialExpired(agency)) {
+      return NextResponse.json({ success: false, error: 'Trial expired. Please upgrade your plan.' }, { status: 403 });
     }
 
     const formData = await req.formData();
