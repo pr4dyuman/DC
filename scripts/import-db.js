@@ -2,12 +2,23 @@
 const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
+const readline = require('readline');
 require('dotenv').config();
 
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
     console.error('❌ MONGODB_URI not found in .env');
     process.exit(1);
+}
+
+function askConfirmation(question) {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    return new Promise(resolve => {
+        rl.question(question, answer => {
+            rl.close();
+            resolve(answer.toLowerCase().trim());
+        });
+    });
 }
 
 async function importAll() {
@@ -19,6 +30,16 @@ async function importAll() {
     const backupDir = path.join(__dirname, '..', 'data', 'backup');
 
     const files = fs.readdirSync(backupDir).filter(f => f.endsWith('.json'));
+
+    console.log(`⚠️  WARNING: This will DROP and re-import ${files.length} collections.`);
+    console.log(`   Database: ${MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')}\n`);
+
+    const answer = await askConfirmation('Are you sure you want to continue? (yes/no): ');
+    if (answer !== 'yes' && answer !== 'y') {
+        console.log('❌ Aborted.');
+        await mongoose.disconnect();
+        process.exit(0);
+    }
 
     let totalDocs = 0;
     for (const file of files) {

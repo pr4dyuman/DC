@@ -63,7 +63,8 @@ async function fixDatabase() {
 
     // Create new admin account
     console.log('\n=== CREATING NEW ADMIN ===\n');
-    const hashedPassword = await bcrypt.hash('Admin@123', 10);
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin@123';
+    const hashedPassword = await bcrypt.hash(adminPassword, 12);
 
     const newAdmin = {
         id: 'admin-' + Math.random().toString(36).substr(2, 9),
@@ -89,21 +90,22 @@ async function fixDatabase() {
 
     console.log('✅ New admin account created:');
     console.log(`   Username: pradyuman`);
-    console.log(`   Password: Admin@123`);
+    console.log(`   Password: (set via SEED_ADMIN_PASSWORD env var)`);
     console.log(`   Email:    pradyuman@agencyos.com`);
     console.log(`   Role:     admin`);
 
     // Also reset superadmin password
     const superAdmin = await db.collection('superadmins').findOne();
     if (superAdmin) {
-        const superHash = await bcrypt.hash('Super@123', 10);
+        const superPassword = process.env.SEED_SUPER_PASSWORD || 'Super@123';
+        const superHash = await bcrypt.hash(superPassword, 12);
         await db.collection('superadmins').updateOne(
             { _id: superAdmin._id },
             { $set: { password: superHash } }
         );
         console.log(`\n✅ Super Admin password reset:`);
         console.log(`   Email:    ${superAdmin.email}`);
-        console.log(`   Password: Super@123`);
+        console.log(`   Password: (set via SEED_SUPER_PASSWORD env var)`);
     }
 
     // Summary

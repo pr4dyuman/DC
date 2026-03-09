@@ -150,7 +150,7 @@ const AgencyModel = mongoose.models.Agency || mongoose.model('Agency', AgencySch
 // Seed Data
 // ──────────────────────────────────────────────────────────────
 
-const COMMON_PASSWORD = 'Test@1234';
+const COMMON_PASSWORD = process.env.SEED_PASSWORD || 'Test@1234';
 
 const now = new Date().toISOString();
 
@@ -159,7 +159,7 @@ async function seed() {
     await mongoose.connect(MONGODB_URI);
     console.log('✅ Connected!\n');
 
-    const hashedPassword = await bcrypt.hash(COMMON_PASSWORD, 10);
+    const hashedPassword = await bcrypt.hash(COMMON_PASSWORD, 12);
 
     // ── 1. Find or create Agency ──
     let agency = await AgencyModel.findOne({}).lean();
@@ -320,7 +320,7 @@ async function seed() {
     console.log('\n' + '═'.repeat(60));
     console.log('  ALL ACCOUNT CREDENTIALS');
     console.log('═'.repeat(60));
-    console.log('  Password for ALL accounts: ' + COMMON_PASSWORD);
+    console.log('  Password for ALL accounts: (set via SEED_PASSWORD env var)');
     console.log('─'.repeat(60));
     console.log('  #  | Role        | Email                      | Redirects To');
     console.log('─'.repeat(60));

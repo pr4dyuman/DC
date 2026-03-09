@@ -21,11 +21,20 @@ async function exportAll() {
     const outputDir = path.join(__dirname, '..', 'data', 'backup');
     if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
+    const SENSITIVE_FIELDS = ['password', 'otp', 'otpExpiry', 'resetToken', 'resetTokenExpiry'];
+
     let totalDocs = 0;
     for (const col of collections) {
         const docs = await db.collection(col.name).find({}).toArray();
+        const sanitized = docs.map(doc => {
+            const clean = { ...doc };
+            for (const field of SENSITIVE_FIELDS) {
+                if (field in clean) clean[field] = '[REDACTED]';
+            }
+            return clean;
+        });
         const filePath = path.join(outputDir, `${col.name}.json`);
-        fs.writeFileSync(filePath, JSON.stringify(docs, null, 2));
+        fs.writeFileSync(filePath, JSON.stringify(sanitized, null, 2));
         console.log(`📦 ${col.name}: ${docs.length} documents → ${col.name}.json`);
         totalDocs += docs.length;
     }

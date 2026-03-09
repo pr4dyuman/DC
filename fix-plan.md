@@ -542,21 +542,10 @@ Also add rate limiting to the actions/auth.ts login() function.
 
 ---
 
-### Group 4H: Add Security Headers
-**Files:** `next.config.ts` or create `middleware.ts` headers
+### Group 4H: Add Security Headers ✅ DONE
+**Files:** `next.config.ts`
 **Bugs:** BUG-284, BUG-285
-**Time:** 30 minutes
-**Fix:** Add to next.config.ts:
-```ts
-async headers() {
-  return [{ source: '/(.*)', headers: [
-    { key: 'X-Frame-Options', value: 'DENY' },
-    { key: 'X-Content-Type-Options', value: 'nosniff' },
-    { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-    { key: 'Content-Security-Policy', value: "default-src 'self'; ..." },
-  ]}];
-}
-```
+**Fix:** Added security headers via `next.config.ts` `headers()`: X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy strict-origin-when-cross-origin, X-DNS-Prefetch-Control on, HSTS 2-year, Permissions-Policy. CSP omitted (requires app-specific tuning). Commit: `e5a321a`.
 
 ---
 
