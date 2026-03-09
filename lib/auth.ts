@@ -1,32 +1,35 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { SuperAdminModel, UserModel, ClientModel, connectDB } from "./mongodb";
+import { SuperAdminModel, UserModel, ClientModel, connectDB, RateLimitModel } from "./mongodb";
 import bcrypt from "bcryptjs";
 import { signToken, verifyToken, AuthSession } from "./auth-utils";
 import { validatePassword } from "./validation";
 
-// --- Rate limiting for login (in-memory, per-process) ---
-const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+// --- Rate limiting for login (MongoDB-backed) ---
 const MAX_LOGIN_ATTEMPTS = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
-function checkLoginRateLimit(email: string): void {
-    const now = Date.now();
-    const key = email.toLowerCase().trim();
-    const record = loginAttempts.get(key);
-    if (record && now < record.resetAt) {
-        if (record.count >= MAX_LOGIN_ATTEMPTS) {
+async function checkLoginRateLimit(email: string): Promise<void> {
+    const key = `login:${email.toLowerCase().trim()}`;
+    const now = new Date();
+    const record = await RateLimitModel.findOne({ key, expiresAt: { $gt: now } }).lean();
+    if (record) {
+        if ((record as any).count >= MAX_LOGIN_ATTEMPTS) {
             throw new Error('Too many login attempts. Please try again later.');
         }
-        record.count++;
+        await RateLimitModel.updateOne({ key }, { $inc: { count: 1 } });
     } else {
-        loginAttempts.set(key, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+        await RateLimitModel.findOneAndUpdate(
+            { key },
+            { count: 1, expiresAt: new Date(now.getTime() + LOGIN_WINDOW_MS) },
+            { upsert: true }
+        );
     }
 }
 
-function resetLoginRateLimit(email: string): void {
-    loginAttempts.delete(email.toLowerCase().trim());
+async function resetLoginRateLimit(email: string): Promise<void> {
+    await RateLimitModel.deleteOne({ key: `login:${email.toLowerCase().trim()}` });
 }
 
 // --- Password Utilities ---
@@ -114,7 +117,7 @@ export type LoginResult = {
 
 export async function authenticateUser(email: string, password: string): Promise<LoginResult> {
     // Rate limiting check
-    checkLoginRateLimit(email);
+    await checkLoginRateLimit(email);
     await connectDB();
 
     // 1. Check Super Admin
@@ -122,7 +125,7 @@ export async function authenticateUser(email: string, password: string): Promise
     if (superAdmin) {
         // Migration: If no password set, assume migration is pending or use default
         if (superAdmin.password && await comparePassword(password, superAdmin.password)) {
-            resetLoginRateLimit(email);
+            await resetLoginRateLimit(email);
             await login(superAdmin.id, 'superadmin');
             return { success: true, redirectTo: '/super-admin' };
         }
@@ -132,7 +135,7 @@ export async function authenticateUser(email: string, password: string): Promise
     const user = await UserModel.findOne({ email }).lean();
     if (user) {
         if (user.password && await comparePassword(password, user.password)) {
-            resetLoginRateLimit(email);
+            await resetLoginRateLimit(email);
             await login(user.id, user.role, user.agencyId);
             return { success: true, redirectTo: '/dashboard' };
         }
@@ -142,7 +145,7 @@ export async function authenticateUser(email: string, password: string): Promise
     const client = await ClientModel.findOne({ email }).lean();
     if (client) {
         if (client.password && await comparePassword(password, client.password)) {
-            resetLoginRateLimit(email);
+            await resetLoginRateLimit(email);
             await login(client.id, 'client', client.agencyId);
             return { success: true, redirectTo: '/dashboard' };
         }

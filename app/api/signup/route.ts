@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { connectDB, AgencyModel, UserModel, SettingsModel, SuperAdminModel, ClientModel } from '@/lib/mongodb';
+import { connectDB, AgencyModel, UserModel, SettingsModel, SuperAdminModel, ClientModel, RateLimitModel } from '@/lib/mongodb';
 import { AGENCY_PLANS } from '@/lib/types';
 import { generateId } from '@/lib/utils-server';
 import { validateEmail, validatePassword, sanitizeName, sanitizePhone } from '@/lib/validation';
@@ -9,28 +9,33 @@ import { signToken } from '@/lib/auth-utils';
 import { verifyOtp } from './send-otp/route';
 
 // ── Rate limiting for signup: max 5 accounts per IP per hour ──
-const signupRateLimit = new Map<string, { count: number; resetAt: number }>();
 const MAX_SIGNUPS = 5;
 const SIGNUP_WINDOW = 60 * 60 * 1000; // 1 hour
 
 export async function POST(request: Request) {
     try {
-        // ── Rate limit by IP ──
+        // ── Rate limit by IP (MongoDB-backed) ──
         const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
             || request.headers.get('x-real-ip')
             || 'unknown';
-        const now = Date.now();
-        const ipRecord = signupRateLimit.get(ip);
-        if (ipRecord && now < ipRecord.resetAt) {
-            if (ipRecord.count >= MAX_SIGNUPS) {
+        await connectDB();
+        const now = new Date();
+        const rateKey = `signup:ip:${ip}`;
+        const ipRecord = await RateLimitModel.findOne({ key: rateKey, expiresAt: { $gt: now } }).lean();
+        if (ipRecord) {
+            if ((ipRecord as any).count >= MAX_SIGNUPS) {
                 return NextResponse.json(
                     { error: 'Too many signup attempts. Please try again later.' },
                     { status: 429 }
                 );
             }
-            ipRecord.count++;
+            await RateLimitModel.updateOne({ key: rateKey }, { $inc: { count: 1 } });
         } else {
-            signupRateLimit.set(ip, { count: 1, resetAt: now + SIGNUP_WINDOW });
+            await RateLimitModel.findOneAndUpdate(
+                { key: rateKey },
+                { count: 1, expiresAt: new Date(now.getTime() + SIGNUP_WINDOW) },
+                { upsert: true }
+            );
         }
 
         const body = await request.json();
