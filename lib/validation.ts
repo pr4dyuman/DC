@@ -109,8 +109,8 @@ export function sanitizeColor(input: string): string {
 export function sanitizeUrl(input: string): string {
     if (typeof input !== 'string') return '';
     const trimmed = input.trim().slice(0, 2000);
-    // Allow http, https, data: URIs, and relative paths
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:') || trimmed.startsWith('/')) {
+    // Allow http, https, data:image URIs, and relative paths
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:image/') || trimmed.startsWith('/')) {
         return trimmed;
     }
     return '';

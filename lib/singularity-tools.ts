@@ -40,6 +40,7 @@ import {
     UserModel, ActivityModel, NotificationModel, AssetModel,
 } from "./mongodb";
 import { generateId } from "./utils-server";
+import crypto from "crypto";
 import type { AIPermissions } from "./types";
 
 // =============================================================================
@@ -1158,6 +1159,7 @@ export async function executeTool(
                 const aiPerms = await getAIPermissions();
                 if (!aiPerms.canCreateEmployee) return { success: false, data: null, summary: '⛔ AI Employee Creation permission is disabled. Enable it in Settings → AI Settings.' };
 
+                const generatedPassword = args.password || crypto.randomBytes(16).toString('base64url');
                 const newEmp = await createUser({
                     name: args.name,
                     email: args.email,
@@ -1165,12 +1167,12 @@ export async function executeTool(
                     jobTitle: args.jobTitle,
                     salary: args.salary,
                     employmentType: args.employmentType || 'Salary',
-                    password: args.password || 'Welcome@123',
+                    password: generatedPassword,
                 });
                 return {
                     success: true,
-                    data: { id: newEmp.id, name: newEmp.name, email: newEmp.email, role: newEmp.role },
-                    summary: `Employee "${newEmp.name}" created (${newEmp.role}) — email: ${newEmp.email}`,
+                    data: { id: newEmp.id, name: newEmp.name, email: newEmp.email, role: newEmp.role, temporaryPassword: generatedPassword },
+                    summary: `Employee "${newEmp.name}" created (${newEmp.role}) — email: ${newEmp.email}. Temporary password: ${generatedPassword} — please change on first login.`,
                 };
             }
 

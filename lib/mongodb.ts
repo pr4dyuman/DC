@@ -70,7 +70,6 @@ export async function connectDB() {
         };
 
         console.log('🔌 Attempting to connect to MongoDB...');
-        console.log('📍 URI:', MONGODB_URI!.replace(/\/\/([^:]+):([^@]+)@/, '//$1:****@')); // Hide password in logs
 
         cached.promise = mongoose.connect(MONGODB_URI!, opts)
             .then((mongoose) => {

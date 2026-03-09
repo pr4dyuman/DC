@@ -551,18 +551,10 @@ Also add rate limiting to the actions/auth.ts login() function.
 
 ## PRIORITY 5 — FIX EVENTUALLY (Polish, UX, minor issues)
 
-### Group 5A: Fix UI/UX Issues
+### Group 5A: Fix UI/UX Issues ✅ PARTIALLY DONE
 **Bugs:** BUG-036, BUG-038, BUG-039, BUG-041, BUG-052, BUG-053, BUG-054, BUG-055, BUG-056, BUG-057, BUG-069, BUG-078, BUG-084, BUG-085, BUG-088, BUG-093, BUG-094, BUG-095, BUG-096, BUG-130, BUG-132, BUG-233, BUG-267
-**Time:** Several sessions
-**Fix:**
-- Add error.tsx error boundaries to key routes
-- Add Suspense skeletons to more pages
-- Fix optimistic message duplication
-- Fix window.location.reload → router.refresh
-- Add empty state components
-- Fix division by zero in analytics
-- Add mobile navigation support
-- Share ChatContext between overlay and messages page
+**Fixed (9 bugs):** BUG-036 (error boundaries), BUG-052 (deduplicate notifications), BUG-084 (analytics div/0), BUG-088 (router.refresh), BUG-093 (parallel Pay All), BUG-094 (CategoryMemberSummary div/0), BUG-095 (alert→toast), BUG-096 (dead code), BUG-132 (Switch component). Commit: `413eb23`.
+**Remaining (14 bugs):** BUG-038 (loading states), BUG-039 (optimistic msgs — already handled by full replace), BUG-041 (empty states), BUG-053 (mobile polling), BUG-054 (mobile nav), BUG-055 (shared ChatContext), BUG-056 (heartbeat visibility), BUG-057 (touch DnD), BUG-069 (pagination), BUG-078 (super-admin settings), BUG-085 (fabricated logs), BUG-130 (confirm UX), BUG-233 (informational), BUG-267 (hardcoded INR). These require larger refactors or are informational.
 - Fix hardcoded INR currency — read from agency settings
 
 ---

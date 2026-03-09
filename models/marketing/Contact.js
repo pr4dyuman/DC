@@ -30,6 +30,6 @@ const ContactSchema = new mongoose.Schema({
     required: [true, 'Please provide a message'],
     minlength: [10, 'Message must be at least 10 characters long'],
   },
-}, { stamps: true, timestamps: true });
+}, { timestamps: true });
 
 export default mongoose.models.Contact || mongoose.model('Contact', ContactSchema);

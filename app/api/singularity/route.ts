@@ -83,8 +83,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { history, message, images, documents, mode, userId } = await req.json();
-        // Use authenticated userId, not user-supplied one
+        const { history, message, images, documents, mode } = await req.json();
         const authenticatedUserId = session.userId;
 
         const aiConfig = await getAgencyAIConfigServer();
@@ -121,7 +120,7 @@ export async function POST(req: NextRequest) {
         // AGENT MODE — TEXT modality + agency context + tool calling
         // =====================================================================
         if (mode === 'agent') {
-            console.log('[Singularity Agent] Starting agent mode for userId:', userId);
+            console.log('[Singularity Agent] Starting agent mode for userId:', authenticatedUserId);
 
             // Build agency context
             let systemInstruction = '';
