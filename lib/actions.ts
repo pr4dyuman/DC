@@ -568,7 +568,7 @@ export async function getEmployeeDashboardData(userId: string) {
     ]);
 
     const activities = user
-        ? await ActivityModel.find({ user: (user as any).name, ...agencyFilter }).sort({ timestamp: -1 }).limit(5).lean()
+        ? await ActivityModel.find({ $or: [{ userId }, { user: (user as any).name }], ...agencyFilter }).sort({ timestamp: -1 }).limit(5).lean()
         : [];
 
     const projectIds = [...new Set(tasks.map((t: any) => t.projectId))];
@@ -812,7 +812,7 @@ export async function getUserActivity(userId: string) {
     if (!user) return [];
 
     // Limit to last 20 for dashboard â€” scoped to agency
-    const activities = await ActivityModel.find({ user: user.name, ...agencyFilter })
+    const activities = await ActivityModel.find({ $or: [{ userId }, { user: user.name }], ...agencyFilter })
         .sort({ timestamp: -1 })
         .limit(20)
         .lean();
@@ -833,7 +833,7 @@ export async function getUserContributionHistory(userId: string) {
     const isoOneYearAgo = oneYearAgo.toISOString();
 
     const activities = await ActivityModel.find({
-        user: user.name,
+        $or: [{ userId }, { user: user.name }],
         timestamp: { $gte: isoOneYearAgo },
         ...agencyFilter
     }).lean();
@@ -1434,7 +1434,7 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
 
     // Activity log
     await ActivityModel.create({
-        id: generateId(), agencyId: agency.id, user: currentUser.name,
+        id: generateId(), agencyId: agency.id, user: currentUser.name, userId: currentUser.id,
         action: 'created project', target: project.name,
         timestamp: new Date().toISOString()
     });
@@ -1560,7 +1560,7 @@ export async function deleteTask(taskId: string) {
     await ActivityModel.create({
         id: generateId(),
         agencyId: agency.id,
-        user: userName,
+        user: userName, userId,
         action: 'deleted task',
         target: task.title,
         timestamp: new Date().toISOString()
@@ -1591,17 +1591,18 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
         if (!permissions.canManageTasks) throw new Error('Unauthorized: You do not have permission to manage tasks.');
     }
 
-    const task = await TaskModel.findOne({ id: taskId, agencyId: agency.id }).lean();
+    const task = await TaskModel.findOneAndUpdate(
+        { id: taskId, agencyId: agency.id },
+        { $set: { status } },
+        { returnDocument: 'before', lean: true }
+    );
     if (!task) throw new Error('Task not found');
-
-    // Update the task status
-    await TaskModel.updateOne({ id: taskId, agencyId: agency.id }, { $set: { status } });
 
     // Activity log
     await ActivityModel.create({
         id: generateId(),
         agencyId: agency.id,
-        user: userName,
+        user: userName, userId,
         action: 'moved task to ' + status,
         target: task.title,
         timestamp: new Date().toISOString()
@@ -1798,7 +1799,7 @@ export async function updateTask(taskId: string, updates: Partial<Task>) {
 
     // Activity log
     await ActivityModel.create({
-        id: generateId(), agencyId: agency.id, user: userName,
+        id: generateId(), agencyId: agency.id, user: userName, userId,
         action: 'updated task',
         target: updates.title || task.title,
         timestamp: new Date().toISOString()
@@ -1835,7 +1836,7 @@ export async function addComment(taskId: string, userId: string, text: string) {
     const commenter = await resolveUserOrClient(userId, agency.id);
     await ActivityModel.create({
         id: generateId(), agencyId: agency.id,
-        user: commenter?.name || 'Unknown User',
+        user: commenter?.name || 'Unknown User', userId,
         action: 'commented on task',
         target: task.title,
         timestamp: new Date().toISOString()
@@ -1934,6 +1935,7 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
         id: generateId(),
         agencyId: agency.id,
         user: currentUser ? currentUser.name : 'System',
+        userId: currentUser ? currentUser.id : 'system',
         action: 'created task',
         target: task.title,
         timestamp: new Date().toISOString()
@@ -3107,7 +3109,7 @@ export async function getProjectAssets(projectId: string) {
 }
 
 export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt" | "agencyId">) {
-    await requireRole('admin', 'manager', 'employee');
+    const caller = await requireRole('admin', 'manager', 'employee');
     // Input sanitization
     asset = sanitizeMongoInput(asset);
     asset.name = sanitizeName(asset.name, 500);
@@ -3128,7 +3130,7 @@ export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt" | "
     };
     await AssetModel.create(newAsset);
     await ActivityModel.create({
-        id: generateId(), agencyId: agency?.id, user: asset.uploadedBy,
+        id: generateId(), agencyId: agency?.id, user: asset.uploadedBy, userId: caller.id,
         action: 'uploaded asset', target: asset.name, timestamp: new Date().toISOString()
     });
 
@@ -3147,7 +3149,7 @@ export async function deleteProjectAsset(assetId: string) {
     if (!asset) throw new Error('Asset not found');
     await AssetModel.deleteOne({ id: assetId, agencyId: agency?.id });
     await ActivityModel.create({
-        id: generateId(), agencyId: agency?.id, user: userName,
+        id: generateId(), agencyId: agency?.id, user: userName, userId: currentUser?.id || 'system',
         action: 'deleted asset', target: (asset as any).name, timestamp: new Date().toISOString()
     });
     revalidatePath('/dashboard/projects/[id]', 'page');
@@ -3169,7 +3171,7 @@ export async function updateProjectAsset(assetId: string, updates: Partial<Asset
     if (!asset) throw new Error('Asset not found');
     await AssetModel.updateOne({ id: assetId, agencyId: agency?.id }, { $set: updates });
     await ActivityModel.create({
-        id: generateId(), agencyId: agency?.id, user: userName,
+        id: generateId(), agencyId: agency?.id, user: userName, userId: currentUser?.id || 'system',
         action: 'updated asset', target: (asset as any)?.name || 'Asset',
         timestamp: new Date().toISOString()
     });
@@ -3791,7 +3793,7 @@ export async function requestLeave(leaveData: Omit<LeaveRequest, 'id' | 'status'
         read: false, timestamp: new Date().toISOString(), link: '/dashboard/team'
     })));
     await ActivityModel.create({
-        id: generateId(), agencyId: agency?.id, user: currentUser.name,
+        id: generateId(), agencyId: agency?.id, user: currentUser.name, userId: currentUser.id,
         action: 'submitted leave request', target: `${leaveData.type} leave for ${daysDiff} days`,
         timestamp: new Date().toISOString()
     });
@@ -3846,7 +3848,7 @@ export async function approveLeaveRequest(leaveRequestId: string) {
         });
     }
     await ActivityModel.create({
-        id: generateId(), agencyId: agency?.id, user: currentUser.name,
+        id: generateId(), agencyId: agency?.id, user: currentUser.name, userId: currentUser.id,
         action: 'approved leave request',
         target: employee ? `${(employee as any).name}'s ${(leaveRequest as any).type} leave` : 'Leave request',
         timestamp: new Date().toISOString()
@@ -3907,7 +3909,7 @@ export async function rejectLeaveRequest(leaveRequestId: string, rejectionReason
         });
     }
     await ActivityModel.create({
-        id: generateId(), agencyId: agency?.id, user: currentUser.name, action: 'rejected leave request',
+        id: generateId(), agencyId: agency?.id, user: currentUser.name, userId: currentUser.id, action: 'rejected leave request',
         target: employee2 ? `${(employee2 as any).name}'s ${(leaveRequest as any).type} leave` : 'Leave request',
         timestamp: new Date().toISOString()
     });
@@ -3954,7 +3956,7 @@ export async function cancelLeaveRequest(leaveRequestId: string) {
     deletedLeaveData = { type: (leaveRequest as any).type };
     await LeaveRequestModel.deleteOne({ id: leaveRequestId, agencyId: agency?.id });
     await ActivityModel.create({
-        id: generateId(), agencyId: agency?.id, user: currentUser.name,
+        id: generateId(), agencyId: agency?.id, user: currentUser.name, userId: currentUser.id,
         action: 'cancelled leave request', target: `${(leaveRequest as any).type} leave`,
         timestamp: new Date().toISOString()
     });
@@ -4101,7 +4103,7 @@ export async function createRefund(refund: {
     };
     await TransactionModel.create(newRefund);
     await ActivityModel.create({
-        id: generateId(), agencyId: agency?.id, user: currentUser.name,
+        id: generateId(), agencyId: agency?.id, user: currentUser.name, userId: currentUser.id,
         action: 'issued refund', target: (project as any).name, timestamp: new Date().toISOString()
     });
     if ((project as any).clientId) {

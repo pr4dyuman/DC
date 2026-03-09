@@ -37,7 +37,9 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: Topbar
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [showResults, setShowResults] = useState(false);
+    const [showMobileSearch, setShowMobileSearch] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
+    const mobileSearchRef = useRef<HTMLDivElement>(null);
 
     // Notification State
     const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -98,6 +100,9 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: Topbar
             if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
                 setShowResults(false);
             }
+            if (mobileSearchRef.current && !mobileSearchRef.current.contains(event.target as Node)) {
+                setShowMobileSearch(false);
+            }
         }
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -134,6 +139,14 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: Topbar
                 </div>
 
                 <div className="flex items-center gap-4">
+                    {/* Mobile Search Toggle */}
+                    <button
+                        className="sm:hidden p-2 rounded-full hover:bg-accent transition-colors"
+                        onClick={() => setShowMobileSearch(prev => !prev)}
+                        aria-label="Search"
+                    >
+                        <Search className="h-5 w-5 text-muted-foreground" />
+                    </button>
                     {/* Global Search */}
                     <div className="relative w-64 hidden sm:block" ref={searchRef}>
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -314,6 +327,64 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: Topbar
                     )}
                 </div>
             </div>
+
+            {/* Mobile Search Panel */}
+            {showMobileSearch && (
+                <div className="sm:hidden border-b bg-background px-4 py-2" ref={mobileSearchRef}>
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <input
+                            type="text"
+                            placeholder="Search projects, tasks..."
+                            className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 pl-9 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            onFocus={() => query.length >= 2 && setShowResults(true)}
+                            autoFocus
+                        />
+                        {isSearching && (
+                            <div className="absolute right-2.5 top-2.5">
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            </div>
+                        )}
+                        {showResults && (
+                            <div className="absolute top-full mt-2 w-full bg-background rounded-md border shadow-lg overflow-hidden z-[100]">
+                                <div className="p-2">
+                                    <h4 className="text-xs font-medium text-muted-foreground mb-2 px-2">
+                                        {searchResults.length > 0 ? "Results" : "No results found"}
+                                    </h4>
+                                    {searchResults.length > 0 && (
+                                        <div className="space-y-1">
+                                            {searchResults.map((result) => (
+                                                <div
+                                                    key={result.id}
+                                                    className="flex items-start gap-3 p-2 rounded-sm hover:bg-accent cursor-pointer transition-colors"
+                                                    onClick={() => {
+                                                        router.push(result.url);
+                                                        setShowResults(false);
+                                                        setShowMobileSearch(false);
+                                                        setQuery("");
+                                                    }}
+                                                >
+                                                    <div className="mt-1">
+                                                        {getIconForType(result.type)}
+                                                    </div>
+                                                    <div className="flex-1 overflow-hidden">
+                                                        <p className="text-sm font-medium truncate">{result.title}</p>
+                                                        {result.subtitle && (
+                                                            <p className="text-xs text-muted-foreground truncate">{result.subtitle}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
         </>
     );

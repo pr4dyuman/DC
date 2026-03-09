@@ -270,7 +270,7 @@ export async function POST(req: NextRequest) {
                             const timeout = setTimeout(() => {
                                 console.log('[Singularity Agent] Timeout reached');
                                 done = true;
-                            }, 300000);
+                            }, 120000);
 
                             const waitMsg = (): Promise<any> => new Promise((resolve) => {
                                 const check = () => {

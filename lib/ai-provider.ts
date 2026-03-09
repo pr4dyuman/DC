@@ -11,6 +11,18 @@ import type { ChatMessage } from "./ai-models";
 // All AI requests are server-side only. API keys never reach the client.
 // =============================================================================
 
+// Timeout for AI API calls to prevent indefinite hangs (BUG-063)
+const AI_TIMEOUT_MS = 60_000; // 60 seconds
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`AI request timed out after ${ms / 1000}s`)), ms)
+        ),
+    ]);
+}
+
 // Resolve the model ID from the config (handles default fallback)
 function resolveModel(config: AIConfig): string {
     return config.model || "gemini-2.5-flash-lite";
@@ -39,7 +51,7 @@ async function geminiGenerateContent(
         ...(systemInstruction && { systemInstruction }),
     });
 
-    const result = await model.generateContent(prompt);
+    const result = await withTimeout(model.generateContent(prompt), AI_TIMEOUT_MS);
     const response = result.response;
     return response.text();
 }
@@ -56,7 +68,7 @@ async function geminiGenerateContentWithParts(
         ...(systemInstruction && { systemInstruction }),
     });
 
-    const result = await model.generateContent({ contents: [{ role: "user", parts }] });
+    const result = await withTimeout(model.generateContent({ contents: [{ role: "user", parts }] }), AI_TIMEOUT_MS);
     const response = result.response;
     return response.text();
 }
@@ -79,7 +91,7 @@ async function geminiChat(
             parts: [{ text: msg.content }],
         })),
     });
-    const result = await chat.sendMessage(userMessage);
+    const result = await withTimeout(chat.sendMessage(userMessage), AI_TIMEOUT_MS);
     return result.response.text();
 }
 
@@ -260,7 +272,7 @@ async function openaiCompatGenerateContent(
     }
     messages.push({ role: "user", content: prompt });
 
-    const response = await fetch(`${baseUrl}/chat/completions`, {
+    const response = await withTimeout(fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -271,7 +283,7 @@ async function openaiCompatGenerateContent(
             messages,
             max_tokens: 4096,
         }),
-    });
+    }), AI_TIMEOUT_MS);
 
     if (!response.ok) {
         const errorBody = await response.text().catch(() => "Unknown error");
@@ -309,7 +321,7 @@ async function openaiCompatChat(
 
     messages.push({ role: "user", content: userMessage });
 
-    const response = await fetch(`${baseUrl}/chat/completions`, {
+    const response = await withTimeout(fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -320,7 +332,7 @@ async function openaiCompatChat(
             messages,
             max_tokens: 4096,
         }),
-    });
+    }), AI_TIMEOUT_MS);
 
     if (!response.ok) {
         const errorBody = await response.text().catch(() => "Unknown error");

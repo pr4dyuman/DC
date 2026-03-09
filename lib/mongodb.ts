@@ -489,6 +489,7 @@ const ActivitySchema = new Schema<Activity>({
     id: { type: String, required: true, unique: true },
     agencyId: { type: String, required: true, index: true },
     user: { type: String, required: true },
+    userId: { type: String },
     action: { type: String, required: true },
     target: { type: String, required: true },
     timestamp: { type: String, required: true },
@@ -498,6 +499,7 @@ const ActivitySchema = new Schema<Activity>({
 
 // Note: id already has index from unique constraint
 ActivitySchema.index({ agencyId: 1, timestamp: -1 }); // Compound for agency-scoped activity feed
+ActivitySchema.index({ userId: 1, agencyId: 1, timestamp: -1 }); // For user-specific activity lookups (BUG-021)
 
 // Asset Schema
 const AssetSchema = new Schema<Asset>({

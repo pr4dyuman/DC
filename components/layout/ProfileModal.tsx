@@ -8,6 +8,16 @@ import {
     DialogTitle,
     DialogFooter
 } from "@/components/ui/dialog";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -95,6 +105,7 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
     // Separate errors per tab
     const [generalError, setGeneralError] = useState("");
     const [securityError, setSecurityError] = useState("");
+    const [showUnsavedAlert, setShowUnsavedAlert] = useState(false);
 
     const isAdmin = user.role === 'admin';
 
@@ -163,8 +174,8 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
 
     const handleOpenChange = (newOpen: boolean) => {
         if (!newOpen && isDirty) {
-            const confirmed = window.confirm("You have unsaved changes. Are you sure you want to close?");
-            if (!confirmed) return;
+            setShowUnsavedAlert(true);
+            return;
         }
         setOpen(newOpen);
     };
@@ -240,6 +251,7 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
     };
 
     return (
+        <>
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden gap-0 max-h-[85vh] flex flex-col">
                 <DialogHeader className="p-6 pb-2">
@@ -567,5 +579,23 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
                 </form>
             </DialogContent>
         </Dialog>
+
+        <AlertDialog open={showUnsavedAlert} onOpenChange={setShowUnsavedAlert}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        You have unsaved changes. Are you sure you want to close?
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => { setShowUnsavedAlert(false); setOpen(false); }}>
+                        Discard changes
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    </>
     );
 }

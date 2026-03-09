@@ -316,7 +316,7 @@ export type Invoice = { id: string; agencyId: string; projectId: string; amount:
 export type Comment = { id: string; userId: string; text: string; timestamp: string };
 export type Task = { id: string; agencyId: string; projectId: string; title: string; description?: string; status: 'Todo' | 'In Progress' | 'Review' | 'Done'; priority?: 'Low' | 'Medium' | 'High'; assigneeId: string; dueDate?: string; startDate?: string; category?: string; createdAt?: string; createdBy?: string; comments?: Comment[]; estimatedHours?: number };
 export type Notification = { id: string; agencyId: string; userId: string; message: string; read: boolean; timestamp: string; link?: string };
-export type Activity = { id: string; agencyId: string; user: string; action: string; target: string; timestamp: string; entityId?: string; entityType?: 'task' | 'project' | 'invoice' | 'client' | 'user' };
+export type Activity = { id: string; agencyId: string; user: string; userId?: string; action: string; target: string; timestamp: string; entityId?: string; entityType?: 'task' | 'project' | 'invoice' | 'client' | 'user' };
 
 export type AssetType = 'image' | 'file' | 'code' | 'zip' | 'folder' | 'link';
 export type Asset = {
