@@ -2,12 +2,38 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/marketing-db';
 import Contact from '@/models/marketing/Contact';
 import { sendUserThankYouEmail, sendAdminNotificationEmail } from '@/lib/email';
+import { sanitizeName, sanitizeString, sanitizePhone, validateEmail } from '@/lib/validation';
+import { RateLimitModel, connectDB } from '@/lib/mongodb';
+
+const MAX_CONTACT_REQUESTS = 5;
+const CONTACT_WINDOW = 60 * 60 * 1000; // 1 hour
 
 export async function POST(request) {
   try {
+    // Rate limit by IP
+    await connectDB();
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+        || request.headers.get('x-real-ip')
+        || 'unknown';
+    const now = new Date();
+    const rateKey = `contact:ip:${ip}`;
+    const ipRecord = await RateLimitModel.findOne({ key: rateKey, expiresAt: { $gt: now } }).lean();
+    if (ipRecord && ipRecord.count >= MAX_CONTACT_REQUESTS) {
+      return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 });
+    }
+    if (ipRecord) {
+      await RateLimitModel.updateOne({ key: rateKey }, { $inc: { count: 1 } });
+    } else {
+      await RateLimitModel.findOneAndUpdate(
+        { key: rateKey },
+        { count: 1, expiresAt: new Date(now.getTime() + CONTACT_WINDOW) },
+        { upsert: true }
+      );
+    }
+
     // Parse request body
     const body = await request.json();
-    const { fullName, email, phone, companyName, message } = body;
+    let { fullName, email, phone, companyName, message } = body;
 
     // Validate required fields
     if (!fullName || !email || !phone || !message) {
@@ -18,10 +44,24 @@ export async function POST(request) {
     }
 
     // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    try {
+      email = validateEmail(email);
+    } catch {
       return NextResponse.json(
         { error: 'Invalid email format' },
+        { status: 400 }
+      );
+    }
+
+    // Sanitize inputs
+    fullName = sanitizeName(fullName, 200);
+    phone = sanitizePhone(phone);
+    companyName = companyName ? sanitizeName(companyName, 200) : '';
+    message = sanitizeString(message, 5000);
+
+    if (!fullName || !message) {
+      return NextResponse.json(
+        { error: 'Name and message are required' },
         { status: 400 }
       );
     }

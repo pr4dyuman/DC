@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/marketing-db';
 import Testimonial from '@/models/marketing/Testimonial';
 import { checkAuth } from '@/lib/authMiddleware';
+import { sanitizeName, sanitizeString } from '@/lib/validation';
 
 // GET - Fetch all testimonials (public or admin)
 export async function GET(request) {
@@ -24,10 +25,13 @@ export async function GET(request) {
       return NextResponse.json({ success: true, data: testimonial });
     }
 
-    // Build query
+    // Build query — public requests only see active testimonials
     const query = {};
     if (status) {
       query.status = status;
+    } else {
+      // Default to active for public access
+      query.status = 'active';
     }
 
     // Fetch testimonials sorted by order and creation date
@@ -69,11 +73,11 @@ export async function POST(request) {
 
     // Create testimonial
     const testimonial = await Testimonial.create({
-      text,
-      name,
-      company,
-      status: status || 'active',
-      order: order || 0,
+      text: sanitizeString(text, 5000),
+      name: sanitizeName(name, 200),
+      company: sanitizeName(company, 200),
+      status: status === 'active' || status === 'inactive' ? status : 'active',
+      order: typeof order === 'number' ? order : 0,
     });
 
     return NextResponse.json(
@@ -111,16 +115,17 @@ export async function PUT(request) {
     }
 
     // Find and update testimonial
+    const updateData = {};
+    if (text) updateData.text = sanitizeString(text, 5000);
+    if (name) updateData.name = sanitizeName(name, 200);
+    if (company) updateData.company = sanitizeName(company, 200);
+    if (status === 'active' || status === 'inactive') updateData.status = status;
+    if (typeof order === 'number') updateData.order = order;
+    updateData.updatedAt = Date.now();
+
     const testimonial = await Testimonial.findByIdAndUpdate(
       id,
-      {
-        text,
-        name,
-        company,
-        status,
-        order,
-        updatedAt: Date.now(),
-      },
+      updateData,
       { new: true, runValidators: true }
     );
 

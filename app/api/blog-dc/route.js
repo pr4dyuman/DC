@@ -3,6 +3,7 @@ import dbConnect from '@/lib/marketing-db';
 import Blog from '@/models/marketing/Blog';
 import { checkAuth } from '@/lib/authMiddleware';
 import DOMPurify from 'isomorphic-dompurify';
+import { sanitizeName, sanitizeString } from '@/lib/validation';
 
 // Cache for 60 seconds - public blog list doesn't need real-time updates
 export const revalidate = 60;
@@ -35,10 +36,22 @@ export async function POST(req) {
     }
 
     const body = await req.json();
-    if (body.content) {
-      body.content = DOMPurify.sanitize(body.content);
+    // Whitelist fields and sanitize
+    const blogData = {
+      title: body.title ? sanitizeName(body.title, 500) : undefined,
+      shortDescription: body.shortDescription ? sanitizeString(body.shortDescription, 1000) : undefined,
+      content: body.content ? DOMPurify.sanitize(body.content) : undefined,
+      category: body.category ? sanitizeName(body.category, 200) : undefined,
+      status: body.status === 'published' || body.status === 'draft' ? body.status : 'draft',
+      image: body.image ? sanitizeString(body.image, 2000) : undefined,
+      slug: body.slug ? sanitizeName(body.slug, 500) : undefined,
+    };
+    // Remove undefined fields
+    Object.keys(blogData).forEach(k => blogData[k] === undefined && delete blogData[k]);
+    if (!blogData.title) {
+      return NextResponse.json({ success: false, error: 'Title is required' }, { status: 400 });
     }
-    const blog = await Blog.create(body);
+    const blog = await Blog.create(blogData);
 
     return NextResponse.json({ success: true, data: blog }, { status: 201 });
   } catch (error) {

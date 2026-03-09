@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/marketing-db';
 import Category from '@/models/marketing/Category';
 import { checkAuth } from '@/lib/authMiddleware';
+import { sanitizeName } from '@/lib/validation';
 
 // Cache for 5 minutes - categories change infrequently
 export const revalidate = 300;
@@ -34,13 +35,22 @@ export async function POST(req) {
 
     const body = await req.json();
     
+    // Sanitize + validate
+    if (!body.name || typeof body.name !== 'string') {
+      return NextResponse.json({ success: false, error: 'Category name is required' }, { status: 400 });
+    }
+    const sanitizedName = sanitizeName(body.name, 200);
+    if (!sanitizedName) {
+      return NextResponse.json({ success: false, error: 'Invalid category name' }, { status: 400 });
+    }
+
     // Check duplicates
-    const existing = await Category.findOne({ name: body.name }).lean();
+    const existing = await Category.findOne({ name: sanitizedName }).lean();
     if (existing) {
       return NextResponse.json({ success: false, error: 'Category already exists' }, { status: 400 });
     }
 
-    const category = await Category.create(body);
+    const category = await Category.create({ name: sanitizedName });
 
     return NextResponse.json({ success: true, data: category }, { status: 201 });
   } catch (error) {
