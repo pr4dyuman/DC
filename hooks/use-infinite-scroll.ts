@@ -118,15 +118,17 @@ export function useProgressiveList(
     resetDeps: unknown[] = []
 ) {
     const [visibleCount, setVisibleCount] = useState(pageSize);
-    const sentinelRef = useRef<HTMLDivElement | null>(null);
+    const [sentinelNode, setSentinelNode] = useState<HTMLDivElement | null>(null);
+    const sentinelRef = useCallback((node: HTMLDivElement | null) => {
+        setSentinelNode(node);
+    }, []);
 
     // Reset when filters change
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => { setVisibleCount(pageSize); }, resetDeps);
 
     useEffect(() => {
-        const el = sentinelRef.current;
-        if (!el || visibleCount >= totalCount) return;
+        if (!sentinelNode || visibleCount >= totalCount) return;
         const obs = new IntersectionObserver(
             ([entry]) => {
                 if (entry?.isIntersecting) {
@@ -135,9 +137,9 @@ export function useProgressiveList(
             },
             { rootMargin: "0px 0px 200px 0px" }
         );
-        obs.observe(el);
+        obs.observe(sentinelNode);
         return () => obs.disconnect();
-    }, [visibleCount, totalCount, pageSize]);
+    }, [sentinelNode, visibleCount, totalCount, pageSize]);
 
     return {
         visibleCount,

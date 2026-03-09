@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { getUsers, createUser, updateUser, deleteUser, getUser, getLeaveRequests } from "@/lib/actions";
 import { User, LeaveRequest } from "@/lib/types";
 import { getSessionId } from "@/lib/auth";
