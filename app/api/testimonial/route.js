@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/marketing-db';
 import Testimonial from '@/models/marketing/Testimonial';
 import { checkAuth } from '@/lib/authMiddleware';
-import { sanitizeName, sanitizeString } from '@/lib/validation';
+import { sanitizeName, sanitizeString, validateCsrfOrigin } from '@/lib/validation';
 
 // GET - Fetch all testimonials (public or admin)
 export async function GET(request) {
@@ -52,6 +52,9 @@ export async function GET(request) {
 // POST - Create new testimonial (admin only)
 export async function POST(request) {
   try {
+    const csrf = validateCsrfOrigin(request);
+    if (!csrf.valid) return csrf.response;
+
     // Verify authentication
     const authResult = await checkAuth();
     if (!authResult.authorized) {
@@ -96,6 +99,9 @@ export async function POST(request) {
 // PUT - Update testimonial (admin only)
 export async function PUT(request) {
   try {
+    const csrf = validateCsrfOrigin(request);
+    if (!csrf.valid) return csrf.response;
+
     // Verify authentication
     const authResult = await checkAuth();
     if (!authResult.authorized) {
@@ -149,6 +155,9 @@ export async function PUT(request) {
 // DELETE - Delete testimonial (admin only)
 export async function DELETE(request) {
   try {
+    const csrf = validateCsrfOrigin(request);
+    if (!csrf.valid) return csrf.response;
+
     // Verify authentication
     const authResult = await checkAuth();
     if (!authResult.authorized) {

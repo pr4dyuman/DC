@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { connectDB, UserModel, SuperAdminModel, ClientModel, OtpModel, RateLimitModel } from '@/lib/mongodb';
-import { validateEmail } from '@/lib/validation';
+import { validateEmail, validateCsrfOrigin } from '@/lib/validation';
 import { sendOtpEmail } from '@/lib/brevo';
 import { randomInt } from 'crypto';
 
@@ -14,6 +14,9 @@ function generateOtp(): string {
 
 export async function POST(request: Request) {
     try {
+        const csrf = validateCsrfOrigin(request);
+        if (!csrf.valid) return csrf.response;
+
         const body = await request.json();
         const { email } = body;
 

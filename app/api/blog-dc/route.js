@@ -3,7 +3,7 @@ import dbConnect from '@/lib/marketing-db';
 import Blog from '@/models/marketing/Blog';
 import { checkAuth } from '@/lib/authMiddleware';
 import DOMPurify from 'isomorphic-dompurify';
-import { sanitizeName, sanitizeString } from '@/lib/validation';
+import { sanitizeName, sanitizeString, validateCsrfOrigin } from '@/lib/validation';
 
 // Cache for 60 seconds - public blog list doesn't need real-time updates
 export const revalidate = 60;
@@ -27,6 +27,9 @@ export async function GET() {
 
 export async function POST(req) {
   try {
+    const csrf = validateCsrfOrigin(req);
+    if (!csrf.valid) return csrf.response;
+
     await dbConnect();
     
     // Use auth middleware

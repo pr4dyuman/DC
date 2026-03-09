@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/marketing-db';
 import Contact from '@/models/marketing/Contact';
 import { sendUserThankYouEmail, sendAdminNotificationEmail } from '@/lib/email';
-import { sanitizeName, sanitizeString, sanitizePhone, validateEmail } from '@/lib/validation';
+import { sanitizeName, sanitizeString, sanitizePhone, validateEmail, validateCsrfOrigin } from '@/lib/validation';
 import { RateLimitModel, connectDB } from '@/lib/mongodb';
 
 const MAX_CONTACT_REQUESTS = 5;
@@ -10,6 +10,9 @@ const CONTACT_WINDOW = 60 * 60 * 1000; // 1 hour
 
 export async function POST(request) {
   try {
+    const csrf = validateCsrfOrigin(request);
+    if (!csrf.valid) return csrf.response;
+
     // Rate limit by IP
     await connectDB();
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()

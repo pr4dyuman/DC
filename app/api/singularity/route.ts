@@ -5,6 +5,7 @@ import { SINGULARITY_TOOL_DECLARATIONS, getToolDisplayName } from "@/lib/singula
 import { executeTool } from "@/lib/singularity-tools";
 import { getSessionUser } from "@/lib/auth";
 import { getAIPermissions } from "@/lib/actions";
+import { validateCsrfOrigin } from "@/lib/validation";
 import type { AIPermissions } from "@/lib/types";
 
 // Tool name → AI permission flag mapping (must stay in sync with singularity-tools.ts)
@@ -73,6 +74,9 @@ async function checkAndContinue(
 
 export async function POST(req: NextRequest) {
     try {
+        const csrf = validateCsrfOrigin(req);
+        if (!csrf.valid) return csrf.response;
+
         // Authentication check
         const session = await getSessionUser();
         if (!session) {

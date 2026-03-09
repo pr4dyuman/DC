@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { connectDB, AgencyModel, UserModel, SettingsModel, SuperAdminModel, ClientModel, RateLimitModel } from '@/lib/mongodb';
 import { AGENCY_PLANS } from '@/lib/types';
 import { generateId } from '@/lib/utils-server';
-import { validateEmail, validatePassword, sanitizeName, sanitizePhone } from '@/lib/validation';
+import { validateEmail, validatePassword, sanitizeName, sanitizePhone, validateCsrfOrigin } from '@/lib/validation';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
 import { signToken } from '@/lib/auth-utils';
@@ -14,6 +14,9 @@ const SIGNUP_WINDOW = 60 * 60 * 1000; // 1 hour
 
 export async function POST(request: Request) {
     try {
+        const csrf = validateCsrfOrigin(request);
+        if (!csrf.valid) return csrf.response;
+
         // ── Rate limit by IP (MongoDB-backed) ──
         const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
             || request.headers.get('x-real-ip')

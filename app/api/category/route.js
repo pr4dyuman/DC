@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/marketing-db';
 import Category from '@/models/marketing/Category';
 import { checkAuth } from '@/lib/authMiddleware';
-import { sanitizeName } from '@/lib/validation';
+import { sanitizeName, validateCsrfOrigin } from '@/lib/validation';
 
 // Cache for 5 minutes - categories change infrequently
 export const revalidate = 300;
@@ -25,6 +25,9 @@ export async function GET() {
 
 export async function POST(req) {
   try {
+    const csrf = validateCsrfOrigin(req);
+    if (!csrf.valid) return csrf.response;
+
     await dbConnect();
 
     // Use auth middleware
@@ -61,6 +64,9 @@ export async function POST(req) {
 
 export async function DELETE(req) {
   try {
+    const csrf = validateCsrfOrigin(req);
+    if (!csrf.valid) return csrf.response;
+
     await dbConnect();
 
     // Use auth middleware

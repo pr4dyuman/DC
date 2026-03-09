@@ -3,6 +3,7 @@ import path from 'path';
 import { writeFile } from 'fs/promises';
 import fs from 'fs';
 import { getSessionUser } from '@/lib/auth';
+import { validateCsrfOrigin } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,9 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 export async function POST(req) {
   try {
+    const csrf = validateCsrfOrigin(req);
+    if (!csrf.valid) return csrf.response;
+
     // Authentication check
     const session = await getSessionUser();
     if (!session) {

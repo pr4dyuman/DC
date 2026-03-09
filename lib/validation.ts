@@ -214,3 +214,28 @@ export function validateEnum<T extends string>(input: string, allowed: T[], fiel
     }
     return input as T;
 }
+
+/**
+ * Validate Origin header for CSRF protection on API routes.
+ * Server actions already have built-in CSRF protection in Next.js.
+ * Returns null if valid, or a NextResponse with 403 if invalid.
+ */
+export function validateCsrfOrigin(request: Request): { valid: false; response: Response } | { valid: true } {
+    const origin = request.headers.get('origin');
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const allowedOrigins = [new URL(appUrl).origin];
+
+    // Allow requests with no origin (same-origin browser requests, curl, server-to-server)
+    if (!origin) return { valid: true };
+
+    if (!allowedOrigins.includes(origin)) {
+        return {
+            valid: false,
+            response: new Response(JSON.stringify({ error: 'Forbidden' }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' },
+            }),
+        };
+    }
+    return { valid: true };
+}

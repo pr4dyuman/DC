@@ -3,6 +3,7 @@ import dbConnect from '@/lib/marketing-db';
 import Admin from '@/models/marketing/Admin';
 import { cookies } from 'next/headers';
 import { SignJWT } from 'jose';
+import { validateCsrfOrigin } from '@/lib/validation';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const encodedKey = new TextEncoder().encode(JWT_SECRET);
@@ -27,6 +28,9 @@ function checkRateLimit(email) {
 
 export async function POST(req) {
   try {
+    const csrf = validateCsrfOrigin(req);
+    if (!csrf.valid) return csrf.response;
+
     if (!JWT_SECRET) {
       return NextResponse.json({ success: false, error: 'Server misconfiguration' }, { status: 500 });
     }

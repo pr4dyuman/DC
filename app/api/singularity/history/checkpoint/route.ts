@@ -8,6 +8,7 @@ import {
     getCheckpointSessionId,
 } from "@/lib/singularity-history";
 import { getSessionUser } from "@/lib/auth";
+import { validateCsrfOrigin } from "@/lib/validation";
 
 // Helper: verify session ownership
 async function verifySessionOwnership(sessionId: string, authUserId: string): Promise<boolean> {
@@ -46,6 +47,9 @@ export async function GET(req: NextRequest) {
 // POST /api/singularity/history/checkpoint — Create checkpoint or analyze rollback
 export async function POST(req: NextRequest) {
     try {
+        const csrf = validateCsrfOrigin(req);
+        if (!csrf.valid) return csrf.response;
+
         const session = await getSessionUser();
         if (!session) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -90,6 +94,9 @@ export async function POST(req: NextRequest) {
 // PUT /api/singularity/history/checkpoint — Execute rollback
 export async function PUT(req: NextRequest) {
     try {
+        const csrf = validateCsrfOrigin(req);
+        if (!csrf.valid) return csrf.response;
+
         const session = await getSessionUser();
         if (!session) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

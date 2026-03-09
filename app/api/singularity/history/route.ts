@@ -8,6 +8,7 @@ import {
     deleteSingularitySession,
 } from "@/lib/singularity-history";
 import { getSessionUser } from "@/lib/auth";
+import { validateCsrfOrigin } from "@/lib/validation";
 
 // GET /api/singularity/history?sessionId=xxx — Load single session
 // GET /api/singularity/history — List current user's sessions
@@ -48,6 +49,9 @@ export async function GET(req: NextRequest) {
 // — Update existing session when body has { sessionId, messages } (used by sendBeacon emergency save)
 export async function POST(req: NextRequest) {
     try {
+        const csrf = validateCsrfOrigin(req);
+        if (!csrf.valid) return csrf.response;
+
         // Authentication check
         const session = await getSessionUser();
         if (!session) {
@@ -80,6 +84,9 @@ export async function POST(req: NextRequest) {
 // PUT /api/singularity/history — Update session (save messages)
 export async function PUT(req: NextRequest) {
     try {
+        const csrf = validateCsrfOrigin(req);
+        if (!csrf.valid) return csrf.response;
+
         // Authentication check
         const session = await getSessionUser();
         if (!session) {
@@ -117,6 +124,9 @@ export async function PUT(req: NextRequest) {
 // DELETE /api/singularity/history?id=xxx — Delete session
 export async function DELETE(req: NextRequest) {
     try {
+        const csrf = validateCsrfOrigin(req);
+        if (!csrf.valid) return csrf.response;
+
         // Authentication check
         const session = await getSessionUser();
         if (!session) {
