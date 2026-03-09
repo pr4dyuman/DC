@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/marketing-db';
 import Blog from '@/models/marketing/Blog';
 import { checkAuth } from '@/lib/authMiddleware';
+import DOMPurify from 'isomorphic-dompurify';
 
 // Cache for 60 seconds - public blog list doesn't need real-time updates
 export const revalidate = 60;
@@ -34,6 +35,9 @@ export async function POST(req) {
     }
 
     const body = await req.json();
+    if (body.content) {
+      body.content = DOMPurify.sanitize(body.content);
+    }
     const blog = await Blog.create(body);
 
     return NextResponse.json({ success: true, data: blog }, { status: 201 });

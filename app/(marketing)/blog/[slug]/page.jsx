@@ -2,6 +2,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Calendar, User, Share2, Clock } from "lucide-react";
+import DOMPurify from "isomorphic-dompurify";
 import dbConnect from '@/lib/marketing-db';
 import Blog from '@/models/marketing/Blog';
 import { notFound } from 'next/navigation';
@@ -132,7 +133,7 @@ export default async function BlogPost({ params }) {
               prose-a:text-[#F5EE30] prose-a:no-underline hover:prose-a:underline 
               prose-strong:text-white 
               font-sans"
-              dangerouslySetInnerHTML={{ __html: post.content }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content) }}
             />
 
             {/* Share Section */}
