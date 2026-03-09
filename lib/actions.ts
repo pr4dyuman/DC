@@ -1109,6 +1109,8 @@ export async function deleteClient(id: string) {
         { id, agencyId: agency?.id },
         { $set: { archived: true, archivedAt: new Date().toISOString() } }
     );
+    // Clean up notifications for archived client
+    await NotificationModel.deleteMany({ userId: id, agencyId: agency?.id });
     revalidatePath('/dashboard/clients');
 }
 
@@ -1219,7 +1221,18 @@ export async function deleteUser(id: string, password: string) {
     const isValid = await verifyAdminPassword(password);
     if (!isValid) throw new Error('Invalid password');
     const agency = await getCurrentAgency();
-    await UserModel.deleteOne({ id, agencyId: agency?.id });
+
+    // Cascade: delete user and all related data
+    await Promise.all([
+        UserModel.deleteOne({ id, agencyId: agency?.id }),
+        NotificationModel.deleteMany({ userId: id, agencyId: agency?.id }),
+        LeaveRequestModel.deleteMany({ userId: id, agencyId: agency?.id }),
+        // Unassign tasks — set assignee to empty rather than deleting tasks
+        TaskModel.updateMany(
+            { assignee: id, agencyId: agency?.id },
+            { $set: { assignee: '' } }
+        ),
+    ]);
     revalidatePath('/dashboard/team');
 }
 
@@ -2168,7 +2181,9 @@ export async function deleteProject(id: string, password: string) {
         TaskModel.deleteMany({ projectId: id, agencyId: agency?.id }),
         AssetModel.deleteMany({ projectId: id, agencyId: agency?.id }),
         InvoiceModel.deleteMany({ projectId: id, agencyId: agency?.id }),
+        TransactionModel.deleteMany({ projectId: id, agencyId: agency?.id }),
         ActivityModel.deleteMany({ target: id, agencyId: agency?.id }),
+        NotificationModel.deleteMany({ agencyId: agency?.id, link: { $regex: id } }),
     ]);
 
     revalidatePath('/dashboard/projects');
