@@ -6,7 +6,7 @@ import {
     Brain, Copy, Check, Trash2, ArrowRight, Image as ImageIcon, X,
     Bot, MessageSquare, Wrench, CheckCircle2, AlertCircle, Loader2,
     Paperclip, FileText, FileSpreadsheet, FileCode,
-    Plus, Clock, Undo2, History, Shield, AlertTriangle, Menu, Send,
+    Plus, Clock, Undo2, History, AlertTriangle, Menu, Send,
     Home, LayoutDashboard, FolderKanban, Mail, Users, DollarSign, UserCircle, Settings
 } from "lucide-react";
 import Link from "next/link";
@@ -122,16 +122,11 @@ export function SingularityChat({ userId }: { userId?: string }) {
     const [checkpoints, setCheckpoints] = useState<CheckpointInfo[]>([]);
     const [rollbackModal, setRollbackModal] = useState<{ analysis: RollbackAnalysis; loading: boolean } | null>(null);
     const [undoConfirmModal, setUndoConfirmModal] = useState<{ checkpointId: string; label: string; totalActions: number } | null>(null);
-    const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ type: 'clear' | 'delete'; sessionId?: string; sessionTitle?: string; hasAgentMessages: boolean } | null>(null);
+    const [deleteConfirmModal, setDeleteConfirmModal] = useState<{ type: 'clear' | 'delete'; sessionId?: string; sessionTitle?: string; hasAgentMessages: boolean; password: string; passwordError: string; verifying: boolean } | null>(null);
     const [showNavMenu, setShowNavMenu] = useState(false);
     const [showModeDropdown, setShowModeDropdown] = useState(false);
     const [undoingCheckpoint, setUndoingCheckpoint] = useState<string | null>(null);
-    const [agentUnlocked, setAgentUnlocked] = useState(false);
-    const [showPasswordGate, setShowPasswordGate] = useState(false);
-    const [passwordInput, setPasswordInput] = useState('');
-    const [passwordError, setPasswordError] = useState('');
-    const [passwordVerifying, setPasswordVerifying] = useState(false);
-    const pendingMessageRef = useRef<string | null>(null); // Stores message while waiting for password
+
     const pendingRollbackRef = useRef<any[]>([]); // Accumulates rollback data during a single agent response
 
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -188,7 +183,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
         // Check if there are agent messages with tool actions
         const hasAgentActions = messages.some(m => m.role === 'model' && m.toolActions && m.toolActions.length > 0);
         if (messages.length > 0) {
-            setDeleteConfirmModal({ type: 'clear', hasAgentMessages: hasAgentActions });
+            setDeleteConfirmModal({ type: 'clear', hasAgentMessages: hasAgentActions, password: '', passwordError: '', verifying: false });
         }
     };
 
@@ -281,6 +276,9 @@ export function SingularityChat({ userId }: { userId?: string }) {
             sessionId: sid,
             sessionTitle: session?.title || 'this chat',
             hasAgentMessages: hasAgentActions,
+            password: '',
+            passwordError: '',
+            verifying: false,
         });
     };
 
@@ -578,14 +576,6 @@ export function SingularityChat({ userId }: { userId?: string }) {
         const msg = (overrideMessage || inputValue).trim();
         if ((!msg && attachments.length === 0) || isLoading) return;
 
-        // Agent mode requires password verification (once per session)
-        if (mode === 'agent' && !agentUnlocked) {
-            pendingMessageRef.current = msg;
-            setShowPasswordGate(true);
-            setPasswordInput('');
-            setPasswordError('');
-            return;
-        }
 
         const currentAttachments = [...attachments];
         setInputValue("");
@@ -802,30 +792,22 @@ export function SingularityChat({ userId }: { userId?: string }) {
         }
     };
 
-    const handlePasswordVerify = async () => {
-        if (!passwordInput.trim() || passwordVerifying) return;
-        setPasswordVerifying(true);
-        setPasswordError('');
+    const handleDeleteWithPassword = async () => {
+        if (!deleteConfirmModal || !deleteConfirmModal.password.trim() || deleteConfirmModal.verifying) return;
+        setDeleteConfirmModal(prev => prev ? { ...prev, verifying: true, passwordError: '' } : null);
         try {
-            const result = await verifyAgentPassword(passwordInput);
+            const result = await verifyAgentPassword(deleteConfirmModal.password);
             if (result.success) {
-                setAgentUnlocked(true);
-                setShowPasswordGate(false);
-                setPasswordInput('');
-                // Send the pending message
-                if (pendingMessageRef.current) {
-                    const msg = pendingMessageRef.current;
-                    pendingMessageRef.current = null;
-                    // Small delay so state updates propagate
-                    setTimeout(() => handleSend(msg), 50);
+                if (deleteConfirmModal.type === 'delete') {
+                    await executeDeleteSession();
+                } else {
+                    executeClearChat();
                 }
             } else {
-                setPasswordError(result.error || 'Incorrect password');
+                setDeleteConfirmModal(prev => prev ? { ...prev, verifying: false, passwordError: result.error || 'Incorrect password' } : null);
             }
         } catch {
-            setPasswordError('Verification failed. Try again.');
-        } finally {
-            setPasswordVerifying(false);
+            setDeleteConfirmModal(prev => prev ? { ...prev, verifying: false, passwordError: 'Verification failed. Try again.' } : null);
         }
     };
 
@@ -852,53 +834,6 @@ export function SingularityChat({ userId }: { userId?: string }) {
                     <div className="text-center space-y-2">
                         <ImageIcon className="w-12 h-12 text-neutral-400 mx-auto" />
                         <p className="text-neutral-600 dark:text-neutral-300 font-medium">Drop files here</p>
-                    </div>
-                </div>
-            )}
-
-            {/* Agent Password Gate */}
-            {showPasswordGate && (
-                <div className="absolute inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-full bg-amber-100 dark:bg-amber-900/30">
-                                <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-neutral-900 dark:text-white">Agent Mode Verification</h3>
-                                <p className="text-xs text-neutral-500 dark:text-neutral-400">Enter your password to allow AI tool execution</p>
-                            </div>
-                        </div>
-                        <div>
-                            <input
-                                type="password"
-                                placeholder="Enter your password"
-                                value={passwordInput}
-                                onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(''); }}
-                                onKeyDown={(e) => { if (e.key === 'Enter') handlePasswordVerify(); }}
-                                className="w-full h-10 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                autoFocus
-                            />
-                            {passwordError && (
-                                <p className="text-xs text-red-500 mt-1.5">{passwordError}</p>
-                            )}
-                        </div>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => { setShowPasswordGate(false); pendingMessageRef.current = null; }}
-                                className="flex-1 h-9 rounded-lg border border-neutral-300 dark:border-neutral-600 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handlePasswordVerify}
-                                disabled={!passwordInput.trim() || passwordVerifying}
-                                className="flex-1 h-9 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                            >
-                                {passwordVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
-                                {passwordVerifying ? 'Verifying...' : 'Confirm'}
-                            </button>
-                        </div>
                     </div>
                 </div>
             )}
@@ -1288,13 +1223,34 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                 </ul>
                             </div>
 
+                            {deleteConfirmModal.hasAgentMessages && (
+                                <div>
+                                    <input
+                                        type="password"
+                                        placeholder="Enter your password to confirm"
+                                        value={deleteConfirmModal.password}
+                                        onChange={(e) => setDeleteConfirmModal(prev => prev ? { ...prev, password: e.target.value, passwordError: '' } : null)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') handleDeleteWithPassword(); }}
+                                        className="w-full h-10 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-destructive/50"
+                                        autoFocus
+                                    />
+                                    {deleteConfirmModal.passwordError && (
+                                        <p className="text-xs text-red-500 mt-1.5">{deleteConfirmModal.passwordError}</p>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="flex gap-2">
                                 <button
-                                    onClick={deleteConfirmModal.type === 'delete' ? executeDeleteSession : executeClearChat}
-                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors shadow-sm"
+                                    onClick={deleteConfirmModal.hasAgentMessages
+                                        ? handleDeleteWithPassword
+                                        : (deleteConfirmModal.type === 'delete' ? executeDeleteSession : executeClearChat)
+                                    }
+                                    disabled={deleteConfirmModal.hasAgentMessages && (!deleteConfirmModal.password.trim() || deleteConfirmModal.verifying)}
+                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                                 >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                    {deleteConfirmModal.type === 'delete' ? 'Delete Chat' : 'Clear Messages'}
+                                    {deleteConfirmModal.verifying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                    {deleteConfirmModal.verifying ? 'Verifying...' : (deleteConfirmModal.type === 'delete' ? 'Delete Chat' : 'Clear Messages')}
                                 </button>
                                 <button
                                     onClick={() => setDeleteConfirmModal(null)}
