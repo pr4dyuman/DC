@@ -1,28 +1,38 @@
 import { Suspense } from 'react';
-import { getTasks, getUsers, getTransactions, getServices, getProjectBySlug, getProjectAssets, getUser, getClients, getUserPermissions } from "@/lib/actions";
+import { getCurrentUser, getTasks, getUsers, getTransactions, getServices, getProjectBySlug, getProjectAssets, getClients, getUserPermissions } from "@/lib/actions";
+import { redirect } from 'next/navigation';
 import { ProjectView } from "@/components/projects/ProjectView";
 import { ProjectDetailSkeleton } from "@/components/projects/ProjectDetailSkeleton";
-import { getSessionId } from "@/lib/auth";
 import { User } from "@/lib/types";
 
 async function ProjectData({ slug }: { slug: string }) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) redirect('/login');
+
     const project = await getProjectBySlug(slug);
 
     if (!project) {
         return <div>Project not found: {slug}</div>;
     }
 
+    // Clients can only view projects they own
+    if (currentUser.role === 'client' && project.clientId !== currentUser.id) {
+        redirect('/dashboard/projects');
+    }
+
+    const isAdminOrManager = currentUser.role === 'admin' || currentUser.role === 'manager';
+
     const projectId = project.id;
 
-    // Parallelize independent fetches
-    const [tasks, users, clients, transactions, assets, allCategories, userId] = await Promise.all([
+    // Parallelize independent fetches — skip financial data for non-admin roles
+    const [tasks, users, clients, transactions, assets, allCategories, permissions] = await Promise.all([
         getTasks(projectId),
         getUsers(),
-        getClients(),
-        getTransactions(projectId),
+        isAdminOrManager ? getClients() : Promise.resolve([]),
+        isAdminOrManager ? getTransactions(projectId) : Promise.resolve([]),
         getProjectAssets(projectId),
         getServices(),
-        getSessionId(),
+        getUserPermissions(currentUser.id),
     ]);
 
     // Merge clients into users list for lookup
@@ -38,12 +48,6 @@ async function ProjectData({ slug }: { slug: string }) {
     }));
 
     const allUsers = [...users, ...clientUsers];
-
-    // These depend on userId
-    const [currentUser, permissions] = await Promise.all([
-        userId ? getUser(userId) : Promise.resolve(undefined),
-        userId ? getUserPermissions(userId) : Promise.resolve(undefined),
-    ]);
 
     return (
         <ProjectView

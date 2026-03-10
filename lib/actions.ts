@@ -1059,6 +1059,14 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
     if (!isAdmin && !isSelf) {
         throw new Error("Unauthorized: You can only edit your own profile.");
     }
+
+    // Prevent privilege escalation — only admin can change role, salary, employmentType
+    if (!isAdmin) {
+        delete updates.role;
+        delete updates.salary;
+        delete updates.employmentType;
+    }
+
     // Input sanitization
     updates = sanitizeUpdates(updates) as Partial<User>;
     if (updates.name) updates.name = sanitizeName(updates.name);
