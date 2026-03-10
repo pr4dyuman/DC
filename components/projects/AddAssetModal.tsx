@@ -112,37 +112,82 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
 
             setLoading(true);
 
-            // SIMULATE UPLOAD PROCESS
-            const totalSize = file.size;
-            let uploaded = 0;
-            const startTime = Date.now();
+            try {
+                // Real upload via /api/upload-dc
+                const uploadFormData = new FormData();
+                uploadFormData.append('file', file);
 
-            // Mock chunk upload simulation
-            const chunkSize = totalSize / 20; // 20 steps
+                const startTime = Date.now();
 
-            const uploadInterval = setInterval(() => {
-                uploaded += chunkSize;
-                if (uploaded > totalSize) uploaded = totalSize;
+                // Use XMLHttpRequest for upload progress tracking
+                const uploadUrl = await new Promise<string>((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
 
-                const progress = Math.round((uploaded / totalSize) * 100);
-                setUploadProgress(progress);
+                    xhr.upload.addEventListener('progress', (e) => {
+                        if (e.lengthComputable) {
+                            const progress = Math.round((e.loaded / e.total) * 100);
+                            setUploadProgress(progress);
 
-                // Calculate Speed & Time
-                const elapsedSeconds = (Date.now() - startTime) / 1000;
-                if (elapsedSeconds > 0) {
-                    const speed = uploaded / elapsedSeconds; // bytes/sec
-                    setUploadSpeed(`${formatBytes(speed)}/s`);
+                            const elapsedSeconds = (Date.now() - startTime) / 1000;
+                            if (elapsedSeconds > 0) {
+                                const speed = e.loaded / elapsedSeconds;
+                                setUploadSpeed(`${formatBytes(speed)}/s`);
+                                const remainingBytes = e.total - e.loaded;
+                                const secondsLeft = Math.ceil(remainingBytes / speed);
+                                setRemainingTime(`${secondsLeft}s`);
+                            }
+                        }
+                    });
 
-                    const remainingBytes = totalSize - uploaded;
-                    const secondsLeft = Math.ceil(remainingBytes / speed);
-                    setRemainingTime(`${secondsLeft}s`);
-                }
+                    xhr.addEventListener('load', () => {
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            if (xhr.status >= 200 && xhr.status < 300 && data.success) {
+                                resolve(data.url);
+                            } else {
+                                reject(new Error(data.error || 'Upload failed'));
+                            }
+                        } catch {
+                            reject(new Error('Upload failed'));
+                        }
+                    });
 
-                if (uploaded >= totalSize) {
-                    clearInterval(uploadInterval);
-                    startVirusScan();
-                }
-            }, 100); // Update every 100ms
+                    xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
+                    xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+
+                    xhr.open('POST', '/api/upload-dc');
+                    xhr.send(uploadFormData);
+                });
+
+                setUploadProgress(100);
+                setIsScanning(false);
+                setScanResult("clean");
+
+                // Save asset record with real uploaded URL
+                const finalName = formData.name || file.name;
+                const finalSize = formatBytes(file.size);
+
+                await addProjectAsset({
+                    projectId,
+                    name: finalName,
+                    type: formData.type,
+                    url: uploadUrl,
+                    description: formData.description,
+                    size: finalSize,
+                    uploadedBy: "Admin",
+                    content: formData.content,
+                });
+
+                setOpen(false);
+                setFormData({ name: "", type: "link", url: "", description: "", content: "" });
+                setInputMode("link");
+                resetState();
+                router.refresh();
+            } catch (err: any) {
+                setError(err?.message || "Upload failed. Please try again.");
+            } finally {
+                setLoading(false);
+            }
 
         } else {
             // Link mode - instant
@@ -150,40 +195,12 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
         }
     }
 
-    const startVirusScan = async () => {
-        setIsScanning(true);
-        // Instant scan - no artificial delay for production performance
-        // In production, this would be a real server-side scan
-
-        // Mock Scan Result (In real world, this comes from server)
-        // We could fail specific names for demo purposes
-        if (file?.name.includes("virus") || file?.name.includes("malware")) {
-            setIsScanning(false);
-            setScanResult("infected");
-            setError("Security Threat Detected: File contains malicious signatures.");
-            setLoading(false);
-        } else {
-            setScanResult("clean");
-            await finalizeSubmission();
-        }
-    };
-
     const finalizeSubmission = async () => {
         try {
             let finalUrl = formData.url;
-            let finalSize = "0KB";
             let finalName = formData.name;
 
-            if (inputMode === "file" && file) {
-                if (formData.type === 'image' && base64Data) {
-                    finalUrl = base64Data;
-                } else {
-                    finalUrl = `/uploads/${file.name}`; // Mock URL
-                }
-
-                if (!finalName) finalName = file.name;
-                finalSize = formatBytes(file.size);
-            } else if (inputMode === "link") {
+            if (inputMode === "link") {
                 if (!finalName) finalName = "New Link";
             }
 
@@ -193,7 +210,7 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                 type: formData.type,
                 url: finalUrl,
                 description: formData.description,
-                size: finalSize,
+                size: "0KB",
                 uploadedBy: "Admin",
                 content: formData.content,
             });

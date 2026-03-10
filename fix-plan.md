@@ -551,14 +551,15 @@ Also add rate limiting to the actions/auth.ts login() function.
 
 ## PRIORITY 5 — FIX EVENTUALLY (Polish, UX, minor issues)
 
-### Group 5A: Fix UI/UX Issues ✅ PARTIALLY DONE
+### Group 5A: Fix UI/UX Issues ✅ DONE
 **Bugs:** BUG-036, BUG-038, BUG-039, BUG-041, BUG-052, BUG-053, BUG-054, BUG-055, BUG-056, BUG-057, BUG-069, BUG-078, BUG-084, BUG-085, BUG-088, BUG-093, BUG-094, BUG-095, BUG-096, BUG-130, BUG-132, BUG-233, BUG-267
 **Fixed (10 bugs):** BUG-036 (error boundaries), BUG-052 (deduplicate notifications), BUG-084 (analytics div/0), BUG-088 (router.refresh), BUG-093 (parallel Pay All), BUG-094 (CategoryMemberSummary div/0), BUG-095 (alert→toast), BUG-096 (dead code), BUG-132 (Switch component), BUG-138 (endDate>=startDate validation). Commits: `413eb23`, `0d68241`.
 **Fixed (Round 3 - commit e0aead5):** BUG-236 (password min 6→8 in SecuritySettings), BUG-267 (exposed currency field from agency settings in getAgencySettings()).
 **Already fixed/false positive:** BUG-039 (optimistic messages work correctly — setMessages replaces entire array).
 **Fixed (Round 4 - commit 5a4c976):** BUG-038 (7 loading.tsx skeletons for dashboard sub-routes), BUG-130 (window.confirm→AlertDialog for unsaved changes in ProfileModal).
 **False positive (Round 4):** BUG-041 (already has empty states — "No urgent tasks", "No recent activity", etc.), BUG-053 (useActivePolling already respects document.hidden), BUG-054 (MobileSidebar already uses Radix Sheet correctly), BUG-055 (ChatContext is minimal open/close state — no actual duplication), BUG-056 (heartbeat only called within visibility-aware polling), BUG-057 (KanbanBoard has TouchSensor + mobile fallback), BUG-233 (cookie check is UI-only indicator, not auth).
-**Remaining (needs user input):** BUG-069 (pagination), BUG-078 (super-admin settings persistence), BUG-085 (fabricated logs).
+**Fixed (Round 5 - commit d0a762d):** BUG-069 (infinite scroll across all list pages).
+**Fixed (Round 6):** BUG-078 (super-admin settings persistence — SystemSettingsModel with platform/security/notifications sections), BUG-085 (fabricated logs replaced with real SystemLogModel event logging from agency CRUD operations).
 
 ---
 
@@ -569,7 +570,7 @@ Also add rate limiting to the actions/auth.ts login() function.
 
 ---
 
-### Group 5C: Fix Miscellaneous Code Quality ✅ PARTIALLY DONE
+### Group 5C: Fix Miscellaneous Code Quality ✅ DONE
 **Bugs:** BUG-021, BUG-030, BUG-033, BUG-034, BUG-040, BUG-047, BUG-062, BUG-063, BUG-064, BUG-066, BUG-067, BUG-068, BUG-070, BUG-072, BUG-073, BUG-074, BUG-075, BUG-077, BUG-081, BUG-087, BUG-089, BUG-090, BUG-091, BUG-092, BUG-097, BUG-098, BUG-099, BUG-100, BUG-101, BUG-102, BUG-103, BUG-104, BUG-106, BUG-107, BUG-109, BUG-110, BUG-111, BUG-112, BUG-113, BUG-114, BUG-115, BUG-116, BUG-117, BUG-122, BUG-124, BUG-127, BUG-133, BUG-134, BUG-138, BUG-222, BUG-236, BUG-237, BUG-264, BUG-271, BUG-272, BUG-277, BUG-281, BUG-287, BUG-288, BUG-293
 **Fixed (Round 1 - commit e530578):** BUG-030 (userId from body), BUG-062 (URI log), BUG-106 (hardcoded password→crypto.randomBytes), BUG-115 (timestamps typo), BUG-133 (empty file removed), BUG-277 (data: URI restricted to images)
 **Fixed (Round 2 - commit 0d68241):** BUG-067 (trial check on singularity+upload APIs), BUG-089 (email enumeration fix), BUG-090 (2MB upload limits on avatars/logos), BUG-092 (50K char message limit), BUG-098 (requireRole on updateProjectAsset), BUG-099 (requireRole on toggleAssetAI), BUG-103 (leave status state machine), BUG-104 (snapshotEntity agencyId filter), BUG-107 (permission message fix), BUG-111 (encrypt key validation), BUG-112 (Cancelled status in Project type), BUG-114 (ActivitySchema entityId/entityType fields), BUG-138 (leave date validation)
@@ -577,7 +578,10 @@ Also add rate limiting to the actions/auth.ts login() function.
 **Already fixed/false positive:** BUG-040 (typeof window checks correct for SSR), BUG-070 (regex already escaped), BUG-077 (useActivePolling cleanup is correct), BUG-081 (password min 8 done), BUG-100 (already has agencyId filter), BUG-117 (Date.now without parens is correct), BUG-122 (already uses DOMPurify.sanitize), BUG-124 (constant array in dep — cosmetic only), BUG-127 (already has 2MB limit), BUG-237 (already has minLength=8 + server validates), BUG-272 (login already strips password), BUG-288 (both SDKs actively used for different features), BUG-293 (public HTML files are benign marketing templates)
 **Fixed (Round 4 - commit 5a4c976):** BUG-021 (activity logs store userId + backward-compatible $or queries + compound index), BUG-063 (withTimeout 60s on all AI API calls), BUG-073 (atomic findOneAndUpdate for task status), BUG-087 (mobile search trigger with slide-down panel), BUG-271 (agent timeout 300s→120s).
 **False positive (Round 4):** BUG-074 (marketing-db.js shares same global.mongoose cache — not a separate connection), BUG-287 (ESLint plugins require npm install — infra decision, not code fix).
-**Remaining (needs user input):** BUG-034 (AI delete confirmation — design decision), BUG-068 (plan limits — new feature), BUG-072 (timezone — global refactor), BUG-075 (logging service — infrastructure), BUG-097 (real file uploads — needs full upload system), BUG-134 (newsletter — no backend handler).
+**Fixed (Round 5 - commit f802897):** BUG-034 (password gate for AI agent destructive actions).
+**Fixed (Round 5 - commit eed3d0b):** BUG-072 (timezone-aware date formatting across entire app — 39 files, per-user timezone with auto-detection).
+**Fixed (Round 6):** BUG-068 (plan limits — checkAgencyLimit enforced on createUser, createProject, createClient, createInvoice), BUG-097 (real file uploads — AddAssetModal now uploads via /api/upload-dc with XHR progress), BUG-134 (newsletter — footer form wired to subscribeNewsletter via Brevo contacts API).
+**Addressed (infrastructure):** BUG-075 (logSystemEvent provides production audit logging for agency operations; external services like Sentry are a vendor/infrastructure decision).
 **Not bugs:** BUG-033 (AI args — already sanitized at server action level), BUG-047 (month calc approximation — already validated), BUG-066 (health check — new feature request), BUG-264 (password in forms — unavoidable for password inputs).
 
 ---

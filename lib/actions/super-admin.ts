@@ -1,6 +1,6 @@
 "use server";
 
-import { AgencyModel, UserModel, SuperAdminModel, ProjectModel, ClientModel, InvoiceModel, TransactionModel, TaskModel, AssetModel, ActivityModel, NotificationModel, ServiceModel, SettingsModel, LeaveRequestModel, MessageModel, SingularityChatSessionModel, SingularityCheckpointModel, connectDB, encryptApiKey, decryptApiKey } from "../mongodb";
+import { AgencyModel, UserModel, SuperAdminModel, ProjectModel, ClientModel, InvoiceModel, TransactionModel, TaskModel, AssetModel, ActivityModel, NotificationModel, ServiceModel, SettingsModel, LeaveRequestModel, MessageModel, SingularityChatSessionModel, SingularityCheckpointModel, SystemSettingsModel, SystemLogModel, connectDB, encryptApiKey, decryptApiKey } from "../mongodb";
 import { Agency, User, AGENCY_PLANS, AIConfig } from "../types";
 import { getSessionUser } from "../auth";
 import { generateId } from "../utils-server";
@@ -243,6 +243,15 @@ export async function createAgency(data: {
     await AgencyModel.create(agency);
     await UserModel.create(owner);
 
+    await logSystemEvent({
+        event: 'Agency Created',
+        type: 'agency',
+        detail: `${data.name} (${data.plan.toUpperCase()}) was registered`,
+        status: 'success',
+        agencyId,
+        userId: sa.userId,
+    });
+
     revalidatePath('/super-admin/agencies');
 
     return { agency, owner };
@@ -282,9 +291,10 @@ export async function updateAgency(agencyId: string, updates: Partial<Agency>) {
  * Suspend agency
  */
 export async function suspendAgency(agencyId: string, reason?: string) {
-    await verifySuperAdmin();
+    const sa = await verifySuperAdmin();
     await connectDB();
 
+    const agency = await AgencyModel.findOne({ id: agencyId }).lean();
     await AgencyModel.updateOne(
         { id: agencyId },
         {
@@ -297,6 +307,15 @@ export async function suspendAgency(agencyId: string, reason?: string) {
         }
     );
 
+    await logSystemEvent({
+        event: 'Agency Suspended',
+        type: 'agency',
+        detail: `${agency?.name || agencyId} was suspended${reason ? `: ${reason}` : ''}`,
+        status: 'warning',
+        agencyId,
+        userId: sa.userId,
+    });
+
     revalidatePath('/super-admin/agencies');
     revalidatePath(`/super-admin/agencies/${agencyId}`);
 
@@ -307,9 +326,10 @@ export async function suspendAgency(agencyId: string, reason?: string) {
  * Activate agency
  */
 export async function activateAgency(agencyId: string) {
-    await verifySuperAdmin();
+    const sa = await verifySuperAdmin();
     await connectDB();
 
+    const agency = await AgencyModel.findOne({ id: agencyId }).lean();
     await AgencyModel.updateOne(
         { id: agencyId },
         {
@@ -323,6 +343,15 @@ export async function activateAgency(agencyId: string) {
             }
         }
     );
+
+    await logSystemEvent({
+        event: 'Agency Activated',
+        type: 'agency',
+        detail: `${agency?.name || agencyId} was activated`,
+        status: 'success',
+        agencyId,
+        userId: sa.userId,
+    });
 
     revalidatePath('/super-admin/agencies');
     revalidatePath(`/super-admin/agencies/${agencyId}`);
@@ -370,6 +399,15 @@ export async function deleteAgency(agencyId: string, password: string) {
         SingularityChatSessionModel.deleteMany({ agencyId }),
         SingularityCheckpointModel.deleteMany({ agencyId }),
     ]);
+
+    await logSystemEvent({
+        event: 'Agency Deleted',
+        type: 'agency',
+        detail: `${(agency as any).name} was permanently deleted`,
+        status: 'error',
+        agencyId,
+        userId: sa.userId,
+    });
 
     revalidatePath('/super-admin/agencies');
 
@@ -495,4 +533,124 @@ export async function removeAgencyAIConfig(agencyId: string) {
     revalidatePath(`/super-admin/agencies/${agencyId}/ai`);
 
     return true;
+}
+
+// =============================================================================
+// System Settings (Global platform settings)
+// =============================================================================
+
+export async function getSystemSettings() {
+    await verifySuperAdmin();
+    await connectDB();
+    let settings = await SystemSettingsModel.findOne({ key: 'global' }).lean();
+    if (!settings) {
+        settings = await SystemSettingsModel.create({ key: 'global' });
+        settings = settings.toObject();
+    }
+    return toSerializable(settings);
+}
+
+export async function updateSystemSettings(section: 'platform' | 'security' | 'notifications', data: Record<string, any>) {
+    await verifySuperAdmin();
+    await connectDB();
+
+    // Build $set object with section prefix
+    const setObj: Record<string, any> = {};
+    for (const [k, v] of Object.entries(data)) {
+        if (typeof v === 'string') {
+            setObj[`${section}.${k}`] = v.slice(0, 500);
+        } else if (typeof v === 'boolean') {
+            setObj[`${section}.${k}`] = v;
+        }
+    }
+
+    await SystemSettingsModel.updateOne(
+        { key: 'global' },
+        { $set: setObj },
+        { upsert: true }
+    );
+
+    await logSystemEvent({
+        event: 'Settings Updated',
+        type: 'system',
+        detail: `${section} settings were updated`,
+        status: 'success',
+    });
+
+    revalidatePath('/super-admin/settings');
+    return true;
+}
+
+// =============================================================================
+// System Logging (Real event log)
+// =============================================================================
+
+export async function logSystemEvent(entry: {
+    event: string;
+    type: 'agency' | 'user' | 'system' | 'security' | 'error';
+    detail: string;
+    status: 'success' | 'error' | 'warning' | 'info';
+    agencyId?: string;
+    userId?: string;
+    meta?: Record<string, any>;
+}) {
+    try {
+        await connectDB();
+        await SystemLogModel.create(entry);
+    } catch (err) {
+        console.error('[SystemLog] Failed to write log:', err);
+    }
+}
+
+export async function getSystemLogs(limit = 100) {
+    await verifySuperAdmin();
+    await connectDB();
+    const logs = await SystemLogModel.find({})
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .lean();
+    return toSerializable(logs);
+}
+
+// =============================================================================
+// Newsletter Subscription (Brevo Contact List)
+// =============================================================================
+
+export async function subscribeNewsletter(email: string) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return { error: 'Please enter a valid email address.' };
+    }
+
+    const apiKey = process.env.BREVO_API_KEY;
+    if (!apiKey) {
+        return { error: 'Newsletter service is not configured.' };
+    }
+
+    try {
+        const res = await fetch('https://api.brevo.com/v3/contacts', {
+            method: 'POST',
+            headers: {
+                'accept': 'application/json',
+                'content-type': 'application/json',
+                'api-key': apiKey,
+            },
+            body: JSON.stringify({
+                email,
+                updateEnabled: true,
+            }),
+        });
+
+        if (res.status === 201 || res.status === 204) {
+            return { success: true };
+        }
+
+        const body = await res.json().catch(() => ({}));
+        if (body.code === 'duplicate_parameter') {
+            return { success: true }; // Already subscribed
+        }
+
+        return { error: 'Could not subscribe. Please try again later.' };
+    } catch {
+        return { error: 'Network error. Please try again later.' };
+    }
 }

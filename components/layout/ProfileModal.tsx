@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { User } from "@/lib/types";
-import { updateUser, getSystemSettings, updateSystemSettings } from "@/lib/actions";
+import { updateUser, getAgencyDashboardSettings, updateAgencyDashboardSettings } from "@/lib/actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, Upload, Lock, Shield, Camera, Building2, Phone, Briefcase, Eye, EyeOff, AtSign, Calendar, Clock } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -98,7 +98,7 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
     useEffect(() => {
         if (open) {
             if (isAdmin) {
-                getSystemSettings()
+                getAgencyDashboardSettings()
                     .then(settings => {
                         if (settings) {
                             setSystemName(settings.systemName);
@@ -178,7 +178,7 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
             try {
                 // Only update system settings if admin AND something changed
                 if (isAdmin && (systemName !== initialSystemName || systemLogo !== initialSystemLogo)) {
-                    await updateSystemSettings({ systemName, logo: systemLogo });
+                    await updateAgencyDashboardSettings({ systemName, logo: systemLogo });
                 }
 
                 // Update User

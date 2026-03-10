@@ -1,17 +1,68 @@
 "use client";
 
-import { useState } from "react";
-import { Settings, Shield, Bell, Database, Globe, Check, Mail, AlertTriangle } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Shield, Bell, Database, Globe, Check, Mail, AlertTriangle, Loader2 } from "lucide-react";
 import { useDateFormat } from "@/context/TimezoneContext";
+import { getSystemSettings, updateSystemSettings } from "@/lib/actions/super-admin";
 
 export default function SystemSettingsPage() {
     const fmt = useDateFormat();
+    const [saving, setSaving] = useState("");
     const [saved, setSaved] = useState("");
+    const [loading, setLoading] = useState(true);
 
-    const handleSave = (section: string) => {
-        setSaved(section);
-        setTimeout(() => setSaved(""), 2500);
-    };
+    // Platform state
+    const [platform, setPlatform] = useState({
+        name: "AgencyOS",
+        supportEmail: "support@agencyos.com",
+        defaultTimezone: "UTC",
+        defaultCurrency: "USD",
+    });
+
+    // Security state
+    const [security, setSecurity] = useState({
+        requireEmailVerification: false,
+        enableTwoFactor: false,
+        allowSelfRegistration: false,
+        enforceStrongPasswords: true,
+    });
+
+    // Notifications state
+    const [notifications, setNotifications] = useState({
+        emailOnAgencyCreated: true,
+        emailOnAgencySuspended: true,
+        weeklySummary: false,
+    });
+
+    // Load settings from DB
+    useEffect(() => {
+        (async () => {
+            try {
+                const settings = await getSystemSettings();
+                if (settings?.platform) setPlatform(prev => ({ ...prev, ...settings.platform }));
+                if (settings?.security) setSecurity(prev => ({ ...prev, ...settings.security }));
+                if (settings?.notifications) setNotifications(prev => ({ ...prev, ...settings.notifications }));
+            } catch (e) {
+                console.error("Failed to load settings:", e);
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, []);
+
+    const handleSave = useCallback(async (section: 'platform' | 'security' | 'notifications') => {
+        setSaving(section);
+        try {
+            const data = section === 'platform' ? platform : section === 'security' ? security : notifications;
+            await updateSystemSettings(section, data);
+            setSaved(section);
+            setTimeout(() => setSaved(""), 2500);
+        } catch (e) {
+            console.error("Failed to save:", e);
+        } finally {
+            setSaving("");
+        }
+    }, [platform, security, notifications]);
 
     const emailCategories = [
         { name: "Account Creation", description: "Login credentials for new employees & clients", priority: "critical", defaultOn: true },
@@ -23,6 +74,14 @@ export default function SystemSettingsPage() {
         { name: "Leave Management", description: "Leave requested, approved, rejected", priority: "optional", defaultOn: false },
         { name: "Document Approval", description: "Document update requests and responses", priority: "optional", defaultOn: false },
     ];
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -42,7 +101,8 @@ export default function SystemSettingsPage() {
                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">Platform Name</label>
                         <input
                             type="text"
-                            defaultValue="AgencyOS"
+                            value={platform.name}
+                            onChange={e => setPlatform(p => ({ ...p, name: e.target.value }))}
                             className="w-full h-10 rounded-lg border border-border bg-background px-4 text-sm text-foreground focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                         />
                     </div>
@@ -50,13 +110,18 @@ export default function SystemSettingsPage() {
                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">Support Email</label>
                         <input
                             type="email"
-                            defaultValue="support@agencyos.com"
+                            value={platform.supportEmail}
+                            onChange={e => setPlatform(p => ({ ...p, supportEmail: e.target.value }))}
                             className="w-full h-10 rounded-lg border border-border bg-background px-4 text-sm text-foreground focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                         />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">Default Timezone</label>
-                        <select className="w-full h-10 rounded-lg border border-border bg-background px-4 text-sm text-foreground focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                        <select
+                            value={platform.defaultTimezone}
+                            onChange={e => setPlatform(p => ({ ...p, defaultTimezone: e.target.value }))}
+                            className="w-full h-10 rounded-lg border border-border bg-background px-4 text-sm text-foreground focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                        >
                             <option value="UTC">UTC</option>
                             <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
                             <option value="America/New_York">America/New_York (EST)</option>
@@ -65,7 +130,11 @@ export default function SystemSettingsPage() {
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">Default Currency</label>
-                        <select className="w-full h-10 rounded-lg border border-border bg-background px-4 text-sm text-foreground focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                        <select
+                            value={platform.defaultCurrency}
+                            onChange={e => setPlatform(p => ({ ...p, defaultCurrency: e.target.value }))}
+                            className="w-full h-10 rounded-lg border border-border bg-background px-4 text-sm text-foreground focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                        >
                             <option value="USD">USD ($)</option>
                             <option value="INR">INR (₹)</option>
                             <option value="EUR">EUR (€)</option>
@@ -77,14 +146,17 @@ export default function SystemSettingsPage() {
                     <p className="text-xs text-muted-foreground">These are the defaults for new agencies</p>
                     <button
                         onClick={() => handleSave("platform")}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition"
+                        disabled={!!saving}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition"
                     >
-                        {saved === "platform" ? <><Check className="w-4 h-4" /> Saved!</> : "Save Changes"}
+                        {saving === "platform" ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                            : saved === "platform" ? <><Check className="w-4 h-4" /> Saved!</>
+                                : "Save Changes"}
                     </button>
                 </div>
             </div>
 
-            {/* Email Services */}
+            {/* Email Services (read-only reference) */}
             <div className="bg-card rounded-lg shadow border border-border p-6 space-y-4">
                 <div className="flex items-center gap-3 mb-2">
                     <Mail className="w-5 h-5 text-emerald-500" />
@@ -171,16 +243,17 @@ export default function SystemSettingsPage() {
                     <h2 className="text-lg font-bold text-foreground">Security</h2>
                 </div>
                 <div className="space-y-4">
-                    {[
-                        { label: "Require email verification for new users", defaultChecked: false },
-                        { label: "Enable two-factor authentication globally", defaultChecked: false },
-                        { label: "Allow agencies to register themselves", defaultChecked: false },
-                        { label: "Enforce strong passwords", defaultChecked: true },
-                    ].map((item) => (
-                        <label key={item.label} className="flex items-center gap-3 cursor-pointer group">
+                    {([
+                        { key: "requireEmailVerification", label: "Require email verification for new users" },
+                        { key: "enableTwoFactor", label: "Enable two-factor authentication globally" },
+                        { key: "allowSelfRegistration", label: "Allow agencies to register themselves" },
+                        { key: "enforceStrongPasswords", label: "Enforce strong passwords" },
+                    ] as const).map((item) => (
+                        <label key={item.key} className="flex items-center gap-3 cursor-pointer group">
                             <input
                                 type="checkbox"
-                                defaultChecked={item.defaultChecked}
+                                checked={security[item.key]}
+                                onChange={e => setSecurity(s => ({ ...s, [item.key]: e.target.checked }))}
                                 className="w-4 h-4 rounded border-border text-blue-600 focus:ring-blue-500"
                             />
                             <span className="text-sm text-foreground group-hover:text-foreground">{item.label}</span>
@@ -190,9 +263,12 @@ export default function SystemSettingsPage() {
                 <div className="flex justify-end pt-2">
                     <button
                         onClick={() => handleSave("security")}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition"
+                        disabled={!!saving}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition"
                     >
-                        {saved === "security" ? <><Check className="w-4 h-4" /> Saved!</> : "Save Security Settings"}
+                        {saving === "security" ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                            : saved === "security" ? <><Check className="w-4 h-4" /> Saved!</>
+                                : "Save Security Settings"}
                     </button>
                 </div>
             </div>
@@ -204,15 +280,16 @@ export default function SystemSettingsPage() {
                     <h2 className="text-lg font-bold text-foreground">Notifications</h2>
                 </div>
                 <div className="space-y-4">
-                    {[
-                        { label: "Email alerts when a new agency is created", defaultChecked: true },
-                        { label: "Email alerts when an agency is suspended", defaultChecked: true },
-                        { label: "Weekly summary report to super-admin email", defaultChecked: false },
-                    ].map((item) => (
-                        <label key={item.label} className="flex items-center gap-3 cursor-pointer group">
+                    {([
+                        { key: "emailOnAgencyCreated", label: "Email alerts when a new agency is created" },
+                        { key: "emailOnAgencySuspended", label: "Email alerts when an agency is suspended" },
+                        { key: "weeklySummary", label: "Weekly summary report to super-admin email" },
+                    ] as const).map((item) => (
+                        <label key={item.key} className="flex items-center gap-3 cursor-pointer group">
                             <input
                                 type="checkbox"
-                                defaultChecked={item.defaultChecked}
+                                checked={notifications[item.key]}
+                                onChange={e => setNotifications(n => ({ ...n, [item.key]: e.target.checked }))}
                                 className="w-4 h-4 rounded border-border text-yellow-500 focus:ring-yellow-500"
                             />
                             <span className="text-sm text-foreground">{item.label}</span>
@@ -222,9 +299,12 @@ export default function SystemSettingsPage() {
                 <div className="flex justify-end pt-2">
                     <button
                         onClick={() => handleSave("notifications")}
-                        className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-sm font-medium transition"
+                        disabled={!!saving}
+                        className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition"
                     >
-                        {saved === "notifications" ? <><Check className="w-4 h-4" /> Saved!</> : "Save Notification Settings"}
+                        {saving === "notifications" ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                            : saved === "notifications" ? <><Check className="w-4 h-4" /> Saved!</>
+                                : "Save Notification Settings"}
                     </button>
                 </div>
             </div>
@@ -237,9 +317,9 @@ export default function SystemSettingsPage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {[
-                        { label: "Platform", value: "AgencyOS" },
+                        { label: "Platform", value: platform.name },
                         { label: "Version", value: "1.0.0" },
-                        { label: "Framework", value: "Next.js 15" },
+                        { label: "Framework", value: "Next.js 16" },
                         { label: "Database", value: "MongoDB" },
                         { label: "Environment", value: "Production" },
                         { label: "Last Restart", value: fmt.date(new Date()) },

@@ -1,36 +1,12 @@
-import { getAllAgenciesWithStats } from "@/lib/actions/super-admin";
+import { getAllAgenciesWithStats, getSystemLogs } from "@/lib/actions/super-admin";
 import { fmtDate, fmtTime } from "@/lib/date-utils";
-import { FileText, Building2, Users, CheckCircle, XCircle, Clock } from "lucide-react";
+import { FileText, Building2, CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
 
 export default async function SystemLogsPage() {
-    const agencies = await getAllAgenciesWithStats();
-
-    // Generate log entries from agency data
-    const logs = agencies
-        .map((agency: any) => [
-            {
-                id: `${agency.id}-created`,
-                type: "agency",
-                event: "Agency Created",
-                detail: `${agency.name} (${agency.plan.toUpperCase()}) was registered`,
-                status: "success",
-                timestamp: agency.createdAt,
-            },
-            agency.status === "suspended" && agency.suspendedAt
-                ? {
-                    id: `${agency.id}-suspended`,
-                    type: "agency",
-                    event: "Agency Suspended",
-                    detail: `${agency.name} was suspended${agency.suspensionReason ? `: ${agency.suspensionReason}` : ""}`,
-                    status: "error",
-                    timestamp: agency.suspendedAt,
-                }
-                : null,
-        ])
-        .flat()
-        .filter(Boolean)
-        .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-        .slice(0, 50);
+    const [agencies, logs] = await Promise.all([
+        getAllAgenciesWithStats(),
+        getSystemLogs(100),
+    ]);
 
     const totalActive = agencies.filter((a: any) => a.status === "active").length;
     const totalSuspended = agencies.filter((a: any) => a.status === "suspended").length;
@@ -91,17 +67,21 @@ export default async function SystemLogsPage() {
                 ) : (
                     <div className="divide-y divide-border">
                         {logs.map((log: any) => (
-                            <div key={log.id} className="p-4 sm:p-5 flex items-start gap-4 hover:bg-muted/40 transition-colors">
+                            <div key={log._id} className="p-4 sm:p-5 flex items-start gap-4 hover:bg-muted/40 transition-colors">
                                 <div className={`mt-0.5 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${log.status === "success"
                                         ? "bg-green-500/10"
                                         : log.status === "error"
                                             ? "bg-red-500/10"
-                                            : "bg-blue-500/10"
+                                            : log.status === "warning"
+                                                ? "bg-yellow-500/10"
+                                                : "bg-blue-500/10"
                                     }`}>
                                     {log.status === "success" ? (
                                         <CheckCircle className="w-4 h-4 text-green-500" />
                                     ) : log.status === "error" ? (
                                         <XCircle className="w-4 h-4 text-red-500" />
+                                    ) : log.status === "warning" ? (
+                                        <AlertTriangle className="w-4 h-4 text-yellow-500" />
                                     ) : (
                                         <Clock className="w-4 h-4 text-blue-500" />
                                     )}
@@ -111,7 +91,11 @@ export default async function SystemLogsPage() {
                                         <span className="font-medium text-foreground text-sm">{log.event}</span>
                                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${log.type === "agency"
                                                 ? "bg-blue-500/10 text-blue-500"
-                                                : "bg-purple-500/10 text-purple-500"
+                                                : log.type === "security"
+                                                    ? "bg-red-500/10 text-red-500"
+                                                    : log.type === "error"
+                                                        ? "bg-orange-500/10 text-orange-500"
+                                                        : "bg-purple-500/10 text-purple-500"
                                             }`}>
                                             {log.type}
                                         </span>
@@ -120,10 +104,10 @@ export default async function SystemLogsPage() {
                                 </div>
                                 <div className="flex-shrink-0 text-right">
                                     <p className="text-xs text-muted-foreground">
-                                        {fmtDate(log.timestamp, 'UTC', 'en-US')}
+                                        {fmtDate(log.createdAt, 'UTC', 'en-US')}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        {fmtTime(log.timestamp, 'UTC')}
+                                        {fmtTime(log.createdAt, 'UTC')}
                                     </p>
                                 </div>
                             </div>

@@ -673,3 +673,43 @@ const RateLimitSchema = new Schema({
     expiresAt: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
 });
 export const RateLimitModel = (mongoose.models.RateLimit as Model<any>) || mongoose.model('RateLimit', RateLimitSchema);
+
+// ============================================================================
+// SYSTEM SETTINGS (Global platform-wide settings for super-admin)
+// ============================================================================
+const SystemSettingsSchema = new Schema({
+    key: { type: String, default: 'global', unique: true },
+    platform: {
+        name: { type: String, default: 'AgencyOS' },
+        supportEmail: { type: String, default: 'support@agencyos.com' },
+        defaultTimezone: { type: String, default: 'UTC' },
+        defaultCurrency: { type: String, default: 'USD' },
+    },
+    security: {
+        requireEmailVerification: { type: Boolean, default: false },
+        enableTwoFactor: { type: Boolean, default: false },
+        allowSelfRegistration: { type: Boolean, default: false },
+        enforceStrongPasswords: { type: Boolean, default: true },
+    },
+    notifications: {
+        emailOnAgencyCreated: { type: Boolean, default: true },
+        emailOnAgencySuspended: { type: Boolean, default: true },
+        weeklySummary: { type: Boolean, default: false },
+    },
+}, { timestamps: true });
+export const SystemSettingsModel = (mongoose.models.SystemSettings as Model<any>) || mongoose.model('SystemSettings', SystemSettingsSchema);
+
+// ============================================================================
+// SYSTEM LOG (Real event log for super-admin — replaces fabricated logs)
+// ============================================================================
+const SystemLogSchema = new Schema({
+    event: { type: String, required: true, index: true },
+    type: { type: String, required: true, enum: ['agency', 'user', 'system', 'security', 'error'] },
+    detail: { type: String, required: true },
+    status: { type: String, required: true, enum: ['success', 'error', 'warning', 'info'], default: 'info' },
+    agencyId: { type: String, index: true },
+    userId: { type: String },
+    meta: { type: Schema.Types.Mixed },
+}, { timestamps: true });
+SystemLogSchema.index({ createdAt: -1 });
+export const SystemLogModel = (mongoose.models.SystemLog as Model<any>) || mongoose.model('SystemLog', SystemLogSchema);

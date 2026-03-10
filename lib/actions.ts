@@ -6,7 +6,7 @@ import { generateContent, generateContentWithParts, generateContentWithChat } fr
 import { createSession, sendMessage, closeSession, isSessionActive } from "./live-session";
 import type { AIConfig, AIPermissions } from "./types";
 import { DEFAULT_AI_PERMISSIONS } from "./types";
-import { withAgencyId, getCurrentAgency } from "./agency-context";
+import { withAgencyId, getCurrentAgency, checkAgencyLimit } from "./agency-context";
 import { generateId, resolveUserOrClient } from "./utils-server";
 import { sanitizeName, sanitizeString, sanitizeUsername, validateEmail, validatePassword, sanitizePhone, sanitizeUrl, sanitizeColor, sanitizeMongoInput, sanitizeUpdates, validateId, validateAmount } from "./validation";
 
@@ -880,6 +880,13 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
     // Ensure username uniqueness via DB query
     await connectDB();
     const agency = await getCurrentAgency();
+
+    // Plan limit check
+    if (agency) {
+        const limit = await checkAgencyLimit(agency.id, 'users');
+        if (!limit.allowed) throw new Error(`Plan limit reached: your plan allows ${limit.limit} users (currently ${limit.current}).`);
+    }
+
     const agencyFilter = requireAgencyFilter(agency);
     let uniqueUsername = username;
     let counter = 1;
@@ -1388,6 +1395,10 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
     // Unique Slug Check
     const agency = await getCurrentAgency();
     if (!agency) throw new Error('No agency context');
+
+    // Plan limit check
+    const projLimit = await checkAgencyLimit(agency.id, 'projects');
+    if (!projLimit.allowed) throw new Error(`Plan limit reached: your plan allows ${projLimit.limit} projects (currently ${projLimit.current}).`);
 
     // Unique slug check against DB
     let uniqueSlug = slug;
@@ -2085,6 +2096,13 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
     // Ensure username uniqueness via DB
     await connectDB();
     const agencyCtx = await getCurrentAgency();
+
+    // Plan limit check
+    if (agencyCtx) {
+        const clientLimit = await checkAgencyLimit(agencyCtx.id, 'clients');
+        if (!clientLimit.allowed) throw new Error(`Plan limit reached: your plan allows ${clientLimit.limit} clients (currently ${clientLimit.current}).`);
+    }
+
     const agencyFilter2 = agencyCtx ? { agencyId: agencyCtx.id } : {};
     let uniqueUsername = username;
     let counter = 1;
@@ -2774,6 +2792,10 @@ export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "ag
     const agency = await getCurrentAgency();
     if (!agency) throw new Error('No agency context');
 
+    // Plan limit check
+    const invoiceLimit = await checkAgencyLimit(agency.id, 'monthlyInvoices');
+    if (!invoiceLimit.allowed) throw new Error(`Plan limit reached: your plan allows ${invoiceLimit.limit} monthly invoices (currently ${invoiceLimit.current}).`);
+
     const project = await ProjectModel.findOne({ id: invoice.projectId, agencyId: agency.id }).lean();
     if (!project) throw new Error(`Project with ID ${invoice.projectId} not found`);
 
@@ -2970,7 +2992,7 @@ export async function payEmployee(userId: string, amount: number, month: string,
     return { success: true };
 }
 
-export async function getSystemSettings() {
+export async function getAgencyDashboardSettings() {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
@@ -2979,7 +3001,7 @@ export async function getSystemSettings() {
     return sanitizeDoc(settingsDoc);
 }
 
-export async function updateSystemSettings(settings: { systemName: string; logo: string }) {
+export async function updateAgencyDashboardSettings(settings: { systemName: string; logo: string }) {
     await requireRole('admin');
     // Input sanitization
     settings.systemName = sanitizeName(settings.systemName, 200);
