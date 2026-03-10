@@ -222,8 +222,11 @@ export function validateEnum<T extends string>(input: string, allowed: T[], fiel
  */
 export function validateCsrfOrigin(request: Request): { valid: false; response: Response } | { valid: true } {
     const origin = request.headers.get('origin');
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const allowedOrigins = [new URL(appUrl).origin];
+    const allowedOrigins = [
+        'https://agency-os-sable.vercel.app',
+        'https://digitalcorvid.com',
+        'http://localhost:3000',
+    ];
 
     // Allow requests with no origin (same-origin browser requests, curl, server-to-server)
     if (!origin) return { valid: true };
