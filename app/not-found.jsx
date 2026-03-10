@@ -113,24 +113,6 @@ export default function NotFound() {
 
             <Footer />
 
-            <style jsx>{`
-        @keyframes bounce-slow {
-          0%, 100% {
-            transform: translateY(0);
-          }
-          50% {
-            transform: translateY(-20px);
-          }
-        }
-        
-        .animate-bounce-slow {
-          animation: bounce-slow 3s ease-in-out infinite;
-        }
-        
-        .delay-150 {
-          animation-delay: 150ms;
-        }
-      `}</style>
         </div>
     );
 }

@@ -205,28 +205,6 @@ const ServicesSection = () => {
           </div>
         </div>
       </div>
-      {/* Custom Styles for Service Slider */}
-      <style jsx global>{`
-        .service-swiper .swiper-slide {
-          height: auto;
-          opacity: 1 !important;
-          visibility: visible !important;
-        }
-        .service-swiper .swiper-pagination {
-          position: static !important;
-          margin-top: 20px;
-        }
-        .service-swiper .swiper-pagination-bullet {
-          background: #cacaca;
-          opacity: 1;
-          width: 10px;
-          height: 10px;
-          margin: 0 6px;
-        }
-        .service-swiper .swiper-pagination-bullet-active {
-          background: #F5EE30;
-        }
-      `}</style>
     </div>
   )
 }

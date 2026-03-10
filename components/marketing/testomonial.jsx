@@ -120,19 +120,6 @@ export default function TestimonialSection() {
         </Swiper>
       </div>
 
-      <style jsx>{`
-        :global(.swiper-pagination-bullet) {
-          background: #4a5568;
-          opacity: 1;
-          width: 8px;
-          height: 8px;
-        }
-        :global(.swiper-pagination-bullet-active) {
-          background: #F5EE30;
-          width: 24px;
-          border-radius: 4px;
-        }
-      `}</style>
     </section>
   );
 }

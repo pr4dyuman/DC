@@ -118,33 +118,6 @@ export default function TeamSlider() {
         </div>
       </div>
 
-      {/* Custom Styles */}
-      <style jsx global>{`
-        .team-swiper {
-          padding: 10px 0 20px 0;
-        }
-        .team-swiper .swiper-slide {
-          height: auto;
-        }
-        .team-swiper .swiper-slide {
-          opacity: 1 !important;
-          visibility: visible !important;
-        }
-        .team-swiper .swiper-pagination {
-          position: static !important;
-          margin-top: 20px;
-        }
-        .team-swiper .swiper-pagination-bullet {
-          background: #cacaca;
-          opacity: 1;
-          width: 10px;
-          height: 10px;
-          margin: 0 6px;
-        }
-        .team-swiper .swiper-pagination-bullet-active {
-          background: #F5EE30;
-        }
-      `}</style>
     </section>
   );
 }

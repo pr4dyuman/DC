@@ -139,11 +139,6 @@ const HeroSection = () => {
           }}
           className="dc-camp-slider"
         >
-          <style jsx global>{`
-            .dc-camp-slider .swiper-wrapper {
-              transition-timing-function: linear !important;
-            }
-          `}</style>
           {Array.from({ length: 15 }, (_, i) => i + 1).map((num) => (
             <SwiperSlide key={num} className="flex items-center justify-center">
               <div className="relative w-full h-[40px] sm:h-[60px] md:h-[80px] overflow-hidden rounded-xl">
@@ -182,14 +177,6 @@ const HeroSection = () => {
             spaceBetween={40}
             className="select-none auto-width-services-slider"
           >
-            <style jsx global>{`
-        .auto-width-services-slider .swiper-wrapper {
-          transition-timing-function: linear !important;
-        }
-        .auto-width-services-slider .swiper-slide {
-          width: auto !important;
-        }
-      `}</style>
 
             {[
               'SEO',
@@ -267,11 +254,6 @@ const HeroSection = () => {
             }}
             className="companions-slider"
           >
-            <style jsx global>{`
-              .companions-slider .swiper-wrapper {
-                transition-timing-function: linear !important;
-              }
-            `}</style>
             {commands.concat(commands).concat(commands).map((item, idx) => (
               <SwiperSlide key={idx} className="flex items-center justify-center">
                 <div className="flex items-center justify-center h-20 sm:h-24 w-full">

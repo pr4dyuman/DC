@@ -1826,32 +1826,6 @@ export function SingularityChat({ userId }: { userId?: string }) {
                 )
             }
 
-            <style jsx global>{`
-                .singularity-response li { margin: 2px 0; }
-                .singularity-response pre { margin: 8px 0; }
-                .singularity-response h1, .singularity-response h2, .singularity-response h3 { margin-top: 12px; }
-                @keyframes singularity-float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
-                .singularity-float { animation: singularity-float 3s ease-in-out infinite; }
-                @keyframes singularity-shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
-                .singularity-shimmer { background-size: 200% auto; animation: singularity-shimmer 4s linear infinite; }
-                @keyframes singularity-dot-pulse { 0%, 100% { box-shadow: 0 0 0 0 currentColor; opacity: 1; } 50% { box-shadow: 0 0 0 4px currentColor; opacity: 0.4; } }
-                .singularity-pulse-dot { animation: singularity-dot-pulse 2s ease-in-out infinite; }
-                @keyframes singularity-bounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
-                .singularity-typing-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: singularity-bounce 1.4s infinite ease-in-out both; }
-                .singularity-typing-dot:nth-child(1) { animation-delay: -0.32s; }
-                .singularity-typing-dot:nth-child(2) { animation-delay: -0.16s; }
-                .singularity-typing-dot:nth-child(3) { animation-delay: 0s; }
-                @keyframes singularity-slide-up { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-                .singularity-msg-enter { animation: singularity-slide-up 0.3s ease-out both; }
-                .singularity-stagger > *:nth-child(1) { animation-delay: 0ms; }
-                .singularity-stagger > *:nth-child(2) { animation-delay: 60ms; }
-                .singularity-stagger > *:nth-child(3) { animation-delay: 120ms; }
-                .singularity-stagger > *:nth-child(4) { animation-delay: 180ms; }
-                .singularity-stagger > *:nth-child(5) { animation-delay: 240ms; }
-                .singularity-avatar-glow { box-shadow: 0 0 12px -2px var(--glow-color, rgba(139, 92, 246, 0.3)); }
-                @keyframes singularity-border-pulse { 0%, 100% { border-color: rgba(6, 182, 212, 0.2); } 50% { border-color: rgba(6, 182, 212, 0.5); } }
-                .singularity-calling-pulse { animation: singularity-border-pulse 1.5s ease-in-out infinite; }
-            `}</style>
         </div >
     );
 }
