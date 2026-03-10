@@ -1,11 +1,10 @@
 "use server";
 
 import { User } from "../db";
-import { getSessionId } from "../auth";
+import { getSessionId, comparePassword, hashPassword } from "../auth";
 import { SuperAdminModel, UserModel, ClientModel, connectDB, RateLimitModel } from "../mongodb";
 import { login as authLogin } from "../auth";
 import { validateEmail } from "../validation";
-import bcrypt from "bcryptjs";
 
 export { getSessionId };
 
@@ -37,10 +36,19 @@ export async function login(email: string, password: string) {
         );
     }
 
+    // Helper: if user had a plain text password, rehash it on successful login
+    async function rehashIfPlain(model: any, id: string, stored: string) {
+        if (!stored.startsWith('$2a$') && !stored.startsWith('$2b$') && !stored.startsWith('$2y$')) {
+            const hashed = await hashPassword(password);
+            await model.updateOne({ id }, { $set: { password: hashed } });
+        }
+    }
+
     // Check super admin first
     const superAdmin = await SuperAdminModel.findOne({ email }).lean();
     if (superAdmin) {
-        if (superAdmin.password && await bcrypt.compare(password, superAdmin.password)) {
+        if (superAdmin.password && await comparePassword(password, superAdmin.password)) {
+            await rehashIfPlain(SuperAdminModel, superAdmin.id, superAdmin.password);
             await RateLimitModel.deleteOne({ key: rateKey });
             await authLogin(superAdmin.id, 'superadmin');
             const { password: _, ...safeAdmin } = superAdmin;
@@ -51,7 +59,8 @@ export async function login(email: string, password: string) {
     // Check regular user
     const user = await UserModel.findOne({ email }).lean();
     if (user) {
-        if (user.password && await bcrypt.compare(password, user.password)) {
+        if (user.password && await comparePassword(password, user.password)) {
+            await rehashIfPlain(UserModel, user.id, user.password);
             await RateLimitModel.deleteOne({ key: rateKey });
             await authLogin(user.id, user.role, user.agencyId);
             await UserModel.updateOne({ id: user.id }, { $set: { lastActiveAt: new Date().toISOString() } });
@@ -66,7 +75,8 @@ export async function login(email: string, password: string) {
         if ((client as any).archived) {
             return { success: false, error: 'This account has been deactivated. Please contact your agency.' };
         }
-        if (client.password && await bcrypt.compare(password, client.password)) {
+        if (client.password && await comparePassword(password, client.password)) {
+            await rehashIfPlain(ClientModel, client.id, client.password);
             await RateLimitModel.deleteOne({ key: rateKey });
             await authLogin(client.id, 'client', client.agencyId);
             await ClientModel.updateOne({ id: client.id }, { $set: { lastActiveAt: new Date().toISOString() } });
