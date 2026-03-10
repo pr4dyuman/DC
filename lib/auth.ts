@@ -126,13 +126,12 @@ export async function authenticateUser(email: string, password: string): Promise
     }
 
     try {
+        await connectDB();
         // Rate limiting check
         await checkLoginRateLimit(email);
     } catch (e: any) {
         return { success: false, error: e.message || 'Too many login attempts. Please try again later.' };
     }
-
-    await connectDB();
 
     // 1. Check Super Admin
     const superAdmin = await SuperAdminModel.findOne({ email }).lean();
