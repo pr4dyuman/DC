@@ -3,16 +3,31 @@
 import Link from "next/link";
 import { Eye, Edit, Ban, CheckCircle, Trash2, Loader2 } from "lucide-react";
 import { suspendAgency, activateAgency, deleteAgency } from "@/lib/actions/super-admin";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 import { useDateFormat } from "@/context/TimezoneContext";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 export default function AgencyTable({ agencies }: { agencies: any[] }) {
     const fmt = useDateFormat();
     const router = useRouter();
     const [filter, setFilter] = useState<string>("all");
     const [search, setSearch] = useState("");
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+    const [deletePassword, setDeletePassword] = useState("");
+    const [deleteError, setDeleteError] = useState("");
+    const [deleting, setDeleting] = useState(false);
+    const passwordRef = useRef<HTMLInputElement>(null);
 
     const filteredAgencies = agencies.filter((agency) => {
         const matchesFilter = filter === "all" || agency.status === filter || agency.plan === filter;
@@ -33,15 +48,27 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
         router.refresh();
     };
 
-    const handleDelete = async (agencyId: string) => {
+    const handleDelete = (agencyId: string) => {
         if (!confirm("⚠️ WARNING: This will permanently delete the agency and ALL its data. This cannot be undone. Are you absolutely sure?")) return;
-        const password = prompt("Enter your super-admin password to confirm deletion:");
-        if (!password) return;
+        setDeleteTargetId(agencyId);
+        setDeletePassword("");
+        setDeleteError("");
+        setDeleteDialogOpen(true);
+        setTimeout(() => passwordRef.current?.focus(), 100);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!deleteTargetId || !deletePassword) return;
+        setDeleting(true);
+        setDeleteError("");
         try {
-            await deleteAgency(agencyId, password);
+            await deleteAgency(deleteTargetId, deletePassword);
+            setDeleteDialogOpen(false);
             router.refresh();
         } catch (err: any) {
-            alert(err.message || 'Failed to delete agency');
+            setDeleteError(err.message || 'Failed to delete agency');
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -173,6 +200,46 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                     <p className="text-muted-foreground">No agencies found</p>
                 </div>
             )}
+
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Confirm Deletion</DialogTitle>
+                        <DialogDescription>
+                            Enter your super-admin password to confirm permanent deletion.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={(e) => { e.preventDefault(); handleDeleteConfirm(); }}>
+                        <Input
+                            ref={passwordRef}
+                            type="password"
+                            placeholder="Super-admin password"
+                            value={deletePassword}
+                            onChange={(e) => setDeletePassword(e.target.value)}
+                            autoComplete="current-password"
+                        />
+                        {deleteError && (
+                            <p className="text-sm text-red-500 mt-2">{deleteError}</p>
+                        )}
+                        <DialogFooter className="mt-4">
+                            <button
+                                type="button"
+                                onClick={() => setDeleteDialogOpen(false)}
+                                className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={!deletePassword || deleting}
+                                className="px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                            >
+                                {deleting ? 'Deleting...' : 'Delete Agency'}
+                            </button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

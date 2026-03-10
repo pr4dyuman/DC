@@ -18,24 +18,16 @@ export default function ConfirmModal({
       }
     };
 
-    const handleEnter = (e) => {
-      if (e.key === 'Enter' && isOpen) {
-        onConfirm();
-      }
-    };
-
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
-      document.addEventListener('keydown', handleEnter);
       document.body.style.overflow = 'hidden';
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.removeEventListener('keydown', handleEnter);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose, onConfirm]);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 

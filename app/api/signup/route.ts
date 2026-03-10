@@ -222,13 +222,15 @@ export async function POST(request: Request) {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
-            path: '/'
+            path: '/',
+            maxAge: 60 * 60 * 24
         });
         cookieStore.set('userRole', 'admin', {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
-            path: '/'
+            path: '/',
+            maxAge: 60 * 60 * 24
         });
         cookieStore.set('logged_in', '1', {
             httpOnly: false,

@@ -171,7 +171,7 @@ export default function PPCAdvertising() {
               <div className="flex items-start gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <span className="w-2 h-2 sm:w-3 sm:h-3 bg-[#F5EE30] rounded-full mt-1 sm:mt-1.5 flex-shrink-0"></span>
                 <span className="uppercase tracking-wide sm:tracking-widest text-xs sm:text-sm md:text-base font-glacial-bold leading-relaxed text-white">
-                  We&apos;t guess—we analyze, optimize, and dominate. Your goals, our blueprint for success.
+                  We don&apos;t guess—we analyze, optimize, and dominate. Your goals, our blueprint for success.
                 </span>
               </div>
               <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 font-['Etna'] leading-tight">
@@ -439,7 +439,7 @@ export default function PPCAdvertising() {
                 No Lock-Ins
               </h3>
               <p className="text-[10px] sm:text-xs md:text-sm text-gray-300 mt-2 leading-relaxed max-w-[200px]">
-                We offer flexible contracts because We&apos;reconfident in our results—our client relationships are built on performance, not paperwork.
+                We offer flexible contracts because we&apos;re confident in our results—our client relationships are built on performance, not paperwork.
               </p>
             </div>
 

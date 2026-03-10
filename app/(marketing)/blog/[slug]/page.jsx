@@ -140,11 +140,20 @@ export default async function BlogPost({ params }) {
             <div className="mt-20 pt-10 border-t border-gray-800 flex flex-col md:flex-row items-center justify-between gap-6">
               <span className="font-etna text-2xl text-gray-400">SHARE THIS ARTICLE</span>
               <div className="flex gap-4">
-                {['Twitter', 'LinkedIn', 'Facebook'].map((platform) => (
-                  <button key={platform} className="px-6 py-3 rounded-full border border-gray-700 hover:border-[#F5EE30] hover:bg-[#F5EE30] hover:text-black transition-all duration-300 font-bold uppercase text-sm tracking-wider">
-                    {platform}
-                  </button>
-                ))}
+                {(() => {
+                  const url = encodeURIComponent(`https://digitalcorvids.com/blog/${slug}`);
+                  const title = encodeURIComponent(post.title);
+                  const platforms = [
+                    { name: 'Twitter', href: `https://twitter.com/intent/tweet?url=${url}&text=${title}` },
+                    { name: 'LinkedIn', href: `https://www.linkedin.com/sharing/share-offsite/?url=${url}` },
+                    { name: 'Facebook', href: `https://www.facebook.com/sharer/sharer.php?u=${url}` },
+                  ];
+                  return platforms.map((platform) => (
+                    <a key={platform.name} href={platform.href} target="_blank" rel="noopener noreferrer" className="px-6 py-3 rounded-full border border-gray-700 hover:border-[#F5EE30] hover:bg-[#F5EE30] hover:text-black transition-all duration-300 font-bold uppercase text-sm tracking-wider">
+                      {platform.name}
+                    </a>
+                  ));
+                })()}
               </div>
             </div>
           </div>

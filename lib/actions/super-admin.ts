@@ -463,8 +463,11 @@ export async function getAgencyAIConfigSuperAdmin(agencyId: string): Promise<AIC
 
     if (!agency.aiConfig) return null;
     const config = toSerializable(agency.aiConfig) as AIConfig;
-    // Decrypt the stored API key before returning to super-admin UI
-    if (config?.apiKey) config.apiKey = decryptApiKey(config.apiKey);
+    // Mask the API key — super-admin UI only needs to know one is configured (BUG-278)
+    if (config?.apiKey) {
+        const decrypted = decryptApiKey(config.apiKey);
+        config.apiKey = decrypted.length > 4 ? '****' + decrypted.slice(-4) : '****';
+    }
     return config;
 }
 

@@ -97,12 +97,16 @@ export function ClientAssetsSection({ assets, projects }: ClientAssetsSectionPro
                                                 {asset.size} • {fmt.date(asset.uploadedAt)}
                                             </p>
                                         </div>
-                                        <button
+                                        <a
+                                            href={asset.url}
+                                            download
+                                            target="_blank"
+                                            rel="noopener noreferrer"
                                             className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition p-2 hover:bg-white/10 rounded"
                                             title="Download"
                                         >
                                             <Download className="h-4 w-4" />
-                                        </button>
+                                        </a>
                                     </div>
                                 ))
                             )}

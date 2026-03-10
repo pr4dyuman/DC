@@ -1083,20 +1083,24 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
 
         await connectDB();
 
-        // Find user in MongoDB (Check all collections since we don't strictly know type here easily without lookup)
-        // But typically this action is for Users. Let's check User first.
-        let user: any = await UserModel.findOne({ id: id });
+        // Find user in MongoDB — scoped by agencyId to prevent cross-tenant password changes (BUG-173)
+        const agency = await getCurrentAgency();
+        const agencyScope = agency ? { agencyId: agency.id } : {};
+
+        let user: any = await UserModel.findOne({ id: id, ...agencyScope });
         let model: any = UserModel;
 
         if (!user) {
-            user = await ClientModel.findOne({ id: id });
+            user = await ClientModel.findOne({ id: id, ...agencyScope });
             model = ClientModel;
         }
         if (!user) {
-            user = await SuperAdminModel.findOne({ id: id });
-            model = SuperAdminModel;
+            // SuperAdmin is not scoped by agency — only allow if user is changing their own password
+            if (isSelf) {
+                user = await SuperAdminModel.findOne({ id: id });
+                model = SuperAdminModel;
+            }
         }
-
 
         if (!user) {
             throw new Error("User not found");
@@ -1113,9 +1117,9 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
         // Hash the NEW password
         updates.password = await hashPassword(updates.password);
 
-        // Perform Update
-        await model.findOneAndUpdate({ id: id }, { $set: updates });
-        return; // Return void as original signature implies (or updated user)
+        // Perform Update — also scoped by id to prevent cross-tenant writes
+        await model.findOneAndUpdate({ id: id, ...(model !== SuperAdminModel ? agencyScope : {}) }, { $set: updates });
+        return;
     }
 
     // For non-password updates, continuing with MongoDB update logic
@@ -1538,6 +1542,15 @@ export async function getTasks(projectId: string) {
     const agency = await getCurrentAgency();
     const tasks = await TaskModel.find({ projectId, agencyId: agency?.id }).lean();
     return tasks.map(sanitizeDoc);
+}
+
+export async function getTaskById(taskId: string) {
+    await requireAuth();
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = requireAgencyFilter(agency);
+    const task = await TaskModel.findOne({ id: taskId, ...agencyFilter }).lean();
+    return task ? sanitizeDoc(task) : null;
 }
 
 /** Lightweight: fetch all tasks for every project in the agency (for list-page progress bars) */

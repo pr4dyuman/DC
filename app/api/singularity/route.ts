@@ -156,36 +156,82 @@ export async function POST(req: NextRequest) {
             }
 
             if (!isLive) {
-                // Non-live model: single response with context (no tool calling)
-                const { generateContent } = await import("@/lib/ai-provider");
-                const result = await generateContent(aiConfig, fullPrompt, systemInstruction);
+                // Non-live model: text API with tool calling support (BUG-031)
+                const { GoogleGenerativeAI } = await import("@google/generative-ai");
+                const genAI = new GoogleGenerativeAI(aiConfig.apiKey);
+                const model = genAI.getGenerativeModel({
+                    model: modelId,
+                    systemInstruction,
+                    tools: [{ functionDeclarations: filteredTools as any }],
+                });
+                const chat = model.startChat();
                 const encoder = new TextEncoder();
 
-                // Stream initial response immediately so user sees it right away.
-                // Fallback check (if needed) runs AFTER that — done is sent only when fully complete.
                 const stream = new ReadableStream({
                     async start(controller) {
-                        // 1. Send initial response immediately — user sees it now
-                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response', text: result })}\n\n`));
+                        try {
+                            let currentPrompt = fullPrompt;
+                            const MAX_TOOL_ROUNDS = 10;
 
-                        // 2. Short-response fallback — runs after initial text is visible
-                        if (isTooShort(result)) {
-                            console.log('[Singularity Agent] Response too short, checking if complete...');
-                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'rechecking' })}\n\n`));
-                            try {
-                                const continuation = await checkAndContinue(generateContent, aiConfig, systemInstruction, fullPrompt, result);
-                                if (continuation) {
-                                    console.log('[Singularity Agent] Appending continuation.');
-                                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response', text: '\n\n' + continuation })}\n\n`));
-                                } else {
-                                    console.log('[Singularity Agent] AI confirmed answer was complete.');
+                            for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+                                const result = await chat.sendMessage(currentPrompt);
+                                const response = result.response;
+                                const parts = response.candidates?.[0]?.content?.parts || [];
+
+                                // Collect text parts
+                                const textParts = parts.filter((p: any) => p.text).map((p: any) => p.text);
+                                if (textParts.length > 0) {
+                                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response', text: textParts.join('') })}\n\n`));
                                 }
-                            } catch (err) {
-                                console.error('[Singularity Agent] Fallback check failed:', err);
+
+                                // Check for function calls
+                                const functionCalls = parts.filter((p: any) => p.functionCall);
+                                if (functionCalls.length === 0) break; // No more tool calls — done
+
+                                // Execute each tool call
+                                const functionResponses: any[] = [];
+                                for (const part of functionCalls) {
+                                    const fc = part.functionCall!;
+                                    const displayName = getToolDisplayName(fc.name);
+                                    controller.enqueue(encoder.encode(
+                                        `data: ${JSON.stringify({ type: 'tool_call', name: fc.name, displayName, args: fc.args })}\n\n`
+                                    ));
+                                    const toolResult = await executeTool(fc.name, fc.args || {}, authenticatedUserId);
+                                    console.log('[Singularity Agent] Tool result:', fc.name, toolResult.success, toolResult.summary);
+                                    controller.enqueue(encoder.encode(
+                                        `data: ${JSON.stringify({ type: 'tool_result', name: fc.name, displayName, success: toolResult.success, summary: toolResult.summary, rollbackData: toolResult.rollbackData })}\n\n`
+                                    ));
+                                    functionResponses.push({
+                                        functionResponse: {
+                                            name: fc.name,
+                                            response: toolResult,
+                                        }
+                                    });
+                                }
+
+                                // Send tool results back to the model
+                                const toolResultMsg = await chat.sendMessage(functionResponses);
+                                const toolResponseParts = toolResultMsg.response.candidates?.[0]?.content?.parts || [];
+
+                                // Collect any text from the tool response
+                                const toolTextParts = toolResponseParts.filter((p: any) => p.text).map((p: any) => p.text);
+                                if (toolTextParts.length > 0) {
+                                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response', text: toolTextParts.join('') })}\n\n`));
+                                }
+
+                                // Check if model wants more tool calls
+                                const moreCalls = toolResponseParts.filter((p: any) => p.functionCall);
+                                if (moreCalls.length === 0) break;
+
+                                // Continue loop with the new function calls as the next prompt
+                                // Re-enter the loop — the chat history is maintained by the SDK
+                                currentPrompt = moreCalls.map((p: any) => JSON.stringify(p.functionCall)).join('\n');
                             }
+                        } catch (err: any) {
+                            console.error('[Singularity Agent] Non-live error:', err?.message || err);
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', text: err?.message || 'Agent error' })}\n\n`));
                         }
 
-                        // 3. Signal completion — unlocks the input box
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
                         controller.close();
                     }

@@ -1,6 +1,7 @@
 import {
     globalSearch,
     getTasks,
+    getTaskById,
     getFinanceStats,
     getUsers,
     getUserTasks,
@@ -844,6 +845,8 @@ export async function executeTool(
                 }
                 const userTasks = await getUserTasks(args.userId).catch(() => []);
                 const activeTasks = userTasks.filter((t: any) => t.status !== "Done");
+                // Redact salary for non-admin/manager roles (BUG-186)
+                const canSeeSalary = userRole === 'admin' || userRole === 'manager';
                 return {
                     success: true,
                     data: {
@@ -853,7 +856,7 @@ export async function executeTool(
                         role: (profile as any).role,
                         jobTitle: (profile as any).jobTitle,
                         phone: (profile as any).phone,
-                        salary: (profile as any).salary,
+                        ...(canSeeSalary ? { salary: (profile as any).salary } : {}),
                         totalTasks: userTasks.length,
                         activeTasks: activeTasks.length,
                         doneTasks: userTasks.length - activeTasks.length,
@@ -883,8 +886,14 @@ export async function executeTool(
             }
 
             case "get_task_comments": {
-                const searchResults = await globalSearch(args.taskId);
-                const targetTask = searchResults.find((r: any) => r.id === args.taskId && r.type === "task");
+                // BUG-105: Use direct task lookup instead of unreliable globalSearch
+                let targetTask: any = await getTaskById(args.taskId).catch(() => null);
+
+                // Fallback to globalSearch if direct lookup fails
+                if (!targetTask) {
+                    const searchResults = await globalSearch(args.taskId);
+                    targetTask = searchResults.find((r: any) => r.id === args.taskId && r.type === "task");
+                }
                 if (!targetTask) {
                     return { success: false, data: null, summary: "Task not found" };
                 }
