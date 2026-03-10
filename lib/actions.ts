@@ -3215,6 +3215,20 @@ export async function deleteProjectAsset(assetId: string) {
     const asset = await AssetModel.findOne({ id: assetId, agencyId: agency?.id }).lean();
     if (!asset) throw new Error('Asset not found');
     await AssetModel.deleteOne({ id: assetId, agencyId: agency?.id });
+
+    // Clean up uploaded file from disk if it's a local upload
+    const assetUrl = (asset as any).url;
+    if (assetUrl && assetUrl.startsWith('/uploads/')) {
+        const { unlink } = await import('fs/promises');
+        const path = await import('path');
+        const filePath = path.join(process.cwd(), 'public', assetUrl);
+        // Verify path stays within uploads dir to prevent path traversal
+        const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+        if (filePath.startsWith(uploadsDir)) {
+            await unlink(filePath).catch(() => { /* file may already be gone */ });
+        }
+    }
+
     await ActivityModel.create({
         id: generateId(), agencyId: agency?.id, user: userName, userId: currentUser?.id || 'system',
         action: 'deleted asset', target: (asset as any).name, timestamp: new Date().toISOString()

@@ -4,24 +4,28 @@ import Admin from '@/models/marketing/Admin';
 import { cookies } from 'next/headers';
 import { SignJWT } from 'jose';
 import { validateCsrfOrigin } from '@/lib/validation';
+import { connectDB, RateLimitModel } from '@/lib/mongodb';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const encodedKey = new TextEncoder().encode(JWT_SECRET);
 
-// In-memory rate limiting
-const loginAttempts = new Map();
 const MAX_ATTEMPTS = 10;
 const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
-function checkRateLimit(email) {
-  const now = Date.now();
-  const key = email.toLowerCase().trim();
-  const record = loginAttempts.get(key);
-  if (record && now < record.resetAt) {
+async function checkRateLimit(email) {
+  await connectDB();
+  const key = `marketing-login:${email.toLowerCase().trim()}`;
+  const now = new Date();
+  const record = await RateLimitModel.findOne({ key, expiresAt: { $gt: now } }).lean();
+  if (record) {
     if (record.count >= MAX_ATTEMPTS) return false;
-    record.count++;
+    await RateLimitModel.updateOne({ key }, { $inc: { count: 1 } });
   } else {
-    loginAttempts.set(key, { count: 1, resetAt: now + WINDOW_MS });
+    await RateLimitModel.findOneAndUpdate(
+      { key },
+      { count: 1, expiresAt: new Date(now.getTime() + WINDOW_MS) },
+      { upsert: true }
+    );
   }
   return true;
 }
@@ -42,7 +46,7 @@ export async function POST(req) {
       return NextResponse.json({ success: false, error: 'Email and password are required' }, { status: 400 });
     }
 
-    if (!checkRateLimit(email)) {
+    if (!(await checkRateLimit(email))) {
       return NextResponse.json({ success: false, error: 'Too many login attempts. Try again later.' }, { status: 429 });
     }
 
@@ -73,7 +77,7 @@ export async function POST(req) {
     });
 
     // Clear rate limit on success
-    loginAttempts.delete(email.toLowerCase().trim());
+    await RateLimitModel.deleteOne({ key: `marketing-login:${email.toLowerCase().trim()}` });
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {

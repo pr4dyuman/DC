@@ -397,7 +397,7 @@ compiler: {
 
 ---
 
-### Group 3C: Fix Agency Data Isolation (agencyFilter = {})
+### Group 3C: Fix Agency Data Isolation (agencyFilter = {}) ✅ DONE
 **Files:** `lib/actions.ts` (multiple locations)
 **Bugs:** BUG-014, BUG-019
 **Time:** 1 hour

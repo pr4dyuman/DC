@@ -8,14 +8,20 @@ import { sanitizeName, sanitizeString, validateCsrfOrigin } from '@/lib/validati
 // Cache for 60 seconds - public blog list doesn't need real-time updates
 export const revalidate = 60;
 
-export async function GET() {
+export async function GET(request) {
   try {
     await dbConnect();
     
+    const { searchParams } = new URL(request.url);
+    const limit = Math.min(Math.max(parseInt(searchParams.get('limit')) || 50, 1), 100);
+    const offset = Math.max(parseInt(searchParams.get('offset')) || 0, 0);
+
     // Use lean() for faster queries and select only needed fields
     const blogs = await Blog.find({})
       .select('title shortDescription category status image slug createdAt')
       .sort({ createdAt: -1 })
+      .skip(offset)
+      .limit(limit)
       .lean();
       
     return NextResponse.json({ success: true, data: blogs }, { status: 200 });

@@ -63,6 +63,9 @@ export async function login(email: string, password: string) {
     // Check client
     const client = await ClientModel.findOne({ email }).lean();
     if (client) {
+        if ((client as any).archived) {
+            return { success: false, error: 'This account has been deactivated. Please contact your agency.' };
+        }
         if (client.password && await bcrypt.compare(password, client.password)) {
             await RateLimitModel.deleteOne({ key: rateKey });
             await authLogin(client.id, 'client', client.agencyId);

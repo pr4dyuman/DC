@@ -148,6 +148,9 @@ export async function authenticateUser(email: string, password: string): Promise
     // 3. Check Clients
     const client = await ClientModel.findOne({ email }).lean();
     if (client) {
+        if ((client as any).archived) {
+            return { success: false, error: 'This account has been deactivated. Please contact your agency.' };
+        }
         if (client.password && await comparePassword(password, client.password)) {
             await resetLoginRateLimit(email);
             await login(client.id, 'client', client.agencyId);
