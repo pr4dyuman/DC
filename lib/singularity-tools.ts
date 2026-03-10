@@ -109,7 +109,6 @@ const TOOL_PERMISSIONS: Record<string, RoleType[]> = {
     bulk_create_invoices: ['admin'],
     create_refund: ['admin'],
     create_employee: ['admin'],
-    bulk_create_clients: ['admin'],
     delete_project: ['admin'],
     delete_client: ['admin'],
     delete_transaction: ['admin'],
@@ -126,7 +125,6 @@ const AI_PERMISSION_MAP: Record<string, keyof AIPermissions> = {
     bulk_create_invoices: 'canManageInvoices',
     create_refund: 'canRefund',
     create_employee: 'canCreateEmployee',
-    bulk_create_clients: 'canManageInvoices',
     delete_project: 'canDelete',
     delete_client: 'canDelete',
     delete_transaction: 'canDelete',
@@ -335,6 +333,11 @@ export async function executeTool(
                     estimatedHours: args.estimatedHours || undefined,
                 });
 
+                // Backdate createdAt for historical imports
+                if (args.createdAt) {
+                    await updateTask(newTask.id, { createdAt: new Date(args.createdAt).toISOString() } as any);
+                }
+
                 const assignInfo = autoAssigned
                     ? `auto-assigned to ${assigneeName} (fewest active tasks)`
                     : `assigned to ${assigneeName}`;
@@ -444,7 +447,7 @@ export async function executeTool(
 
             case "add_task_comment": {
                 const commentSnapshot = await snapshotEntity('task', args.taskId);
-                await addComment(args.taskId, userId, args.comment);
+                await addComment(args.taskId, userId, args.comment, args.createdAt ? new Date(args.createdAt).toISOString() : undefined);
                 return {
                     success: true,
                     data: { taskId: args.taskId },
@@ -601,6 +604,11 @@ export async function executeTool(
                             status: taskStatus,
                             estimatedHours: task.estimatedHours || undefined,
                         });
+
+                        // Backdate createdAt for historical imports
+                        if (task.createdAt) {
+                            await updateTask(newTask.id, { createdAt: new Date(task.createdAt).toISOString() } as any);
+                        }
 
                         const assigneeName = userNameMap.get(assigneeId) || "Unassigned";
                         createdTasks.push({
@@ -802,10 +810,16 @@ export async function executeTool(
                     address: args.address || undefined,
                     logo: args.logo || undefined,
                 });
+
+                // Backdate createdAt for historical imports
+                if (args.createdAt) {
+                    await updateClient(newClient.id, { createdAt: new Date(args.createdAt).toISOString() } as any);
+                }
+
                 return {
                     success: true,
                     data: { id: newClient.id, name: newClient.name, companyName: newClient.companyName },
-                    summary: `Client "${newClient.name}" (${newClient.companyName}) created`,
+                    summary: `Client "${newClient.name}" (${newClient.companyName}) created${args.createdAt ? ` (backdated: ${args.createdAt})` : ''}`,
                     rollbackData: [{
                         toolName: 'create_client',
                         actionType: 'create',
@@ -1184,38 +1198,16 @@ export async function executeTool(
                     employmentType: args.employmentType || 'Salary',
                     password: generatedPassword,
                 });
+
+                // Backdate createdAt for historical imports
+                if (args.createdAt) {
+                    await updateUser(newEmp.id, { createdAt: new Date(args.createdAt).toISOString() } as any);
+                }
+
                 return {
                     success: true,
                     data: { id: newEmp.id, name: newEmp.name, email: newEmp.email, role: newEmp.role, temporaryPassword: generatedPassword },
                     summary: `Employee "${newEmp.name}" created (${newEmp.role}) — email: ${newEmp.email}. Temporary password: ${generatedPassword} — please change on first login.`,
-                };
-            }
-
-            case "bulk_create_clients": {
-                const aiPerms = await getAIPermissions();
-                if (!aiPerms.canManageInvoices) return { success: false, data: null, summary: '⛔ AI Client Management permission is disabled. Enable Invoice Management in Settings → AI Settings to allow client creation.' };
-
-                const clientIds: string[] = [];
-                const clientNames: string[] = [];
-                for (const cl of args.clients) {
-                    const newCl = await createClient({
-                        name: cl.name,
-                        email: cl.email,
-                        companyName: cl.companyName,
-                        phone: cl.phone || '',
-                        address: cl.address || '',
-                    });
-                    clientIds.push(newCl.id);
-                    clientNames.push(newCl.name);
-                }
-                return {
-                    success: true,
-                    data: { count: clientIds.length, ids: clientIds },
-                    summary: `${clientIds.length} client(s) created: ${clientNames.join(', ')}`,
-                    rollbackData: [{
-                        toolName: 'bulk_create_clients', actionType: 'create', entityType: 'client',
-                        entityId: clientIds[0] || '', createdEntityIds: clientIds, executedAt: new Date().toISOString(),
-                    }],
                 };
             }
 

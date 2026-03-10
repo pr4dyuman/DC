@@ -2,7 +2,9 @@ import { getAllAgenciesWithStats } from "@/lib/actions/super-admin";
 import Link from "next/link";
 
 export default async function BillingPage() {
-    const agencies = await getAllAgenciesWithStats();
+    const rawAgencies = await getAllAgenciesWithStats();
+    // Ensure plain objects for RSC serialization
+    const agencies = JSON.parse(JSON.stringify(rawAgencies));
 
     const totalRevenue = agencies.reduce((sum: number, a: any) => sum + (a.stats?.revenue || 0), 0);
     const proAgencies = agencies.filter((a: any) => a.plan === 'pro').length;

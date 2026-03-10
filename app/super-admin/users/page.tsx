@@ -3,7 +3,9 @@ import Link from "next/link";
 import { Users, Building2, Shield, User } from "lucide-react";
 
 export default async function SystemUsersPage() {
-    const agencies = await getAllAgenciesWithStats();
+    const rawAgencies = await getAllAgenciesWithStats();
+    // Ensure plain objects for RSC serialization
+    const agencies = JSON.parse(JSON.stringify(rawAgencies));
 
     const totalUsers = agencies.reduce((sum: number, a: any) => sum + (a.stats?.users || 0), 0);
     const totalAdmins = agencies.length; // Each agency has at least one admin (owner)

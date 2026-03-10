@@ -4,7 +4,9 @@ import Link from "next/link";
 import { Building2, Users, FolderKanban, DollarSign, TrendingUp, AlertCircle } from "lucide-react";
 
 export default async function SuperAdminDashboard() {
-    const analytics = await getSystemAnalytics();
+    const rawAnalytics = await getSystemAnalytics();
+    // Ensure plain objects for RSC serialization
+    const analytics = JSON.parse(JSON.stringify(rawAnalytics));
 
     const stats = [
         {

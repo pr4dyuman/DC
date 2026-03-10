@@ -23,9 +23,10 @@ interface SidebarProps {
     currentUserRole?: string;
     agencyName?: string;
     agencyLogo?: string;
+    agencyPlan?: string;
 }
 
-export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, agencyName = "Agency OS", agencyLogo }: SidebarProps) {
+export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, agencyName = "Agency OS", agencyLogo, agencyPlan }: SidebarProps) {
     const pathname = usePathname();
 
 
@@ -106,6 +107,15 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, a
                     <h1 className="text-xl font-bold truncate max-w-[180px]" title={agencyName}>
                         {agencyName}
                     </h1>
+                    {agencyPlan && agencyPlan !== 'free' && (
+                        <span className={`ml-2 px-1.5 py-0.5 text-[10px] font-bold uppercase rounded ${
+                            agencyPlan === 'enterprise' ? 'bg-purple-500/15 text-purple-400' :
+                            agencyPlan === 'pro' ? 'bg-blue-500/15 text-blue-400' :
+                            'bg-emerald-500/15 text-emerald-400'
+                        }`}>
+                            {agencyPlan}
+                        </span>
+                    )}
                 </Link>
                 <div className="space-y-1">
                     {filteredRoutes.map((route) => (

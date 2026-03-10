@@ -78,7 +78,7 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
     },
     {
         name: "create_task",
-        description: "Create a new task in a project. If no assignee specified, it auto-assigns to the least busy team member.",
+        description: "Create a new task in a project. If no assignee specified, it auto-assigns to the least busy team member. For historical tasks, set status to 'Done' and provide a past createdAt date.",
         parameters: {
             type: "OBJECT",
             properties: {
@@ -91,6 +91,7 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
                 dueDate: { type: "STRING", description: "Due date in YYYY-MM-DD format. Estimate based on task complexity if not specified." },
                 status: { type: "STRING", description: "Initial task status (default: Todo)", enum: ["Todo", "In Progress", "Review", "Done"] },
                 estimatedHours: { type: "NUMBER", description: "Estimated hours to complete this task (e.g. 2, 4, 8). Estimate based on task complexity." },
+                createdAt: { type: "STRING", description: "For historical tasks, the original creation date in YYYY-MM-DD format" },
             },
             required: ["projectId", "title"],
         },
@@ -150,12 +151,13 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
     },
     {
         name: "add_task_comment",
-        description: "Add a comment to a task.",
+        description: "Add a comment to a task. For historical data, provide a createdAt timestamp.",
         parameters: {
             type: "OBJECT",
             properties: {
                 taskId: { type: "STRING", description: "The task ID" },
                 comment: { type: "STRING", description: "The comment text" },
+                createdAt: { type: "STRING", description: "For historical comments, the original date in YYYY-MM-DD format" },
             },
             required: ["taskId", "comment"],
         },
@@ -207,6 +209,7 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
                             status: { type: "STRING", description: "Task status — use 'Done' for completed historical tasks", enum: ["Todo", "In Progress", "Review", "Done"] },
                             dueDate: { type: "STRING", description: "For historical tasks, the actual completion date in YYYY-MM-DD format. Overrides auto-calculation." },
                             estimatedHours: { type: "NUMBER", description: "Estimated hours for this task (e.g. 2, 4, 8)" },
+                            createdAt: { type: "STRING", description: "For historical tasks, the original creation date in YYYY-MM-DD format" },
                         },
                         required: ["title", "description", "category", "priority"],
                     },
@@ -311,7 +314,7 @@ Always follow these rules strictly. The system will reject invalid combinations.
     },
     {
         name: "create_client",
-        description: "Create a new client in the agency. Use when the user asks to add a client or company.",
+        description: "Create a new client in the agency. Use when the user asks to add a client or company. For historical/past clients, provide a createdAt date.",
         parameters: {
             type: "OBJECT",
             properties: {
@@ -321,6 +324,7 @@ Always follow these rules strictly. The system will reject invalid combinations.
                 phone: { type: "STRING", description: "Phone number (optional)" },
                 address: { type: "STRING", description: "Address (optional)" },
                 logo: { type: "STRING", description: "URL to client logo image (optional)" },
+                createdAt: { type: "STRING", description: "For historical clients, the original onboarding date in YYYY-MM-DD format" },
             },
             required: ["name", "email", "companyName"],
         },
@@ -576,7 +580,7 @@ Always follow these rules strictly. The system will reject invalid combinations.
     },
     {
         name: "create_employee",
-        description: "Create a new employee/user in the agency. Use for onboarding new team members. Requires AI Employee Creation permission.",
+        description: "Create a new employee/user in the agency. Use for onboarding new team members. For historical employees, provide a createdAt date. Requires AI Employee Creation permission.",
         parameters: {
             type: "OBJECT",
             properties: {
@@ -587,33 +591,9 @@ Always follow these rules strictly. The system will reject invalid combinations.
                 salary: { type: "NUMBER", description: "Monthly salary in INR" },
                 employmentType: { type: "STRING", description: "Employment type", enum: ["Salary", "Project Based", "Freelancer"] },
                 password: { type: "STRING", description: "Initial password for the account" },
+                createdAt: { type: "STRING", description: "For historical employees, the original join date in YYYY-MM-DD format" },
             },
             required: ["name", "email", "role"],
-        },
-    },
-    {
-        name: "bulk_create_clients",
-        description: "Create multiple clients at once. Great for importing historical client data. Requires AI Invoice Management permission.",
-        parameters: {
-            type: "OBJECT",
-            properties: {
-                clients: {
-                    type: "ARRAY",
-                    description: "List of clients to create",
-                    items: {
-                        type: "OBJECT",
-                        properties: {
-                            name: { type: "STRING", description: "Client name" },
-                            email: { type: "STRING", description: "Client email" },
-                            companyName: { type: "STRING", description: "Company name" },
-                            phone: { type: "STRING", description: "Phone number" },
-                            address: { type: "STRING", description: "Address" },
-                        },
-                        required: ["name", "email", "companyName"],
-                    },
-                },
-            },
-            required: ["clients"],
         },
     },
     {
@@ -705,7 +685,6 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
     bulk_create_invoices: "📄 Creating invoices",
     create_refund: "💸 Issuing refund",
     create_employee: "👤 Creating employee",
-    bulk_create_clients: "👥 Creating clients",
     delete_project: "🗑️ Deleting project",
     delete_client: "🗑️ Archiving client",
     delete_transaction: "🗑️ Deleting transaction",

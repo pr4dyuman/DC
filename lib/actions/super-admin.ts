@@ -26,16 +26,23 @@ async function verifySuperAdmin() {
  * Helper to purify data and remove MongoDB specific fields
  */
 function toSerializable<T>(obj: T): T {
-    // Use JSON.stringify replacer to strip _id and __v during serialization
-    // This is safer and handles deep nesting automatically via the JSON engine
-    const jsonString = JSON.stringify(obj, (key, value) => {
-        if (key === '_id' || key === '__v') {
-            return undefined;
-        }
-        return value;
-    });
+    // JSON round-trip converts all MongoDB types (ObjectId, Buffer, Date) to plain values,
+    // then we strip _id and __v from the result
+    const plain = JSON.parse(JSON.stringify(obj));
+    return stripMongoFields(plain);
+}
 
-    return JSON.parse(jsonString);
+function stripMongoFields(obj: any): any {
+    if (Array.isArray(obj)) return obj.map(stripMongoFields);
+    if (obj && typeof obj === 'object') {
+        const clean: any = {};
+        for (const key of Object.keys(obj)) {
+            if (key === '_id' || key === '__v') continue;
+            clean[key] = stripMongoFields(obj[key]);
+        }
+        return clean;
+    }
+    return obj;
 }
 
 /**

@@ -411,14 +411,14 @@ export function SingularityChat({ userId }: { userId?: string }) {
             const analysis: RollbackAnalysis = await res.json();
 
             if (analysis.conflictedActions.length === 0) {
-                // No conflicts Ã¢â‚¬â€ show confirmation modal
+                // No conflicts-- show confirmation modal
                 setUndoConfirmModal({
                     checkpointId,
                     label: analysis.label || 'these actions',
                     totalActions: analysis.totalActions,
                 });
             } else {
-                // Has conflicts Ã¢â‚¬â€ show conflict modal
+                // Has conflicts-- show conflict modal
                 setRollbackModal({ analysis, loading: false });
             }
         } catch (err) {
@@ -470,12 +470,12 @@ export function SingularityChat({ userId }: { userId?: string }) {
         }
     };
 
-    // File handling Ã¢â‚¬â€ images AND documents
+    // File handling-- images AND documents
     const ACCEPTED_DOCS = ['application/pdf', 'text/plain', 'text/markdown', 'text/csv', 'application/json', 'text/html'];
     const DOC_EXTENSIONS = ['.pdf', '.txt', '.md', '.csv', '.json', '.html', '.prd', '.doc', '.docx'];
 
     const processFile = async (file: File): Promise<Attachment | null> => {
-        // Image files Ã¢â‚¬â€ same as before
+        // Image files-- same as before
         if (file.type.startsWith('image/')) {
             if (file.size > 10 * 1024 * 1024) return null;
             return new Promise((resolve) => {
@@ -495,7 +495,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
             });
         }
 
-        // Document files Ã¢â‚¬â€ extract text
+        // Document files-- extract text
         const ext = '.' + file.name.split('.').pop()?.toLowerCase();
         const isDoc = ACCEPTED_DOCS.includes(file.type) || DOC_EXTENSIONS.includes(ext);
         if (!isDoc) return null;
@@ -700,7 +700,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                     } : m
                                 ));
                             } else if (data.type === 'tool_result') {
-                                // Agent mode: tool finished Ã¢â‚¬â€ capture rollback data
+                                // Agent mode: tool finished-- capture rollback data
                                 if (data.rollbackData) {
                                     pendingRollbackRef.current.push(...data.rollbackData);
                                 }
@@ -838,9 +838,9 @@ export function SingularityChat({ userId }: { userId?: string }) {
                 </div>
             )}
 
-            {/* Full-width Header Ã¢â‚¬â€ icons at viewport corners */}
+            {/* Full-width Header-- icons at viewport corners */}
             <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 z-30">
-                {/* Left corner Ã¢â‚¬â€ Hamburger */}
+                {/* Left corner-- Hamburger */}
                 <button
                     onClick={() => { setShowNavMenu(!showNavMenu); setShowHistory(false); }}
                     className="relative z-[60] p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors"
@@ -868,7 +868,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
 
 
 
-                {/* Right corner Ã¢â‚¬â€ New Chat + History */}
+                {/* Right corner-- New Chat + History */}
                 <div className="flex items-center gap-1">
                     <button
                         onClick={newChat}
@@ -887,7 +887,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                 </div>
             </div>
 
-            {/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â Navigation Menu Ã¢â‚¬â€ Left Side Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */}
+
             {/* ••• Navigation Menu — Left Side ••• */}
             {/* Backdrop */}
             <div
@@ -973,7 +973,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
 
 
 
-            {/* â€¢â€¢â€¢ History Sidebar â€” Right Side â€¢â€¢â€¢ */}
+            {/* History Sidebar -- Right Side */}
             {/* Backdrop */}
             <div
                 className={cn(
@@ -1033,7 +1033,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                                     <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate">{s.title}</p>
                                                     <p className="text-[10px] text-neutral-400 mt-0.5 flex items-center gap-1.5">
                                                         <span>{s.messageCount} messages</span>
-                                                        <span className="opacity-40">Â·</span>
+                                                        <span className="opacity-40">·</span>
                                                         <span>{(() => {
                                                             const diff = Date.now() - new Date(s.updatedAt).getTime();
                                                             const mins = Math.floor(diff / 60000);
@@ -1085,7 +1085,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                                         <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
                                         <div>
                                             <span className="font-medium text-foreground">{ca.conflict.entityName}</span>
-                                            <span className="text-muted-foreground"> Ã¢â‚¬â€ {ca.conflict.reason}</span>
+                                            <span className="text-muted-foreground">-- {ca.conflict.reason}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -1264,10 +1264,10 @@ export function SingularityChat({ userId }: { userId?: string }) {
                 )
             }
 
-            {/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â Gemini-style Layout Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */}
+            {/* Gemini-style Layout */}
             {
                 messages.length === 0 && !isLoading ? (
-                    /* Ã¢â€â‚¬Ã¢â€â‚¬ EMPTY STATE: Centered greeting + input + pills Ã¢â€â‚¬Ã¢â€â‚¬ */
+                    /* EMPTY STATE: Centered greeting + input + pills */
                     <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6">
                         <div className="w-full max-w-3xl space-y-6 sm:space-y-8 animate-in fade-in duration-700">
                             {/* Greeting */}
@@ -1427,7 +1427,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                         </div>
                     </div>
                 ) : (
-                    /* Ã¢â€â‚¬Ã¢â€â‚¬ CHAT STATE: Messages + bottom input Ã¢â€â‚¬Ã¢â€â‚¬ */
+                    /* CHAT STATE: Messages + bottom input */
                     <>
                         {/* Messages Area */}
                         <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 sm:py-6 scroll-smooth no-scrollbar">

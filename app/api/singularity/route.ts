@@ -19,7 +19,6 @@ const TOOL_PERMISSION_FLAGS: Record<string, keyof AIPermissions> = {
     bulk_create_invoices: 'canManageInvoices',
     create_refund: 'canRefund',
     create_employee: 'canCreateEmployee',
-    bulk_create_clients: 'canManageInvoices',
     delete_project: 'canDelete',
     delete_client: 'canDelete',
     delete_transaction: 'canDelete',
@@ -46,8 +45,11 @@ export const dynamic = "force-dynamic";
 //   anything else → that text is the continuation, append it
 // ---------------------------------------------------------------------------
 function isTooShort(text: string): boolean {
-    const nonEmpty = text.split('\n').filter(l => l.trim().length > 0);
-    return nonEmpty.length < 2;
+    const trimmed = text.trim();
+    if (!trimmed) return true;
+    // Ends with sentence-ending punctuation → complete
+    if (/[.!?]$/.test(trimmed)) return false;
+    return true;
 }
 
 async function checkAndContinue(
@@ -262,59 +264,20 @@ export async function POST(req: NextRequest) {
             }
             parts.push({ text: agentPrompt });
 
-            const MAX_ATTEMPTS = 2;
-
             const stream = new ReadableStream({
                 async start(controller) {
                     try {
                         let totalResponseChars = 0;
+                        let accumulatedText = '';
 
-                        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-                            if (attempt > 1) {
-                                console.log(`[Singularity Agent] Retry attempt ${attempt} (previous returned 0 chars)`);
-                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'rechecking' })}\n\n`));
-                                await new Promise(r => setTimeout(r, 500)); // Brief pause before retry
-                            }
-
-                            const messageQueue: any[] = [];
-                            console.log('[Singularity Agent] Connecting with model:', modelId);
-
-                            const session = await ai.live.connect({
-                                model: `models/${modelId}`,
-                                config: {
-                                    responseModalities: [Modality.AUDIO],
-                                    speechConfig: {
-                                        voiceConfig: {
-                                            prebuiltVoiceConfig: { voiceName: 'Zephyr' }
-                                        }
-                                    },
-                                    outputAudioTranscription: {},
-                                    tools: [{ functionDeclarations: filteredTools }],
-                                } as any,
-                                callbacks: {
-                                    onopen: () => { console.log('[Singularity Agent] Connected'); },
-                                    onmessage: (msg: any) => messageQueue.push(msg),
-                                    onerror: (e: any) => {
-                                        console.error('[Singularity Agent] WS Error:', e?.message || e);
-                                        try {
-                                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', text: 'Connection error' })}\n\n`));
-                                        } catch { }
-                                    },
-                                    onclose: () => { console.log('[Singularity Agent] Disconnected'); },
-                                },
-                            });
-
-                            // Send prompt
-                            session.sendClientContent({
-                                turns: [{ role: 'user', parts }]
-                            });
-
-                            // Poll and stream messages
+                        // Helper: poll messages from a Live session, stream to client, handle tools
+                        const pollSession = async (liveSession: any, messageQueue: any[], label: string) => {
                             let done = false;
                             totalResponseChars = 0;
+                            accumulatedText = '';
                             let msgCount = 0;
                             const timeout = setTimeout(() => {
-                                console.log('[Singularity Agent] Timeout reached');
+                                console.log(`[Agent ${label}] Timeout reached`);
                                 done = true;
                             }, 120000);
 
@@ -333,11 +296,11 @@ export async function POST(req: NextRequest) {
                                 if (!msg) break;
                                 msgCount++;
 
-                                // Process text/transcript from every message
                                 if (msg.serverContent?.modelTurn?.parts) {
                                     for (const part of msg.serverContent.modelTurn.parts) {
                                         if (part.text) {
                                             totalResponseChars += part.text.length;
+                                            accumulatedText += part.text;
                                             controller.enqueue(encoder.encode(
                                                 `data: ${JSON.stringify({ type: 'response', text: part.text })}\n\n`
                                             ));
@@ -348,6 +311,7 @@ export async function POST(req: NextRequest) {
                                 if ((msg.serverContent as any)?.outputTranscription?.text) {
                                     const chunk = (msg.serverContent as any).outputTranscription.text;
                                     totalResponseChars += chunk.length;
+                                    accumulatedText += chunk;
                                     controller.enqueue(encoder.encode(
                                         `data: ${JSON.stringify({ type: 'response', text: chunk })}\n\n`
                                     ));
@@ -355,7 +319,7 @@ export async function POST(req: NextRequest) {
 
                                 // Handle tool calls
                                 if (msg.toolCall && msg.toolCall.functionCalls) {
-                                    console.log('[Singularity Agent] Tool calls:', msg.toolCall.functionCalls.map((fc: any) => fc.name));
+                                    console.log(`[Agent ${label}] Tool calls:`, msg.toolCall.functionCalls.map((fc: any) => fc.name));
                                     const functionResponses: any[] = [];
 
                                     const flushTranscripts = () => {
@@ -367,6 +331,7 @@ export async function POST(req: NextRequest) {
                                                 for (const part of queued.serverContent.modelTurn.parts) {
                                                     if (part.text) {
                                                         totalResponseChars += part.text.length;
+                                                        accumulatedText += part.text;
                                                         controller.enqueue(encoder.encode(
                                                             `data: ${JSON.stringify({ type: 'response', text: part.text })}\n\n`
                                                         ));
@@ -376,6 +341,7 @@ export async function POST(req: NextRequest) {
                                             if ((queued.serverContent as any)?.outputTranscription?.text) {
                                                 const chunk = (queued.serverContent as any).outputTranscription.text;
                                                 totalResponseChars += chunk.length;
+                                                accumulatedText += chunk;
                                                 controller.enqueue(encoder.encode(
                                                     `data: ${JSON.stringify({ type: 'response', text: chunk })}\n\n`
                                                 ));
@@ -389,7 +355,7 @@ export async function POST(req: NextRequest) {
                                             `data: ${JSON.stringify({ type: 'tool_call', name: fc.name, displayName, args: fc.args })}\n\n`
                                         ));
                                         const result = await executeTool(fc.name, fc.args || {}, authenticatedUserId);
-                                        console.log('[Singularity Agent] Tool result:', fc.name, result.success, result.summary);
+                                        console.log(`[Agent ${label}] Tool result:`, fc.name, result.success, result.summary);
                                         controller.enqueue(encoder.encode(
                                             `data: ${JSON.stringify({ type: 'tool_result', name: fc.name, displayName, success: result.success, summary: result.summary, rollbackData: result.rollbackData })}\n\n`
                                         ));
@@ -397,13 +363,12 @@ export async function POST(req: NextRequest) {
                                         flushTranscripts();
                                     }
 
-                                    session.sendToolResponse({ functionResponses });
+                                    liveSession.sendToolResponse({ functionResponses });
                                     continue;
                                 }
 
-                                // Check for turn completion
                                 if (msg.serverContent?.turnComplete) {
-                                    console.log(`[Agent] turnComplete after ${msgCount} messages. Response: ${totalResponseChars} chars`);
+                                    console.log(`[Agent ${label}] turnComplete after ${msgCount} msgs. Response: ${totalResponseChars} chars`);
                                     done = true;
                                 }
                             }
@@ -418,6 +383,7 @@ export async function POST(req: NextRequest) {
                                     for (const part of remaining.serverContent.modelTurn.parts) {
                                         if (part.text) {
                                             totalResponseChars += part.text.length;
+                                            accumulatedText += part.text;
                                             controller.enqueue(encoder.encode(
                                                 `data: ${JSON.stringify({ type: 'response', text: part.text })}\n\n`
                                             ));
@@ -428,6 +394,7 @@ export async function POST(req: NextRequest) {
                                 if ((remaining.serverContent as any)?.outputTranscription?.text) {
                                     const chunk = (remaining.serverContent as any).outputTranscription.text;
                                     totalResponseChars += chunk.length;
+                                    accumulatedText += chunk;
                                     controller.enqueue(encoder.encode(
                                         `data: ${JSON.stringify({ type: 'response', text: chunk })}\n\n`
                                     ));
@@ -435,16 +402,122 @@ export async function POST(req: NextRequest) {
                                 }
                                 if (hadContent) drainDeadline = Math.max(drainDeadline, Date.now() + 2000);
                             }
-
                             clearTimeout(timeout);
-                            session.close();
+                        };
 
-                            // If we got content, stop retrying
-                            if (totalResponseChars > 0) {
-                                console.log(`[Agent] Attempt ${attempt} success: ${totalResponseChars} chars`);
-                                break;
+                        const isResponseBad = () => totalResponseChars === 0 || isTooShort(accumulatedText);
+
+                        // --- Phase 1: Initial attempt on fresh connection ---
+                        const messageQueue: any[] = [];
+                        console.log('[Singularity Agent] Connecting with model:', modelId);
+
+                        let session = await ai.live.connect({
+                            model: `models/${modelId}`,
+                            config: {
+                                responseModalities: [Modality.AUDIO],
+                                speechConfig: {
+                                    voiceConfig: {
+                                        prebuiltVoiceConfig: { voiceName: 'Zephyr' }
+                                    }
+                                },
+                                outputAudioTranscription: {},
+                                tools: [{ functionDeclarations: filteredTools }],
+                            } as any,
+                            callbacks: {
+                                onopen: () => { console.log('[Singularity Agent] Connected'); },
+                                onmessage: (msg: any) => messageQueue.push(msg),
+                                onerror: (e: any) => {
+                                    console.error('[Singularity Agent] WS Error:', e?.message || e);
+                                    try {
+                                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', text: 'Connection error' })}\n\n`));
+                                    } catch { }
+                                },
+                                onclose: () => { console.log('[Singularity Agent] Disconnected'); },
+                            },
+                        });
+
+                        session.sendClientContent({ turns: [{ role: 'user', parts }] });
+                        await pollSession(session, messageQueue, 'attempt-1');
+
+                        // --- Phase 2: Same-connection retry if response was bad ---
+                        if (isResponseBad()) {
+                            console.log(`[Agent] Same-connection retry (was ${totalResponseChars} chars)`);
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'clear' })}\n\n`));
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'rechecking' })}\n\n`));
+                            totalResponseChars = 0;
+                            accumulatedText = '';
+                            messageQueue.length = 0; // Clear stale messages
+                            session.sendClientContent({ turns: [{ role: 'user', parts }] });
+                            await pollSession(session, messageQueue, 'same-conn-retry');
+                        }
+
+                        session.close();
+
+                        // --- Phase 3: Reconnect if still bad ---
+                        if (isResponseBad()) {
+                            console.log(`[Agent] Reconnecting (was ${totalResponseChars} chars)`);
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'clear' })}\n\n`));
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'rechecking' })}\n\n`));
+                            totalResponseChars = 0;
+                            accumulatedText = '';
+                            await new Promise(r => setTimeout(r, 500));
+
+                            const mq2: any[] = [];
+                            session = await ai.live.connect({
+                                model: `models/${modelId}`,
+                                config: {
+                                    responseModalities: [Modality.AUDIO],
+                                    speechConfig: {
+                                        voiceConfig: {
+                                            prebuiltVoiceConfig: { voiceName: 'Zephyr' }
+                                        }
+                                    },
+                                    outputAudioTranscription: {},
+                                    tools: [{ functionDeclarations: filteredTools }],
+                                } as any,
+                                callbacks: {
+                                    onopen: () => { console.log('[Singularity Agent] Reconnected'); },
+                                    onmessage: (msg: any) => mq2.push(msg),
+                                    onerror: (e: any) => {
+                                        console.error('[Singularity Agent] WS Error:', e?.message || e);
+                                        try {
+                                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', text: 'Connection error' })}\n\n`));
+                                        } catch { }
+                                    },
+                                    onclose: () => { console.log('[Singularity Agent] Disconnected'); },
+                                },
+                            });
+
+                            session.sendClientContent({ turns: [{ role: 'user', parts }] });
+                            await pollSession(session, mq2, 'reconnect');
+                            session.close();
+                        }
+
+                        // --- Phase 4: Short-response fallback via text API (non-live model) ---
+                        if (totalResponseChars > 0 && isTooShort(accumulatedText)) {
+                            console.log('[Agent] Response too short, falling back to gemini-3.1-flash-lite-preview...');
+                            const previousAnswer = accumulatedText;
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'clear' })}\n\n`));
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'rechecking' })}\n\n`));
+                            totalResponseChars = 0;
+                            accumulatedText = '';
+                            try {
+                                const { generateContent } = await import("@/lib/ai-provider");
+                                const fallbackConfig = { ...aiConfig, model: 'gemini-3.1-flash-lite-preview' };
+                                const continuation = await checkAndContinue(generateContent, fallbackConfig, systemInstruction, fullPrompt, previousAnswer);
+                                if (continuation) {
+                                    console.log('[Agent] Text API continuation appended.');
+                                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response', text: continuation })}\n\n`));
+                                } else {
+                                    console.log('[Agent] Text API confirmed answer was complete.');
+                                }
+                            } catch (err) {
+                                console.error('[Agent] Text API fallback failed:', err);
                             }
-                            console.log(`[Agent] Attempt ${attempt} returned 0 chars`);
+                        }
+
+                        if (totalResponseChars === 0) {
+                            console.log('[Agent] All attempts returned 0 chars');
                         }
 
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
@@ -484,15 +557,17 @@ export async function POST(req: NextRequest) {
                     // 1. Send initial response right away
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response', text: result })}\n\n`));
 
-                    // 2. Short-response fallback check
+                    // 2. Short-response fallback check (non-live model)
                     if (isTooShort(result)) {
-                        console.log('[Singularity Chat] Response too short, checking if complete...');
+                        console.log('[Singularity Chat] Response too short, falling back to gemini-3.1-flash-lite-preview...');
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'clear' })}\n\n`));
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'rechecking' })}\n\n`));
                         try {
-                            const continuation = await checkAndContinue(generateContent, aiConfig, '', fullPrompt, result);
+                            const fallbackConfig = { ...aiConfig, model: 'gemini-3.1-flash-lite-preview' };
+                            const continuation = await checkAndContinue(generateContent, fallbackConfig, '', fullPrompt, result);
                             if (continuation) {
                                 console.log('[Singularity Chat] Appending continuation.');
-                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response', text: '\n\n' + continuation })}\n\n`));
+                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response', text: continuation })}\n\n`));
                             } else {
                                 console.log('[Singularity Chat] AI confirmed answer was complete.');
                             }

@@ -26,9 +26,10 @@ interface TopbarProps {
     currentUser?: User;
     agencyName?: string;
     agencyLogo?: string;
+    agencyPlan?: string;
 }
 
-export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: TopbarProps) {
+export function Topbar({ currentUser: propUser, agencyName, agencyLogo, agencyPlan }: TopbarProps) {
     const fmt = useDateFormat();
     const router = useRouter();
 
@@ -135,7 +136,7 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo }: Topbar
             <div className="h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 flex items-center justify-between z-10">
                 <div className="flex items-center gap-4">
                     <div className="md:hidden mr-2">
-                        {mounted && <MobileSidebar currentUserId={user.id} currentUserUsername={user.username} currentUserRole={user.role} agencyName={agencyName} agencyLogo={agencyLogo} />}
+                        {mounted && <MobileSidebar currentUserId={user.id} currentUserUsername={user.username} currentUserRole={user.role} agencyName={agencyName} agencyLogo={agencyLogo} agencyPlan={agencyPlan} />}
                     </div>
                     <h2 className="text-lg font-semibold">Dashboard</h2>
                 </div>

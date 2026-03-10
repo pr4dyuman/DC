@@ -4,7 +4,9 @@ import { Plus, Search } from "lucide-react";
 import AgencyTable from "@/components/super-admin/AgencyTable";
 
 export default async function AgenciesPage() {
-    const agencies = await getAllAgenciesWithStats();
+    const rawAgencies = await getAllAgenciesWithStats();
+    // Ensure plain objects for client component serialization
+    const agencies = JSON.parse(JSON.stringify(rawAgencies));
 
     return (
         <div className="space-y-6">

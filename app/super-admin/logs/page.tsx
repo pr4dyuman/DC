@@ -3,10 +3,13 @@ import { fmtDate, fmtTime } from "@/lib/date-utils";
 import { FileText, Building2, CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
 
 export default async function SystemLogsPage() {
-    const [agencies, logs] = await Promise.all([
+    const [rawAgencies, rawLogs] = await Promise.all([
         getAllAgenciesWithStats(),
         getSystemLogs(100),
     ]);
+    // Ensure plain objects for RSC serialization
+    const agencies = JSON.parse(JSON.stringify(rawAgencies));
+    const logs = JSON.parse(JSON.stringify(rawLogs));
 
     const totalActive = agencies.filter((a: any) => a.status === "active").length;
     const totalSuspended = agencies.filter((a: any) => a.status === "suspended").length;

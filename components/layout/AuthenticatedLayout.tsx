@@ -49,6 +49,7 @@ export async function AuthenticatedLayout({
                         currentUserRole={dashboardUser.role}
                         agencyName={agencyName}
                         agencyLogo={agencyLogo}
+                        agencyPlan={agency?.plan}
                     />
                 </div>
                 <main className="md:pl-72 min-h-screen pb-10" style={{ backgroundColor: 'var(--content-bg)', color: 'var(--foreground)' }}>
@@ -56,6 +57,7 @@ export async function AuthenticatedLayout({
                         currentUser={dashboardUser}
                         agencyName={agencyName}
                         agencyLogo={agencyLogo}
+                        agencyPlan={agency?.plan}
                     />
                     <div className="p-8">
                         {children}

@@ -12,9 +12,10 @@ interface MobileSidebarProps {
     currentUserRole?: string;
     agencyName?: string;
     agencyLogo?: string;
+    agencyPlan?: string;
 }
 
-export function MobileSidebar({ currentUserId, currentUserUsername, currentUserRole, agencyName, agencyLogo }: MobileSidebarProps) {
+export function MobileSidebar({ currentUserId, currentUserUsername, currentUserRole, agencyName, agencyLogo, agencyPlan }: MobileSidebarProps) {
     const [open, setOpen] = useState(false);
     const pathname = usePathname();
     const [mounted, setMounted] = useState(false);
@@ -46,6 +47,7 @@ export function MobileSidebar({ currentUserId, currentUserUsername, currentUserR
                         currentUserRole={currentUserRole}
                         agencyName={agencyName}
                         agencyLogo={agencyLogo}
+                        agencyPlan={agencyPlan}
                     />
                 </div>
             </SheetContent>

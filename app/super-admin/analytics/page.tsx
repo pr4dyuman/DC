@@ -2,7 +2,9 @@ import { getSystemAnalytics } from "@/lib/actions/super-admin";
 import { Users, Building2 } from "lucide-react";
 
 export default async function AnalyticsPage() {
-    const analytics = await getSystemAnalytics();
+    const rawAnalytics = await getSystemAnalytics();
+    // Ensure plain objects for RSC serialization
+    const analytics = JSON.parse(JSON.stringify(rawAnalytics));
 
     return (
         <div className="space-y-6">
