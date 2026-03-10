@@ -72,9 +72,10 @@ export async function getTotalUnreadCount(_currentUserId?: string): Promise<numb
 
     await connectDB();
     const agency = await getCurrentAgency();
+    if (!agency?.id) return 0;
     return MessageModel.countDocuments({
         receiverId: authedUserId, read: false,
-        ...(agency ? { agencyId: agency.id } : {})
+        agencyId: agency.id
     });
 }
 
@@ -85,7 +86,8 @@ export async function getContacts(_currentUserId?: string): Promise<Contact[]> {
 
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    if (!agency?.id) throw new Error('Agency context required');
+    const agencyFilter = { agencyId: agency.id };
     const now = new Date().getTime();
 
     // Fetch users/clients, and use aggregation for message stats instead of loading ALL messages
@@ -157,12 +159,13 @@ export async function getMessages(_currentUserId: string, otherUserId: string): 
 
     await connectDB();
     const agency = await getCurrentAgency();
+    if (!agency?.id) throw new Error('Agency context required');
     const msgs = await MessageModel.find({
         $or: [
             { senderId: currentUserId, receiverId: otherUserId },
             { senderId: otherUserId, receiverId: currentUserId }
         ],
-        ...(agency ? { agencyId: agency.id } : {})
+        agencyId: agency.id
     }).lean();
     return msgs
         .map((m: any) => serializeMessage(m))
@@ -179,22 +182,19 @@ export async function sendMessage(_senderId: string, receiverId: string, content
     content = sanitizeString(content, 10000);
     if (!content) throw new Error('Message content is required');
 
-    // Resolve agencyId
-    let agencyId = 'default-agency';
-    try {
-        const agency = await getCurrentAgency();
-        if (agency) {
-            agencyId = agency.id;
-        } else {
-            // Fallback: look up user directly from DB
-            const userData = await UserModel.findOne({ id: senderId }).select('-password').lean();
-            if (userData && (userData as any).agencyId) {
-                agencyId = (userData as any).agencyId;
-            }
+    // Resolve agencyId — require it for data isolation
+    let agencyId: string | undefined;
+    const agency = await getCurrentAgency();
+    if (agency) {
+        agencyId = agency.id;
+    } else {
+        // Fallback: look up user directly from DB
+        const userData = await UserModel.findOne({ id: senderId }).select('agencyId').lean();
+        if (userData && (userData as any).agencyId) {
+            agencyId = (userData as any).agencyId;
         }
-    } catch (e) {
-        console.warn("Failed to get agency context in sendMessage, using default/fallback", e);
     }
+    if (!agencyId) throw new Error('Agency context required');
 
     const newMessage: Message = {
         id: generateId(),
@@ -226,12 +226,13 @@ export async function markAsRead(_currentUserId: string, senderId: string) {
 
     await connectDB();
     const agency = await getCurrentAgency();
+    if (!agency?.id) return;
     await MessageModel.updateMany(
-        { senderId, receiverId: currentUserId, agencyId: agency?.id, read: false },
+        { senderId, receiverId: currentUserId, agencyId: agency.id, read: false },
         { $set: { read: true } }
     );
     await UserModel.updateOne(
-        { id: currentUserId, agencyId: agency?.id },
+        { id: currentUserId, agencyId: agency.id },
         { $set: { lastActiveAt: new Date().toISOString() } }
     );
 }

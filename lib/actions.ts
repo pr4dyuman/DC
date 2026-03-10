@@ -2499,9 +2499,10 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
     }
 
     // BUG-291: Add performedBy audit trail
+    if (!agency?.id) throw new Error('Agency context required');
     const newTransaction: Transaction = {
         ...transaction, id: generateId(),
-        status: transaction.status || 'completed', agencyId: agency?.id || 'default-agency',
+        status: transaction.status || 'completed', agencyId: agency.id,
         ...(currentUser ? { performedBy: currentUser.id } : {}),
     } as Transaction;
     await TransactionModel.create(newTransaction);
@@ -3190,8 +3191,9 @@ export async function addProjectAsset(asset: Omit<Asset, "id" | "uploadedAt" | "
 
     await connectDB();
     const agency = await getCurrentAgency();
+    if (!agency?.id) throw new Error('Agency context required');
     const newAsset: Asset = {
-        ...asset, id: generateId(), uploadedAt: new Date().toISOString(), agencyId: agency?.id || 'default-agency'
+        ...asset, id: generateId(), uploadedAt: new Date().toISOString(), agencyId: agency.id
     };
     await AssetModel.create(newAsset);
     await ActivityModel.create({

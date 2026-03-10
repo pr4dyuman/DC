@@ -6,7 +6,8 @@ import { getCurrentAgency } from "@/lib/agency-context";
 export async function getExportData(startDate: string, endDate: string) {
     await connectDB();
     const agency = await getCurrentAgency();
-    const agencyFilter = agency ? { agencyId: agency.id } : {};
+    if (!agency?.id) throw new Error('Agency context required');
+    const agencyFilter = { agencyId: agency.id };
 
     const startStr = startDate; // "YYYY-MM-DD"
     const endStr = endDate;     // "YYYY-MM-DD"

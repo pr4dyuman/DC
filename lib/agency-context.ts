@@ -49,8 +49,8 @@ export const getCurrentAgency = cache(async (): Promise<Agency | null> => {
         // 1. Check if user is a regular user
         const user = await UserModel.findOne({ id: userId }).lean();
         if (user) {
-            const userAgencyId = user.agencyId || 'default-agency';
-            const agency = await AgencyModel.findOne({ id: userAgencyId }).lean();
+            if (!user.agencyId) return null;
+            const agency = await AgencyModel.findOne({ id: user.agencyId }).lean();
             return serialize(agency) as Agency | null;
         }
 
@@ -68,8 +68,8 @@ export const getCurrentAgency = cache(async (): Promise<Agency | null> => {
         // 3. Check if user is a client
         const client = await ClientModel.findOne({ id: userId }).lean();
         if (client) {
-            const clientAgencyId = client.agencyId || 'default-agency';
-            const agency = await AgencyModel.findOne({ id: clientAgencyId }).lean();
+            if (!client.agencyId) return null;
+            const agency = await AgencyModel.findOne({ id: client.agencyId }).lean();
             return serialize(agency) as Agency | null;
         }
 
