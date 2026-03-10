@@ -42,12 +42,12 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 export async function comparePassword(plain: string, stored: string): Promise<boolean> {
-    // Check if stored password is a bcrypt hash
+    // Only compare against properly hashed passwords
     if (stored.startsWith('$2a$') || stored.startsWith('$2b$') || stored.startsWith('$2y$')) {
         return bcrypt.compare(plain, stored);
     }
-    // Plain text fallback for migration from unhashed passwords
-    return plain === stored;
+    // Reject login if password is not hashed — run migrate-passwords script to fix
+    return false;
 }
 
 // --- Session Management ---
@@ -134,19 +134,10 @@ export async function authenticateUser(email: string, password: string): Promise
 
     await connectDB();
 
-    // Helper: if user had a plain text password, rehash it on successful login
-    async function rehashIfPlain(model: any, id: string, stored: string) {
-        if (!stored.startsWith('$2a$') && !stored.startsWith('$2b$') && !stored.startsWith('$2y$')) {
-            const hashed = await hashPassword(password);
-            await model.updateOne({ id }, { $set: { password: hashed } });
-        }
-    }
-
     // 1. Check Super Admin
     const superAdmin = await SuperAdminModel.findOne({ email }).lean();
     if (superAdmin) {
         if (superAdmin.password && await comparePassword(password, superAdmin.password)) {
-            await rehashIfPlain(SuperAdminModel, superAdmin.id, superAdmin.password);
             await resetLoginRateLimit(email);
             await login(superAdmin.id, 'superadmin');
             return { success: true, redirectTo: '/super-admin' };
@@ -157,7 +148,6 @@ export async function authenticateUser(email: string, password: string): Promise
     const user = await UserModel.findOne({ email }).lean();
     if (user) {
         if (user.password && await comparePassword(password, user.password)) {
-            await rehashIfPlain(UserModel, user.id, user.password);
             await resetLoginRateLimit(email);
             await login(user.id, user.role, user.agencyId);
             return { success: true, redirectTo: '/dashboard' };
@@ -171,7 +161,6 @@ export async function authenticateUser(email: string, password: string): Promise
             return { success: false, error: 'This account has been deactivated. Please contact your agency.' };
         }
         if (client.password && await comparePassword(password, client.password)) {
-            await rehashIfPlain(ClientModel, client.id, client.password);
             await resetLoginRateLimit(email);
             await login(client.id, 'client', client.agencyId);
             return { success: true, redirectTo: '/dashboard' };
