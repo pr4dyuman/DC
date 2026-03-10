@@ -27,7 +27,13 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
     const [deletePassword, setDeletePassword] = useState("");
     const [deleteError, setDeleteError] = useState("");
     const [deleting, setDeleting] = useState(false);
+    const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
+    const [suspendTargetId, setSuspendTargetId] = useState<string | null>(null);
+    const [suspendPassword, setSuspendPassword] = useState("");
+    const [suspendError, setSuspendError] = useState("");
+    const [suspending, setSuspending] = useState(false);
     const passwordRef = useRef<HTMLInputElement>(null);
+    const suspendPasswordRef = useRef<HTMLInputElement>(null);
 
     const filteredAgencies = agencies.filter((agency) => {
         const matchesFilter = filter === "all" || agency.status === filter || agency.plan === filter;
@@ -37,10 +43,28 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
 
     const { visibleCount, sentinelRef, hasMore } = useProgressiveList(filteredAgencies.length, 20, [filter, search]);
 
-    const handleSuspend = async (agencyId: string) => {
+    const handleSuspend = (agencyId: string) => {
         if (!confirm("Are you sure you want to suspend this agency?")) return;
-        await suspendAgency(agencyId, "Suspended by super admin");
-        router.refresh();
+        setSuspendTargetId(agencyId);
+        setSuspendPassword("");
+        setSuspendError("");
+        setSuspendDialogOpen(true);
+        setTimeout(() => suspendPasswordRef.current?.focus(), 100);
+    };
+
+    const handleSuspendConfirm = async () => {
+        if (!suspendTargetId || !suspendPassword) return;
+        setSuspending(true);
+        setSuspendError("");
+        try {
+            await suspendAgency(suspendTargetId, suspendPassword, "Suspended by super admin");
+            setSuspendDialogOpen(false);
+            router.refresh();
+        } catch (err: any) {
+            setSuspendError(err.message || 'Failed to suspend agency');
+        } finally {
+            setSuspending(false);
+        }
     };
 
     const handleActivate = async (agencyId: string) => {
@@ -200,6 +224,46 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                     <p className="text-muted-foreground">No agencies found</p>
                 </div>
             )}
+
+            <Dialog open={suspendDialogOpen} onOpenChange={setSuspendDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Confirm Suspension</DialogTitle>
+                        <DialogDescription>
+                            Enter your super-admin password to confirm agency suspension.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={(e) => { e.preventDefault(); handleSuspendConfirm(); }}>
+                        <Input
+                            ref={suspendPasswordRef}
+                            type="password"
+                            placeholder="Super-admin password"
+                            value={suspendPassword}
+                            onChange={(e) => setSuspendPassword(e.target.value)}
+                            autoComplete="current-password"
+                        />
+                        {suspendError && (
+                            <p className="text-sm text-red-500 mt-2">{suspendError}</p>
+                        )}
+                        <DialogFooter className="mt-4">
+                            <button
+                                type="button"
+                                onClick={() => setSuspendDialogOpen(false)}
+                                className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={!suspendPassword || suspending}
+                                className="px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                            >
+                                {suspending ? 'Suspending...' : 'Suspend Agency'}
+                            </button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <DialogContent>

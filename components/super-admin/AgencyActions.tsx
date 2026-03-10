@@ -33,7 +33,7 @@ export default function AgencyActions({ agency }: { agency: any }) {
         setLoading(true);
         setError("");
         try {
-            await suspendAgency(agency.id, reason || undefined);
+            await suspendAgency(agency.id, password, reason || undefined);
             router.refresh();
             resetModal();
         } catch (err: any) {

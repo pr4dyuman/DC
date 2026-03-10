@@ -604,7 +604,7 @@ export async function getEmployeeDashboardData(userId: string) {
 }
 
 // Auto-clear notifications older than 30 days
-export async function getNotifications(userId: string, offset = 0, limit = 1000): Promise<Notification[]> {
+export async function getNotifications(userId: string, offset = 0, limit = 50): Promise<Notification[]> {
     const caller = await requireAuth();
     // IDOR prevention: users can only view their own notifications
     if (caller.id !== userId && caller.role !== 'admin' && caller.role !== 'manager') {

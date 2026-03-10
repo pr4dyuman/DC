@@ -288,11 +288,18 @@ export async function updateAgency(agencyId: string, updates: Partial<Agency>) {
 }
 
 /**
- * Suspend agency
+ * Suspend agency — requires super-admin password confirmation
  */
-export async function suspendAgency(agencyId: string, reason?: string) {
+export async function suspendAgency(agencyId: string, password: string, reason?: string) {
     const sa = await verifySuperAdmin();
     await connectDB();
+
+    // Verify super-admin password before destructive operation
+    if (!password) throw new Error('Password is required to suspend an agency');
+    const superAdmin = await SuperAdminModel.findOne({ id: sa.userId }).lean();
+    if (!superAdmin || !(await bcrypt.compare(password, (superAdmin as any).password))) {
+        throw new Error('Invalid password');
+    }
 
     const agency = await AgencyModel.findOne({ id: agencyId }).lean();
     await AgencyModel.updateOne(

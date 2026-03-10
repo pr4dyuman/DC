@@ -14,7 +14,7 @@ interface MetricCardProps {
 
 export function MetricCard({ title, value, description, icon: Icon, trend, iconColor = "text-amber-500", href }: MetricCardProps) {
     const card = (
-        <Card className={`transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/5 ${href ? 'hover:border-indigo-500/50 cursor-pointer' : 'hover:border-amber-500/30'}`}>
+        <Card className={`transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/5 group ${href ? 'hover:border-indigo-500/50 cursor-pointer' : 'hover:border-amber-500/30'}`}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{title}</CardTitle>
                 <div className="rounded-md bg-amber-500/10 p-1.5">

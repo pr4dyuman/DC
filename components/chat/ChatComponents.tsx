@@ -2,6 +2,7 @@ import { Message, Contact } from "@/lib/chat";
 import { cn } from "@/lib/utils";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { Check, CheckCheck, User, Image as ImageIcon, Trash2, Smile, X, Loader2 } from "lucide-react";
+import NextImage from 'next/image';
 import { useState, useRef, useEffect } from "react";
 
 // ── Message Bubble ──────────────────────────────────────────
@@ -233,7 +234,7 @@ export function ContactItem({ contact, isActive, onClick, onDelete }: ContactIte
         >
             <div className="relative shrink-0">
                 {contact.avatar ? (
-                    <img src={contact.avatar} alt={contact.name} className="w-10 h-10 rounded-full object-cover border border-border" />
+                    <NextImage src={contact.avatar} alt={contact.name} width={40} height={40} className="w-10 h-10 rounded-full object-cover border border-border" unoptimized />
                 ) : (
                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center border border-border text-muted-foreground">
                         <User className="w-5 h-5" />

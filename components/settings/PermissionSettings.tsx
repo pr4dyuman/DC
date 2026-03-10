@@ -7,6 +7,7 @@ import { getUsers, getUserPermissions, updateUserPermissions, getClients } from 
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Search, User as UserIcon, Building2, Trash2, Sparkles, FolderPlus, Loader2 } from 'lucide-react';
+import Image from 'next/image';
 import { Switch } from '@/components/ui/switch';
 
 export default function PermissionSettings() {
@@ -144,10 +145,13 @@ export default function PermissionSettings() {
                                 <div className="flex items-center gap-4 min-w-[200px]">
                                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden border border-border group-hover:border-primary/50 transition-colors">
                                         {('avatar' in user && (user as any).avatar) || ('logo' in user && (user as any).logo) ? (
-                                            <img
+                                            <Image
                                                 src={('avatar' in user && (user as any).avatar) ? (user as any).avatar : ('logo' in user ? (user as any).logo : '')}
                                                 alt={user.name}
+                                                width={40}
+                                                height={40}
                                                 className="w-full h-full object-cover"
+                                                unoptimized
                                             />
                                         ) : (
                                             <UserIcon className="w-5 h-5 text-muted-foreground" />

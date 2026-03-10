@@ -163,14 +163,17 @@ async function snapshotEntity(entityType: string, entityId: string): Promise<any
     return doc || null;
 }
 
-/** Look up user role from userId */
+/** Look up user role from userId, scoped to the current agency */
 async function getUserRole(userId: string): Promise<RoleType> {
     await connectDB();
+    const { getCurrentAgency } = await import('./agency-context');
+    const agency = await getCurrentAgency();
+    const agencyFilter = agency ? { agencyId: agency.id } : {};
     // Check users first
-    const user = await UserModel.findOne({ id: userId }).select('role').lean() as any;
+    const user = await UserModel.findOne({ id: userId, ...agencyFilter }).select('role').lean() as any;
     if (user?.role) return user.role as RoleType;
     // Check if it's a client
-    const client = await ClientModel.findOne({ id: userId }).select('role').lean() as any;
+    const client = await ClientModel.findOne({ id: userId, ...agencyFilter }).select('role').lean() as any;
     if (client) return 'client';
     return 'employee'; // Fallback
 }
