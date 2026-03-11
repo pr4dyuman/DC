@@ -224,7 +224,8 @@ export function validateCsrfOrigin(request: Request): { valid: false; response: 
     const origin = request.headers.get('origin');
     const allowedOrigins = [
         'https://agency-os-sable.vercel.app',
-        'https://digitalcorvid.com',
+        'https://digitalcorvids.com',
+        'https://www.digitalcorvids.com',
         'http://localhost:3000',
     ];
 
