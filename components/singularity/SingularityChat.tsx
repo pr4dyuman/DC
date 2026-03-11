@@ -84,6 +84,52 @@ const AGENT_SUGGESTIONS = [
     { emoji: "\u2705", label: "Add a client" },
 ];
 
+// Seed histories for suggestion pills so AI gets context on first click
+const SUGGESTION_SEED_HISTORY: Record<string, { role: 'user' | 'model'; content: string }[]> = {
+    // Chat mode
+    "Write anything": [
+        { role: "user", content: "Hi, I need help writing something." },
+        { role: "model", content: "Sure! What would you like me to help you write? I can draft emails, reports, proposals, social media posts, or anything else you need." },
+    ],
+    "Draft an email": [
+        { role: "user", content: "I need to draft a professional email." },
+        { role: "model", content: "I'd be happy to help draft an email. Who is it for, and what's the main purpose or message you'd like to convey?" },
+    ],
+    "Brainstorm ideas": [
+        { role: "user", content: "I want to brainstorm some ideas." },
+        { role: "model", content: "Let's brainstorm! What topic or area are you looking for ideas in? Marketing, product features, content, business strategies?" },
+    ],
+    "Plan a sprint": [
+        { role: "user", content: "Help me plan a sprint for my team." },
+        { role: "model", content: "Let's plan your sprint. How long is the sprint, and what are the key goals or features you want to deliver?" },
+    ],
+    "Research a topic": [
+        { role: "user", content: "I need to research a topic." },
+        { role: "model", content: "I can help with research. What topic would you like me to look into? I'll provide a comprehensive overview." },
+    ],
+    // Agent mode
+    "Create a project": [
+        { role: "user", content: "I want to create a new project." },
+        { role: "model", content: "I can help set up a new project. What's the project name, and do you have details like the client, deadline, or budget in mind?" },
+    ],
+    "Finance summary": [
+        { role: "user", content: "Show me a summary of the finances." },
+        { role: "model", content: "I'll pull up the financial overview for you. Let me check the latest invoices, payments, and revenue data." },
+    ],
+    "Team workload": [
+        { role: "user", content: "How is the team workload looking?" },
+        { role: "model", content: "Let me check the current task distribution and workload across your team members." },
+    ],
+    "List projects": [
+        { role: "user", content: "Can you list all the current projects?" },
+        { role: "model", content: "Sure, let me fetch all your active projects with their status and details." },
+    ],
+    "Add a client": [
+        { role: "user", content: "I need to add a new client." },
+        { role: "model", content: "I can add a new client for you. What's the client's name, email, and company? I'll also need a phone number if available." },
+    ],
+};
+
 // Simple markdown-to-HTML renderer
 function renderMarkdown(text: string): string {
     if (!text) return '';
@@ -623,9 +669,14 @@ export function SingularityChat({ userId }: { userId?: string }) {
         let accumThinking = '';
 
         try {
-            const history = messages
+            let history = messages
                 .filter(m => !m.isStreaming)
                 .map(m => ({ role: m.role, content: m.content }));
+
+            // Inject seed history when clicking a suggestion on empty chat
+            if (history.length === 0 && overrideMessage && SUGGESTION_SEED_HISTORY[overrideMessage]) {
+                history = SUGGESTION_SEED_HISTORY[overrideMessage];
+            }
 
             const body: any = { history, message: msg, mode };
             if (userId) body.userId = userId;
