@@ -115,6 +115,11 @@ export type Agency = {
                 medium?: boolean;
                 low?: boolean;
             };
+            taskEmailEvents?: {
+                taskCreated?: { enabled?: boolean; notifyAssignee?: boolean; notifyClient?: boolean };
+                taskInProgress?: { enabled?: boolean; notifyAssignee?: boolean; notifyClient?: boolean };
+                taskDone?: { enabled?: boolean; notifyAssignee?: boolean; notifyClient?: boolean };
+            };
         };
     };
 

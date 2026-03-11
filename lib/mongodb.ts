@@ -160,10 +160,16 @@ const AgencyUsageSchema = new Schema({
 }, { _id: false });
 
 // Agency Settings Schema (Embedded)
-const TaskEmailPrioritiesSchema = new Schema({
-    high: { type: Boolean, default: true },
-    medium: { type: Boolean, default: false },
-    low: { type: Boolean, default: false },
+const TaskEmailEventSchema = new Schema({
+    enabled: { type: Boolean, default: false },
+    notifyAssignee: { type: Boolean, default: true },
+    notifyClient: { type: Boolean, default: false },
+}, { _id: false });
+
+const TaskEmailEventsSchema = new Schema({
+    taskCreated: { type: TaskEmailEventSchema, default: () => ({ enabled: true, notifyAssignee: true, notifyClient: false }) },
+    taskInProgress: { type: TaskEmailEventSchema, default: () => ({ enabled: false, notifyAssignee: true, notifyClient: false }) },
+    taskDone: { type: TaskEmailEventSchema, default: () => ({ enabled: false, notifyAssignee: true, notifyClient: true }) },
 }, { _id: false });
 
 const EmailCategoriesSchema = new Schema({
@@ -175,7 +181,8 @@ const EmailCategoriesSchema = new Schema({
     taskUpdates: { type: Boolean, default: false },
     leaveManagement: { type: Boolean, default: false },
     documentApproval: { type: Boolean, default: false },
-    taskEmailPriorities: { type: TaskEmailPrioritiesSchema, default: () => ({}) },
+    taskEmailPriorities: { type: Schema.Types.Mixed, default: undefined },
+    taskEmailEvents: { type: TaskEmailEventsSchema, default: () => ({}) },
 }, { _id: false });
 
 const AgencySettingsSchema = new Schema({
@@ -699,6 +706,45 @@ const SystemSettingsSchema = new Schema({
         emailOnAgencyCreated: { type: Boolean, default: true },
         emailOnAgencySuspended: { type: Boolean, default: true },
         weeklySummary: { type: Boolean, default: false },
+    },
+    notificationDefaults: {
+        welcome: { type: Boolean, default: true },
+        project: { type: Boolean, default: true },
+        task: { type: Boolean, default: true },
+        invoice: { type: Boolean, default: true },
+        salary: { type: Boolean, default: true },
+        leave: { type: Boolean, default: true },
+        refund: { type: Boolean, default: true },
+        document: { type: Boolean, default: true },
+        security: { type: Boolean, default: true },
+    },
+    emailDefaults: {
+        globalEnabled: { type: Boolean, default: true },
+        accountCreation: { type: Boolean, default: true },
+        invoicePayment: { type: Boolean, default: true },
+        salaryPayroll: { type: Boolean, default: true },
+        refund: { type: Boolean, default: true },
+        projectUpdates: { type: Boolean, default: false },
+        taskUpdates: { type: Boolean, default: false },
+        leaveManagement: { type: Boolean, default: false },
+        documentApproval: { type: Boolean, default: false },
+        taskEmailEvents: {
+            taskCreated: {
+                enabled: { type: Boolean, default: true },
+                notifyAssignee: { type: Boolean, default: true },
+                notifyClient: { type: Boolean, default: false },
+            },
+            taskInProgress: {
+                enabled: { type: Boolean, default: false },
+                notifyAssignee: { type: Boolean, default: true },
+                notifyClient: { type: Boolean, default: false },
+            },
+            taskDone: {
+                enabled: { type: Boolean, default: false },
+                notifyAssignee: { type: Boolean, default: true },
+                notifyClient: { type: Boolean, default: true },
+            },
+        },
     },
 }, { timestamps: true });
 export const SystemSettingsModel = (mongoose.models.SystemSettings as Model<any>) || mongoose.model('SystemSettings', SystemSettingsSchema);

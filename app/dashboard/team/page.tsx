@@ -7,7 +7,7 @@ import { getSessionId } from "@/lib/auth";
 import { LeaveRequestsList } from "@/components/leave-requests-list";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Link from "next/link";
-import { Plus, Mail, IndianRupee, Briefcase, Search, Users, Shield, UserCheck, MessageCircle, Phone } from "lucide-react";
+import { Plus, Mail, Banknote, Briefcase, Search, Users, Shield, UserCheck, MessageCircle, Phone } from "lucide-react";
 import { TeamPageSkeleton } from "@/components/team/TeamPageSkeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EditUserDialog } from "@/components/team/EditUserDialog";
@@ -280,7 +280,7 @@ export default function TeamPage() {
                                     )}
                                     {canViewSalary && user.salary && user.salary > 0 && (
                                         <div className="flex items-center text-sm font-medium text-green-500">
-                                            <IndianRupee className="mr-2 h-4 w-4" />
+                                            <Banknote className="mr-2 h-4 w-4" />
                                             {user.salary.toLocaleString()}/mo
                                         </div>
                                     )}

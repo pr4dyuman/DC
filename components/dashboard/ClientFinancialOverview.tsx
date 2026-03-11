@@ -2,9 +2,10 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { IndianRupee, Wallet, CreditCard, DollarSign } from "lucide-react";
+import { Wallet, CreditCard, DollarSign, Banknote } from "lucide-react";
 import { Transaction } from "@/lib/types";
 import { useDateFormat } from "@/context/TimezoneContext";
+import { useCurrency } from "@/context/CurrencyContext";
 
 interface ClientFinancialOverviewProps {
     transactions: Transaction[];
@@ -20,6 +21,7 @@ export function ClientFinancialOverview({
     pendingAmount
 }: ClientFinancialOverviewProps) {
     const fmt = useDateFormat();
+    const { format: formatMoney } = useCurrency();
     const recentTransactions = transactions.slice(0, 5);
     const remainingBudget = totalBudget - totalSpent;
 
@@ -37,7 +39,7 @@ export function ClientFinancialOverview({
                             <Wallet className="h-4 w-4 text-blue-500" />
                         </div>
                         <div className="text-2xl font-bold text-blue-500">
-                            ₹{totalSpent.toLocaleString()}
+                            {formatMoney(totalSpent)}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">Payments made</p>
                     </div>
@@ -45,10 +47,10 @@ export function ClientFinancialOverview({
                     <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-sm text-muted-foreground">Total Budget</span>
-                            <IndianRupee className="h-4 w-4 text-purple-500" />
+                            <Banknote className="h-4 w-4 text-purple-500" />
                         </div>
                         <div className="text-2xl font-bold text-purple-500">
-                            ₹{totalBudget.toLocaleString()}
+                            {formatMoney(totalBudget)}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">All projects</p>
                     </div>
@@ -59,7 +61,7 @@ export function ClientFinancialOverview({
                             <CreditCard className="h-4 w-4 text-amber-500" />
                         </div>
                         <div className="text-2xl font-bold text-amber-500">
-                            ₹{pendingAmount.toLocaleString()}
+                            {formatMoney(pendingAmount)}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">Due invoices</p>
                     </div>
@@ -69,14 +71,14 @@ export function ClientFinancialOverview({
                 <div className="mb-6 p-4 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-muted-foreground">Budget Utilization</span>
-                        <IndianRupee className="h-4 w-4 text-indigo-500" />
+                        <Banknote className="h-4 w-4 text-indigo-500" />
                     </div>
                     <div className="flex items-end gap-3">
                         <div className="text-3xl font-bold text-indigo-400">
                             {totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0}%
                         </div>
                         <div className="text-sm text-muted-foreground mb-1">
-                            ₹{remainingBudget.toLocaleString()} remaining
+                            {formatMoney(remainingBudget)} remaining
                         </div>
                     </div>
                     {/* Progress Bar */}
@@ -118,7 +120,7 @@ export function ClientFinancialOverview({
                                             </div>
                                             <div className={`text-sm font-semibold ${isIncome ? 'text-emerald-500' : 'text-red-500'
                                                 }`}>
-                                                {isIncome ? '+' : '-'}₹{transaction.amount.toLocaleString()}
+                                                {isIncome ? '+' : '-'}{formatMoney(transaction.amount)}
                                             </div>
                                         </div>
                                     );

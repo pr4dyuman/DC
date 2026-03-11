@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useCurrency } from "@/context/CurrencyContext";
 
 interface CategoryMemberSummaryProps {
     category: string;
@@ -18,6 +19,7 @@ interface CategoryMemberSummaryProps {
 export function CategoryMemberSummary({ category, data }: CategoryMemberSummaryProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { format: formatMoney } = useCurrency();
     const totalAmount = data.reduce((sum, item) => sum + item.total, 0);
 
     const handleMemberClick = (memberId: string) => {
@@ -35,7 +37,7 @@ export function CategoryMemberSummary({ category, data }: CategoryMemberSummaryP
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">
-                            {totalAmount.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}
+                            {formatMoney(totalAmount)}
                         </div>
                         <p className="text-xs text-muted-foreground">
                             Across {data.length} {category === 'Investor' ? 'investors' : 'members'}
@@ -68,7 +70,7 @@ export function CategoryMemberSummary({ category, data }: CategoryMemberSummaryP
                                 </div>
                                 <div className="text-right">
                                     <p className="font-bold">
-                                        {item.total.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}
+                                        {formatMoney(item.total)}
                                     </p>
                                     <div className="h-1 w-full bg-muted mt-1 rounded-full overflow-hidden">
                                         <div

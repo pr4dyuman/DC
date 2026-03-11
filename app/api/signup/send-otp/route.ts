@@ -3,6 +3,7 @@ import { connectDB, UserModel, SuperAdminModel, ClientModel, OtpModel, RateLimit
 import { validateEmail, validateCsrfOrigin } from '@/lib/validation';
 import { sendOtpEmail } from '@/lib/brevo';
 import { randomInt } from 'crypto';
+import { getPublicSecuritySettings } from '@/lib/actions/super-admin';
 
 const MAX_OTP_REQUESTS = 5;
 const OTP_RATE_WINDOW = 60 * 60 * 1000; // 1 hour
@@ -22,6 +23,15 @@ export async function POST(request: Request) {
 
         if (!email) {
             return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+        }
+
+        // Check if self-registration is allowed
+        const securitySettings = await getPublicSecuritySettings();
+        if (!securitySettings.allowSelfRegistration) {
+            return NextResponse.json(
+                { error: 'Agency registration is currently disabled. Please contact the platform administrator.' },
+                { status: 403 }
+            );
         }
 
         // Validate email format

@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { connectDB, AgencyModel, UserModel, SettingsModel, SuperAdminModel, ClientModel, RateLimitModel } from '@/lib/mongodb';
 import { AGENCY_PLANS } from '@/lib/types';
 import { generateId } from '@/lib/utils-server';
-import { validateEmail, validatePassword, sanitizeName, sanitizePhone, validateCsrfOrigin } from '@/lib/validation';
+import { validateEmail, validatePassword, validateStrongPassword, sanitizeName, sanitizePhone, validateCsrfOrigin } from '@/lib/validation';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
 import { signToken } from '@/lib/auth-utils';
 import { verifyOtp } from './send-otp/route';
+import { getPublicSecuritySettings } from '@/lib/actions/super-admin';
 
 // ── Rate limiting for signup: max 5 accounts per IP per hour ──
 const MAX_SIGNUPS = 5;
@@ -44,6 +45,15 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { agencyName, ownerName, email, password, phone, otp, logo } = body;
 
+        // --- Check if self-registration is allowed ---
+        const securitySettings = await getPublicSecuritySettings();
+        if (!securitySettings.allowSelfRegistration) {
+            return NextResponse.json(
+                { error: 'Agency registration is currently disabled. Please contact the platform administrator.' },
+                { status: 403 }
+            );
+        }
+
         // --- Validate required inputs ---
         if (!agencyName || !ownerName || !email || !password) {
             return NextResponse.json(
@@ -78,7 +88,11 @@ export async function POST(request: Request) {
         }
 
         try {
-            validatePassword(password);
+            if (securitySettings.enforceStrongPasswords) {
+                validateStrongPassword(password);
+            } else {
+                validatePassword(password);
+            }
         } catch (e: any) {
             return NextResponse.json({ error: e.message }, { status: 400 });
         }
@@ -162,7 +176,7 @@ export async function POST(request: Request) {
             settings: {
                 systemName: sanitizedAgencyName,
                 timezone: 'Asia/Kolkata',
-                currency: 'INR',
+                currency: 'USD',
                 dateFormat: 'DD/MM/YYYY',
                 allowClientRegistration: false,
                 requireEmailVerification: true,

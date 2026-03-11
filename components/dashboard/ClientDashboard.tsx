@@ -9,6 +9,7 @@ import { ClientFinancialOverview } from "./ClientFinancialOverview";
 import { ClientTaskOverview } from "./ClientTaskOverview";
 import { ClientAssetsSection } from "./ClientAssetsSection";
 import { useDateFormat } from "@/context/TimezoneContext";
+import { useCurrency } from "@/context/CurrencyContext";
 import Link from "next/link";
 
 
@@ -46,6 +47,7 @@ export function ClientDashboard({
     assets = []
 }: ClientDashboardProps) {
     const fmt = useDateFormat();
+    const { format: formatMoney } = useCurrency();
     const pendingAmount = invoices
         .filter(i => i.status === 'Pending' || i.status === 'Overdue')
         .reduce((sum, inv) => sum + inv.amount, 0);
@@ -117,7 +119,7 @@ export function ClientDashboard({
                         <CardContent>
                             <div className="text-2xl font-bold">{metrics.pendingInvoicesCount}</div>
                             <p className="text-xs text-muted-foreground">
-                                {metrics.totalDue > 0 ? `₹${metrics.totalDue.toLocaleString()}` : "All paid!"}
+                                {metrics.totalDue > 0 ? formatMoney(metrics.totalDue) : "All paid!"}
                             </p>
                             {nextInvoiceDue && (
                                 <p className="text-xs text-amber-500 mt-1">Next due: {nextInvoiceDue}</p>
@@ -133,7 +135,7 @@ export function ClientDashboard({
                             <Wallet className="h-4 w-4 text-blue-500" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">₹{metrics.totalSpent.toLocaleString()}</div>
+                            <div className="text-2xl font-bold">{formatMoney(metrics.totalSpent)}</div>
                             <p className="text-xs text-muted-foreground">Payments made</p>
                         </CardContent>
                     </Card>

@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { DashboardChatProvider } from "@/components/providers/DashboardChatProvider";
 import { getCurrentAgency, checkTrialExpired } from "@/lib/agency-context";
 import { TimezoneProvider } from "@/context/TimezoneContext";
+import { CurrencyProvider } from "@/context/CurrencyContext";
 
 export async function AuthenticatedLayout({
     children
@@ -40,6 +41,7 @@ export async function AuthenticatedLayout({
 
     return (
         <TimezoneProvider userTimezone={dashboardUser.timezone} onDetected={updateUserTimezone}>
+        <CurrencyProvider currency={agencySettings?.currency || "USD"}>
         <DashboardChatProvider currentUserId={dashboardUser.id}>
             <div className="h-full relative">
                 <div className="hidden h-full md:flex md:w-72 md:flex-col md:fixed md:inset-y-0 z-[80]" style={{ backgroundColor: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)' }}>
@@ -65,6 +67,7 @@ export async function AuthenticatedLayout({
                 </main>
             </div>
         </DashboardChatProvider>
+        </CurrencyProvider>
         </TimezoneProvider>
     );
 }

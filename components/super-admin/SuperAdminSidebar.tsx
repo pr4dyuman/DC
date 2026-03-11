@@ -77,7 +77,9 @@ export default function SuperAdminSidebar({ isOpen, onClose }: SuperAdminSidebar
                 <nav className="flex-1 px-3 space-y-1">
                     {navigation.map((item) => {
                         const Icon = item.icon;
-                        const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+                        const isActive = item.href === "/super-admin"
+                            ? pathname === "/super-admin"
+                            : pathname === item.href || pathname?.startsWith(item.href + "/");
 
                         return (
                             <Link

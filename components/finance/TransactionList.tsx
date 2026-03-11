@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useEffect } from "react";
 import { isAfter, startOfMonth, subMonths, startOfYear } from "date-fns";
 import { useDateFormat } from "@/context/TimezoneContext";
+import { useCurrency } from "@/context/CurrencyContext";
 import { Transaction, Project, User } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ interface TransactionListProps {
 
 export function TransactionList({ transactions, title = "Recent Transactions", isAdmin = false, projects = [], users = [] }: TransactionListProps) {
     const fmt = useDateFormat();
+    const { format: formatMoney } = useCurrency();
     const router = useRouter();
     const [search, setSearch] = useState("");
     const [verifyOpen, setVerifyOpen] = useState(false);
@@ -47,12 +49,6 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
     const [error, setError] = useState<string | null>(null);
     const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
     const [dateRange, setDateRange] = useState<string>('all');
-
-    const formatter = new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        maximumFractionDigits: 0
-    });
 
     const filteredTransactions = transactions.filter(t => {
         const query = search.toLowerCase();
@@ -194,12 +190,12 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
                                             if (projectName) return projectName;
                                             if (userName) return `${transaction.category} - ${userName}`;
                                             return transaction.category;
-                                        })()} • {fmt.date(transaction.date)}
+                                        })()} â€¢ {fmt.date(transaction.date)}
                                     </p>
                                 </div>
                                 <div className="ml-auto font-medium flex items-center gap-4">
                                     <span className={transaction.type === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
-                                        {transaction.type === 'income' ? '+' : '-'}{formatter.format(transaction.amount)}
+                                        {transaction.type === 'income' ? '+' : '-'}{formatMoney(transaction.amount)}
                                     </span>
 
                                     {isAdmin && (

@@ -10,6 +10,8 @@ import {
     getUserTasks,
 } from "./actions";
 import { fmtDate } from "./date-utils";
+import { formatCurrency } from "./currency";
+import { getDefaultCurrency } from "./actions/super-admin";
 
 /**
  * Build a rich system instruction for Singularity Agent Mode.
@@ -19,7 +21,7 @@ import { fmtDate } from "./date-utils";
 export async function buildSingularityContext(userId: string): Promise<string> {
     try {
         // Fetch all data in parallel
-        const [projects, clients, users, financeStats, recentActivity, services] = await Promise.all([
+        const [projects, clients, users, financeStats, recentActivity, services, _currency] = await Promise.all([
             getProjects().catch(() => []),
             getClients().catch(() => []),
             getUsers().catch(() => []),
@@ -32,6 +34,7 @@ export async function buildSingularityContext(userId: string): Promise<string> {
             })),
             getRecentActivity(0, 10).catch(() => []),
             getServices().catch(() => []),
+            getDefaultCurrency().catch(() => "USD"),
         ]);
 
         // Find the current user
@@ -156,8 +159,8 @@ export async function buildSingularityContext(userId: string): Promise<string> {
 
         // Finance snapshot
         const finance = financeStats as any;
-        const financeSection = `Revenue: ₹${(finance.totalRevenue || 0).toLocaleString("en-IN")} | Expenses: ₹${(finance.totalExpenses || 0).toLocaleString("en-IN")} | Net Profit: ₹${(finance.netProfit || 0).toLocaleString("en-IN")}
-Pending Invoices: ${finance.pendingInvoicesCount || 0} (₹${(finance.pendingInvoicesAmount || 0).toLocaleString("en-IN")})`;
+        const financeSection = `Revenue: ${formatCurrency(finance.totalRevenue || 0, _currency)} | Expenses: ${formatCurrency(finance.totalExpenses || 0, _currency)} | Net Profit: ${formatCurrency(finance.netProfit || 0, _currency)}
+Pending Invoices: ${finance.pendingInvoicesCount || 0} (${formatCurrency(finance.pendingInvoicesAmount || 0, _currency)})`;
 
         // Recent activity
         let activitySection = "";

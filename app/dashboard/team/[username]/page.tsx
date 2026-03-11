@@ -14,7 +14,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import {
-    Mail, Briefcase, Calendar, IndianRupee,
+    Mail, Briefcase, Calendar, Banknote,
     CheckCircle2, Clock, Activity as ActivityIcon, ArrowLeft,
     Zap, Pencil, MessageCircle,
     Eye, ListTodo, FolderOpen, Search, ChevronDown, Phone, AlertCircle, Flame, Share2, Download, Loader2
@@ -537,7 +537,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                             )}
                             {user.salary && user.salary > 0 && (isSelf || currentUserRole === 'admin' || currentUserRole === 'manager') && (
                                 <Badge variant="secondary" className="bg-muted text-green-500 hover:bg-accent px-3 py-1">
-                                    <IndianRupee className="mr-2 h-3 w-3" />
+                                    <Banknote className="mr-2 h-3 w-3" />
                                     {user.salary.toLocaleString()}/mo
                                 </Badge>
                             )}

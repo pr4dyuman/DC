@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { TransactionCategory, TransactionType, User, Project, TRANSACTION_CATEGORIES } from "@/lib/types";
 import { toast } from "sonner";
 import { DateTimeInput } from "@/components/ui/DateTimeInput";
+import { useCurrency } from "@/context/CurrencyContext";
 
 // Categories shown when inside a specific project
 const PROJECT_SCOPED_CATEGORIES: TransactionCategory[] = ["Project", "Refund", "Freelancer", "Retainer"];
@@ -25,6 +26,7 @@ interface AddTransactionModalProps {
 
 export function AddTransactionModal({ projectId, projectName, users = [], projects = [] }: AddTransactionModalProps) {
     const isProjectScoped = !!projectId;
+    const { format: formatMoney } = useCurrency();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const router = useRouter();
@@ -614,7 +616,7 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                                     <SelectItem value="none">Select Freelancer</SelectItem>
                                                     {freelancers.map(u => (
                                                         <SelectItem key={u.id} value={u.id}>
-                                                            {u.name} {u.jobTitle ? `(${u.jobTitle})` : ''} {u.salary ? `- ₹${u.salary.toLocaleString()}` : ''}
+                                                            {u.name} {u.jobTitle ? `(${u.jobTitle})` : ''} {u.salary ? `- ${formatMoney(u.salary)}` : ''}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>

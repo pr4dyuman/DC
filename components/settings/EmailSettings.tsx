@@ -1,15 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { updateEmailSettings, updateEmailCategorySettings, updateTaskEmailPriorities } from "@/lib/actions";
+import { updateEmailSettings, updateEmailCategorySettings, updateTaskEmailEvents } from "@/lib/actions";
 import { toast } from "sonner";
 import { Loader2, Mail, AlertTriangle, Shield, Zap } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { EMAIL_CATEGORY_INFO, DEFAULT_EMAIL_CATEGORIES } from "@/lib/email-constants";
-import type { EmailCategory } from "@/lib/email-constants";
+import { EMAIL_CATEGORY_INFO, DEFAULT_EMAIL_CATEGORIES, TASK_EMAIL_EVENTS, DEFAULT_TASK_EMAIL_EVENTS } from "@/lib/email-constants";
+import type { EmailCategory, TaskEmailEventKey, TaskEmailEventConfig } from "@/lib/email-constants";
 
 interface EmailSettingsProps {
     initialEnabled?: boolean;
@@ -17,7 +17,7 @@ interface EmailSettingsProps {
     loading?: boolean;
 }
 
-const DEFAULT_TASK_PRIORITIES = { high: true, medium: false, low: false };
+const DEFAULT_EVENTS = { ...DEFAULT_TASK_EMAIL_EVENTS };
 
 export function EmailSettings({ initialEnabled = true, initialCategories, loading: parentLoading }: EmailSettingsProps) {
     const [enabled, setEnabled] = useState(initialEnabled);
@@ -25,11 +25,19 @@ export function EmailSettings({ initialEnabled = true, initialCategories, loadin
     const [categories, setCategories] = useState<Record<string, boolean>>(
         initialCategories || { ...DEFAULT_EMAIL_CATEGORIES }
     );
-    const [taskPriorities, setTaskPriorities] = useState<Record<string, boolean>>(
-        initialCategories?.taskEmailPriorities || { ...DEFAULT_TASK_PRIORITIES }
-    );
+    const [taskEmailEvents, setTaskEmailEvents] = useState<Record<TaskEmailEventKey, TaskEmailEventConfig>>(() => {
+        const events = { ...DEFAULT_EVENTS };
+        if (initialCategories?.taskEmailEvents) {
+            for (const key of Object.keys(events) as TaskEmailEventKey[]) {
+                if (initialCategories.taskEmailEvents[key]) {
+                    events[key] = { ...events[key], ...initialCategories.taskEmailEvents[key] };
+                }
+            }
+        }
+        return events;
+    });
     const [updatingCategory, setUpdatingCategory] = useState<string | null>(null);
-    const [updatingPriority, setUpdatingPriority] = useState<string | null>(null);
+    const [updatingEvent, setUpdatingEvent] = useState<string | null>(null);
 
     useEffect(() => {
         setEnabled(initialEnabled);
@@ -38,8 +46,16 @@ export function EmailSettings({ initialEnabled = true, initialCategories, loadin
     useEffect(() => {
         if (initialCategories) {
             setCategories({ ...DEFAULT_EMAIL_CATEGORIES, ...initialCategories });
-            if (initialCategories.taskEmailPriorities) {
-                setTaskPriorities({ ...DEFAULT_TASK_PRIORITIES, ...initialCategories.taskEmailPriorities });
+            if (initialCategories.taskEmailEvents) {
+                setTaskEmailEvents(prev => {
+                    const merged = { ...prev };
+                    for (const key of Object.keys(prev) as TaskEmailEventKey[]) {
+                        if (initialCategories.taskEmailEvents[key]) {
+                            merged[key] = { ...prev[key], ...initialCategories.taskEmailEvents[key] };
+                        }
+                    }
+                    return merged;
+                });
             }
         }
     }, [initialCategories]);
@@ -75,18 +91,25 @@ export function EmailSettings({ initialEnabled = true, initialCategories, loadin
         }
     };
 
-    const handlePriorityToggle = async (priority: string, checked: boolean) => {
-        setTaskPriorities(prev => ({ ...prev, [priority]: checked }));
-        setUpdatingPriority(priority);
+    const handleEventToggle = async (eventKey: TaskEmailEventKey, field: keyof TaskEmailEventConfig, checked: boolean) => {
+        setTaskEmailEvents(prev => ({
+            ...prev,
+            [eventKey]: { ...prev[eventKey], [field]: checked },
+        }));
+        setUpdatingEvent(`${eventKey}-${field}`);
         try {
-            await updateTaskEmailPriorities({ [priority]: checked });
-            toast.success(`${priority.charAt(0).toUpperCase() + priority.slice(1)} priority task emails ${checked ? 'enabled' : 'disabled'}`);
+            await updateTaskEmailEvents({ [eventKey]: { [field]: checked } });
+            const info = TASK_EMAIL_EVENTS[eventKey];
+            toast.success(`${info.label} — ${field === 'enabled' ? (checked ? 'enabled' : 'disabled') : `${field} ${checked ? 'on' : 'off'}`}`);
         } catch (error) {
-            console.error("Failed to update priority", error);
+            console.error("Failed to update event", error);
             toast.error("Failed to update");
-            setTaskPriorities(prev => ({ ...prev, [priority]: !checked }));
+            setTaskEmailEvents(prev => ({
+                ...prev,
+                [eventKey]: { ...prev[eventKey], [field]: !checked },
+            }));
         } finally {
-            setUpdatingPriority(null);
+            setUpdatingEvent(null);
         }
     };
 
@@ -170,28 +193,57 @@ export function EmailSettings({ initialEnabled = true, initialCategories, loadin
                                         </div>
                                     </div>
 
-                                    {/* Task Priority Sub-toggles */}
+                                    {/* Task Email Event Sub-toggles */}
                                     {key === 'taskUpdates' && isOn && (
-                                        <div className="ml-12 pl-3 border-l-2 border-blue-500/20 space-y-1 py-1 mb-1">
-                                            <p className="text-xs text-muted-foreground mb-1">Send emails by task priority:</p>
-                                            {([['high', 'High', 'bg-red-500'], ['medium', 'Medium', 'bg-yellow-500'], ['low', 'Low', 'bg-green-500']] as const).map(([pKey, pLabel, pColor]) => {
-                                                const pOn = taskPriorities[pKey] ?? DEFAULT_TASK_PRIORITIES[pKey as keyof typeof DEFAULT_TASK_PRIORITIES];
-                                                const pUpdating = updatingPriority === pKey;
+                                        <div className="ml-12 pl-3 border-l-2 border-blue-500/20 space-y-2 py-1 mb-1">
+                                            <p className="text-xs text-muted-foreground mb-1">Configure task email events and recipients:</p>
+                                            {(Object.entries(TASK_EMAIL_EVENTS) as [TaskEmailEventKey, typeof TASK_EMAIL_EVENTS[TaskEmailEventKey]][]).map(([eventKey, eventInfo]) => {
+                                                const eventConfig = taskEmailEvents[eventKey] || DEFAULT_TASK_EMAIL_EVENTS[eventKey];
                                                 return (
-                                                    <div key={pKey} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/30 transition-colors">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className={`w-2 h-2 rounded-full ${pColor}`} />
-                                                            <span className="text-xs font-medium">{pLabel} Priority</span>
+                                                    <div key={eventKey} className="rounded-lg bg-muted/20 p-2">
+                                                        <div className="flex items-center justify-between py-1">
+                                                            <div>
+                                                                <span className="text-xs font-medium text-foreground">{eventInfo.label}</span>
+                                                                <p className="text-[10px] text-muted-foreground">{eventInfo.description}</p>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {updatingEvent === `${eventKey}-enabled` && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                                                                <Switch
+                                                                    checked={eventConfig.enabled}
+                                                                    onCheckedChange={(checked) => handleEventToggle(eventKey, 'enabled', checked)}
+                                                                    disabled={!!updatingEvent}
+                                                                    className="scale-[0.8]"
+                                                                />
+                                                            </div>
                                                         </div>
-                                                        <div className="flex items-center gap-2">
-                                                            {pUpdating && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-                                                            <Switch
-                                                                checked={pOn}
-                                                                onCheckedChange={(checked) => handlePriorityToggle(pKey, checked)}
-                                                                disabled={pUpdating}
-                                                                className="scale-[0.8]"
-                                                            />
-                                                        </div>
+                                                        {eventConfig.enabled && (
+                                                            <div className="ml-4 mt-1 space-y-1 border-l border-border pl-3">
+                                                                <div className="flex items-center justify-between py-1">
+                                                                    <span className="text-[11px] text-muted-foreground">Send to Assignee</span>
+                                                                    <div className="flex items-center gap-2">
+                                                                        {updatingEvent === `${eventKey}-notifyAssignee` && <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />}
+                                                                        <Switch
+                                                                            checked={eventConfig.notifyAssignee}
+                                                                            onCheckedChange={(checked) => handleEventToggle(eventKey, 'notifyAssignee', checked)}
+                                                                            disabled={!!updatingEvent}
+                                                                            className="scale-[0.7]"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex items-center justify-between py-1">
+                                                                    <span className="text-[11px] text-muted-foreground">Send to Project Client</span>
+                                                                    <div className="flex items-center gap-2">
+                                                                        {updatingEvent === `${eventKey}-notifyClient` && <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />}
+                                                                        <Switch
+                                                                            checked={eventConfig.notifyClient}
+                                                                            onCheckedChange={(checked) => handleEventToggle(eventKey, 'notifyClient', checked)}
+                                                                            disabled={!!updatingEvent}
+                                                                            className="scale-[0.7]"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 );
                                             })}

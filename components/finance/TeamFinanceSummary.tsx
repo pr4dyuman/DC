@@ -2,6 +2,7 @@
 
 import { DollarSign, TrendingUp, TrendingDown, Briefcase } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCurrency } from "@/context/CurrencyContext";
 
 interface TeamFinanceSummaryProps {
     stats: {
@@ -13,6 +14,7 @@ interface TeamFinanceSummaryProps {
 }
 
 export function TeamFinanceSummary({ stats, userName, salary }: TeamFinanceSummaryProps) {
+    const { format: formatMoney } = useCurrency();
     const netBalance = stats.totalSalary - stats.totalInvestment; // Just a stat, maybe not "balance" in pure accounting terms for user
     const hasInvested = stats.totalInvestment > 0;
 
@@ -23,7 +25,7 @@ export function TeamFinanceSummary({ stats, userName, salary }: TeamFinanceSumma
                     Financial Profile: <span className="text-primary">{userName}</span>
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                    Base Salary: ₹{salary.toLocaleString('en-IN')}/mo
+                    Base Salary: {formatMoney(salary)}/mo
                 </p>
             </div>
 
@@ -35,7 +37,7 @@ export function TeamFinanceSummary({ stats, userName, salary }: TeamFinanceSumma
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-indigo-700 dark:text-indigo-300">
-                            ₹{stats.totalSalary.toLocaleString('en-IN')}
+                            {formatMoney(stats.totalSalary)}
                         </div>
                         <p className="text-xs text-indigo-600/80 dark:text-indigo-500/80">Total salary paid to date</p>
                     </CardContent>
@@ -48,7 +50,7 @@ export function TeamFinanceSummary({ stats, userName, salary }: TeamFinanceSumma
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
-                            ₹{stats.totalInvestment.toLocaleString('en-IN')}
+                            {formatMoney(stats.totalInvestment)}
                         </div>
                         <p className="text-xs text-emerald-600/80 dark:text-emerald-500/80">Invested in company</p>
                     </CardContent>

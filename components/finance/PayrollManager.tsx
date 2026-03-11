@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { User } from "@/lib/types";
@@ -10,6 +10,7 @@ import { payEmployee } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { Check, DollarSign, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useCurrency } from "@/context/CurrencyContext";
 
 interface PayrollItem {
     user: User;
@@ -24,12 +25,8 @@ interface PayrollManagerProps {
 
 export function PayrollManager({ items }: PayrollManagerProps) {
     const router = useRouter();
+    const { format: formatMoney } = useCurrency();
     const [loadingIds, setLoadingIds] = useState<string[]>([]);
-    const formatter = new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        maximumFractionDigits: 0
-    });
 
     const handlePay = async (userId: string, salary: number, month: string, userName: string) => {
         setLoadingIds(prev => [...prev, userId]);
@@ -68,7 +65,7 @@ export function PayrollManager({ items }: PayrollManagerProps) {
                         <CardDescription>
                             {items.length > 0 ? (
                                 <>
-                                    {items[0]?.month} · Total: {formatter.format(totalPayroll)} ·
+                                    {items[0]?.month} Â· Total: {formatMoney(totalPayroll)} Â·
                                     <span className="text-emerald-500">{paidCount} paid</span>
                                     {pendingCount > 0 && <>, <span className="text-amber-500">{pendingCount} pending</span></>}
                                 </>
@@ -121,7 +118,7 @@ export function PayrollManager({ items }: PayrollManagerProps) {
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-muted-foreground">{item.user.jobTitle || item.user.role}</TableCell>
-                                        <TableCell>{formatter.format(item.salary)}</TableCell>
+                                        <TableCell>{formatMoney(item.salary)}</TableCell>
                                         <TableCell>
                                             <Badge variant={item.status === 'Paid' ? 'secondary' : 'destructive'} className={
                                                 item.status === 'Paid' ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/15' : 'bg-red-500/15 text-red-500 border border-red-500/20 hover:bg-red-500/15'

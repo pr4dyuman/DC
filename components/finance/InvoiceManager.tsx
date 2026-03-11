@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Invoice, Project } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { useState, useEffect } from "react";
 import { createInvoice, clientMarkInvoiceAsPaid, adminApproveInvoicePayment, adminRejectInvoicePayment } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { useDateFormat } from "@/context/TimezoneContext";
+import { useCurrency } from "@/context/CurrencyContext";
 import { toast } from "sonner";
 import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 
@@ -25,6 +26,7 @@ interface InvoiceManagerProps {
 
 export function InvoiceManager({ invoices, isClient = false, projects = [] }: InvoiceManagerProps) {
     const fmt = useDateFormat();
+    const { format: formatMoney } = useCurrency();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -32,11 +34,6 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [invoiceSearch, setInvoiceSearch] = useState("");
     const router = useRouter();
-    const formatter = new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        maximumFractionDigits: 0
-    });
 
     const [formData, setFormData] = useState({
         projectId: "",
@@ -260,7 +257,7 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                                     <TableRow key={invoice.id}>
                                         <TableCell className="font-medium">{getProjectName(invoice.projectId)}</TableCell>
                                         <TableCell>{fmt.date(invoice.date)}</TableCell>
-                                        <TableCell>{formatter.format(invoice.amount)}</TableCell>
+                                        <TableCell>{formatMoney(invoice.amount)}</TableCell>
                                         <TableCell>
                                             <Badge variant={invoice.status === 'Paid' ? 'secondary' : 'default'} className={
                                                 invoice.status === 'Paid' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' :
@@ -284,7 +281,7 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                                                         ) : "Submit Payment"}
                                                     </Button>
                                                 ) : invoice.status === 'Paid' ? (
-                                                    <span className="text-xs text-emerald-500 font-medium">✓ Paid</span>
+                                                    <span className="text-xs text-emerald-500 font-medium">âœ“ Paid</span>
                                                 ) : invoice.status === 'Processing' ? (
                                                     <span className="text-xs text-blue-400 font-medium">Under Review</span>
                                                 ) : null
@@ -311,7 +308,7 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                                                         </Button>
                                                     </div>
                                                 ) : invoice.status === 'Paid' ? (
-                                                    <span className="text-xs text-emerald-500 font-medium">✓ Confirmed</span>
+                                                    <span className="text-xs text-emerald-500 font-medium">âœ“ Confirmed</span>
                                                 ) : invoice.status === 'Pending' ? (
                                                     <span className="text-xs text-muted-foreground">Awaiting Client</span>
                                                 ) : null

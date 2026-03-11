@@ -6,6 +6,8 @@
 import { EMAIL_TEMPLATES, TEMPLATE_TO_CATEGORY, DEFAULT_EMAIL_CATEGORIES } from "./email-constants";
 import type { EmailCategory } from "./email-constants";
 import { getCurrentAgency } from "./agency-context";
+import { formatCurrency } from "./currency";
+import { getDefaultCurrency } from "./actions/super-admin";
 
 interface EmailParams {
   to: string | string[];
@@ -102,7 +104,7 @@ export async function sendProjectCreatedEmail(params: {
     params: {
       CLIENT_NAME: params.clientName,
       PROJECT_NAME: params.projectName,
-      BUDGET: params.budget.toLocaleString('en-IN'),
+      BUDGET: formatCurrency(params.budget, await getDefaultCurrency()),
       PAYMENT_PLAN: params.paymentPlan,
       INVOICE_COUNT: params.invoiceCount,
       PROJECT_LINK: params.projectLink,
@@ -258,7 +260,7 @@ export async function sendInvoiceCreatedEmail(params: {
     templateId: EMAIL_TEMPLATES.INVOICE_CREATED,
     params: {
       CLIENT_NAME: params.clientName,
-      AMOUNT: params.amount.toLocaleString('en-IN'),
+      AMOUNT: formatCurrency(params.amount, await getDefaultCurrency()),
       PROJECT_NAME: params.projectName,
       DUE_DATE: params.dueDate,
       FINANCE_LINK: params.financeLink,
@@ -278,7 +280,7 @@ export async function sendPaymentPendingApprovalEmail(params: {
     templateId: EMAIL_TEMPLATES.PAYMENT_PENDING_APPROVAL,
     params: {
       CLIENT_NAME: params.clientName,
-      AMOUNT: params.amount.toLocaleString('en-IN'),
+      AMOUNT: formatCurrency(params.amount, await getDefaultCurrency()),
       PROJECT_NAME: params.projectName,
       FINANCE_LINK: params.financeLink,
     },
@@ -297,7 +299,7 @@ export async function sendPaymentApprovedEmail(params: {
     templateId: EMAIL_TEMPLATES.PAYMENT_APPROVED,
     params: {
       CLIENT_NAME: params.clientName,
-      AMOUNT: params.amount.toLocaleString('en-IN'),
+      AMOUNT: formatCurrency(params.amount, await getDefaultCurrency()),
       PROJECT_NAME: params.projectName,
       FINANCE_LINK: params.financeLink,
     },
@@ -317,7 +319,7 @@ export async function sendPaymentRejectedEmail(params: {
     templateId: EMAIL_TEMPLATES.PAYMENT_REJECTED,
     params: {
       CLIENT_NAME: params.clientName,
-      AMOUNT: params.amount.toLocaleString('en-IN'),
+      AMOUNT: formatCurrency(params.amount, await getDefaultCurrency()),
       PROJECT_NAME: params.projectName,
       REJECTION_REASON: params.rejectionReason || 'No reason provided',
       FINANCE_LINK: params.financeLink,
@@ -440,7 +442,7 @@ export async function sendSalaryPaidEmail(params: {
     templateId: EMAIL_TEMPLATES.SALARY_PAID,
     params: {
       EMPLOYEE_NAME: params.employeeName,
-      AMOUNT: params.amount.toLocaleString('en-IN'),
+      AMOUNT: formatCurrency(params.amount, await getDefaultCurrency()),
       MONTH: params.month,
       PAYMENT_DATE: params.paymentDate,
       FINANCE_LINK: params.financeLink,
@@ -465,7 +467,7 @@ export async function sendRefundIssuedEmail(params: {
     templateId: EMAIL_TEMPLATES.REFUND_ISSUED,
     params: {
       CLIENT_NAME: params.clientName,
-      AMOUNT: params.amount.toLocaleString('en-IN'),
+      AMOUNT: formatCurrency(params.amount, await getDefaultCurrency()),
       PROJECT_NAME: params.projectName,
       REFUND_REASON: params.refundReason,
       PROJECT_LINK: params.projectLink,

@@ -309,8 +309,9 @@ export default function AgencyActions({ agency }: { agency: any }) {
                                 </div>
                                 <div className="p-6 space-y-3">
                                     {[
-                                        { value: "free", label: "Free", desc: "5 users, 10 projects", color: "border-muted-foreground/20" },
-                                        { value: "pro", label: "Pro", desc: "25 users, 100 projects", color: "border-blue-500/30" },
+                                        { value: "free", label: "Free", desc: "3 users, 5 projects", color: "border-muted-foreground/20" },
+                                        { value: "starter", label: "Starter", desc: "10 users, 50 projects", color: "border-emerald-500/30" },
+                                        { value: "pro", label: "Pro", desc: "50 users, 500 projects", color: "border-blue-500/30" },
                                         { value: "enterprise", label: "Enterprise", desc: "Unlimited everything", color: "border-purple-500/30" },
                                     ].map((plan) => (
                                         <label

@@ -4,9 +4,8 @@ import { Plus, Search } from "lucide-react";
 import AgencyTable from "@/components/super-admin/AgencyTable";
 
 export default async function AgenciesPage() {
-    const rawAgencies = await getAllAgenciesWithStats();
-    // Ensure plain objects for client component serialization
-    const agencies = JSON.parse(JSON.stringify(rawAgencies));
+    // JSON round-trip needed because AgencyTable is a client component
+    const agencies = JSON.parse(JSON.stringify(await getAllAgenciesWithStats()));
 
     return (
         <div className="space-y-6">
@@ -43,9 +42,9 @@ export default async function AgenciesPage() {
                     </p>
                 </div>
                 <div className="bg-card rounded-lg shadow border border-border p-4">
-                    <p className="text-sm text-muted-foreground">Total Revenue</p>
+                    <p className="text-sm text-muted-foreground">Total Users</p>
                     <p className="text-2xl font-bold text-foreground mt-1">
-                        ${agencies.reduce((sum: number, a: any) => sum + (a.stats?.revenue || 0), 0).toLocaleString()}
+                        {agencies.reduce((sum: number, a: any) => sum + (a.stats?.users || 0), 0)}
                     </p>
                 </div>
             </div>

@@ -273,7 +273,7 @@ export async function getAllAgencies(): Promise<Agency[]> {
         const session = await getSessionUser();
         if (!session || session.role !== 'superadmin') return [];
         const agencies = await AgencyModel.find({}).lean();
-        return agencies as Agency[];
+        return JSON.parse(JSON.stringify(agencies));
     } catch (error) {
         console.error('Error getting all agencies:', error);
         return [];

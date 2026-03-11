@@ -8,6 +8,7 @@ import { Loader2, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { createUser, updateUser, deleteUser, adminResetPassword, getServices, approveDocumentUpdate } from "@/lib/actions";
 import { useRouter } from "next/navigation";
+import { useCurrency } from "@/context/CurrencyContext";
 import { DocumentManager } from "./DocumentManager";
 
 interface EditUserDialogProps {
@@ -21,6 +22,7 @@ interface EditUserDialogProps {
 
 export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUserRole, isSelf }: EditUserDialogProps) {
     const router = useRouter();
+    const { symbol } = useCurrency();
     const [submitting, setSubmitting] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deletePassword, setDeletePassword] = useState("");
@@ -308,7 +310,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                         {canManageFinances && (formData.employmentType === 'Salary' || formData.employmentType === 'Freelancer') && formData.role !== 'client' && (
                                             <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
                                                 <label className="text-xs font-medium text-muted-foreground">
-                                                    {formData.employmentType === 'Freelancer' ? 'Rate (₹)' : 'Salary (₹)'}
+                                                    {formData.employmentType === 'Freelancer' ? `Rate (${symbol})` : `Salary (${symbol})`}
                                                 </label>
                                                 <input type="number" value={formData.salary} onChange={e => setFormData({ ...formData, salary: parseInt(e.target.value) || 0 })}
                                                     className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary" />

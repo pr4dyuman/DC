@@ -1,10 +1,10 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { SuperAdminModel, UserModel, ClientModel, connectDB, RateLimitModel } from "./mongodb";
+import { SuperAdminModel, UserModel, ClientModel, connectDB, RateLimitModel, SystemSettingsModel } from "./mongodb";
 import bcrypt from "bcryptjs";
 import { signToken, verifyToken, AuthSession } from "./auth-utils";
-import { validatePassword } from "./validation";
+import { validatePassword, validateStrongPassword } from "./validation";
 
 import { validateEmail } from "./validation";
 
@@ -174,14 +174,22 @@ export async function updatePassword(currentPassword: string, newPassword: strin
 
     if (!session) return { success: false, error: "Unauthorized" };
 
-    // Validate new password
+    // Validate new password against system policy
     try {
-        validatePassword(newPassword);
+        await connectDB();
+        const sys = await SystemSettingsModel.findOne(
+            { key: 'global' },
+            { 'security.enforceStrongPasswords': 1 }
+        ).lean() as any;
+        const enforceStrong = sys?.security?.enforceStrongPasswords ?? true;
+        if (enforceStrong) {
+            validateStrongPassword(newPassword);
+        } else {
+            validatePassword(newPassword);
+        }
     } catch (e: any) {
         return { success: false, error: e.message || 'Invalid password' };
     }
-
-    await connectDB();
 
     // 1. Fetch User Document
     let user: any;

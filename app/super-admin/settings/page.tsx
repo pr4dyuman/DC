@@ -1,9 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Shield, Bell, Database, Globe, Check, Mail, AlertTriangle, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Shield, Bell, Database, Globe, Check, Mail, AlertTriangle, Loader2, Brain, ChevronRight, ChevronDown, Zap } from "lucide-react";
 import { useDateFormat } from "@/context/TimezoneContext";
-import { getSystemSettings, updateSystemSettings } from "@/lib/actions/super-admin";
+import { CURRENCIES } from "@/lib/currency";
+import { getSystemSettings, updateSystemSettings, getAllAgenciesWithStats } from "@/lib/actions/super-admin";
+import { Switch } from "@/components/ui/switch";
+import { EMAIL_CATEGORY_INFO, DEFAULT_EMAIL_CATEGORIES, TASK_EMAIL_EVENTS, DEFAULT_TASK_EMAIL_EVENTS } from "@/lib/email-constants";
+import type { EmailCategory, TaskEmailEventKey, TaskEmailEventConfig } from "@/lib/email-constants";
 
 export default function SystemSettingsPage() {
     const fmt = useDateFormat();
@@ -15,7 +20,6 @@ export default function SystemSettingsPage() {
     const [platform, setPlatform] = useState({
         name: "AgencyOS",
         supportEmail: "support@agencyos.com",
-        defaultTimezone: "UTC",
         defaultCurrency: "USD",
     });
 
@@ -27,21 +31,75 @@ export default function SystemSettingsPage() {
         enforceStrongPasswords: true,
     });
 
-    // Notifications state
+    // Notifications state (super-admin email alerts — shown in Email section)
     const [notifications, setNotifications] = useState({
         emailOnAgencyCreated: true,
         emailOnAgencySuspended: true,
         weeklySummary: false,
     });
 
+    // Notification type defaults (controls in-app notifications for all agencies)
+    const [notificationDefaults, setNotificationDefaults] = useState<Record<string, boolean>>({
+        welcome: true,
+        project: true,
+        task: true,
+        invoice: true,
+        salary: true,
+        leave: true,
+        refund: true,
+        document: true,
+        security: true,
+    });
+    const [updatingNotif, setUpdatingNotif] = useState<string | null>(null);
+
+    // Agencies for AI config
+    const [agencies, setAgencies] = useState<any[]>([]);
+
+    // Email defaults state
+    const [emailGlobalEnabled, setEmailGlobalEnabled] = useState(true);
+    const [emailCategories, setEmailCategories] = useState<Record<string, boolean>>({ ...DEFAULT_EMAIL_CATEGORIES });
+    const [taskEmailEvents, setTaskEmailEvents] = useState<Record<TaskEmailEventKey, TaskEmailEventConfig>>({ ...DEFAULT_TASK_EMAIL_EVENTS });
+    const [updatingEmail, setUpdatingEmail] = useState<string | null>(null);
+
+    // Section accordion state — platform open by default
+    const [openSections, setOpenSections] = useState<Record<string, boolean>>({ platform: true });
+
+    const toggleSection = useCallback((key: string) => {
+        setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+    }, []);
+
     // Load settings from DB
     useEffect(() => {
         (async () => {
             try {
-                const settings = await getSystemSettings();
+                const [settings, agencyList] = await Promise.all([
+                    getSystemSettings(),
+                    getAllAgenciesWithStats()
+                ]);
                 if (settings?.platform) setPlatform(prev => ({ ...prev, ...settings.platform }));
                 if (settings?.security) setSecurity(prev => ({ ...prev, ...settings.security }));
                 if (settings?.notifications) setNotifications(prev => ({ ...prev, ...settings.notifications }));
+                if (settings?.notificationDefaults) setNotificationDefaults(prev => ({ ...prev, ...settings.notificationDefaults }));
+                if (settings?.emailDefaults) {
+                    if (typeof settings.emailDefaults.globalEnabled === 'boolean') setEmailGlobalEnabled(settings.emailDefaults.globalEnabled);
+                    const cats: Record<string, boolean> = { ...DEFAULT_EMAIL_CATEGORIES };
+                    for (const key of Object.keys(DEFAULT_EMAIL_CATEGORIES)) {
+                        if (typeof settings.emailDefaults[key] === 'boolean') cats[key] = settings.emailDefaults[key];
+                    }
+                    setEmailCategories(cats);
+                    if (settings.emailDefaults.taskEmailEvents) {
+                        setTaskEmailEvents(prev => {
+                            const merged = { ...prev };
+                            for (const eventKey of Object.keys(prev) as TaskEmailEventKey[]) {
+                                if (settings.emailDefaults.taskEmailEvents[eventKey]) {
+                                    merged[eventKey] = { ...prev[eventKey], ...settings.emailDefaults.taskEmailEvents[eventKey] };
+                                }
+                            }
+                            return merged;
+                        });
+                    }
+                }
+                setAgencies(agencyList);
             } catch (e) {
                 console.error("Failed to load settings:", e);
             } finally {
@@ -64,16 +122,80 @@ export default function SystemSettingsPage() {
         }
     }, [platform, security, notifications]);
 
-    const emailCategories = [
-        { name: "Account Creation", description: "Login credentials for new employees & clients", priority: "critical", defaultOn: true },
-        { name: "Invoice & Payment", description: "Invoice created, payment approved/rejected", priority: "critical", defaultOn: true },
-        { name: "Salary & Payroll", description: "Salary payment confirmations", priority: "critical", defaultOn: true },
-        { name: "Refund", description: "Refund issued notifications", priority: "critical", defaultOn: true },
-        { name: "Project Updates", description: "Project created, status changed, completed", priority: "optional", defaultOn: false },
-        { name: "Task Updates", description: "Task assigned, status changed, comments", priority: "optional", defaultOn: false },
-        { name: "Leave Management", description: "Leave requested, approved, rejected", priority: "optional", defaultOn: false },
-        { name: "Document Approval", description: "Document update requests and responses", priority: "optional", defaultOn: false },
-    ];
+    const handleEmailGlobalToggle = useCallback(async (checked: boolean) => {
+        setEmailGlobalEnabled(checked);
+        setUpdatingEmail('global');
+        try {
+            await updateSystemSettings('emailDefaults', { globalEnabled: checked });
+            setSaved('email');
+            setTimeout(() => setSaved(''), 2500);
+        } catch (e) {
+            console.error('Failed to toggle email:', e);
+            setEmailGlobalEnabled(!checked);
+        } finally {
+            setUpdatingEmail(null);
+        }
+    }, []);
+
+    const handleEmailCategoryToggle = useCallback(async (category: string, checked: boolean) => {
+        setEmailCategories(prev => ({ ...prev, [category]: checked }));
+        setUpdatingEmail(category);
+        try {
+            await updateSystemSettings('emailDefaults', { [category]: checked });
+        } catch (e) {
+            console.error('Failed to toggle category:', e);
+            setEmailCategories(prev => ({ ...prev, [category]: !checked }));
+        } finally {
+            setUpdatingEmail(null);
+        }
+    }, []);
+
+    const handleTaskEventToggle = useCallback(async (eventKey: TaskEmailEventKey, field: keyof TaskEmailEventConfig, checked: boolean) => {
+        setTaskEmailEvents(prev => ({
+            ...prev,
+            [eventKey]: { ...prev[eventKey], [field]: checked },
+        }));
+        setUpdatingEmail(`event-${eventKey}-${field}`);
+        try {
+            await updateSystemSettings('emailDefaults', {
+                taskEmailEvents: { [eventKey]: { [field]: checked } },
+            });
+        } catch (e) {
+            console.error('Failed to toggle task event:', e);
+            setTaskEmailEvents(prev => ({
+                ...prev,
+                [eventKey]: { ...prev[eventKey], [field]: !checked },
+            }));
+        } finally {
+            setUpdatingEmail(null);
+        }
+    }, []);
+
+    const handleNotifToggle = useCallback(async (key: string, checked: boolean) => {
+        setNotificationDefaults(prev => ({ ...prev, [key]: checked }));
+        setUpdatingNotif(key);
+        try {
+            await updateSystemSettings('notificationDefaults', { [key]: checked });
+        } catch (e) {
+            console.error('Failed to toggle notification:', e);
+            setNotificationDefaults(prev => ({ ...prev, [key]: !checked }));
+        } finally {
+            setUpdatingNotif(null);
+        }
+    }, []);
+
+    const handleSuperAdminAlertToggle = useCallback(async (key: string, checked: boolean) => {
+        setNotifications(prev => ({ ...prev, [key]: checked }));
+        setUpdatingEmail(`sa-${key}`);
+        try {
+            await updateSystemSettings('notifications', { [key]: checked });
+        } catch (e) {
+            console.error('Failed to toggle alert:', e);
+            setNotifications(prev => ({ ...prev, [key]: !checked }));
+        } finally {
+            setUpdatingEmail(null);
+        }
+    }, []);
 
     if (loading) {
         return (
@@ -91,11 +213,14 @@ export default function SystemSettingsPage() {
             </div>
 
             {/* Platform Info */}
-            <div className="bg-card rounded-lg shadow border border-border p-6 space-y-4">
-                <div className="flex items-center gap-3 mb-2">
-                    <Globe className="w-5 h-5 text-blue-500" />
-                    <h2 className="text-lg font-bold text-foreground">Platform Information</h2>
-                </div>
+            <SectionAccordion
+                title="Platform Information"
+                description="Platform name, support email, and defaults for new agencies."
+                icon={<Globe className="h-6 w-6 text-blue-500" />}
+                iconBg="bg-blue-500/10"
+                isOpen={!!openSections.platform}
+                onToggle={() => toggleSection('platform')}
+            >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">Platform Name</label>
@@ -115,31 +240,18 @@ export default function SystemSettingsPage() {
                             className="w-full h-10 rounded-lg border border-border bg-background px-4 text-sm text-foreground focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                         />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">Default Timezone</label>
-                        <select
-                            value={platform.defaultTimezone}
-                            onChange={e => setPlatform(p => ({ ...p, defaultTimezone: e.target.value }))}
-                            className="w-full h-10 rounded-lg border border-border bg-background px-4 text-sm text-foreground focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                        >
-                            <option value="UTC">UTC</option>
-                            <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
-                            <option value="America/New_York">America/New_York (EST)</option>
-                            <option value="Europe/London">Europe/London (GMT)</option>
-                        </select>
-                    </div>
-                    <div>
+                    <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">Default Currency</label>
                         <select
                             value={platform.defaultCurrency}
                             onChange={e => setPlatform(p => ({ ...p, defaultCurrency: e.target.value }))}
                             className="w-full h-10 rounded-lg border border-border bg-background px-4 text-sm text-foreground focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                         >
-                            <option value="USD">USD ($)</option>
-                            <option value="INR">INR (₹)</option>
-                            <option value="EUR">EUR (€)</option>
-                            <option value="GBP">GBP (£)</option>
+                            {CURRENCIES.map(c => (
+                                <option key={c.code} value={c.code}>{c.code} ({c.symbol}) — {c.name}</option>
+                            ))}
                         </select>
+                        <p className="text-xs text-muted-foreground mt-1">This currency is used across all dashboards, invoices, and reports</p>
                     </div>
                 </div>
                 <div className="flex items-center justify-between pt-2">
@@ -154,70 +266,174 @@ export default function SystemSettingsPage() {
                                 : "Save Changes"}
                     </button>
                 </div>
-            </div>
+            </SectionAccordion>
 
-            {/* Email Services (read-only reference) */}
-            <div className="bg-card rounded-lg shadow border border-border p-6 space-y-4">
-                <div className="flex items-center gap-3 mb-2">
-                    <Mail className="w-5 h-5 text-emerald-500" />
-                    <div>
-                        <h2 className="text-lg font-bold text-foreground">Email Services</h2>
-                        <p className="text-xs text-muted-foreground">Each agency can toggle these categories independently from their Settings page</p>
+            {/* Email Services */}
+            <SectionAccordion
+                title="Email Services"
+                description="Default email settings for all agencies. Each agency can override from their Settings page."
+                icon={<Mail className="h-6 w-6 text-emerald-500" />}
+                iconBg="bg-emerald-500/10"
+                isOpen={!!openSections.email}
+                onToggle={() => toggleSection('email')}
+            >
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-foreground">Global Email Service</span>
+                        {updatingEmail === 'global' && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
                     </div>
+                    <Switch
+                        checked={emailGlobalEnabled}
+                        onCheckedChange={handleEmailGlobalToggle}
+                        disabled={updatingEmail === 'global'}
+                    />
                 </div>
 
-                <div className="border border-amber-500/20 bg-amber-500/5 rounded-lg p-3 flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                    <div className="text-xs text-amber-200/80">
-                        <strong>Brevo Free Tier:</strong> 300 emails/day. Critical categories (credentials, payments) are ON by default. Optional categories (task/project/leave updates) are OFF to conserve volume.
-                    </div>
-                </div>
-
-                <div className="space-y-1">
-                    {emailCategories.map((cat) => (
-                        <div key={cat.name}>
-                            <div className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/30 transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-2 h-2 rounded-full ${cat.priority === "critical" ? "bg-amber-500" : "bg-blue-500"}`} />
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-medium text-foreground">{cat.name}</span>
-                                            <span className={`text-[10px] px-1.5 py-0 rounded-full border ${cat.priority === "critical"
-                                                ? "border-amber-500/30 text-amber-500 bg-amber-500/10"
-                                                : "border-blue-500/30 text-blue-500 bg-blue-500/10"
-                                                }`}>
-                                                {cat.priority}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground">{cat.description}</p>
-                                    </div>
-                                </div>
-                                <span className={`text-xs font-medium ${cat.defaultOn ? "text-green-500" : "text-muted-foreground"}`}>
-                                    {cat.defaultOn ? "ON" : "OFF"}
-                                </span>
-                            </div>
-                            {cat.name === "Task Updates" && (
-                                <div className="ml-8 pl-3 border-l-2 border-blue-500/20 py-1 mb-1 space-y-0.5">
-                                    <p className="text-[10px] text-muted-foreground mb-1">By priority (agency can toggle per-level):</p>
-                                    {[
-                                        { label: "High", color: "bg-red-500", on: true },
-                                        { label: "Medium", color: "bg-yellow-500", on: false },
-                                        { label: "Low", color: "bg-green-500", on: false },
-                                    ].map(p => (
-                                        <div key={p.label} className="flex items-center justify-between py-0.5 px-2">
-                                            <div className="flex items-center gap-2">
-                                                <div className={`w-1.5 h-1.5 rounded-full ${p.color}`} />
-                                                <span className="text-[11px] text-muted-foreground">{p.label}</span>
-                                            </div>
-                                            <span className={`text-[10px] font-medium ${p.on ? "text-green-500" : "text-muted-foreground"}`}>
-                                                {p.on ? "ON" : "OFF"}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                {!emailGlobalEnabled && (
+                    <div className="border border-red-500/20 bg-red-500/5 rounded-lg p-3 flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                        <div className="text-xs text-red-400">
+                            <strong>All emails disabled.</strong> No emails will be sent across the platform.
                         </div>
-                    ))}
+                    </div>
+                )}
+
+                {emailGlobalEnabled && (
+                    <div className="border border-amber-500/20 bg-amber-500/5 rounded-lg p-3 flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                        <div className="text-xs text-amber-200/80">
+                            <strong>Brevo Free Tier:</strong> 300 emails/day. Critical categories (credentials, payments) are recommended to stay ON.
+                        </div>
+                    </div>
+                )}
+
+                {emailGlobalEnabled && (
+                    <div className="space-y-1">
+                        {(Object.entries(EMAIL_CATEGORY_INFO) as [EmailCategory, typeof EMAIL_CATEGORY_INFO[EmailCategory]][]).map(([key, info]) => {
+                            const isOn = emailCategories[key] ?? DEFAULT_EMAIL_CATEGORIES[key];
+                            const isUpdating = updatingEmail === key;
+                            return (
+                                <div key={key}>
+                                    <div className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-muted/30 transition-colors">
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                            <div className={`p-1.5 rounded-md ${info.priority === 'critical' ? 'bg-amber-500/10' : 'bg-blue-500/10'}`}>
+                                                {info.priority === 'critical'
+                                                    ? <Shield className="h-4 w-4 text-amber-500" />
+                                                    : <Zap className="h-4 w-4 text-blue-500" />
+                                                }
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium text-foreground">{info.label}</span>
+                                                    <span className={`text-[10px] px-1.5 py-0 rounded-full border ${
+                                                        info.priority === 'critical'
+                                                            ? 'border-amber-500/30 text-amber-500 bg-amber-500/10'
+                                                            : 'border-blue-500/30 text-blue-500 bg-blue-500/10'
+                                                    }`}>
+                                                        {info.priority}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground truncate">{info.description}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 ml-2">
+                                            {isUpdating && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                                            <Switch
+                                                checked={isOn}
+                                                onCheckedChange={(checked) => handleEmailCategoryToggle(key, checked)}
+                                                disabled={!!updatingEmail}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Task Email Event Sub-toggles */}
+                                    {key === 'taskUpdates' && isOn && (
+                                        <div className="ml-12 pl-3 border-l-2 border-blue-500/20 space-y-2 py-1 mb-1">
+                                            <p className="text-xs text-muted-foreground mb-1">Configure task email events and recipients:</p>
+                                            {(Object.entries(TASK_EMAIL_EVENTS) as [TaskEmailEventKey, typeof TASK_EMAIL_EVENTS[TaskEmailEventKey]][]).map(([eventKey, eventInfo]) => {
+                                                const eventConfig = taskEmailEvents[eventKey] || DEFAULT_TASK_EMAIL_EVENTS[eventKey];
+                                                const eventUpdating = updatingEmail?.startsWith(`event-${eventKey}`);
+                                                return (
+                                                    <div key={eventKey} className="rounded-lg bg-muted/20 p-2">
+                                                        <div className="flex items-center justify-between py-1">
+                                                            <div>
+                                                                <span className="text-xs font-medium text-foreground">{eventInfo.label}</span>
+                                                                <p className="text-[10px] text-muted-foreground">{eventInfo.description}</p>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {updatingEmail === `event-${eventKey}-enabled` && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                                                                <Switch
+                                                                    checked={eventConfig.enabled}
+                                                                    onCheckedChange={(checked) => handleTaskEventToggle(eventKey, 'enabled', checked)}
+                                                                    disabled={!!updatingEmail}
+                                                                    className="scale-[0.8]"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        {eventConfig.enabled && (
+                                                            <div className="ml-4 mt-1 space-y-1 border-l border-border pl-3">
+                                                                <div className="flex items-center justify-between py-1">
+                                                                    <span className="text-[11px] text-muted-foreground">Notify Assignee</span>
+                                                                    <div className="flex items-center gap-2">
+                                                                        {updatingEmail === `event-${eventKey}-notifyAssignee` && <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />}
+                                                                        <Switch
+                                                                            checked={eventConfig.notifyAssignee}
+                                                                            onCheckedChange={(checked) => handleTaskEventToggle(eventKey, 'notifyAssignee', checked)}
+                                                                            disabled={!!updatingEmail}
+                                                                            className="scale-[0.7]"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex items-center justify-between py-1">
+                                                                    <span className="text-[11px] text-muted-foreground">Notify Project Client</span>
+                                                                    <div className="flex items-center gap-2">
+                                                                        {updatingEmail === `event-${eventKey}-notifyClient` && <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />}
+                                                                        <Switch
+                                                                            checked={eventConfig.notifyClient}
+                                                                            onCheckedChange={(checked) => handleTaskEventToggle(eventKey, 'notifyClient', checked)}
+                                                                            disabled={!!updatingEmail}
+                                                                            className="scale-[0.7]"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                <div className="border-t border-border pt-3 space-y-2">
+                    <p className="text-xs font-medium text-foreground">Super-Admin Email Alerts</p>
+                    <p className="text-xs text-muted-foreground mb-2">Receive email notifications for important platform events.</p>
+                    <div className="space-y-1">
+                        {([
+                            { key: "emailOnAgencyCreated", label: "New agency created", desc: "Get notified when a new agency registers on the platform" },
+                            { key: "emailOnAgencySuspended", label: "Agency suspended", desc: "Get notified when an agency is suspended" },
+                            { key: "weeklySummary", label: "Weekly summary report", desc: "Receive a weekly summary of platform activity (coming soon)", disabled: true },
+                        ] as const).map((item) => (
+                            <div key={item.key} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-muted/30 transition-colors">
+                                <div className="min-w-0">
+                                    <span className="text-sm font-medium text-foreground">{item.label}</span>
+                                    <p className="text-xs text-muted-foreground">{item.desc}</p>
+                                </div>
+                                <div className="flex items-center gap-2 ml-2">
+                                    {updatingEmail === `sa-${item.key}` && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                                    <Switch
+                                        checked={notifications[item.key]}
+                                        onCheckedChange={(checked) => handleSuperAdminAlertToggle(item.key, checked)}
+                                        disabled={!!updatingEmail || ('disabled' in item && item.disabled)}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
 
                 <div className="border-t border-border pt-3 space-y-2">
@@ -234,30 +450,39 @@ export default function SystemSettingsPage() {
                         Configure these in your Brevo dashboard → Settings → Senders & Domains → Authenticate domain
                     </p>
                 </div>
-            </div>
+            </SectionAccordion>
 
             {/* Security */}
-            <div className="bg-card rounded-lg shadow border border-border p-6 space-y-4">
-                <div className="flex items-center gap-3 mb-2">
-                    <Shield className="w-5 h-5 text-green-500" />
-                    <h2 className="text-lg font-bold text-foreground">Security</h2>
-                </div>
+            <SectionAccordion
+                title="Security"
+                description="Authentication, registration, and password policies."
+                icon={<Shield className="h-6 w-6 text-green-500" />}
+                iconBg="bg-green-500/10"
+                isOpen={!!openSections.security}
+                onToggle={() => toggleSection('security')}
+            >
                 <div className="space-y-4">
                     {([
-                        { key: "requireEmailVerification", label: "Require email verification for new users" },
-                        { key: "enableTwoFactor", label: "Enable two-factor authentication globally" },
-                        { key: "allowSelfRegistration", label: "Allow agencies to register themselves" },
-                        { key: "enforceStrongPasswords", label: "Enforce strong passwords" },
+                        { key: "requireEmailVerification", label: "Require email verification for new users", hint: "Always enforced — OTP required at signup", disabled: true },
+                        { key: "enableTwoFactor", label: "Enable two-factor authentication globally", hint: "Coming soon", disabled: true },
+                        { key: "allowSelfRegistration", label: "Allow agencies to register themselves", hint: "Controls whether the Get Started signup page accepts new registrations", disabled: false },
+                        { key: "enforceStrongPasswords", label: "Enforce strong passwords", hint: "Requires 10+ chars, uppercase, lowercase, number, and special character", disabled: false },
                     ] as const).map((item) => (
-                        <label key={item.key} className="flex items-center gap-3 cursor-pointer group">
+                        <div key={item.key} className="flex items-start gap-3 group">
                             <input
                                 type="checkbox"
                                 checked={security[item.key]}
-                                onChange={e => setSecurity(s => ({ ...s, [item.key]: e.target.checked }))}
-                                className="w-4 h-4 rounded border-border text-blue-600 focus:ring-blue-500"
+                                onChange={e => !item.disabled && setSecurity(s => ({ ...s, [item.key]: e.target.checked }))}
+                                disabled={item.disabled}
+                                className="w-4 h-4 mt-0.5 rounded border-border text-blue-600 focus:ring-blue-500 disabled:opacity-50"
                             />
-                            <span className="text-sm text-foreground group-hover:text-foreground">{item.label}</span>
-                        </label>
+                            <div>
+                                <span className={`text-sm text-foreground ${item.disabled ? 'opacity-60' : 'group-hover:text-foreground'}`}>{item.label}</span>
+                                {item.hint && (
+                                    <p className="text-xs text-muted-foreground mt-0.5">{item.hint}</p>
+                                )}
+                            </div>
+                        </div>
                     ))}
                 </div>
                 <div className="flex justify-end pt-2">
@@ -271,50 +496,105 @@ export default function SystemSettingsPage() {
                                 : "Save Security Settings"}
                     </button>
                 </div>
-            </div>
+            </SectionAccordion>
+
+            {/* AI Configuration */}
+            <SectionAccordion
+                title="Singularity AI"
+                description="Manage AI provider configuration per agency."
+                icon={<Brain className="h-6 w-6 text-purple-500" />}
+                iconBg="bg-purple-500/10"
+                isOpen={!!openSections.ai}
+                onToggle={() => toggleSection('ai')}
+            >
+                {agencies.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No agencies found.</p>
+                ) : (
+                    <div className="divide-y divide-border">
+                        {agencies.map((agency: any) => (
+                            <Link
+                                key={agency.id}
+                                href={`/super-admin/settings/ai/${agency.id}`}
+                                className="flex items-center justify-between py-3 px-2 rounded-lg hover:bg-muted/40 transition-colors group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-2 h-2 rounded-full ${agency.aiConfig ? "bg-green-500" : "bg-muted-foreground/40"}`} />
+                                    <div>
+                                        <span className="text-sm font-medium text-foreground">{agency.name}</span>
+                                        <p className="text-xs text-muted-foreground">
+                                            {agency.aiConfig
+                                                ? `${agency.aiConfig.provider?.charAt(0).toUpperCase()}${agency.aiConfig.provider?.slice(1)} · ${agency.aiConfig.model || "configured"}`
+                                                : "Not configured"}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${agency.aiConfig ? "bg-green-500/10 text-green-500" : "bg-muted text-muted-foreground"}`}>
+                                        {agency.aiConfig ? "Active" : "Off"}
+                                    </span>
+                                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition" />
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                )}
+            </SectionAccordion>
 
             {/* Notifications */}
-            <div className="bg-card rounded-lg shadow border border-border p-6 space-y-4">
-                <div className="flex items-center gap-3 mb-2">
-                    <Bell className="w-5 h-5 text-yellow-500" />
-                    <h2 className="text-lg font-bold text-foreground">Notifications</h2>
-                </div>
-                <div className="space-y-4">
+            <SectionAccordion
+                title="Notifications"
+                description="Control which in-app notification types are enabled across all agencies."
+                icon={<Bell className="h-6 w-6 text-yellow-500" />}
+                iconBg="bg-yellow-500/10"
+                isOpen={!!openSections.notifications}
+                onToggle={() => toggleSection('notifications')}
+            >
+                <p className="text-xs text-muted-foreground mb-3">
+                    Toggle notification types on or off. When disabled, no in-app notifications of that type will
+                    be created for any user across all agencies.
+                </p>
+                <div className="space-y-1">
                     {([
-                        { key: "emailOnAgencyCreated", label: "Email alerts when a new agency is created" },
-                        { key: "emailOnAgencySuspended", label: "Email alerts when an agency is suspended" },
-                        { key: "weeklySummary", label: "Weekly summary report to super-admin email" },
+                        { key: "welcome", label: "Welcome & Onboarding", desc: "Welcome messages when new employees or clients are added", icon: "👋" },
+                        { key: "project", label: "Project Updates", desc: "Project status changes, completions, and auto-completion alerts", icon: "📁" },
+                        { key: "task", label: "Task Notifications", desc: "Task assignments, status updates, and comments", icon: "✅" },
+                        { key: "invoice", label: "Invoice & Billing", desc: "Invoice generation, payment pending, approved, and rejected", icon: "🧾" },
+                        { key: "salary", label: "Salary & Payroll", desc: "Salary payment confirmations sent to employees", icon: "💰" },
+                        { key: "leave", label: "Leave Management", desc: "Leave requests, approvals, rejections, and cancellations", icon: "🏖️" },
+                        { key: "refund", label: "Refunds", desc: "Refund issued notifications sent to clients", icon: "↩️" },
+                        { key: "document", label: "Document Approvals", desc: "Document update requests and admin approvals/rejections", icon: "📄" },
+                        { key: "security", label: "Security Alerts", desc: "Password reset notifications and security warnings", icon: "🔒" },
                     ] as const).map((item) => (
-                        <label key={item.key} className="flex items-center gap-3 cursor-pointer group">
-                            <input
-                                type="checkbox"
-                                checked={notifications[item.key]}
-                                onChange={e => setNotifications(n => ({ ...n, [item.key]: e.target.checked }))}
-                                className="w-4 h-4 rounded border-border text-yellow-500 focus:ring-yellow-500"
-                            />
-                            <span className="text-sm text-foreground">{item.label}</span>
-                        </label>
+                        <div key={item.key} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-muted/30 transition-colors">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <span className="text-lg">{item.icon}</span>
+                                <div className="min-w-0">
+                                    <span className="text-sm font-medium text-foreground">{item.label}</span>
+                                    <p className="text-xs text-muted-foreground truncate">{item.desc}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 ml-2">
+                                {updatingNotif === item.key && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                                <Switch
+                                    checked={notificationDefaults[item.key] ?? true}
+                                    onCheckedChange={(checked) => handleNotifToggle(item.key, checked)}
+                                    disabled={!!updatingNotif}
+                                />
+                            </div>
+                        </div>
                     ))}
                 </div>
-                <div className="flex justify-end pt-2">
-                    <button
-                        onClick={() => handleSave("notifications")}
-                        disabled={!!saving}
-                        className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition"
-                    >
-                        {saving === "notifications" ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
-                            : saved === "notifications" ? <><Check className="w-4 h-4" /> Saved!</>
-                                : "Save Notification Settings"}
-                    </button>
-                </div>
-            </div>
+            </SectionAccordion>
 
             {/* System Info */}
-            <div className="bg-card rounded-lg shadow border border-border p-6">
-                <div className="flex items-center gap-3 mb-4">
-                    <Database className="w-5 h-5 text-purple-500" />
-                    <h2 className="text-lg font-bold text-foreground">System Information</h2>
-                </div>
+            <SectionAccordion
+                title="System Information"
+                description="Platform version and environment details."
+                icon={<Database className="h-6 w-6 text-indigo-500" />}
+                iconBg="bg-indigo-500/10"
+                isOpen={!!openSections.system}
+                onToggle={() => toggleSection('system')}
+            >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {[
                         { label: "Platform", value: platform.name },
@@ -329,6 +609,47 @@ export default function SystemSettingsPage() {
                             <span className="text-sm font-medium text-foreground">{item.value}</span>
                         </div>
                     ))}
+                </div>
+            </SectionAccordion>
+        </div>
+    );
+}
+
+// Reusable collapsible section component (matches admin settings pattern)
+function SectionAccordion({
+    title, description, icon, iconBg, isOpen, onToggle, children
+}: {
+    title: string;
+    description: string;
+    icon: React.ReactNode;
+    iconBg: string;
+    isOpen: boolean;
+    onToggle: () => void;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="border rounded-lg bg-card text-card-foreground shadow-sm">
+            <div
+                onClick={onToggle}
+                className="flex flex-row items-center justify-between p-6 cursor-pointer hover:bg-accent/50 transition-colors"
+            >
+                <div className="flex items-center gap-4">
+                    <div className={`p-2 ${iconBg} rounded-full`}>
+                        {icon}
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-semibold">{title}</h2>
+                        <p className="text-sm text-muted-foreground">{description}</p>
+                    </div>
+                </div>
+                {isOpen ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : <ChevronRight className="h-5 w-5 text-muted-foreground" />}
+            </div>
+
+            <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                <div className="overflow-hidden">
+                    <div className="p-6 pt-0">
+                        {children}
+                    </div>
                 </div>
             </div>
         </div>

@@ -7,7 +7,9 @@ import { RevenueChart, ProjectDistributionChart } from "@/components/dashboard/C
 import { RecentActivityList } from "@/components/dashboard/RecentActivityList";
 import { UrgentTasksList } from "@/components/dashboard/UrgentTasksList";
 import { EmployeeTasksList } from "@/components/dashboard/EmployeeTasksList";
-import { IndianRupee, Briefcase, FileText, Activity as ActivityIcon, CheckCircle2, Clock, Users, Calendar } from "lucide-react";
+import { Banknote, Briefcase, FileText, Activity as ActivityIcon, CheckCircle2, Clock, Users, Calendar } from "lucide-react";
+import { formatCurrency } from "@/lib/currency";
+import { getDefaultCurrency } from "@/lib/actions/super-admin";
 import { ClientDashboard } from "@/components/dashboard/ClientDashboard";
 import { ExportReportButton } from "@/components/dashboard/ExportReportButton";
 import Link from "next/link";
@@ -38,12 +40,13 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
 
     if (isAdmin) {
         // Parallel Fetch for Admin
-        const [metrics, revenueData, projectDist, activities, urgentTasks] = await Promise.all([
+        const [metrics, revenueData, projectDist, activities, urgentTasks, currency] = await Promise.all([
             getDashboardMetrics(),
             getRevenueData(),
             getProjectDistribution(),
             getRecentActivity(),
-            getUrgentTasks()
+            getUrgentTasks(),
+            getDefaultCurrency()
         ]);
 
         return (
@@ -64,9 +67,9 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                     <MetricCard
                         title="Total Revenue"
-                        value={`₹${metrics?.revenue?.toLocaleString() ?? 0}`}
+                        value={formatCurrency(metrics?.revenue, currency)}
                         description={`${(metrics?.growth ?? 0) > 0 ? '+' : ''}${metrics?.growth ?? 0}% from last month`}
-                        icon={IndianRupee}
+                        icon={Banknote}
                         trend={(metrics?.growth ?? 0) > 0 ? 'up' : (metrics?.growth ?? 0) < 0 ? 'down' : 'neutral'}
                         href="/dashboard/finance?tab=overview"
                     />
@@ -79,7 +82,7 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
                     />
                     <MetricCard
                         title="Pending Invoices"
-                        value={`₹${metrics?.pending?.toLocaleString() ?? 0}`}
+                        value={formatCurrency(metrics?.pending, currency)}
                         description={`${metrics?.overdueCount ?? 0} invoices overdue`}
                         icon={FileText}
                         href="/dashboard/finance?tab=invoices"

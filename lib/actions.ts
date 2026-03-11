@@ -8,10 +8,12 @@ import type { AIConfig, AIPermissions } from "./types";
 import { DEFAULT_AI_PERMISSIONS } from "./types";
 import { withAgencyId, getCurrentAgency, checkAgencyLimit } from "./agency-context";
 import { generateId, resolveUserOrClient } from "./utils-server";
-import { sanitizeName, sanitizeString, sanitizeUsername, validateEmail, validatePassword, sanitizePhone, sanitizeUrl, sanitizeColor, sanitizeMongoInput, sanitizeUpdates, validateId, validateAmount } from "./validation";
+import { sanitizeName, sanitizeString, sanitizeUsername, validateEmail, validatePassword, validateStrongPassword, sanitizePhone, sanitizeUrl, sanitizeColor, sanitizeMongoInput, sanitizeUpdates, validateId, validateAmount } from "./validation";
+import { formatCurrency, getCurrencySymbol } from "./currency";
+import { getDefaultCurrency, getNotificationDefaults } from "./actions/super-admin";
 
 // Authentication
-import { connectDB, AgencyModel, UserModel, ClientModel, SuperAdminModel, ProjectModel, TaskModel, InvoiceModel, TransactionModel, ServiceModel, NotificationModel, ActivityModel, AssetModel, MessageModel, LeaveRequestModel, SettingsModel, decryptApiKey } from "./mongodb";
+import { connectDB, AgencyModel, UserModel, ClientModel, SuperAdminModel, ProjectModel, TaskModel, InvoiceModel, TransactionModel, ServiceModel, NotificationModel, ActivityModel, AssetModel, MessageModel, LeaveRequestModel, SettingsModel, decryptApiKey, SystemSettingsModel } from "./mongodb";
 import { getSessionUser } from "@/lib/auth";
 import { fmtDate } from "@/lib/date-utils";
 import { getSessionId as authGetSessionId, login as authLogin, logout as authLogout } from "@/lib/auth";
@@ -40,17 +42,52 @@ import {
     sendClientAccountCreatedEmail,
     sendEmployeeAccountCreatedEmail,
 } from "./brevo-mail";
+import { DEFAULT_TASK_EMAIL_EVENTS } from "./email-constants";
+
+/** Check password against system-level enforceStrongPasswords setting */
+async function validatePasswordWithPolicy(password: string) {
+    const sys = await SystemSettingsModel.findOne(
+        { key: 'global' },
+        { 'security.enforceStrongPasswords': 1 }
+    ).lean() as any;
+    const enforceStrong = sys?.security?.enforceStrongPasswords ?? true;
+    if (enforceStrong) {
+        validateStrongPassword(password);
+    } else {
+        validatePassword(password);
+    }
+}
+
+type NotifType = 'welcome' | 'project' | 'task' | 'invoice' | 'salary' | 'leave' | 'refund' | 'document' | 'security';
+
+/** Check if a notification type is enabled globally. Defaults to true if not set. */
+async function isNotifEnabled(type: NotifType): Promise<boolean> {
+    try {
+        const defaults = await getNotificationDefaults();
+        return defaults[type] ?? true;
+    } catch {
+        return true; // Fail-open: send notifications if settings can't be read
+    }
+}
 
 export async function getAgencySettings() {
     await requireAuth();
     const agency = await getCurrentAgency();
     if (!agency) return null;
+
+    // Read the system-level default currency
+    let systemCurrency = "USD";
+    try {
+        const sys = await SystemSettingsModel.findOne({ key: 'global' }, { 'platform.defaultCurrency': 1 }).lean() as any;
+        if (sys?.platform?.defaultCurrency) systemCurrency = sys.platform.defaultCurrency;
+    } catch { /* use fallback */ }
+
     return {
         name: agency.name,
         logo: agency.logo || "",
         primaryColor: agency.primaryColor,
         secondaryColor: agency.secondaryColor,
-        currency: agency.settings?.currency || "INR",
+        currency: systemCurrency,
         emailNotificationsEnabled: agency.settings?.emailNotificationsEnabled ?? true,
         emailCategories: agency.settings?.emailCategories || {}
     };
@@ -160,20 +197,25 @@ export async function updateEmailCategorySettings(categories: Record<string, boo
     return { success: true };
 }
 
-export async function updateTaskEmailPriorities(priorities: Record<string, boolean>) {
+export async function updateTaskEmailEvents(events: Record<string, Record<string, boolean>>) {
     await requireRole('admin', 'manager');
     const agency = await getCurrentAgency();
     if (!agency) throw new Error("Unauthorized");
 
+    const validEvents = ['taskCreated', 'taskInProgress', 'taskDone'];
+    const validFields = ['enabled', 'notifyAssignee', 'notifyClient'];
     const updates: Record<string, boolean> = {};
-    const validPriorities = ['high', 'medium', 'low'];
-    for (const [key, value] of Object.entries(priorities)) {
-        if (validPriorities.includes(key) && typeof value === 'boolean') {
-            updates[`settings.emailCategories.taskEmailPriorities.${key}`] = value;
+
+    for (const [eventKey, fields] of Object.entries(events)) {
+        if (!validEvents.includes(eventKey) || typeof fields !== 'object') continue;
+        for (const [field, value] of Object.entries(fields)) {
+            if (validFields.includes(field) && typeof value === 'boolean') {
+                updates[`settings.emailCategories.taskEmailEvents.${eventKey}.${field}`] = value;
+            }
         }
     }
 
-    if (Object.keys(updates).length === 0) throw new Error("No valid priorities provided");
+    if (Object.keys(updates).length === 0) throw new Error("No valid event settings provided");
 
     await AgencyModel.updateOne(
         { id: agency.id },
@@ -869,7 +911,7 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
     if (!user.name) throw new Error('Name is required');
     if (user.email) user.email = validateEmail(user.email);
     if (user.contactNumber) user.contactNumber = sanitizePhone(user.contactNumber);
-    if (user.password) validatePassword(user.password);
+    if (user.password) await validatePasswordWithPolicy(user.password);
     if (user.jobTitle) user.jobTitle = sanitizeName(user.jobTitle, 100);
     // Generate/Validate username
     let username = user.username ? sanitizeUsername(user.username) : '';
@@ -950,13 +992,15 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
 
     // Welcome in-app notification
     try {
-        const agency = await getCurrentAgency();
-        await NotificationModel.create({
-            id: generateId(), agencyId: agency?.id, userId: newUser.id,
-            message: `Welcome to the team, ${newUser.name}! Your account has been set up. Explore your dashboard to get started.`,
-            read: false, timestamp: new Date().toISOString(),
-            link: '/dashboard'
-        });
+        if (await isNotifEnabled('welcome')) {
+            const agency = await getCurrentAgency();
+            await NotificationModel.create({
+                id: generateId(), agencyId: agency?.id, userId: newUser.id,
+                message: `Welcome to the team, ${newUser.name}! Your account has been set up. Explore your dashboard to get started.`,
+                read: false, timestamp: new Date().toISOString(),
+                link: '/dashboard'
+            });
+        }
     } catch (notifError) {
         console.error('[Notification] Failed to create welcome notification:', notifError);
     }
@@ -1176,7 +1220,7 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
     }
 
     // Notify Admins if document request
-    if (notifyAdmin) {
+    if (notifyAdmin && await isNotifEnabled('document')) {
         const admins = await UserModel.find({ ...agencyFilter, $or: [{ role: 'admin' }, { role: 'manager' }] }).select('-password').lean();
         const currentUserDoc = await UserModel.findOne({ id, ...agencyFilter }).select('-password').lean() ||
             await ClientModel.findOne({ id, ...agencyFilter }).select('-password').lean();
@@ -1281,10 +1325,12 @@ export async function approveDocumentUpdate(userId: string, type: 'adhar' | 'pan
         ? `Your document update request for ${type === 'both' ? 'documents' : type.toUpperCase()} has been APPROVED.`
         : `Your document update request for ${type === 'both' ? 'documents' : type.toUpperCase()} has been REJECTED.`;
 
-    await NotificationModel.create({
-        id: generateId(), agencyId: agency?.id, userId,
-        message, read: false, timestamp: new Date().toISOString()
-    });
+    if (await isNotifEnabled('document')) {
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency?.id, userId,
+            message, read: false, timestamp: new Date().toISOString()
+        });
+    }
     revalidatePath('/dashboard/team');
 }
 
@@ -1294,19 +1340,21 @@ export async function adminResetPassword(id: string, newPassword: string) {
         throw new Error("Unauthorized: Only Admins can reset passwords.");
     }
     // Input validation
-    validatePassword(newPassword);
+    await validatePasswordWithPolicy(newPassword);
     await connectDB();
     const hashedPassword = await hashPassword(newPassword);
     const agency = await getCurrentAgency();
     await UserModel.updateOne({ id, agencyId: agency?.id }, { $set: { password: hashedPassword } });
 
     // Security notification -- password was reset by admin
-    await NotificationModel.create({
-        id: generateId(), agencyId: agency?.id, userId: id,
-        message: `Your password was reset by ${currentUser.name}. If you did not request this, please contact your admin immediately.`,
-        read: false, timestamp: new Date().toISOString(),
-        link: '/dashboard/settings'
-    });
+    if (await isNotifEnabled('security')) {
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency?.id, userId: id,
+            message: `Your password was reset by ${currentUser.name}. If you did not request this, please contact your admin immediately.`,
+            read: false, timestamp: new Date().toISOString(),
+            link: '/dashboard/settings'
+        });
+    }
 
     revalidatePath('/dashboard/team');
 }
@@ -1482,7 +1530,7 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
     }
 
     // Notify client about invoices
-    if (project.clientId && newInvoices.length > 0) {
+    if (project.clientId && newInvoices.length > 0 && await isNotifEnabled('invoice')) {
         await NotificationModel.create({
             id: generateId(), agencyId: agency.id, userId: project.clientId,
             message: `${newInvoices.length} pending invoice(s) for project: ${project.name}`,
@@ -1676,55 +1724,58 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
     });
 
     // Collect unique notification recipients to avoid duplicates
-    const notifiedUserIds = new Set<string>();
+    const projectForNotif = await ProjectModel.findOne({ id: task.projectId, agencyId: agency.id }).lean();
+    if (await isNotifEnabled('task')) {
+        const notifiedUserIds = new Set<string>();
 
-    // In-app notification for task status change - notify assignee if someone else changed it
-    if (task.assigneeId && task.assigneeId !== userId) {
-        await NotificationModel.create({
-            id: generateId(), agencyId: agency.id, userId: task.assigneeId,
-            message: `${userName} moved your task "${task.title}" to ${status}`,
-            read: false, timestamp: new Date().toISOString(),
-            link: `/dashboard/projects/${task.projectId}?task=${taskId}`
-        });
-        notifiedUserIds.add(task.assigneeId);
-    }
-
-    // Notify admins about task status change (exclude already-notified users)
-    const adminsForTask = await UserModel.find({ agencyId: agency.id, role: { $in: ['admin', 'manager'] } }).select('-password').lean();
-    const adminNotifs = adminsForTask
-        .filter((a: any) => a.id !== userId && !notifiedUserIds.has(a.id))
-        .map((admin: any) => {
-            notifiedUserIds.add(admin.id);
-            return {
-                id: generateId(), agencyId: agency.id, userId: admin.id,
-                message: `${userName} moved task "${task.title}" to ${status}`,
+        // In-app notification for task status change - notify assignee if someone else changed it
+        if (task.assigneeId && task.assigneeId !== userId) {
+            await NotificationModel.create({
+                id: generateId(), agencyId: agency.id, userId: task.assigneeId,
+                message: `${userName} moved your task "${task.title}" to ${status}`,
                 read: false, timestamp: new Date().toISOString(),
                 link: `/dashboard/projects/${task.projectId}?task=${taskId}`
-            };
-        });
-    if (adminNotifs.length > 0) await NotificationModel.insertMany(adminNotifs);
+            });
+            notifiedUserIds.add(task.assigneeId);
+        }
 
-    // Notify project client about task progress (skip if already notified)
-    const projectForNotif = await ProjectModel.findOne({ id: task.projectId, agencyId: agency.id }).lean();
-    if (projectForNotif?.clientId && !notifiedUserIds.has(projectForNotif.clientId)) {
-        await NotificationModel.create({
-            id: generateId(), agencyId: agency.id, userId: projectForNotif.clientId,
-            message: `Task "${task.title}" has been moved to ${status}`,
-            read: false, timestamp: new Date().toISOString(),
-            link: `/dashboard/projects/${task.projectId}`
-        });
+        // Notify admins about task status change (exclude already-notified users)
+        const adminsForTask = await UserModel.find({ agencyId: agency.id, role: { $in: ['admin', 'manager'] } }).select('-password').lean();
+        const adminNotifs = adminsForTask
+            .filter((a: any) => a.id !== userId && !notifiedUserIds.has(a.id))
+            .map((admin: any) => {
+                notifiedUserIds.add(admin.id);
+                return {
+                    id: generateId(), agencyId: agency.id, userId: admin.id,
+                    message: `${userName} moved task "${task.title}" to ${status}`,
+                    read: false, timestamp: new Date().toISOString(),
+                    link: `/dashboard/projects/${task.projectId}?task=${taskId}`
+                };
+            });
+        if (adminNotifs.length > 0) await NotificationModel.insertMany(adminNotifs);
+
+        // Notify project client about task progress (skip if already notified)
+        if (projectForNotif?.clientId && !notifiedUserIds.has(projectForNotif.clientId)) {
+            await NotificationModel.create({
+                id: generateId(), agencyId: agency.id, userId: projectForNotif.clientId,
+                message: `Task "${task.title}" has been moved to ${status}`,
+                read: false, timestamp: new Date().toISOString(),
+                link: `/dashboard/projects/${task.projectId}`
+            });
+        }
     }
 
-    // Email notifications for task status change (gated by priority)
-    const taskPriority = (task.priority || 'Medium').toLowerCase() as 'high' | 'medium' | 'low';
+    // Email notifications for task status change (gated by event settings)
     const emailCats = agency.settings?.emailCategories || {} as any;
-    const taskPriorities = emailCats.taskEmailPriorities || { high: true, medium: false, low: false };
-    const shouldSendTaskEmail = emailCats.taskUpdates !== false && (taskPriorities[taskPriority] ?? false);
+    const taskEmailEvents = emailCats.taskEmailEvents || {};
+    const eventKey = status === 'Done' ? 'taskDone' : (status === 'In Progress' ? 'taskInProgress' : null);
+    const eventConfig = eventKey ? { ...DEFAULT_TASK_EMAIL_EVENTS[eventKey], ...taskEmailEvents[eventKey] } : null;
+    const shouldSendTaskEmail = emailCats.taskUpdates !== false && eventConfig?.enabled;
 
     if (shouldSendTaskEmail) {
         try {
             // Email to assignee about status change
-            if (task.assigneeId && task.assigneeId !== userId) {
+            if (eventConfig!.notifyAssignee && task.assigneeId && task.assigneeId !== userId) {
                 const assignee = await getUser(task.assigneeId);
                 if (assignee?.email) {
                     await sendTaskStatusChangedEmail({
@@ -1740,7 +1791,7 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
             }
 
             // Email to project client about task progress
-            if (projectForNotif?.clientId) {
+            if (eventConfig!.notifyClient && projectForNotif?.clientId) {
                 const clientDoc = await ClientModel.findOne({ id: projectForNotif.clientId, agencyId: agency.id }).select('-password').lean();
                 if (clientDoc?.email) {
                     await sendTaskStatusChangedEmail({
@@ -1772,7 +1823,7 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
                 await ProjectModel.updateOne({ id: task.projectId, agencyId: agency.id }, { $set: { status: 'Completed' } });
 
                 // Notify client
-                if (project.clientId) {
+                if (project.clientId && await isNotifEnabled('project')) {
                     await NotificationModel.create({
                         id: generateId(), agencyId: agency.id, userId: project.clientId,
                         message: `Project "${project.name}" has been completed! All tasks are done.`,
@@ -1783,12 +1834,14 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
 
                 // Notify admins
                 const admins = await UserModel.find({ agencyId: agency.id, role: 'admin' }).select('-password').lean();
-                await NotificationModel.insertMany(admins.map(admin => ({
-                    id: generateId(), agencyId: agency.id, userId: admin.id,
-                    message: `Project "${project.name}" auto-completed - all tasks done`,
-                    read: false, timestamp: new Date().toISOString(),
-                    link: `/dashboard/projects/${project.id}`
-                })));
+                if (await isNotifEnabled('project')) {
+                    await NotificationModel.insertMany(admins.map(admin => ({
+                        id: generateId(), agencyId: agency.id, userId: admin.id,
+                        message: `Project "${project.name}" auto-completed - all tasks done`,
+                        read: false, timestamp: new Date().toISOString(),
+                        link: `/dashboard/projects/${project.id}`
+                    })));
+                }
 
                 // Email notification
                 try {
@@ -1909,11 +1962,9 @@ export async function addComment(taskId: string, userId: string, text: string, t
         timestamp: new Date().toISOString()
     });
 
-    // Send email notification to task participants (gated by priority)
-    const taskPriority = (task.priority || 'Medium').toLowerCase() as 'high' | 'medium' | 'low';
+    // Send email notification to task participants (gated by task updates category)
     const emailCats = agency.settings?.emailCategories || {} as any;
-    const taskPriorities = emailCats.taskEmailPriorities || { high: true, medium: false, low: false };
-    const shouldSendTaskEmail = emailCats.taskUpdates !== false && (taskPriorities[taskPriority] ?? false);
+    const shouldSendTaskEmail = emailCats.taskUpdates !== false;
 
     if (shouldSendTaskEmail) {
         try {
@@ -1948,21 +1999,23 @@ export async function addComment(taskId: string, userId: string, text: string, t
 
     // In-app notifications for task comment -- notify all participants except commenter
     try {
-        const participantIds = new Set<string>();
-        if (task.assigneeId) participantIds.add(task.assigneeId);
-        if (task.createdBy) participantIds.add(task.createdBy);
-        task.comments?.forEach(c => participantIds.add(c.userId));
-        participantIds.delete(userId);
+        if (await isNotifEnabled('task')) {
+            const participantIds = new Set<string>();
+            if (task.assigneeId) participantIds.add(task.assigneeId);
+            if (task.createdBy) participantIds.add(task.createdBy);
+            task.comments?.forEach(c => participantIds.add(c.userId));
+            participantIds.delete(userId);
 
-        if (participantIds.size > 0) {
-            const commenterDoc = await getUser(userId);
-            const commenterName = commenterDoc?.name || 'Someone';
-            await NotificationModel.insertMany([...participantIds].map(pid => ({
-                id: generateId(), agencyId: agency.id, userId: pid,
-                message: `${commenterName} commented on "${task.title}": ${text.substring(0, 80)}${text.length > 80 ? '...' : ''}`,
-                read: false, timestamp: new Date().toISOString(),
-                link: `/dashboard/projects/${task.projectId}?task=${taskId}`
-            })));
+            if (participantIds.size > 0) {
+                const commenterDoc = await getUser(userId);
+                const commenterName = commenterDoc?.name || 'Someone';
+                await NotificationModel.insertMany([...participantIds].map(pid => ({
+                    id: generateId(), agencyId: agency.id, userId: pid,
+                    message: `${commenterName} commented on "${task.title}": ${text.substring(0, 80)}${text.length > 80 ? '...' : ''}`,
+                    read: false, timestamp: new Date().toISOString(),
+                    link: `/dashboard/projects/${task.projectId}?task=${taskId}`
+                })));
+            }
         }
     } catch (notifError) {
         console.error('[Notification] Failed to create comment notifications:', notifError);
@@ -2008,18 +2061,19 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
         timestamp: new Date().toISOString()
     });
 
-    // Send email notification to assignee (gated by priority)
-    const taskPriority = (task.priority || 'Medium').toLowerCase() as 'high' | 'medium' | 'low';
+    // Send email notification for task creation (gated by event settings)
     const emailCats = agency.settings?.emailCategories || {} as any;
-    const taskPriorities = emailCats.taskEmailPriorities || { high: true, medium: false, low: false };
-    const shouldSendTaskEmail = emailCats.taskUpdates !== false && (taskPriorities[taskPriority] ?? false);
+    const taskEmailEvents = emailCats.taskEmailEvents || {};
+    const createdEventConfig = { ...DEFAULT_TASK_EMAIL_EVENTS.taskCreated, ...taskEmailEvents.taskCreated };
+    const shouldSendTaskEmail = emailCats.taskUpdates !== false && createdEventConfig.enabled;
 
-    if (task.assigneeId && shouldSendTaskEmail) {
+    if (shouldSendTaskEmail) {
         try {
-            const assignee = await getUser(task.assigneeId);
+            const assignee = task.assigneeId ? await getUser(task.assigneeId) : null;
             const project = await getProject(task.projectId);
 
-            if (assignee?.email && project) {
+            // Email to assignee
+            if (createdEventConfig.notifyAssignee && task.assigneeId && assignee?.email && project) {
                 await sendTaskAssignedEmail({
                     assigneeEmail: assignee.email,
                     assigneeName: assignee.name,
@@ -2031,11 +2085,30 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
                     taskLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${task.projectId}?task=${newTask.id}`,
                 });
             }
-        } catch (emailError) {
-            console.error('[Email] Failed to send task assignment email:', emailError);
-        }
 
-        // In-app notification for task assignment
+            // Email to project client
+            if (createdEventConfig.notifyClient && project?.clientId) {
+                const clientDoc = await ClientModel.findOne({ id: project.clientId, agencyId: agency.id }).select('-password').lean() as any;
+                if (clientDoc?.email) {
+                    await sendTaskAssignedEmail({
+                        assigneeEmail: clientDoc.email,
+                        assigneeName: clientDoc.name,
+                        taskTitle: task.title,
+                        taskDescription: task.description || '',
+                        projectName: project.name,
+                        dueDate: task.dueDate || '',
+                        priority: task.priority || 'Medium',
+                        taskLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${task.projectId}?task=${newTask.id}`,
+                    });
+                }
+            }
+        } catch (emailError) {
+            console.error('[Email] Failed to send task creation email:', emailError);
+        }
+    }
+
+    // In-app notification for task assignment
+    if (task.assigneeId && await isNotifEnabled('task')) {
         await NotificationModel.create({
             id: generateId(), agencyId: agency.id, userId: task.assigneeId,
             message: `You've been assigned a new task: "${task.title}"`,
@@ -2056,7 +2129,7 @@ export async function createTask(task: Omit<Task, "id" | "agencyId">) {
             read: false, timestamp: new Date().toISOString(),
             link: `/dashboard/projects/${task.projectId}?task=${newTask.id}`
         }));
-    if (adminNewTaskNotifs.length > 0) await NotificationModel.insertMany(adminNewTaskNotifs);
+    if (adminNewTaskNotifs.length > 0 && await isNotifEnabled('task')) await NotificationModel.insertMany(adminNewTaskNotifs);
 
     revalidatePath('/dashboard/projects/[id]', 'page');
     revalidatePath('/dashboard/projects');
@@ -2106,7 +2179,7 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
     if (!client.companyName) throw new Error('Company name is required');
     if (client.email) client.email = validateEmail(client.email);
     if (client.phone) client.phone = sanitizePhone(client.phone);
-    if (client.password) validatePassword(client.password);
+    if (client.password) await validatePasswordWithPolicy(client.password);
 
     // Generate username if not provided
     let username = client.username ? sanitizeUsername(client.username) : '';
@@ -2194,13 +2267,15 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
 
     // Welcome in-app notification for client
     try {
-        const agency = await getCurrentAgency();
-        await NotificationModel.create({
-            id: generateId(), agencyId: agency?.id, userId: newClient.id,
-            message: `Welcome, ${newClient.name}! Your client portal is ready. Check your projects and invoices here.`,
-            read: false, timestamp: new Date().toISOString(),
-            link: '/dashboard'
-        });
+        if (await isNotifEnabled('welcome')) {
+            const agency = await getCurrentAgency();
+            await NotificationModel.create({
+                id: generateId(), agencyId: agency?.id, userId: newClient.id,
+                message: `Welcome, ${newClient.name}! Your client portal is ready. Check your projects and invoices here.`,
+                read: false, timestamp: new Date().toISOString(),
+                link: '/dashboard'
+            });
+        }
     } catch (notifError) {
         console.error('[Notification] Failed to create client welcome notification:', notifError);
     }
@@ -2255,7 +2330,7 @@ export async function updateProject(id: string, updates: Partial<Project>) {
     await ProjectModel.updateOne({ id, agencyId: agency?.id }, { $set: updates });
 
     // Notify client on status change
-    if (updates.status && oldProject && (oldProject as any).status !== updates.status && (oldProject as any).clientId) {
+    if (updates.status && oldProject && (oldProject as any).status !== updates.status && (oldProject as any).clientId && await isNotifEnabled('project')) {
         const statusMessages: Record<string, string> = {
             'Active': 'is now active and in progress',
             'Completed': 'has been completed',
@@ -2523,11 +2598,13 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
 
     // Salary notification + email
     if (newTransaction.category === 'Salary' && newTransaction.userId && newTransaction.type === 'expense') {
-        await NotificationModel.create({
-            id: generateId(), agencyId: agency?.id, userId: newTransaction.userId,
-            message: `Salary Payment Received: ₹${newTransaction.amount.toLocaleString()} `,
-            read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
-        });
+        if (await isNotifEnabled('salary')) {
+            await NotificationModel.create({
+                id: generateId(), agencyId: agency?.id, userId: newTransaction.userId,
+                message: `Salary Payment Received: ${formatCurrency(newTransaction.amount, await getDefaultCurrency())} `,
+                read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
+            });
+        }
         try {
             const employee = await UserModel.findOne({ id: newTransaction.userId, agencyId: agency?.id }).select('-password').lean();
             if ((employee as any)?.email) {
@@ -2607,11 +2684,14 @@ export async function clientMarkInvoiceAsPaid(invoiceId: string) {
 
     // Notify admins
     const admins = await UserModel.find({ agencyId: agency.id, role: 'admin' }).select('-password').lean();
-    await NotificationModel.insertMany(admins.map(admin => ({
-        id: generateId(), agencyId: agency.id, userId: admin.id,
-        message: `${currentUser.name} marked invoice ₹${invoice.amount.toLocaleString()} as paid - Awaiting approval`,
-        read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
-    })));
+    const _cur = await getDefaultCurrency();
+    if (await isNotifEnabled('invoice')) {
+        await NotificationModel.insertMany(admins.map(admin => ({
+            id: generateId(), agencyId: agency.id, userId: admin.id,
+            message: `${currentUser.name} marked invoice ${formatCurrency(invoice.amount, _cur)} as paid - Awaiting approval`,
+            read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
+        })));
+    }
 
     // Email admins (use already-fetched admins list)
     try {
@@ -2668,10 +2748,10 @@ export async function adminApproveInvoicePayment(invoiceId: string) {
     await TransactionModel.create(newTransaction);
 
     // Notify client
-    if ((project as any)?.clientId) {
+    if ((project as any)?.clientId && await isNotifEnabled('invoice')) {
         await NotificationModel.create({
             id: generateId(), agencyId: agency.id, userId: (project as any).clientId,
-            message: `Payment approved! ₹${invoice.amount.toLocaleString()} received for ${(project as any).name}`,
+            message: `Payment approved! ${formatCurrency(invoice.amount, await getDefaultCurrency())} received for ${(project as any).name}`,
             read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
         });
     }
@@ -2712,10 +2792,10 @@ export async function adminRejectInvoicePayment(invoiceId: string, reason?: stri
     await InvoiceModel.updateOne({ id: invoiceId, agencyId: agency.id }, { $set: { status: 'Pending' } });
 
     const project = await ProjectModel.findOne({ id: invoice.projectId, agencyId: agency.id }).lean();
-    if ((project as any)?.clientId) {
+    if ((project as any)?.clientId && await isNotifEnabled('invoice')) {
         const message = reason
             ? `Payment rejected: ${reason}. Please mark as paid again.`
-            : `Payment rejected for ₹${invoice.amount.toLocaleString()}. Please mark as paid again.`;
+            : `Payment rejected for ${formatCurrency(invoice.amount, await getDefaultCurrency())}. Please mark as paid again.`;
         await NotificationModel.create({
             id: generateId(), agencyId: agency.id, userId: (project as any).clientId,
             message, read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
@@ -2825,10 +2905,10 @@ export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "ag
     await InvoiceModel.create(newInvoice);
 
     // Notify client
-    if (project.clientId) {
+    if (project.clientId && await isNotifEnabled('invoice')) {
         await NotificationModel.create({
             id: generateId(), agencyId: agency.id, userId: project.clientId,
-            message: `New Invoice Generated: ₹${invoice.amount.toLocaleString()}`,
+            message: `New Invoice Generated: ${formatCurrency(invoice.amount, await getDefaultCurrency())}`,
             read: false, timestamp: new Date().toISOString(), link: '/dashboard/finance'
         });
     }
@@ -3881,11 +3961,13 @@ export async function requestLeave(leaveData: Omit<LeaveRequest, 'id' | 'status'
 
     // Notify admins
     const adminUsers = await UserModel.find({ agencyId: agency?.id, role: 'admin' }).select('-password').lean();
-    await NotificationModel.insertMany(adminUsers.map((admin: any) => ({
-        id: generateId(), agencyId: agency?.id, userId: admin.id,
-        message: `${currentUser.name} requested ${leaveData.type} leave (${daysDiff} day${daysDiff > 1 ? 's' : ''})`,
-        read: false, timestamp: new Date().toISOString(), link: '/dashboard/team'
-    })));
+    if (await isNotifEnabled('leave')) {
+        await NotificationModel.insertMany(adminUsers.map((admin: any) => ({
+            id: generateId(), agencyId: agency?.id, userId: admin.id,
+            message: `${currentUser.name} requested ${leaveData.type} leave (${daysDiff} day${daysDiff > 1 ? 's' : ''})`,
+            read: false, timestamp: new Date().toISOString(), link: '/dashboard/team'
+        })));
+    }
     await ActivityModel.create({
         id: generateId(), agencyId: agency?.id, user: currentUser.name, userId: currentUser.id,
         action: 'submitted leave request', target: `${leaveData.type} leave for ${daysDiff} days`,
@@ -3934,7 +4016,7 @@ export async function approveLeaveRequest(leaveRequestId: string) {
     const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
     const employee = await UserModel.findOne({ id: (leaveRequest as any).userId, agencyId: agency?.id }).select('-password').lean();
-    if (employee) {
+    if (employee && await isNotifEnabled('leave')) {
         await NotificationModel.create({
             id: generateId(), agencyId: agency?.id, userId: (leaveRequest as any).userId,
             message: `Your ${(leaveRequest as any).type} leave request (${daysDiff} day${daysDiff > 1 ? 's' : ''}) has been approved by ${currentUser.name}`,
@@ -3993,7 +4075,7 @@ export async function rejectLeaveRequest(leaveRequestId: string, rejectionReason
     const daysDiff2 = Math.ceil((endDate2.getTime() - startDate2.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     const employee2 = await UserModel.findOne({ id: (leaveRequest as any).userId, agencyId: agency?.id }).select('-password').lean();
 
-    if (employee2) {
+    if (employee2 && await isNotifEnabled('leave')) {
         const message = rejectionReason
             ? `Your ${(leaveRequest as any).type} leave request (${daysDiff2} day${daysDiff2 > 1 ? 's' : ''}) was rejected by ${currentUser.name}. Reason: ${rejectionReason}`
             : `Your ${(leaveRequest as any).type} leave request (${daysDiff2} day${daysDiff2 > 1 ? 's' : ''}) was rejected by ${currentUser.name}`;
@@ -4057,11 +4139,13 @@ export async function cancelLeaveRequest(leaveRequestId: string) {
 
     if (currentUser.role !== 'admin') {
         const adminUsers2 = await UserModel.find({ agencyId: agency?.id, role: 'admin' }).select('-password').lean();
-        await NotificationModel.insertMany(adminUsers2.map((admin: any) => ({
-            id: generateId(), agencyId: agency?.id, userId: admin.id,
-            message: `${currentUser.name} cancelled their ${(leaveRequest as any).type} leave request`,
-            read: false, timestamp: new Date().toISOString(), link: '/dashboard/team'
-        })));
+        if (await isNotifEnabled('leave')) {
+            await NotificationModel.insertMany(adminUsers2.map((admin: any) => ({
+                id: generateId(), agencyId: agency?.id, userId: admin.id,
+                message: `${currentUser.name} cancelled their ${(leaveRequest as any).type} leave request`,
+                read: false, timestamp: new Date().toISOString(), link: '/dashboard/team'
+            })));
+        }
 
         // Email admins
         try {
@@ -4144,12 +4228,14 @@ export async function updateLeaveStatus(requestId: string, status: LeaveStatus) 
         { $set: { status, reviewedBy: currentUser?.id, reviewedAt: new Date().toISOString() } }
     );
     const userDoc = await UserModel.findOne({ id: (request as any).userId, agencyId: agency?.id }).select('-password').lean();
-    await NotificationModel.create({
-        id: generateId(), agencyId: agency?.id, userId: (request as any).userId,
-        message: `Your leave request for ${fmtDate((request as any).startDate, 'UTC', 'en-US')} has been ${status}`,
-        read: false, timestamp: new Date().toISOString(),
-        link: `/dashboard/team/${(userDoc as any)?.username || (request as any).userId}?tab=leaves`
-    });
+    if (await isNotifEnabled('leave')) {
+        await NotificationModel.create({
+            id: generateId(), agencyId: agency?.id, userId: (request as any).userId,
+            message: `Your leave request for ${fmtDate((request as any).startDate, 'UTC', 'en-US')} has been ${status}`,
+            read: false, timestamp: new Date().toISOString(),
+            link: `/dashboard/team/${(userDoc as any)?.username || (request as any).userId}?tab=leaves`
+        });
+    }
 
     revalidatePath('/dashboard/team');
 }
@@ -4186,7 +4272,8 @@ export async function createRefund(refund: {
     const projectIncome = incomeAgg[0]?.total || 0;
     const existingRefunds = refundAgg[0]?.total || 0;
     if (existingRefunds + refund.amount > projectIncome) {
-        throw new Error(`Refund amount exceeds project income. Project income: ₹${projectIncome.toLocaleString()}, Existing refunds: ₹${existingRefunds.toLocaleString()}, Attempted refund: ₹${refund.amount.toLocaleString()}`);
+        const _cur = await getDefaultCurrency();
+        throw new Error(`Refund amount exceeds project income. Project income: ${formatCurrency(projectIncome, _cur)}, Existing refunds: ${formatCurrency(existingRefunds, _cur)}, Attempted refund: ${formatCurrency(refund.amount, _cur)}`);
     }
 
     const newRefund = {
@@ -4200,10 +4287,10 @@ export async function createRefund(refund: {
         id: generateId(), agencyId: agency?.id, user: currentUser.name, userId: currentUser.id,
         action: 'issued refund', target: (project as any).name, timestamp: new Date().toISOString()
     });
-    if ((project as any).clientId) {
+    if ((project as any).clientId && await isNotifEnabled('refund')) {
         await NotificationModel.create({
             id: generateId(), agencyId: agency?.id, userId: (project as any).clientId,
-            message: `Refund of ₹${refund.amount.toLocaleString()} has been issued for ${(project as any).name}`,
+            message: `Refund of ${formatCurrency(refund.amount, await getDefaultCurrency())} has been issued for ${(project as any).name}`,
             read: false, timestamp: new Date().toISOString(),
             link: `/dashboard/projects/${(project as any).slug || (project as any).id}`
         });

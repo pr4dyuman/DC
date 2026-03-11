@@ -5,10 +5,8 @@ import AgencyActions from "@/components/super-admin/AgencyActions";
 
 export default async function AgencyDetailsPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const rawData = await getAgencyDetails(id);
-    // Ensure clean serialization — strip MongoDB _id/buffer for client components
-    const data = JSON.parse(JSON.stringify(rawData));
-    const { agency, stats, users } = data;
+    // JSON round-trip needed because AgencyActions is a client component
+    const { agency, stats, users } = JSON.parse(JSON.stringify(await getAgencyDetails(id)));
 
     return (
         <div className="space-y-6">
@@ -33,7 +31,8 @@ export default async function AgencyDetailsPage({ params }: { params: Promise<{ 
             <div className="flex items-center gap-3">
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${agency.plan === 'enterprise' ? 'bg-purple-500/10 text-purple-500' :
                     agency.plan === 'pro' ? 'bg-blue-500/10 text-blue-500' :
-                        'bg-muted text-muted-foreground'
+                        agency.plan === 'starter' ? 'bg-emerald-500/10 text-emerald-500' :
+                            'bg-muted text-muted-foreground'
                     }`}>
                     {agency.plan.toUpperCase()} Plan
                 </span>
@@ -88,7 +87,7 @@ export default async function AgencyDetailsPage({ params }: { params: Promise<{ 
 
             {/* Singularity AI Configuration */}
             <Link
-                href={`/super-admin/agencies/${agency.id}/ai`}
+                href={`/super-admin/settings/ai/${agency.id}`}
                 className="block bg-gradient-to-r from-purple-500/10 to-indigo-500/10 rounded-lg shadow p-6 border border-purple-500/20 hover:shadow-md transition-shadow group"
             >
                 <div className="flex items-center justify-between">
@@ -117,13 +116,15 @@ export default async function AgencyDetailsPage({ params }: { params: Promise<{ 
                     <h2 className="text-xl font-bold text-foreground">Users ({users.length})</h2>
                 </div>
                 <div className="divide-y divide-border">
-                    {users.slice(0, 10).map((user: any) => (
+                    {users.map((user: any) => (
                         <div key={user.id} className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                             <div>
                                 <p className="font-medium text-foreground">{user.name}</p>
                                 <p className="text-sm text-muted-foreground">{user.email}</p>
                             </div>
-                            <span className="px-3 py-1 bg-muted text-muted-foreground rounded-full text-sm">
+                            <span className={`px-3 py-1 rounded-full text-sm ${
+                                user.role === 'admin' ? 'bg-blue-500/10 text-blue-500' : 'bg-muted text-muted-foreground'
+                            }`}>
                                 {user.role}
                             </span>
                         </div>

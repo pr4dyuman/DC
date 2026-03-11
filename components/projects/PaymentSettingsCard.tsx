@@ -13,12 +13,14 @@ import { Pencil, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { DateTimeInput } from "@/components/ui/DateTimeInput";
+import { useCurrency } from "@/context/CurrencyContext";
 
 interface PaymentSettingsCardProps {
     project: Project;
 }
 
 export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
+    const { format: formatMoney, symbol } = useCurrency();
     const [editingConfig, setEditingConfig] = useState<ProjectServiceConfig | null>(null);
     const [loading, setLoading] = useState(false);
     const [formConfig, setFormConfig] = useState<PaymentConfig | null>(null);
@@ -91,7 +93,7 @@ export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
                                             <span className="flex items-center text-xs">
                                                 {config.paymentConfig?.type === 'installment'
                                                     ? `${config.paymentConfig.installments} Installments • Starts ${config.paymentConfig.firstPaymentDate}`
-                                                    : `₹${config.paymentConfig?.monthlyAmount}/mo • Billing starts ${config.paymentConfig?.billingStartDate}`
+                                                    : `${formatMoney(config.paymentConfig?.monthlyAmount)}/mo • Billing starts ${config.paymentConfig?.billingStartDate}`
                                                 }
                                             </span>
                                         )}
@@ -153,7 +155,7 @@ export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <Label className="text-xs">Amount per Installment (₹)</Label>
+                                            <Label className="text-xs">Amount per Installment ({symbol})</Label>
                                             <Input
                                                 type="number"
                                                 min="0"
@@ -173,7 +175,7 @@ export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
                                 ) : (
                                     <>
                                         <div className="space-y-1">
-                                            <Label className="text-xs">Monthly Amount (₹)</Label>
+                                            <Label className="text-xs">Monthly Amount ({symbol})</Label>
                                             <Input
                                                 type="number"
                                                 value={formConfig.monthlyAmount || ''}

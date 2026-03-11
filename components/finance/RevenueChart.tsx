@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { useCurrency } from "@/context/CurrencyContext";
 
 interface RevenueChartProps {
     data: {
@@ -12,6 +13,7 @@ interface RevenueChartProps {
 }
 
 export function RevenueChart({ data }: RevenueChartProps) {
+    const { symbol } = useCurrency();
     return (
         <Card>
             <CardHeader>
@@ -34,7 +36,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
                             fontSize={12}
                             tickLine={false}
                             axisLine={false}
-                            tickFormatter={(value) => `₹${value}`}
+                            tickFormatter={(value) => `${symbol}${value}`}
                         />
                         <Tooltip
                             cursor={{ fill: 'transparent' }}

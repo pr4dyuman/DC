@@ -6,7 +6,7 @@ import { getSessionUser } from "../auth";
 import { generateId } from "../utils-server";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
-import { sanitizeName, sanitizeString, sanitizeMongoInput, sanitizeUpdates, validateEmail, validatePassword } from "../validation";
+import { sanitizeName, sanitizeString, sanitizeMongoInput, sanitizeUpdates, validateEmail, validatePassword, validateStrongPassword } from "../validation";
 
 /**
  * Verify current user is super admin
@@ -161,7 +161,7 @@ export async function createAgency(data: {
     name: string;
     ownerEmail: string;
     ownerPassword: string;
-    plan: 'free' | 'pro' | 'enterprise';
+    plan: 'free' | 'starter' | 'pro' | 'enterprise';
     customLimits?: Partial<Agency['limits']>;
     customFeatures?: Partial<Agency['features']>;
 }) {
@@ -172,7 +172,17 @@ export async function createAgency(data: {
     data.name = sanitizeName(data.name, 200);
     if (!data.name) throw new Error('Agency name is required');
     data.ownerEmail = validateEmail(data.ownerEmail);
-    validatePassword(data.ownerPassword);
+    // Check system-level strong password policy
+    const sys = await SystemSettingsModel.findOne(
+        { key: 'global' },
+        { 'security.enforceStrongPasswords': 1 }
+    ).lean() as any;
+    const enforceStrong = sys?.security?.enforceStrongPasswords ?? true;
+    if (enforceStrong) {
+        validateStrongPassword(data.ownerPassword);
+    } else {
+        validatePassword(data.ownerPassword);
+    }
 
     // Check if email already exists
     const existingUser = await UserModel.findOne({ email: data.ownerEmail });
@@ -259,6 +269,19 @@ export async function createAgency(data: {
         userId: sa.userId,
     });
 
+    // Send super-admin email alert if enabled
+    const alertSettings = await getSuperAdminAlertSettings();
+    if (alertSettings.emailOnAgencyCreated) {
+        const esc = (s: string) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        await sendSuperAdminAlertEmail(
+            `New Agency Created: ${data.name}`,
+            `<p><strong>Agency:</strong> ${esc(data.name)}</p>
+            <p><strong>Plan:</strong> ${esc(data.plan.toUpperCase())}</p>
+            <p><strong>Owner:</strong> ${esc(data.ownerEmail)}</p>
+            <p><strong>Created:</strong> ${new Date().toLocaleDateString()}</p>`
+        );
+    }
+
     revalidatePath('/super-admin/agencies');
 
     return { agency, owner };
@@ -301,6 +324,9 @@ export async function suspendAgency(agencyId: string, password: string, reason?:
     const sa = await verifySuperAdmin();
     await connectDB();
 
+    // Sanitize reason before storage/display
+    if (reason) reason = sanitizeString(reason, 1000);
+
     // Verify super-admin password before destructive operation
     if (!password) throw new Error('Password is required to suspend an agency');
     const superAdmin = await SuperAdminModel.findOne({ id: sa.userId }).lean();
@@ -329,6 +355,19 @@ export async function suspendAgency(agencyId: string, password: string, reason?:
         agencyId,
         userId: sa.userId,
     });
+
+    // Send super-admin email alert if enabled
+    const alertSettings = await getSuperAdminAlertSettings();
+    if (alertSettings.emailOnAgencySuspended) {
+        const esc = (s: string) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const agencyName = agency?.name || agencyId;
+        await sendSuperAdminAlertEmail(
+            `Agency Suspended: ${agencyName}`,
+            `<p><strong>Agency:</strong> ${esc(agencyName)}</p>
+            ${reason ? `<p><strong>Reason:</strong> ${esc(reason)}</p>` : ''}
+            <p><strong>Suspended at:</strong> ${new Date().toLocaleDateString()}</p>`
+        );
+    }
 
     revalidatePath('/super-admin/agencies');
     revalidatePath(`/super-admin/agencies/${agencyId}`);
@@ -567,17 +606,122 @@ export async function getSystemSettings() {
     return toSerializable(settings);
 }
 
-export async function updateSystemSettings(section: 'platform' | 'security' | 'notifications', data: Record<string, any>) {
+/** Public read of security settings — no auth required (used by signup route) */
+export async function getPublicSecuritySettings(): Promise<{
+    allowSelfRegistration: boolean;
+    enforceStrongPasswords: boolean;
+}> {
+    await connectDB();
+    const settings = await SystemSettingsModel.findOne(
+        { key: 'global' },
+        { 'security.allowSelfRegistration': 1, 'security.enforceStrongPasswords': 1 }
+    ).lean() as any;
+    return {
+        allowSelfRegistration: settings?.security?.allowSelfRegistration ?? false,
+        enforceStrongPasswords: settings?.security?.enforceStrongPasswords ?? true,
+    };
+}
+
+/** Public read of platform default currency — no auth required */
+export async function getDefaultCurrency(): Promise<string> {
+    await connectDB();
+    const settings = await SystemSettingsModel.findOne(
+        { key: 'global' },
+        { 'platform.defaultCurrency': 1 }
+    ).lean() as any;
+    return settings?.platform?.defaultCurrency || 'USD';
+}
+
+/** Public read of notification defaults — no auth required (used by actions.ts) */
+export async function getNotificationDefaults(): Promise<Record<string, boolean>> {
+    await connectDB();
+    const settings = await SystemSettingsModel.findOne(
+        { key: 'global' },
+        { 'notificationDefaults': 1 }
+    ).lean() as any;
+    return {
+        welcome: settings?.notificationDefaults?.welcome ?? true,
+        project: settings?.notificationDefaults?.project ?? true,
+        task: settings?.notificationDefaults?.task ?? true,
+        invoice: settings?.notificationDefaults?.invoice ?? true,
+        salary: settings?.notificationDefaults?.salary ?? true,
+        leave: settings?.notificationDefaults?.leave ?? true,
+        refund: settings?.notificationDefaults?.refund ?? true,
+        document: settings?.notificationDefaults?.document ?? true,
+        security: settings?.notificationDefaults?.security ?? true,
+    };
+}
+
+/** Read super-admin email alert settings — no auth (used internally) */
+async function getSuperAdminAlertSettings(): Promise<{
+    emailOnAgencyCreated: boolean;
+    emailOnAgencySuspended: boolean;
+    weeklySummary: boolean;
+}> {
+    await connectDB();
+    const settings = await SystemSettingsModel.findOne(
+        { key: 'global' },
+        { 'notifications': 1 }
+    ).lean() as any;
+    return {
+        emailOnAgencyCreated: settings?.notifications?.emailOnAgencyCreated ?? true,
+        emailOnAgencySuspended: settings?.notifications?.emailOnAgencySuspended ?? true,
+        weeklySummary: settings?.notifications?.weeklySummary ?? false,
+    };
+}
+
+/** Send an email alert to the super-admin */
+async function sendSuperAdminAlertEmail(subject: string, body: string) {
+    try {
+        const sa = await SuperAdminModel.findOne({}).select('email name').lean() as any;
+        if (!sa?.email) return;
+        const { sendEmail } = await import("../brevo");
+        // subject is used in visible <h2> — escape it
+        const escSubject = subject.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        await sendEmail({
+            to: sa.email,
+            toName: sa.name || 'Super Admin',
+            subject,
+            htmlContent: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f8f9fa;border-radius:8px;">
+                <h2 style="margin:0 0 16px;color:#1a1a2e;">${escSubject}</h2>
+                <div style="background:#fff;padding:20px;border-radius:6px;border:1px solid #e5e7eb;color:#374151;line-height:1.6;">${body}</div>
+                <p style="margin:16px 0 0;font-size:12px;color:#9ca3af;">This is an automated alert from your AgencyOS platform.</p>
+            </div>`,
+        });
+    } catch (e) {
+        console.error('Failed to send super-admin alert email:', e);
+    }
+}
+
+export async function updateSystemSettings(section: 'platform' | 'security' | 'notifications' | 'emailDefaults' | 'notificationDefaults', data: Record<string, any>) {
     await verifySuperAdmin();
     await connectDB();
+
+    const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
     // Build $set object with section prefix
     const setObj: Record<string, any> = {};
     for (const [k, v] of Object.entries(data)) {
+        if (DANGEROUS_KEYS.has(k)) continue;
         if (typeof v === 'string') {
             setObj[`${section}.${k}`] = v.slice(0, 500);
         } else if (typeof v === 'boolean') {
             setObj[`${section}.${k}`] = v;
+        } else if (typeof v === 'object' && v !== null) {
+            // Handle nested objects (e.g. taskEmailEvents.taskCreated.enabled)
+            for (const [nk, nv] of Object.entries(v)) {
+                if (DANGEROUS_KEYS.has(nk)) continue;
+                if (typeof nv === 'boolean') {
+                    setObj[`${section}.${k}.${nk}`] = nv;
+                } else if (typeof nv === 'object' && nv !== null) {
+                    for (const [nnk, nnv] of Object.entries(nv)) {
+                        if (DANGEROUS_KEYS.has(nnk)) continue;
+                        if (typeof nnv === 'boolean') {
+                            setObj[`${section}.${k}.${nk}.${nnk}`] = nnv;
+                        }
+                    }
+                }
+            }
         }
     }
 

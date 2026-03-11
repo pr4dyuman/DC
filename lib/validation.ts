@@ -75,7 +75,7 @@ export function validateEmail(input: string): string {
 
 /**
  * Validate password strength.
- * Minimum 6 chars, at least 1 letter and 1 number.
+ * Minimum 8 chars, at least 1 letter and 1 number.
  */
 export function validatePassword(input: string): string {
     if (typeof input !== 'string') throw new Error('Password must be a string');
@@ -83,6 +83,21 @@ export function validatePassword(input: string): string {
     if (input.length > 128) throw new Error('Password must be at most 128 characters');
     if (!/[a-zA-Z]/.test(input)) throw new Error('Password must contain at least 1 letter');
     if (!/[0-9]/.test(input)) throw new Error('Password must contain at least 1 number');
+    return input;
+}
+
+/**
+ * Validate strong password (when enforceStrongPasswords is ON).
+ * Minimum 10 chars, uppercase, lowercase, number, and special character.
+ */
+export function validateStrongPassword(input: string): string {
+    if (typeof input !== 'string') throw new Error('Password must be a string');
+    if (input.length < 10) throw new Error('Password must be at least 10 characters');
+    if (input.length > 128) throw new Error('Password must be at most 128 characters');
+    if (!/[a-z]/.test(input)) throw new Error('Password must contain at least 1 lowercase letter');
+    if (!/[A-Z]/.test(input)) throw new Error('Password must contain at least 1 uppercase letter');
+    if (!/[0-9]/.test(input)) throw new Error('Password must contain at least 1 number');
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(input)) throw new Error('Password must contain at least 1 special character');
     return input;
 }
 

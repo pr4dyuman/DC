@@ -82,7 +82,6 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
         })();
     }, [params]);
 
-    // When provider changes, reset model to first of that provider
     const handleProviderChange = (newProvider: AIProvider) => {
         setProvider(newProvider);
         const models = AI_MODELS[newProvider];
@@ -160,11 +159,11 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
             {/* Header */}
             <div>
                 <Link
-                    href={`/super-admin/agencies/${agencyId}`}
+                    href="/super-admin/settings"
                     className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4"
                 >
                     <ArrowLeft className="w-4 h-4" />
-                    <span>Back to {agencyName}</span>
+                    <span>Back to Settings</span>
                 </Link>
                 <div className="flex items-center gap-3">
                     <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg">

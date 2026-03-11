@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, ChevronDown, Menu } from "lucide-react";
 import { getAllAgencies, switchAgency, clearAgencySelection } from "@/lib/agency-context";
+import Cookies from "js-cookie";
 
 interface SuperAdminTopbarProps {
     onMenuClick?: () => void;
@@ -18,11 +19,9 @@ export default function SuperAdminTopbar({ onMenuClick }: SuperAdminTopbarProps)
 
     useEffect(() => {
         loadAgencies();
-        // Get selected agency from cookie
-        const cookies = document.cookie.split(';');
-        const selectedCookie = cookies.find(c => c.trim().startsWith('selectedAgencyId='));
-        if (selectedCookie) {
-            setSelectedAgency(selectedCookie.split('=')[1]);
+        const selected = Cookies.get('selectedAgencyId');
+        if (selected) {
+            setSelectedAgency(selected);
         }
     }, []);
 

@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 import { useDateFormat } from "@/context/TimezoneContext";
+import { useCurrency } from "@/context/CurrencyContext";
 
 // Helper: download vCard for client
 function downloadVCard(client: Client) {
@@ -86,6 +87,7 @@ function ClientDetailSkeleton() {
 export default function ClientDetailPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = use(params);
     const fmt = useDateFormat();
+    const { format: formatMoney } = useCurrency();
     const [client, setClient] = useState<Client | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     const [financeData, setFinanceData] = useState<{
@@ -340,7 +342,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                         {financeData && financeData.stats.pendingAmount > 0 && (
                             <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-1.5">
                                 <AlertCircle className="h-3 w-3" />
-                                ₹{financeData.stats.pendingAmount.toLocaleString()} pending
+                                {formatMoney(financeData.stats.pendingAmount)} pending
                             </div>
                         )}
                     </div>
@@ -367,7 +369,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                 <CreditCard className="h-4 w-4 text-yellow-500" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-foreground">₹{financeData?.stats.ltv.toLocaleString() ?? '0'}</div>
+                                <div className="text-2xl font-bold text-foreground">{formatMoney(financeData?.stats.ltv)}</div>
                                 <p className="text-xs text-muted-foreground mt-1">Total paid amount</p>
                             </CardContent>
                         </Card>
@@ -389,7 +391,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                 <FileText className="h-4 w-4 text-yellow-500" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-foreground">₹{financeData?.stats.pendingAmount.toLocaleString() ?? '0'}</div>
+                                <div className="text-2xl font-bold text-foreground">{formatMoney(financeData?.stats.pendingAmount)}</div>
                                 <p className="text-xs text-muted-foreground mt-1">{financeData?.invoices.filter(i => i.status === 'Pending').length ?? 0} invoices pending</p>
                             </CardContent>
                         </Card>
@@ -400,7 +402,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                 <CheckCircle2 className="h-4 w-4 text-green-500" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-foreground">₹{financeData?.stats.totalPaid.toLocaleString() ?? '0'}</div>
+                                <div className="text-2xl font-bold text-foreground">{formatMoney(financeData?.stats.totalPaid)}</div>
                                 <p className="text-xs text-muted-foreground mt-1">Settled payments</p>
                             </CardContent>
                         </Card>
@@ -495,7 +497,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                     <CardContent>
                                         <div className="flex justify-between text-sm py-2 border-t border-border">
                                             <span className="text-muted-foreground">Budget</span>
-                                            <span className="font-medium text-foreground">₹{project.budget?.toLocaleString() ?? '—'}</span>
+                                            <span className="font-medium text-foreground">{formatMoney(project.budget)}</span>
                                         </div>
                                         {project.dueDate && (
                                             <div className="flex justify-between text-sm pt-2">
@@ -539,7 +541,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-sm font-bold text-foreground">₹{invoice.amount.toLocaleString()}</p>
+                                                    <p className="text-sm font-bold text-foreground">{formatMoney(invoice.amount)}</p>
                                                     <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 rounded-full ${invoice.status === 'Paid' ? 'bg-green-900/30 text-green-500' :
                                                         invoice.status === 'Pending' ? 'bg-yellow-900/30 text-yellow-500' : 'bg-red-900/30 text-red-500'
                                                         }`}>
@@ -580,7 +582,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ slug: s
                                                 </div>
                                                 <p className={`text-sm font-bold ${tx.type?.toLowerCase() === 'income' ? 'text-green-500' : 'text-foreground'
                                                     }`}>
-                                                    {tx.type?.toLowerCase() === 'income' ? '+' : '-'} ₹{tx.amount.toLocaleString()}
+                                                    {tx.type?.toLowerCase() === 'income' ? '+' : '-'} {formatMoney(tx.amount)}
                                                 </p>
                                             </div>
                                         ))}

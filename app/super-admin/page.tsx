@@ -4,9 +4,7 @@ import Link from "next/link";
 import { Building2, Users, FolderKanban, DollarSign, TrendingUp, AlertCircle } from "lucide-react";
 
 export default async function SuperAdminDashboard() {
-    const rawAnalytics = await getSystemAnalytics();
-    // Ensure plain objects for RSC serialization
-    const analytics = JSON.parse(JSON.stringify(rawAnalytics));
+    const analytics = await getSystemAnalytics();
 
     const stats = [
         {
@@ -73,10 +71,14 @@ export default async function SuperAdminDashboard() {
             {/* Agencies by Plan */}
             <div className="bg-card border border-border rounded-lg shadow p-6">
                 <h2 className="text-xl font-bold text-foreground mb-4">Agencies by Plan</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div className="text-center p-4 bg-muted rounded-lg">
                         <p className="text-2xl font-bold text-foreground">{analytics.agenciesByPlan.free || 0}</p>
                         <p className="text-sm text-muted-foreground mt-1">Free Plan</p>
+                    </div>
+                    <div className="text-center p-4 bg-emerald-500/10 rounded-lg">
+                        <p className="text-2xl font-bold text-emerald-500">{analytics.agenciesByPlan.starter || 0}</p>
+                        <p className="text-sm text-emerald-400 mt-1">Starter Plan</p>
                     </div>
                     <div className="text-center p-4 bg-blue-500/10 rounded-lg">
                         <p className="text-2xl font-bold text-blue-500">{analytics.agenciesByPlan.pro || 0}</p>
@@ -111,7 +113,8 @@ export default async function SuperAdminDashboard() {
                                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${agency.plan === 'enterprise' ? 'bg-purple-500/10 text-purple-500' :
                                         agency.plan === 'pro' ? 'bg-blue-500/10 text-blue-500' :
-                                            'bg-muted text-muted-foreground'
+                                            agency.plan === 'starter' ? 'bg-emerald-500/10 text-emerald-500' :
+                                                'bg-muted text-muted-foreground'
                                         }`}>
                                         {agency.plan.toUpperCase()}
                                     </span>

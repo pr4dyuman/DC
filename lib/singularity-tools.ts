@@ -41,6 +41,8 @@ import {
     UserModel, ActivityModel, NotificationModel, AssetModel,
 } from "./mongodb";
 import { generateId } from "./utils-server";
+import { formatCurrency, getCurrencySymbol } from "./currency";
+import { getDefaultCurrency } from "./actions/super-admin";
 import crypto from "crypto";
 import type { AIPermissions } from "./types";
 
@@ -182,6 +184,9 @@ export async function executeTool(
     userId: string
 ): Promise<{ success: boolean; data: any; summary: string; rollbackData?: RollbackAction[] }> {
     try {
+        const _currency = await getDefaultCurrency();
+        const fmtCur = (amount: number) => formatCurrency(amount, _currency);
+
         // ── Role-based permission check ──────────────────────────────
         const userRole = await getUserRole(userId);
         const allowedRoles = TOOL_PERMISSIONS[name];
@@ -259,7 +264,7 @@ export async function executeTool(
                 return {
                     success: true,
                     data: stats,
-                    summary: `Revenue: ₹${(stats.totalRevenue || 0).toLocaleString("en-IN")}, Expenses: ₹${(stats.totalExpenses || 0).toLocaleString("en-IN")}, Profit: ₹${(stats.netProfit || 0).toLocaleString("en-IN")}`,
+                    summary: `Revenue: ${fmtCur(stats.totalRevenue || 0)}, Expenses: ${fmtCur(stats.totalExpenses || 0)}, Profit: ${fmtCur(stats.netProfit || 0)}`,
                 };
             }
 
@@ -472,7 +477,7 @@ export async function executeTool(
                 return {
                     success: true,
                     data: { id: newInvoice.id, amount: newInvoice.amount },
-                    summary: `Invoice created: ₹${args.amount.toLocaleString("en-IN")}${args.status ? ` (${args.status})` : ""}`,
+                    summary: `Invoice created: ${fmtCur(args.amount)}${args.status ? ` (${args.status})` : ""}`,
                     rollbackData: [{
                         toolName: 'create_invoice',
                         actionType: 'create',
@@ -720,7 +725,7 @@ export async function executeTool(
                     },
                     summary: `✅ ${created.length}/${txns.length} transactions imported` +
                         (failed.length > 0 ? ` (${failed.length} failed)` : "") +
-                        ` | Income: ₹${totalIncome.toLocaleString("en-IN")} | Expenses: ₹${totalExpense.toLocaleString("en-IN")}`,
+                        ` | Income: ${fmtCur(totalIncome)} | Expenses: ${fmtCur(totalExpense)}`,
                     rollbackData: created.length > 0 ? [{
                         toolName: 'bulk_add_transactions',
                         actionType: 'create',
@@ -756,7 +761,7 @@ export async function executeTool(
                 return {
                     success: true,
                     data: { id: txn.id, category: txn.category, type: txn.type, amount: txn.amount },
-                    summary: `${args.type === "income" ? "Income" : "Expense"} of ₹${args.amount.toLocaleString("en-IN")} added (${args.category})${extraInfo}`,
+                    summary: `${args.type === "income" ? "Income" : "Expense"} of ${fmtCur(args.amount)} added (${args.category})${extraInfo}`,
                     rollbackData: [{
                         toolName: 'add_transaction',
                         actionType: 'create',
@@ -783,7 +788,7 @@ export async function executeTool(
                         description: t.description,
                         status: t.status,
                     })),
-                    summary: `${filtered.length} transaction(s) found | Total: ₹${filtered.reduce((sum: number, t: any) => sum + (t.type === "income" ? t.amount : -t.amount), 0).toLocaleString("en-IN")}`,
+                    summary: `${filtered.length} transaction(s) found | Total: ${fmtCur(filtered.reduce((sum: number, t: any) => sum + (t.type === "income" ? t.amount : -t.amount), 0))}`,
                 };
             }
 
@@ -949,7 +954,7 @@ export async function executeTool(
                         date: inv.date,
                         description: inv.description,
                     })),
-                    summary: `${filtered.length} invoice(s)${args.status ? ` (${args.status})` : ""} | Total: ₹${filtered.reduce((sum: number, i: any) => sum + i.amount, 0).toLocaleString("en-IN")}`,
+                    summary: `${filtered.length} invoice(s)${args.status ? ` (${args.status})` : ""} | Total: ${fmtCur(filtered.reduce((sum: number, i: any) => sum + i.amount, 0))}`,
                 };
             }
 
@@ -1045,7 +1050,7 @@ export async function executeTool(
                 return {
                     success: true,
                     data: { userId: args.userId, amount: args.amount, month: args.month },
-                    summary: `Salary of ₹${args.amount.toLocaleString('en-IN')} paid to ${empUser?.name || 'employee'} for ${args.month}`,
+                    summary: `Salary of ${fmtCur(args.amount)} paid to ${empUser?.name || 'employee'} for ${args.month}`,
                     rollbackData: [{
                         toolName: 'pay_employee', actionType: 'create', entityType: 'transaction',
                         entityId: '', executedAt: new Date().toISOString(),
@@ -1061,7 +1066,7 @@ export async function executeTool(
                 for (const pay of args.payments) {
                     const emp = await getUser(pay.userId);
                     await payEmployee(pay.userId, pay.amount, args.month, emp?.name || 'Employee');
-                    results.push(`${emp?.name || pay.userId}: ₹${pay.amount.toLocaleString('en-IN')}`);
+                    results.push(`${emp?.name || pay.userId}: ${fmtCur(pay.amount)}`);
                 }
                 return {
                     success: true,
@@ -1176,7 +1181,7 @@ export async function executeTool(
                 return {
                     success: true,
                     data: { id: refundResult.id, amount: args.amount },
-                    summary: `Refund of ₹${args.amount.toLocaleString('en-IN')} created — ${args.description}`,
+                    summary: `Refund of ${fmtCur(args.amount)} created — ${args.description}`,
                     rollbackData: [{
                         toolName: 'create_refund', actionType: 'create', entityType: 'transaction',
                         entityId: refundResult.id, executedAt: new Date().toISOString(),
@@ -1281,7 +1286,7 @@ export async function executeTool(
                 return {
                     success: true,
                     data: { transactionId: args.transactionId },
-                    summary: `Transaction deleted: ₹${(txn as any).amount.toLocaleString('en-IN')} (${(txn as any).category})`,
+                    summary: `Transaction deleted: ${fmtCur((txn as any).amount)} (${(txn as any).category})`,
                     rollbackData: txnSnapshot ? [{
                         toolName: 'delete_transaction', actionType: 'delete', entityType: 'transaction',
                         entityId: args.transactionId, beforeSnapshot: txnSnapshot, executedAt: new Date().toISOString(),

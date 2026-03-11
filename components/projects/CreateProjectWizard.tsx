@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, ArrowRight, Check, Calendar, CreditCard, Layers, User, Banknote } from "lucide-react";
 import { useDateFormat } from "@/context/TimezoneContext";
+import { useCurrency } from "@/context/CurrencyContext";
 import { getClients, getServices, createProject } from "@/lib/actions";
 import { ProjectServiceConfig, PaymentConfig } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ interface CreateProjectWizardProps {
 
 export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: CreateProjectWizardProps) {
     const fmt = useDateFormat();
+    const { symbol } = useCurrency();
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -243,7 +245,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
             </div>
 
             <div className="space-y-2">
-                <Label>Overall Budget Estimate (₹)</Label>
+                <Label>Overall Budget Estimate ({symbol})</Label>
                 <div className="relative">
                     <Banknote className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -386,7 +388,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
                                         ) : (
                                             <>
                                                 <div className="space-y-1">
-                                                    <Label className="text-xs">Monthly Amount (₹)</Label>
+                                                    <Label className="text-xs">Monthly Amount ({symbol})</Label>
                                                     <Input
                                                         type="number"
                                                         placeholder="e.g. 500"

@@ -1,8 +1,9 @@
-import { TrendingUp, TrendingDown, Wallet, Target, CalendarClock, CreditCard, BarChart3, ArrowUpRight, ArrowDownRight } from "lucide-react";
+﻿import { TrendingUp, TrendingDown, Wallet, Target, CalendarClock, CreditCard, BarChart3, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Project, Transaction } from "@/lib/types";
 import { useDateFormat } from "@/context/TimezoneContext";
+import { useCurrency } from "@/context/CurrencyContext";
 
 interface ProjectFinanceSummaryProps {
     project: Project;
@@ -55,11 +56,7 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
     const budgetProgress = displayBudget > 0 ? Math.min(100, (totalPaid / displayBudget) * 100) : 0;
     const hasData = totalVolume > 0;
 
-    const formatter = new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        maximumFractionDigits: 0
-    });
+    const { format: formatMoney } = useCurrency();
 
     // Recent transactions (last 3)
     const recentTxns = projectTransactions
@@ -76,7 +73,7 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
                     {totalMonthlyRate > 0 && (
                         <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-400 rounded-full text-sm font-medium border border-blue-500/20">
                             <CalendarClock className="w-4 h-4" />
-                            <span>Recurring: {formatter.format(totalMonthlyRate)}/mo</span>
+                            <span>Recurring: {formatMoney(totalMonthlyRate)}/mo</span>
                         </div>
                     )}
                 </div>
@@ -91,7 +88,7 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-purple-300">
-                            {displayBudget > 0 ? formatter.format(displayBudget) : 'Not Set'}
+                            {displayBudget > 0 ? formatMoney(displayBudget) : 'Not Set'}
                         </div>
                         <p className="text-xs text-purple-400/70 mt-1">
                             {totalFixedBudget > 0 ? 'From service configs' : displayBudget > 0 ? 'Project budget' : 'Configure payment settings below'}
@@ -107,7 +104,7 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-emerald-300">
-                            {formatter.format(totalPaid)}
+                            {formatMoney(totalPaid)}
                         </div>
                         <p className="text-xs text-emerald-400/70 mt-1">
                             {projectTransactions.filter(t => t.type === 'income').length} payment{projectTransactions.filter(t => t.type === 'income').length !== 1 ? 's' : ''} received
@@ -124,8 +121,8 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
                     <CardContent>
                         <div className={`text-2xl font-bold ${remainingFixedBalance > 0 ? 'text-amber-300' : 'text-emerald-300'}`}>
                             {displayBudget > 0
-                                ? (remainingFixedBalance > 0 ? formatter.format(remainingFixedBalance) : '✓ Paid')
-                                : '—'
+                                ? (remainingFixedBalance > 0 ? formatMoney(remainingFixedBalance) : 'âœ“ Paid')
+                                : 'â€”'
                             }
                         </div>
                         <p className={`text-xs mt-1 ${remainingFixedBalance > 0 ? 'text-amber-400/70' : 'text-emerald-400/70'}`}>
@@ -145,7 +142,7 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
                     </CardHeader>
                     <CardContent>
                         <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-blue-300' : 'text-red-300'}`}>
-                            {formatter.format(netProfit)}
+                            {formatMoney(netProfit)}
                         </div>
                         <p className={`text-xs mt-1 ${netProfit >= 0 ? 'text-blue-400/70' : 'text-red-400/70'}`}>
                             {totalPaid > 0 ? `Margin: ${profitMargin.toFixed(1)}%` : 'No income yet'}
@@ -163,7 +160,7 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
                     <div>
                         <h4 className="font-semibold text-blue-300">Monthly Coverage</h4>
                         <p className="text-sm text-blue-400 mt-1">
-                            Excess payment of <strong>{formatter.format(excessPayment)}</strong> covers approximately <strong>{monthsCovered.toFixed(1)} months</strong> of recurring services.
+                            Excess payment of <strong>{formatMoney(excessPayment)}</strong> covers approximately <strong>{monthsCovered.toFixed(1)} months</strong> of recurring services.
                         </p>
                     </div>
                 </div>
@@ -180,15 +177,15 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
                             </div>
                             <Progress value={budgetProgress} className="h-2.5" />
                             <div className="flex justify-between text-xs text-muted-foreground">
-                                <span>Collected: {formatter.format(totalPaid)}</span>
-                                <span>Target: {formatter.format(displayBudget)}</span>
+                                <span>Collected: {formatMoney(totalPaid)}</span>
+                                <span>Target: {formatMoney(displayBudget)}</span>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
             )}
 
-            {/* Expenditure Ratio — only show when there's actual data */}
+            {/* Expenditure Ratio â€” only show when there's actual data */}
             {hasData ? (
                 <Card className="border-border/50">
                     <CardHeader className="pb-3">
@@ -213,12 +210,12 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
                                 <span className="flex items-center gap-1.5">
                                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                                     <span className="text-muted-foreground">Income</span>
-                                    <span className="font-semibold text-emerald-400">{formatter.format(totalPaid)}</span>
+                                    <span className="font-semibold text-emerald-400">{formatMoney(totalPaid)}</span>
                                 </span>
                                 <span className="flex items-center gap-1.5">
                                     <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
                                     <span className="text-muted-foreground">Expenses</span>
-                                    <span className="font-semibold text-red-400">{formatter.format(totalExpenses)}</span>
+                                    <span className="font-semibold text-red-400">{formatMoney(totalExpenses)}</span>
                                 </span>
                             </div>
                         </div>
@@ -258,7 +255,7 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
                                     </p>
                                 </div>
                                 <span className={`text-sm font-semibold ${txn.type === 'income' ? 'text-emerald-400' : 'text-red-400'}`}>
-                                    {txn.type === 'income' ? '+' : '-'}{formatter.format(txn.amount)}
+                                    {txn.type === 'income' ? '+' : '-'}{formatMoney(txn.amount)}
                                 </span>
                             </div>
                         ))}

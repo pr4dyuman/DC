@@ -18,6 +18,8 @@ import { PendingPayablesList } from "@/components/finance/PendingPayablesList";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { formatCurrency } from "@/lib/currency";
+import { getDefaultCurrency } from "@/lib/actions/super-admin";
 
 interface FinanceContentProps {
     searchParams: { [key: string]: string | string[] | undefined };
@@ -27,6 +29,7 @@ interface FinanceContentProps {
 }
 
 export async function FinanceContent({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+    const currency = await getDefaultCurrency();
     const params = searchParams;
     const projectId = typeof params.projectId === 'string' ? params.projectId : undefined;
     const username = typeof params.username === 'string' ? params.username : undefined;
@@ -79,7 +82,7 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
                     <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">My Invoices</h2>
                     <div className="text-right">
                         <p className="text-sm text-muted-foreground">Total Due</p>
-                        <p className="text-2xl font-bold text-emerald-500">₹{pendingTotal.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-emerald-500">{formatCurrency(pendingTotal, currency)}</p>
                     </div>
                 </div>
 
@@ -293,7 +296,7 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
                                     </CardHeader>
                                     <CardContent>
                                         <div className="text-2xl font-bold">
-                                            {memberTransactions.reduce((sum, t) => sum + t.amount, 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}
+                                            {formatCurrency(memberTransactions.reduce((sum, t) => sum + t.amount, 0), currency)}
                                         </div>
                                         <p className="text-xs text-muted-foreground">
                                             {memberTransactions.length} transactions

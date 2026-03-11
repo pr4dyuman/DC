@@ -7,6 +7,7 @@ import { Plus, Search, AlertCircle, LayoutGrid, List, Loader2 } from "lucide-rea
 import { Badge } from "@/components/ui/badge";
 import { differenceInCalendarDays } from "date-fns";
 import { CreateProjectWizard } from "@/components/projects/CreateProjectWizard";
+import { useCurrency } from "@/context/CurrencyContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 
@@ -60,6 +61,7 @@ export function ProjectsContent({
     currentUser,
 }: ProjectsContentProps) {
     const [projects, setProjects] = useState(initialProjects);
+    const { format: formatMoney } = useCurrency();
     const [services] = useState(initialServices);
     const [allTasks] = useState(initialTasks);
     const [allUsers] = useState(initialUsers);
@@ -195,7 +197,7 @@ export function ProjectsContent({
 
                         <div className="flex items-center gap-2">
                             {project.budget > 0 && (
-                                <span className="text-xs text-muted-foreground font-medium">₹{project.budget.toLocaleString()}</span>
+                                <span className="text-xs text-muted-foreground font-medium">{formatMoney(project.budget)}</span>
                             )}
                             <DaysLabel dueDate={project.dueDate} status={project.status} />
                         </div>

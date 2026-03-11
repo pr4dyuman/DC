@@ -1,5 +1,8 @@
+﻿"use client";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IndianRupee, TrendingDown, TrendingUp, CreditCard } from "lucide-react";
+import { TrendingDown, TrendingUp, CreditCard, Banknote } from "lucide-react";
+import { useCurrency } from "@/context/CurrencyContext";
 
 interface StatsCardsProps {
     stats: {
@@ -12,11 +15,7 @@ interface StatsCardsProps {
 }
 
 export function StatsCards({ stats }: StatsCardsProps) {
-    const formatter = new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        maximumFractionDigits: 0
-    });
+    const { format: formatMoney } = useCurrency();
 
     const profitMargin = stats.totalRevenue > 0 ? ((stats.netProfit / stats.totalRevenue) * 100).toFixed(1) : '0';
 
@@ -26,11 +25,11 @@ export function StatsCards({ stats }: StatsCardsProps) {
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
                     <div className="rounded-md bg-emerald-500/10 p-1.5">
-                        <IndianRupee className="h-4 w-4 text-emerald-400" />
+                        <Banknote className="h-4 w-4 text-emerald-400" />
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">{formatter.format(stats.totalRevenue)}</div>
+                    <div className="text-2xl font-bold">{formatMoney(stats.totalRevenue)}</div>
                     <p className="text-xs text-muted-foreground">All completed income</p>
                 </CardContent>
             </Card>
@@ -42,7 +41,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">{formatter.format(stats.totalExpenses)}</div>
+                    <div className="text-2xl font-bold">{formatMoney(stats.totalExpenses)}</div>
                     <p className="text-xs text-muted-foreground">All completed expenses</p>
                 </CardContent>
             </Card>
@@ -54,7 +53,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">{formatter.format(stats.netProfit)}</div>
+                    <div className="text-2xl font-bold">{formatMoney(stats.netProfit)}</div>
                     <p className="text-xs text-muted-foreground">
                         {profitMargin}% margin
                     </p>
@@ -68,7 +67,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">{formatter.format(stats.pendingInvoicesAmount)}</div>
+                    <div className="text-2xl font-bold">{formatMoney(stats.pendingInvoicesAmount)}</div>
                     <p className="text-xs text-muted-foreground">
                         {stats.pendingInvoicesCount !== undefined ? `${stats.pendingInvoicesCount} invoices pending` : 'Awaiting payment'}
                     </p>

@@ -13,7 +13,7 @@ export default function CreateAgencyForm() {
         name: "",
         ownerEmail: "",
         ownerPassword: "",
-        plan: "free" as "free" | "pro" | "enterprise"
+        plan: "free" as "free" | "starter" | "pro" | "enterprise"
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -93,8 +93,9 @@ export default function CreateAgencyForm() {
                     onChange={(e) => setFormData({ ...formData, plan: e.target.value as any })}
                     className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
-                    <option value="free">Free (5 users, 10 projects)</option>
-                    <option value="pro">Pro (25 users, 100 projects)</option>
+                    <option value="free">Free (3 users, 5 projects)</option>
+                    <option value="starter">Starter (10 users, 50 projects)</option>
+                    <option value="pro">Pro (50 users, 500 projects)</option>
                     <option value="enterprise">Enterprise (Unlimited)</option>
                 </select>
             </div>

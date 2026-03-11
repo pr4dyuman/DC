@@ -100,3 +100,24 @@ export const DEFAULT_EMAIL_CATEGORIES: Record<EmailCategory, boolean> = {
   leaveManagement: false,
   documentApproval: false,
 };
+
+/** Task email event types with per-recipient toggles */
+export type TaskEmailEventKey = 'taskCreated' | 'taskInProgress' | 'taskDone';
+
+export interface TaskEmailEventConfig {
+  enabled: boolean;
+  notifyAssignee: boolean;
+  notifyClient: boolean;
+}
+
+export const TASK_EMAIL_EVENTS: Record<TaskEmailEventKey, { label: string; description: string }> = {
+  taskCreated: { label: 'Task Created', description: 'When a new task is created and assigned' },
+  taskInProgress: { label: 'Task In Progress', description: 'When a task is moved to in-progress' },
+  taskDone: { label: 'Task Completed', description: 'When a task is marked as done' },
+};
+
+export const DEFAULT_TASK_EMAIL_EVENTS: Record<TaskEmailEventKey, TaskEmailEventConfig> = {
+  taskCreated: { enabled: true, notifyAssignee: true, notifyClient: false },
+  taskInProgress: { enabled: false, notifyAssignee: true, notifyClient: false },
+  taskDone: { enabled: false, notifyAssignee: true, notifyClient: true },
+};

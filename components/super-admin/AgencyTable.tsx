@@ -131,7 +131,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                             <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Users</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Projects</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Revenue</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Clients</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Created</th>
                             <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
                         </tr>
@@ -148,7 +148,8 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${agency.plan === 'enterprise' ? 'bg-purple-500/10 text-purple-500' :
                                         agency.plan === 'pro' ? 'bg-blue-500/10 text-blue-500' :
-                                            'bg-muted text-muted-foreground'
+                                            agency.plan === 'starter' ? 'bg-emerald-500/10 text-emerald-500' :
+                                                'bg-muted text-muted-foreground'
                                         }`}>
                                         {agency.plan.toUpperCase()}
                                     </span>
@@ -167,7 +168,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                                     {agency.stats?.projects || 0}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                                    ${(agency.stats?.revenue || 0).toLocaleString()}
+                                    {agency.stats?.clients || 0}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                                     {fmt.date(agency.createdAt)}

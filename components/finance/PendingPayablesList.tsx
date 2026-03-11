@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Check, Clock, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useCurrency } from "@/context/CurrencyContext";
 
 interface PendingPayablesListProps {
     transactions: Transaction[];
@@ -17,6 +18,7 @@ interface PendingPayablesListProps {
 export function PendingPayablesList({ transactions }: PendingPayablesListProps) {
     const [loadingId, setLoadingId] = useState<string | null>(null);
     const router = useRouter();
+    const { format: formatMoney } = useCurrency();
 
     if (transactions.length === 0) return null;
 
@@ -48,12 +50,12 @@ export function PendingPayablesList({ transactions }: PendingPayablesListProps) 
                         <div className="flex gap-3 justify-end">
                             {transactions.some(t => t.type === 'income') && (
                                 <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
-                                    +₹{transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0).toLocaleString()}
+                                    +{formatMoney(transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0))}
                                 </span>
                             )}
                             {transactions.some(t => t.type === 'expense') && (
                                 <span className="text-lg font-bold text-red-600 dark:text-red-400">
-                                    -₹{transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0).toLocaleString()}
+                                    -{formatMoney(transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0))}
                                 </span>
                             )}
                         </div>
@@ -86,7 +88,7 @@ export function PendingPayablesList({ transactions }: PendingPayablesListProps) 
                             </div>
 
                             <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
-                                <span className="font-bold text-lg">₹{t.amount.toLocaleString()}</span>
+                                <span className="font-bold text-lg">{formatMoney(t.amount)}</span>
                                 <Button
                                     size="sm"
                                     className="bg-amber-600 hover:bg-amber-700 text-white border-none"

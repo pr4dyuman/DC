@@ -2,9 +2,7 @@ import { getSystemAnalytics } from "@/lib/actions/super-admin";
 import { Users, Building2 } from "lucide-react";
 
 export default async function AnalyticsPage() {
-    const rawAnalytics = await getSystemAnalytics();
-    // Ensure plain objects for RSC serialization
-    const analytics = JSON.parse(JSON.stringify(rawAnalytics));
+    const analytics = await getSystemAnalytics();
 
     return (
         <div className="space-y-6">
@@ -39,7 +37,7 @@ export default async function AnalyticsPage() {
             {/* Plan Distribution */}
             <div className="bg-card rounded-lg shadow border border-border p-6">
                 <h2 className="text-xl font-bold text-foreground mb-6">Agency Distribution by Plan</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                     <div className="text-center">
                         <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto bg-muted rounded-full flex items-center justify-center">
                             <div className="text-center">
@@ -49,6 +47,18 @@ export default async function AnalyticsPage() {
                         </div>
                         <p className="text-sm text-muted-foreground mt-3">
                             {(analytics.totalAgencies > 0 ? (analytics.agenciesByPlan.free || 0) / analytics.totalAgencies * 100 : 0).toFixed(1)}%
+                        </p>
+                    </div>
+
+                    <div className="text-center">
+                        <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto bg-emerald-500/10 rounded-full flex items-center justify-center">
+                            <div className="text-center">
+                                <p className="text-3xl font-bold text-emerald-500">{analytics.agenciesByPlan.starter || 0}</p>
+                                <p className="text-sm text-emerald-400">Starter</p>
+                            </div>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-3">
+                            {(analytics.totalAgencies > 0 ? (analytics.agenciesByPlan.starter || 0) / analytics.totalAgencies * 100 : 0).toFixed(1)}%
                         </p>
                     </div>
 
