@@ -12,6 +12,15 @@ export type AIFeature =
     | 'ai-hour-estimate';
 
 /**
+ * Estimate token count from text length.
+ * Gemini averages ~4 characters per token for English text.
+ */
+export function estimateTokens(text: string): number {
+    if (!text) return 0;
+    return Math.ceil(text.length / 4);
+}
+
+/**
  * Log an AI API call for usage tracking.
  * Fire-and-forget — never throws to avoid disrupting the AI feature.
  */

@@ -520,9 +520,11 @@ export async function POST(req: NextRequest) {
                             console.log('[Agent] All attempts returned 0 chars');
                         }
 
-                        // Log AI usage for agent mode (Live API — no token metadata)
-                        const { logAIUsage: logAgentUsage } = await import("@/lib/ai-usage");
-                        logAgentUsage({ agencyId: agency!.id, userId: authenticatedUserId, feature: 'singularity-agent', model: modelId, provider: aiConfig.provider });
+                        // Log AI usage for agent mode (Live API — estimate tokens from text)
+                        const { logAIUsage: logAgentUsage, estimateTokens: estAgent } = await import("@/lib/ai-usage");
+                        const agentInputTokens = estAgent(agentPrompt);
+                        const agentOutputTokens = estAgent(accumulatedText);
+                        logAgentUsage({ agencyId: agency!.id, userId: authenticatedUserId, feature: 'singularity-agent', model: modelId, provider: aiConfig.provider, inputTokens: agentInputTokens, outputTokens: agentOutputTokens, totalTokens: agentInputTokens + agentOutputTokens });
 
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
                         controller.close();
@@ -648,6 +650,7 @@ export async function POST(req: NextRequest) {
 
                     // Poll and stream messages
                     let done = false;
+                    let liveChatAccumulatedText = '';
                     const timeout = setTimeout(() => { done = true; }, 60000);
 
                     const waitMsg = (): Promise<any> => new Promise((resolve) => {
@@ -666,6 +669,7 @@ export async function POST(req: NextRequest) {
                         if (msg.serverContent?.modelTurn?.parts) {
                             for (const part of msg.serverContent.modelTurn.parts) {
                                 if (part.text) {
+                                    liveChatAccumulatedText += part.text;
                                     controller.enqueue(encoder.encode(
                                         `data: ${JSON.stringify({ type: 'thinking', text: part.text })}\n\n`
                                     ));
@@ -675,6 +679,7 @@ export async function POST(req: NextRequest) {
 
                         // Stream transcript text as it arrives
                         if ((msg.serverContent as any)?.outputTranscription?.text) {
+                            liveChatAccumulatedText += (msg.serverContent as any).outputTranscription.text;
                             controller.enqueue(encoder.encode(
                                 `data: ${JSON.stringify({ type: 'response', text: (msg.serverContent as any).outputTranscription.text })}\n\n`
                             ));
@@ -695,6 +700,7 @@ export async function POST(req: NextRequest) {
                             continue;
                         }
                         if ((remaining.serverContent as any)?.outputTranscription?.text) {
+                            liveChatAccumulatedText += (remaining.serverContent as any).outputTranscription.text;
                             controller.enqueue(encoder.encode(
                                 `data: ${JSON.stringify({ type: 'response', text: (remaining.serverContent as any).outputTranscription.text })}\n\n`
                             ));
@@ -706,9 +712,11 @@ export async function POST(req: NextRequest) {
                     clearTimeout(timeout);
                     session.close();
 
-                    // Log AI usage for live chat mode (no token metadata from Live API)
-                    const { logAIUsage: logLiveChatUsage } = await import("@/lib/ai-usage");
-                    logLiveChatUsage({ agencyId: agency!.id, userId: authenticatedUserId, feature: 'singularity-chat', model: modelId, provider: aiConfig.provider });
+                    // Log AI usage for live chat mode (estimate tokens from text)
+                    const { logAIUsage: logLiveChatUsage, estimateTokens: estChat } = await import("@/lib/ai-usage");
+                    const chatInputTokens = estChat(fullPrompt);
+                    const chatOutputTokens = estChat(liveChatAccumulatedText);
+                    logLiveChatUsage({ agencyId: agency!.id, userId: authenticatedUserId, feature: 'singularity-chat', model: modelId, provider: aiConfig.provider, inputTokens: chatInputTokens, outputTokens: chatOutputTokens, totalTokens: chatInputTokens + chatOutputTokens });
 
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
                     controller.close();
