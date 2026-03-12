@@ -53,7 +53,7 @@ function isTooShort(text: string): boolean {
 }
 
 async function checkAndContinue(
-    generateContent: (cfg: any, prompt: string, sys?: string) => Promise<string>,
+    generateContent: (cfg: any, prompt: string, sys?: string) => Promise<{ text: string; tokens?: any }>,
     aiConfig: any,
     systemInstruction: string,
     originalPrompt: string,
@@ -66,7 +66,7 @@ async function checkAndContinue(
         `If it was complete (even if short), reply with exactly the word COMPLETE and nothing else. ` +
         `If it was cut off or incomplete, continue your answer from exactly where you left off — do NOT repeat what you already said.`;
 
-    const continuation = await generateContent(aiConfig, followUpPrompt, systemInstruction);
+    const { text: continuation } = await generateContent(aiConfig, followUpPrompt, systemInstruction);
     const trimmed = continuation.trim();
 
     // AI signals it was done → nothing to add
@@ -520,6 +520,10 @@ export async function POST(req: NextRequest) {
                             console.log('[Agent] All attempts returned 0 chars');
                         }
 
+                        // Log AI usage for agent mode (Live API — no token metadata)
+                        const { logAIUsage: logAgentUsage } = await import("@/lib/ai-usage");
+                        logAgentUsage({ agencyId: agency!.id, userId: authenticatedUserId, feature: 'singularity-agent', model: modelId, provider: aiConfig.provider });
+
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
                         controller.close();
                     } catch (error: any) {
@@ -548,7 +552,9 @@ export async function POST(req: NextRequest) {
         if (!isLive) {
             // Non-live model: single response, no streaming
             const { generateContent } = await import("@/lib/ai-provider");
-            const result = await generateContent(aiConfig, fullPrompt);
+            const { logAIUsage } = await import("@/lib/ai-usage");
+            const { text: result, tokens } = await generateContent(aiConfig, fullPrompt);
+            logAIUsage({ agencyId: agency!.id, userId: authenticatedUserId, feature: 'singularity-chat', model: modelId, provider: aiConfig.provider, ...tokens });
             const encoder = new TextEncoder();
 
             // Stream initial response immediately, fallback check runs inside stream before done
@@ -699,6 +705,10 @@ export async function POST(req: NextRequest) {
 
                     clearTimeout(timeout);
                     session.close();
+
+                    // Log AI usage for live chat mode (no token metadata from Live API)
+                    const { logAIUsage: logLiveChatUsage } = await import("@/lib/ai-usage");
+                    logLiveChatUsage({ agencyId: agency!.id, userId: authenticatedUserId, feature: 'singularity-chat', model: modelId, provider: aiConfig.provider });
 
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
                     controller.close();

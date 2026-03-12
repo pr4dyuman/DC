@@ -11,6 +11,13 @@ import type { ChatMessage } from "./ai-models";
 // All AI requests are server-side only. API keys never reach the client.
 // =============================================================================
 
+// Token usage metadata returned from AI calls
+export type TokenUsage = {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+};
+
 // Timeout for AI API calls to prevent indefinite hangs (BUG-063)
 const AI_TIMEOUT_MS = 60_000; // 60 seconds
 
@@ -43,7 +50,7 @@ async function geminiGenerateContent(
     config: AIConfig,
     prompt: string,
     systemInstruction?: string
-): Promise<string> {
+): Promise<{ text: string; tokens?: TokenUsage }> {
     const genAI = new GoogleGenerativeAI(config.apiKey);
     const modelId = resolveModel(config);
     const model = genAI.getGenerativeModel({
@@ -53,14 +60,18 @@ async function geminiGenerateContent(
 
     const result = await withTimeout(model.generateContent(prompt), AI_TIMEOUT_MS);
     const response = result.response;
-    return response.text();
+    const meta = response.usageMetadata;
+    return {
+        text: response.text(),
+        tokens: meta ? { inputTokens: meta.promptTokenCount || 0, outputTokens: meta.candidatesTokenCount || 0, totalTokens: meta.totalTokenCount || 0 } : undefined,
+    };
 }
 
 async function geminiGenerateContentWithParts(
     config: AIConfig,
     parts: any[],
     systemInstruction?: string
-): Promise<string> {
+): Promise<{ text: string; tokens?: TokenUsage }> {
     const genAI = new GoogleGenerativeAI(config.apiKey);
     const modelId = resolveModel(config);
     const model = genAI.getGenerativeModel({
@@ -70,7 +81,11 @@ async function geminiGenerateContentWithParts(
 
     const result = await withTimeout(model.generateContent({ contents: [{ role: "user", parts }] }), AI_TIMEOUT_MS);
     const response = result.response;
-    return response.text();
+    const meta = response.usageMetadata;
+    return {
+        text: response.text(),
+        tokens: meta ? { inputTokens: meta.promptTokenCount || 0, outputTokens: meta.candidatesTokenCount || 0, totalTokens: meta.totalTokenCount || 0 } : undefined,
+    };
 }
 
 async function geminiChat(
@@ -78,7 +93,7 @@ async function geminiChat(
     history: ChatMessage[],
     systemInstruction: string,
     userMessage: string
-): Promise<string> {
+): Promise<{ text: string; tokens?: TokenUsage }> {
     const genAI = new GoogleGenerativeAI(config.apiKey);
     const modelId = resolveModel(config);
     const model = genAI.getGenerativeModel({
@@ -92,7 +107,11 @@ async function geminiChat(
         })),
     });
     const result = await withTimeout(chat.sendMessage(userMessage), AI_TIMEOUT_MS);
-    return result.response.text();
+    const meta = result.response.usageMetadata;
+    return {
+        text: result.response.text(),
+        tokens: meta ? { inputTokens: meta.promptTokenCount || 0, outputTokens: meta.candidatesTokenCount || 0, totalTokens: meta.totalTokenCount || 0 } : undefined,
+    };
 }
 
 // =============================================================================
@@ -260,7 +279,7 @@ async function openaiCompatGenerateContent(
     config: AIConfig,
     prompt: string,
     systemInstruction?: string
-): Promise<string> {
+): Promise<{ text: string; tokens?: TokenUsage }> {
     const baseUrl = OPENAI_COMPAT_BASE_URLS[config.provider];
     if (!baseUrl) throw new Error(`Unknown provider: ${config.provider}`);
 
@@ -293,7 +312,11 @@ async function openaiCompatGenerateContent(
     }
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content || "";
+    const usage = data.usage;
+    return {
+        text: data.choices?.[0]?.message?.content || "",
+        tokens: usage ? { inputTokens: usage.prompt_tokens || 0, outputTokens: usage.completion_tokens || 0, totalTokens: usage.total_tokens || 0 } : undefined,
+    };
 }
 
 async function openaiCompatChat(
@@ -301,7 +324,7 @@ async function openaiCompatChat(
     history: ChatMessage[],
     systemInstruction: string,
     userMessage: string
-): Promise<string> {
+): Promise<{ text: string; tokens?: TokenUsage }> {
     const baseUrl = OPENAI_COMPAT_BASE_URLS[config.provider];
     if (!baseUrl) throw new Error(`Unknown provider: ${config.provider}`);
 
@@ -342,7 +365,11 @@ async function openaiCompatChat(
     }
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content || "";
+    const usage = data.usage;
+    return {
+        text: data.choices?.[0]?.message?.content || "",
+        tokens: usage ? { inputTokens: usage.prompt_tokens || 0, outputTokens: usage.completion_tokens || 0, totalTokens: usage.total_tokens || 0 } : undefined,
+    };
 }
 
 // =============================================================================
@@ -351,17 +378,17 @@ async function openaiCompatChat(
 
 /**
  * Generate content using the configured AI provider.
- * Used by explainTask and enhanceTaskDescription.
+ * Returns { text, tokens } where tokens may be undefined for Live API models.
  */
 export async function generateContent(
     config: AIConfig,
     prompt: string,
     systemInstruction?: string
-): Promise<string> {
+): Promise<{ text: string; tokens?: TokenUsage }> {
     if (config.provider === "gemini") {
         const modelId = resolveModel(config);
         if (isLiveModel(modelId)) {
-            return liveGenerateContent(config, prompt, systemInstruction);
+            return { text: await liveGenerateContent(config, prompt, systemInstruction) };
         }
         return geminiGenerateContent(config, prompt, systemInstruction);
     }
@@ -370,27 +397,24 @@ export async function generateContent(
 
 /**
  * Generate content with multimodal parts (text + images).
- * Used by explainTask when image assets are present.
- * Falls back to text-only for non-Gemini providers.
+ * Returns { text, tokens } where tokens may be undefined for Live/OpenAI providers.
  */
 export async function generateContentWithParts(
     config: AIConfig,
     parts: any[],
     systemInstruction?: string
-): Promise<string> {
+): Promise<{ text: string; tokens?: TokenUsage }> {
     if (config.provider === "gemini") {
         const modelId = resolveModel(config);
         if (isLiveModel(modelId)) {
-            // Live API doesn't support multimodal parts — extract text only
             const textContent = parts
                 .filter((p: any) => typeof p === 'string' || p.text)
                 .map((p: any) => (typeof p === 'string' ? p : p.text))
                 .join('\n');
-            return liveGenerateContent(config, textContent, systemInstruction);
+            return { text: await liveGenerateContent(config, textContent, systemInstruction) };
         }
         return geminiGenerateContentWithParts(config, parts, systemInstruction);
     }
-    // For OpenAI-compatible providers, extract text content only
     const textParts = parts
         .filter((p: any) => typeof p === "string" || p.text)
         .map((p: any) => (typeof p === "string" ? p : p.text))
@@ -400,18 +424,18 @@ export async function generateContentWithParts(
 
 /**
  * Chat with AI using conversation history.
- * Used by chatWithTaskAI.
+ * Returns { text, tokens } where tokens may be undefined for Live API models.
  */
 export async function generateContentWithChat(
     config: AIConfig,
     history: ChatMessage[],
     systemInstruction: string,
     userMessage: string
-): Promise<string> {
+): Promise<{ text: string; tokens?: TokenUsage }> {
     if (config.provider === "gemini") {
         const modelId = resolveModel(config);
         if (isLiveModel(modelId)) {
-            return liveChat(config, history, systemInstruction, userMessage);
+            return { text: await liveChat(config, history, systemInstruction, userMessage) };
         }
         return geminiChat(config, history, systemInstruction, userMessage);
     }

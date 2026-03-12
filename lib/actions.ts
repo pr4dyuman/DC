@@ -3,6 +3,9 @@
 import { User, Project, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig, LeaveRequest, LeaveType, LeaveStatus, UserPermissions, Transaction, TransactionType, TransactionCategory } from "./db";
 import { revalidatePath } from "next/cache";
 import { generateContent, generateContentWithParts, generateContentWithChat } from "./ai-provider";
+import type { TokenUsage } from "./ai-provider";
+import { logAIUsage } from "./ai-usage";
+import type { AIFeature } from "./ai-usage";
 import { createSession, sendMessage, closeSession, isSessionActive } from "./live-session";
 import type { AIConfig, AIPermissions } from "./types";
 import { DEFAULT_AI_PERMISSIONS } from "./types";
@@ -3399,9 +3402,9 @@ Return ONLY valid JSON. No markdown fences, no extra text. Example:
     const prompt = `Extract task fields from this AI response:\n\n${aiResponseText}`;
 
     try {
-        const result = await generateContent(aiConfig, prompt, systemInstruction);
+        const { text, tokens } = await generateContent(aiConfig, prompt, systemInstruction);
         // Strip any markdown fences the model might add
-        const cleaned = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
         const parsed = JSON.parse(cleaned) as ExtractedTaskFields;
         // Validate category against available list
         if (parsed.category && !availableCategories.includes(parsed.category)) {
@@ -3554,8 +3557,9 @@ ${context.comments.length > 0 ? context.comments.map((c: any) => `- ${c.text}`).
     }
 
     try {
-        const result = await generateContentWithParts(aiConfig, parts);
-        return result;
+        const { text, tokens } = await generateContentWithParts(aiConfig, parts);
+        logAIUsage({ agencyId: agency!.id, userId, feature: 'ai-explain', model: aiConfig.model || 'unknown', provider: aiConfig.provider, ...tokens });
+        return text;
     } catch (error: any) {
         console.error("[explainTask] Singularity error:", error.message);
         return `Singularity Error: ${error.message || "Unknown error"}`;
@@ -3616,8 +3620,9 @@ Return ONLY the Markdown content.`;
 
 
     try {
-        const result = await generateContent(aiConfig, prompt);
-        return result;
+        const { text, tokens } = await generateContent(aiConfig, prompt);
+        logAIUsage({ agencyId: agency!.id, userId, feature: 'ai-enhance', model: aiConfig.model || 'unknown', provider: aiConfig.provider, ...tokens });
+        return text;
     } catch (error: any) {
         console.error("Enhance Task Error", error);
         return content; // Fallback to original
@@ -3784,8 +3789,9 @@ export async function chatWithTaskAI(
     const systemInstruction = buildChatSystemInstruction(projectId || '', currentTitle || '', currentDescription || '', data);
 
     try {
-        const result = await generateContentWithChat(aiConfig, history, systemInstruction, userMessage);
-        return result;
+        const { text, tokens } = await generateContentWithChat(aiConfig, history, systemInstruction, userMessage);
+        logAIUsage({ agencyId: agency!.id, userId, feature: 'ai-task-chat', model: aiConfig.model || 'unknown', provider: aiConfig.provider, ...tokens });
+        return text;
     } catch (error: any) {
         console.error("Singularity Chat Error:", error);
         return "I encountered an error. Please try again.";
@@ -3800,7 +3806,8 @@ export async function singularityChat(
     history: Array<{ role: 'user' | 'model'; content: string }>,
     userMessage: string
 ): Promise<{ response: string; thinking: string }> {
-    await requireAuth();
+    const user = await requireAuth();
+    const agency = await getCurrentAgency();
     const aiConfig = await getAgencyAIConfigInternal();
     if (!aiConfig) throw new Error("Singularity is not configured.");
 
@@ -3878,14 +3885,16 @@ export async function singularityChat(
             thoughtText.replace(/\*\*[A-Z][^*]*\*\*\s*\n\n/g, '').trim() ||
             thoughtText.trim();
 
+        logAIUsage({ agencyId: agency?.id || 'unknown', userId: (user as any).id, feature: 'ai-chatbot', model: modelId, provider: aiConfig.provider });
         return {
             response,
             thinking: thoughtText.trim(),
         };
     } else {
         // Non-live model fallback
-        const result = await generateContent(aiConfig, fullPrompt);
-        return { response: result, thinking: '' };
+        const { text, tokens } = await generateContent(aiConfig, fullPrompt);
+        logAIUsage({ agencyId: agency?.id || 'unknown', userId: (user as any).id, feature: 'ai-chatbot', model: modelId, provider: aiConfig.provider, ...tokens });
+        return { response: text, thinking: '' };
     }
 }
 
@@ -4436,7 +4445,7 @@ export async function aiEstimateTaskHours(
     description: string,
     priority: string
 ): Promise<number> {
-    await requireAuth();
+    const user = await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
@@ -4479,8 +4488,9 @@ ${historyLines || '(No historical data available)'}
 - Return ONLY a single number. No text, no explanation, no units.`;
 
     try {
-        const result = await generateContent(aiConfig, prompt);
-        const cleaned = result.trim().replace(/[^0-9.]/g, '');
+        const { text, tokens } = await generateContent(aiConfig, prompt);
+        logAIUsage({ agencyId: agency!.id, userId: (user as any).id, feature: 'ai-hour-estimate', model: aiConfig.model || 'unknown', provider: aiConfig.provider, ...tokens });
+        const cleaned = text.trim().replace(/[^0-9.]/g, '');
         const hours = parseFloat(cleaned);
         if (isNaN(hours) || hours <= 0) return estimateHoursFromTask({ title, description, priority });
         return Math.max(0.5, Math.min(Math.round(hours * 2) / 2, 40)); // round to 0.5 increments, clamp

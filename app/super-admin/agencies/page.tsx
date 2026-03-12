@@ -24,7 +24,7 @@ export default async function AgenciesPage() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <div className="bg-card rounded-lg shadow border border-border p-4">
                     <p className="text-sm text-muted-foreground">Total Agencies</p>
                     <p className="text-2xl font-bold text-foreground mt-1">{agencies.length}</p>
@@ -33,6 +33,12 @@ export default async function AgenciesPage() {
                     <p className="text-sm text-muted-foreground">Active</p>
                     <p className="text-2xl font-bold text-green-500 mt-1">
                         {agencies.filter((a: any) => a.status === 'active').length}
+                    </p>
+                </div>
+                <div className="bg-card rounded-lg shadow border border-border p-4">
+                    <p className="text-sm text-muted-foreground">Trial</p>
+                    <p className="text-2xl font-bold text-blue-500 mt-1">
+                        {agencies.filter((a: any) => a.status === 'trial').length}
                     </p>
                 </div>
                 <div className="bg-card rounded-lg shadow border border-border p-4">

@@ -763,3 +763,29 @@ const SystemLogSchema = new Schema({
 }, { timestamps: true });
 SystemLogSchema.index({ createdAt: -1 });
 export const SystemLogModel = (mongoose.models.SystemLog as Model<any>) || mongoose.model('SystemLog', SystemLogSchema);
+
+// ============================================================================
+// AI USAGE LOG — Tracks every AI API call for monitoring and billing
+// ============================================================================
+const AIUsageLogSchema = new Schema({
+    agencyId: { type: String, required: true, index: true },
+    userId: { type: String, required: true, index: true },
+    feature: {
+        type: String,
+        required: true,
+        enum: ['singularity-agent', 'singularity-chat', 'ai-explain', 'ai-enhance', 'ai-task-chat', 'ai-chatbot', 'ai-hour-estimate'],
+        index: true,
+    },
+    model: { type: String, required: true },
+    provider: { type: String, required: true },
+    inputTokens: { type: Number, default: 0 },
+    outputTokens: { type: Number, default: 0 },
+    totalTokens: { type: Number, default: 0 },
+    durationMs: { type: Number, default: 0 },
+    success: { type: Boolean, default: true },
+    error: { type: String },
+}, { timestamps: true });
+AIUsageLogSchema.index({ createdAt: -1 });
+AIUsageLogSchema.index({ agencyId: 1, createdAt: -1 });
+AIUsageLogSchema.index({ agencyId: 1, feature: 1, createdAt: -1 });
+export const AIUsageLogModel = (mongoose.models.AIUsageLog as Model<any>) || mongoose.model('AIUsageLog', AIUsageLogSchema);

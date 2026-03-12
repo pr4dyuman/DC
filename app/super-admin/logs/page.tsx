@@ -66,8 +66,8 @@ export default async function SystemLogsPage() {
                     </div>
                 ) : (
                     <div className="divide-y divide-border">
-                        {logs.map((log: any) => (
-                            <div key={log._id} className="p-4 sm:p-5 flex items-start gap-4 hover:bg-muted/40 transition-colors">
+                        {logs.map((log: any, idx: number) => (
+                            <div key={log._id?.toString() || idx} className="p-4 sm:p-5 flex items-start gap-4 hover:bg-muted/40 transition-colors">
                                 <div className={`mt-0.5 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${log.status === "success"
                                         ? "bg-green-500/10"
                                         : log.status === "error"

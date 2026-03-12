@@ -1,12 +1,12 @@
 "use server";
 
-import { AgencyModel, UserModel, SuperAdminModel, ProjectModel, ClientModel, InvoiceModel, TransactionModel, TaskModel, AssetModel, ActivityModel, NotificationModel, ServiceModel, SettingsModel, LeaveRequestModel, MessageModel, SingularityChatSessionModel, SingularityCheckpointModel, SystemSettingsModel, SystemLogModel, connectDB, encryptApiKey, decryptApiKey } from "../mongodb";
+import { AgencyModel, UserModel, SuperAdminModel, ProjectModel, ClientModel, InvoiceModel, TransactionModel, TaskModel, AssetModel, ActivityModel, NotificationModel, ServiceModel, SettingsModel, LeaveRequestModel, MessageModel, SingularityChatSessionModel, SingularityCheckpointModel, SystemSettingsModel, SystemLogModel, AIUsageLogModel, connectDB, encryptApiKey, decryptApiKey } from "../mongodb";
 import { Agency, User, AGENCY_PLANS, AIConfig } from "../types";
 import { getSessionUser } from "../auth";
 import { generateId } from "../utils-server";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
-import { sanitizeName, sanitizeString, sanitizeMongoInput, sanitizeUpdates, validateEmail, validatePassword, validateStrongPassword } from "../validation";
+import { sanitizeName, sanitizeString, sanitizePhone, sanitizeMongoInput, sanitizeUpdates, validateEmail, validatePassword, validateStrongPassword } from "../validation";
 
 /**
  * Verify current user is super admin
@@ -159,9 +159,12 @@ export async function getSystemAnalytics() {
  */
 export async function createAgency(data: {
     name: string;
+    ownerName: string;
     ownerEmail: string;
     ownerPassword: string;
+    ownerPhone?: string;
     plan: 'free' | 'starter' | 'pro' | 'enterprise';
+    logo?: string;
     customLimits?: Partial<Agency['limits']>;
     customFeatures?: Partial<Agency['features']>;
 }) {
@@ -171,6 +174,8 @@ export async function createAgency(data: {
     // Input sanitization
     data.name = sanitizeName(data.name, 200);
     if (!data.name) throw new Error('Agency name is required');
+    data.ownerName = sanitizeName(data.ownerName || '', 200);
+    if (!data.ownerName) throw new Error('Owner name is required');
     data.ownerEmail = validateEmail(data.ownerEmail);
     // Check system-level strong password policy
     const sys = await SystemSettingsModel.findOne(
@@ -184,10 +189,23 @@ export async function createAgency(data: {
         validatePassword(data.ownerPassword);
     }
 
-    // Check if email already exists
-    const existingUser = await UserModel.findOne({ email: data.ownerEmail });
-    if (existingUser) {
-        throw new Error('Email already in use');
+    const sanitizedPhone = data.ownerPhone ? sanitizePhone(data.ownerPhone) : '';
+
+    // Validate logo if provided (max 3MB base64, must be data:image/*)
+    let sanitizedLogo = '';
+    if (data.logo && typeof data.logo === 'string') {
+        if (data.logo.length > 3_000_000) throw new Error('Logo file is too large. Max 2MB.');
+        if (data.logo.startsWith('data:image/')) sanitizedLogo = data.logo;
+    }
+
+    // Check if email already exists across all collections
+    const [existingUser, existingSuperAdmin, existingClient] = await Promise.all([
+        UserModel.findOne({ email: data.ownerEmail }).lean(),
+        SuperAdminModel.findOne({ email: data.ownerEmail }).lean(),
+        ClientModel.findOne({ email: data.ownerEmail }).lean(),
+    ]);
+    if (existingUser || existingSuperAdmin || existingClient) {
+        throw new Error('An account with this email already exists');
     }
 
     const agencyId = generateId();
@@ -196,11 +214,16 @@ export async function createAgency(data: {
     // Get plan defaults
     const planDefaults = AGENCY_PLANS[data.plan];
 
+    // Generate unique slug
+    const baseSlug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const existingAgency = await AgencyModel.findOne({ slug: baseSlug }).lean();
+    const slug = existingAgency ? `${baseSlug}-${agencyId.slice(0, 6)}` : baseSlug;
+
     // Create agency
     const agency: Agency = {
         id: agencyId,
         name: data.name,
-        slug: data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        slug,
         plan: data.plan,
         status: 'active',
         limits: {
@@ -227,7 +250,7 @@ export async function createAgency(data: {
             cancelAtPeriodEnd: false
         },
         settings: {
-            systemName: 'AgencyOS',
+            systemName: data.name,
             timezone: 'UTC',
             currency: 'USD',
             dateFormat: 'MM/DD/YYYY',
@@ -241,17 +264,28 @@ export async function createAgency(data: {
         createdBy: sa.userId
     };
 
+    // Generate unique username
+    let baseUsername = data.ownerEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+    let username = baseUsername;
+    let counter = 1;
+    while (await UserModel.exists({ username, agencyId }) || await ClientModel.exists({ username, agencyId })) {
+        username = `${baseUsername}${counter}`;
+        counter++;
+    }
+
     // Create owner user
     const hashedPassword = await bcrypt.hash(data.ownerPassword, 12);
     const owner: User = {
         id: userId,
         agencyId,
-        name: data.name + ' Owner',
+        name: data.ownerName,
         email: data.ownerEmail,
         password: hashedPassword,
         role: 'admin',
-        username: data.ownerEmail.split('@')[0],
-        phone: '',
+        username,
+        phone: sanitizedPhone,
+        contactNumber: sanitizedPhone,
+        jobTitle: 'Agency Owner',
         salary: 0,
         createdAt: new Date().toISOString()
     } as User;
@@ -259,6 +293,15 @@ export async function createAgency(data: {
     // Save to database
     await AgencyModel.create(agency);
     await UserModel.create(owner);
+
+    // Create default Settings with logo if provided
+    if (sanitizedLogo) {
+        await SettingsModel.create({
+            agencyId,
+            systemName: data.name,
+            logo: sanitizedLogo
+        });
+    }
 
     await logSystemEvent({
         event: 'Agency Created',
@@ -406,6 +449,18 @@ export async function activateAgency(agencyId: string) {
         userId: sa.userId,
     });
 
+    // Send super-admin email alert
+    const alertSettings = await getSuperAdminAlertSettings();
+    if (alertSettings.emailOnAgencySuspended) {
+        const esc = (s: string) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const agencyName = (agency as any)?.name || agencyId;
+        await sendSuperAdminAlertEmail(
+            `Agency Activated: ${agencyName}`,
+            `<p><strong>Agency:</strong> ${esc(agencyName)}</p>
+            <p><strong>Activated at:</strong> ${new Date().toLocaleDateString()}</p>`
+        );
+    }
+
     revalidatePath('/super-admin/agencies');
     revalidatePath(`/super-admin/agencies/${agencyId}`);
 
@@ -461,6 +516,19 @@ export async function deleteAgency(agencyId: string, password: string) {
         agencyId,
         userId: sa.userId,
     });
+
+    // Send super-admin email alert
+    const alertSettings = await getSuperAdminAlertSettings();
+    if (alertSettings.emailOnAgencySuspended) {
+        const esc = (s: string) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const agencyName = (agency as any).name || agencyId;
+        await sendSuperAdminAlertEmail(
+            `Agency Deleted: ${agencyName}`,
+            `<p><strong>Agency:</strong> ${esc(agencyName)}</p>
+            <p><strong>Deleted at:</strong> ${new Date().toLocaleDateString()}</p>
+            <p>All agency data has been permanently removed.</p>`
+        );
+    }
 
     revalidatePath('/super-admin/agencies');
 
@@ -814,4 +882,203 @@ export async function subscribeNewsletter(email: string) {
     } catch {
         return { error: 'Network error. Please try again later.' };
     }
+}
+
+// =============================================================================
+// AI USAGE MONITORING
+// =============================================================================
+
+/**
+ * Get AI usage overview stats (totals, by feature, recent trend)
+ */
+export async function getAIUsageOverview(days: number = 30) {
+    await verifySuperAdmin();
+    await connectDB();
+
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+
+    const [totals, byFeature, byDay, byProvider] = await Promise.all([
+        // Overall totals
+        AIUsageLogModel.aggregate([
+            { $match: { createdAt: { $gte: since } } },
+            { $group: {
+                _id: null,
+                totalRequests: { $sum: 1 },
+                totalInputTokens: { $sum: { $ifNull: ['$inputTokens', 0] } },
+                totalOutputTokens: { $sum: { $ifNull: ['$outputTokens', 0] } },
+                totalTokens: { $sum: { $ifNull: ['$totalTokens', 0] } },
+                successCount: { $sum: { $cond: ['$success', 1, 0] } },
+                errorCount: { $sum: { $cond: ['$success', 0, 1] } },
+            }}
+        ]),
+        // By feature
+        AIUsageLogModel.aggregate([
+            { $match: { createdAt: { $gte: since } } },
+            { $group: {
+                _id: '$feature',
+                requests: { $sum: 1 },
+                totalTokens: { $sum: { $ifNull: ['$totalTokens', 0] } },
+                inputTokens: { $sum: { $ifNull: ['$inputTokens', 0] } },
+                outputTokens: { $sum: { $ifNull: ['$outputTokens', 0] } },
+            }},
+            { $sort: { requests: -1 } }
+        ]),
+        // Daily trend
+        AIUsageLogModel.aggregate([
+            { $match: { createdAt: { $gte: since } } },
+            { $group: {
+                _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+                requests: { $sum: 1 },
+                tokens: { $sum: { $ifNull: ['$totalTokens', 0] } },
+            }},
+            { $sort: { _id: 1 } }
+        ]),
+        // By provider
+        AIUsageLogModel.aggregate([
+            { $match: { createdAt: { $gte: since } } },
+            { $group: {
+                _id: '$provider',
+                requests: { $sum: 1 },
+                totalTokens: { $sum: { $ifNull: ['$totalTokens', 0] } },
+            }},
+            { $sort: { requests: -1 } }
+        ]),
+    ]);
+
+    return {
+        totals: totals[0] || { totalRequests: 0, totalInputTokens: 0, totalOutputTokens: 0, totalTokens: 0, successCount: 0, errorCount: 0 },
+        byFeature,
+        byDay,
+        byProvider,
+        days,
+    };
+}
+
+/**
+ * Get AI usage breakdown per agency
+ */
+export async function getAIUsageByAgency(days: number = 30) {
+    await verifySuperAdmin();
+    await connectDB();
+
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+
+    const usage = await AIUsageLogModel.aggregate([
+        { $match: { createdAt: { $gte: since } } },
+        { $group: {
+            _id: '$agencyId',
+            totalRequests: { $sum: 1 },
+            totalTokens: { $sum: { $ifNull: ['$totalTokens', 0] } },
+            inputTokens: { $sum: { $ifNull: ['$inputTokens', 0] } },
+            outputTokens: { $sum: { $ifNull: ['$outputTokens', 0] } },
+        }},
+        { $sort: { totalRequests: -1 } }
+    ]);
+
+    // Enrich with agency names
+    const agencyIds = usage.map((u: any) => u._id).filter(Boolean);
+    const agencies = await AgencyModel.find(
+        { _id: { $in: agencyIds } },
+        { name: 1, slug: 1, 'usage.storage': 1, 'limits.maxStorage': 1, plan: 1 }
+    ).lean();
+    const agencyMap = new Map(agencies.map((a: any) => [a._id.toString(), a]));
+
+    return usage.map((u: any) => {
+        const agency = agencyMap.get(u._id?.toString());
+        return {
+            agencyId: u._id?.toString(),
+            agencyName: agency?.name || 'Unknown',
+            agencySlug: agency?.slug || '',
+            plan: agency?.plan || '',
+            storageUsed: agency?.usage?.storage || 0,
+            storageLimit: agency?.limits?.maxStorage || 0,
+            totalRequests: u.totalRequests,
+            totalTokens: u.totalTokens,
+            inputTokens: u.inputTokens,
+            outputTokens: u.outputTokens,
+        };
+    });
+}
+
+/**
+ * Get AI usage for a specific agency (per-user + per-feature breakdown)
+ */
+export async function getAIUsageForAgency(agencyId: string, days: number = 30) {
+    await verifySuperAdmin();
+    await connectDB();
+
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+
+    const [byUser, byFeature, recentLogs] = await Promise.all([
+        AIUsageLogModel.aggregate([
+            { $match: { agencyId, createdAt: { $gte: since } } },
+            { $group: {
+                _id: '$userId',
+                totalRequests: { $sum: 1 },
+                totalTokens: { $sum: { $ifNull: ['$totalTokens', 0] } },
+            }},
+            { $sort: { totalRequests: -1 } }
+        ]),
+        AIUsageLogModel.aggregate([
+            { $match: { agencyId, createdAt: { $gte: since } } },
+            { $group: {
+                _id: '$feature',
+                requests: { $sum: 1 },
+                totalTokens: { $sum: { $ifNull: ['$totalTokens', 0] } },
+            }},
+            { $sort: { requests: -1 } }
+        ]),
+        AIUsageLogModel.find({ agencyId, createdAt: { $gte: since } })
+            .sort({ createdAt: -1 })
+            .limit(50)
+            .lean()
+    ]);
+
+    // Enrich user names
+    const userIds = byUser.map((u: any) => u._id).filter(Boolean);
+    const users = await UserModel.find(
+        { _id: { $in: userIds } },
+        { name: 1, email: 1 }
+    ).lean();
+    const userMap = new Map(users.map((u: any) => [u._id.toString(), u]));
+
+    return {
+        byUser: byUser.map((u: any) => {
+            const user = userMap.get(u._id?.toString());
+            return {
+                userId: u._id?.toString(),
+                userName: user?.name || 'Unknown',
+                userEmail: user?.email || '',
+                totalRequests: u.totalRequests,
+                totalTokens: u.totalTokens,
+            };
+        }),
+        byFeature,
+        recentLogs: JSON.parse(JSON.stringify(recentLogs)),
+    };
+}
+
+/**
+ * Get storage usage across all agencies
+ */
+export async function getStorageByAgency() {
+    await verifySuperAdmin();
+    await connectDB();
+
+    const agencies = await AgencyModel.find(
+        {},
+        { name: 1, slug: 1, plan: 1, 'usage.storage': 1, 'limits.maxStorage': 1 }
+    ).sort({ 'usage.storage': -1 }).lean();
+
+    return agencies.map((a: any) => ({
+        agencyId: a._id.toString(),
+        agencyName: a.name,
+        agencySlug: a.slug,
+        plan: a.plan,
+        storageUsed: a.usage?.storage || 0,
+        storageLimit: a.limits?.maxStorage || 0,
+    }));
 }

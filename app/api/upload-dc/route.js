@@ -71,6 +71,19 @@ export async function POST(req) {
 
     await writeFile(filePath, buffer);
 
+    // Track storage usage for the agency
+    try {
+      const { connectDB } = await import('@/lib/db');
+      const { AgencyModel } = await import('@/lib/mongodb');
+      await connectDB();
+      await AgencyModel.updateOne(
+        { _id: agency._id },
+        { $inc: { 'usage.storage': buffer.length } }
+      );
+    } catch (storageErr) {
+      console.error('Failed to update storage usage:', storageErr);
+    }
+
     return NextResponse.json({ 
       success: true, 
       url: `/uploads/${filename}` 

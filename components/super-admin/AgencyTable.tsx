@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, Edit, Ban, CheckCircle, Trash2, Loader2 } from "lucide-react";
+import { Eye, Ban, CheckCircle, Trash2, Loader2 } from "lucide-react";
 import { suspendAgency, activateAgency, deleteAgency } from "@/lib/actions/super-admin";
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -30,23 +30,28 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
     const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
     const [suspendTargetId, setSuspendTargetId] = useState<string | null>(null);
     const [suspendPassword, setSuspendPassword] = useState("");
+    const [suspendReason, setSuspendReason] = useState("");
     const [suspendError, setSuspendError] = useState("");
     const [suspending, setSuspending] = useState(false);
+    const [activatingId, setActivatingId] = useState<string | null>(null);
     const passwordRef = useRef<HTMLInputElement>(null);
     const suspendPasswordRef = useRef<HTMLInputElement>(null);
 
     const filteredAgencies = agencies.filter((agency) => {
         const matchesFilter = filter === "all" || agency.status === filter || agency.plan === filter;
-        const matchesSearch = agency.name.toLowerCase().includes(search.toLowerCase());
+        const q = search.toLowerCase();
+        const matchesSearch = !q || agency.name.toLowerCase().includes(q)
+            || (agency.slug || '').toLowerCase().includes(q)
+            || (agency.billing?.billingEmail || '').toLowerCase().includes(q);
         return matchesFilter && matchesSearch;
     });
 
     const { visibleCount, sentinelRef, hasMore } = useProgressiveList(filteredAgencies.length, 20, [filter, search]);
 
     const handleSuspend = (agencyId: string) => {
-        if (!confirm("Are you sure you want to suspend this agency?")) return;
         setSuspendTargetId(agencyId);
         setSuspendPassword("");
+        setSuspendReason("");
         setSuspendError("");
         setSuspendDialogOpen(true);
         setTimeout(() => suspendPasswordRef.current?.focus(), 100);
@@ -57,7 +62,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
         setSuspending(true);
         setSuspendError("");
         try {
-            await suspendAgency(suspendTargetId, suspendPassword, "Suspended by super admin");
+            await suspendAgency(suspendTargetId, suspendPassword, suspendReason || "Suspended by super admin");
             setSuspendDialogOpen(false);
             router.refresh();
         } catch (err: any) {
@@ -68,12 +73,19 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
     };
 
     const handleActivate = async (agencyId: string) => {
-        await activateAgency(agencyId);
-        router.refresh();
+        if (activatingId) return;
+        setActivatingId(agencyId);
+        try {
+            await activateAgency(agencyId);
+            router.refresh();
+        } catch {
+            // handled by server
+        } finally {
+            setActivatingId(null);
+        }
     };
 
     const handleDelete = (agencyId: string) => {
-        if (!confirm("⚠️ WARNING: This will permanently delete the agency and ALL its data. This cannot be undone. Are you absolutely sure?")) return;
         setDeleteTargetId(agencyId);
         setDeletePassword("");
         setDeleteError("");
@@ -96,29 +108,56 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
         }
     };
 
+    const statusBadge = (status: string) => {
+        const map: Record<string, string> = {
+            active: 'bg-green-500/10 text-green-500',
+            trial: 'bg-blue-500/10 text-blue-500',
+            suspended: 'bg-red-500/10 text-red-500',
+            cancelled: 'bg-muted text-muted-foreground',
+        };
+        return map[status] || 'bg-muted text-muted-foreground';
+    };
+
+    const filters = [
+        { value: 'all', label: 'All' },
+        { value: 'active', label: 'Active' },
+        { value: 'trial', label: 'Trial' },
+        { value: 'suspended', label: 'Suspended' },
+        { value: 'cancelled', label: 'Cancelled' },
+        { value: 'free', label: 'Free' },
+        { value: 'starter', label: 'Starter' },
+        { value: 'pro', label: 'Pro' },
+        { value: 'enterprise', label: 'Enterprise' },
+    ];
+
     return (
         <div className="bg-card rounded-lg shadow border border-border">
-            <div className="p-6 border-b border-border">
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
-                    <input
-                        type="text"
-                        placeholder="Search agencies..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="flex-1 px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent placeholder:text-muted-foreground"
-                    />
-                    <select
-                        value={filter}
-                        onChange={(e) => setFilter(e.target.value)}
-                        className="px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent"
-                    >
-                        <option value="all">All Agencies</option>
-                        <option value="active">Active</option>
-                        <option value="suspended">Suspended</option>
-                        <option value="free">Free Plan</option>
-                        <option value="pro">Pro Plan</option>
-                        <option value="enterprise">Enterprise Plan</option>
-                    </select>
+            <div className="p-4 sm:p-6 border-b border-border space-y-3">
+                <input
+                    type="text"
+                    placeholder="Search by name, slug, or email..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent placeholder:text-muted-foreground"
+                />
+                <div className="flex flex-wrap gap-1.5">
+                    {filters.map((f) => (
+                        <button
+                            key={f.value}
+                            onClick={() => setFilter(f.value)}
+                            className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${filter === f.value
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                            }`}
+                        >
+                            {f.label}
+                            {f.value !== 'all' && (
+                                <span className="ml-1 opacity-60">
+                                    {agencies.filter(a => a.status === f.value || a.plan === f.value).length}
+                                </span>
+                            )}
+                        </button>
+                    ))}
                 </div>
             </div>
 
@@ -138,7 +177,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                     </thead>
                     <tbody className="bg-card divide-y divide-border">
                         {filteredAgencies.slice(0, visibleCount).map((agency) => (
-                            <tr key={agency.id} className="hover:bg-muted/50">
+                            <tr key={agency.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => router.push(`/super-admin/agencies/${agency.id}`)}>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div>
                                         <div className="font-medium text-foreground">{agency.name}</div>
@@ -155,9 +194,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${agency.status === 'active' ? 'bg-green-500/10 text-green-500' :
-                                        'bg-red-500/10 text-red-500'
-                                        }`}>
+                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusBadge(agency.status)}`}>
                                         {agency.status}
                                     </span>
                                 </td>
@@ -173,7 +210,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                                     {fmt.date(agency.createdAt)}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center justify-end gap-2">
                                         <Link
                                             href={`/super-admin/agencies/${agency.id}`}
@@ -182,10 +219,10 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                                         >
                                             <Eye className="w-4 h-4" />
                                         </Link>
-                                        {agency.status === 'active' ? (
+                                        {agency.status === 'active' || agency.status === 'trial' ? (
                                             <button
                                                 onClick={() => handleSuspend(agency.id)}
-                                                className="text-red-500 hover:text-red-400"
+                                                className="text-amber-500 hover:text-amber-400"
                                                 title="Suspend"
                                             >
                                                 <Ban className="w-4 h-4" />
@@ -193,10 +230,15 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                                         ) : (
                                             <button
                                                 onClick={() => handleActivate(agency.id)}
-                                                className="text-green-500 hover:text-green-400"
+                                                disabled={activatingId === agency.id}
+                                                className="text-green-500 hover:text-green-400 disabled:opacity-50"
                                                 title="Activate"
                                             >
-                                                <CheckCircle className="w-4 h-4" />
+                                                {activatingId === agency.id ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <CheckCircle className="w-4 h-4" />
+                                                )}
                                             </button>
                                         )}
                                         <button
@@ -226,25 +268,37 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                 </div>
             )}
 
+            {/* Suspend Dialog */}
             <Dialog open={suspendDialogOpen} onOpenChange={setSuspendDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Confirm Suspension</DialogTitle>
+                        <DialogTitle>Suspend Agency</DialogTitle>
                         <DialogDescription>
-                            Enter your super-admin password to confirm agency suspension.
+                            This will disable access for all users in this agency.
                         </DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={(e) => { e.preventDefault(); handleSuspendConfirm(); }}>
-                        <Input
-                            ref={suspendPasswordRef}
-                            type="password"
-                            placeholder="Super-admin password"
-                            value={suspendPassword}
-                            onChange={(e) => setSuspendPassword(e.target.value)}
-                            autoComplete="current-password"
-                        />
+                    <form onSubmit={(e) => { e.preventDefault(); handleSuspendConfirm(); }} className="space-y-3">
+                        <div>
+                            <label className="text-sm text-muted-foreground mb-1 block">Reason (optional)</label>
+                            <Input
+                                placeholder="e.g. Non-payment, TOS violation..."
+                                value={suspendReason}
+                                onChange={(e) => setSuspendReason(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm text-muted-foreground mb-1 block">Super-admin password *</label>
+                            <Input
+                                ref={suspendPasswordRef}
+                                type="password"
+                                placeholder="Enter your password"
+                                value={suspendPassword}
+                                onChange={(e) => setSuspendPassword(e.target.value)}
+                                autoComplete="current-password"
+                            />
+                        </div>
                         {suspendError && (
-                            <p className="text-sm text-red-500 mt-2">{suspendError}</p>
+                            <p className="text-sm text-red-500">{suspendError}</p>
                         )}
                         <DialogFooter className="mt-4">
                             <button
@@ -257,7 +311,7 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                             <button
                                 type="submit"
                                 disabled={!suspendPassword || suspending}
-                                className="px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                                className="px-4 py-2 text-sm bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50"
                             >
                                 {suspending ? 'Suspending...' : 'Suspend Agency'}
                             </button>
@@ -266,25 +320,29 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                 </DialogContent>
             </Dialog>
 
+            {/* Delete Dialog */}
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Confirm Deletion</DialogTitle>
+                        <DialogTitle>Delete Agency</DialogTitle>
                         <DialogDescription>
-                            Enter your super-admin password to confirm permanent deletion.
+                            This action is permanent. All agency data will be deleted.
                         </DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={(e) => { e.preventDefault(); handleDeleteConfirm(); }}>
-                        <Input
-                            ref={passwordRef}
-                            type="password"
-                            placeholder="Super-admin password"
-                            value={deletePassword}
-                            onChange={(e) => setDeletePassword(e.target.value)}
-                            autoComplete="current-password"
-                        />
+                    <form onSubmit={(e) => { e.preventDefault(); handleDeleteConfirm(); }} className="space-y-3">
+                        <div>
+                            <label className="text-sm text-muted-foreground mb-1 block">Super-admin password *</label>
+                            <Input
+                                ref={passwordRef}
+                                type="password"
+                                placeholder="Enter your password"
+                                value={deletePassword}
+                                onChange={(e) => setDeletePassword(e.target.value)}
+                                autoComplete="current-password"
+                            />
+                        </div>
                         {deleteError && (
-                            <p className="text-sm text-red-500 mt-2">{deleteError}</p>
+                            <p className="text-sm text-red-500">{deleteError}</p>
                         )}
                         <DialogFooter className="mt-4">
                             <button

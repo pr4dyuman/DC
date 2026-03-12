@@ -11,7 +11,8 @@ import {
     Settings,
     FileText,
     LogOut,
-    X
+    X,
+    Brain
 } from "lucide-react";
 import { logout } from "@/lib/auth";
 
@@ -20,6 +21,7 @@ const navigation = [
     { name: "Agencies", href: "/super-admin/agencies", icon: Building2 },
     { name: "Users", href: "/super-admin/users", icon: Users },
     { name: "Analytics", href: "/super-admin/analytics", icon: BarChart3 },
+    { name: "AI Usage", href: "/super-admin/analytics/ai", icon: Brain },
     { name: "Billing", href: "/super-admin/billing", icon: CreditCard },
     { name: "System Logs", href: "/super-admin/logs", icon: FileText },
     { name: "Settings", href: "/super-admin/settings", icon: Settings },
@@ -77,9 +79,16 @@ export default function SuperAdminSidebar({ isOpen, onClose }: SuperAdminSidebar
                 <nav className="flex-1 px-3 space-y-1">
                     {navigation.map((item) => {
                         const Icon = item.icon;
-                        const isActive = item.href === "/super-admin"
+                        const matchesPath = item.href === "/super-admin"
                             ? pathname === "/super-admin"
                             : pathname === item.href || pathname?.startsWith(item.href + "/");
+                        // Don't highlight parent if a more specific child nav item matches
+                        const hasMoreSpecificMatch = matchesPath && navigation.some(
+                            other => other.href !== item.href
+                                && other.href.startsWith(item.href + "/")
+                                && (pathname === other.href || pathname?.startsWith(other.href + "/"))
+                        );
+                        const isActive = matchesPath && !hasMoreSpecificMatch;
 
                         return (
                             <Link
