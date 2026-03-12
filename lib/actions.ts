@@ -3885,9 +3885,8 @@ export async function singularityChat(
             thoughtText.replace(/\*\*[A-Z][^*]*\*\*\s*\n\n/g, '').trim() ||
             thoughtText.trim();
 
-        const { estimateTokens: estBot } = await import("@/lib/ai-usage");
-        const botInputTokens = estBot(fullPrompt);
-        const botOutputTokens = estBot(response);
+        const botInputTokens = Math.ceil((fullPrompt || '').length / 4);
+        const botOutputTokens = Math.ceil((response || '').length / 4);
         logAIUsage({ agencyId: agency?.id || 'unknown', userId: (user as any).id, feature: 'ai-chatbot', model: modelId, provider: aiConfig.provider, inputTokens: botInputTokens, outputTokens: botOutputTokens, totalTokens: botInputTokens + botOutputTokens });
         return {
             response,

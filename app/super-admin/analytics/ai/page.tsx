@@ -1,10 +1,11 @@
-import { getAIUsageOverview, getAIUsageByAgency, getStorageByAgency } from "@/lib/actions/super-admin";
+import { getAIUsageOverview, getAIUsageByAgency, getAIUsageByUser, getStorageByAgency } from "@/lib/actions/super-admin";
 import AIUsageDashboard from "@/components/super-admin/AIUsageDashboard";
 
 export default async function AIUsagePage() {
-    const [overview, byAgency, storage] = await Promise.all([
+    const [overview, byAgency, byUser, storage] = await Promise.all([
         getAIUsageOverview(30),
         getAIUsageByAgency(30),
+        getAIUsageByUser(30),
         getStorageByAgency(),
     ]);
 
@@ -17,6 +18,7 @@ export default async function AIUsagePage() {
             <AIUsageDashboard
                 overview={overview}
                 byAgency={byAgency}
+                byUser={byUser}
                 storage={storage}
             />
         </div>

@@ -1062,6 +1062,58 @@ export async function getAIUsageForAgency(agencyId: string, days: number = 30) {
 }
 
 /**
+ * Get AI usage breakdown per user (across all agencies)
+ */
+export async function getAIUsageByUser(days: number = 30) {
+    await verifySuperAdmin();
+    await connectDB();
+
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+
+    const usage = await AIUsageLogModel.aggregate([
+        { $match: { createdAt: { $gte: since } } },
+        { $group: {
+            _id: '$userId',
+            agencyId: { $first: '$agencyId' },
+            totalRequests: { $sum: 1 },
+            totalTokens: { $sum: { $ifNull: ['$totalTokens', 0] } },
+            inputTokens: { $sum: { $ifNull: ['$inputTokens', 0] } },
+            outputTokens: { $sum: { $ifNull: ['$outputTokens', 0] } },
+            lastUsed: { $max: '$createdAt' },
+        }},
+        { $sort: { totalRequests: -1 } }
+    ]);
+
+    const userIds = usage.map((u: any) => u._id).filter(Boolean);
+    const agencyIds = [...new Set(usage.map((u: any) => u.agencyId).filter(Boolean))];
+
+    const [users, agencies] = await Promise.all([
+        UserModel.find({ id: { $in: userIds } }, { id: 1, name: 1, email: 1 }).lean(),
+        AgencyModel.find({ id: { $in: agencyIds } }, { id: 1, name: 1 }).lean(),
+    ]);
+
+    const userMap = new Map((users as any[]).map((u) => [u.id, u]));
+    const agencyMap = new Map((agencies as any[]).map((a) => [a.id, a]));
+
+    return usage.map((u: any) => {
+        const user = userMap.get(u._id);
+        const agency = agencyMap.get(u.agencyId);
+        return {
+            userId: u._id?.toString() || '',
+            userName: user?.name || 'Unknown',
+            userEmail: user?.email || '',
+            agencyName: agency?.name || 'Unknown',
+            totalRequests: u.totalRequests,
+            totalTokens: u.totalTokens,
+            inputTokens: u.inputTokens,
+            outputTokens: u.outputTokens,
+            lastUsed: u.lastUsed ? new Date(u.lastUsed).toISOString() : null,
+        };
+    });
+}
+
+/**
  * Get storage usage across all agencies
  */
 export async function getStorageByAgency() {
@@ -1072,6 +1124,7 @@ export async function getStorageByAgency() {
         {},
         { name: 1, slug: 1, plan: 1, 'usage.storage': 1, 'limits.maxStorage': 1 }
     ).sort({ 'usage.storage': -1 }).lean();
+
 
     return agencies.map((a: any) => ({
         agencyId: a._id.toString(),

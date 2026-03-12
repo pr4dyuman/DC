@@ -521,9 +521,9 @@ export async function POST(req: NextRequest) {
                         }
 
                         // Log AI usage for agent mode (Live API — estimate tokens from text)
-                        const { logAIUsage: logAgentUsage, estimateTokens: estAgent } = await import("@/lib/ai-usage");
-                        const agentInputTokens = estAgent(agentPrompt);
-                        const agentOutputTokens = estAgent(accumulatedText);
+                        const { logAIUsage: logAgentUsage } = await import("@/lib/ai-usage");
+                        const agentInputTokens = Math.ceil((agentPrompt || '').length / 4);
+                        const agentOutputTokens = Math.ceil((accumulatedText || '').length / 4);
                         logAgentUsage({ agencyId: agency!.id, userId: authenticatedUserId, feature: 'singularity-agent', model: modelId, provider: aiConfig.provider, inputTokens: agentInputTokens, outputTokens: agentOutputTokens, totalTokens: agentInputTokens + agentOutputTokens });
 
                         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
@@ -713,9 +713,9 @@ export async function POST(req: NextRequest) {
                     session.close();
 
                     // Log AI usage for live chat mode (estimate tokens from text)
-                    const { logAIUsage: logLiveChatUsage, estimateTokens: estChat } = await import("@/lib/ai-usage");
-                    const chatInputTokens = estChat(fullPrompt);
-                    const chatOutputTokens = estChat(liveChatAccumulatedText);
+                    const { logAIUsage: logLiveChatUsage } = await import("@/lib/ai-usage");
+                    const chatInputTokens = Math.ceil((fullPrompt || '').length / 4);
+                    const chatOutputTokens = Math.ceil((liveChatAccumulatedText || '').length / 4);
                     logLiveChatUsage({ agencyId: agency!.id, userId: authenticatedUserId, feature: 'singularity-chat', model: modelId, provider: aiConfig.provider, inputTokens: chatInputTokens, outputTokens: chatOutputTokens, totalTokens: chatInputTokens + chatOutputTokens });
 
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`));
