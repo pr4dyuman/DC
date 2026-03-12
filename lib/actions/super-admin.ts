@@ -980,13 +980,13 @@ export async function getAIUsageByAgency(days: number = 30) {
     // Enrich with agency names
     const agencyIds = usage.map((u: any) => u._id).filter(Boolean);
     const agencies = await AgencyModel.find(
-        { _id: { $in: agencyIds } },
-        { name: 1, slug: 1, 'usage.storage': 1, 'limits.maxStorage': 1, plan: 1 }
+        { id: { $in: agencyIds } },
+        { id: 1, name: 1, slug: 1, 'usage.storage': 1, 'limits.maxStorage': 1, plan: 1 }
     ).lean();
-    const agencyMap = new Map(agencies.map((a: any) => [a._id.toString(), a]));
+    const agencyMap = new Map(agencies.map((a: any) => [a.id, a]));
 
     return usage.map((u: any) => {
-        const agency = agencyMap.get(u._id?.toString());
+        const agency = agencyMap.get(u._id);
         return {
             agencyId: u._id?.toString(),
             agencyName: agency?.name || 'Unknown',
@@ -1040,14 +1040,14 @@ export async function getAIUsageForAgency(agencyId: string, days: number = 30) {
     // Enrich user names
     const userIds = byUser.map((u: any) => u._id).filter(Boolean);
     const users = await UserModel.find(
-        { _id: { $in: userIds } },
-        { name: 1, email: 1 }
+        { id: { $in: userIds } },
+        { id: 1, name: 1, email: 1 }
     ).lean();
-    const userMap = new Map(users.map((u: any) => [u._id.toString(), u]));
+    const userMap = new Map(users.map((u: any) => [u.id, u]));
 
     return {
         byUser: byUser.map((u: any) => {
-            const user = userMap.get(u._id?.toString());
+            const user = userMap.get(u._id);
             return {
                 userId: u._id?.toString(),
                 userName: user?.name || 'Unknown',
