@@ -4,7 +4,7 @@
 import { Client } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Mail, Briefcase, Phone, MapPin, ArchiveRestore, Archive } from "lucide-react";
+import { Mail, Briefcase, Phone, MapPin, ArchiveRestore, Archive, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -13,10 +13,11 @@ interface ClientCardProps {
     onEdit?: (client: Client) => void;
     onUnarchive?: (clientId: string, clientName: string) => void;
     onDelete?: (clientId: string, clientName: string) => void;
+    onPermanentDelete?: (client: Client) => void;
     isArchived?: boolean;
 }
 
-export function ClientCard({ client, onEdit, onUnarchive, onDelete, isArchived }: ClientCardProps) {
+export function ClientCard({ client, onEdit, onUnarchive, onDelete, onPermanentDelete, isArchived }: ClientCardProps) {
     return (
         <Link href={`/dashboard/clients/${client.username || client.id}`} className="block h-full">
             <Card className="group relative overflow-hidden transition-all hover:shadow-lg h-full border-border hover:border-pink-500/50 hover:bg-muted cursor-pointer">
@@ -57,10 +58,23 @@ export function ClientCard({ client, onEdit, onUnarchive, onDelete, isArchived }
                                             e.stopPropagation();
                                             onDelete(client.id, client.name);
                                         }}
-                                        className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700"
+                                        className="p-2 bg-amber-600 text-white rounded-full hover:bg-amber-700"
                                         title="Archive client"
                                     >
                                         <Archive className="h-3 w-3" />
+                                    </button>
+                                )}
+                                {onPermanentDelete && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            onPermanentDelete(client);
+                                        }}
+                                        className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700"
+                                        title="Permanently delete"
+                                    >
+                                        <Trash2 className="h-3 w-3" />
                                     </button>
                                 )}
                             </>

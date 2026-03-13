@@ -1,16 +1,17 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { getClients, getArchivedClients, unarchiveClient, deleteClient } from "@/lib/actions";
+import { getClients, getArchivedClients, unarchiveClient, deleteClient, permanentlyDeleteClient } from "@/lib/actions";
 import { Client } from "@/lib/types";
 import { ClientCard } from "@/components/clients/ClientCard";
 import { EditClientDialog } from "@/components/clients/EditClientDialog";
-import { Plus, Archive, ArchiveRestore, Search } from "lucide-react";
+import { Plus, Archive, ArchiveRestore, Search, Trash2 } from "lucide-react";
 import { ClientsSkeleton } from "@/components/clients/ClientsSkeleton";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 import { Loader2 } from "lucide-react";
+import { PermanentDeleteDialog } from "@/components/PermanentDeleteDialog";
 
 export default function ClientsPage() {
     const [clients, setClients] = useState<Client[]>([]);
@@ -19,6 +20,7 @@ export default function ClientsPage() {
     const [editingClient, setEditingClient] = useState<Client | null>(null);
     const [showArchived, setShowArchived] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+    const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<Client | null>(null);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -67,7 +69,7 @@ export default function ClientsPage() {
     };
 
     const handleDelete = async (clientId: string, clientName: string) => {
-        if (confirm(`Are you sure you want to archive "${clientName}"? All financial data will be preserved.`)) {
+        if (confirm(`Archive "${clientName}"? Their login is disabled but all data is preserved. You can restore them anytime.`)) {
             try {
                 await deleteClient(clientId);
                 toast.success(`${clientName} archived successfully`);
@@ -77,6 +79,18 @@ export default function ClientsPage() {
                 toast.error("Failed to archive client");
             }
         }
+    };
+
+    const handlePermanentDelete = (client: Client) => {
+        setPermanentDeleteTarget(client);
+    };
+
+    const executePermanentDelete = async (password: string) => {
+        if (!permanentDeleteTarget) return;
+        await permanentlyDeleteClient(permanentDeleteTarget.id, password);
+        toast.success(`${permanentDeleteTarget.name} has been permanently deleted.`);
+        setPermanentDeleteTarget(null);
+        loadData();
     };
 
     return (
@@ -147,6 +161,7 @@ export default function ClientsPage() {
                                 onEdit={handleOpenDialog}
                                 onUnarchive={showArchived ? handleUnarchive : undefined}
                                 onDelete={!showArchived ? handleDelete : undefined}
+                                onPermanentDelete={!showArchived ? handlePermanentDelete : undefined}
                                 isArchived={showArchived}
                             />
                         ))}
@@ -164,6 +179,22 @@ export default function ClientsPage() {
                 open={isDialogOpen}
                 onOpenChange={setIsDialogOpen}
                 onSuccess={loadData}
+            />
+
+            <PermanentDeleteDialog
+                open={!!permanentDeleteTarget}
+                onOpenChange={(open) => { if (!open) setPermanentDeleteTarget(null); }}
+                entityName={permanentDeleteTarget?.name || ""}
+                entityType="client"
+                warningItems={[
+                    "Client account and login credentials",
+                    "All projects owned by this client",
+                    "All tasks within those projects",
+                    "All invoices and payment records",
+                    "All transactions linked to client projects",
+                    "All project assets and files",
+                ]}
+                onConfirm={executePermanentDelete}
             />
         </div>
     );

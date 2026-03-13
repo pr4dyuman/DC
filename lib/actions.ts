@@ -1,4 +1,4 @@
-﻿﻿﻿﻿"use server";
+"use server";
 
 import { User, Project, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig, LeaveRequest, LeaveType, LeaveStatus, UserPermissions, Transaction, TransactionType, TransactionCategory } from "./db";
 import { revalidatePath } from "next/cache";
@@ -356,11 +356,13 @@ export async function getDashboardMetrics() {
                     currentMonthRevenue: {
                         $sum: {
                             $cond: [
-                                { $and: [
-                                    { $eq: ['$type', 'income'] },
-                                    { $eq: [{ $year: { $toDate: '$date' } }, currentYear] },
-                                    { $eq: [{ $month: { $toDate: '$date' } }, currentMonth + 1] }
-                                ] },
+                                {
+                                    $and: [
+                                        { $eq: ['$type', 'income'] },
+                                        { $eq: [{ $year: { $toDate: '$date' } }, currentYear] },
+                                        { $eq: [{ $month: { $toDate: '$date' } }, currentMonth + 1] }
+                                    ]
+                                },
                                 '$amount', 0
                             ]
                         }
@@ -368,11 +370,13 @@ export async function getDashboardMetrics() {
                     prevMonthRevenue: {
                         $sum: {
                             $cond: [
-                                { $and: [
-                                    { $eq: ['$type', 'income'] },
-                                    { $eq: [{ $year: { $toDate: '$date' } }, prevMonthYear] },
-                                    { $eq: [{ $month: { $toDate: '$date' } }, prevMonth + 1] }
-                                ] },
+                                {
+                                    $and: [
+                                        { $eq: ['$type', 'income'] },
+                                        { $eq: [{ $year: { $toDate: '$date' } }, prevMonthYear] },
+                                        { $eq: [{ $month: { $toDate: '$date' } }, prevMonth + 1] }
+                                    ]
+                                },
                                 '$amount', 0
                             ]
                         }
@@ -740,7 +744,7 @@ export async function getUsers() {
     // Fetch users scoped to current agency
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
-    const usersRaw = await UserModel.find(agencyFilter).select('-password').lean();
+    const usersRaw = await UserModel.find({ ...agencyFilter, archived: { $ne: true } }).select('-password').lean();
     const users = usersRaw.map(u => ({ ...sanitizeDoc(u), agencyId: u.agencyId || 'default-agency' }));
 
     if (currentUser?.role === 'client') {
@@ -1286,6 +1290,42 @@ export async function unarchiveClient(id: string) {
     revalidatePath('/dashboard/clients');
 }
 
+export async function permanentlyDeleteClient(id: string, password: string) {
+    await requireRole('admin');
+    await connectDB();
+    const isValid = await verifyAdminPassword(password);
+    if (!isValid) throw new Error('Invalid password');
+    const agency = await getCurrentAgency();
+
+    const client = await ClientModel.findOne({ id, agencyId: agency?.id }).select('-password').lean();
+    if (!client) throw new Error('Client not found');
+
+    // Find all projects owned by this client to cascade-delete their data
+    const clientProjects = await ProjectModel.find({ clientId: id, agencyId: agency?.id }).select('id').lean();
+    const projectIds = clientProjects.map((p: any) => p.id);
+
+    // Hard-delete: permanently remove client and all related data
+    await Promise.all([
+        ClientModel.deleteOne({ id, agencyId: agency?.id }),
+        NotificationModel.deleteMany({ userId: id, agencyId: agency?.id }),
+        // Clean up messages sent/received by this client
+        MessageModel.deleteMany({
+            agencyId: agency?.id,
+            $or: [{ senderId: id }, { receiverId: id }]
+        }),
+        // Delete all projects and their child data
+        ...(projectIds.length > 0 ? [
+            ProjectModel.deleteMany({ id: { $in: projectIds }, agencyId: agency?.id }),
+            TaskModel.deleteMany({ projectId: { $in: projectIds }, agencyId: agency?.id }),
+            InvoiceModel.deleteMany({ projectId: { $in: projectIds }, agencyId: agency?.id }),
+            TransactionModel.deleteMany({ projectId: { $in: projectIds }, agencyId: agency?.id }),
+            AssetModel.deleteMany({ projectId: { $in: projectIds }, agencyId: agency?.id }),
+            ActivityModel.deleteMany({ target: { $in: projectIds }, agencyId: agency?.id }),
+        ] : []),
+    ]);
+    revalidatePath('/dashboard/clients');
+}
+
 export async function approveDocumentUpdate(userId: string, type: 'adhar' | 'pan' | 'contracts' | 'other' | 'both', approve: boolean) {
     const currentUser = await getCurrentUser();
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
@@ -1369,7 +1409,57 @@ export async function deleteUser(id: string, password: string) {
     if (!isValid) throw new Error('Invalid password');
     const agency = await getCurrentAgency();
 
-    // Cascade: delete user and all related data
+    const user = await UserModel.findOne({ id, agencyId: agency?.id }).select('-password').lean();
+    if (!user) throw new Error('User not found');
+
+    // Soft-delete: mark as archived to preserve transaction/task history
+    await UserModel.updateOne(
+        { id, agencyId: agency?.id },
+        { $set: { archived: true, archivedAt: new Date().toISOString() } }
+    );
+    // Clean up notifications for archived user
+    await NotificationModel.deleteMany({ userId: id, agencyId: agency?.id });
+    revalidatePath('/dashboard/team');
+}
+
+export async function getArchivedUsers() {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== 'admin') throw new Error('Unauthorized');
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const users = await UserModel.find({ agencyId: agency?.id, archived: true }).select('-password').lean();
+    return users.map(sanitizeDoc);
+}
+
+export async function unarchiveUser(id: string) {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== 'admin') {
+        throw new Error('Unauthorized');
+    }
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const user = await UserModel.findOne({ id, agencyId: agency?.id }).select('-password').lean();
+    if (!user) throw new Error('User not found');
+    if (!(user as any).archived) throw new Error('User is not archived');
+
+    await UserModel.updateOne(
+        { id, agencyId: agency?.id },
+        { $set: { archived: false }, $unset: { archivedAt: '' } }
+    );
+    revalidatePath('/dashboard/team');
+}
+
+export async function permanentlyDeleteUser(id: string, password: string) {
+    await requireRole('admin');
+    await connectDB();
+    const isValid = await verifyAdminPassword(password);
+    if (!isValid) throw new Error('Invalid password');
+    const agency = await getCurrentAgency();
+
+    const user = await UserModel.findOne({ id, agencyId: agency?.id }).select('-password').lean();
+    if (!user) throw new Error('User not found');
+
+    // Hard-delete: permanently remove user and all related data
     await Promise.all([
         UserModel.deleteOne({ id, agencyId: agency?.id }),
         NotificationModel.deleteMany({ userId: id, agencyId: agency?.id }),
@@ -1379,6 +1469,15 @@ export async function deleteUser(id: string, password: string) {
             { assignee: id, agencyId: agency?.id },
             { $set: { assignee: '' } }
         ),
+        // Delete transactions linked to this user (salary payments etc)
+        TransactionModel.deleteMany({ userId: id, agencyId: agency?.id }),
+        // Clean up messages sent/received by this user
+        MessageModel.deleteMany({
+            agencyId: agency?.id,
+            $or: [{ senderId: id }, { receiverId: id }]
+        }),
+        // Clean up activity log entries by this user
+        ActivityModel.deleteMany({ userId: id, agencyId: agency?.id }),
     ]);
     revalidatePath('/dashboard/team');
 }
@@ -1411,7 +1510,19 @@ export async function deleteService(id: string) {
     await connectDB();
     const agency = await getCurrentAgency();
     const serviceToDelete = await ServiceModel.findOne({ id, agencyId: agency?.id }).lean();
+    if (!serviceToDelete) throw new Error('Service not found');
     const serviceName = (serviceToDelete as any)?.name;
+
+    // Safety check: block deletion if any tasks reference this service as their category
+    const tasksUsingService = await TaskModel.countDocuments({
+        agencyId: agency?.id,
+        category: serviceName,
+    });
+    if (tasksUsingService > 0) {
+        throw new Error(
+            `Cannot delete "${serviceName}": ${tasksUsingService} task(s) are still using this service as their category. Please reassign or delete those tasks first.`
+        );
+    }
 
     await ServiceModel.deleteOne({ id, agencyId: agency?.id });
     // Remove this service from all projects that reference it
@@ -1431,9 +1542,31 @@ export async function updateService(id: string, name: string, jobs: { title: str
     jobs = (jobs || []).map(j => ({ title: sanitizeName(j.title, 200), count: Math.max(0, Math.floor(Number(j.count) || 0)) }));
     await connectDB();
     const agency = await getCurrentAgency();
+
+    // Get old name before updating — needed to propagate rename
+    const oldService = await ServiceModel.findOne({ id, agencyId: agency?.id }).lean();
+    const oldName = (oldService as any)?.name;
+
     await ServiceModel.updateOne(
         { id, agencyId: agency?.id },
         { $set: { name, jobs } });
+
+    // Propagate service rename to tasks and projects that reference the old name
+    if (oldName && oldName !== name) {
+        await Promise.all([
+            // Update task categories that use the old service name
+            TaskModel.updateMany(
+                { agencyId: agency?.id, category: oldName },
+                { $set: { category: name } }
+            ),
+            // Update project services arrays (replace old name with new name)
+            ProjectModel.updateMany(
+                { agencyId: agency?.id, services: oldName },
+                { $set: { 'services.$': name } }
+            ),
+        ]);
+    }
+
     revalidatePath('/dashboard/settings');
     revalidatePath('/dashboard/projects');
 }
@@ -1675,6 +1808,13 @@ export async function deleteTask(taskId: string) {
     if (permissions.deleteAccess === 'own' && task.createdBy !== userId) throw new Error('Unauthorized: You can only delete your own tasks.');
 
     await TaskModel.deleteOne({ id: taskId, agencyId: agency.id });
+
+    // Clean up notifications that link to this task
+    await NotificationModel.deleteMany({
+        agencyId: agency.id,
+        link: { $regex: taskId }
+    });
+
     await ActivityModel.create({
         id: generateId(),
         agencyId: agency.id,
@@ -2302,12 +2442,26 @@ export async function updateClient(id: string, updates: Partial<Client>) {
     if (updates.phone) updates.phone = sanitizePhone(updates.phone);
     if (updates.username) updates.username = sanitizeUsername(updates.username);
     const agency = await getCurrentAgency();
+
+    // Propagate client name change to projects that display this client's name
+    if (updates.name) {
+        const oldClient = await ClientModel.findOne({ id, agencyId: agency?.id }).select('name').lean();
+        const oldName = (oldClient as any)?.name;
+        if (oldName && oldName !== updates.name) {
+            await ProjectModel.updateMany(
+                { clientId: id, agencyId: agency?.id },
+                { $set: { client: updates.name } }
+            );
+        }
+    }
+
     await ClientModel.updateOne(
         { id, agencyId: agency?.id },
         { $set: { ...updates, updatedAt: new Date().toISOString() } }
     );
     revalidatePath('/dashboard/clients');
     revalidatePath(`/dashboard/clients/${id}`);
+    revalidatePath('/dashboard/projects');
 }
 
 

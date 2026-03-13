@@ -25,6 +25,7 @@ import {
     rejectLeaveRequest,
     addService,
     updateService,
+    deleteService,
     updateUser,
     bulkEstimateTaskHours,
     getAIPermissions,
@@ -1233,6 +1234,9 @@ export async function executeTool(
                     TaskModel.deleteMany({ projectId: args.projectId, agencyId: agency?.id }),
                     InvoiceModel.deleteMany({ projectId: args.projectId, agencyId: agency?.id }),
                     AssetModel.deleteMany({ projectId: args.projectId, agencyId: agency?.id }),
+                    TransactionModel.deleteMany({ projectId: args.projectId, agencyId: agency?.id }),
+                    ActivityModel.deleteMany({ target: args.projectId, agencyId: agency?.id }),
+                    NotificationModel.deleteMany({ agencyId: agency?.id, link: { $regex: args.projectId } }),
                 ]);
                 return {
                     success: true,
@@ -1298,18 +1302,16 @@ export async function executeTool(
                 const aiPerms = await getAIPermissions();
                 if (!aiPerms.canDelete) return { success: false, data: null, summary: '⛔ AI Delete permission is disabled. Enable it in Settings → AI Settings.' };
 
-                await connectDB();
-                const { getCurrentAgency } = await import('./agency-context');
-                const agency = await getCurrentAgency();
                 const svcDelSnapshot = await snapshotEntity('service', args.serviceId);
-                const svc = await ServiceModel.findOne({ id: args.serviceId, agencyId: agency?.id }).lean();
-                if (!svc) return { success: false, data: null, summary: 'Service not found' };
-
-                await ServiceModel.deleteOne({ id: args.serviceId, agencyId: agency?.id });
+                try {
+                    await deleteService(args.serviceId);
+                } catch (err: any) {
+                    return { success: false, data: null, summary: err.message };
+                }
                 return {
                     success: true,
                     data: { serviceId: args.serviceId },
-                    summary: `Service "${(svc as any).name}" deleted`,
+                    summary: `Service deleted`,
                     rollbackData: svcDelSnapshot ? [{
                         toolName: 'delete_service', actionType: 'delete', entityType: 'service',
                         entityId: args.serviceId, beforeSnapshot: svcDelSnapshot, executedAt: new Date().toISOString(),

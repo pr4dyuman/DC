@@ -266,6 +266,9 @@ export type User = {
     pendingContracts?: string[];
     otherDocuments?: string[];
     pendingOtherDocuments?: string[];
+    // Archive fields - preserve financial/task data when employee leaves
+    archived?: boolean;
+    archivedAt?: string;
     createdAt?: string;
     updatedAt?: string;
 };

@@ -4,12 +4,13 @@ import { useState, useEffect } from "react";
 import { User } from "@/lib/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, Trash2, AlertTriangle, Archive } from "lucide-react";
 import { toast } from "sonner";
-import { createUser, updateUser, deleteUser, adminResetPassword, getServices, approveDocumentUpdate } from "@/lib/actions";
+import { createUser, updateUser, deleteUser, adminResetPassword, getServices, approveDocumentUpdate, permanentlyDeleteUser } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { useCurrency } from "@/context/CurrencyContext";
 import { DocumentManager } from "./DocumentManager";
+import { PermanentDeleteDialog } from "@/components/PermanentDeleteDialog";
 
 interface EditUserDialogProps {
     user?: User | null;
@@ -27,6 +28,8 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deletePassword, setDeletePassword] = useState("");
     const [deleting, setDeleting] = useState(false);
+    const [archiving, setArchiving] = useState(false);
+    const [showPermanentDelete, setShowPermanentDelete] = useState(false);
     const [services, setServices] = useState<any[]>([]);
     const [loadingRoles, setLoadingRoles] = useState(false);
     const [showDocumentManager, setShowDocumentManager] = useState(false);
@@ -169,23 +172,33 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
         }
     };
 
-    const handleDelete = async () => {
+    const handleArchive = async () => {
         if (!user) return;
-        setDeleting(true);
+        setArchiving(true);
         try {
             await deleteUser(user.id, deletePassword);
             if (window.location.pathname.includes(user.id)) {
                 router.push('/dashboard/team');
             }
-
             if (onSuccess) onSuccess();
             onOpenChange(false);
-            toast.success("User deleted successfully");
+            toast.success(`${user.name} has been deactivated (archived). They can be restored anytime.`);
         } catch (error: any) {
-            toast.error(error.message || "Failed to delete user");
+            toast.error(error.message || "Failed to archive user");
         } finally {
-            setDeleting(false);
+            setArchiving(false);
         }
+    };
+
+    const handlePermanentDelete = async (password: string) => {
+        if (!user) return;
+        await permanentlyDeleteUser(user.id, password);
+        if (window.location.pathname.includes(user.id)) {
+            router.push('/dashboard/team');
+        }
+        if (onSuccess) onSuccess();
+        onOpenChange(false);
+        toast.success(`${user.name} has been permanently deleted.`);
     };
 
     return (
@@ -456,39 +469,69 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                         </form>
                     ) : (
                         <div className="py-4 space-y-4">
-                            <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500">
+                            <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-500">
                                 <AlertTriangle className="h-5 w-5" />
-                                <p className="text-sm font-medium">Warning: This action is permanent and cannot be undone.</p>
+                                <p className="text-sm font-medium">Choose how to handle this account</p>
                             </div>
 
-                            <div className="space-y-2">
-                                <p className="text-sm text-muted-foreground">
-                                    Please enter the <strong className="text-foreground">Admin Password</strong> to confirm the deletion of <strong>{user?.name}</strong>.
-                                </p>
-                                <input
-                                    type="password"
-                                    placeholder="Admin Password"
-                                    value={deletePassword}
-                                    onChange={(e) => setDeletePassword(e.target.value)}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-red-500"
-                                    autoFocus
-                                />
+                            {/* Archive option */}
+                            <div className="p-4 border border-border rounded-lg space-y-3">
+                                <div className="flex items-start gap-3">
+                                    <Archive className="h-5 w-5 text-amber-500 mt-0.5" />
+                                    <div>
+                                        <p className="text-sm font-semibold text-foreground">Deactivate (Archive)</p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Account is disabled but all data (tasks, transactions, history) is preserved. Can be restored anytime.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="space-y-2 pl-8">
+                                    <input
+                                        type="password"
+                                        placeholder="Admin Password"
+                                        value={deletePassword}
+                                        onChange={(e) => setDeletePassword(e.target.value)}
+                                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                                    />
+                                    <button
+                                        onClick={handleArchive}
+                                        disabled={!deletePassword || archiving}
+                                        className="w-full px-4 py-2 text-sm font-medium text-amber-700 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                        {archiving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
+                                        {archiving ? "Archiving..." : "Archive User"}
+                                    </button>
+                                </div>
                             </div>
 
-                            <DialogFooter className="flex justify-end gap-2 pt-2">
+                            {/* Permanent delete option */}
+                            <div className="p-4 border border-red-500/30 rounded-lg bg-red-500/5 space-y-3">
+                                <div className="flex items-start gap-3">
+                                    <Trash2 className="h-5 w-5 text-red-500 mt-0.5" />
+                                    <div>
+                                        <p className="text-sm font-semibold text-red-500">Permanently Delete</p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            <strong className="text-red-400">Irreversible.</strong> Removes user account and all associated data including transactions, leave requests, and notifications.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="pl-8">
+                                    <button
+                                        onClick={() => { setShowDeleteConfirm(false); setShowPermanentDelete(true); }}
+                                        className="w-full px-4 py-2 text-sm font-medium text-red-500 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-md flex items-center justify-center gap-2"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        Delete Permanently...
+                                    </button>
+                                </div>
+                            </div>
+
+                            <DialogFooter className="flex justify-end pt-2">
                                 <button
                                     onClick={() => setShowDeleteConfirm(false)}
                                     className="px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted rounded-md transition-colors"
                                 >
                                     Back
-                                </button>
-                                <button
-                                    onClick={handleDelete}
-                                    disabled={!deletePassword || deleting}
-                                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                                >
-                                    {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                                    {deleting ? "Deleting..." : "Confirm Delete"}
                                 </button>
                             </DialogFooter>
                         </div>
@@ -508,6 +551,23 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                     />
                 )
             }
+            {/* Permanent Delete Dialog */}
+            {user && (
+                <PermanentDeleteDialog
+                    open={showPermanentDelete}
+                    onOpenChange={setShowPermanentDelete}
+                    entityName={user.name}
+                    entityType="user"
+                    warningItems={[
+                        "User account and login credentials",
+                        "All salary/payment transactions linked to this user",
+                        "Leave requests and attendance records",
+                        "Notifications",
+                        "Tasks will be unassigned (not deleted)",
+                    ]}
+                    onConfirm={handlePermanentDelete}
+                />
+            )}
         </>
     );
 }

@@ -50,6 +50,9 @@ export async function login(email: string, password: string) {
     // Check regular user
     const user = await UserModel.findOne({ email }).lean();
     if (user) {
+        if ((user as any).archived) {
+            return { success: false, error: 'This account has been deactivated. Please contact your agency.' };
+        }
         if (user.password && await comparePassword(password, user.password)) {
             await RateLimitModel.deleteOne({ key: rateKey });
             await authLogin(user.id, user.role, user.agencyId);

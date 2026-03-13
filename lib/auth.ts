@@ -146,6 +146,9 @@ export async function authenticateUser(email: string, password: string): Promise
     // 2. Check Users
     const user = await UserModel.findOne({ email }).lean();
     if (user) {
+        if ((user as any).archived) {
+            return { success: false, error: 'This account has been deactivated. Please contact your agency.' };
+        }
         if (user.password && await comparePassword(password, user.password)) {
             await resetLoginRateLimit(email);
             await login(user.id, user.role, user.agencyId);

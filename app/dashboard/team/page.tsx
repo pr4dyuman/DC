@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getUsers, createUser, updateUser, deleteUser, getUser, getLeaveRequests } from "@/lib/actions";
+import { getUsers, createUser, updateUser, deleteUser, getUser, getLeaveRequests, getArchivedUsers, unarchiveUser } from "@/lib/actions";
 import { User, LeaveRequest } from "@/lib/types";
 import { getSessionId } from "@/lib/auth";
 import { LeaveRequestsList } from "@/components/leave-requests-list";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Link from "next/link";
-import { Plus, Mail, Banknote, Briefcase, Search, Users, Shield, UserCheck, MessageCircle, Phone } from "lucide-react";
+import { Plus, Mail, Banknote, Briefcase, Search, Users, Shield, UserCheck, MessageCircle, Phone, Archive, ArchiveRestore } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { TeamPageSkeleton } from "@/components/team/TeamPageSkeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EditUserDialog } from "@/components/team/EditUserDialog";
@@ -37,11 +38,12 @@ export default function TeamPage() {
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [roleFilter, setRoleFilter] = useState<string>("all");
+    const [showArchived, setShowArchived] = useState(false);
     const { openChat } = useChat();
 
     const loadData = async () => {
         const [usersData, currentId] = await Promise.all([
-            getUsers(),
+            showArchived ? getArchivedUsers() : getUsers(),
             getSessionId()
         ]);
 
@@ -69,7 +71,7 @@ export default function TeamPage() {
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [showArchived]);
 
     const handleOpenDialog = (user?: User) => {
         setEditingUser(user || null);
@@ -95,18 +97,52 @@ export default function TeamPage() {
     const employeeCount = users.filter(u => u.role === 'employee' || u.role === 'manager').length;
     const clientCount = users.filter(u => u.role === 'client').length;
 
-    const { visibleCount, sentinelRef, hasMore } = useProgressiveList(filteredUsers.length, 12, [searchQuery, roleFilter]);
+    const { visibleCount, sentinelRef, hasMore } = useProgressiveList(filteredUsers.length, 12, [searchQuery, roleFilter, showArchived]);
+
+    const handleRestore = async (userId: string, userName: string) => {
+        try {
+            await unarchiveUser(userId);
+            loadData();
+        } catch (error) {
+            console.error("Failed to restore user", error);
+        }
+    };
 
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0">
-                <h1 className="text-2xl sm:text-3xl font-bold">Team</h1>
-                <button
-                    onClick={() => handleOpenDialog()}
-                    className="w-full sm:w-auto inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-                >
-                    <Plus className="mr-2 h-4 w-4" /> Add Member
-                </button>
+                <h1 className="text-2xl sm:text-3xl font-bold">
+                    {showArchived ? "Deactivated Members" : "Team"}
+                </h1>
+                <div className="flex gap-2">
+                    {(currentUserRole === 'admin') && (
+                        <Button
+                            variant={showArchived ? "default" : "outline"}
+                            onClick={() => setShowArchived(!showArchived)}
+                            className="w-full sm:w-auto"
+                        >
+                            {showArchived ? (
+                                <>
+                                    <ArchiveRestore className="mr-2 h-4 w-4" />
+                                    Show Active
+                                </>
+                            ) : (
+                                <>
+                                    <Archive className="mr-2 h-4 w-4" />
+                                    Show Deactivated
+                                </>
+                            )}
+                        </Button>
+                    )}
+                    {!showArchived && (
+                        <button
+                            onClick={() => handleOpenDialog()}
+                            className="w-full sm:w-auto inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+                        >
+                            <Plus className="mr-2 h-4 w-4" /> Add Member
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Stats Bar */}
@@ -224,70 +260,87 @@ export default function TeamPage() {
                 <>
                     <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                         {filteredUsers.slice(0, visibleCount).map(user => (
-                        <Link href={`/dashboard/team/${user.username || user.id}`} key={user.id} className="block h-full">
-                            <Card className="group relative overflow-hidden transition-all hover:shadow-lg h-full border-border hover:border-primary/50 hover:bg-muted cursor-pointer">
-                                {/* Quick Actions (hover) */}
-                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
-                                    {user.id !== currentUserId && (
-                                        <button
-                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); openChat(user.id); }}
-                                            className="p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition shadow-sm"
-                                            title="Send Message"
-                                        >
-                                            <MessageCircle className="h-3 w-3" />
-                                        </button>
-                                    )}
-                                    {(currentUserRole === 'admin' || currentUserRole === 'manager' || currentUserId === user.id) && (
-                                        <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOpenDialog(user); }} className="p-2 bg-secondary text-secondary-foreground rounded-full hover:bg-secondary/80 transition shadow-sm">
-                                            <span className="sr-only">Edit</span>
-                                            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-3 w-3"><path d="M11.8536 1.14645C11.6583 0.951184 11.3417 0.951184 11.1464 1.14645L3.71455 8.57829C3.64584 8.647 3.58564 8.72531 3.53033 8.80868L3.53033 8.80868L2 12.9999L6.19122 11.4696L6.19122 11.4696C6.27463 11.4143 6.35304 11.3541 6.42171 11.2854L13.8536 3.85355C14.0488 3.65829 14.0488 3.34171 13.8536 3.14645L11.8536 1.14645ZM4.41421 9.41421L3.99998 12.0001L6.58579 11.5858L10.5 7.67157L8.32843 5.5L4.41421 9.41421ZM11.4142 2.41421L12.5858 3.58579L11.5 4.67157L10.3284 3.5L11.4142 2.41421Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
-                                        </button>
-                                    )}
-                                </div>
-
-                                {/* Role Badge */}
-                                <div className="absolute top-3 left-3 z-10">
-                                    <Badge variant="secondary" className="text-[10px] capitalize bg-muted/80 backdrop-blur-sm border border-border">
-                                        {user.role}
-                                    </Badge>
-                                </div>
-
-                                <CardHeader className="flex flex-row items-center gap-4 pt-10">
-                                    <div className="relative">
-                                        <Avatar className="h-14 w-14 border-2 border-primary/10 transition-transform group-hover:scale-110">
-                                            <AvatarImage src={user.avatar} alt={user.name} />
-                                            <AvatarFallback>{user.name.substring(0, 2).toUpperCase()}</AvatarFallback>
-                                        </Avatar>
-                                    </div>
-                                    <div>
-                                        <CardTitle className="text-lg group-hover:text-primary transition-colors">{user.name}</CardTitle>
-                                        {user.username && (
-                                            <p className="text-xs text-muted-foreground mb-0.5">@{user.username}</p>
+                            <Link href={`/dashboard/team/${user.username || user.id}`} key={user.id} className="block h-full">
+                                <Card className={cn("group relative overflow-hidden transition-all hover:shadow-lg h-full border-border hover:border-primary/50 hover:bg-muted cursor-pointer", showArchived && "opacity-70")}>
+                                    {/* Quick Actions (hover) */}
+                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+                                        {user.id !== currentUserId && (
+                                            <button
+                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); openChat(user.id); }}
+                                                className="p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition shadow-sm"
+                                                title="Send Message"
+                                            >
+                                                <MessageCircle className="h-3 w-3" />
+                                            </button>
                                         )}
-                                        <CardDescription className="capitalize text-primary font-medium">{user.jobTitle || user.role}</CardDescription>
+                                        {(currentUserRole === 'admin' || currentUserRole === 'manager' || currentUserId === user.id) && (
+                                            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOpenDialog(user); }} className="p-2 bg-secondary text-secondary-foreground rounded-full hover:bg-secondary/80 transition shadow-sm">
+                                                <span className="sr-only">Edit</span>
+                                                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-3 w-3"><path d="M11.8536 1.14645C11.6583 0.951184 11.3417 0.951184 11.1464 1.14645L3.71455 8.57829C3.64584 8.647 3.58564 8.72531 3.53033 8.80868L3.53033 8.80868L2 12.9999L6.19122 11.4696L6.19122 11.4696C6.27463 11.4143 6.35304 11.3541 6.42171 11.2854L13.8536 3.85355C14.0488 3.65829 14.0488 3.34171 13.8536 3.14645L11.8536 1.14645ZM4.41421 9.41421L3.99998 12.0001L6.58579 11.5858L10.5 7.67157L8.32843 5.5L4.41421 9.41421ZM11.4142 2.41421L12.5858 3.58579L11.5 4.67157L10.3284 3.5L11.4142 2.41421Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
+                                            </button>
+                                        )}
                                     </div>
-                                </CardHeader>
-                                <CardContent className="space-y-2">
-                                    <div className="flex items-center text-sm text-muted-foreground">
-                                        <Mail className="mr-2 h-4 w-4 shrink-0" />
-                                        <span className="truncate">{user.email}</span>
+
+                                    {/* Role Badge */}
+                                    <div className="absolute top-3 left-3 z-10 flex gap-1">
+                                        <Badge variant="secondary" className="text-[10px] capitalize bg-muted/80 backdrop-blur-sm border border-border">
+                                            {user.role}
+                                        </Badge>
+                                        {showArchived && (
+                                            <Badge variant="destructive" className="text-[10px] bg-red-500/80 backdrop-blur-sm">
+                                                Deactivated
+                                            </Badge>
+                                        )}
                                     </div>
-                                    {user.contactNumber && (
+                                    {showArchived && currentUserRole === 'admin' && (
+                                        <div className="absolute top-2 right-2 z-10">
+                                            <button
+                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleRestore(user.id, user.name); }}
+                                                className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition shadow-sm flex items-center gap-1"
+                                                title="Reactivate this account"
+                                            >
+                                                <ArchiveRestore className="h-3 w-3" />
+                                                Restore
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    <CardHeader className="flex flex-row items-center gap-4 pt-10">
+                                        <div className="relative">
+                                            <Avatar className="h-14 w-14 border-2 border-primary/10 transition-transform group-hover:scale-110">
+                                                <AvatarImage src={user.avatar} alt={user.name} />
+                                                <AvatarFallback>{user.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                                            </Avatar>
+                                        </div>
+                                        <div>
+                                            <CardTitle className="text-lg group-hover:text-primary transition-colors">{user.name}</CardTitle>
+                                            {user.username && (
+                                                <p className="text-xs text-muted-foreground mb-0.5">@{user.username}</p>
+                                            )}
+                                            <CardDescription className="capitalize text-primary font-medium">{user.jobTitle || user.role}</CardDescription>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-2">
                                         <div className="flex items-center text-sm text-muted-foreground">
-                                            <Phone className="mr-2 h-4 w-4 shrink-0" />
-                                            <span>{user.contactNumber}</span>
+                                            <Mail className="mr-2 h-4 w-4 shrink-0" />
+                                            <span className="truncate">{user.email}</span>
                                         </div>
-                                    )}
-                                    {canViewSalary && user.salary && user.salary > 0 && (
-                                        <div className="flex items-center text-sm font-medium text-green-500">
-                                            <Banknote className="mr-2 h-4 w-4" />
-                                            {user.salary.toLocaleString()}/mo
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </Link>
-                    ))}
+                                        {user.contactNumber && (
+                                            <div className="flex items-center text-sm text-muted-foreground">
+                                                <Phone className="mr-2 h-4 w-4 shrink-0" />
+                                                <span>{user.contactNumber}</span>
+                                            </div>
+                                        )}
+                                        {canViewSalary && user.salary && user.salary > 0 && (
+                                            <div className="flex items-center text-sm font-medium text-green-500">
+                                                <Banknote className="mr-2 h-4 w-4" />
+                                                {user.salary.toLocaleString()}/mo
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </Link>
+                        ))}
                     </div>
                     {hasMore && (
                         <div ref={sentinelRef} className="flex justify-center py-6">

@@ -349,13 +349,16 @@ const UserSchema = new Schema<User>({
     contracts: [{ type: String }],
     pendingContracts: [{ type: String }],
     otherDocuments: [{ type: String }],
-    pendingOtherDocuments: [{ type: String }]
+    pendingOtherDocuments: [{ type: String }],
+    archived: { type: Boolean, default: false },
+    archivedAt: { type: String },
 }, { timestamps: true });
 
 // Compound unique index: each email is unique within an agency
 UserSchema.index({ email: 1, agencyId: 1 }, { unique: true });
 // Compound unique index: each username is unique within an agency
 UserSchema.index({ username: 1, agencyId: 1 }, { unique: true, sparse: true });
+UserSchema.index({ archived: 1 });
 
 // Client Schema
 const ClientSchema = new Schema<Client>({
