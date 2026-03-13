@@ -4,7 +4,7 @@ import { Topbar } from "@/components/layout/Topbar";
 import { getCurrentUser, getAgencySettings, updateUserTimezone } from "@/lib/actions";
 import { redirect } from "next/navigation";
 import { DashboardChatProvider } from "@/components/providers/DashboardChatProvider";
-import { getCurrentAgency, checkTrialExpired } from "@/lib/agency-context";
+import { getCurrentAgency, checkTrialExpired, checkPlanExpired } from "@/lib/agency-context";
 import { TimezoneProvider } from "@/context/TimezoneContext";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 
@@ -32,6 +32,11 @@ export async function AuthenticatedLayout({
     // Check if agency trial has expired (sync comparison, no DB call)
     if (await checkTrialExpired(agency)) {
         redirect("/trial-expired");
+    }
+
+    // Check if paid plan has expired
+    if (await checkPlanExpired(agency)) {
+        redirect("/plan-expired");
     }
 
     const dashboardUser = user as any;

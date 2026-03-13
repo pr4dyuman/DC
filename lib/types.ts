@@ -74,6 +74,8 @@ export type Agency = {
     status: AgencyStatus;
     plan: AgencyPlan;
     trialEndsAt?: string;      // ISO date
+    planExpiresAt?: string;    // ISO date — when paid plan expires (null = lifetime)
+    planDuration?: 'monthly' | '3months' | '6months' | 'yearly' | 'lifetime';
 
     // Limits & Usage
     limits: AgencyLimits;

@@ -74,7 +74,7 @@ export default async function AgencyDetailsPage({ params }: { params: Promise<{ 
             )}
 
             {/* Status Badges */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${agency.plan === 'enterprise' ? 'bg-purple-500/10 text-purple-500' :
                     agency.plan === 'pro' ? 'bg-blue-500/10 text-blue-500' :
                         agency.plan === 'starter' ? 'bg-emerald-500/10 text-emerald-500' :
@@ -85,6 +85,29 @@ export default async function AgencyDetailsPage({ params }: { params: Promise<{ 
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusBadge(agency.status)}`}>
                     {agency.status}
                 </span>
+                {agency.planDuration && (
+                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-cyan-500/10 text-cyan-500">
+                        {agency.planDuration === 'lifetime' ? '∞ Lifetime' :
+                         agency.planDuration === 'monthly' ? '1 Month' :
+                         agency.planDuration === '3months' ? '3 Months' :
+                         agency.planDuration === '6months' ? '6 Months' :
+                         agency.planDuration === 'yearly' ? '1 Year' : agency.planDuration}
+                    </span>
+                )}
+                {agency.planExpiresAt && (
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        new Date(agency.planExpiresAt) < new Date() ? 'bg-red-500/10 text-red-500' : 'bg-muted text-muted-foreground'
+                    }`}>
+                        {new Date(agency.planExpiresAt) < new Date() ? 'Expired' : 'Expires'}: {new Date(agency.planExpiresAt).toLocaleDateString()}
+                    </span>
+                )}
+                {agency.status === 'trial' && agency.trialEndsAt && (
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        new Date(agency.trialEndsAt) < new Date() ? 'bg-red-500/10 text-red-500' : 'bg-muted text-muted-foreground'
+                    }`}>
+                        Trial {new Date(agency.trialEndsAt) < new Date() ? 'ended' : 'ends'}: {new Date(agency.trialEndsAt).toLocaleDateString()}
+                    </span>
+                )}
             </div>
 
             {/* Stats Grid with Usage Bars */}

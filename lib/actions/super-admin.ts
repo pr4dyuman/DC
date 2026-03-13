@@ -191,11 +191,21 @@ export async function createAgency(data: {
 
     const sanitizedPhone = data.ownerPhone ? sanitizePhone(data.ownerPhone) : '';
 
-    // Validate logo if provided (max 3MB base64, must be data:image/*)
+    // Validate logo if provided (max 3MB base64, must be safe raster image)
+    const ALLOWED_LOGO_MIME_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
     let sanitizedLogo = '';
     if (data.logo && typeof data.logo === 'string') {
         if (data.logo.length > 3_000_000) throw new Error('Logo file is too large. Max 2MB.');
-        if (data.logo.startsWith('data:image/')) sanitizedLogo = data.logo;
+        const mimeMatch = data.logo.match(/^data:(image\/[a-zA-Z+]+);base64,/);
+        if (mimeMatch) {
+            const mimeType = mimeMatch[1].toLowerCase();
+            if (!ALLOWED_LOGO_MIME_TYPES.includes(mimeType)) {
+                throw new Error('Unsupported logo format. Please use PNG, JPG, GIF, or WebP.');
+            }
+            sanitizedLogo = data.logo;
+        } else if (data.logo.startsWith('data:')) {
+            throw new Error('Invalid logo format. Please upload a valid image file.');
+        }
     }
 
     // Check if email already exists across all collections
@@ -538,16 +548,36 @@ export async function deleteAgency(agencyId: string, password: string) {
 /**
  * Update agency plan
  */
-export async function updateAgencyPlan(agencyId: string, plan: 'free' | 'starter' | 'pro' | 'enterprise') {
+export async function updateAgencyPlan(
+    agencyId: string,
+    plan: 'free' | 'starter' | 'pro' | 'enterprise',
+    duration: 'monthly' | '3months' | '6months' | 'yearly' | 'lifetime' = 'lifetime'
+) {
     await verifySuperAdmin();
     await connectDB();
 
     const planDefaults = AGENCY_PLANS[plan];
 
+    // Calculate planExpiresAt based on duration
+    let planExpiresAt: string | undefined = undefined;
+    if (duration !== 'lifetime') {
+        const now = new Date();
+        const durationMap: Record<string, number> = {
+            'monthly': 1,
+            '3months': 3,
+            '6months': 6,
+            'yearly': 12,
+        };
+        const months = durationMap[duration] || 1;
+        now.setMonth(now.getMonth() + months);
+        planExpiresAt = now.toISOString();
+    }
+
     const updateFields: Record<string, any> = {
         plan,
         limits: planDefaults.limits,
         features: planDefaults.features,
+        planDuration: duration,
         updatedAt: new Date().toISOString()
     };
 
@@ -556,10 +586,73 @@ export async function updateAgencyPlan(agencyId: string, plan: 'free' | 'starter
         updateFields.status = 'active';
     }
 
+    // Set or clear planExpiresAt
+    if (planExpiresAt) {
+        updateFields.planExpiresAt = planExpiresAt;
+    }
+
+    const unsetFields: Record<string, string> = {};
+    if (!planExpiresAt) {
+        unsetFields.planExpiresAt = '';
+    }
+    // Clear trial fields when upgrading
+    if (plan !== 'free') {
+        unsetFields.trialEndsAt = '';
+    }
+
     await AgencyModel.updateOne(
         { id: agencyId },
-        { $set: updateFields }
+        {
+            $set: updateFields,
+            ...(Object.keys(unsetFields).length > 0 ? { $unset: unsetFields } : {})
+        }
     );
+
+    revalidatePath('/super-admin/agencies');
+    revalidatePath(`/super-admin/agencies/${agencyId}`);
+
+    return true;
+}
+
+/**
+ * Extend agency trial by N days
+ */
+export async function extendTrial(agencyId: string, days: number) {
+    const sa = await verifySuperAdmin();
+    await connectDB();
+
+    if (!days || days < 1 || days > 365) {
+        throw new Error('Days must be between 1 and 365');
+    }
+
+    const agency = await AgencyModel.findOne({ id: agencyId }).lean();
+    if (!agency) throw new Error('Agency not found');
+
+    // Calculate new trial end date
+    const currentEnd = agency.trialEndsAt ? new Date(agency.trialEndsAt) : new Date();
+    // If expired, extend from now; if still active, extend from current end
+    const base = currentEnd < new Date() ? new Date() : currentEnd;
+    base.setDate(base.getDate() + days);
+
+    await AgencyModel.updateOne(
+        { id: agencyId },
+        {
+            $set: {
+                status: 'trial',
+                trialEndsAt: base.toISOString(),
+                updatedAt: new Date().toISOString()
+            }
+        }
+    );
+
+    await logSystemEvent({
+        event: 'Trial Extended',
+        type: 'agency',
+        detail: `${(agency as any).name || agencyId} trial extended by ${days} days (new end: ${base.toLocaleDateString()})`,
+        status: 'info',
+        agencyId,
+        userId: sa.userId,
+    });
 
     revalidatePath('/super-admin/agencies');
     revalidatePath(`/super-admin/agencies/${agencyId}`);

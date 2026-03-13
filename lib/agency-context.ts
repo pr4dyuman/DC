@@ -335,3 +335,14 @@ export async function checkTrialExpired(agency: Agency | null): Promise<boolean>
     return new Date(agency.trialEndsAt) < new Date();
 }
 
+/**
+ * Check if the current agency's paid plan has expired.
+ * Returns false if agency has no expiry date (lifetime) or is not active.
+ */
+export async function checkPlanExpired(agency: Agency | null): Promise<boolean> {
+    if (!agency) return false;
+    if (agency.status !== 'active') return false;
+    if (!agency.planExpiresAt) return false; // No expiry = lifetime
+    return new Date(agency.planExpiresAt) < new Date();
+}
+
