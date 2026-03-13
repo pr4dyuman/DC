@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
@@ -150,7 +150,7 @@ function renderMarkdown(text: string): string {
     return DOMPurify.sanitize(html);
 }
 
-export function SingularityChat({ userId }: { userId?: string }) {
+export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?: string; agencyName?: string }) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -959,7 +959,7 @@ export function SingularityChat({ userId }: { userId?: string }) {
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center">
                             <Sparkles className="w-4 h-4 text-white" />
                         </div>
-                        <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">AgencyOS</span>
+                        <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">{agencyName}</span>
                     </div>
                 </div>
 
