@@ -3466,16 +3466,46 @@ export async function deleteProjectAsset(assetId: string) {
     if (!asset) throw new Error('Asset not found');
     await AssetModel.deleteOne({ id: assetId, agencyId: agency?.id });
 
-    // Clean up uploaded file from disk if it's a local upload
+    // Clean up uploaded file
     const assetUrl = (asset as any).url;
-    if (assetUrl && assetUrl.startsWith('/uploads/')) {
-        const { unlink } = await import('fs/promises');
-        const path = await import('path');
-        const filePath = path.join(process.cwd(), 'public', assetUrl);
-        // Verify path stays within uploads dir to prevent path traversal
-        const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-        if (filePath.startsWith(uploadsDir)) {
-            await unlink(filePath).catch(() => { /* file may already be gone */ });
+    if (assetUrl) {
+        // Azure Blob Storage cleanup
+        if (assetUrl.includes('.blob.core.windows.net/')) {
+            try {
+                const { deleteFromAzure } = await import('@/lib/azure-storage');
+                await deleteFromAzure(assetUrl);
+            } catch (e) {
+                console.error('Failed to delete blob from Azure:', e);
+            }
+        }
+        // Legacy: local filesystem cleanup
+        else if (assetUrl.startsWith('/uploads/')) {
+            const { unlink } = await import('fs/promises');
+            const path = await import('path');
+            const filePath = path.join(process.cwd(), 'public', assetUrl);
+            const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+            if (filePath.startsWith(uploadsDir)) {
+                await unlink(filePath).catch(() => { /* file may already be gone */ });
+            }
+        }
+
+        // Decrement storage usage
+        try {
+            const assetSize = (asset as any).size;
+            if (assetSize) {
+                const sizeMatch = String(assetSize).match(/([\d.]+)\s*(KB|MB|GB|B)/i);
+                if (sizeMatch) {
+                    const num = parseFloat(sizeMatch[1]);
+                    const unit = sizeMatch[2].toUpperCase();
+                    const bytes = unit === 'GB' ? num * 1073741824 : unit === 'MB' ? num * 1048576 : unit === 'KB' ? num * 1024 : num;
+                    await AgencyModel.updateOne(
+                        { _id: agency?._id },
+                        { $inc: { 'usage.storage': -Math.round(bytes) } }
+                    );
+                }
+            }
+        } catch (e) {
+            console.error('Failed to update storage usage:', e);
         }
     }
 

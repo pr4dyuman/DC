@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import path from 'path';
-import { writeFile } from 'fs/promises';
-import fs from 'fs';
 import { getSessionUser } from '@/lib/auth';
 import { getCurrentAgency, checkTrialExpired } from '@/lib/agency-context';
 import { validateCsrfOrigin } from '@/lib/validation';
+import { uploadToAzure } from '@/lib/azure-storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +12,17 @@ const ALLOWED_EXTENSIONS = new Set([
   '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv', '.txt'
 ]);
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
+// MIME type mapping for Azure content-type header
+const MIME_TYPES = {
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+  '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
+  '.pdf': 'application/pdf', '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.csv': 'text/csv', '.txt': 'text/plain'
+};
 
 export async function POST(req) {
   try {
@@ -56,20 +66,12 @@ export async function POST(req) {
     const baseName = path.basename(originalName);
     const safeName = baseName.replace(/[^a-zA-Z0-9._-]/g, '_');
     const filename = Date.now() + '_' + safeName;
-    
-    // Ensure upload dir exists
-    const uploadDir = path.join(process.cwd(), 'public/uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
 
-    // Resolve and verify the final path stays within uploadDir
-    const filePath = path.resolve(uploadDir, filename);
-    if (!filePath.startsWith(uploadDir)) {
-      return NextResponse.json({ success: false, error: 'Invalid filename.' }, { status: 400 });
-    }
+    // Get content type for Azure
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
-    await writeFile(filePath, buffer);
+    // Upload to Azure Blob Storage
+    const blobUrl = await uploadToAzure(buffer, filename, contentType);
 
     // Track storage usage for the agency
     try {
@@ -86,7 +88,7 @@ export async function POST(req) {
 
     return NextResponse.json({ 
       success: true, 
-      url: `/uploads/${filename}` 
+      url: blobUrl
     }, { status: 201 });
 
   } catch (error) {
@@ -94,5 +96,3 @@ export async function POST(req) {
     return NextResponse.json({ success: false, error: 'Upload failed' }, { status: 500 });
   }
 }
-
-
