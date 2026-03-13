@@ -79,7 +79,7 @@ export async function POST(req) {
       const { AgencyModel } = await import('@/lib/mongodb');
       await connectDB();
       await AgencyModel.updateOne(
-        { _id: agency._id },
+        { id: agency.id },
         { $inc: { 'usage.storage': buffer.length } }
       );
     } catch (storageErr) {

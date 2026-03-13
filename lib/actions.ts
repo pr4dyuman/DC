@@ -3499,7 +3499,7 @@ export async function deleteProjectAsset(assetId: string) {
                     const unit = sizeMatch[2].toUpperCase();
                     const bytes = unit === 'GB' ? num * 1073741824 : unit === 'MB' ? num * 1048576 : unit === 'KB' ? num * 1024 : num;
                     await AgencyModel.updateOne(
-                        { _id: agency?._id },
+                        { id: agency?.id },
                         { $inc: { 'usage.storage': -Math.round(bytes) } }
                     );
                 }
