@@ -51,8 +51,10 @@ export default function CreateAgencyForm() {
             setError("Logo file is too large. Max 2MB.");
             return;
         }
-        if (!file.type.startsWith("image/")) {
-            setError("Only image files are allowed.");
+        // Only allow safe raster image types — block SVG (can contain scripts)
+        const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp"];
+        if (!allowedTypes.includes(file.type)) {
+            setError("Unsupported format. Please use PNG, JPG, GIF, or WebP.");
             return;
         }
         const reader = new FileReader();
@@ -150,10 +152,10 @@ export default function CreateAgencyForm() {
                     >
                         <Upload className="w-8 h-8 text-muted-foreground mb-2" />
                         <p className="text-sm text-muted-foreground">Click to upload logo</p>
-                        <p className="text-xs text-muted-foreground/60 mt-1">PNG, JPG, or SVG — max 2MB</p>
+                        <p className="text-xs text-muted-foreground/60 mt-1">PNG, JPG, GIF, or WebP — max 2MB</p>
                     </div>
                 )}
-                <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/svg+xml" onChange={handleLogoChange} className="hidden" />
+                <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={handleLogoChange} className="hidden" />
             </div>
 
             <div>

@@ -681,13 +681,13 @@ export default function GetStartedPage() {
                                         <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-gray-400 hover:border-[#F5EE30]/30 hover:text-white transition-all">
                                             <input
                                                 type="file"
-                                                accept="image/*"
+                                                accept="image/png,image/jpeg,image/gif,image/webp"
                                                 onChange={handleLogoChange}
                                                 className="hidden"
                                             />
                                             {logoPreview ? "Change Logo" : "Upload Logo"}
                                         </label>
-                                        <p className="text-xs text-gray-600 mt-1.5">PNG, JPG, or SVG — max 2MB</p>
+                                        <p className="text-xs text-gray-600 mt-1.5">PNG, JPG, GIF, or WebP — max 2MB</p>
                                     </div>
                                 </div>
                             </div>
