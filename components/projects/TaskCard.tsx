@@ -25,7 +25,6 @@ const PRIORITY_STYLES: Record<TaskPriority, string> = {
 
 interface TaskCardProps {
     task: Task;
-    aiEnabled?: boolean;
     users?: { id: string; name: string; avatar?: string; jobTitle?: string; role?: string }[];
     readOnly?: boolean;
     permissions?: UserPermissions;
@@ -35,7 +34,7 @@ interface TaskCardProps {
     onStatusChange?: (taskId: string, newStatus: Task['status']) => void;
 }
 
-export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEnabled, readOnly, permissions, onQuickEdit, dragOverlay = false, disableDrag = false, onStatusChange }: TaskCardProps & { onView: (task: Task) => void; onEdit: (task: Task) => void; currentUserId?: string }) {
+export function TaskCard({ task, users = [], onView, onEdit, currentUserId, readOnly, permissions, onQuickEdit, dragOverlay = false, disableDrag = false, onStatusChange }: TaskCardProps & { onView: (task: Task) => void; onEdit: (task: Task) => void; currentUserId?: string }) {
     const fmt = useDateFormat();
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id: task.id,
@@ -84,7 +83,7 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
 
     const assignee = users.find(u => u.id === task.assigneeId);
     const canEdit = !readOnly && ((permissions?.canManageTasks ?? true) || permissions?.deleteAccess === 'any' || (permissions?.deleteAccess === 'own' && task.createdBy === currentUserId));
-    const isAiDisabled = aiEnabled === false;
+
 
     // ── Quick: cycle priority ─────────────────────────────────────────────────
     const handlePriorityClick = (e: React.MouseEvent) => {
@@ -132,7 +131,6 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
     const handleEditClick = (e: React.MouseEvent) => { e.stopPropagation(); onEdit(task); };
     const handleExplainClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (isAiDisabled) { toast.info("Please enable AI features in Project Settings to use this."); return; }
         setShowAIModal(true);
     };
 
@@ -293,10 +291,8 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, aiEn
                                 )}
                                 <button
                                     onClick={handleExplainClick}
-                                    className={`flex items-center gap-1 transition-colors px-2 py-1 sm:px-1.5 sm:py-0.5 rounded-md ${isAiDisabled
-                                        ? "text-muted-foreground/30 cursor-not-allowed"
-                                        : "text-muted-foreground/60 hover:text-foreground hover:bg-accent"}`}
-                                    title={isAiDisabled ? "AI Disabled in Settings" : "Explain this task with AI"}
+                                    className="flex items-center gap-1 transition-colors px-2 py-1 sm:px-1.5 sm:py-0.5 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-accent"
+                                    title="Explain this task with AI"
                                 >
                                     <Sparkles className="w-3.5 h-3.5 sm:w-3 sm:h-3 shrink-0" />
                                     <span className="text-[10px] sm:text-[9px] font-medium">Explain</span>

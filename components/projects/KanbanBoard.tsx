@@ -38,7 +38,6 @@ interface KanbanBoardProps {
     categories?: { id: string; name: string }[];
     users?: any[];
     currentUserId?: string;
-    aiEnabled?: boolean;
     selectedCategory?: string;
     readOnly?: boolean;
     permissions?: UserPermissions;
@@ -75,7 +74,7 @@ const kanbanCollision: CollisionDetection = (args) => {
     return collisions;
 };
 
-export function KanbanBoard({ initialTasks, projectId, users, categories = [], currentUserId, aiEnabled, selectedCategory = "All", readOnly = false, permissions }: KanbanBoardProps) {
+export function KanbanBoard({ initialTasks, projectId, users, categories = [], currentUserId, selectedCategory = "All", readOnly = false, permissions }: KanbanBoardProps) {
     const [mounted, setMounted] = useState(false);
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -275,7 +274,6 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                             onViewTask={(task) => setViewTaskId(task.id)}
                             onEditTask={(task) => !readOnly && setEditTaskId(task.id)}
                             currentUserId={currentUserId}
-                            aiEnabled={aiEnabled}
                             readOnly={readOnly}
                             permissions={permissions}
                             onQuickEdit={handleQuickEdit}
@@ -294,7 +292,6 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                         onViewTask={(task) => setViewTaskId(task.id)}
                         onEditTask={(task) => !readOnly && setEditTaskId(task.id)}
                         currentUserId={currentUserId}
-                        aiEnabled={aiEnabled}
                         readOnly={readOnly}
                         permissions={permissions}
                         onQuickEdit={handleQuickEdit}
@@ -327,7 +324,6 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
                             users={users || []}
                             onView={() => { }}
                             onEdit={() => { }}
-                            aiEnabled={aiEnabled}
                             currentUserId={currentUserId}
                             permissions={permissions}
                             onQuickEdit={() => { }}

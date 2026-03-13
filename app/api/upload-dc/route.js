@@ -12,7 +12,7 @@ const ALLOWED_EXTENSIONS = new Set([
   '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg',
   '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv', '.txt'
 ]);
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 export async function POST(req) {
   try {
@@ -40,7 +40,7 @@ export async function POST(req) {
 
     // File size validation
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ success: false, error: 'File too large. Maximum size is 5MB.' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'File too large. Maximum size is 50MB.' }, { status: 400 });
     }
 
     // File type validation — use extension from original filename

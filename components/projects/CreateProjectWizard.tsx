@@ -40,8 +40,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
         services: [] as string[], // Helper for legacy support and selection
         serviceConfigs: [] as ProjectServiceConfig[],
         budget: 0,
-        dueDate: "",
-        aiEnabled: false
+        dueDate: ""
     });
 
     useEffect(() => {
@@ -174,8 +173,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
                 // @ts-ignore - Schema update pending in actions
                 serviceConfigs: formData.serviceConfigs,
                 budget: formData.budget,
-                dueDate: formData.dueDate,
-                aiEnabled: formData.aiEnabled
+                dueDate: formData.dueDate
             });
 
             if (onProjectCreated) onProjectCreated();

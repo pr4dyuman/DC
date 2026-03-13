@@ -12,7 +12,6 @@ interface DroppableColumnProps {
     onViewTask: (task: Task) => void;
     onEditTask: (task: Task) => void;
     currentUserId?: string;
-    aiEnabled?: boolean;
     readOnly?: boolean;
     permissions?: any;
     onQuickEdit?: (taskId: string, patch: Partial<Task>) => void;
@@ -20,7 +19,7 @@ interface DroppableColumnProps {
     onStatusChange?: (taskId: string, newStatus: Task['status']) => void;
 }
 
-export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTask, currentUserId, aiEnabled, readOnly, permissions, onQuickEdit, disableDrag, onStatusChange }: DroppableColumnProps) {
+export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTask, currentUserId, readOnly, permissions, onQuickEdit, disableDrag, onStatusChange }: DroppableColumnProps) {
     const { setNodeRef, isOver } = useDroppable({ id });
 
     return (
@@ -61,7 +60,6 @@ export function DroppableColumn({ id, title, tasks, users, onViewTask, onEditTas
                         onView={onViewTask}
                         onEdit={onEditTask}
                         currentUserId={currentUserId}
-                        aiEnabled={aiEnabled}
                         readOnly={readOnly}
                         permissions={permissions}
                         onQuickEdit={onQuickEdit}

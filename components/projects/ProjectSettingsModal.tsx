@@ -17,10 +17,9 @@ interface ProjectSettingsModalProps {
     currentSlug?: string;
     currentClientId?: string;
     currentUserId?: string;
-    aiEnabled?: boolean;
 }
 
-export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, currentUserId, aiEnabled }: ProjectSettingsModalProps) {
+export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, currentUserId }: ProjectSettingsModalProps) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [status, setStatus] = useState<string>("");
@@ -41,11 +40,6 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
     const [assets, setAssets] = useState<Asset[]>([]);
     const [aiLoading, setAiLoading] = useState(false);
     const [aiConfigured, setAiConfigured] = useState(false);
-    const [enabled, setEnabled] = useState(aiEnabled === undefined ? false : aiEnabled);
-
-    useEffect(() => {
-        setEnabled(aiEnabled !== false);
-    }, [aiEnabled]);
 
     // Delete State
     const [deletePassword, setDeletePassword] = useState("");
@@ -133,7 +127,7 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
 
 
     const handleToggleAsset = async (assetId: string, currentState: boolean | undefined) => {
-        if (!aiConfigured || !enabled) return;
+        if (!aiConfigured) return;
 
         // Optimistic update
         setAssets(prev => prev.map(a => a.id === assetId ? { ...a, aiEnabled: !currentState } : a));
@@ -145,18 +139,7 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
         }
     };
 
-    // Toggle Project AI
-    const handleToggleProjectAI = async () => {
-        const newState = !enabled;
-        setEnabled(newState); // Optimistic
-        try {
-            await updateProject(projectId, { aiEnabled: newState });
-            router.refresh();
-        } catch (error) {
-            console.error("Failed to toggle AI", error);
-            setEnabled(!newState);
-        }
-    };
+
 
     const getAssetIcon = (type: string) => {
         switch (type) {
@@ -355,7 +338,7 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
                                     </h3>
                                     <p className="text-xs text-muted-foreground max-w-[400px]">
                                         {aiConfigured
-                                            ? "AI is configured for your organization. You can enable it per-project below."
+                                            ? "AI is configured for your organization. Select which assets to include in AI context below."
                                             : "AI is not configured. Contact your system administrator to set up Singularity."}
                                     </p>
                                 </div>
@@ -368,38 +351,8 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
                             </div>
                         </div>
 
-                        {/* AI Enable Toggle */}
-                        <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card">
-                            <div className="space-y-0.5">
-                                <h3 className="font-medium text-sm text-foreground">Enable AI Features</h3>
-                                <p className="text-xs text-muted-foreground">
-                                    Allow AI to explain tasks and analyze assets in this project.
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className={`text-xs font-medium ${enabled ? 'text-indigo-600' : 'text-muted-foreground'}`}>
-                                    {enabled ? 'Enabled' : 'Disabled'}
-                                </span>
-                                <button
-                                    onClick={handleToggleProjectAI}
-                                    className={`
-                                        relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2
-                                        ${enabled ? 'bg-indigo-600' : 'bg-zinc-200 dark:bg-zinc-700'}
-                                    `}
-                                >
-                                    <span className="sr-only">Toggle AI</span>
-                                    <span
-                                        className={`
-                                            pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
-                                            ${enabled ? 'translate-x-5' : 'translate-x-0'}
-                                        `}
-                                    />
-                                </button>
-                            </div>
-                        </div>
-
                         {/* Context Manager */}
-                        <div className={`space-y-4 ${(!aiConfigured || !enabled) ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+                        <div className={`space-y-4 ${!aiConfigured ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
                             <div className="flex items-center justify-between">
                                 <h3 className="font-medium flex items-center gap-2">
                                     Context Manager

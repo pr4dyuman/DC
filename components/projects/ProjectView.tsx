@@ -218,7 +218,6 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                             users={users}
                             categories={filteredCategories}
                             currentUserId={currentUser?.id}
-                            aiEnabled={project.aiEnabled}
                             selectedCategory={selectedCategory}
                             readOnly={false}
                             permissions={permissions}
