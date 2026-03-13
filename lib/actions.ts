@@ -1466,8 +1466,8 @@ export async function permanentlyDeleteUser(id: string, password: string) {
         LeaveRequestModel.deleteMany({ userId: id, agencyId: agency?.id }),
         // Unassign tasks — set assignee to empty rather than deleting tasks
         TaskModel.updateMany(
-            { assignee: id, agencyId: agency?.id },
-            { $set: { assignee: '' } }
+            { assigneeId: id, agencyId: agency?.id },
+            { $set: { assigneeId: '' } }
         ),
         // Delete transactions linked to this user (salary payments etc)
         TransactionModel.deleteMany({ userId: id, agencyId: agency?.id }),
