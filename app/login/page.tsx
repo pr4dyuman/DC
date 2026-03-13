@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { authenticateUser } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -15,6 +15,17 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [authChecked, setAuthChecked] = useState(false);
+
+    // Redirect logged-in users to dashboard
+    useEffect(() => {
+        const isLoggedIn = document.cookie.split(";").some((c) => c.trim().startsWith("logged_in="));
+        if (isLoggedIn) {
+            window.location.href = "/dashboard";
+            return;
+        }
+        setAuthChecked(true);
+    }, []);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -36,6 +47,14 @@ export default function LoginPage() {
             setLoading(false);
         }
     };
+
+    if (!authChecked) {
+        return (
+            <div className="min-h-screen bg-black text-white flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-[#F5EE30] border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-black text-white flex flex-col font-glacial">

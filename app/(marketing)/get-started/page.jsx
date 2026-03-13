@@ -138,6 +138,17 @@ export default function GetStartedPage() {
     const [otpSent, setOtpSent] = useState(false);
     const [otp, setOtp] = useState("");
     const [otpTimer, setOtpTimer] = useState(0);
+    const [authChecked, setAuthChecked] = useState(false);
+
+    // Redirect logged-in users to dashboard
+    useEffect(() => {
+        const isLoggedIn = document.cookie.split(";").some((c) => c.trim().startsWith("logged_in="));
+        if (isLoggedIn) {
+            window.location.href = "/dashboard";
+            return;
+        }
+        setAuthChecked(true);
+    }, []);
 
     // OTP countdown timer
     useEffect(() => {
@@ -160,8 +171,10 @@ export default function GetStartedPage() {
             setError("Logo must be under 2MB");
             return;
         }
-        if (!file.type.startsWith("image/")) {
-            setError("Please select an image file");
+        // Only allow safe raster image types — block SVG (can contain scripts)
+        const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp"];
+        if (!allowedTypes.includes(file.type)) {
+            setError("Unsupported format. Please use PNG, JPG, GIF, or WebP.");
             return;
         }
 
@@ -259,6 +272,14 @@ export default function GetStartedPage() {
 
     const inputClass =
         "w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-[#F5EE30]/50 transition-colors";
+
+    if (!authChecked) {
+        return (
+            <div className="bg-black text-white font-glacial min-h-screen flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-[#F5EE30] border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
 
     return (
         <div className="bg-black text-white font-glacial">

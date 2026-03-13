@@ -5,9 +5,12 @@ import { generateId } from '@/lib/utils-server';
 import { validateEmail, validatePassword, validateStrongPassword, sanitizeName, sanitizePhone, validateCsrfOrigin } from '@/lib/validation';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
-import { signToken } from '@/lib/auth-utils';
+import { signToken, verifyToken } from '@/lib/auth-utils';
 import { verifyOtp } from './send-otp/route';
 import { getPublicSecuritySettings } from '@/lib/actions/super-admin';
+
+// Safe image MIME types — SVG is intentionally excluded (can contain embedded scripts)
+const ALLOWED_LOGO_MIME_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
 
 // ── Rate limiting for signup: max 5 accounts per IP per hour ──
 const MAX_SIGNUPS = 5;
@@ -17,6 +20,19 @@ export async function POST(request: Request) {
     try {
         const csrf = validateCsrfOrigin(request);
         if (!csrf.valid) return csrf.response;
+
+        // ── Block signup if user is already authenticated ──
+        const cookieStore = await cookies();
+        const existingToken = cookieStore.get('auth_token')?.value;
+        if (existingToken) {
+            const existingSession = await verifyToken(existingToken);
+            if (existingSession) {
+                return NextResponse.json(
+                    { error: 'You are already logged in. Please log out first to register a new agency.' },
+                    { status: 403 }
+                );
+            }
+        }
 
         // ── Rate limit by IP (MongoDB-backed) ──
         const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
@@ -100,16 +116,32 @@ export async function POST(request: Request) {
         // Sanitize phone
         const sanitizedPhone = phone ? sanitizePhone(phone) : '';
 
-        // Validate logo (if provided, must be a data URI or empty)
+        // Validate logo (if provided, must be a data URI with safe image MIME type)
         let sanitizedLogo = '';
         if (logo && typeof logo === 'string') {
             // Max 2MB base64 (~2.7M chars)
             if (logo.length > 3_000_000) {
                 return NextResponse.json({ error: 'Logo file is too large. Max 2MB.' }, { status: 400 });
             }
-            if (logo.startsWith('data:image/')) {
+            // Extract MIME type from data URI and validate against allowlist
+            const mimeMatch = logo.match(/^data:(image\/[a-zA-Z+]+);base64,/);
+            if (mimeMatch) {
+                const mimeType = mimeMatch[1].toLowerCase();
+                if (!ALLOWED_LOGO_MIME_TYPES.includes(mimeType)) {
+                    return NextResponse.json(
+                        { error: 'Unsupported logo format. Please use PNG, JPG, GIF, or WebP.' },
+                        { status: 400 }
+                    );
+                }
                 sanitizedLogo = logo;
+            } else if (logo.startsWith('data:')) {
+                // data: URI but not a valid base64 image — reject
+                return NextResponse.json(
+                    { error: 'Invalid logo format. Please upload a valid image file.' },
+                    { status: 400 }
+                );
             }
+            // If it doesn't match any data: pattern, sanitizedLogo stays empty (ignored)
         }
 
         // --- Verify OTP ---
@@ -223,7 +255,6 @@ export async function POST(request: Request) {
 
         // --- Auto-login: set JWT cookie ---
         const token = await signToken({ userId, role: 'admin', agencyId });
-        const cookieStore = await cookies();
 
         cookieStore.set('auth_token', token, {
             httpOnly: true,
