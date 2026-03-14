@@ -13,6 +13,7 @@ import { AssetType } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { upload } from "@vercel/blob/client";
 
 
 interface AddAssetModalProps {
@@ -118,48 +119,71 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                 uploadFormData.append('file', file);
 
                 const startTime = Date.now();
+                const VERCEL_BODY_LIMIT = 4 * 1024 * 1024; // 4MB — Vercel serverless limit
 
-                // Use XMLHttpRequest for upload progress tracking
-                const uploadUrl = await new Promise<string>((resolve, reject) => {
-                    const xhr = new XMLHttpRequest();
+                let uploadUrl: string;
 
-                    xhr.upload.addEventListener('progress', (e) => {
-                        if (e.lengthComputable) {
-                            const progress = Math.round((e.loaded / e.total) * 100);
-                            setUploadProgress(progress);
+                if (file.size > VERCEL_BODY_LIMIT) {
+                    // Large file: upload directly to Vercel Blob from browser
+                    // This bypasses the 4.5MB serverless function body limit
+                    setUploadProgress(10);
+                    try {
+                        const blob = await upload(file.name, file, {
+                            access: 'public',
+                            handleUploadUrl: '/api/upload-blob',
+                        });
+                        uploadUrl = blob.url;
+                        setUploadProgress(100);
+                    } catch (blobErr: any) {
+                        // If Vercel Blob fails (e.g. storage full), fall back to server upload
+                        throw new Error(blobErr?.message || 'Large file upload failed. Storage may be full.');
+                    }
+                } else {
+                    // Small file: use server route (includes image validation)
+                    const uploadFormData = new FormData();
+                    uploadFormData.append('file', file);
 
-                            const elapsedSeconds = (Date.now() - startTime) / 1000;
-                            if (elapsedSeconds > 0) {
-                                const speed = e.loaded / elapsedSeconds;
-                                setUploadSpeed(`${formatBytes(speed)}/s`);
-                                const remainingBytes = e.total - e.loaded;
-                                const secondsLeft = Math.ceil(remainingBytes / speed);
-                                setRemainingTime(`${secondsLeft}s`);
+                    uploadUrl = await new Promise<string>((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+
+                        xhr.upload.addEventListener('progress', (e) => {
+                            if (e.lengthComputable) {
+                                const progress = Math.round((e.loaded / e.total) * 100);
+                                setUploadProgress(progress);
+
+                                const elapsedSeconds = (Date.now() - startTime) / 1000;
+                                if (elapsedSeconds > 0) {
+                                    const speed = e.loaded / elapsedSeconds;
+                                    setUploadSpeed(`${formatBytes(speed)}/s`);
+                                    const remainingBytes = e.total - e.loaded;
+                                    const secondsLeft = Math.ceil(remainingBytes / speed);
+                                    setRemainingTime(`${secondsLeft}s`);
+                                }
                             }
-                        }
-                    });
+                        });
 
-                    xhr.addEventListener('load', () => {
-                        try {
-                            const data = JSON.parse(xhr.responseText);
-                            if (xhr.status >= 200 && xhr.status < 300 && data.success) {
-                                resolve(data.url);
-                            } else {
-                                reject(new Error(data.error || 'Upload failed'));
+                        xhr.addEventListener('load', () => {
+                            try {
+                                const data = JSON.parse(xhr.responseText);
+                                if (xhr.status >= 200 && xhr.status < 300 && data.success) {
+                                    resolve(data.url);
+                                } else {
+                                    reject(new Error(data.error || 'Upload failed'));
+                                }
+                            } catch {
+                                reject(new Error('Upload failed'));
                             }
-                        } catch {
-                            reject(new Error('Upload failed'));
-                        }
+                        });
+
+                        xhr.addEventListener('error', () => reject(new Error('Network error. Check your connection and try again.')));
+                        xhr.addEventListener('abort', () => reject(new Error('Upload was cancelled.')));
+                        xhr.addEventListener('timeout', () => reject(new Error('Upload timed out. The file may be too large for your connection speed.')));
+
+                        xhr.open('POST', '/api/upload-dc');
+                        xhr.timeout = 120000; // 2 minute timeout
+                        xhr.send(uploadFormData);
                     });
-
-                    xhr.addEventListener('error', () => reject(new Error('Network error. Check your connection and try again.')));
-                    xhr.addEventListener('abort', () => reject(new Error('Upload was cancelled.')));
-                    xhr.addEventListener('timeout', () => reject(new Error('Upload timed out. The file may be too large for your connection speed.')));
-
-                    xhr.open('POST', '/api/upload-dc');
-                    xhr.timeout = 120000; // 2 minute timeout for large files
-                    xhr.send(uploadFormData);
-                });
+                }
 
                 setUploadProgress(100);
                 setIsScanning(false);
