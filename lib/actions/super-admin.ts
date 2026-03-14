@@ -754,6 +754,88 @@ export async function removeAgencyAIConfig(agencyId: string) {
 }
 
 // =============================================================================
+// Default AI Config for New Signups
+// =============================================================================
+
+/**
+ * Get the default AI config that's applied to new signup agencies.
+ * Returns masked API key for display in super-admin UI.
+ */
+export async function getDefaultAiConfig(): Promise<AIConfig | null> {
+    await verifySuperAdmin();
+    await connectDB();
+
+    const settings = await SystemSettingsModel.findOne({ key: 'global' }).lean();
+    const config = (settings as any)?.defaultAiConfig;
+    if (!config?.provider || !config?.apiKey || !config?.model) return null;
+
+    // Return with masked key for display
+    const maskedConfig = { ...toSerializable(config) } as AIConfig;
+    if (maskedConfig.apiKey) {
+        const decrypted = decryptApiKey(maskedConfig.apiKey);
+        maskedConfig.apiKey = decrypted.length > 4 ? '****' + decrypted.slice(-4) : '****';
+    }
+    return maskedConfig;
+}
+
+/**
+ * Save the default AI config for new signup agencies (super-admin only).
+ * Set config to null to remove the default.
+ */
+export async function saveDefaultAiConfig(config: AIConfig | null) {
+    await verifySuperAdmin();
+    await connectDB();
+
+    if (!config) {
+        // Remove default AI config
+        await SystemSettingsModel.updateOne(
+            { key: 'global' },
+            { $unset: { defaultAiConfig: '' } },
+            { upsert: true }
+        );
+    } else {
+        // Validate
+        if (!config.provider || !config.apiKey || !config.model) {
+            throw new Error("Provider, API Key, and Model are required");
+        }
+        const validProviders = ['gemini', 'openai', 'nvidia', 'github'];
+        if (!validProviders.includes(config.provider)) {
+            throw new Error(`Invalid provider: ${config.provider}`);
+        }
+
+        await SystemSettingsModel.updateOne(
+            { key: 'global' },
+            {
+                $set: {
+                    defaultAiConfig: {
+                        provider: config.provider,
+                        apiKey: encryptApiKey(config.apiKey),
+                        model: sanitizeString(config.model, 200),
+                        ...(config.customModelId ? { customModelId: sanitizeString(config.customModelId, 200) } : {}),
+                    }
+                }
+            },
+            { upsert: true }
+        );
+    }
+
+    revalidatePath('/super-admin/settings');
+    return true;
+}
+
+/**
+ * Get raw default AI config for signup (NOT masked, with encrypted key).
+ * This is used internally by the signup route, not exposed to UI.
+ */
+export async function getDefaultAiConfigForSignup(): Promise<Record<string, any> | null> {
+    await connectDB();
+    const settings = await SystemSettingsModel.findOne({ key: 'global' }).lean();
+    const config = (settings as any)?.defaultAiConfig;
+    if (!config?.provider || !config?.apiKey || !config?.model) return null;
+    return toSerializable(config);
+}
+
+// =============================================================================
 // System Settings (Global platform settings)
 // =============================================================================
 

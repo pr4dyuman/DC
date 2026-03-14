@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Shield, Bell, Database, Globe, Check, Mail, AlertTriangle, Loader2, Brain, ChevronRight, ChevronDown, Zap } from "lucide-react";
+import { Shield, Bell, Database, Globe, Check, Mail, AlertTriangle, Loader2, Brain, ChevronRight, ChevronDown, Zap, Sparkles } from "lucide-react";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { CURRENCIES } from "@/lib/currency";
-import { getSystemSettings, updateSystemSettings, getAllAgenciesWithStats } from "@/lib/actions/super-admin";
+import { getSystemSettings, updateSystemSettings, getAllAgenciesWithStats, getDefaultAiConfig, saveDefaultAiConfig } from "@/lib/actions/super-admin";
+import { AI_MODELS } from "@/lib/ai-models";
+import { AIProvider, AIConfig } from "@/lib/types";
 import { Switch } from "@/components/ui/switch";
 import { EMAIL_CATEGORY_INFO, DEFAULT_EMAIL_CATEGORIES, TASK_EMAIL_EVENTS, DEFAULT_TASK_EMAIL_EVENTS } from "@/lib/email-constants";
 import type { EmailCategory, TaskEmailEventKey, TaskEmailEventConfig } from "@/lib/email-constants";
@@ -55,6 +57,12 @@ export default function SystemSettingsPage() {
     // Agencies for AI config
     const [agencies, setAgencies] = useState<any[]>([]);
 
+    // Default AI config state
+    const [defaultAi, setDefaultAi] = useState<{ provider: AIProvider; apiKey: string; model: string; customModelId: string }>({ provider: 'gemini', apiKey: '', model: '', customModelId: '' });
+    const [defaultAiConfigured, setDefaultAiConfigured] = useState(false);
+    const [savingDefaultAi, setSavingDefaultAi] = useState(false);
+    const [savedDefaultAi, setSavedDefaultAi] = useState('');
+
     // Email defaults state
     const [emailGlobalEnabled, setEmailGlobalEnabled] = useState(true);
     const [emailCategories, setEmailCategories] = useState<Record<string, boolean>>({ ...DEFAULT_EMAIL_CATEGORIES });
@@ -100,6 +108,14 @@ export default function SystemSettingsPage() {
                     }
                 }
                 setAgencies(agencyList);
+                // Load default AI config
+                try {
+                    const daiConfig = await getDefaultAiConfig();
+                    if (daiConfig) {
+                        setDefaultAi({ provider: daiConfig.provider, apiKey: daiConfig.apiKey, model: daiConfig.model, customModelId: daiConfig.customModelId || '' });
+                        setDefaultAiConfigured(true);
+                    }
+                } catch { /* ignore if not configured */ }
             } catch (e) {
                 console.error("Failed to load settings:", e);
             } finally {
@@ -507,6 +523,144 @@ export default function SystemSettingsPage() {
                 isOpen={!!openSections.ai}
                 onToggle={() => toggleSection('ai')}
             >
+                {/* Default AI for Signups */}
+                <div className="border border-purple-500/20 rounded-lg p-4 mb-4 bg-purple-500/5">
+                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-1">
+                        <Sparkles className="w-4 h-4 text-purple-400" />
+                        Default AI for New Signups
+                    </h3>
+                    <p className="text-xs text-muted-foreground mb-3">
+                        This config is automatically applied when a new agency registers via signup.
+                        All trial agencies will share this API key.
+                    </p>
+
+                    <div className="space-y-3">
+                        {/* Provider */}
+                        <div>
+                            <label className="block text-xs font-medium text-muted-foreground mb-1">Provider</label>
+                            <select
+                                value={defaultAi.provider}
+                                onChange={e => {
+                                    const p = e.target.value as AIProvider;
+                                    setDefaultAi(prev => ({ ...prev, provider: p, model: AI_MODELS[p]?.[0]?.id || '', customModelId: '' }));
+                                }}
+                                className="w-full h-9 rounded-lg border border-border bg-background px-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                            >
+                                <option value="gemini">Google Gemini</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="nvidia">NVIDIA NIM</option>
+                                <option value="github">GitHub Models</option>
+                            </select>
+                        </div>
+
+                        {/* API Key */}
+                        <div>
+                            <label className="block text-xs font-medium text-muted-foreground mb-1">API Key</label>
+                            <input
+                                type="password"
+                                value={defaultAi.apiKey}
+                                onChange={e => setDefaultAi(prev => ({ ...prev, apiKey: e.target.value }))}
+                                placeholder={defaultAiConfigured ? "Enter new key to change" : "Enter API key..."}
+                                className="w-full h-9 rounded-lg border border-border bg-background px-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                            />
+                            {defaultAiConfigured && (
+                                <p className="text-[10px] text-muted-foreground mt-0.5">Current: {defaultAi.apiKey.startsWith('****') ? defaultAi.apiKey : '****'}</p>
+                            )}
+                        </div>
+
+                        {/* Model */}
+                        <div>
+                            <label className="block text-xs font-medium text-muted-foreground mb-1">Model</label>
+                            <select
+                                value={defaultAi.model}
+                                onChange={e => setDefaultAi(prev => ({ ...prev, model: e.target.value, customModelId: e.target.value !== 'custom' ? '' : prev.customModelId }))}
+                                className="w-full h-9 rounded-lg border border-border bg-background px-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                            >
+                                <option value="">Select a model...</option>
+                                {(AI_MODELS[defaultAi.provider] || []).map((m: any) => (
+                                    <option key={m.id} value={m.id}>{m.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {defaultAi.model === 'custom' && (
+                            <div>
+                                <label className="block text-xs font-medium text-muted-foreground mb-1">Custom Model ID</label>
+                                <input
+                                    type="text"
+                                    value={defaultAi.customModelId}
+                                    onChange={e => setDefaultAi(prev => ({ ...prev, customModelId: e.target.value }))}
+                                    placeholder="e.g. ft:gpt-4o:custom-model"
+                                    className="w-full h-9 rounded-lg border border-border bg-background px-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                                />
+                            </div>
+                        )}
+
+                        <div className="flex items-center gap-2 pt-1">
+                            <button
+                                onClick={async () => {
+                                    if (!defaultAi.apiKey || defaultAi.apiKey.startsWith('****')) {
+                                        if (!defaultAiConfigured) return;
+                                    }
+                                    if (!defaultAi.model) return;
+                                    setSavingDefaultAi(true);
+                                    try {
+                                        const configToSave: any = {
+                                            provider: defaultAi.provider,
+                                            apiKey: defaultAi.apiKey.startsWith('****') ? undefined : defaultAi.apiKey,
+                                            model: defaultAi.model,
+                                        };
+                                        // If key starts with ****, user didn't change it — re-fetch and re-save with old key
+                                        if (defaultAi.apiKey.startsWith('****')) {
+                                            // Only update provider/model, not key — need fresh key
+                                            // For simplicity, require new key entry to update
+                                            setSavedDefaultAi('Enter a new API key to update');
+                                            setTimeout(() => setSavedDefaultAi(''), 3000);
+                                            return;
+                                        }
+                                        if (defaultAi.customModelId) configToSave.customModelId = defaultAi.customModelId;
+                                        await saveDefaultAiConfig(configToSave);
+                                        setDefaultAiConfigured(true);
+                                        setSavedDefaultAi('Saved!');
+                                        // Refresh to get masked key
+                                        const fresh = await getDefaultAiConfig();
+                                        if (fresh) setDefaultAi({ provider: fresh.provider, apiKey: fresh.apiKey, model: fresh.model, customModelId: fresh.customModelId || '' });
+                                        setTimeout(() => setSavedDefaultAi(''), 3000);
+                                    } catch (err: any) {
+                                        setSavedDefaultAi(err?.message || 'Failed');
+                                        setTimeout(() => setSavedDefaultAi(''), 3000);
+                                    } finally {
+                                        setSavingDefaultAi(false);
+                                    }
+                                }}
+                                disabled={savingDefaultAi || !defaultAi.model || (!defaultAi.apiKey)}
+                                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition"
+                            >
+                                {savingDefaultAi ? 'Saving...' : defaultAiConfigured ? 'Update Default' : 'Set Default'}
+                            </button>
+                            {defaultAiConfigured && (
+                                <button
+                                    onClick={async () => {
+                                        setSavingDefaultAi(true);
+                                        try {
+                                            await saveDefaultAiConfig(null);
+                                            setDefaultAi({ provider: 'gemini', apiKey: '', model: '', customModelId: '' });
+                                            setDefaultAiConfigured(false);
+                                            setSavedDefaultAi('Removed');
+                                            setTimeout(() => setSavedDefaultAi(''), 3000);
+                                        } catch { } finally { setSavingDefaultAi(false); }
+                                    }}
+                                    className="px-3 py-1.5 text-red-500 hover:bg-red-500/10 rounded-lg text-xs font-medium transition"
+                                >
+                                    Remove Default
+                                </button>
+                            )}
+                            {savedDefaultAi && <span className="text-xs text-green-500">{savedDefaultAi}</span>}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Per-Agency AI Config List */}
                 {agencies.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No agencies found.</p>
                 ) : (

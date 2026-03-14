@@ -185,6 +185,10 @@ export async function POST(request: Request) {
         const finalSlug = existingAgency ? `${slug}-${agencyId.slice(0, 6)}` : slug;
 
         // --- Create Agency ---
+        // Get default AI config for trial agencies (if configured by super-admin)
+        const { getDefaultAiConfigForSignup } = await import('@/lib/actions/super-admin');
+        const defaultAiConfig = await getDefaultAiConfigForSignup();
+
         await AgencyModel.create({
             id: agencyId,
             name: sanitizedAgencyName,
@@ -215,6 +219,8 @@ export async function POST(request: Request) {
                 enableTwoFactor: false,
                 emailNotificationsEnabled: true
             },
+            // Apply default AI config if configured by super-admin
+            ...(defaultAiConfig ? { aiConfig: defaultAiConfig } : {}),
             createdAt: nowDate.toISOString(),
             updatedAt: nowDate.toISOString(),
             createdBy: userId
