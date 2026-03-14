@@ -119,14 +119,19 @@ export function sanitizeColor(input: string): string {
 }
 
 /**
- * Sanitize a URL — must be http/https or data: (for logos).
+ * Sanitize a URL — must be http/https or data:image (for logos/favicons).
+ * Data URIs (base64 images) can be large (50k-200k chars), so they get a higher limit.
  */
 export function sanitizeUrl(input: string): string {
     if (typeof input !== 'string') return '';
-    const trimmed = input.trim().slice(0, 2000);
-    // Allow http, https, data:image URIs, and relative paths
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:image/') || trimmed.startsWith('/')) {
-        return trimmed;
+    const trimmed = input.trim();
+    // Allow http/https URLs (up to 5000 chars)
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
+        return trimmed.slice(0, 5000);
+    }
+    // Allow data:image URIs (base64 logos can be 50k–200k chars) — up to 5MB
+    if (trimmed.startsWith('data:image/')) {
+        return trimmed.slice(0, 5 * 1024 * 1024);
     }
     return '';
 }

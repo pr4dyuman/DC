@@ -94,29 +94,32 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, a
     return (
         <div className="space-y-4 py-4 flex flex-col h-full overflow-y-auto no-scrollbar" style={{ backgroundColor: 'var(--sidebar-bg)', color: 'var(--sidebar-text)' }}>
             <div className="px-3 py-2 flex-1">
-                <Link href="/dashboard" className="flex items-center pl-3 mb-14 transition hover:opacity-75">
-                    <div className="relative w-8 h-8 mr-4">
+                <Link href="/dashboard" className="flex items-center pl-3 mb-14 transition hover:opacity-75 gap-3">
+                    <div className="relative flex-shrink-0 w-9 h-9">
                         {agencyLogo ? (
-                            <img src={agencyLogo} alt="Logo" className="w-8 h-8 rounded-md object-cover" />
+                            <img src={agencyLogo} alt="Logo" className="w-9 h-9 rounded-md object-cover" />
                         ) : (
-                            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-xl">
+                            <div className="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-xl">
                                 A
                             </div>
                         )}
                     </div>
-                    <h1 className="text-xl font-bold truncate max-w-[180px]" title={agencyName}>
-                        {agencyName}
-                    </h1>
-                    {agencyPlan && agencyPlan !== 'free' && (
-                        <span className={`ml-2 px-1.5 py-0.5 text-[10px] font-bold uppercase rounded ${
-                            agencyPlan === 'enterprise' ? 'bg-purple-500/15 text-purple-400' :
-                            agencyPlan === 'pro' ? 'bg-blue-500/15 text-blue-400' :
-                            'bg-emerald-500/15 text-emerald-400'
-                        }`}>
-                            {agencyPlan}
-                        </span>
-                    )}
+                    <div className="flex flex-col min-w-0 flex-1">
+                        <h1 className="text-base font-bold leading-tight truncate" title={agencyName}>
+                            {agencyName}
+                        </h1>
+                        {agencyPlan && agencyPlan !== 'free' && (
+                            <span className={`self-start mt-0.5 px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${
+                                agencyPlan === 'enterprise' ? 'bg-purple-500/15 text-purple-400' :
+                                agencyPlan === 'pro' ? 'bg-blue-500/15 text-blue-400' :
+                                'bg-emerald-500/15 text-emerald-400'
+                            }`}>
+                                {agencyPlan}
+                            </span>
+                        )}
+                    </div>
                 </Link>
+
                 <div className="space-y-1">
                     {filteredRoutes.map((route) => (
                         <Link

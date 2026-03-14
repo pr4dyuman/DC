@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { updateAgencyDetails } from "@/lib/actions";
 import { toast } from "sonner";
-import { Loader2, Building, Upload, Image as ImageIcon } from "lucide-react";
+import { Loader2, Building, Upload, Image as ImageIcon, Globe } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ interface AgencySettingsProps {
     initialSettings?: {
         name: string;
         logo: string;
+        favicon?: string;
         primaryColor?: string;
         secondaryColor?: string;
     } | null;
@@ -24,8 +25,10 @@ interface AgencySettingsProps {
 export function AgencySettings({ initialSettings, loading: parentLoading, onSaved }: AgencySettingsProps) {
     const [name, setName] = useState("");
     const [logo, setLogo] = useState("");
+    const [favicon, setFavicon] = useState("");
     const [saving, setSaving] = useState(false);
     const [logoPreview, setLogoPreview] = useState("");
+    const [faviconPreview, setFaviconPreview] = useState("");
 
     // Sync from parent props
     useEffect(() => {
@@ -33,6 +36,8 @@ export function AgencySettings({ initialSettings, loading: parentLoading, onSave
             setName(initialSettings.name);
             setLogo(initialSettings.logo);
             setLogoPreview(initialSettings.logo);
+            setFavicon(initialSettings.favicon || "");
+            setFaviconPreview(initialSettings.favicon || "");
         }
     }, [initialSettings]);
 
@@ -54,11 +59,29 @@ export function AgencySettings({ initialSettings, loading: parentLoading, onSave
         reader.readAsDataURL(file);
     };
 
+    const handleFaviconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 512 * 1024) {
+            toast.error("Favicon file is too large. Max 512KB.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const result = e.target?.result as string;
+            setFavicon(result);
+            setFaviconPreview(result);
+        };
+        reader.readAsDataURL(file);
+    };
+
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
         try {
-            await updateAgencyDetails(name, logo);
+            await updateAgencyDetails(name, logo, undefined, undefined, favicon);
             toast.success("Agency details updated successfully!");
             onSaved?.();
         } catch (error) {
@@ -82,7 +105,7 @@ export function AgencySettings({ initialSettings, loading: parentLoading, onSave
                     </div>
                     <div>
                         <CardTitle>Agency Branding</CardTitle>
-                        <CardDescription>Update your agency's identity and logo.</CardDescription>
+                        <CardDescription>Update your agency's identity, logo, and favicon.</CardDescription>
                     </div>
                 </div>
             </CardHeader>
@@ -99,6 +122,7 @@ export function AgencySettings({ initialSettings, loading: parentLoading, onSave
                         />
                     </div>
 
+                    {/* Logo Upload */}
                     <div className="space-y-4">
                         <Label>Agency Logo</Label>
                         <div className="flex items-center gap-6">
@@ -129,6 +153,49 @@ export function AgencySettings({ initialSettings, loading: parentLoading, onSave
                                 </div>
                                 <p className="text-xs text-muted-foreground">
                                     Recommended: Square PNG or JPG, max 2MB.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Favicon Upload */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                            <Globe className="h-4 w-4 text-muted-foreground" />
+                            <Label>Browser Tab Icon (Favicon)</Label>
+                        </div>
+                        <p className="text-xs text-muted-foreground -mt-2">
+                            This icon appears in browser tabs and bookmarks when users visit your dashboard.
+                        </p>
+                        <div className="flex items-center gap-6">
+                            <div className="h-12 w-12 border-2 border-dashed border-border rounded-md flex items-center justify-center bg-muted/30 overflow-hidden flex-shrink-0">
+                                {faviconPreview ? (
+                                    <img src={faviconPreview} alt="Favicon preview" className="h-8 w-8 object-contain" />
+                                ) : (
+                                    <Globe className="h-6 w-6 text-muted-foreground/40" />
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <Button type="button" variant="outline" size="sm" className="relative cursor-pointer overflow-hidden">
+                                        <Upload className="mr-2 h-4 w-4" />
+                                        Upload Favicon
+                                        <Input
+                                            type="file"
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                            accept="image/x-icon,image/png,image/svg+xml,image/jpeg"
+                                            onChange={handleFaviconUpload}
+                                        />
+                                    </Button>
+                                    {favicon && (
+                                        <Button type="button" variant="ghost" size="sm" onClick={() => { setFavicon(""); setFaviconPreview(""); }}>
+                                            Remove
+                                        </Button>
+                                    )}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    .ico, .png, or .svg recommended. Square, max 512KB.
                                 </p>
                             </div>
                         </div>

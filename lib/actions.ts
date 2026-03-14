@@ -88,6 +88,7 @@ export async function getAgencySettings() {
     return {
         name: agency.name,
         logo: agency.logo || "",
+        favicon: (agency as any).favicon || "",
         primaryColor: agency.primaryColor,
         secondaryColor: agency.secondaryColor,
         currency: systemCurrency,
@@ -229,13 +230,14 @@ export async function updateTaskEmailEvents(events: Record<string, Record<string
     return { success: true };
 }
 
-export async function updateAgencyDetails(name: string, logo: string, primaryColor?: string, secondaryColor?: string) {
+export async function updateAgencyDetails(name: string, logo: string, primaryColor?: string, secondaryColor?: string, favicon?: string) {
     await requireRole('admin');
     const agency = await getCurrentAgency();
     if (!agency) throw new Error("Unauthorized");
     // Input sanitization
     name = sanitizeName(name, 200);
     logo = sanitizeUrl(logo);
+    if (favicon) favicon = sanitizeUrl(favicon);
     if (primaryColor) primaryColor = sanitizeColor(primaryColor);
     if (secondaryColor) secondaryColor = sanitizeColor(secondaryColor);
     if (!name) throw new Error('Agency name is required');
@@ -246,6 +248,7 @@ export async function updateAgencyDetails(name: string, logo: string, primaryCol
             $set: {
                 name,
                 logo,
+                ...(favicon !== undefined && { favicon }),
                 ...(primaryColor && { primaryColor }),
                 ...(secondaryColor && { secondaryColor })
             }

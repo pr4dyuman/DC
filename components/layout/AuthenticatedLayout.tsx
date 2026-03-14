@@ -7,6 +7,7 @@ import { DashboardChatProvider } from "@/components/providers/DashboardChatProvi
 import { getCurrentAgency, checkTrialExpired, checkPlanExpired } from "@/lib/agency-context";
 import { TimezoneProvider } from "@/context/TimezoneContext";
 import { CurrencyProvider } from "@/context/CurrencyContext";
+import { DynamicFavicon } from "@/components/layout/DynamicFavicon";
 
 export async function AuthenticatedLayout({
     children
@@ -43,11 +44,13 @@ export async function AuthenticatedLayout({
 
     const agencyName = agencySettings?.name || "Agency OS";
     const agencyLogo = agencySettings?.logo;
+    const agencyFavicon = (agencySettings as any)?.favicon;
 
     return (
         <TimezoneProvider userTimezone={dashboardUser.timezone} onDetected={updateUserTimezone}>
         <CurrencyProvider currency={agencySettings?.currency || "USD"}>
         <DashboardChatProvider currentUserId={dashboardUser.id}>
+            {agencyFavicon && <DynamicFavicon faviconUrl={agencyFavicon} />}
             <div className="h-full relative">
                 <div className="hidden h-full md:flex md:w-72 md:flex-col md:fixed md:inset-y-0 z-[80]" style={{ backgroundColor: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)' }}>
                     <Sidebar

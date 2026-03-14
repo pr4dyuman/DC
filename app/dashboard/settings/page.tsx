@@ -34,6 +34,7 @@ type Service = { id: string; name: string; jobs: Job[] };
 type AgencySettingsData = {
     name: string;
     logo: string;
+    favicon?: string;
     primaryColor?: string;
     secondaryColor?: string;
     emailNotificationsEnabled: boolean;
@@ -109,6 +110,7 @@ export default function SettingsPage() {
             setAgencySettings(settings ? {
                 name: settings.name,
                 logo: settings.logo,
+                favicon: (settings as any).favicon || "",
                 primaryColor: settings.primaryColor,
                 secondaryColor: settings.secondaryColor,
                 emailNotificationsEnabled: settings.emailNotificationsEnabled ?? true,

@@ -233,6 +233,7 @@ const AgencySchema = new Schema({
 
     // Branding
     logo: { type: String },
+    favicon: { type: String },
     primaryColor: { type: String },
     secondaryColor: { type: String },
 
