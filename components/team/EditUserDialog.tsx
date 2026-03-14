@@ -91,8 +91,9 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                     contactNumber: "",
                     adharCardImage: "",
                     panCardImage: "",
-                    password: ""
-                });
+                    password: "",
+                    createdAt: new Date().toISOString().split('T')[0] // Default: today
+                } as any);
             }
             setShowDeleteConfirm(false);
             setDeletePassword("");
@@ -330,6 +331,21 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Join Date (backdate) — only on create */}
+                                    {!user && (
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-medium text-muted-foreground">Join Date</label>
+                                            <input
+                                                type="date"
+                                                value={(formData as any).createdAt || new Date().toISOString().split('T')[0]}
+                                                onChange={e => setFormData({ ...formData, createdAt: e.target.value } as any)}
+                                                max={new Date().toISOString().split('T')[0]}
+                                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary"
+                                            />
+                                            <p className="text-[10px] text-muted-foreground">Set a past date for backdating</p>
+                                        </div>
+                                    )}
 
                                     {/* Password section — self gets secure change, admin gets force-reset */}
                                     {isSelf ? (

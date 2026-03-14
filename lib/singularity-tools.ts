@@ -1118,10 +1118,24 @@ export async function executeTool(
                 const { getCurrentAgency } = await import('./agency-context');
                 const agency = await getCurrentAgency();
                 const invStatusSnapshot = await snapshotEntity('invoice', args.invoiceId);
+                // C4 fix: Invoice state machine — prevent invalid transitions (mirrors BUG-044)
+                const invoice = await InvoiceModel.findOne({ id: args.invoiceId, agencyId: agency?.id }).lean();
+                if (!invoice) return { success: false, data: null, summary: 'Invoice not found' };
+                const currentInvStatus = (invoice as any).status;
+                const invalidTransitions: Record<string, string[]> = {
+                    'Paid': ['Pending'], // Cannot revert paid invoice to pending
+                };
+                if (invalidTransitions[currentInvStatus]?.includes(args.status)) {
+                    return { success: false, data: null, summary: `Cannot change invoice status from ${currentInvStatus} to ${args.status}` };
+                }
+
                 await InvoiceModel.updateOne(
                     { id: args.invoiceId, agencyId: agency?.id },
                     { $set: { status: args.status } }
                 );
+                // C4 fix: Revalidate cache
+                const { revalidatePath: revalInvFinance } = await import('next/cache');
+                revalInvFinance('/dashboard/finance');
                 return {
                     success: true,
                     data: { invoiceId: args.invoiceId, status: args.status },
@@ -1228,6 +1242,20 @@ export async function executeTool(
                 const proj = await ProjectModel.findOne({ id: args.projectId, agencyId: agency?.id }).lean();
                 if (!proj) return { success: false, data: null, summary: 'Project not found' };
 
+                // C11 fix: Clean up Azure blobs before deleting asset records
+                const projectAssets = await AssetModel.find({ projectId: args.projectId, agencyId: agency?.id }).select('url').lean();
+                for (const asset of projectAssets) {
+                    const assetUrl = (asset as any).url;
+                    if (assetUrl && assetUrl.includes('.blob.core.windows.net/')) {
+                        try {
+                            const { deleteFromAzure } = await import('@/lib/azure-storage');
+                            await deleteFromAzure(assetUrl);
+                        } catch (e) {
+                            console.error('Failed to delete blob from Azure:', e);
+                        }
+                    }
+                }
+
                 // Delete project and all related data
                 await Promise.all([
                     ProjectModel.deleteOne({ id: args.projectId, agencyId: agency?.id }),
@@ -1238,6 +1266,14 @@ export async function executeTool(
                     ActivityModel.deleteMany({ target: args.projectId, agencyId: agency?.id }),
                     NotificationModel.deleteMany({ agencyId: agency?.id, link: { $regex: args.projectId } }),
                 ]);
+                // Decrement agency usage counter (mirrors actions.ts:deleteProject)
+                if (agency) {
+                    const { decrementAgencyUsage } = await import('./agency-context');
+                    await decrementAgencyUsage(agency.id, 'projects');
+                }
+                // C1 fix: Revalidate cache
+                const { revalidatePath } = await import('next/cache');
+                revalidatePath('/dashboard/projects');
                 return {
                     success: true,
                     data: { projectId: args.projectId },
@@ -1264,6 +1300,16 @@ export async function executeTool(
                     { id: args.clientId, agencyId: agency?.id },
                     { $set: { archived: true, archivedAt: new Date().toISOString() } }
                 );
+                // C2 fix: Clean up notifications for archived client (mirrors actions.ts:deleteClient)
+                await NotificationModel.deleteMany({ userId: args.clientId, agencyId: agency?.id });
+                // Decrement agency usage counter (mirrors actions.ts:deleteClient)
+                if (agency) {
+                    const { decrementAgencyUsage } = await import('./agency-context');
+                    await decrementAgencyUsage(agency.id, 'clients');
+                }
+                // C2 fix: Revalidate cache
+                const { revalidatePath: revalClients } = await import('next/cache');
+                revalClients('/dashboard/clients');
                 return {
                     success: true,
                     data: { clientId: args.clientId },
@@ -1287,6 +1333,9 @@ export async function executeTool(
                 if (!txn) return { success: false, data: null, summary: 'Transaction not found' };
 
                 await TransactionModel.deleteOne({ id: args.transactionId, agencyId: agency?.id });
+                // C3 fix: Revalidate cache
+                const { revalidatePath: revalFinance } = await import('next/cache');
+                revalFinance('/dashboard/finance');
                 return {
                     success: true,
                     data: { transactionId: args.transactionId },

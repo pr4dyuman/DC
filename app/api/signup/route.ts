@@ -263,20 +263,7 @@ export async function POST(request: Request) {
             path: '/',
             maxAge: 60 * 60 * 24
         });
-        cookieStore.set('userId', userId, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
-            maxAge: 60 * 60 * 24
-        });
-        cookieStore.set('userRole', 'admin', {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
-            maxAge: 60 * 60 * 24
-        });
+        // S1 fix: Removed legacy userId/userRole cookies — JWT is the single source of truth
         cookieStore.set('logged_in', '1', {
             httpOnly: false,
             secure: process.env.NODE_ENV === 'production',

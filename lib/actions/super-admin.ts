@@ -167,6 +167,7 @@ export async function createAgency(data: {
     logo?: string;
     customLimits?: Partial<Agency['limits']>;
     customFeatures?: Partial<Agency['features']>;
+    createdAt?: string; // Optional backdate
 }) {
     const sa = await verifySuperAdmin();
     await connectDB();
@@ -269,7 +270,7 @@ export async function createAgency(data: {
             enableTwoFactor: false,
             emailNotificationsEnabled: true
         },
-        createdAt: new Date().toISOString(),
+        createdAt: data.createdAt && !isNaN(new Date(data.createdAt).getTime()) ? new Date(data.createdAt).toISOString() : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         createdBy: sa.userId
     };
@@ -297,7 +298,7 @@ export async function createAgency(data: {
         contactNumber: sanitizedPhone,
         jobTitle: 'Agency Owner',
         salary: 0,
-        createdAt: new Date().toISOString()
+        createdAt: data.createdAt && !isNaN(new Date(data.createdAt).getTime()) ? new Date(data.createdAt).toISOString() : new Date().toISOString()
     } as User;
 
     // Save to database

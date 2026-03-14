@@ -44,7 +44,7 @@ export function LeaveRequestDialog({ userId }: { userId: string }) {
             setOpen(false);
             router.refresh();
         } catch (err: any) {
-            setError(err.message);
+            setError(err.message || 'Failed to submit leave request. Please try again.');
         } finally {
             setLoading(false);
         }

@@ -9,7 +9,7 @@ import type { AIFeature } from "./ai-usage";
 import { createSession, sendMessage, closeSession, isSessionActive } from "./live-session";
 import type { AIConfig, AIPermissions } from "./types";
 import { DEFAULT_AI_PERMISSIONS } from "./types";
-import { withAgencyId, getCurrentAgency, checkAgencyLimit } from "./agency-context";
+import { withAgencyId, getCurrentAgency, checkAgencyLimit, incrementAgencyUsage, decrementAgencyUsage } from "./agency-context";
 import { generateId, resolveUserOrClient } from "./utils-server";
 import { sanitizeName, sanitizeString, sanitizeUsername, validateEmail, validatePassword, validateStrongPassword, sanitizePhone, sanitizeUrl, sanitizeColor, sanitizeMongoInput, sanitizeUpdates, validateId, validateAmount } from "./validation";
 import { formatCurrency, getCurrencySymbol } from "./currency";
@@ -282,7 +282,7 @@ async function requireRole(...roles: AllowedRole[]) {
     const user = await requireAuth();
     if (!roles.includes(user.role as AllowedRole)) {
         const allowed = roles.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(' / ');
-        throw new Error(`Unauthorized: This action requires ${allowed} access. Your role (${user.role}) does not have permission.`);
+        throw new Error(`Unauthorized: This action requires ${allowed} access.`);
     }
     return user;
 }
@@ -809,7 +809,12 @@ export async function getUserByUsername(username: string) {
 }
 
 export async function getUserTasks(userId: string, offset = 0, limit = 1000) {
-    await requireAuth();
+    const caller = await requireAuth();
+    // S3 fix: IDOR protection — non-admin users can only access their own tasks
+    const isPrivileged = caller.role === 'admin' || caller.role === 'manager';
+    if (!isPrivileged && caller.id !== userId) {
+        throw new Error('Unauthorized: You can only view your own tasks.');
+    }
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
@@ -830,7 +835,12 @@ export async function getUserTasks(userId: string, offset = 0, limit = 1000) {
 
 // For Client Profile: Get projects they OWN
 export async function getClientProjects(clientId: string) {
-    await requireAuth();
+    const caller = await requireAuth();
+    // S3 fix: IDOR protection — clients can only access their own projects
+    const isPrivileged = caller.role === 'admin' || caller.role === 'manager';
+    if (caller.role === 'client' && caller.id !== clientId && !isPrivileged) {
+        throw new Error('Unauthorized: You can only view your own projects.');
+    }
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
@@ -873,7 +883,12 @@ export async function getClientCreatedTasks(userId: string) {
 }
 
 export async function getUserActivity(userId: string) {
-    await requireAuth();
+    const caller = await requireAuth();
+    // S3 fix: IDOR protection — non-admin users can only access their own activity
+    const isPrivileged = caller.role === 'admin' || caller.role === 'manager';
+    if (!isPrivileged && caller.id !== userId) {
+        throw new Error('Unauthorized: You can only view your own activity.');
+    }
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
@@ -890,7 +905,12 @@ export async function getUserActivity(userId: string) {
 }
 
 export async function getUserContributionHistory(userId: string) {
-    await requireAuth();
+    const caller = await requireAuth();
+    // S3 fix: IDOR protection — non-admin users can only access their own contributions
+    const isPrivileged = caller.role === 'admin' || caller.role === 'manager';
+    if (!isPrivileged && caller.id !== userId) {
+        throw new Error('Unauthorized: You can only view your own contribution history.');
+    }
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
@@ -955,9 +975,17 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
     if (newUser.password) {
         newUser.password = await hashPassword(newUser.password);
     }
+    // Support backdate: admin can set a custom createdAt (join date)
+    if ((newUser as any).createdAt && !isNaN(new Date((newUser as any).createdAt).getTime())) {
+        (newUser as any).createdAt = new Date((newUser as any).createdAt).toISOString();
+    } else {
+        (newUser as any).createdAt = new Date().toISOString();
+    }
     await connectDB();
     try {
         await UserModel.create(newUser);
+        // Increment agency usage counter for users
+        if (agency) await incrementAgencyUsage(agency.id, 'users');
     } catch (err: any) {
         // Handle duplicate username race condition
         if (err?.code === 11000 && err?.keyPattern?.username) {
@@ -1258,6 +1286,8 @@ export async function deleteClient(id: string) {
     );
     // Clean up notifications for archived client
     await NotificationModel.deleteMany({ userId: id, agencyId: agency?.id });
+    // Decrement agency usage counter
+    if (agency) await decrementAgencyUsage(agency.id, 'clients');
     revalidatePath('/dashboard/clients');
 }
 
@@ -1286,6 +1316,8 @@ export async function unarchiveClient(id: string) {
         { id, agencyId: agency?.id },
         { $set: { archived: false }, $unset: { archivedAt: '' } }
     );
+    // Re-increment agency usage counter after unarchive
+    if (agency) await incrementAgencyUsage(agency.id, 'clients');
 
     revalidatePath('/dashboard/clients');
 }
@@ -1323,6 +1355,11 @@ export async function permanentlyDeleteClient(id: string, password: string) {
             ActivityModel.deleteMany({ target: { $in: projectIds }, agencyId: agency?.id }),
         ] : []),
     ]);
+    // Decrement agency usage counters for client and cascaded projects
+    if (agency) {
+        await decrementAgencyUsage(agency.id, 'clients');
+        if (projectIds.length > 0) await decrementAgencyUsage(agency.id, 'projects', projectIds.length);
+    }
     revalidatePath('/dashboard/clients');
 }
 
@@ -1419,6 +1456,8 @@ export async function deleteUser(id: string, password: string) {
     );
     // Clean up notifications for archived user
     await NotificationModel.deleteMany({ userId: id, agencyId: agency?.id });
+    // Decrement agency usage counter
+    if (agency) await decrementAgencyUsage(agency.id, 'users');
     revalidatePath('/dashboard/team');
 }
 
@@ -1446,6 +1485,8 @@ export async function unarchiveUser(id: string) {
         { id, agencyId: agency?.id },
         { $set: { archived: false }, $unset: { archivedAt: '' } }
     );
+    // Re-increment agency usage counter after unarchive
+    if (agency) await incrementAgencyUsage(agency.id, 'users');
     revalidatePath('/dashboard/team');
 }
 
@@ -1479,6 +1520,8 @@ export async function permanentlyDeleteUser(id: string, password: string) {
         // Clean up activity log entries by this user
         ActivityModel.deleteMany({ userId: id, agencyId: agency?.id }),
     ]);
+    // Decrement agency usage counter
+    if (agency) await decrementAgencyUsage(agency.id, 'users');
     revalidatePath('/dashboard/team');
 }
 
@@ -1661,6 +1704,8 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
 
     // Save project + invoices
     await ProjectModel.create(newProject);
+    // Increment agency usage counter for projects
+    await incrementAgencyUsage(agency.id, 'projects');
     if (newInvoices.length > 0) {
         await InvoiceModel.insertMany(newInvoices.map(inv => ({ ...inv, agencyId: agency.id })));
     }
@@ -1792,6 +1837,7 @@ export async function updateUserPermissions(targetUserId: string, permissions: U
 }
 
 export async function deleteTask(taskId: string) {
+    await requireAuth();
     await connectDB();
     const currentUser = await getCurrentUser();
     const agency = await getCurrentAgency();
@@ -2011,6 +2057,7 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
 }
 
 export async function updateTask(taskId: string, updates: Partial<Task>) {
+    await requireAuth();
     await connectDB();
     // Input sanitization
     updates = sanitizeUpdates(updates) as Partial<Task>;
@@ -2073,6 +2120,11 @@ export async function updateTask(taskId: string, updates: Partial<Task>) {
 }
 
 export async function addComment(taskId: string, userId: string, text: string, timestamp?: string) {
+    const currentUser = await requireAuth();
+    // Verify userId matches the authenticated user to prevent spoofing
+    if (userId !== currentUser.id) {
+        throw new Error('Unauthorized: You can only post comments as yourself.');
+    }
     await connectDB();
     const agency = await getCurrentAgency();
     if (!agency) throw new Error('No agency context');
@@ -2366,7 +2418,6 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
         newClient.password = await hashPassword(newClient.password);
     }
 
-    await connectDB();
     try {
         await ClientModel.create(newClient);
     } catch (err: any) {
@@ -2389,6 +2440,9 @@ export async function createClient(client: Omit<Client, "id" | "agencyId">) {
             throw err;
         }
     }
+
+    // Increment agency usage counter for clients
+    if (agencyCtx) await incrementAgencyUsage(agencyCtx.id, 'clients');
 
     // Send welcome email to client
     try {
@@ -2562,6 +2616,8 @@ export async function deleteProject(id: string, password: string) {
         ActivityModel.deleteMany({ target: id, agencyId: agency?.id }),
         NotificationModel.deleteMany({ agencyId: agency?.id, link: { $regex: id } }),
     ]);
+    // Decrement agency usage counter
+    if (agency) await decrementAgencyUsage(agency.id, 'projects');
 
     revalidatePath('/dashboard/projects');
     return true;
@@ -2644,7 +2700,7 @@ export async function getClientActivityLogs(clientId: string, limit = 20) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const acts = await ActivityModel.find({ user: clientId, agencyId: agency?.id })
+    const acts = await ActivityModel.find({ userId: clientId, agencyId: agency?.id })
         .sort({ timestamp: -1 }).limit(limit).lean();
     return acts.map(sanitizeDoc);
 }
@@ -2861,7 +2917,7 @@ export async function clientMarkInvoiceAsPaid(invoiceId: string) {
                 clientName: currentUser.name,
                 amount: invoice.amount,
                 projectName: project.name,
-                financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'} /dashboard/finance`,
+                financeLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/finance`,
             });
         }
     } catch (emailError) {
@@ -3406,9 +3462,14 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
 
 
 export async function markNotificationAsRead(id: string) {
-    await requireAuth();
+    const caller = await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
+    // S5 fix: IDOR protection — only allow marking own notifications (or admin/manager)
+    const notification = await NotificationModel.findOne({ id, agencyId: agency?.id }).lean();
+    if (!notification) return;
+    const isPrivileged = caller.role === 'admin' || caller.role === 'manager';
+    if ((notification as any).userId !== caller.id && !isPrivileged) return;
     await NotificationModel.updateOne({ id, agencyId: agency?.id }, { $set: { read: true } });
 }
 
@@ -4091,11 +4152,21 @@ export async function singularityChat(
 
 
 export async function getLeaveRequests(userId?: string) {
-    await requireAuth();
+    const caller = await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const query: any = requireAgencyFilter(agency);
-    if (userId) query.userId = userId;
+    // S4 fix: IDOR protection — non-admin users can only see their own leave requests
+    const isPrivileged = caller.role === 'admin' || caller.role === 'manager';
+    if (userId) {
+        if (!isPrivileged && caller.id !== userId) {
+            throw new Error('Unauthorized: You can only view your own leave requests.');
+        }
+        query.userId = userId;
+    } else if (!isPrivileged) {
+        // Default to own leave requests for non-privileged users
+        query.userId = caller.id;
+    }
     const requests = await LeaveRequestModel.find(query).lean();
     return requests
         .map(sanitizeDoc)

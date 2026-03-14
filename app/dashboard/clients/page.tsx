@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { getClients, getArchivedClients, unarchiveClient, deleteClient, permanentlyDeleteClient } from "@/lib/actions";
+import { useRouter } from "next/navigation";
+import { getClients, getArchivedClients, unarchiveClient, deleteClient, permanentlyDeleteClient, getCurrentUser } from "@/lib/actions";
 import { Client } from "@/lib/types";
 import { ClientCard } from "@/components/clients/ClientCard";
 import { EditClientDialog } from "@/components/clients/EditClientDialog";
@@ -21,10 +22,17 @@ export default function ClientsPage() {
     const [showArchived, setShowArchived] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [permanentDeleteTarget, setPermanentDeleteTarget] = useState<Client | null>(null);
+    const router = useRouter();
 
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
+            // C8 fix: Block client accounts from seeing other clients
+            const user = await getCurrentUser();
+            if (user?.role === 'client') {
+                router.replace('/dashboard');
+                return;
+            }
             const data = showArchived ? await getArchivedClients() : await getClients();
             setClients(data);
         } catch (error) {

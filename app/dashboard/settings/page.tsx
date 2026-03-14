@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getServices, addService, deleteService, updateService, getAgencySettings } from "@/lib/actions";
+import { getServices, addService, deleteService, updateService, getAgencySettings, getCurrentUser } from "@/lib/actions";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,8 @@ type AgencySettingsData = {
 };
 
 export default function SettingsPage() {
+    const router = useRouter();
+    const [authorized, setAuthorized] = useState(false);
     const [services, setServices] = useState<Service[]>([]);
     const [loading, setLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -119,10 +122,22 @@ export default function SettingsPage() {
         }
     }, []);
 
+    // C6 fix: Role guard — only admin/manager can access settings
     useEffect(() => {
+        getCurrentUser().then(user => {
+            if (!user || (user.role !== 'admin' && user.role !== 'manager')) {
+                router.replace('/dashboard');
+            } else {
+                setAuthorized(true);
+            }
+        });
+    }, [router]);
+
+    useEffect(() => {
+        if (!authorized) return;
         loadServices();
         loadAgencySettings();
-    }, [loadServices, loadAgencySettings]);
+    }, [authorized, loadServices, loadAgencySettings]);
 
     const handleOpenDialog = (service?: Service) => {
         if (service) {
@@ -196,6 +211,9 @@ export default function SettingsPage() {
     };
 
     const totalEmployees = (serviceJobs: Job[]) => serviceJobs.reduce((acc, curr) => acc + (Number(curr.count) || 0), 0);
+
+    // Block render until role is verified
+    if (!authorized) return null;
 
     return (
         <div className="space-y-6 p-2">

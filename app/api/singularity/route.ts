@@ -722,7 +722,12 @@ export async function POST(req: NextRequest) {
                     controller.close();
                 } catch (error: any) {
                     console.error('[Singularity Stream] Error:', error);
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', text: error.message })}\n\n`));
+                    // Sanitize error: only show safe user-facing messages, not internal details
+                    const msg = error?.message || '';
+                    const isSafe = msg.startsWith('Unauthorized') || msg.startsWith('AI permissions')
+                        || msg.startsWith('Plan limit') || msg.includes('quota') || msg.includes('rate limit');
+                    const safeMsg = isSafe ? msg : 'Something went wrong. Please try again.';
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'error', text: safeMsg })}\n\n`));
                     controller.close();
                 }
             }

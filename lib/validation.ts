@@ -244,7 +244,38 @@ export function validateCsrfOrigin(request: Request): { valid: false; response: 
         'http://localhost:3000',
     ];
 
-    // Allow requests with no origin (same-origin browser requests, curl, server-to-server)
+    // Also allow the configured app URL (handles custom domains in production)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (appUrl && !allowedOrigins.includes(appUrl)) {
+        allowedOrigins.push(appUrl);
+    }
+
+    // Reject 'null' origin explicitly (sent by data: URIs, sandboxed iframes, etc.)
+    if (origin === 'null') {
+        return {
+            valid: false,
+            response: new Response(JSON.stringify({ error: 'Forbidden' }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' },
+            }),
+        };
+    }
+
+    // S2 fix: Require Origin header on mutation requests (POST/PUT/DELETE/PATCH)
+    // GET/HEAD/OPTIONS without Origin are safe (idempotent, no state changes)
+    const method = request.method?.toUpperCase();
+    const isMutation = method === 'POST' || method === 'PUT' || method === 'DELETE' || method === 'PATCH';
+    if (!origin && isMutation) {
+        return {
+            valid: false,
+            response: new Response(JSON.stringify({ error: 'Forbidden: Origin header required' }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' },
+            }),
+        };
+    }
+
+    // Allow requests with no origin header for safe methods (GET, HEAD, OPTIONS)
     if (!origin) return { valid: true };
 
     if (!allowedOrigins.includes(origin)) {

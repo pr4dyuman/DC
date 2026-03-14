@@ -23,6 +23,7 @@ export default function CreateAgencyForm() {
         ownerPhone: "",
         plan: "free" as "free" | "starter" | "pro" | "enterprise",
         logo: "" as string,
+        createdAt: new Date().toISOString().split('T')[0], // Default today, can backdate
     });
 
     useEffect(() => {
@@ -92,6 +93,7 @@ export default function CreateAgencyForm() {
                 ownerPhone: formData.ownerPhone || undefined,
                 plan: formData.plan,
                 logo: formData.logo || undefined,
+                createdAt: formData.createdAt || undefined,
             });
             router.push("/super-admin/agencies");
         } catch (err: any) {
@@ -170,6 +172,18 @@ export default function CreateAgencyForm() {
                     <option value="pro">Pro (50 users, 500 projects)</option>
                     <option value="enterprise">Enterprise (Unlimited)</option>
                 </select>
+            </div>
+
+            <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Created Date</label>
+                <input
+                    type="date"
+                    value={formData.createdAt}
+                    onChange={(e) => setFormData({ ...formData, createdAt: e.target.value })}
+                    max={new Date().toISOString().split('T')[0]}
+                    className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Leave as today or set a past date for backdating</p>
             </div>
 
             {/* ── Owner Account ── */}

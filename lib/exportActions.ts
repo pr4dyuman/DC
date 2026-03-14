@@ -2,8 +2,24 @@
 
 import { connectDB, TransactionModel, InvoiceModel, TaskModel, ProjectModel } from "@/lib/mongodb";
 import { getCurrentAgency } from "@/lib/agency-context";
+import { getSessionUser } from "@/lib/auth";
 
 export async function getExportData(startDate: string, endDate: string) {
+    // Auth check — only admin/manager can export financial data
+    const session = await getSessionUser();
+    if (!session) throw new Error('Unauthorized: You must be logged in.');
+    if (!['admin', 'manager'].includes(session.role)) {
+        throw new Error('Unauthorized: Only admins and managers can export data.');
+    }
+
+    // Validate date format
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        throw new Error('Invalid date format. Expected YYYY-MM-DD.');
+    }
+    if (isNaN(Date.parse(startDate)) || isNaN(Date.parse(endDate))) {
+        throw new Error('Invalid date values.');
+    }
+
     await connectDB();
     const agency = await getCurrentAgency();
     if (!agency?.id) throw new Error('Agency context required');

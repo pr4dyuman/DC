@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { getUsers, createUser, updateUser, deleteUser, getUser, getLeaveRequests, getArchivedUsers, unarchiveUser } from "@/lib/actions";
 import { User, LeaveRequest } from "@/lib/types";
 import { getSessionId } from "@/lib/auth";
@@ -40,6 +41,7 @@ export default function TeamPage() {
     const [roleFilter, setRoleFilter] = useState<string>("all");
     const [showArchived, setShowArchived] = useState(false);
     const { openChat } = useChat();
+    const router = useRouter();
 
     const loadData = async () => {
         const [usersData, currentId] = await Promise.all([
@@ -53,6 +55,11 @@ export default function TeamPage() {
             try {
                 const currentUser = await getUser(currentId);
                 if (currentUser) {
+                    // C7 fix: Block client accounts from accessing team page
+                    if (currentUser.role === 'client') {
+                        router.replace('/dashboard');
+                        return;
+                    }
                     setCurrentUserRole(currentUser.role);
                     setCurrentUserId(currentUser.id);
 
@@ -134,7 +141,7 @@ export default function TeamPage() {
                             )}
                         </Button>
                     )}
-                    {!showArchived && (
+                    {!showArchived && (currentUserRole === 'admin' || currentUserRole === 'manager') && (
                         <button
                             onClick={() => handleOpenDialog()}
                             className="w-full sm:w-auto inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
