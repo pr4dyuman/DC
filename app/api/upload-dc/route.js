@@ -54,6 +54,10 @@ export async function POST(req) {
     }
 
     // Agency storage limit validation
+    if (!agency) {
+      return NextResponse.json({ success: false, error: 'Agency context not found. Please log in again.' }, { status: 403 });
+    }
+
     const maxStorageBytes = (agency.limits?.maxStorage || 0) * 1024 * 1024;
     const currentStorageBytes = agency.usage?.storage || 0;
     
