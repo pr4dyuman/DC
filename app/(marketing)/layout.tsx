@@ -1,5 +1,5 @@
 import Navigation from "@/components/marketing/Navigation";
-import Footer from "@/components/marketing/footer";
+import Footer from "@/components/marketing/Footer";
 
 export const metadata = {
     title: "Digital Corvids — Strategic Birds of the Digital Sky",

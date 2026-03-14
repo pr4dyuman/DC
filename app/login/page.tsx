@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import Navigation from "@/components/marketing/Navigation";
-import Footer from "@/components/marketing/footer";
+import Footer from "@/components/marketing/Footer";
 
 export default function LoginPage() {
     const router = useRouter();

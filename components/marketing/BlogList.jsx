@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import Navigation from "./Navigation";
-import Footer from "./footer";
+import Footer from "./Footer";
 import BlogCard from "./BlogCard";
 
 

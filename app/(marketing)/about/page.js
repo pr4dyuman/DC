@@ -1,4 +1,4 @@
-import TeamSlider from '@/components/marketing/teamSlider';
+import TeamSlider from '@/components/marketing/TeamSlider';
 import Image from 'next/image';
 import CountUp from '@/components/marketing/CountUp';
 

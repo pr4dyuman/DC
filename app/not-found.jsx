@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Navigation from "@/components/marketing/Navigation";
-import Footer from "@/components/marketing/footer";
+import Footer from "@/components/marketing/Footer";
 
 export default function NotFound() {
     const [mounted, setMounted] = useState(false);

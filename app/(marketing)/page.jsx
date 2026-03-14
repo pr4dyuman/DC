@@ -1,10 +1,10 @@
 "use client";
 import React from "react";
 import Image from "next/image";
-import AboutAgency from "@/components/marketing/aboutAgency";
-import ServicesSection from "@/components/marketing/serviceSlider";
+import AboutAgency from "@/components/marketing/AboutAgency";
+import ServicesSection from "@/components/marketing/ServiceSlider";
 import TestimonialSection from "@/components/marketing/testomonial";
-import TeamSlider from "@/components/marketing/teamSlider";
+import TeamSlider from "@/components/marketing/TeamSlider";
 import ManageCompanySection from "@/components/marketing/ManageCompany";
 import HeroBackground from "@/components/marketing/HeroBackground";
 import { Swiper, SwiperSlide } from "swiper/react";
