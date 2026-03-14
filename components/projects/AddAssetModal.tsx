@@ -81,19 +81,23 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
     };
 
     // Security: Validate File
-    const validateFile = (file: File): { valid: boolean; error?: string } => {
-        const FORBIDDEN_EXTENSIONS = ['.exe', '.bat', '.cmd', '.sh', '.vbs', '.msi', '.jar', '.com', '.scr', '.pif'];
-        const fileName = file.name.toLowerCase();
+    const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv', '.txt'];
+    const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
-        // 1. Extension Check
-        if (FORBIDDEN_EXTENSIONS.some(ext => fileName.endsWith(ext))) {
-            return { valid: false, error: "Security Alert: Executable files are not allowed." };
+    const validateFile = (file: File): { valid: boolean; error?: string } => {
+        const fileName = file.name.toLowerCase();
+        const ext = '.' + fileName.split('.').pop();
+
+        // 1. File type check — allowlist only
+        if (!ALLOWED_EXTENSIONS.includes(ext)) {
+            const allowed = ALLOWED_EXTENSIONS.map(e => e.replace('.', '').toUpperCase()).join(', ');
+            return { valid: false, error: `Unsupported file type (${ext}). Allowed types: ${allowed}` };
         }
 
-        // 2. Size Limit (e.g., 50MB)
-        const MAX_SIZE = 50 * 1024 * 1024;
+        // 2. Size Limit — 50MB
         if (file.size > MAX_SIZE) {
-            return { valid: false, error: "File too large. Maximum size is 50MB." };
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+            return { valid: false, error: `File too large (${sizeMB}MB). Maximum size is 50MB.` };
         }
 
         return { valid: true };
@@ -325,6 +329,7 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                                             id="file"
                                             type="file"
                                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                            accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
                                             onChange={(e) => {
                                                 if (e.target.files && e.target.files[0]) {
                                                     const f = e.target.files[0];
@@ -375,7 +380,7 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                                             ) : (
                                                 <>
                                                     <span className="text-sm font-medium">Click to upload or drag and drop</span>
-                                                    <span className="text-xs text-muted-foreground">Max 50MB. Secure Scanned.</span>
+                                                    <span className="text-xs text-muted-foreground">Images, PDF, DOC, XLS, CSV, TXT · Max 50MB</span>
                                                 </>
                                             )}
                                         </div>
