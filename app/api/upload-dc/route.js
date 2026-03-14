@@ -3,7 +3,7 @@ import path from 'path';
 import { getSessionUser } from '@/lib/auth';
 import { getCurrentAgency, checkTrialExpired } from '@/lib/agency-context';
 import { validateCsrfOrigin } from '@/lib/validation';
-import { uploadToAzure } from '@/lib/azure-storage';
+import { uploadFile } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -214,8 +214,8 @@ export async function POST(req) {
     // Get content type for Azure
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
-    // Upload to Azure Blob Storage
-    const blobUrl = await uploadToAzure(buffer, filename, contentType);
+    // Upload to storage (Vercel Blob primary, Azure overflow)
+    const blobUrl = await uploadFile(buffer, filename, contentType);
 
     // Track storage usage for the agency
     try {
