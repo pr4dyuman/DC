@@ -7,6 +7,9 @@ import { uploadFile } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 
+// Allow up to 50MB uploads (Vercel default is 4.5MB for serverless functions)
+export const maxDuration = 60; // 60 seconds for large uploads
+
 // SVG intentionally excluded — can contain embedded <script> tags (XSS vector)
 const ALLOWED_EXTENSIONS = new Set([
   '.jpg', '.jpeg', '.png', '.gif', '.webp',

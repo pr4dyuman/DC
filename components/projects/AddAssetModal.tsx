@@ -152,10 +152,12 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                         }
                     });
 
-                    xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
-                    xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+                    xhr.addEventListener('error', () => reject(new Error('Network error. Check your connection and try again.')));
+                    xhr.addEventListener('abort', () => reject(new Error('Upload was cancelled.')));
+                    xhr.addEventListener('timeout', () => reject(new Error('Upload timed out. The file may be too large for your connection speed.')));
 
                     xhr.open('POST', '/api/upload-dc');
+                    xhr.timeout = 120000; // 2 minute timeout for large files
                     xhr.send(uploadFormData);
                 });
 
@@ -184,7 +186,17 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                 resetState();
                 router.refresh();
             } catch (err: any) {
-                setError(err?.message || "Upload failed. Please try again.");
+                const msg = err?.message || "Upload failed.";
+                // Make messages more user-friendly
+                if (msg.includes('413') || msg.toLowerCase().includes('too large') || msg.toLowerCase().includes('body exceeded')) {
+                    setError("File is too large. Maximum upload size is 50MB.");
+                } else if (msg.includes('403') || msg.toLowerCase().includes('storage limit')) {
+                    setError("Storage limit reached. Contact your admin to upgrade.");
+                } else if (msg.includes('401') || msg.toLowerCase().includes('unauthorized')) {
+                    setError("Session expired. Please refresh the page and try again.");
+                } else {
+                    setError(msg);
+                }
             } finally {
                 setLoading(false);
             }

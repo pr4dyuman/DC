@@ -87,8 +87,8 @@ export function AssetCard({ asset, onDelete }: AssetCardProps) {
                     </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity self-start pt-1">
+                {/* Actions — always visible on mobile, hover-reveal on desktop */}
+                <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity self-start pt-1">
                     {canView && (
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => setViewerOpen(true)} title="View">
                             <EyeIcon className="h-4 w-4" />
