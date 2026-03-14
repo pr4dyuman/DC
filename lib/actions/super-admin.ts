@@ -499,6 +499,26 @@ export async function deleteAgency(agencyId: string, password: string) {
     const agency = await AgencyModel.findOne({ id: agencyId }).lean();
     if (!agency) throw new Error('Agency not found');
 
+    // Delete ALL uploaded files from storage (Vercel Blob + Azure) before removing DB records
+    try {
+        const assets = await AssetModel.find({ agencyId }).select('url').lean();
+        if (assets.length > 0) {
+            const { deleteFile } = await import('@/lib/storage');
+            // Delete in batches of 10 to avoid overwhelming APIs
+            const BATCH_SIZE = 10;
+            for (let i = 0; i < assets.length; i += BATCH_SIZE) {
+                const batch = assets.slice(i, i + BATCH_SIZE);
+                await Promise.allSettled(
+                    batch.map((asset: any) => asset.url ? deleteFile(asset.url) : Promise.resolve())
+                );
+            }
+            console.log(`[deleteAgency] Cleaned up ${assets.length} files from storage for agency ${agencyId}`);
+        }
+    } catch (storageErr) {
+        // Log but don't block deletion — DB cleanup is more important
+        console.error('[deleteAgency] Storage cleanup error (proceeding with DB deletion):', storageErr);
+    }
+
     // Delete ALL agency data from every collection — prevents orphaned data
     await Promise.all([
         AgencyModel.deleteOne({ id: agencyId }),

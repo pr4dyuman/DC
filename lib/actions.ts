@@ -3527,27 +3527,14 @@ export async function deleteProjectAsset(assetId: string) {
     if (!asset) throw new Error('Asset not found');
     await AssetModel.deleteOne({ id: assetId, agencyId: agency?.id });
 
-    // Clean up uploaded file
+    // Clean up uploaded file from storage (Vercel Blob or Azure)
     const assetUrl = (asset as any).url;
     if (assetUrl) {
-        // Azure Blob Storage cleanup
-        if (assetUrl.includes('.blob.core.windows.net/')) {
-            try {
-                const { deleteFromAzure } = await import('@/lib/azure-storage');
-                await deleteFromAzure(assetUrl);
-            } catch (e) {
-                console.error('Failed to delete blob from Azure:', e);
-            }
-        }
-        // Legacy: local filesystem cleanup
-        else if (assetUrl.startsWith('/uploads/')) {
-            const { unlink } = await import('fs/promises');
-            const path = await import('path');
-            const filePath = path.join(process.cwd(), 'public', assetUrl);
-            const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-            if (filePath.startsWith(uploadsDir)) {
-                await unlink(filePath).catch(() => { /* file may already be gone */ });
-            }
+        try {
+            const { deleteFile } = await import('@/lib/storage');
+            await deleteFile(assetUrl);
+        } catch (e) {
+            console.error('Failed to delete file from storage:', e);
         }
 
         // Decrement storage usage
