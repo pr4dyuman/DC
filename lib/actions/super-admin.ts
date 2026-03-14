@@ -1225,6 +1225,6 @@ export async function getStorageByAgency() {
         agencySlug: a.slug,
         plan: a.plan,
         storageUsed: a.usage?.storage || 0,
-        storageLimit: a.limits?.maxStorage || 0,
+        storageLimit: (a.limits?.maxStorage || 0) * 1024 * 1024, // Convert MB to bytes
     }));
 }

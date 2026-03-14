@@ -53,6 +53,18 @@ export async function POST(req) {
       return NextResponse.json({ success: false, error: 'File too large. Maximum size is 50MB.' }, { status: 400 });
     }
 
+    // Agency storage limit validation
+    const maxStorageBytes = (agency.limits?.maxStorage || 0) * 1024 * 1024;
+    const currentStorageBytes = agency.usage?.storage || 0;
+    
+    // -1 means unlimited
+    if (agency.limits?.maxStorage !== -1 && (currentStorageBytes + file.size) > maxStorageBytes) {
+        return NextResponse.json({ 
+            success: false, 
+            error: `Storage limit reached. You have used ${(currentStorageBytes / (1024*1024)).toFixed(2)}MB of your ${agency.limits?.maxStorage}MB limit.` 
+        }, { status: 403 });
+    }
+
     // File type validation — use extension from original filename
     const originalName = file.name || '';
     const ext = path.extname(originalName).toLowerCase();
