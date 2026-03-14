@@ -19,17 +19,24 @@ let _cachedVercelUsage: { bytes: number; fetchedAt: number } | null = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
+ * Get the Vercel Blob token. Returns undefined if not configured.
+ */
+function getVercelBlobToken(): string | undefined {
+  return process.env.BLOB_READ_WRITE_TOKEN;
+}
+
+/**
  * Check if BLOB_READ_WRITE_TOKEN is configured (Vercel Blob available)
  */
 function isVercelBlobConfigured(): boolean {
-  return !!process.env.BLOB_READ_WRITE_TOKEN;
+  return !!getVercelBlobToken();
 }
 
 /**
  * Check if a URL is a Vercel Blob URL
  */
 export function isVercelBlobUrl(url: string): boolean {
-  return url.includes('.public.blob.vercel-storage.com');
+  return url.includes('.public.blob.vercel-storage.com') || url.includes('.blob.vercel-storage.com');
 }
 
 /**
@@ -43,13 +50,16 @@ async function getVercelBlobUsage(): Promise<number> {
     return _cachedVercelUsage.bytes;
   }
 
+  const token = getVercelBlobToken();
+  if (!token) return Infinity;
+
   try {
     let totalBytes = 0;
     let cursor: string | undefined;
     let hasMore = true;
 
     while (hasMore) {
-      const result = await list({ cursor, limit: 1000 });
+      const result = await list({ cursor, limit: 1000, token });
       for (const blob of result.blobs) {
         totalBytes += blob.size;
       }
@@ -86,16 +96,20 @@ export async function uploadFile(
   fileName: string,
   contentType?: string
 ): Promise<string> {
+  const token = getVercelBlobToken();
+
   // Check if Vercel Blob is available and under threshold
-  if (isVercelBlobConfigured()) {
+  if (token) {
     try {
       const currentUsage = await getVercelBlobUsage();
+      console.log(`[Storage] Vercel Blob configured. Usage: ${(currentUsage / (1024 * 1024)).toFixed(1)}MB / ${(VERCEL_BLOB_THRESHOLD / (1024 * 1024)).toFixed(0)}MB`);
 
       if (currentUsage + buffer.length <= VERCEL_BLOB_THRESHOLD) {
         // Upload to Vercel Blob
         const blob = await put(fileName, buffer, {
           access: 'public',
           contentType: contentType || 'application/octet-stream',
+          token,
         });
 
         // Update cache optimistically
@@ -103,14 +117,16 @@ export async function uploadFile(
           _cachedVercelUsage.bytes += buffer.length;
         }
 
-        console.log(`[Storage] Uploaded to Vercel Blob (${(currentUsage / (1024 * 1024)).toFixed(1)}MB used)`);
+        console.log(`[Storage] ✅ Uploaded to Vercel Blob: ${blob.url}`);
         return blob.url;
       } else {
-        console.log(`[Storage] Vercel Blob at ${(currentUsage / (1024 * 1024)).toFixed(1)}MB — routing to Azure`);
+        console.log(`[Storage] Vercel Blob at ${(currentUsage / (1024 * 1024)).toFixed(1)}MB — over threshold, routing to Azure`);
       }
-    } catch (error) {
-      console.error('[Storage] Vercel Blob upload failed, falling back to Azure:', error);
+    } catch (error: any) {
+      console.error(`[Storage] ❌ Vercel Blob failed (${error?.message || error}), falling back to Azure`);
     }
+  } else {
+    console.log('[Storage] BLOB_READ_WRITE_TOKEN not set — using Azure');
   }
 
   // Fallback: Upload to Azure
@@ -124,10 +140,11 @@ export async function uploadFile(
  * Detects provider from the URL.
  */
 export async function deleteFile(url: string): Promise<void> {
+  const token = getVercelBlobToken();
   try {
     if (isVercelBlobUrl(url)) {
-      await del(url);
-      invalidateUsageCache(); // Usage changed, clear cache
+      await del(url, { token });
+      invalidateUsageCache();
       console.log('[Storage] Deleted from Vercel Blob');
     } else if (isAzureBlobUrl(url)) {
       await deleteFromAzure(url);
