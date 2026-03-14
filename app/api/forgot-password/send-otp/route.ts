@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { connectDB, UserModel, SuperAdminModel, ClientModel, OtpModel, RateLimitModel } from '@/lib/mongodb';
 import { validateEmail, validateCsrfOrigin } from '@/lib/validation';
-import { sendOtpEmail } from '@/lib/brevo';
+import { sendPasswordResetOtpEmail } from '@/lib/brevo';
 import { randomInt } from 'crypto';
-import { getPublicSecuritySettings } from '@/lib/actions/super-admin';
 
 const MAX_OTP_REQUESTS = 5;
 const OTP_RATE_WINDOW = 60 * 60 * 1000; // 1 hour
@@ -25,15 +24,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Email is required' }, { status: 400 });
         }
 
-        // Check if self-registration is allowed
-        const securitySettings = await getPublicSecuritySettings();
-        if (!securitySettings.allowSelfRegistration) {
-            return NextResponse.json(
-                { error: 'Agency registration is currently disabled. Please contact the platform administrator.' },
-                { status: 403 }
-            );
-        }
-
         // Validate email format
         let validatedEmail: string;
         try {
@@ -46,7 +36,7 @@ export async function POST(request: Request) {
         const now = new Date();
 
         // ── Rate limit by email (MongoDB-backed) ──
-        const emailRateKey = `otp:email:${validatedEmail}`;
+        const emailRateKey = `pwd-reset-otp:email:${validatedEmail}`;
         const emailRecord = await RateLimitModel.findOne({ key: emailRateKey, expiresAt: { $gt: now } }).lean();
         if (emailRecord) {
             if ((emailRecord as any).count >= MAX_OTP_REQUESTS) {
@@ -68,7 +58,7 @@ export async function POST(request: Request) {
         const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
             || request.headers.get('x-real-ip')
             || 'unknown';
-        const ipRateKey = `otp:ip:${ip}`;
+        const ipRateKey = `pwd-reset-otp:ip:${ip}`;
         const ipRecord = await RateLimitModel.findOne({ key: ipRateKey, expiresAt: { $gt: now } }).lean();
         if (ipRecord) {
             if ((ipRecord as any).count >= MAX_IP_REQUESTS) {
@@ -86,31 +76,39 @@ export async function POST(request: Request) {
             );
         }
 
-        // ── Check if email already exists (across all collections) ──
+        // ── Check if email exists in any collection ──
         const [existingUser, existingSuperAdmin, existingClient] = await Promise.all([
             UserModel.findOne({ email: validatedEmail }).lean(),
             SuperAdminModel.findOne({ email: validatedEmail }).lean(),
             ClientModel.findOne({ email: validatedEmail }).lean(),
         ]);
 
-        if (existingUser || existingSuperAdmin || existingClient) {
+        if (!existingUser && !existingSuperAdmin && !existingClient) {
             // Return same success-like response to prevent email enumeration
-            return NextResponse.json(
-                { message: 'If this email is not already registered, you will receive an OTP shortly.' },
-                { status: 200 }
-            );
+            return NextResponse.json({
+                success: true,
+                message: 'If an account with this email exists, you will receive a reset code shortly.',
+            });
+        }
+
+        // Check if account is archived/deactivated
+        if ((existingUser && (existingUser as any).archived) || (existingClient && (existingClient as any).archived)) {
+            return NextResponse.json({
+                success: true,
+                message: 'If an account with this email exists, you will receive a reset code shortly.',
+            });
         }
 
         // ── Generate OTP and store in MongoDB with TTL ──
         const otp = generateOtp();
         await OtpModel.findOneAndUpdate(
-            { email: validatedEmail, purpose: 'signup' },
-            { otp, attempts: 0, expiresAt: new Date(now.getTime() + 5 * 60 * 1000), purpose: 'signup' },
+            { email: validatedEmail, purpose: 'password-reset' },
+            { otp, attempts: 0, expiresAt: new Date(now.getTime() + 5 * 60 * 1000), purpose: 'password-reset' },
             { upsert: true }
         );
 
         // ── Send OTP via Brevo ──
-        const result = await sendOtpEmail(validatedEmail, otp);
+        const result = await sendPasswordResetOtpEmail(validatedEmail, otp);
         if (!result.success) {
             return NextResponse.json(
                 { error: 'Failed to send verification email. Please try again.' },
@@ -120,48 +118,14 @@ export async function POST(request: Request) {
 
         return NextResponse.json({
             success: true,
-            message: 'Verification code sent to your email',
+            message: 'If an account with this email exists, you will receive a reset code shortly.',
         });
 
     } catch (error: any) {
-        console.error('Send OTP error:', error);
+        console.error('Forgot password send OTP error:', error);
         return NextResponse.json(
             { error: 'Something went wrong. Please try again.' },
             { status: 500 }
         );
     }
-}
-
-/**
- * Verify an OTP (called internally by the signup or forgot-password routes).
- * Returns true if valid, throws error if invalid/expired.
- */
-export async function verifyOtp(email: string, otp: string, purpose: 'signup' | 'password-reset' = 'signup'): Promise<boolean> {
-    await connectDB();
-    const query = { email, purpose };
-    const record = await OtpModel.findOne(query).lean();
-    if (!record) {
-        throw new Error('No verification code found. Please request a new one.');
-    }
-
-    if (new Date() > new Date((record as any).expiresAt)) {
-        await OtpModel.deleteOne(query);
-        throw new Error('Verification code expired. Please request a new one.');
-    }
-
-    // Max 3 wrong attempts
-    if ((record as any).attempts >= 3) {
-        await OtpModel.deleteOne(query);
-        throw new Error('Too many wrong attempts. Please request a new code.');
-    }
-
-    if ((record as any).otp !== otp) {
-        await OtpModel.updateOne(query, { $inc: { attempts: 1 } });
-        const remaining = 3 - ((record as any).attempts + 1);
-        throw new Error(`Invalid verification code. ${remaining} attempts remaining.`);
-    }
-
-    // Valid — clean up
-    await OtpModel.deleteOne(query);
-    return true;
 }

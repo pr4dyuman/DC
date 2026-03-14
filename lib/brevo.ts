@@ -100,3 +100,54 @@ export async function sendOtpEmail(email: string, otp: string): Promise<{ succes
 </html>`,
     });
 }
+
+/**
+ * Send OTP email for password reset.
+ */
+export async function sendPasswordResetOtpEmail(email: string, otp: string): Promise<{ success: boolean; error?: string }> {
+    return sendEmail({
+        to: email,
+        subject: `Password Reset Code: ${otp}`,
+        htmlContent: `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#000000;font-family:Arial,sans-serif;">
+    <div style="max-width:500px;margin:40px auto;background:#0a0a0a;border:1px solid #222;border-radius:12px;overflow:hidden;">
+        <!-- Header -->
+        <div style="background:#111;padding:30px;text-align:center;border-bottom:1px solid #222;">
+            <span style="color:#F5EE30;font-size:36px;font-weight:bold;letter-spacing:2px;">DC</span>
+            <p style="color:#888;font-size:13px;margin:8px 0 0;">Digital Corvids</p>
+        </div>
+        
+        <!-- Body -->
+        <div style="padding:30px 30px 20px;">
+            <h2 style="color:#fff;margin:0 0 10px;font-size:20px;">Reset Your Password</h2>
+            <p style="color:#999;font-size:14px;line-height:1.6;margin:0 0 25px;">
+                We received a request to reset your password. Enter this code to proceed:
+            </p>
+            
+            <!-- OTP Code -->
+            <div style="background:#111;border:2px solid #F5EE30;border-radius:8px;padding:20px;text-align:center;margin:0 0 25px;">
+                <span style="color:#F5EE30;font-size:32px;font-weight:bold;letter-spacing:8px;">${otp}</span>
+            </div>
+            
+            <p style="color:#666;font-size:12px;line-height:1.5;margin:0;">
+                This code expires in <strong style="color:#999;">5 minutes</strong>. 
+                If you didn't request a password reset, you can safely ignore this email — your password will remain unchanged.
+            </p>
+        </div>
+        
+        <!-- Footer -->
+        <div style="padding:15px 30px;border-top:1px solid #222;text-align:center;">
+            <p style="color:#555;font-size:11px;margin:0;">© Digital Corvids — Strategic Birds of the Digital Sky</p>
+        </div>
+    </div>
+</body>
+</html>`,
+    });
+}
+

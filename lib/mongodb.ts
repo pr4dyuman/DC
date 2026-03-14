@@ -673,11 +673,13 @@ export const SingularityCheckpointModel = (mongoose.models.SingularityCheckpoint
 
 // OTP Schema with TTL auto-expiry
 const OtpSchema = new Schema({
-    email: { type: String, required: true, index: true },
+    email: { type: String, required: true },
     otp: { type: String, required: true },
     attempts: { type: Number, default: 0 },
+    purpose: { type: String, enum: ['signup', 'password-reset'], default: 'signup' },
     expiresAt: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
 });
+OtpSchema.index({ email: 1, purpose: 1 });
 export const OtpModel = (mongoose.models.Otp as Model<any>) || mongoose.model('Otp', OtpSchema);
 
 // Rate Limit Schema with TTL auto-expiry
