@@ -29,6 +29,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
     const [isLoadingContacts, setIsLoadingContacts] = useState(true);
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [isSending, setIsSending] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [showEmoji, setShowEmoji] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -135,7 +136,8 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
 
     async function handleDeleteConversation(contactId?: string) {
         const targetId = contactId || activeContactId;
-        if (!currentUserId || !targetId) return;
+        if (!currentUserId || !targetId || isDeleting) return;
+        setIsDeleting(true);
         try {
             await deleteConversation(currentUserId, targetId);
             setMessages([]);
@@ -148,6 +150,8 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
         } catch (error) {
             console.error("Failed to delete conversation", error);
             toast.error("Failed to delete conversation");
+        } finally {
+            setIsDeleting(false);
         }
     }
 

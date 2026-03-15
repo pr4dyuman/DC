@@ -1242,18 +1242,18 @@ export async function executeTool(
                 const proj = await ProjectModel.findOne({ id: args.projectId, agencyId: agency?.id }).lean();
                 if (!proj) return { success: false, data: null, summary: 'Project not found' };
 
-                // C11 fix: Clean up Azure blobs before deleting asset records
+                // Clean up uploaded files from blob storage (Vercel Blob + Azure) before deleting asset records
                 const projectAssets = await AssetModel.find({ projectId: args.projectId, agencyId: agency?.id }).select('url').lean();
-                for (const asset of projectAssets) {
-                    const assetUrl = (asset as any).url;
-                    if (assetUrl && assetUrl.includes('.blob.core.windows.net/')) {
-                        try {
-                            const { deleteFromAzure } = await import('@/lib/azure-storage');
-                            await deleteFromAzure(assetUrl);
-                        } catch (e) {
-                            console.error('Failed to delete blob from Azure:', e);
-                        }
+                if (projectAssets.length > 0) {
+                    const { deleteFile } = await import('@/lib/storage');
+                    const BATCH_SIZE = 10;
+                    for (let i = 0; i < projectAssets.length; i += BATCH_SIZE) {
+                        const batch = projectAssets.slice(i, i + BATCH_SIZE);
+                        await Promise.allSettled(
+                            batch.map((asset: any) => asset.url ? deleteFile(asset.url) : Promise.resolve())
+                        );
                     }
+                    console.log(`[singularity:delete_project] Cleaned up ${projectAssets.length} files from storage`);
                 }
 
                 // Delete project and all related data

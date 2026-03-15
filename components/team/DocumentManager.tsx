@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User, Client } from "@/lib/types";
 import { approveDocumentUpdate, updateUser } from "@/lib/actions";
-import { AlertCircle, FileText, CheckCircle2, Clock, Trash2, Eye, Upload, ShieldAlert, X } from "lucide-react";
+import { AlertCircle, FileText, CheckCircle2, Clock, Trash2, Eye, Upload, ShieldAlert, X, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
@@ -20,6 +20,7 @@ interface DocumentManagerProps {
 export function DocumentManager({ user, open, onOpenChange, isAdmin, onSuccess }: DocumentManagerProps) {
     const [activeTab, setActiveTab] = useState("identity");
     const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [actionLoading, setActionLoading] = useState<string | null>(null);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'adhar' | 'pan' | 'contracts' | 'other' | 'contracts_add' | 'other_add') => {
         const file = e.target.files?.[0];
@@ -58,6 +59,9 @@ export function DocumentManager({ user, open, onOpenChange, isAdmin, onSuccess }
     };
 
     const handleDelete = async (index: number, type: 'contracts' | 'other') => {
+        const key = `delete-${type}-${index}`;
+        if (actionLoading) return;
+        setActionLoading(key);
         try {
             if (type === 'contracts') {
                 const currentList = user.contracts || [];
@@ -71,8 +75,24 @@ export function DocumentManager({ user, open, onOpenChange, isAdmin, onSuccess }
             if (onSuccess) onSuccess();
         } catch (error) {
             console.error("Delete failed", error);
+        } finally {
+            setActionLoading(null);
         }
     };
+
+    const handleApproveReject = useCallback(async (type: 'adhar' | 'pan' | 'contracts' | 'other' | 'both', approve: boolean) => {
+        const key = `${approve ? 'approve' : 'reject'}-${type}`;
+        if (actionLoading) return;
+        setActionLoading(key);
+        try {
+            await approveDocumentUpdate(user.id, type, approve);
+            if (onSuccess) onSuccess();
+        } catch (error) {
+            console.error(`${approve ? 'Approve' : 'Reject'} failed`, error);
+        } finally {
+            setActionLoading(null);
+        }
+    }, [actionLoading, user.id, onSuccess]);
 
     const PendingBanner = ({ type, pendingList }: { type: 'contracts' | 'other', pendingList: string[] }) => {
         if (!pendingList) return null;
@@ -91,21 +111,19 @@ export function DocumentManager({ user, open, onOpenChange, isAdmin, onSuccess }
                     {isAdmin && (
                         <div className="flex gap-2">
                             <button
-                                onClick={async () => {
-                                    await approveDocumentUpdate(user.id, type, true);
-                                    if (onSuccess) onSuccess();
-                                }}
-                                className="px-3 py-1.5 bg-green-500/10 text-green-600 dark:text-green-500 hover:bg-green-500/20 rounded-md text-sm font-medium transition-colors"
+                                onClick={() => handleApproveReject(type, true)}
+                                disabled={!!actionLoading}
+                                className="px-3 py-1.5 bg-green-500/10 text-green-600 dark:text-green-500 hover:bg-green-500/20 rounded-md text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
                             >
+                                {actionLoading === `approve-${type}` && <Loader2 className="w-3 h-3 animate-spin" />}
                                 Approve All
                             </button>
                             <button
-                                onClick={async () => {
-                                    await approveDocumentUpdate(user.id, type, false);
-                                    if (onSuccess) onSuccess();
-                                }}
-                                className="px-3 py-1.5 bg-red-500/10 text-red-600 dark:text-red-500 hover:bg-red-500/20 rounded-md text-sm font-medium transition-colors"
+                                onClick={() => handleApproveReject(type, false)}
+                                disabled={!!actionLoading}
+                                className="px-3 py-1.5 bg-red-500/10 text-red-600 dark:text-red-500 hover:bg-red-500/20 rounded-md text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
                             >
+                                {actionLoading === `reject-${type}` && <Loader2 className="w-3 h-3 animate-spin" />}
                                 Reject
                             </button>
                         </div>
@@ -148,8 +166,9 @@ export function DocumentManager({ user, open, onOpenChange, isAdmin, onSuccess }
                                             pendingImage={user.pendingAdharCardImage}
                                             isRequired={!user.adharCardImage && !user.pendingAdharCardImage}
                                             isAdmin={isAdmin}
-                                            onApprove={() => { approveDocumentUpdate(user.id, 'adhar', true); if (onSuccess) onSuccess(); }}
-                                            onReject={() => { approveDocumentUpdate(user.id, 'adhar', false); if (onSuccess) onSuccess(); }}
+                                            onApprove={() => handleApproveReject('adhar', true)}
+                                            onReject={() => handleApproveReject('adhar', false)}
+                                            actionLoading={actionLoading}
                                             onUpload={(e) => handleFileUpload(e, 'adhar')}
                                             onPreview={setPreviewImage}
                                         />
@@ -161,8 +180,9 @@ export function DocumentManager({ user, open, onOpenChange, isAdmin, onSuccess }
                                             pendingImage={user.pendingPanCardImage}
                                             isRequired={!user.panCardImage && !user.pendingPanCardImage}
                                             isAdmin={isAdmin}
-                                            onApprove={() => { approveDocumentUpdate(user.id, 'pan', true); if (onSuccess) onSuccess(); }}
-                                            onReject={() => { approveDocumentUpdate(user.id, 'pan', false); if (onSuccess) onSuccess(); }}
+                                            onApprove={() => handleApproveReject('pan', true)}
+                                            onReject={() => handleApproveReject('pan', false)}
+                                            actionLoading={actionLoading}
                                             onUpload={(e) => handleFileUpload(e, 'pan')}
                                             onPreview={setPreviewImage}
                                         />
@@ -182,6 +202,7 @@ export function DocumentManager({ user, open, onOpenChange, isAdmin, onSuccess }
                                                 isPending={!!user.pendingContracts}
                                                 onPreview={setPreviewImage}
                                                 onDelete={handleDelete}
+                                                isDeleting={actionLoading === `delete-contracts-${idx}`}
                                             />
                                         ))}
                                         <UploadCard label="Add Contract" onChange={(e) => handleFileUpload(e, 'contracts_add')} />
@@ -201,6 +222,7 @@ export function DocumentManager({ user, open, onOpenChange, isAdmin, onSuccess }
                                                 isPending={!!user.pendingOtherDocuments}
                                                 onPreview={setPreviewImage}
                                                 onDelete={handleDelete}
+                                                isDeleting={actionLoading === `delete-other-${idx}`}
                                             />
                                         ))}
                                         <UploadCard label="Add Document" onChange={(e) => handleFileUpload(e, 'other_add')} />
@@ -229,7 +251,7 @@ export function DocumentManager({ user, open, onOpenChange, isAdmin, onSuccess }
     );
 }
 
-function DocumentCard({ url, index, type, label, isPending, onPreview, onDelete }: { url: string, index: number, type: 'contracts' | 'other', label: string, isPending: boolean, onPreview: (url: string) => void, onDelete: (index: number, type: 'contracts' | 'other') => void }) {
+function DocumentCard({ url, index, type, label, isPending, onPreview, onDelete, isDeleting }: { url: string, index: number, type: 'contracts' | 'other', label: string, isPending: boolean, onPreview: (url: string) => void, onDelete: (index: number, type: 'contracts' | 'other') => void, isDeleting?: boolean }) {
     return (
         <div className={`group relative flex flex-col rounded-lg border bg-card overflow-hidden transition-all hover:shadow-md ${isPending ? 'border-yellow-500/50' : 'border-border'}`}>
             <div className="aspect-[4/3] bg-muted relative overflow-hidden">
@@ -249,9 +271,10 @@ function DocumentCard({ url, index, type, label, isPending, onPreview, onDelete 
                     </button>
                     <button
                         onClick={() => onDelete(index, type)}
-                        className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-bold hover:bg-red-700 transition-colors w-24"
+                        disabled={isDeleting}
+                        className="px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-bold hover:bg-red-700 transition-colors w-24 disabled:opacity-50 flex items-center justify-center gap-1"
                     >
-                        Delete
+                        {isDeleting ? <><Loader2 className="w-3 h-3 animate-spin" /> Deleting</> : 'Delete'}
                     </button>
                 </div>
             </div>
@@ -289,9 +312,10 @@ interface IdentityCardProps {
     onReject: () => void;
     onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onPreview: (url: string) => void;
+    actionLoading?: string | null;
 }
 
-function IdentityCard({ title, image, pendingImage, isRequired, isAdmin, onApprove, onReject, onUpload, onPreview }: IdentityCardProps) {
+function IdentityCard({ title, image, pendingImage, isRequired, isAdmin, onApprove, onReject, onUpload, onPreview, actionLoading }: IdentityCardProps) {
     const hasPending = !!pendingImage;
 
     return (
@@ -307,10 +331,16 @@ function IdentityCard({ title, image, pendingImage, isRequired, isAdmin, onAppro
                 </div>
                 {/* Status Badges */}
                 {isAdmin && hasPending && (
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
                         <Badge variant="outline" className="border-yellow-500 text-yellow-500 bg-yellow-500/10">Pending Approval</Badge>
-                        <button onClick={onApprove} className="text-xs text-green-500 font-medium hover:underline">Approve</button>
-                        <button onClick={onReject} className="text-xs text-red-500 font-medium hover:underline">Reject</button>
+                        <button onClick={onApprove} disabled={!!actionLoading} className="text-xs text-green-500 font-medium hover:underline disabled:opacity-50 flex items-center gap-1">
+                            {actionLoading?.startsWith('approve') && <Loader2 className="w-3 h-3 animate-spin" />}
+                            Approve
+                        </button>
+                        <button onClick={onReject} disabled={!!actionLoading} className="text-xs text-red-500 font-medium hover:underline disabled:opacity-50 flex items-center gap-1">
+                            {actionLoading?.startsWith('reject') && <Loader2 className="w-3 h-3 animate-spin" />}
+                            Reject
+                        </button>
                     </div>
                 )}
                 {!isAdmin && hasPending && (

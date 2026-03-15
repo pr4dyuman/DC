@@ -1343,6 +1343,40 @@ export async function permanentlyDeleteClient(id: string, password: string) {
     const clientProjects = await ProjectModel.find({ clientId: id, agencyId: agency?.id }).select('id').lean();
     const projectIds = clientProjects.map((p: any) => p.id);
 
+    // Clean up uploaded files from blob storage (Vercel Blob + Azure) before removing DB records
+    if (projectIds.length > 0) {
+        try {
+            const assets = await AssetModel.find({ projectId: { $in: projectIds }, agencyId: agency?.id }).select('url size').lean();
+            if (assets.length > 0) {
+                const { deleteFile } = await import('@/lib/storage');
+                const BATCH_SIZE = 10;
+                let totalBytesFreed = 0;
+                for (let i = 0; i < assets.length; i += BATCH_SIZE) {
+                    const batch = assets.slice(i, i + BATCH_SIZE);
+                    await Promise.allSettled(
+                        batch.map((asset: any) => asset.url ? deleteFile(asset.url) : Promise.resolve())
+                    );
+                }
+                // Calculate total storage to decrement
+                for (const asset of assets) {
+                    const sizeStr = String((asset as any).size || '');
+                    const sizeMatch = sizeStr.match(/([\d.]+)\s*(KB|MB|GB|B)/i);
+                    if (sizeMatch) {
+                        const num = parseFloat(sizeMatch[1]);
+                        const unit = sizeMatch[2].toUpperCase();
+                        totalBytesFreed += unit === 'GB' ? num * 1073741824 : unit === 'MB' ? num * 1048576 : unit === 'KB' ? num * 1024 : num;
+                    }
+                }
+                if (totalBytesFreed > 0 && agency) {
+                    await AgencyModel.updateOne({ id: agency.id }, { $inc: { 'usage.storage': -Math.round(totalBytesFreed) } });
+                }
+                console.log(`[permanentDeleteClient] Cleaned up ${assets.length} files from storage`);
+            }
+        } catch (storageErr) {
+            console.error('[permanentDeleteClient] Storage cleanup error (proceeding with DB deletion):', storageErr);
+        }
+    }
+
     // Hard-delete: permanently remove client and all related data
     await Promise.all([
         ClientModel.deleteOne({ id, agencyId: agency?.id }),
@@ -2612,6 +2646,38 @@ export async function deleteProject(id: string, password: string) {
     const isValid = await verifyAdminPassword(password);
     if (!isValid) throw new Error('Invalid password');
     const agency = await getCurrentAgency();
+
+    // Clean up uploaded files from blob storage (Vercel Blob + Azure) before removing DB records
+    try {
+        const assets = await AssetModel.find({ projectId: id, agencyId: agency?.id }).select('url size').lean();
+        if (assets.length > 0) {
+            const { deleteFile } = await import('@/lib/storage');
+            const BATCH_SIZE = 10;
+            let totalBytesFreed = 0;
+            for (let i = 0; i < assets.length; i += BATCH_SIZE) {
+                const batch = assets.slice(i, i + BATCH_SIZE);
+                await Promise.allSettled(
+                    batch.map((asset: any) => asset.url ? deleteFile(asset.url) : Promise.resolve())
+                );
+            }
+            // Calculate total storage to decrement
+            for (const asset of assets) {
+                const sizeStr = String((asset as any).size || '');
+                const sizeMatch = sizeStr.match(/([\d.]+)\s*(KB|MB|GB|B)/i);
+                if (sizeMatch) {
+                    const num = parseFloat(sizeMatch[1]);
+                    const unit = sizeMatch[2].toUpperCase();
+                    totalBytesFreed += unit === 'GB' ? num * 1073741824 : unit === 'MB' ? num * 1048576 : unit === 'KB' ? num * 1024 : num;
+                }
+            }
+            if (totalBytesFreed > 0 && agency) {
+                await AgencyModel.updateOne({ id: agency.id }, { $inc: { 'usage.storage': -Math.round(totalBytesFreed) } });
+            }
+            console.log(`[deleteProject] Cleaned up ${assets.length} files from storage`);
+        }
+    } catch (storageErr) {
+        console.error('[deleteProject] Storage cleanup error (proceeding with DB deletion):', storageErr);
+    }
 
     // Delete project and ALL related data atomically
     await Promise.all([
