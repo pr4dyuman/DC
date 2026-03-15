@@ -104,6 +104,12 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
             setNewPassword("");
             setConfirmPassword("");
             setPasswordError("");
+        } else {
+            // Radix UI Dialog bug workaround: ensure pointer-events are restored
+            const timer = setTimeout(() => {
+                document.body.style.pointerEvents = '';
+            }, 500);
+            return () => clearTimeout(timer);
         }
     }, [user, open]);
 
