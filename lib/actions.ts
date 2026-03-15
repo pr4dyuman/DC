@@ -1574,15 +1574,16 @@ export async function getServices() {
     return services.map(sanitizeDoc);
 }
 
-export async function addService(name: string, jobs: { title: string; count: number }[]) {
+export async function addService(name: string, projectId: string, jobs: { title: string; employees: string[] }[]) {
     await requireRole('admin');
     // Input sanitization
     name = sanitizeName(name, 200);
     if (!name) throw new Error('Service name is required');
-    jobs = (jobs || []).map(j => ({ title: sanitizeName(j.title, 200), count: Math.max(0, Math.floor(Number(j.count) || 0)) }));
+    if (!projectId) throw new Error('Project is required');
+    jobs = (jobs || []).map(j => ({ title: sanitizeName(j.title, 200), employees: (j.employees || []).filter(e => typeof e === 'string' && e.trim()) }));
     await connectDB();
     const agency = await getCurrentAgency();
-    const newService = { id: generateId(), agencyId: agency?.id, name, jobs };
+    const newService = { id: generateId(), agencyId: agency?.id, name, projectId, jobs };
     await ServiceModel.create(newService);
     revalidatePath('/dashboard/settings');
     revalidatePath('/dashboard/projects');
@@ -1618,12 +1619,13 @@ export async function deleteService(id: string) {
     revalidatePath('/dashboard/projects');
 }
 
-export async function updateService(id: string, name: string, jobs: { title: string; count: number }[]) {
+export async function updateService(id: string, name: string, projectId: string, jobs: { title: string; employees: string[] }[]) {
     await requireRole('admin');
     // Input sanitization
     name = sanitizeName(name, 200);
     if (!name) throw new Error('Service name is required');
-    jobs = (jobs || []).map(j => ({ title: sanitizeName(j.title, 200), count: Math.max(0, Math.floor(Number(j.count) || 0)) }));
+    if (!projectId) throw new Error('Project is required');
+    jobs = (jobs || []).map(j => ({ title: sanitizeName(j.title, 200), employees: (j.employees || []).filter(e => typeof e === 'string' && e.trim()) }));
     await connectDB();
     const agency = await getCurrentAgency();
 
@@ -1633,7 +1635,7 @@ export async function updateService(id: string, name: string, jobs: { title: str
 
     await ServiceModel.updateOne(
         { id, agencyId: agency?.id },
-        { $set: { name, jobs } });
+        { $set: { name, projectId, jobs } });
 
     // Propagate service rename to tasks and projects that reference the old name
     if (oldName && oldName !== name) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getServices, addService, deleteService, updateService, getAgencySettings, getCurrentUser } from "@/lib/actions";
+import { getServices, addService, deleteService, updateService, getAgencySettings, getCurrentUser, getProjects, getUsers } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import {
 import {
     Loader2, Plus, Trash2, Edit2, Users, Briefcase,
     ChevronDown, ChevronRight, Settings, Shield, Palette,
-    Sun, Moon, X, Lock, Bot
+    Sun, Moon, X, Lock, Bot, FolderOpen, Check
 } from "lucide-react";
 import { toast } from "sonner";
 import PermissionSettings from "@/components/settings/PermissionSettings";
@@ -28,8 +28,10 @@ import { EmailSettings } from "@/components/settings/EmailSettings";
 import { useTheme } from "@/components/providers/ThemeProvider";
 import { AISettings } from "@/components/settings/AISettings";
 
-type Job = { title: string; count: number };
-type Service = { id: string; name: string; jobs: Job[] };
+type Job = { title: string; employees: string[] };
+type Service = { id: string; name: string; projectId?: string; jobs: Job[] };
+type ProjectItem = { id: string; name: string; slug?: string };
+type UserItem = { id: string; name: string; role?: string; jobTitle?: string };
 
 type AgencySettingsData = {
     name: string;
@@ -44,6 +46,8 @@ export default function SettingsPage() {
     const router = useRouter();
     const [authorized, setAuthorized] = useState(false);
     const [services, setServices] = useState<Service[]>([]);
+    const [projects, setProjects] = useState<ProjectItem[]>([]);
+    const [users, setUsers] = useState<UserItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingService, setEditingService] = useState<Service | null>(null);
@@ -69,8 +73,10 @@ export default function SettingsPage() {
 
     // Form State
     const [name, setName] = useState("");
+    const [projectId, setProjectId] = useState("");
     const [jobs, setJobs] = useState<Job[]>([]);
     const [submitting, setSubmitting] = useState(false);
+    const [employeeDropdownOpen, setEmployeeDropdownOpen] = useState<number | null>(null);
 
     const toggleSection = useCallback((key: string) => {
         setOpenSections(prev => {
@@ -93,8 +99,14 @@ export default function SettingsPage() {
 
     const loadServices = useCallback(async () => {
         try {
-            const servicesData = await getServices();
+            const [servicesData, projectsData, usersData] = await Promise.all([
+                getServices(),
+                getProjects(),
+                getUsers(),
+            ]);
             setServices(servicesData || []);
+            setProjects((projectsData || []).map((p: any) => ({ id: p.id, name: p.name, slug: p.slug })));
+            setUsers((usersData || []).map((u: any) => ({ id: u.id, name: u.name, role: u.role, jobTitle: u.jobTitle })));
         } catch (error) {
             console.error("Failed to load services", error);
             toast.error("Failed to load services");
@@ -143,32 +155,50 @@ export default function SettingsPage() {
         if (service) {
             setEditingService(service);
             setName(service.name);
+            setProjectId(service.projectId || "");
             setJobs([...service.jobs]);
         } else {
             setEditingService(null);
             setName("");
-            setJobs([{ title: "", count: 1 }]);
+            setProjectId("");
+            setJobs([{ title: "", employees: [] }]);
         }
+        setEmployeeDropdownOpen(null);
         setIsDialogOpen(true);
     };
 
     const handleAddJob = () => {
-        setJobs([...jobs, { title: "", count: 1 }]);
+        setJobs([...jobs, { title: "", employees: [] }]);
     };
 
     const handleRemoveJob = (index: number) => {
         setJobs(jobs.filter((_, i) => i !== index));
     };
 
-    const handleJobChange = (index: number, field: keyof Job, value: string | number) => {
+    const handleJobChange = (index: number, field: keyof Job, value: string | string[]) => {
         const newJobs = [...jobs];
         newJobs[index] = { ...newJobs[index], [field]: value };
         setJobs(newJobs);
     };
 
+    const toggleEmployee = (jobIndex: number, userId: string) => {
+        const currentEmployees = [...(jobs[jobIndex].employees || [])];
+        const idx = currentEmployees.indexOf(userId);
+        if (idx >= 0) {
+            currentEmployees.splice(idx, 1);
+        } else {
+            currentEmployees.push(userId);
+        }
+        handleJobChange(jobIndex, 'employees', currentEmployees);
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim()) return;
+        if (!projectId) {
+            toast.error("Please select a project");
+            return;
+        }
 
         setSubmitting(true);
         const validJobs = jobs.filter(j => j.title.trim() !== "");
@@ -177,11 +207,11 @@ export default function SettingsPage() {
         try {
             if (editingService) {
                 // Optimistic update
-                setServices(prev => prev.map(s => s.id === editingService.id ? { ...s, name, jobs: validJobs } : s));
-                await updateService(editingService.id, name, validJobs);
+                setServices(prev => prev.map(s => s.id === editingService.id ? { ...s, name, projectId, jobs: validJobs } : s));
+                await updateService(editingService.id, name, projectId, validJobs);
                 toast.success("Service updated");
             } else {
-                await addService(name, validJobs);
+                await addService(name, projectId, validJobs);
                 toast.success("Service created");
             }
             setIsDialogOpen(false);
@@ -210,7 +240,22 @@ export default function SettingsPage() {
         }
     };
 
-    const totalEmployees = (serviceJobs: Job[]) => serviceJobs.reduce((acc, curr) => acc + (Number(curr.count) || 0), 0);
+    const totalEmployees = (serviceJobs: Job[]) => {
+        const uniqueIds = new Set<string>();
+        for (const j of serviceJobs) {
+            for (const e of (j.employees || [])) uniqueIds.add(e);
+        }
+        return uniqueIds.size;
+    };
+
+    const getProjectName = (pid?: string) => {
+        if (!pid) return "No project";
+        return projects.find(p => p.id === pid)?.name || "Unknown project";
+    };
+
+    const getUserName = (uid: string) => {
+        return users.find(u => u.id === uid)?.name || uid;
+    };
 
     // Block render until role is verified
     if (!authorized) return null;
@@ -331,16 +376,32 @@ export default function SettingsPage() {
                                     </div>
                                 </div>
 
-                                <div className="text-sm text-muted-foreground mb-4 flex items-center">
-                                    <Users className="mr-1.5 h-3.5 w-3.5" />
-                                    {totalEmployees(service.jobs)} Employees
+                                <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground mb-3">
+                                    <span className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-medium">
+                                        <FolderOpen className="h-3 w-3" />
+                                        {getProjectName(service.projectId)}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                        <Users className="h-3.5 w-3.5" />
+                                        {totalEmployees(service.jobs)} Employee{totalEmployees(service.jobs) !== 1 ? 's' : ''}
+                                    </span>
                                 </div>
 
                                 <div className="space-y-2">
                                     {service.jobs.length > 0 ? service.jobs.map((job, idx) => (
-                                        <div key={idx} className="flex justify-between items-center text-xs bg-muted/50 p-1.5 rounded">
-                                            <span>{job.title}</span>
-                                            <span className="font-mono bg-yellow-500/10 text-yellow-600 px-1.5 rounded">{job.count}</span>
+                                        <div key={idx} className="text-xs bg-muted/50 p-2 rounded space-y-1">
+                                            <div className="font-medium text-foreground">{job.title}</div>
+                                            {(job.employees || []).length > 0 ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {job.employees.map(empId => (
+                                                        <span key={empId} className="bg-yellow-500/10 text-yellow-600 px-1.5 py-0.5 rounded text-[10px]">
+                                                            {getUserName(empId)}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <span className="text-muted-foreground italic">No employees assigned</span>
+                                            )}
                                         </div>
                                     )) : (
                                         <div className="text-xs text-muted-foreground italic">No roles defined</div>
@@ -451,6 +512,22 @@ export default function SettingsPage() {
                     </DialogHeader>
                     <form onSubmit={handleSubmit} className="space-y-6 py-4">
                         <div className="space-y-2">
+                            <Label htmlFor="project">Project <span className="text-red-500">*</span></Label>
+                            <select
+                                id="project"
+                                value={projectId}
+                                onChange={e => setProjectId(e.target.value)}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                required
+                            >
+                                <option value="">Select a project...</option>
+                                {projects.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="space-y-2">
                             <Label htmlFor="name">Service Name</Label>
                             <Input
                                 id="name"
@@ -463,7 +540,7 @@ export default function SettingsPage() {
 
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <Label>Job Roles & Headcount</Label>
+                                <Label>Job Roles & Employees</Label>
                                 <Button type="button" variant="outline" size="sm" onClick={handleAddJob} className="h-7 text-xs">
                                     <Plus className="mr-1 h-3 w-3" /> Add Role
                                 </Button>
@@ -471,34 +548,83 @@ export default function SettingsPage() {
 
                             <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
                                 {jobs.map((job, index) => (
-                                    <div key={index} className="flex gap-2 items-start">
-                                        <div className="flex-1 space-y-1">
+                                    <div key={index} className="border border-border rounded-lg p-3 space-y-2">
+                                        <div className="flex gap-2 items-center">
                                             <Input
-                                                placeholder="Job Title"
+                                                placeholder="Job Title (e.g. Designer)"
                                                 value={job.title}
                                                 onChange={e => handleJobChange(index, "title", e.target.value)}
-                                                className="h-9"
+                                                className="h-9 flex-1"
                                             />
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-9 w-9 text-muted-foreground hover:text-red-500 shrink-0"
+                                                onClick={() => handleRemoveJob(index)}
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </Button>
                                         </div>
-                                        <div className="w-20 space-y-1">
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                placeholder="Qty"
-                                                value={job.count}
-                                                onChange={e => handleJobChange(index, "count", parseInt(e.target.value) || 0)}
-                                                className="h-9"
-                                            />
+                                        {/* Employee multi-select dropdown */}
+                                        <div className="relative">
+                                            <button
+                                                type="button"
+                                                onClick={() => setEmployeeDropdownOpen(employeeDropdownOpen === index ? null : index)}
+                                                className="flex items-center justify-between w-full h-9 px-3 rounded-md border border-input bg-background text-sm text-left hover:bg-accent/50 transition-colors"
+                                            >
+                                                <span className={job.employees.length > 0 ? "text-foreground" : "text-muted-foreground"}>
+                                                    {job.employees.length > 0
+                                                        ? `${job.employees.length} employee${job.employees.length > 1 ? 's' : ''} selected`
+                                                        : "Select employees..."}
+                                                </span>
+                                                <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${employeeDropdownOpen === index ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            {employeeDropdownOpen === index && (
+                                                <>
+                                                    <div className="fixed inset-0 z-[60]" onClick={() => setEmployeeDropdownOpen(null)} />
+                                                    <div className="absolute top-full left-0 right-0 z-[70] mt-1 max-h-40 overflow-y-auto border border-border rounded-lg bg-popover shadow-lg">
+                                                        {users.length > 0 ? users.map(user => {
+                                                            const isSelected = job.employees.includes(user.id);
+                                                            return (
+                                                                <button
+                                                                    key={user.id}
+                                                                    type="button"
+                                                                    onClick={() => toggleEmployee(index, user.id)}
+                                                                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-accent/50 transition-colors ${isSelected ? 'bg-primary/5' : ''}`}
+                                                                >
+                                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-primary border-primary' : 'border-input'}`}>
+                                                                        {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <span className="font-medium">{user.name}</span>
+                                                                        {user.jobTitle && <span className="text-muted-foreground ml-1">• {user.jobTitle}</span>}
+                                                                    </div>
+                                                                </button>
+                                                            );
+                                                        }) : (
+                                                            <div className="px-3 py-2 text-sm text-muted-foreground">No employees found</div>
+                                                        )}
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-9 w-9 text-muted-foreground hover:text-red-500"
-                                            onClick={() => handleRemoveJob(index)}
-                                        >
-                                            <X className="h-4 w-4" />
-                                        </Button>
+                                        {/* Show selected employee chips */}
+                                        {job.employees.length > 0 && (
+                                            <div className="flex flex-wrap gap-1">
+                                                {job.employees.map(empId => (
+                                                    <span
+                                                        key={empId}
+                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs"
+                                                    >
+                                                        {getUserName(empId)}
+                                                        <button type="button" onClick={() => toggleEmployee(index, empId)} className="hover:text-red-500">
+                                                            <X className="h-3 w-3" />
+                                                        </button>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                                 {jobs.length === 0 && (

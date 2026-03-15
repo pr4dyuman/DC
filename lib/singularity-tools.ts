@@ -995,7 +995,7 @@ export async function executeTool(
             }
 
             case "add_service": {
-                const newService = await addService(args.name, args.jobs || []);
+                const newService = await addService(args.name, args.projectId || '', args.jobs || []);
                 return {
                     success: true,
                     data: { id: newService.id, name: newService.name },
@@ -1012,7 +1012,7 @@ export async function executeTool(
 
             case "update_service": {
                 const svcSnapshot = await snapshotEntity('service', args.serviceId);
-                await updateService(args.serviceId, args.name, args.jobs || []);
+                await updateService(args.serviceId, args.name, args.projectId || '', args.jobs || []);
                 return {
                     success: true,
                     data: { serviceId: args.serviceId, name: args.name },
