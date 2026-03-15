@@ -187,16 +187,16 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
     const { visibleCount: taskVisibleCount, sentinelRef: taskSentinelRef, hasMore: hasMoreTasks } = useProgressiveList(filteredTasks.length, 20, [taskStatusFilter, taskSearch, taskSortBy]);
 
     const availableYears = useMemo(() => {
-        const years = new Set<number>();
-        years.add(new Date().getFullYear());
-        if (contributionHistory) {
-            contributionHistory.forEach(act => {
-                const y = new Date(act.timestamp).getFullYear();
-                years.add(y);
-            });
+        const currentYear = new Date().getFullYear();
+        const joinYear = user?.createdAt
+            ? new Date(user.createdAt).getFullYear()
+            : currentYear;
+        const years: number[] = [];
+        for (let y = currentYear; y >= joinYear; y--) {
+            years.push(y);
         }
-        return Array.from(years).sort((a, b) => b - a);
-    }, [contributionHistory]);
+        return years;
+    }, [user?.createdAt]);
 
     const router = useRouter();
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
