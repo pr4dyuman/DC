@@ -365,7 +365,7 @@ export type LeaveRequest = {
     reviewedAt?: string;
 };
 
-export type Job = { title: string; count: number };
+export type Job = { title: string; count: number; employees?: string[] };
 
 export type Message = {
     id: string;
@@ -378,7 +378,7 @@ export type Message = {
     type: 'text' | 'image';
 };
 
-export type Service = { id: string; agencyId: string; name: string; jobs: Job[] };
+export type Service = { id: string; agencyId: string; name: string; projectId?: string; employees?: string[]; jobs?: Job[] };
 
 export type TransactionType = 'income' | 'expense';
 export type TransactionCategory = 'Project' | 'Salary' | 'Freelancer' | 'Tax' | 'Reimbursement' | 'Retainer' | 'Internal Transfer' | 'Investor' | 'Refund' | 'Other';

@@ -16,6 +16,7 @@ import { AddTransactionModal } from "@/components/finance/AddTransactionModal";
 import { AssetList } from "@/components/projects/AssetList";
 import { AddAssetModal } from "@/components/projects/AddAssetModal";
 import { PaymentSettingsCard } from "@/components/projects/PaymentSettingsCard";
+import { ProjectServices } from "@/components/projects/ProjectServices";
 
 type ProjectViewProps = {
     project: Project;
@@ -64,6 +65,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                             <TabsTrigger value="board">Board</TabsTrigger>
                             {isAdmin && <TabsTrigger value="finance">Finance</TabsTrigger>}
                             <TabsTrigger value="assets">Assets</TabsTrigger>
+                            {isAdmin && <TabsTrigger value="services">Services</TabsTrigger>}
                         </TabsList>
 
                         <div className="flex items-center gap-2">
@@ -244,6 +246,12 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                         <AssetList assets={assets} />
                     </div>
                 </TabsContent>
+
+                {isAdmin && (
+                    <TabsContent value="services" className="flex-1 overflow-auto data-[state=inactive]:hidden no-scrollbar">
+                        <ProjectServices projectId={project.id} users={users} />
+                    </TabsContent>
+                )}
             </Tabs>
         </div >
     );

@@ -1569,24 +1569,24 @@ export async function getServices() {
     return services.map(sanitizeDoc);
 }
 
-export async function addService(name: string, projectId: string, jobs: { title: string; employees: string[] }[]) {
-    await requireRole('admin');
+export async function addService(name: string, projectId: string, employees: string[]) {
+    await requireRole('admin', 'manager');
     // Input sanitization
     name = sanitizeName(name, 200);
     if (!name) throw new Error('Service name is required');
     if (!projectId) throw new Error('Project is required');
-    jobs = (jobs || []).map(j => ({ title: sanitizeName(j.title, 200), employees: (j.employees || []).filter(e => typeof e === 'string' && e.trim()) }));
+    employees = (employees || []).filter(e => typeof e === 'string' && e.trim());
     await connectDB();
     const agency = await getCurrentAgency();
-    const newService = { id: generateId(), agencyId: agency?.id, name, projectId, jobs };
+    const newService = { id: generateId(), agencyId: agency?.id, name, projectId, employees };
     await ServiceModel.create(newService);
-    revalidatePath('/dashboard/settings');
     revalidatePath('/dashboard/projects');
+    revalidatePath('/dashboard/settings');
     return newService;
 }
 
 export async function deleteService(id: string) {
-    await requireRole('admin');
+    await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
     const serviceToDelete = await ServiceModel.findOne({ id, agencyId: agency?.id }).lean();
@@ -1614,13 +1614,13 @@ export async function deleteService(id: string) {
     revalidatePath('/dashboard/projects');
 }
 
-export async function updateService(id: string, name: string, projectId: string, jobs: { title: string; employees: string[] }[]) {
-    await requireRole('admin');
+export async function updateService(id: string, name: string, projectId: string, employees: string[]) {
+    await requireRole('admin', 'manager');
     // Input sanitization
     name = sanitizeName(name, 200);
     if (!name) throw new Error('Service name is required');
     if (!projectId) throw new Error('Project is required');
-    jobs = (jobs || []).map(j => ({ title: sanitizeName(j.title, 200), employees: (j.employees || []).filter(e => typeof e === 'string' && e.trim()) }));
+    employees = (employees || []).filter(e => typeof e === 'string' && e.trim());
     await connectDB();
     const agency = await getCurrentAgency();
 
@@ -1630,7 +1630,7 @@ export async function updateService(id: string, name: string, projectId: string,
 
     await ServiceModel.updateOne(
         { id, agencyId: agency?.id },
-        { $set: { name, projectId, jobs } });
+        { $set: { name, projectId, employees } });
 
     // Propagate service rename to tasks and projects that reference the old name
     if (oldName && oldName !== name) {
@@ -1650,6 +1650,14 @@ export async function updateService(id: string, name: string, projectId: string,
 
     revalidatePath('/dashboard/settings');
     revalidatePath('/dashboard/projects');
+}
+
+export async function getProjectServices(projectId: string) {
+    await requireAuth();
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const services = await ServiceModel.find({ ...requireAgencyFilter(agency), projectId }).lean();
+    return services.map(sanitizeDoc);
 }
 
 export async function createProject(project: Omit<Project, "id" | "status" | "createdAt" | "agencyId">) {
