@@ -104,8 +104,8 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, a
                             </div>
                         )}
                     </div>
-                    <div className="flex flex-col min-w-0 flex-1">
-                        <h1 className="text-base font-bold leading-tight truncate" title={agencyName}>
+                    <div className="flex flex-col min-w-0 flex-1 pr-2">
+                        <h1 className="text-sm md:text-base font-bold leading-tight line-clamp-2" title={agencyName}>
                             {agencyName}
                         </h1>
                         {agencyPlan && agencyPlan !== 'free' && (

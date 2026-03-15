@@ -1,0 +1,304 @@
+﻿diff --git a/app/dashboard/settings/page.tsx b/app/dashboard/settings/page.tsx
+index 9496e98..64e9542 100644
+--- a/app/dashboard/settings/page.tsx
++++ b/app/dashboard/settings/page.tsx
+@@ -34,7 +34,6 @@ type Service = { id: string; name: string; jobs: Job[] };
+ type AgencySettingsData = {
+     name: string;
+     logo: string;
+-    favicon?: string;
+     primaryColor?: string;
+     secondaryColor?: string;
+     emailNotificationsEnabled: boolean;
+@@ -110,7 +109,6 @@ export default function SettingsPage() {
+             setAgencySettings(settings ? {
+                 name: settings.name,
+                 logo: settings.logo,
+-                favicon: (settings as any).favicon || "",
+                 primaryColor: settings.primaryColor,
+                 secondaryColor: settings.secondaryColor,
+                 emailNotificationsEnabled: settings.emailNotificationsEnabled ?? true,
+diff --git a/components/layout/AuthenticatedLayout.tsx b/components/layout/AuthenticatedLayout.tsx
+index 2a8d7bf..d023a9f 100644
+--- a/components/layout/AuthenticatedLayout.tsx
++++ b/components/layout/AuthenticatedLayout.tsx
+@@ -7,7 +7,6 @@ import { DashboardChatProvider } from "@/components/providers/DashboardChatProvi
+ import { getCurrentAgency, checkTrialExpired, checkPlanExpired } from "@/lib/agency-context";
+ import { TimezoneProvider } from "@/context/TimezoneContext";
+ import { CurrencyProvider } from "@/context/CurrencyContext";
+-import { DynamicFavicon } from "@/components/layout/DynamicFavicon";
+ 
+ export async function AuthenticatedLayout({
+     children
+@@ -44,13 +43,11 @@ export async function AuthenticatedLayout({
+ 
+     const agencyName = agencySettings?.name || "Agency OS";
+     const agencyLogo = agencySettings?.logo;
+-    const agencyFavicon = (agencySettings as any)?.favicon;
+ 
+     return (
+         <TimezoneProvider userTimezone={dashboardUser.timezone} onDetected={updateUserTimezone}>
+         <CurrencyProvider currency={agencySettings?.currency || "USD"}>
+         <DashboardChatProvider currentUserId={dashboardUser.id}>
+-            {agencyFavicon && <DynamicFavicon faviconUrl={agencyFavicon} />}
+             <div className="h-full relative">
+                 <div className="hidden h-full md:flex md:w-72 md:flex-col md:fixed md:inset-y-0 z-[80]" style={{ backgroundColor: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)' }}>
+                     <Sidebar
+diff --git a/components/layout/DynamicFavicon.tsx b/components/layout/DynamicFavicon.tsx
+deleted file mode 100644
+index a4e8b52..0000000
+--- a/components/layout/DynamicFavicon.tsx
++++ /dev/null
+@@ -1,21 +0,0 @@
+-"use client";
+-
+-import { useEffect } from "react";
+-
+-export function DynamicFavicon({ faviconUrl }: { faviconUrl: string }) {
+-    useEffect(() => {
+-        if (!faviconUrl) return;
+-
+-        // Remove existing favicon link tags
+-        const existing = document.querySelectorAll("link[rel*='icon']");
+-        existing.forEach(el => el.remove());
+-
+-        // Insert new favicon
+-        const link = document.createElement("link");
+-        link.rel = "icon";
+-        link.href = faviconUrl;
+-        document.head.appendChild(link);
+-    }, [faviconUrl]);
+-
+-    return null;
+-}
+diff --git a/components/layout/Sidebar.tsx b/components/layout/Sidebar.tsx
+index 699cd28..45422a6 100644
+--- a/components/layout/Sidebar.tsx
++++ b/components/layout/Sidebar.tsx
+@@ -94,32 +94,29 @@ export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, a
+     return (
+         <div className="space-y-4 py-4 flex flex-col h-full overflow-y-auto no-scrollbar" style={{ backgroundColor: 'var(--sidebar-bg)', color: 'var(--sidebar-text)' }}>
+             <div className="px-3 py-2 flex-1">
+-                <Link href="/dashboard" className="flex items-center pl-3 mb-14 transition hover:opacity-75 gap-3">
+-                    <div className="relative flex-shrink-0 w-9 h-9">
++                <Link href="/dashboard" className="flex items-center pl-3 mb-14 transition hover:opacity-75">
++                    <div className="relative w-8 h-8 mr-4">
+                         {agencyLogo ? (
+-                            <img src={agencyLogo} alt="Logo" className="w-9 h-9 rounded-md object-cover" />
++                            <img src={agencyLogo} alt="Logo" className="w-8 h-8 rounded-md object-cover" />
+                         ) : (
+-                            <div className="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-xl">
++                            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-xl">
+                                 A
+                             </div>
+                         )}
+                     </div>
+-                    <div className="flex flex-col min-w-0 flex-1">
+-                        <h1 className="text-base font-bold leading-tight truncate" title={agencyName}>
+-                            {agencyName}
+-                        </h1>
+-                        {agencyPlan && agencyPlan !== 'free' && (
+-                            <span className={`self-start mt-0.5 px-1.5 py-0.5 text-[9px] font-bold uppercase rounded ${
+-                                agencyPlan === 'enterprise' ? 'bg-purple-500/15 text-purple-400' :
+-                                agencyPlan === 'pro' ? 'bg-blue-500/15 text-blue-400' :
+-                                'bg-emerald-500/15 text-emerald-400'
+-                            }`}>
+-                                {agencyPlan}
+-                            </span>
+-                        )}
+-                    </div>
++                    <h1 className="text-xl font-bold truncate max-w-[180px]" title={agencyName}>
++                        {agencyName}
++                    </h1>
++                    {agencyPlan && agencyPlan !== 'free' && (
++                        <span className={`ml-2 px-1.5 py-0.5 text-[10px] font-bold uppercase rounded ${
++                            agencyPlan === 'enterprise' ? 'bg-purple-500/15 text-purple-400' :
++                            agencyPlan === 'pro' ? 'bg-blue-500/15 text-blue-400' :
++                            'bg-emerald-500/15 text-emerald-400'
++                        }`}>
++                            {agencyPlan}
++                        </span>
++                    )}
+                 </Link>
+-
+                 <div className="space-y-1">
+                     {filteredRoutes.map((route) => (
+                         <Link
+diff --git a/components/settings/AgencySettings.tsx b/components/settings/AgencySettings.tsx
+index 18fc2a7..a80445d 100644
+--- a/components/settings/AgencySettings.tsx
++++ b/components/settings/AgencySettings.tsx
+@@ -3,7 +3,7 @@
+ import { useState, useEffect } from "react";
+ import { updateAgencyDetails } from "@/lib/actions";
+ import { toast } from "sonner";
+-import { Loader2, Building, Upload, Image as ImageIcon, Globe } from "lucide-react";
++import { Loader2, Building, Upload, Image as ImageIcon } from "lucide-react";
+ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+ import { Button } from "@/components/ui/button";
+ import { Input } from "@/components/ui/input";
+@@ -14,7 +14,6 @@ interface AgencySettingsProps {
+     initialSettings?: {
+         name: string;
+         logo: string;
+-        favicon?: string;
+         primaryColor?: string;
+         secondaryColor?: string;
+     } | null;
+@@ -25,10 +24,8 @@ interface AgencySettingsProps {
+ export function AgencySettings({ initialSettings, loading: parentLoading, onSaved }: AgencySettingsProps) {
+     const [name, setName] = useState("");
+     const [logo, setLogo] = useState("");
+-    const [favicon, setFavicon] = useState("");
+     const [saving, setSaving] = useState(false);
+     const [logoPreview, setLogoPreview] = useState("");
+-    const [faviconPreview, setFaviconPreview] = useState("");
+ 
+     // Sync from parent props
+     useEffect(() => {
+@@ -36,8 +33,6 @@ export function AgencySettings({ initialSettings, loading: parentLoading, onSave
+             setName(initialSettings.name);
+             setLogo(initialSettings.logo);
+             setLogoPreview(initialSettings.logo);
+-            setFavicon(initialSettings.favicon || "");
+-            setFaviconPreview(initialSettings.favicon || "");
+         }
+     }, [initialSettings]);
+ 
+@@ -59,29 +54,11 @@ export function AgencySettings({ initialSettings, loading: parentLoading, onSave
+         reader.readAsDataURL(file);
+     };
+ 
+-    const handleFaviconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+-        const file = e.target.files?.[0];
+-        if (!file) return;
+-
+-        if (file.size > 512 * 1024) {
+-            toast.error("Favicon file is too large. Max 512KB.");
+-            return;
+-        }
+-
+-        const reader = new FileReader();
+-        reader.onload = (e) => {
+-            const result = e.target?.result as string;
+-            setFavicon(result);
+-            setFaviconPreview(result);
+-        };
+-        reader.readAsDataURL(file);
+-    };
+-
+     const handleSave = async (e: React.FormEvent) => {
+         e.preventDefault();
+         setSaving(true);
+         try {
+-            await updateAgencyDetails(name, logo, undefined, undefined, favicon);
++            await updateAgencyDetails(name, logo);
+             toast.success("Agency details updated successfully!");
+             onSaved?.();
+         } catch (error) {
+@@ -105,7 +82,7 @@ export function AgencySettings({ initialSettings, loading: parentLoading, onSave
+                     </div>
+                     <div>
+                         <CardTitle>Agency Branding</CardTitle>
+-                        <CardDescription>Update your agency's identity, logo, and favicon.</CardDescription>
++                        <CardDescription>Update your agency's identity and logo.</CardDescription>
+                     </div>
+                 </div>
+             </CardHeader>
+@@ -122,7 +99,6 @@ export function AgencySettings({ initialSettings, loading: parentLoading, onSave
+                         />
+                     </div>
+ 
+-                    {/* Logo Upload */}
+                     <div className="space-y-4">
+                         <Label>Agency Logo</Label>
+                         <div className="flex items-center gap-6">
+@@ -158,49 +134,6 @@ export function AgencySettings({ initialSettings, loading: parentLoading, onSave
+                         </div>
+                     </div>
+ 
+-                    {/* Favicon Upload */}
+-                    <div className="space-y-4">
+-                        <div className="flex items-center gap-2">
+-                            <Globe className="h-4 w-4 text-muted-foreground" />
+-                            <Label>Browser Tab Icon (Favicon)</Label>
+-                        </div>
+-                        <p className="text-xs text-muted-foreground -mt-2">
+-                            This icon appears in browser tabs and bookmarks when users visit your dashboard.
+-                        </p>
+-                        <div className="flex items-center gap-6">
+-                            <div className="h-12 w-12 border-2 border-dashed border-border rounded-md flex items-center justify-center bg-muted/30 overflow-hidden flex-shrink-0">
+-                                {faviconPreview ? (
+-                                    <img src={faviconPreview} alt="Favicon preview" className="h-8 w-8 object-contain" />
+-                                ) : (
+-                                    <Globe className="h-6 w-6 text-muted-foreground/40" />
+-                                )}
+-                            </div>
+-
+-                            <div className="space-y-2">
+-                                <div className="flex items-center gap-2">
+-                                    <Button type="button" variant="outline" size="sm" className="relative cursor-pointer overflow-hidden">
+-                                        <Upload className="mr-2 h-4 w-4" />
+-                                        Upload Favicon
+-                                        <Input
+-                                            type="file"
+-                                            className="absolute inset-0 opacity-0 cursor-pointer"
+-                                            accept="image/x-icon,image/png,image/svg+xml,image/jpeg"
+-                                            onChange={handleFaviconUpload}
+-                                        />
+-                                    </Button>
+-                                    {favicon && (
+-                                        <Button type="button" variant="ghost" size="sm" onClick={() => { setFavicon(""); setFaviconPreview(""); }}>
+-                                            Remove
+-                                        </Button>
+-                                    )}
+-                                </div>
+-                                <p className="text-xs text-muted-foreground">
+-                                    .ico, .png, or .svg recommended. Square, max 512KB.
+-                                </p>
+-                            </div>
+-                        </div>
+-                    </div>
+-
+                     <div className="pt-2">
+                         <Button type="submit" disabled={saving}>
+                             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+diff --git a/lib/actions.ts b/lib/actions.ts
+index 1255a7d..e17a39a 100644
+--- a/lib/actions.ts
++++ b/lib/actions.ts
+@@ -1,4 +1,4 @@
+-"use server";
++´╗┐"use server";
+ 
+ import { User, Project, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig, LeaveRequest, LeaveType, LeaveStatus, UserPermissions, Transaction, TransactionType, TransactionCategory } from "./db";
+ import { revalidatePath } from "next/cache";
+diff --git a/lib/validation.ts b/lib/validation.ts
+index 018aa1c..3d8db53 100644
+--- a/lib/validation.ts
++++ b/lib/validation.ts
+@@ -119,19 +119,14 @@ export function sanitizeColor(input: string): string {
+ }
+ 
+ /**
+- * Sanitize a URL ÔÇö must be http/https or data:image (for logos/favicons).
+- * Data URIs (base64 images) can be large (50k-200k chars), so they get a higher limit.
++ * Sanitize a URL ÔÇö must be http/https or data: (for logos).
+  */
+ export function sanitizeUrl(input: string): string {
+     if (typeof input !== 'string') return '';
+-    const trimmed = input.trim();
+-    // Allow http/https URLs (up to 5000 chars)
+-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
+-        return trimmed.slice(0, 5000);
+-    }
+-    // Allow data:image URIs (base64 logos can be 50kÔÇô200k chars) ÔÇö up to 5MB
+-    if (trimmed.startsWith('data:image/')) {
+-        return trimmed.slice(0, 5 * 1024 * 1024);
++    const trimmed = input.trim().slice(0, 2000);
++    // Allow http, https, data:image URIs, and relative paths
++    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:image/') || trimmed.startsWith('/')) {
++        return trimmed;
+     }
+     return '';
+ }
