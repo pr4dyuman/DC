@@ -920,13 +920,8 @@ export async function getUserContributionHistory(userId: string) {
     const user = await getUser(userId);
     if (!user) return [];
 
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-    const isoOneYearAgo = oneYearAgo.toISOString();
-
     const activities = await ActivityModel.find({
         $or: [{ userId }, { user: user.name }],
-        timestamp: { $gte: isoOneYearAgo },
         ...agencyFilter
     }).lean();
 

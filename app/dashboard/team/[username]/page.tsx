@@ -223,7 +223,11 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                 }
             });
         } else {
-            const currentDoneTitles = new Set(
+            // Track which task titles we've already counted via activity logs
+            const countedTitles = new Set<string>();
+
+            // Approach 1: Use activity logs to find exact completion timestamps
+            const doneTitles = new Set(
                 tasks
                     .filter(t => t.status === 'Done')
                     .map(t => t.title.toLowerCase().trim())
@@ -236,7 +240,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                     const action = activity.action.toLowerCase();
                     const title = activity.target.toLowerCase().trim();
 
-                    if (currentDoneTitles.has(title)) {
+                    if (doneTitles.has(title)) {
                         if (action.includes('done') || action.includes('completed') || action.includes('fixed') || action.includes('finished')) {
                             const currentStored = taskCompletionTimes.get(title);
                             if (!currentStored || activity.timestamp > currentStored) {
@@ -247,11 +251,31 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ user
                 });
             }
 
-            taskCompletionTimes.forEach((timestamp) => {
+            taskCompletionTimes.forEach((timestamp, title) => {
                 const dateStr = timestamp.split('T')[0];
                 const day = getDay(dateStr);
                 day.count++;
+                countedTitles.add(title);
             });
+
+            // Approach 2: Fallback — for Done tasks not captured by activity logs,
+            // use the task's updatedAt as the completion date
+            tasks
+                .filter(t => t.status === 'Done')
+                .forEach(task => {
+                    const titleKey = task.title.toLowerCase().trim();
+                    if (!countedTitles.has(titleKey)) {
+                        const timestamp = (task as any).updatedAt || task.createdAt;
+                        if (timestamp) {
+                            const dateStr = typeof timestamp === 'string'
+                                ? timestamp.split('T')[0]
+                                : new Date(timestamp).toISOString().split('T')[0];
+                            const day = getDay(dateStr);
+                            day.count++;
+                            countedTitles.add(titleKey);
+                        }
+                    }
+                });
         }
 
         return stats;
