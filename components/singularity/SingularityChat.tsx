@@ -767,11 +767,16 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                                 setMessages(prev => prev.map(m =>
                                     m.id === msgId ? {
                                         ...m,
-                                        toolActions: (m.toolActions || []).map(ta =>
-                                            ta.name === data.name && ta.status === 'calling'
-                                                ? { ...ta, status: data.success ? 'done' as const : 'error' as const, summary: data.summary, success: data.success, rollbackData: data.rollbackData }
-                                                : ta
-                                        )
+                                        toolActions: (() => {
+                                            let hasMatched = false;
+                                            return (m.toolActions || []).map(ta => {
+                                                if (!hasMatched && ta.name === data.name && ta.status === 'calling') {
+                                                    hasMatched = true;
+                                                    return { ...ta, status: data.success ? 'done' as const : 'error' as const, summary: data.summary, success: data.success, rollbackData: data.rollbackData };
+                                                }
+                                                return ta;
+                                            });
+                                        })()
                                     } : m
                                 ));
                             } else if (data.type === 'done') {

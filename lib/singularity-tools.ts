@@ -78,6 +78,7 @@ const TOOL_PERMISSIONS: Record<string, RoleType[]> = {
     delete_task: ['admin', 'manager'],
     add_task_comment: ['admin', 'manager', 'employee', 'client'],
     bulk_create_tasks: ['admin', 'manager'],
+    bulk_update_task_status: ['admin', 'manager'],
 
     // Project actions — admin/manager only
     create_project: ['admin', 'manager'],
@@ -534,6 +535,59 @@ export async function executeTool(
                         status: l.status,
                     })),
                     summary: `${leaves.length} leave request(s) found`,
+                };
+            }
+
+            case "bulk_update_task_status": {
+                const targetStatus = args.status;
+                if (!targetStatus) {
+                    return { success: false, data: null, summary: "No status specified" };
+                }
+
+                let taskIdsToUpdate: string[] = args.taskIds || [];
+
+                // If projectId provided, fetch all tasks in that project
+                if (args.projectId && taskIdsToUpdate.length === 0) {
+                    const projectTasks = await getTasks(args.projectId);
+                    taskIdsToUpdate = projectTasks
+                        .filter((t: any) => t.status !== targetStatus)
+                        .map((t: any) => t.id);
+                }
+
+                if (taskIdsToUpdate.length === 0) {
+                    return { success: false, data: null, summary: `No tasks to update (all may already be ${targetStatus})` };
+                }
+
+                // Snapshot first task for rollback reference
+                const firstSnapshot = await snapshotEntity('task', taskIdsToUpdate[0]);
+                let updated = 0;
+                let failed = 0;
+                const BATCH_SIZE = 20;
+
+                for (let i = 0; i < taskIdsToUpdate.length; i += BATCH_SIZE) {
+                    const batch = taskIdsToUpdate.slice(i, i + BATCH_SIZE);
+                    const results = await Promise.allSettled(
+                        batch.map(id => updateTaskStatus(id, targetStatus))
+                    );
+                    for (const r of results) {
+                        if (r.status === 'fulfilled') updated++;
+                        else failed++;
+                    }
+                }
+
+                return {
+                    success: true,
+                    data: { updated, failed, status: targetStatus, totalProcessed: taskIdsToUpdate.length },
+                    summary: `✅ ${updated}/${taskIdsToUpdate.length} tasks moved to "${targetStatus}"${failed > 0 ? ` (${failed} failed)` : ''}`,
+                    rollbackData: [{
+                        toolName: 'bulk_update_task_status',
+                        actionType: 'update' as const,
+                        entityType: 'task' as const,
+                        entityId: taskIdsToUpdate[0],
+                        beforeSnapshot: firstSnapshot,
+                        createdEntityIds: taskIdsToUpdate,
+                        executedAt: new Date().toISOString(),
+                    }],
                 };
             }
 

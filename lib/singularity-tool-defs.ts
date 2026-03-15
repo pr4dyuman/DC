@@ -219,6 +219,23 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
         },
     },
     {
+        name: "bulk_update_task_status",
+        description: "Update the status of multiple tasks at once. Use this when the user asks to move many tasks to Done, Todo, In Progress, or Review. Supports filtering by projectId to update all tasks in a project. Provide EITHER a list of taskIds OR a projectId (to update ALL tasks in that project).",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                projectId: { type: "STRING", description: "Update ALL tasks in this project (alternative to taskIds)" },
+                taskIds: {
+                    type: "ARRAY",
+                    description: "Specific task IDs to update (alternative to projectId)",
+                    items: { type: "STRING" },
+                },
+                status: { type: "STRING", description: "The new status for all tasks", enum: ["Todo", "In Progress", "Review", "Done"] },
+            },
+            required: ["status"],
+        },
+    },
+    {
         name: "bulk_add_transactions",
         description: `Import multiple financial transactions at once. Use for historical data import, monthly salary batch, or bulk expense recording. Each transaction follows the same validation rules as add_transaction.`,
         parameters: {
@@ -663,6 +680,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
     get_leave_requests: "Checking leaves",
     get_recent_activity: "Loading activity",
     bulk_create_tasks: "🚀 Planning project tasks",
+    bulk_update_task_status: "📋 Updating task statuses",
     bulk_add_transactions: "💰 Importing transactions",
     add_transaction: "💰 Adding transaction",
     get_transactions: "📊 Loading transactions",
