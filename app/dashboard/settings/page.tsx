@@ -97,6 +97,14 @@ export default function SettingsPage() {
         });
     }, []);
 
+    // Normalize old DB format: ensure every job has employees[] instead of count
+    const normalizeJobs = (jobs: any[]): Job[] => {
+        return (jobs || []).map((j: any) => ({
+            title: j.title || '',
+            employees: Array.isArray(j.employees) ? j.employees : [],
+        }));
+    };
+
     const loadServices = useCallback(async () => {
         try {
             const [servicesData, projectsData, usersData] = await Promise.all([
@@ -104,7 +112,13 @@ export default function SettingsPage() {
                 getProjects(),
                 getUsers(),
             ]);
-            setServices(servicesData || []);
+            // Normalize services from DB (old ones may have count instead of employees)
+            setServices((servicesData || []).map((s: any) => ({
+                id: s.id,
+                name: s.name,
+                projectId: s.projectId || '',
+                jobs: normalizeJobs(s.jobs),
+            })));
             setProjects((projectsData || []).map((p: any) => ({ id: p.id, name: p.name, slug: p.slug })));
             setUsers((usersData || []).map((u: any) => ({ id: u.id, name: u.name, role: u.role, jobTitle: u.jobTitle })));
         } catch (error) {
@@ -156,7 +170,8 @@ export default function SettingsPage() {
             setEditingService(service);
             setName(service.name);
             setProjectId(service.projectId || "");
-            setJobs([...service.jobs]);
+            // Normalize jobs in case of old DB format
+            setJobs(normalizeJobs(service.jobs));
         } else {
             setEditingService(null);
             setName("");
@@ -393,7 +408,7 @@ export default function SettingsPage() {
                                             <div className="font-medium text-foreground">{job.title}</div>
                                             {(job.employees || []).length > 0 ? (
                                                 <div className="flex flex-wrap gap-1">
-                                                    {job.employees.map(empId => (
+                                                    {(job.employees || []).map(empId => (
                                                         <span key={empId} className="bg-yellow-500/10 text-yellow-600 px-1.5 py-0.5 rounded text-[10px]">
                                                             {getUserName(empId)}
                                                         </span>
@@ -573,9 +588,9 @@ export default function SettingsPage() {
                                                 onClick={() => setEmployeeDropdownOpen(employeeDropdownOpen === index ? null : index)}
                                                 className="flex items-center justify-between w-full h-9 px-3 rounded-md border border-input bg-background text-sm text-left hover:bg-accent/50 transition-colors"
                                             >
-                                                <span className={job.employees.length > 0 ? "text-foreground" : "text-muted-foreground"}>
-                                                    {job.employees.length > 0
-                                                        ? `${job.employees.length} employee${job.employees.length > 1 ? 's' : ''} selected`
+                                                <span className={(job.employees || []).length > 0 ? "text-foreground" : "text-muted-foreground"}>
+                                                    {(job.employees || []).length > 0
+                                                        ? `${(job.employees || []).length} employee${(job.employees || []).length > 1 ? 's' : ''} selected`
                                                         : "Select employees..."}
                                                 </span>
                                                 <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${employeeDropdownOpen === index ? 'rotate-180' : ''}`} />
@@ -585,7 +600,7 @@ export default function SettingsPage() {
                                                     <div className="fixed inset-0 z-[60]" onClick={() => setEmployeeDropdownOpen(null)} />
                                                     <div className="absolute top-full left-0 right-0 z-[70] mt-1 max-h-40 overflow-y-auto border border-border rounded-lg bg-popover shadow-lg">
                                                         {users.length > 0 ? users.map(user => {
-                                                            const isSelected = job.employees.includes(user.id);
+                                                            const isSelected = (job.employees || []).includes(user.id);
                                                             return (
                                                                 <button
                                                                     key={user.id}
@@ -610,9 +625,9 @@ export default function SettingsPage() {
                                             )}
                                         </div>
                                         {/* Show selected employee chips */}
-                                        {job.employees.length > 0 && (
+                                        {(job.employees || []).length > 0 && (
                                             <div className="flex flex-wrap gap-1">
-                                                {job.employees.map(empId => (
+                                                {(job.employees || []).map(empId => (
                                                     <span
                                                         key={empId}
                                                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs"
