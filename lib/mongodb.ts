@@ -233,7 +233,6 @@ const AgencySchema = new Schema({
 
     // Branding
     logo: { type: String },
-    favicon: { type: String },
     primaryColor: { type: String },
     secondaryColor: { type: String },
 
@@ -250,6 +249,11 @@ const AgencySchema = new Schema({
         required: true,
         default: 'free'
     },
+    planDuration: {
+        type: String,
+        enum: ['monthly', '3months', '6months', 'yearly', 'lifetime']
+    },
+    planExpiresAt: { type: String },
     trialEndsAt: { type: String },
 
     // Limits & Usage

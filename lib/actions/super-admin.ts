@@ -537,6 +537,7 @@ export async function deleteAgency(agencyId: string, password: string) {
         MessageModel.deleteMany({ agencyId }),
         SingularityChatSessionModel.deleteMany({ agencyId }),
         SingularityCheckpointModel.deleteMany({ agencyId }),
+        AIUsageLogModel.deleteMany({ agencyId }),
     ]);
 
     await logSystemEvent({

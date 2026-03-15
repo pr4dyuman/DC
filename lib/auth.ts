@@ -120,8 +120,10 @@ export type LoginResult = {
 };
 
 export async function authenticateUser(email: string, password: string): Promise<LoginResult> {
-    // Validate email format before DB queries
-    if (!email || !validateEmail(email)) {
+    // Validate email format and normalize to lowercase before DB queries
+    try {
+        email = validateEmail(email);
+    } catch {
         return { success: false, error: "Invalid email or password" };
     }
 

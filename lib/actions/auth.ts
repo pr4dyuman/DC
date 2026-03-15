@@ -12,8 +12,10 @@ const MAX_LOGIN_ATTEMPTS = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
 export async function login(email: string, password: string) {
-    // Validate email format before DB queries
-    if (!email || !validateEmail(email)) {
+    // Validate email format and normalize to lowercase before DB queries
+    try {
+        email = validateEmail(email);
+    } catch {
         return { success: false, error: 'Invalid credentials' };
     }
 
