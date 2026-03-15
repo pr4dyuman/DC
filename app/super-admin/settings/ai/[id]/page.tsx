@@ -69,7 +69,7 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
                 setAgencyName(details.agency.name);
                 if (config) {
                     setProvider(config.provider);
-                    setApiKey(config.apiKey);
+                    setApiKey(""); // Don't load masked key — keep empty, show placeholder
                     setModel(config.model);
                     setCustomModelId(config.customModelId || "");
                     setIsConfigured(true);
@@ -92,7 +92,8 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
     const handleSave = async () => {
         setError("");
         setSuccess("");
-        if (!apiKey.trim()) {
+        // Require key for first-time setup; optional for updates
+        if (!apiKey.trim() && !isConfigured) {
             setError("API Key / Token is required");
             return;
         }
@@ -109,12 +110,13 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
         try {
             const config: AIConfig = {
                 provider,
-                apiKey: apiKey.trim(),
+                apiKey: apiKey.trim(), // Empty string = keep existing key (server handles it)
                 model,
                 ...(model === "custom" ? { customModelId: customModelId.trim() } : {})
             };
             await updateAgencyAIConfigSuperAdmin(agencyId, config);
             setIsConfigured(true);
+            setApiKey(""); // Clear after save
             setSuccess("Singularity AI configured successfully!");
             setTimeout(() => setSuccess(""), 3000);
         } catch (err: any) {
@@ -242,7 +244,7 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
                         type={isKeyVisible ? "text" : "password"}
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
-                        placeholder={currentProviderInfo.keyPlaceholder}
+                        placeholder={isConfigured ? "Key configured — enter new key to change" : currentProviderInfo.keyPlaceholder}
                         className="w-full h-11 rounded-lg border border-border bg-background px-4 pr-10 text-sm text-foreground focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition placeholder:text-muted-foreground"
                     />
                     <button
@@ -290,7 +292,7 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
             <div className="flex items-center gap-3 flex-wrap">
                 <button
                     onClick={handleSave}
-                    disabled={saving || !apiKey || !model}
+                    disabled={saving || (!apiKey && !isConfigured) || !model}
                     className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-medium text-sm hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm"
                 >
                     <Sparkles className="w-4 h-4" />

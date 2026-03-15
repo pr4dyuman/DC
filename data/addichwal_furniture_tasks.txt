@@ -1,0 +1,604 @@
+Project Name: Addichwal Furniture
+Project Duration: January 2025 - July 2025
+Framework: Next.js
+
+Team Allocations:
+- Nagendra Indoria: Graphic Designer (UI/UX, Branding, Assets)
+- Nitin Maharishi: Lead Developer (80% dev capacity - Architecture, Backend, Logic)
+- Ankit Maharishi: Developer (20% dev capacity - Components, UI polish, Templates)
+
+=======================================================
+PHASE 1: Project Setup & Branding (January 2025)
+=======================================================
+
+Task: Requirements gathering & feature spec
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Define brand guidelines
+Assignee: Nagendra Indoria
+Hours: 12h
+
+Task: Logo design concepts
+Assignee: Nagendra Indoria
+Hours: 16h
+
+Task: Logo finalization & export
+Assignee: Nagendra Indoria
+Hours: 8h
+
+Task: Color palette & typography selection
+Assignee: Nagendra Indoria
+Hours: 8h
+
+Task: Initialize Next.js app router project
+Assignee: Nitin Maharishi
+Hours: 4h
+
+Task: Setup Tailwind CSS & design tokens
+Assignee: Nitin Maharishi
+Hours: 4h
+
+Task: Setup Git repository & branch policies
+Assignee: Ankit Maharishi
+Hours: 2h
+
+Task: Setup ESLint, Prettier & Husky
+Assignee: Ankit Maharishi
+Hours: 4h
+
+Task: Database Schema Design (Users, Products)
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Database Schema Design (Orders, Categories)
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Setup ORM (Prisma/Drizzle) & initial migrations
+Assignee: Nitin Maharishi
+Hours: 6h
+
+Task: CI/CD pipeline initial setup
+Assignee: Nitin Maharishi
+Hours: 8h
+
+=======================================================
+PHASE 2: UI Design & Wireframing (Jan - Feb 2025)
+=======================================================
+
+Task: Low-fi wireframes: Homepage
+Assignee: Nagendra Indoria
+Hours: 8h
+
+Task: Low-fi wireframes: Category Listing (PLP)
+Assignee: Nagendra Indoria
+Hours: 8h
+
+Task: Low-fi wireframes: Product Detail (PDP)
+Assignee: Nagendra Indoria
+Hours: 8h
+
+Task: Low-fi wireframes: Cart & Checkout
+Assignee: Nagendra Indoria
+Hours: 12h
+
+Task: High-fi UI: Homepage
+Assignee: Nagendra Indoria
+Hours: 16h
+
+Task: High-fi UI: Category Listing (PLP)
+Assignee: Nagendra Indoria
+Hours: 12h
+
+Task: High-fi UI: Product Detail (PDP)
+Assignee: Nagendra Indoria
+Hours: 16h
+
+Task: High-fi UI: Cart & Checkout flow
+Assignee: Nagendra Indoria
+Hours: 16h
+
+Task: High-fi UI: User Profile & Orders
+Assignee: Nagendra Indoria
+Hours: 12h
+
+Task: Finalize Design System component library in Figma
+Assignee: Nagendra Indoria
+Hours: 24h
+
+=======================================================
+PHASE 3: Core UI Components (February 2025)
+=======================================================
+
+Task: Setup UI component library folder architecture
+Assignee: Nitin Maharishi
+Hours: 4h
+
+Task: Build Button & Input variants (React components)
+Assignee: Ankit Maharishi
+Hours: 6h
+
+Task: Build Typography & Heading components
+Assignee: Ankit Maharishi
+Hours: 4h
+
+Task: Build Card & Badge components
+Assignee: Ankit Maharishi
+Hours: 6h
+
+Task: Build Modal & Drawer wrapper components
+Assignee: Ankit Maharishi
+Hours: 8h
+
+Task: Build Main Navigation/Header (Desktop)
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Build Main Navigation (Mobile Menu & Hamburger)
+Assignee: Ankit Maharishi
+Hours: 8h
+
+Task: Build Global Footer
+Assignee: Ankit Maharishi
+Hours: 4h
+
+Task: Build Image Carousel/Slider component
+Assignee: Nitin Maharishi
+Hours: 6h
+
+Task: Build Toast/Snackbar notification system
+Assignee: Ankit Maharishi
+Hours: 4h
+
+=======================================================
+PHASE 4: Authentication & User Accounts (Feb - Mar 2025)
+=======================================================
+
+Task: Setup NextAuth.js / clerk core logic
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Create Email/Password login UI
+Assignee: Ankit Maharishi
+Hours: 6h
+
+Task: Implement Email/Password credentials logic
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Implement OAuth logic (Google/Apple)
+Assignee: Nitin Maharishi
+Hours: 6h
+
+Task: Create Registration Page UI
+Assignee: Ankit Maharishi
+Hours: 6h
+
+Task: Implement Registration API endpoint
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Password Reset UI Flow (Forgot Password)
+Assignee: Ankit Maharishi
+Hours: 6h
+
+Task: Password Reset logic & database tokens
+Assignee: Nitin Maharishi
+Hours: 10h
+
+Task: User Settings/Profile Layout UI
+Assignee: Ankit Maharishi
+Hours: 6h
+
+Task: Update Profile details API logic
+Assignee: Nitin Maharishi
+Hours: 6h
+
+Task: Implement Change Password feature inside profile
+Assignee: Nitin Maharishi
+Hours: 6h
+
+Task: Address Book UI (User settings)
+Assignee: Ankit Maharishi
+Hours: 8h
+
+Task: Address Book API (CRUD for shipping addresses)
+Assignee: Nitin Maharishi
+Hours: 10h
+
+=======================================================
+PHASE 5: Product Catalog Backend & Admin (March 2025)
+=======================================================
+
+Task: Admin Dashboard UI Layout design
+Assignee: Nagendra Indoria
+Hours: 12h
+
+Task: Admin Dashboard routing & layout implementation
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Category CRUD API endpoints
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Category Admin UI (List, Add, Edit)
+Assignee: Ankit Maharishi
+Hours: 10h
+
+Task: Product basic info CRUD API
+Assignee: Nitin Maharishi
+Hours: 12h
+
+Task: Implement image upload logic (S3/Cloudinary)
+Assignee: Nitin Maharishi
+Hours: 12h
+
+Task: Product Variants database logic (Color/Size/SKU)
+Assignee: Nitin Maharishi
+Hours: 16h
+
+Task: Product Inventory constraint tracking logic
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Product Admin UI Form (Complex Add/Edit form)
+Assignee: Nitin Maharishi
+Hours: 16h
+
+Task: Product Admin List view (Data table with filters)
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Admin Image Upload Drag & Drop UI component
+Assignee: Ankit Maharishi
+Hours: 8h
+
+Task: Data seeding scripts for testing products
+Assignee: Nitin Maharishi
+Hours: 4h
+
+=======================================================
+PHASE 6: Product Catalog Frontend (April 2025)
+=======================================================
+
+Task: Homepage Hero section implementation
+Assignee: Ankit Maharishi
+Hours: 8h
+
+Task: Homepage Featured Products implementation
+Assignee: Ankit Maharishi
+Hours: 6h
+
+Task: Homepage Categories Grid implementation
+Assignee: Ankit Maharishi
+Hours: 6h
+
+Task: Category Page routing & dynamic params setup
+Assignee: Nitin Maharishi
+Hours: 4h
+
+Task: PLP (Product List) API - Pagination & Filtering logic
+Assignee: Nitin Maharishi
+Hours: 16h
+
+Task: PLP UI React Product Grid
+Assignee: Ankit Maharishi
+Hours: 10h
+
+Task: PLP Filters sidebar UI (Price, Color, Size)
+Assignee: Ankit Maharishi
+Hours: 10h
+
+Task: PLP Sorting implementation (Price Low/High, Latest)
+Assignee: Nitin Maharishi
+Hours: 6h
+
+Task: Product Detail Page (PDP) dynamic routing setup
+Assignee: Nitin Maharishi
+Hours: 4h
+
+Task: PDP Image Gallery interaction & zoom UI
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: PDP Variant Selector logic (disabling out of stock)
+Assignee: Nitin Maharishi
+Hours: 12h
+
+Task: PDP Product info & details accordion UI
+Assignee: Ankit Maharishi
+Hours: 6h
+
+Task: Global Search API logic (Fuzzy search)
+Assignee: Nitin Maharishi
+Hours: 12h
+
+Task: Header Search Bar UI & dropdown autocomplete
+Assignee: Nitin Maharishi
+Hours: 10h
+
+=======================================================
+PHASE 7: Cart & Checkout Flow (April - May 2025)
+=======================================================
+
+Task: Setup Cart Global State (Zustand/Redux)
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Add to Cart logic handling selected variants
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Update/Remove from Cart logic
+Assignee: Nitin Maharishi
+Hours: 6h
+
+Task: Cart Flyout/Drawer side panel UI
+Assignee: Ankit Maharishi
+Hours: 12h
+
+Task: Cart Database sync logic for logged-in users
+Assignee: Nitin Maharishi
+Hours: 16h
+
+Task: Checkout Page multi-step layout UI
+Assignee: Ankit Maharishi
+Hours: 10h
+
+Task: Server-side pricing calculation logic (Taxes/Discounts)
+Assignee: Nitin Maharishi
+Hours: 12h
+
+Task: Shipping address Form with client validation UI
+Assignee: Ankit Maharishi
+Hours: 8h
+
+Task: Stripe Payment Processor API initial setup
+Assignee: Nitin Maharishi
+Hours: 6h
+
+Task: Stripe Payment Element UI integration
+Assignee: Nitin Maharishi
+Hours: 16h
+
+Task: Order Database Creation transaction logic (Pending Order)
+Assignee: Nitin Maharishi
+Hours: 10h
+
+Task: Stripe Webhook handler for completed/failed payments
+Assignee: Nitin Maharishi
+Hours: 16h
+
+Task: Order Success UI Screen (Thank You Page)
+Assignee: Ankit Maharishi
+Hours: 6h
+
+=======================================================
+PHASE 8: Order Management & Admin (May - June 2025)
+=======================================================
+
+Task: Order Admin Dashboard UI Mockups
+Assignee: Nagendra Indoria
+Hours: 12h
+
+Task: View All Orders Admin API implementation
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Orders Data Table UI with status filters
+Assignee: Nitin Maharishi
+Hours: 10h
+
+Task: Update Order Status API (Pending -> Processing -> Shipped)
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Specific Order Details Admin View UI
+Assignee: Ankit Maharishi
+Hours: 8h
+
+Task: User "My Orders" History API logic
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: User "My Orders" History List UI
+Assignee: Ankit Maharishi
+Hours: 8h
+
+Task: User single Order Detail Page UI
+Assignee: Ankit Maharishi
+Hours: 6h
+
+=======================================================
+PHASE 9: Static Pages & SEO (June 2025)
+=======================================================
+
+Task: About Us Page Design
+Assignee: Nagendra Indoria
+Hours: 8h
+
+Task: Contact Us Page Design
+Assignee: Nagendra Indoria
+Hours: 8h
+
+Task: FAQ, Terms, & Privacy Design formatting
+Assignee: Nagendra Indoria
+Hours: 6h
+
+Task: About Us Page implementation
+Assignee: Ankit Maharishi
+Hours: 6h
+
+Task: Contact Page UI implementation
+Assignee: Ankit Maharishi
+Hours: 4h
+
+Task: Contact Form backend email route
+Assignee: Nitin Maharishi
+Hours: 6h
+
+Task: Setup Markdown/CMS pipeline for Legal Pages
+Assignee: Nitin Maharishi
+Hours: 6h
+
+Task: FAQ, Terms & Privacy layout implementation
+Assignee: Ankit Maharishi
+Hours: 6h
+
+Task: Global SEO Component and Meta-tags hook
+Assignee: Nitin Maharishi
+Hours: 4h
+
+Task: Dynamic SEO integration for Products (OpenGraph)
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Dynamic SEO integration for Categories
+Assignee: Nitin Maharishi
+Hours: 4h
+
+Task: Dynamic XML Sitemap Generation API
+Assignee: Nitin Maharishi
+Hours: 6h
+
+Task: Setup static Robots.txt and web manifest
+Assignee: Ankit Maharishi
+Hours: 2h
+
+=======================================================
+PHASE 10: Email Notifications (June 2025)
+=======================================================
+
+Task: Visual Design for all Email Templates
+Assignee: Nagendra Indoria
+Hours: 16h
+
+Task: React Email / MJML infrastructure setup
+Assignee: Nitin Maharishi
+Hours: 6h
+
+Task: Build Welcome Email Template
+Assignee: Ankit Maharishi
+Hours: 6h
+
+Task: Build Password Reset Email Template
+Assignee: Ankit Maharishi
+Hours: 6h
+
+Task: Build Order Confirmation Email Template
+Assignee: Ankit Maharishi
+Hours: 8h
+
+Task: Build Order Shipped/Tracking Email Template
+Assignee: Ankit Maharishi
+Hours: 6h
+
+Task: Backend triggers for transactional emails inside webhooks
+Assignee: Nitin Maharishi
+Hours: 10h
+
+Task: Resend/AWS SES Provider connection setup
+Assignee: Nitin Maharishi
+Hours: 6h
+
+=======================================================
+PHASE 11: Testing & QA (July 2025)
+=======================================================
+
+Task: Setup testing frameworks (Playwright/Jest)
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Write E2E Test: Login and user session flow
+Assignee: Nitin Maharishi
+Hours: 12h
+
+Task: Write E2E Test: Add to cart & checkout pipeline
+Assignee: Nitin Maharishi
+Hours: 16h
+
+Task: Write E2E Test: Admin product creation flow
+Assignee: Nitin Maharishi
+Hours: 12h
+
+Task: Cross-browser manual QA (Safari, Chrome, Firefox)
+Assignee: Ankit Maharishi
+Hours: 12h
+
+Task: Mobile device comprehensive review & fixes
+Assignee: Ankit Maharishi
+Hours: 16h
+
+Task: Performance Audit (Lighthouse) analysis
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Fix performance issues (Image Optimization, Lazy loading)
+Assignee: Nitin Maharishi
+Hours: 12h
+
+Task: Accessibility (a11y) audit & contrast fixes
+Assignee: Ankit Maharishi
+Hours: 12h
+
+Task: Visual QA review against Figma & feedback loop
+Assignee: Nagendra Indoria
+Hours: 16h
+
+Task: Final touch-ups on minor visual bugs
+Assignee: Ankit Maharishi
+Hours: 12h
+
+=======================================================
+PHASE 12: Deployment & Post-Launch (July 2025)
+=======================================================
+
+Task: Provision Production Database (Vercel Postgres/Supabase)
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Production Secrets/Env Variables Management
+Assignee: Nitin Maharishi
+Hours: 4h
+
+Task: Final Vercel/AWS Production App Deployment
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Custom Domain configuration & SSL verification
+Assignee: Nitin Maharishi
+Hours: 4h
+
+Task: Setup error logging infrastructure (Sentry)
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Setup web Analytics (Google Analytics/PostHog)
+Assignee: Nitin Maharishi
+Hours: 6h
+
+Task: Live Testing in production environment constraints
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Monitor initial live traffic & backend scaling
+Assignee: Nitin Maharishi
+Hours: 8h
+
+Task: Post-launch hotfixes round 1
+Assignee: Nitin Maharishi
+Hours: 16h
+
+Task: Post-launch minor visual fixes
+Assignee: Ankit Maharishi
+Hours: 8h
+
+Task: Prepare technical documentation handoff
+Assignee: Ankit Maharishi
+Hours: 8h
+
+Task: Compile source files and asset delivery package
+Assignee: Nagendra Indoria
+Hours: 8h

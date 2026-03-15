@@ -714,9 +714,9 @@ export async function updateAgencyAIConfigSuperAdmin(agencyId: string, config: A
     await verifySuperAdmin();
     await connectDB();
 
-    // Validate required fields
-    if (!config.provider || !config.apiKey || !config.model) {
-        throw new Error("Provider, API Key, and Model are required");
+    // Validate required fields (apiKey can be empty if user didn't change it)
+    if (!config.provider || !config.model) {
+        throw new Error("Provider and Model are required");
     }
 
     // Validate provider
@@ -728,13 +728,29 @@ export async function updateAgencyAIConfigSuperAdmin(agencyId: string, config: A
     config.model = sanitizeString(config.model, 200);
     if (config.customModelId) config.customModelId = sanitizeString(config.customModelId, 200);
 
+    // Determine the API key to store
+    let encryptedApiKey: string;
+    const isNewKey = config.apiKey && !config.apiKey.startsWith('****');
+    if (isNewKey) {
+        // User provided a new key — encrypt and store
+        encryptedApiKey = encryptApiKey(config.apiKey);
+    } else {
+        // No new key — preserve existing encrypted key from DB
+        const agency = await AgencyModel.findOne({ id: agencyId }).lean();
+        if (!agency) throw new Error("Agency not found");
+        if (!agency.aiConfig?.apiKey) {
+            throw new Error("API Key is required for initial configuration");
+        }
+        encryptedApiKey = agency.aiConfig.apiKey;
+    }
+
     const result = await AgencyModel.updateOne(
         { id: agencyId },
         {
             $set: {
                 aiConfig: {
                     provider: config.provider,
-                    apiKey: encryptApiKey(config.apiKey), // Encrypt before storing
+                    apiKey: encryptedApiKey,
                     model: config.model,
                     ...(config.customModelId ? { customModelId: config.customModelId } : {})
                 },
@@ -816,12 +832,27 @@ export async function saveDefaultAiConfig(config: AIConfig | null) {
         );
     } else {
         // Validate
-        if (!config.provider || !config.apiKey || !config.model) {
-            throw new Error("Provider, API Key, and Model are required");
+        if (!config.provider || !config.model) {
+            throw new Error("Provider and Model are required");
         }
         const validProviders = ['gemini', 'openai', 'nvidia', 'github'];
         if (!validProviders.includes(config.provider)) {
             throw new Error(`Invalid provider: ${config.provider}`);
+        }
+
+        // Determine the API key to store
+        let encryptedApiKey: string;
+        const isNewKey = config.apiKey && !config.apiKey.startsWith('****');
+        if (isNewKey) {
+            encryptedApiKey = encryptApiKey(config.apiKey);
+        } else {
+            // Preserve existing key from DB
+            const existing = await SystemSettingsModel.findOne({ key: 'global' }).lean();
+            const existingKey = (existing as any)?.defaultAiConfig?.apiKey;
+            if (!existingKey) {
+                throw new Error("API Key is required for initial configuration");
+            }
+            encryptedApiKey = existingKey;
         }
 
         await SystemSettingsModel.updateOne(
@@ -830,7 +861,7 @@ export async function saveDefaultAiConfig(config: AIConfig | null) {
                 $set: {
                     defaultAiConfig: {
                         provider: config.provider,
-                        apiKey: encryptApiKey(config.apiKey),
+                        apiKey: encryptedApiKey,
                         model: sanitizeString(config.model, 200),
                         ...(config.customModelId ? { customModelId: sanitizeString(config.customModelId, 200) } : {}),
                     }

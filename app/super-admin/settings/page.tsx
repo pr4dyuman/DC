@@ -112,7 +112,7 @@ export default function SystemSettingsPage() {
                 try {
                     const daiConfig = await getDefaultAiConfig();
                     if (daiConfig) {
-                        setDefaultAi({ provider: daiConfig.provider, apiKey: daiConfig.apiKey, model: daiConfig.model, customModelId: daiConfig.customModelId || '' });
+                        setDefaultAi({ provider: daiConfig.provider, apiKey: '', model: daiConfig.model, customModelId: daiConfig.customModelId || '' });
                         setDefaultAiConfigured(true);
                     }
                 } catch { /* ignore if not configured */ }
@@ -560,11 +560,11 @@ export default function SystemSettingsPage() {
                                 type="password"
                                 value={defaultAi.apiKey}
                                 onChange={e => setDefaultAi(prev => ({ ...prev, apiKey: e.target.value }))}
-                                placeholder={defaultAiConfigured ? "Enter new key to change" : "Enter API key..."}
+                                placeholder={defaultAiConfigured ? "Key configured — enter new key to change" : "Enter API key..."}
                                 className="w-full h-9 rounded-lg border border-border bg-background px-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
                             />
                             {defaultAiConfigured && (
-                                <p className="text-[10px] text-muted-foreground mt-0.5">Current: {defaultAi.apiKey.startsWith('****') ? defaultAi.apiKey : '****'}</p>
+                                <p className="text-[10px] text-muted-foreground mt-0.5">Leave empty to keep existing key</p>
                             )}
                         </div>
 
@@ -599,32 +599,20 @@ export default function SystemSettingsPage() {
                         <div className="flex items-center gap-2 pt-1">
                             <button
                                 onClick={async () => {
-                                    if (!defaultAi.apiKey || defaultAi.apiKey.startsWith('****')) {
-                                        if (!defaultAiConfigured) return;
-                                    }
+                                    if (!defaultAi.apiKey && !defaultAiConfigured) return;
                                     if (!defaultAi.model) return;
                                     setSavingDefaultAi(true);
                                     try {
                                         const configToSave: any = {
                                             provider: defaultAi.provider,
-                                            apiKey: defaultAi.apiKey.startsWith('****') ? undefined : defaultAi.apiKey,
+                                            apiKey: defaultAi.apiKey || '', // Empty = keep existing (server handles it)
                                             model: defaultAi.model,
                                         };
-                                        // If key starts with ****, user didn't change it — re-fetch and re-save with old key
-                                        if (defaultAi.apiKey.startsWith('****')) {
-                                            // Only update provider/model, not key — need fresh key
-                                            // For simplicity, require new key entry to update
-                                            setSavedDefaultAi('Enter a new API key to update');
-                                            setTimeout(() => setSavedDefaultAi(''), 3000);
-                                            return;
-                                        }
                                         if (defaultAi.customModelId) configToSave.customModelId = defaultAi.customModelId;
                                         await saveDefaultAiConfig(configToSave);
                                         setDefaultAiConfigured(true);
+                                        setDefaultAi(prev => ({ ...prev, apiKey: '' })); // Clear after save
                                         setSavedDefaultAi('Saved!');
-                                        // Refresh to get masked key
-                                        const fresh = await getDefaultAiConfig();
-                                        if (fresh) setDefaultAi({ provider: fresh.provider, apiKey: fresh.apiKey, model: fresh.model, customModelId: fresh.customModelId || '' });
                                         setTimeout(() => setSavedDefaultAi(''), 3000);
                                     } catch (err: any) {
                                         setSavedDefaultAi(err?.message || 'Failed');
@@ -633,7 +621,7 @@ export default function SystemSettingsPage() {
                                         setSavingDefaultAi(false);
                                     }
                                 }}
-                                disabled={savingDefaultAi || !defaultAi.model || (!defaultAi.apiKey)}
+                                disabled={savingDefaultAi || !defaultAi.model || (!defaultAi.apiKey && !defaultAiConfigured)}
                                 className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition"
                             >
                                 {savingDefaultAi ? 'Saving...' : defaultAiConfigured ? 'Update Default' : 'Set Default'}

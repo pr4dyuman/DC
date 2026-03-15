@@ -34,12 +34,19 @@ interface ToolAction {
     rollbackData?: any[];
 }
 
+interface MessageAttachment {
+    fileName: string;
+    fileType: 'image' | 'document';
+    mimeType?: string;
+}
+
 interface Message {
     id: string;
     role: 'user' | 'model';
     content: string;
     thinking?: string;
     images?: string[];
+    attachments?: MessageAttachment[];
     timestamp: Date;
     isStreaming?: boolean;
     toolActions?: ToolAction[];
@@ -350,6 +357,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
             content: m.content,
             thinking: m.thinking,
             images: m.images,
+            attachments: m.attachments,
             toolActions: m.toolActions?.map(ta => ({
                 name: ta.name,
                 displayName: ta.displayName,
@@ -631,7 +639,8 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
             id: `user-${Date.now()}`,
             role: 'user',
             content: msg,
-            images: currentAttachments.map(a => a.preview),
+            images: currentAttachments.filter(a => a.fileType === 'image' && a.preview).map(a => a.preview),
+            attachments: currentAttachments.filter(a => a.fileType === 'document').map(a => ({ fileName: a.fileName || a.file.name, fileType: 'document' as const, mimeType: a.mimeType })),
             timestamp: new Date(),
         };
 
@@ -774,6 +783,13 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                                     next.delete(msgId);
                                     return next;
                                 });
+                            } else if (data.type === 'clear') {
+                                // Server is retrying — reset accumulated response
+                                accumContent = '';
+                                accumThinking = '';
+                                setMessages(prev => prev.map(m =>
+                                    m.id === msgId ? { ...m, content: '', thinking: mode === 'chat' ? '' : undefined, toolActions: mode === 'agent' ? [] : undefined } : m
+                                ));
                             } else if (data.type === 'rechecking') {
                                 setStreamingPhase('rechecking');
                             } else if (data.type === 'error') {
@@ -1525,10 +1541,35 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                                             )}
 
                                             {/* Image Attachments */}
-                                            {msg.images && msg.images.length > 0 && (
+                                            {msg.images && msg.images.filter(Boolean).length > 0 && (
                                                 <div className="flex gap-2 flex-wrap">
-                                                    {msg.images.map((img, i) => (
+                                                    {msg.images.filter(Boolean).map((img, i) => (
                                                         <img key={i} src={img} alt="Attached" className="max-w-[200px] max-h-[200px] rounded-xl border border-neutral-200 dark:border-neutral-700 object-cover" />
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Document Attachments */}
+                                            {msg.attachments && msg.attachments.length > 0 && (
+                                                <div className="flex gap-2 flex-wrap">
+                                                    {msg.attachments.map((att, i) => (
+                                                        <div key={i} className={cn(
+                                                            "flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium",
+                                                            msg.role === 'user'
+                                                                ? "bg-neutral-700/50 text-neutral-200"
+                                                                : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700"
+                                                        )}>
+                                                            {att.mimeType === 'application/pdf' ? (
+                                                                <FileText className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                                                            ) : att.mimeType === 'text/csv' ? (
+                                                                <FileSpreadsheet className="w-3.5 h-3.5 text-green-400 shrink-0" />
+                                                            ) : att.mimeType === 'application/json' || att.mimeType === 'text/html' ? (
+                                                                <FileCode className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                                                            ) : (
+                                                                <Paperclip className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                                                            )}
+                                                            <span className="truncate max-w-[200px]">{att.fileName}</span>
+                                                        </div>
                                                     ))}
                                                 </div>
                                             )}
