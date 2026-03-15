@@ -943,6 +943,8 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
     if (user.contactNumber) user.contactNumber = sanitizePhone(user.contactNumber);
     if (user.password) await validatePasswordWithPolicy(user.password);
     if (user.jobTitle) user.jobTitle = sanitizeName(user.jobTitle, 100);
+    const validGenders = ['Male', 'Female', 'Other'];
+    if (user.gender && !validGenders.includes(user.gender)) user.gender = 'Male';
     // Generate/Validate username
     let username = user.username ? sanitizeUsername(user.username) : '';
     if (!username) {
@@ -1156,6 +1158,8 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
     if (updates.contactNumber) updates.contactNumber = sanitizePhone(updates.contactNumber);
     if (updates.username) updates.username = sanitizeUsername(updates.username);
     if (updates.jobTitle) updates.jobTitle = sanitizeName(updates.jobTitle, 100);
+    const validGenders = ['Male', 'Female', 'Other'];
+    if (updates.gender && !validGenders.includes(updates.gender)) updates.gender = 'Male';
 
     // Verify password if changing it
     if (updates.password) {

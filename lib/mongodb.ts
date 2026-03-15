@@ -342,6 +342,7 @@ const UserSchema = new Schema<User>({
     timezone: { type: String },
     lastActiveAt: { type: String },
     employmentType: { type: String, enum: ['Salary', 'Project Based', 'Freelancer'] },
+    gender: { type: String, enum: ['Male', 'Female', 'Other'] },
     contactNumber: { type: String },
     adharCardImage: { type: String },
     panCardImage: { type: String },

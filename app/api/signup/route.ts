@@ -59,7 +59,7 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { agencyName, ownerName, email, password, phone, otp, logo } = body;
+        const { agencyName, ownerName, email, password, phone, otp, logo, gender } = body;
 
         // --- Check if self-registration is allowed ---
         const securitySettings = await getPublicSecuritySettings();
@@ -95,6 +95,9 @@ export async function POST(request: Request) {
         if (!sanitizedOwnerName) {
             return NextResponse.json({ error: 'Invalid owner name' }, { status: 400 });
         }
+
+        const validGenders = ['Male', 'Female', 'Other'];
+        const sanitizedGender = validGenders.includes(gender) ? gender : 'Male';
 
         let validatedEmail: string;
         try {
@@ -247,6 +250,7 @@ export async function POST(request: Request) {
             role: 'admin',
             username,
             contactNumber: sanitizedPhone,
+            gender: sanitizedGender,
             jobTitle: 'Agency Owner',
             salary: 0,
             createdAt: nowDate.toISOString()

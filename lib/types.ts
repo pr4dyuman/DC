@@ -259,6 +259,7 @@ export type User = {
     timezone?: string; // IANA timezone (e.g. 'Asia/Kolkata')
     lastActiveAt?: string; // ISO Date string for presence
     employmentType?: 'Salary' | 'Project Based' | 'Freelancer';
+    gender?: 'Male' | 'Female' | 'Other';
     contactNumber?: string;
     adharCardImage?: string;
     panCardImage?: string;

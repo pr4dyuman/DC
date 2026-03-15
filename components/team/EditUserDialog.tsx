@@ -53,6 +53,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
         avatar: "",
         password: "",
         employmentType: "Salary" as 'Salary' | 'Project Based' | 'Freelancer',
+        gender: "Male" as "Male" | "Female" | "Other",
         contactNumber: "",
         adharCardImage: "",
         panCardImage: ""
@@ -72,6 +73,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                     avatar: user.avatar || "",
 
                     employmentType: user.employmentType || "Salary",
+                    gender: user.gender || "Male",
                     contactNumber: user.contactNumber || "",
                     adharCardImage: user.adharCardImage || "",
                     panCardImage: user.panCardImage || "",
@@ -88,6 +90,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                     avatar: "",
 
                     employmentType: "Salary",
+                    gender: "Male",
                     contactNumber: "",
                     adharCardImage: "",
                     panCardImage: "",
@@ -321,6 +324,17 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                                 </select>
                                             </div>
                                         )}
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-medium text-muted-foreground">Gender</label>
+                                            <select
+                                                value={formData.gender || "Male"}
+                                                onChange={e => setFormData({ ...formData, gender: e.target.value as any })}
+                                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary">
+                                                <option value="Male">Male</option>
+                                                <option value="Female">Female</option>
+                                                <option value="Other">Other</option>
+                                            </select>
+                                        </div>
                                         {canManageFinances && (formData.employmentType === 'Salary' || formData.employmentType === 'Freelancer') && formData.role !== 'client' && (
                                             <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
                                                 <label className="text-xs font-medium text-muted-foreground">

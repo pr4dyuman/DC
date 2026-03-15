@@ -128,6 +128,7 @@ export default function GetStartedPage() {
         password: "",
         confirmPassword: "",
         phone: "",
+        gender: "Male",
     });
     const [logo, setLogo] = useState(null); // base64 data URI
     const [logoPreview, setLogoPreview] = useState(null);
@@ -253,6 +254,7 @@ export default function GetStartedPage() {
                     email: formData.email,
                     password: formData.password,
                     phone: formData.phone,
+                    gender: formData.gender,
                     otp: otp,
                     logo: logo || "",
                 }),
@@ -660,6 +662,23 @@ export default function GetStartedPage() {
                                     className={inputClass}
                                     placeholder="+91 98765 43210"
                                 />
+                            </div>
+
+                            {/* Gender */}
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
+                                    Gender *
+                                </label>
+                                <select
+                                    required
+                                    value={formData.gender}
+                                    onChange={(e) => setFormData((p) => ({ ...p, gender: e.target.value }))}
+                                    className={`${inputClass} appearance-none cursor-pointer`}
+                                >
+                                    <option value="Male" className="bg-black text-white">Male</option>
+                                    <option value="Female" className="bg-black text-white">Female</option>
+                                    <option value="Other" className="bg-black text-white">Other</option>
+                                </select>
                             </div>
 
                             {/* Logo Upload */}
