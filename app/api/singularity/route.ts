@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
                     async start(controller) {
                         try {
                             let currentPrompt = fullPrompt;
-                            const MAX_TOOL_ROUNDS = 10;
+                            const MAX_TOOL_ROUNDS = 25;
 
                             for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
                                 const result = await chat.sendMessage(currentPrompt);

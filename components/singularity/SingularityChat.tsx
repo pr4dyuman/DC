@@ -6,7 +6,7 @@ import {
     Brain, Copy, Check, Trash2, ArrowRight, Image as ImageIcon, X,
     Bot, MessageSquare, Wrench, CheckCircle2, AlertCircle, Loader2,
     Paperclip, FileText, FileSpreadsheet, FileCode,
-    Plus, Clock, Undo2, History, AlertTriangle, Menu, Send,
+    Plus, Clock, Undo2, History, AlertTriangle, Menu, Send, Square,
     Home, LayoutDashboard, FolderKanban, Mail, Users, DollarSign, UserCircle, Settings
 } from "lucide-react";
 import Link from "next/link";
@@ -187,6 +187,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
     // Refs to track latest values inside event handlers (avoids stale closures)
     const messagesRef = useRef<Message[]>(messages);
     const sessionIdRef = useRef<string | null>(sessionId);
@@ -626,6 +627,17 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
         await handleFileSelect(e.dataTransfer.files);
     }, []);
 
+    const handleStop = useCallback(() => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        setIsLoading(false);
+        setStreamingPhase('idle');
+        // Mark any streaming messages as done
+        setMessages(prev => prev.map(m => m.isStreaming ? { ...m, isStreaming: false, content: m.content || '(Stopped by user)' } : m));
+    }, []);
+
     const handleSend = async (overrideMessage?: string) => {
         const msg = (overrideMessage || inputValue).trim();
         if ((!msg && attachments.length === 0) || isLoading) return;
@@ -709,10 +721,14 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                 }));
             }
 
+            const controller = new AbortController();
+            abortControllerRef.current = controller;
+
             const response = await fetch('/api/singularity', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
+                signal: controller.signal,
             });
 
             if (!response.ok) throw new Error('Failed to connect');
@@ -1465,19 +1481,29 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                                                     </>
                                                 )}
                                             </div>
-                                            {/* Send */}
-                                            <button
-                                                onClick={() => handleSend()}
-                                                disabled={(!inputValue.trim() && attachments.length === 0) || isLoading}
-                                                className={cn(
-                                                    "p-1.5 rounded-full transition-all duration-200",
-                                                    (inputValue.trim() || attachments.length > 0) && !isLoading
-                                                        ? "bg-neutral-800 dark:bg-neutral-200 text-white dark:text-black hover:scale-105 active:scale-95"
-                                                        : "text-neutral-300 dark:text-neutral-600 cursor-not-allowed"
-                                                )}
-                                            >
-                                                <Send className="w-4 h-4" />
-                                            </button>
+                                            {/* Send / Stop */}
+                                            {isLoading ? (
+                                                <button
+                                                    onClick={handleStop}
+                                                    className="p-1.5 rounded-full bg-red-500 hover:bg-red-600 text-white transition-all duration-200 hover:scale-105 active:scale-95 animate-pulse"
+                                                    title="Stop generating"
+                                                >
+                                                    <Square className="w-3.5 h-3.5 fill-current" />
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleSend()}
+                                                    disabled={!inputValue.trim() && attachments.length === 0}
+                                                    className={cn(
+                                                        "p-1.5 rounded-full transition-all duration-200",
+                                                        (inputValue.trim() || attachments.length > 0)
+                                                            ? "bg-neutral-800 dark:bg-neutral-200 text-white dark:text-black hover:scale-105 active:scale-95"
+                                                            : "text-neutral-300 dark:text-neutral-600 cursor-not-allowed"
+                                                    )}
+                                                >
+                                                    <Send className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -1857,19 +1883,29 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                                                     </>
                                                 )}
                                             </div>
-                                            {/* Send */}
-                                            <button
-                                                onClick={() => handleSend()}
-                                                disabled={(!inputValue.trim() && attachments.length === 0) || isLoading}
-                                                className={cn(
-                                                    "p-1.5 rounded-full transition-all duration-200",
-                                                    (inputValue.trim() || attachments.length > 0) && !isLoading
-                                                        ? "bg-neutral-800 dark:bg-neutral-200 text-white dark:text-black hover:scale-105 active:scale-95"
-                                                        : "text-neutral-300 dark:text-neutral-600 cursor-not-allowed"
-                                                )}
-                                            >
-                                                <Send className="w-4 h-4" />
-                                            </button>
+                                            {/* Send / Stop */}
+                                            {isLoading ? (
+                                                <button
+                                                    onClick={handleStop}
+                                                    className="p-1.5 rounded-full bg-red-500 hover:bg-red-600 text-white transition-all duration-200 hover:scale-105 active:scale-95 animate-pulse"
+                                                    title="Stop generating"
+                                                >
+                                                    <Square className="w-3.5 h-3.5 fill-current" />
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleSend()}
+                                                    disabled={!inputValue.trim() && attachments.length === 0}
+                                                    className={cn(
+                                                        "p-1.5 rounded-full transition-all duration-200",
+                                                        (inputValue.trim() || attachments.length > 0)
+                                                            ? "bg-neutral-800 dark:bg-neutral-200 text-white dark:text-black hover:scale-105 active:scale-95"
+                                                            : "text-neutral-300 dark:text-neutral-600 cursor-not-allowed"
+                                                    )}
+                                                >
+                                                    <Send className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
