@@ -488,6 +488,8 @@ const ServiceSchema = new Schema<Service>({
     id: { type: String, required: true, unique: true },
     agencyId: { type: String, required: true, index: true },
     name: { type: String, required: true },
+    projectId: { type: String, index: true },
+    employees: [{ type: String }],
     jobs: [JobSchema]
 }, { timestamps: true });
 
