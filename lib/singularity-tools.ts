@@ -217,7 +217,16 @@ export async function executeTool(
                     const updates: Record<string, any> = {};
                     if (args.status) updates.status = args.status;
                     if (args.createdAt) updates.createdAt = new Date(args.createdAt).toISOString();
-                    await updateProject(newProject.id, updates);
+                    if (args.createdAt) {
+                        // Use direct MongoDB update with timestamps:false to preserve backdated createdAt
+                        await ProjectModel.updateOne(
+                            { id: newProject.id },
+                            { $set: updates },
+                            { timestamps: false }
+                        );
+                    } else {
+                        await updateProject(newProject.id, updates);
+                    }
                 }
 
                 // Auto-create Service documents for each service name so they appear in the project's Services tab
@@ -353,14 +362,19 @@ export async function executeTool(
 
                 // Backdate createdAt for historical imports
                 if (args.createdAt) {
-                    await updateTask(newTask.id, { createdAt: new Date(args.createdAt).toISOString() } as any);
+                    await TaskModel.updateOne(
+                        { id: newTask.id },
+                        { $set: { createdAt: new Date(args.createdAt).toISOString() } },
+                        { timestamps: false }
+                    );
                 }
 
                 // Backdate updatedAt for historical Done tasks
                 if (args.completedAt && args.status === 'Done') {
                     await TaskModel.updateOne(
                         { id: newTask.id },
-                        { $set: { updatedAt: new Date(args.completedAt).toISOString() } }
+                        { $set: { updatedAt: new Date(args.completedAt).toISOString() } },
+                        { timestamps: false }
                     );
                 }
 
@@ -427,7 +441,8 @@ export async function executeTool(
                 if (Object.keys(timestampUpdates).length > 0) {
                     await TaskModel.updateOne(
                         { id: args.taskId },
-                        { $set: timestampUpdates }
+                        { $set: timestampUpdates },
+                        { timestamps: false }
                     );
                 }
                 const changedFields = [...Object.keys(editUpdates), ...Object.keys(timestampUpdates)].join(", ");
@@ -547,7 +562,8 @@ export async function executeTool(
                 if (Object.keys(projTimestamps).length > 0) {
                     await ProjectModel.updateOne(
                         { id: args.projectId },
-                        { $set: projTimestamps }
+                        { $set: projTimestamps },
+                        { timestamps: false }
                     );
                 }
                 const changedFields = [...Object.keys(projUpdates), ...Object.keys(projTimestamps)].join(", ");
@@ -718,7 +734,7 @@ export async function executeTool(
                         }
 
                         if (Object.keys(setFields).length > 0) {
-                            await TaskModel.updateOne({ id: task.id }, { $set: setFields });
+                            await TaskModel.updateOne({ id: task.id }, { $set: setFields }, { timestamps: false });
                             edited++;
                         }
                     } catch (err: any) {
@@ -828,7 +844,11 @@ export async function executeTool(
 
                         // Backdate createdAt for historical imports
                         if (task.createdAt) {
-                            await updateTask(newTask.id, { createdAt: new Date(task.createdAt).toISOString() } as any);
+                            await TaskModel.updateOne(
+                                { id: newTask.id },
+                                { $set: { createdAt: new Date(task.createdAt).toISOString() } },
+                                { timestamps: false }
+                            );
                         }
 
                         // Backdate updatedAt for historical Done tasks

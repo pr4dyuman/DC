@@ -1969,7 +1969,7 @@ export async function updateTaskStatus(taskId: string, status: Task['status'], c
     const task = await TaskModel.findOneAndUpdate(
         { id: taskId, agencyId: agency.id },
         { $set: updateFields },
-        { returnDocument: 'before', lean: true }
+        { returnDocument: 'before', lean: true, timestamps: completedAt ? false : true }
     );
     if (!task) throw new Error('Task not found');
 
