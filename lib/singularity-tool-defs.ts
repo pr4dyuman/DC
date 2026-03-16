@@ -457,25 +457,19 @@ Always follow these rules strictly. The system will reject invalid combinations.
     },
     {
         name: "add_service",
-        description: "Add a new service/category to the agency. Services are used as task categories. Use when the user asks to add a new department or service offering.",
+        description: "Add a new service to a specific project. Services are used as task categories and for filtering on the Kanban board. IMPORTANT: You MUST provide the projectId. Use when the user asks to add a new service, department, or category to a project.",
         parameters: {
             type: "OBJECT",
             properties: {
-                name: { type: "STRING", description: "Service name (e.g. 'Mobile Development', 'SEO')" },
-                jobs: {
+                name: { type: "STRING", description: "Service name (e.g. 'Mobile Development', 'SEO', 'UI Design')" },
+                projectId: { type: "STRING", description: "The project ID this service belongs to — REQUIRED. Look up from the QUICK LOOKUP TABLE." },
+                employees: {
                     type: "ARRAY",
-                    description: "List of job roles under this service",
-                    items: {
-                        type: "OBJECT",
-                        properties: {
-                            title: { type: "STRING", description: "Job title (e.g. 'React Developer')" },
-                            count: { type: "NUMBER", description: "Number of positions" },
-                        },
-                        required: ["title", "count"],
-                    },
+                    description: "List of employee user IDs to assign to this service (optional)",
+                    items: { type: "STRING" },
                 },
             },
-            required: ["name"],
+            required: ["name", "projectId"],
         },
     },
     {

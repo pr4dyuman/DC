@@ -220,6 +220,17 @@ export async function executeTool(
                     await updateProject(newProject.id, updates);
                 }
 
+                // Auto-create Service documents for each service name so they appear in the project's Services tab
+                if (args.services && args.services.length > 0) {
+                    for (const svcName of args.services) {
+                        try {
+                            await addService(svcName, newProject.id, []);
+                        } catch (e) {
+                            // Ignore duplicates — service may already exist
+                        }
+                    }
+                }
+
                 const statusLabel = args.status || "Active";
                 return {
                     success: true,
@@ -1082,11 +1093,11 @@ export async function executeTool(
             }
 
             case "add_service": {
-                const newService = await addService(args.name, args.projectId || '', args.jobs || []);
+                const newService = await addService(args.name, args.projectId, args.employees || []);
                 return {
                     success: true,
-                    data: { id: newService.id, name: newService.name },
-                    summary: `Service "${newService.name}" added as a new category`,
+                    data: { id: newService.id, name: newService.name, projectId: args.projectId },
+                    summary: `Service "${newService.name}" added to project`,
                     rollbackData: [{
                         toolName: 'add_service',
                         actionType: 'create',
