@@ -62,16 +62,18 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
     },
     {
         name: "update_project",
-        description: "Update an existing project's details — name, budget, deadline, status, description, or assigned services/categories. Use when the user asks to edit, rename, or change a project.",
+        description: "Update an existing project's details — name, budget, deadline, status, description, or assigned services/categories. For historical projects, use createdAt to backdate the project creation date. Use when the user asks to edit, rename, or change a project.",
         parameters: {
             type: "OBJECT",
             properties: {
                 projectId: { type: "STRING", description: "The project ID from the QUICK LOOKUP TABLE" },
                 name: { type: "STRING", description: "New project name (optional)" },
+                description: { type: "STRING", description: "New project description (optional)" },
                 budget: { type: "NUMBER", description: "New budget in INR (optional)" },
                 dueDate: { type: "STRING", description: "New deadline in YYYY-MM-DD format (optional)" },
                 status: { type: "STRING", description: "New status", enum: ["Active", "Completed", "On Hold"] },
                 services: { type: "ARRAY", description: "Updated list of service/category names for this project", items: { type: "STRING" } },
+                createdAt: { type: "STRING", description: "Backdate the project creation date (YYYY-MM-DD or ISO format). Use for historical project imports." },
             },
             required: ["projectId"],
         },
@@ -112,7 +114,7 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
     },
     {
         name: "edit_task",
-        description: "Edit/update an existing task — change its title, description, priority, category, or due date. Use this when the user asks to edit, modify, or update a task's details.",
+        description: "Edit/update an existing task — change its title, description, priority, category, due date, or timestamps. Use this when the user asks to edit, modify, or update a task's details. For backdating historical tasks, use createdAt and updatedAt fields.",
         parameters: {
             type: "OBJECT",
             properties: {
@@ -124,6 +126,8 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
                 dueDate: { type: "STRING", description: "New due date in YYYY-MM-DD format" },
                 status: { type: "STRING", description: "New task status", enum: ["Todo", "In Progress", "Review", "Done"] },
                 estimatedHours: { type: "NUMBER", description: "Estimated hours to complete the task" },
+                createdAt: { type: "STRING", description: "Backdate the task creation date (YYYY-MM-DD or ISO format). Use for historical imports." },
+                updatedAt: { type: "STRING", description: "Backdate the task completion/update date (YYYY-MM-DD or ISO format). Use for historical imports to fix heatmap dates." },
             },
             required: ["taskId"],
         },
@@ -236,8 +240,37 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
                 status: { type: "STRING", description: "The new status for all tasks", enum: ["Todo", "In Progress", "Review", "Done"] },
                 completedAt: { type: "STRING", description: "For backdating: a single completion date in YYYY-MM-DD format applied to ALL tasks. Use autoBackdate instead if you want per-task dates." },
                 autoBackdate: { type: "BOOLEAN", description: "When true, automatically sets each task's completedAt to its dueDate (+ 1-2 days). Use this when moving historical tasks to Done so each task gets a realistic individual completion date based on its timeline." },
+                force: { type: "BOOLEAN", description: "When true, include tasks that are ALREADY in the target status. Use this to re-backdate tasks that were already moved to Done but need their updatedAt timestamps corrected." },
             },
             required: ["status"],
+        },
+    },
+    {
+        name: "bulk_edit_tasks",
+        description: "Edit/update fields on multiple existing tasks at once. Use for bulk backdating timestamps (createdAt, updatedAt), changing priorities, categories, or other fields across many tasks. Provide a projectId to target all tasks in a project, or specific taskIds.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                projectId: { type: "STRING", description: "Edit ALL tasks in this project (alternative to taskIds)" },
+                taskIds: {
+                    type: "ARRAY",
+                    description: "Specific task IDs to edit (alternative to projectId)",
+                    items: { type: "STRING" },
+                },
+                updates: {
+                    type: "OBJECT",
+                    description: "Fields to update on every matched task",
+                    properties: {
+                        priority: { type: "STRING", description: "New priority for all tasks", enum: ["Low", "Medium", "High"] },
+                        category: { type: "STRING", description: "New category for all tasks" },
+                    },
+                },
+                autoBackdateCreatedAt: { type: "BOOLEAN", description: "When true, automatically backdate each task's createdAt to a date derived from its dueDate minus its estimatedHours (spread across the project timeline). Use for historical imports." },
+                createdAtStart: { type: "STRING", description: "Start date (YYYY-MM-DD) for spreading createdAt dates across tasks. Tasks will get creation dates spread between this and createdAtEnd." },
+                createdAtEnd: { type: "STRING", description: "End date (YYYY-MM-DD) for spreading createdAt dates. Used with createdAtStart." },
+                autoBackdateUpdatedAt: { type: "BOOLEAN", description: "When true, set each Done task's updatedAt to its dueDate + 1-2 days. Use for fixing heatmap dates on historical tasks." },
+            },
+            required: [],
         },
     },
     {
@@ -674,6 +707,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
     get_recent_activity: "Loading activity",
     bulk_create_tasks: "🚀 Planning project tasks",
     bulk_update_task_status: "📋 Updating task statuses",
+    bulk_edit_tasks: "✏️ Editing tasks in bulk",
     bulk_add_transactions: "💰 Importing transactions",
     add_transaction: "💰 Adding transaction",
     get_transactions: "📊 Loading transactions",

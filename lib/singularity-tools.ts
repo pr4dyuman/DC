@@ -410,16 +410,30 @@ export async function executeTool(
                 if (args.status) editUpdates.status = args.status;
                 if (args.estimatedHours !== undefined) editUpdates.estimatedHours = args.estimatedHours;
 
-                if (Object.keys(editUpdates).length === 0) {
+                // Timestamp backdating fields (applied directly via MongoDB to bypass middleware)
+                const timestampUpdates: Record<string, any> = {};
+                if (args.createdAt) timestampUpdates.createdAt = new Date(args.createdAt).toISOString();
+                if (args.updatedAt) timestampUpdates.updatedAt = new Date(args.updatedAt).toISOString();
+
+                if (Object.keys(editUpdates).length === 0 && Object.keys(timestampUpdates).length === 0) {
                     return { success: false, data: null, summary: "No changes specified" };
                 }
 
                 const editSnapshot = await snapshotEntity('task', args.taskId);
-                await updateTask(args.taskId, editUpdates);
-                const changedFields = Object.keys(editUpdates).join(", ");
+                if (Object.keys(editUpdates).length > 0) {
+                    await updateTask(args.taskId, editUpdates);
+                }
+                // Apply timestamp fields directly to avoid being overwritten
+                if (Object.keys(timestampUpdates).length > 0) {
+                    await TaskModel.updateOne(
+                        { id: args.taskId },
+                        { $set: timestampUpdates }
+                    );
+                }
+                const changedFields = [...Object.keys(editUpdates), ...Object.keys(timestampUpdates)].join(", ");
                 return {
                     success: true,
-                    data: { taskId: args.taskId, updates: editUpdates },
+                    data: { taskId: args.taskId, updates: { ...editUpdates, ...timestampUpdates } },
                     summary: `Task updated — changed: ${changedFields}`,
                     rollbackData: editSnapshot ? [{
                         toolName: 'edit_task',
@@ -512,18 +526,31 @@ export async function executeTool(
             case "update_project": {
                 const projUpdates: Record<string, any> = {};
                 if (args.name) projUpdates.name = args.name;
+                if (args.description) projUpdates.description = args.description;
                 if (args.budget !== undefined) projUpdates.budget = args.budget;
                 if (args.dueDate) projUpdates.dueDate = args.dueDate;
                 if (args.status) projUpdates.status = args.status;
                 if (args.services) projUpdates.services = args.services;
 
-                if (Object.keys(projUpdates).length === 0) {
+                // Timestamp backdating (applied directly via MongoDB)
+                const projTimestamps: Record<string, any> = {};
+                if (args.createdAt) projTimestamps.createdAt = new Date(args.createdAt).toISOString();
+
+                if (Object.keys(projUpdates).length === 0 && Object.keys(projTimestamps).length === 0) {
                     return { success: false, data: null, summary: "No changes specified" };
                 }
 
                 const projSnapshot = await snapshotEntity('project', args.projectId);
-                await updateProject(args.projectId, projUpdates);
-                const changedFields = Object.keys(projUpdates).join(", ");
+                if (Object.keys(projUpdates).length > 0) {
+                    await updateProject(args.projectId, projUpdates);
+                }
+                if (Object.keys(projTimestamps).length > 0) {
+                    await ProjectModel.updateOne(
+                        { id: args.projectId },
+                        { $set: projTimestamps }
+                    );
+                }
+                const changedFields = [...Object.keys(projUpdates), ...Object.keys(projTimestamps)].join(", ");
                 return {
                     success: true,
                     data: { projectId: args.projectId, updates: projUpdates },
@@ -570,7 +597,10 @@ export async function executeTool(
                 // If projectId provided, fetch all tasks in that project
                 if (args.projectId && taskIdsToUpdate.length === 0) {
                     const projectTasks = await getTasks(args.projectId);
-                    const filtered = projectTasks.filter((t: any) => t.status !== targetStatus);
+                    // force=true includes tasks already in the target status (for re-backdating)
+                    const filtered = args.force
+                        ? projectTasks
+                        : projectTasks.filter((t: any) => t.status !== targetStatus);
                     taskIdsToUpdate = filtered.map((t: any) => t.id);
 
                     // autoBackdate: calculate per-task completedAt from each task's dueDate
@@ -629,6 +659,94 @@ export async function executeTool(
                 };
             }
 
+            case "bulk_edit_tasks": {
+                let taskIdsToEdit: string[] = args.taskIds || [];
+
+                // If projectId provided, fetch all tasks in that project
+                let projectTasks: any[] = [];
+                if (args.projectId && taskIdsToEdit.length === 0) {
+                    projectTasks = await getTasks(args.projectId);
+                    taskIdsToEdit = projectTasks.map((t: any) => t.id);
+                }
+
+                if (taskIdsToEdit.length === 0) {
+                    return { success: false, data: null, summary: "No tasks found to edit" };
+                }
+
+                // Fetch full task data if we don't have it yet
+                if (projectTasks.length === 0) {
+                    projectTasks = await Promise.all(
+                        taskIdsToEdit.map(id => TaskModel.findOne({ id }).lean())
+                    ).then(results => results.filter(Boolean));
+                }
+
+                // Snapshot for rollback
+                const editSnapshots = await Promise.all(
+                    taskIdsToEdit.map(id => snapshotEntity('task', id))
+                );
+
+                let edited = 0;
+                let failed = 0;
+
+                for (const task of projectTasks) {
+                    try {
+                        const setFields: Record<string, any> = {};
+
+                        // Apply common field updates
+                        if (args.updates) {
+                            if (args.updates.priority) setFields.priority = args.updates.priority;
+                            if (args.updates.category) setFields.category = args.updates.category;
+                        }
+
+                        // Auto-backdate createdAt: spread tasks across a date range
+                        if (args.autoBackdateCreatedAt && args.createdAtStart && args.createdAtEnd) {
+                            const rangeStart = new Date(args.createdAtStart).getTime();
+                            const rangeEnd = new Date(args.createdAtEnd).getTime();
+                            const idx = projectTasks.indexOf(task);
+                            const fraction = projectTasks.length > 1 ? idx / (projectTasks.length - 1) : 0;
+                            const taskDate = new Date(rangeStart + fraction * (rangeEnd - rangeStart));
+                            // Add small random offset (0-2 days) for realism
+                            taskDate.setDate(taskDate.getDate() + Math.floor(Math.random() * 3));
+                            setFields.createdAt = taskDate.toISOString();
+                        }
+
+                        // Auto-backdate updatedAt: set Done tasks' updatedAt to dueDate + 1-2 days
+                        if (args.autoBackdateUpdatedAt && task.status === 'Done' && task.dueDate) {
+                            const due = new Date(task.dueDate);
+                            due.setDate(due.getDate() + Math.floor(Math.random() * 2) + 1);
+                            setFields.updatedAt = due.toISOString();
+                        }
+
+                        if (Object.keys(setFields).length > 0) {
+                            await TaskModel.updateOne({ id: task.id }, { $set: setFields });
+                            edited++;
+                        }
+                    } catch (err: any) {
+                        failed++;
+                    }
+                }
+
+                const changes: string[] = [];
+                if (args.updates) changes.push(`fields: ${Object.keys(args.updates).join(', ')}`);
+                if (args.autoBackdateCreatedAt) changes.push('createdAt spread');
+                if (args.autoBackdateUpdatedAt) changes.push('updatedAt backdated');
+
+                return {
+                    success: true,
+                    data: { edited, failed, total: taskIdsToEdit.length },
+                    summary: `✅ ${edited}/${taskIdsToEdit.length} tasks edited (${changes.join(', ')})${failed > 0 ? ` (${failed} failed)` : ''}`,
+                    rollbackData: [{
+                        toolName: 'bulk_edit_tasks',
+                        actionType: 'update' as const,
+                        entityType: 'task' as const,
+                        entityId: taskIdsToEdit[0],
+                        beforeSnapshot: editSnapshots.filter(Boolean),
+                        createdEntityIds: taskIdsToEdit,
+                        executedAt: new Date().toISOString(),
+                    }],
+                };
+            }
+
             case "bulk_create_tasks": {
                 const tasks = args.tasks || [];
                 if (tasks.length === 0) {
@@ -655,9 +773,14 @@ export async function executeTool(
                 workloads.sort((a, b) => a.activeTasks - b.activeTasks);
 
                 // Calculate sequential due dates
-                const startDate = args.startDate
-                    ? new Date(args.startDate)
-                    : new Date();
+                // Fallback: use project's createdAt if no startDate provided (avoids using today for historical projects)
+                let startDate: Date;
+                if (args.startDate) {
+                    startDate = new Date(args.startDate);
+                } else {
+                    const projectForDate = await ProjectModel.findOne({ id: args.projectId }).lean();
+                    startDate = projectForDate?.createdAt ? new Date(projectForDate.createdAt as string) : new Date();
+                }
                 let currentDate = new Date(startDate);
 
                 // Track per-assignee schedule for parallelism
