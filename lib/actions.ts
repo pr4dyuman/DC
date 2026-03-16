@@ -1580,6 +1580,11 @@ export async function addService(name: string, projectId: string, employees: str
     const agency = await getCurrentAgency();
     const newService = { id: generateId(), agencyId: agency?.id, name, projectId, employees };
     await ServiceModel.create(newService);
+    // Auto-add service name to project's services array for Kanban filter & project cards
+    await ProjectModel.updateOne(
+        { id: projectId, agencyId: agency?.id },
+        { $addToSet: { services: newService.name } }
+    );
     revalidatePath('/dashboard/projects');
     revalidatePath('/dashboard/settings');
     return newService;
@@ -1647,6 +1652,12 @@ export async function updateService(id: string, name: string, projectId: string,
             ),
         ]);
     }
+
+    // Ensure service name is in the project's services array
+    await ProjectModel.updateOne(
+        { id: projectId, agencyId: agency?.id },
+        { $addToSet: { services: name } }
+    );
 
     revalidatePath('/dashboard/settings');
     revalidatePath('/dashboard/projects');
