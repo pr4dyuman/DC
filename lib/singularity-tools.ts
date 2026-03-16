@@ -345,6 +345,14 @@ export async function executeTool(
                     await updateTask(newTask.id, { createdAt: new Date(args.createdAt).toISOString() } as any);
                 }
 
+                // Backdate updatedAt for historical Done tasks
+                if (args.completedAt && args.status === 'Done') {
+                    await TaskModel.updateOne(
+                        { id: newTask.id },
+                        { $set: { updatedAt: new Date(args.completedAt).toISOString() } }
+                    );
+                }
+
                 const assignInfo = autoAssigned
                     ? `auto-assigned to ${assigneeName} (fewest active tasks)`
                     : `assigned to ${assigneeName}`;
@@ -365,11 +373,11 @@ export async function executeTool(
 
             case "update_task_status": {
                 const taskStatusSnapshot = await snapshotEntity('task', args.taskId);
-                await updateTaskStatus(args.taskId, args.status);
+                await updateTaskStatus(args.taskId, args.status, args.completedAt || undefined);
                 return {
                     success: true,
                     data: { taskId: args.taskId, newStatus: args.status },
-                    summary: `Task moved to "${args.status}"`,
+                    summary: `Task moved to "${args.status}"${args.completedAt ? ` (backdated to ${args.completedAt})` : ''}`,
                     rollbackData: taskStatusSnapshot ? [{
                         toolName: 'update_task_status',
                         actionType: 'update',
@@ -567,7 +575,7 @@ export async function executeTool(
                 for (let i = 0; i < taskIdsToUpdate.length; i += BATCH_SIZE) {
                     const batch = taskIdsToUpdate.slice(i, i + BATCH_SIZE);
                     const results = await Promise.allSettled(
-                        batch.map(id => updateTaskStatus(id, targetStatus))
+                        batch.map(id => updateTaskStatus(id, targetStatus, args.completedAt || undefined))
                     );
                     for (const r of results) {
                         if (r.status === 'fulfilled') updated++;
@@ -668,6 +676,14 @@ export async function executeTool(
                         // Backdate createdAt for historical imports
                         if (task.createdAt) {
                             await updateTask(newTask.id, { createdAt: new Date(task.createdAt).toISOString() } as any);
+                        }
+
+                        // Backdate updatedAt for historical Done tasks
+                        if (task.completedAt && taskStatus === 'Done') {
+                            await TaskModel.updateOne(
+                                { id: newTask.id },
+                                { $set: { updatedAt: new Date(task.completedAt).toISOString() } }
+                            );
                         }
 
                         const assigneeName = userNameMap.get(assigneeId) || "Unassigned";

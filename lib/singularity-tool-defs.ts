@@ -78,7 +78,7 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
     },
     {
         name: "create_task",
-        description: "Create a new task in a project. If no assignee specified, it auto-assigns to the least busy team member. For historical tasks, set status to 'Done' and provide a past createdAt date.",
+        description: "Create a new task in a project. If no assignee specified, it auto-assigns to the least busy team member. For historical tasks, set status to 'Done' and provide both createdAt and completedAt dates so the contribution heatmap shows the correct completion date.",
         parameters: {
             type: "OBJECT",
             properties: {
@@ -92,18 +92,20 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
                 status: { type: "STRING", description: "Initial task status (default: Todo)", enum: ["Todo", "In Progress", "Review", "Done"] },
                 estimatedHours: { type: "NUMBER", description: "Estimated hours to complete this task (e.g. 2, 4, 8). Estimate based on task complexity." },
                 createdAt: { type: "STRING", description: "For historical tasks, the original creation date in YYYY-MM-DD format" },
+                completedAt: { type: "STRING", description: "For historical Done tasks, the actual completion date in YYYY-MM-DD format. IMPORTANT: Always set this when creating historical tasks with status 'Done' so the contribution heatmap shows the correct date." },
             },
             required: ["projectId", "title"],
         },
     },
     {
         name: "update_task_status",
-        description: "Move a task to a different status column (Todo, In Progress, Review, Done).",
+        description: "Move a task to a different status column (Todo, In Progress, Review, Done). For historical/backdated completions, provide a completedAt date.",
         parameters: {
             type: "OBJECT",
             properties: {
                 taskId: { type: "STRING", description: "The task ID" },
                 status: { type: "STRING", description: "The new status", enum: ["Todo", "In Progress", "Review", "Done"] },
+                completedAt: { type: "STRING", description: "For backdating: the actual completion date in YYYY-MM-DD format. Use this when moving historical tasks to Done so the contribution heatmap shows the correct date instead of today." },
             },
             required: ["taskId", "status"],
         },
@@ -187,7 +189,7 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
     },
     {
         name: "bulk_create_tasks",
-        description: "Create multiple tasks at once from a project plan/breakdown. For HISTORICAL/completed projects, set each task's status to 'Done' and provide a past dueDate. For new projects, leave status as default (Todo) and provide estimatedDays for auto-scheduling.",
+        description: "Create multiple tasks at once from a project plan/breakdown. For HISTORICAL/completed projects, set each task's status to 'Done' and provide a completedAt date so the contribution heatmap shows correct dates. For new projects, leave status as default (Todo) and provide estimatedDays for auto-scheduling.",
         parameters: {
             type: "OBJECT",
             properties: {
@@ -210,6 +212,7 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
                             dueDate: { type: "STRING", description: "For historical tasks, the actual completion date in YYYY-MM-DD format. Overrides auto-calculation." },
                             estimatedHours: { type: "NUMBER", description: "Estimated hours for this task (e.g. 2, 4, 8)" },
                             createdAt: { type: "STRING", description: "For historical tasks, the original creation date in YYYY-MM-DD format" },
+                            completedAt: { type: "STRING", description: "For historical Done tasks, the actual completion date in YYYY-MM-DD format. IMPORTANT: Always set this when status is 'Done' so the contribution heatmap shows the correct date." },
                         },
                         required: ["title", "description", "category", "priority"],
                     },
@@ -220,7 +223,7 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
     },
     {
         name: "bulk_update_task_status",
-        description: "Update the status of multiple tasks at once. Use this when the user asks to move many tasks to Done, Todo, In Progress, or Review. Supports filtering by projectId to update all tasks in a project. Provide EITHER a list of taskIds OR a projectId (to update ALL tasks in that project).",
+        description: "Update the status of multiple tasks at once. Use this when the user asks to move many tasks to Done, Todo, In Progress, or Review. Supports filtering by projectId to update all tasks in a project. Provide EITHER a list of taskIds OR a projectId (to update ALL tasks in that project). For historical completions, provide a completedAt date.",
         parameters: {
             type: "OBJECT",
             properties: {
@@ -231,6 +234,7 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
                     items: { type: "STRING" },
                 },
                 status: { type: "STRING", description: "The new status for all tasks", enum: ["Todo", "In Progress", "Review", "Done"] },
+                completedAt: { type: "STRING", description: "For backdating: the actual completion date in YYYY-MM-DD format. Use when moving historical tasks to Done so the contribution heatmap shows correct dates." },
             },
             required: ["status"],
         },

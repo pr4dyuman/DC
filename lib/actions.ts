@@ -1920,7 +1920,7 @@ export async function deleteTask(taskId: string) {
     revalidatePath('/dashboard/projects');
 }
 
-export async function updateTaskStatus(taskId: string, status: Task['status']) {
+export async function updateTaskStatus(taskId: string, status: Task['status'], completedAt?: string) {
     // Validate status against allowed values
     const VALID_STATUSES = ['Todo', 'In Progress', 'Review', 'Done'];
     if (!VALID_STATUSES.includes(status)) {
@@ -1941,21 +1941,28 @@ export async function updateTaskStatus(taskId: string, status: Task['status']) {
         if (!permissions.canManageTasks) throw new Error('Unauthorized: You do not have permission to manage tasks.');
     }
 
+    const updateFields: Record<string, any> = { status };
+    // If backdating, also set updatedAt so the heatmap shows the correct completion date
+    if (completedAt) {
+        updateFields.updatedAt = new Date(completedAt).toISOString();
+    }
+
     const task = await TaskModel.findOneAndUpdate(
         { id: taskId, agencyId: agency.id },
-        { $set: { status } },
+        { $set: updateFields },
         { returnDocument: 'before', lean: true }
     );
     if (!task) throw new Error('Task not found');
 
-    // Activity log
+    // Activity log — use backdated timestamp if provided
+    const activityTimestamp = completedAt ? new Date(completedAt).toISOString() : new Date().toISOString();
     await ActivityModel.create({
         id: generateId(),
         agencyId: agency.id,
         user: userName, userId,
         action: 'moved task to ' + status,
         target: task.title,
-        timestamp: new Date().toISOString()
+        timestamp: activityTimestamp
     });
 
     // Collect unique notification recipients to avoid duplicates
