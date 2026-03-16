@@ -1110,7 +1110,7 @@ export async function executeTool(
 
             case "update_service": {
                 const svcSnapshot = await snapshotEntity('service', args.serviceId);
-                await updateService(args.serviceId, args.name, args.projectId || '', args.jobs || []);
+                await updateService(args.serviceId, args.name, args.projectId || '', args.employees || []);
                 return {
                     success: true,
                     data: { serviceId: args.serviceId, name: args.name },

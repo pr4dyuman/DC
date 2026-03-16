@@ -398,23 +398,17 @@ Always follow these rules strictly. The system will reject invalid combinations.
     },
     {
         name: "update_service",
-        description: "Update an existing service/category — rename it or change its job roles. Use when the user asks to edit or rename a service/department.",
+        description: "Update an existing service — rename it or change its assigned employees. Use when the user asks to edit or rename a service.",
         parameters: {
             type: "OBJECT",
             properties: {
                 serviceId: { type: "STRING", description: "The service ID to update" },
                 name: { type: "STRING", description: "New service name" },
-                jobs: {
+                projectId: { type: "STRING", description: "The project ID this service belongs to" },
+                employees: {
                     type: "ARRAY",
-                    description: "Updated list of job roles under this service",
-                    items: {
-                        type: "OBJECT",
-                        properties: {
-                            title: { type: "STRING", description: "Job title" },
-                            count: { type: "NUMBER", description: "Number of positions" },
-                        },
-                        required: ["title", "count"],
-                    },
+                    description: "Updated list of employee user IDs assigned to this service",
+                    items: { type: "STRING" },
                 },
             },
             required: ["serviceId", "name"],
