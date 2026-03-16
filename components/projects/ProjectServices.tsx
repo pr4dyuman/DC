@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Trash2, Edit2, Users, Loader2, X, ChevronDown, Check, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 type ServiceItem = {
     id: string;
@@ -30,6 +31,7 @@ type Props = {
 };
 
 export function ProjectServices({ projectId, users }: Props) {
+    const router = useRouter();
     const [services, setServices] = useState<ServiceItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -104,7 +106,8 @@ export function ProjectServices({ projectId, users }: Props) {
                 toast.success("Service created");
             }
             setIsDialogOpen(false);
-            loadServices();
+            await loadServices();
+            router.refresh();
         } catch (error: any) {
             toast.error(error?.message || "Failed to save service");
         } finally {
@@ -129,7 +132,8 @@ export function ProjectServices({ projectId, users }: Props) {
         try {
             await deleteService(deleteTarget.id);
             toast.success(`"${deleteTarget.name}" deleted`);
-            loadServices();
+            await loadServices();
+            router.refresh();
         } catch (error: any) {
             toast.error(error?.message || "Failed to delete service");
         } finally {

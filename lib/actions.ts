@@ -1581,12 +1581,42 @@ export async function addService(name: string, projectId: string, employees: str
     const agency = await getCurrentAgency();
     const newService = { id: generateId(), agencyId: agency?.id, name, projectId, employees };
     await ServiceModel.create(newService);
-    // Auto-add service name to project's services array for Kanban filter & project cards
+    const defaultPaymentConfig: PaymentConfig = {
+        type: 'installment',
+        paymentDetailsLater: true,
+        installments: 1,
+        installmentAmount: 0,
+        monthlyAmount: 0
+    };
     await ProjectModel.updateOne(
         { id: projectId, agencyId: agency?.id },
         { $addToSet: { services: newService.name } }
     );
+    const project = await ProjectModel.findOne({ id: projectId, agencyId: agency?.id })
+        .select('serviceConfigs')
+        .lean();
+    const hasConfig = Array.isArray((project as any)?.serviceConfigs)
+        && (project as any).serviceConfigs.some((cfg: any) =>
+            String(cfg?.serviceId || '').toLowerCase() === name.toLowerCase()
+            || String(cfg?.name || '').toLowerCase() === name.toLowerCase()
+        );
+    if (!hasConfig) {
+        await ProjectModel.updateOne(
+            { id: projectId, agencyId: agency?.id },
+            {
+                $push: {
+                    serviceConfigs: {
+                        serviceId: name,
+                        name,
+                        paymentConfig: defaultPaymentConfig
+                    }
+                }
+            }
+        );
+    }
     revalidatePath('/dashboard/projects');
+    revalidatePath('/dashboard/projects/[slug]', 'page');
+    revalidatePath('/dashboard/finance');
     revalidatePath('/dashboard/settings');
     return newService;
 }
@@ -1616,8 +1646,14 @@ export async function deleteService(id: string) {
         { agencyId: agency?.id, services: { $in: [id, serviceName] } },
         { $pull: { services: { $in: [id, serviceName] } } }
     );
+    await ProjectModel.updateMany(
+        { agencyId: agency?.id },
+        { $pull: { serviceConfigs: { $or: [{ serviceId: { $in: [id, serviceName] } }, { name: { $in: [id, serviceName] } }] } } }
+    );
     revalidatePath('/dashboard/settings');
     revalidatePath('/dashboard/projects');
+    revalidatePath('/dashboard/projects/[slug]', 'page');
+    revalidatePath('/dashboard/finance');
 }
 
 export async function updateService(id: string, name: string, projectId: string, employees: string[]) {
@@ -1646,10 +1682,31 @@ export async function updateService(id: string, name: string, projectId: string,
                 { agencyId: agency?.id, category: oldName },
                 { $set: { category: name } }
             ),
-            // Update project services arrays (replace old name with new name)
+            // Update project services arrays (replace old name/id with new name)
             ProjectModel.updateMany(
                 { agencyId: agency?.id, services: oldName },
-                { $set: { 'services.$': name } }
+                { $set: { 'services.$[svc]': name } },
+                { arrayFilters: [{ svc: oldName }] }
+            ),
+            ProjectModel.updateMany(
+                { agencyId: agency?.id, services: id },
+                { $set: { 'services.$[svc]': name } },
+                { arrayFilters: [{ svc: id }] }
+            ),
+            ProjectModel.updateMany(
+                { agencyId: agency?.id, 'serviceConfigs.serviceId': oldName },
+                { $set: { 'serviceConfigs.$[cfg].serviceId': name, 'serviceConfigs.$[cfg].name': name } },
+                { arrayFilters: [{ 'cfg.serviceId': oldName }] }
+            ),
+            ProjectModel.updateMany(
+                { agencyId: agency?.id, 'serviceConfigs.name': oldName },
+                { $set: { 'serviceConfigs.$[cfg].serviceId': name, 'serviceConfigs.$[cfg].name': name } },
+                { arrayFilters: [{ 'cfg.name': oldName }] }
+            ),
+            ProjectModel.updateMany(
+                { agencyId: agency?.id, 'serviceConfigs.serviceId': id },
+                { $set: { 'serviceConfigs.$[cfg].serviceId': name, 'serviceConfigs.$[cfg].name': name } },
+                { arrayFilters: [{ 'cfg.serviceId': id }] }
             ),
         ]);
     }
@@ -1659,9 +1716,39 @@ export async function updateService(id: string, name: string, projectId: string,
         { id: projectId, agencyId: agency?.id },
         { $addToSet: { services: name } }
     );
+    const project = await ProjectModel.findOne({ id: projectId, agencyId: agency?.id })
+        .select('serviceConfigs')
+        .lean();
+    const hasConfig = Array.isArray((project as any)?.serviceConfigs)
+        && (project as any).serviceConfigs.some((cfg: any) =>
+            String(cfg?.serviceId || '').toLowerCase() === name.toLowerCase()
+            || String(cfg?.name || '').toLowerCase() === name.toLowerCase()
+        );
+    if (!hasConfig) {
+        await ProjectModel.updateOne(
+            { id: projectId, agencyId: agency?.id },
+            {
+                $push: {
+                    serviceConfigs: {
+                        serviceId: name,
+                        name,
+                        paymentConfig: {
+                            type: 'installment',
+                            paymentDetailsLater: true,
+                            installments: 1,
+                            installmentAmount: 0,
+                            monthlyAmount: 0
+                        } as PaymentConfig
+                    }
+                }
+            }
+        );
+    }
 
     revalidatePath('/dashboard/settings');
     revalidatePath('/dashboard/projects');
+    revalidatePath('/dashboard/projects/[slug]', 'page');
+    revalidatePath('/dashboard/finance');
 }
 
 export async function getProjectServices(projectId: string) {
@@ -1690,6 +1777,33 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
     project.name = sanitizeName(project.name, 300);
     if (!project.name) throw new Error('Project name is required');
     if ((project as any).description) (project as any).description = sanitizeString((project as any).description, 10000);
+    const normalizedServices = Array.isArray(project.services)
+        ? project.services
+            .map((svc) => sanitizeName(String(svc || ''), 200))
+            .filter(Boolean)
+        : [];
+    const dedupedServices = Array.from(new Map(normalizedServices.map((name) => [name.toLowerCase(), name])).values());
+    project.services = dedupedServices;
+
+    if (Array.isArray(project.serviceConfigs)) {
+        project.serviceConfigs = project.serviceConfigs
+            .map((config) => {
+                const normalizedName = sanitizeName(String(config?.name || config?.serviceId || ''), 200);
+                if (!normalizedName) return null;
+                return {
+                    ...config,
+                    name: normalizedName,
+                    serviceId: normalizedName,
+                };
+            })
+            .filter((config): config is NonNullable<typeof config> => Boolean(config));
+
+        for (const config of project.serviceConfigs) {
+            if (!project.services.some((serviceName) => serviceName.toLowerCase() === config.name.toLowerCase())) {
+                project.services.push(config.name);
+            }
+        }
+    }
 
     // Slug Generation
     let slug = project.slug;
@@ -1770,6 +1884,30 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
 
     // Save project + invoices
     await ProjectModel.create(newProject);
+    if (newProject.services.length > 0) {
+        try {
+            const existing = await ServiceModel.find({
+                agencyId: agency.id,
+                projectId: newProject.id,
+                name: { $in: newProject.services },
+            }).select('name').lean();
+            const existingNames = new Set((existing as any[]).map((s) => String(s.name).toLowerCase()));
+            const missingDocs = newProject.services
+                .filter((name) => !existingNames.has(String(name).toLowerCase()))
+                .map((name) => ({
+                    id: generateId(),
+                    agencyId: agency.id,
+                    name,
+                    projectId: newProject.id,
+                    employees: [],
+                }));
+            if (missingDocs.length > 0) {
+                await ServiceModel.insertMany(missingDocs, { ordered: false });
+            }
+        } catch (serviceSyncError) {
+            console.error('[createProject] Service sync failed:', serviceSyncError);
+        }
+    }
     // Increment agency usage counter for projects
     await incrementAgencyUsage(agency.id, 'projects');
     if (newInvoices.length > 0) {

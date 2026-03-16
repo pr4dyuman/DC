@@ -229,17 +229,6 @@ export async function executeTool(
                     }
                 }
 
-                // Auto-create Service documents for each service name so they appear in the project's Services tab
-                if (args.services && args.services.length > 0) {
-                    for (const svcName of args.services) {
-                        try {
-                            await addService(svcName, newProject.id, []);
-                        } catch (e) {
-                            // Ignore duplicates — service may already exist
-                        }
-                    }
-                }
-
                 const statusLabel = args.status || "Active";
                 return {
                     success: true,

@@ -58,7 +58,7 @@ export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
 
     return (
         <>
-            <Card>
+            <Card id="project-service-payments">
                 <CardHeader>
                     <CardTitle>Service Payments</CardTitle>
                     <CardDescription>Manage payment terms for each service in this project.</CardDescription>

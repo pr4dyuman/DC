@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
-import { TrendingUp, TrendingDown, Wallet, Target, CalendarClock, CreditCard, BarChart3, ArrowUpRight, ArrowDownRight, Pencil, Check, X } from "lucide-react";
+import { TrendingUp, Wallet, Target, CalendarClock, CreditCard, BarChart3, ArrowUpRight, ArrowDownRight, Pencil, Check, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ interface ProjectFinanceSummaryProps {
 
 export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceSummaryProps) {
     const fmt = useDateFormat();
+    const { format: formatMoney } = useCurrency();
     const router = useRouter();
     const [editingBudget, setEditingBudget] = useState(false);
     const [budgetInput, setBudgetInput] = useState("");
@@ -85,7 +86,15 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
         }
     };
 
-    const { format: formatMoney } = useCurrency();
+    const scrollToServicePayments = () => {
+        const section = document.getElementById("project-service-payments");
+        if (section) {
+            section.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else {
+            setBudgetInput('');
+            setEditingBudget(true);
+        }
+    };
 
     // Recent transactions (last 3)
     const recentTxns = projectTransactions
@@ -172,7 +181,7 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
                                 <p className="text-xs text-purple-400/70 mt-1">
                                     {totalFixedBudget > 0 ? 'From service configs' : displayBudget > 0 ? 'Project budget' : (
                                         <button
-                                            onClick={() => { setBudgetInput(''); setEditingBudget(true); }}
+                                            onClick={scrollToServicePayments}
                                             className="underline hover:text-purple-300 transition-colors cursor-pointer"
                                         >
                                             Click to set deal value
@@ -218,7 +227,7 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
                                 ? (remainingFixedBalance > 0 ? `${(100 - budgetProgress).toFixed(0)}% pending` : 'Fully collected')
                                 : (
                                     <button
-                                        onClick={() => { setBudgetInput(''); setEditingBudget(true); }}
+                                        onClick={scrollToServicePayments}
                                         className="underline hover:text-amber-300 transition-colors cursor-pointer"
                                     >
                                         Set deal value first

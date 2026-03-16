@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, ArrowRight, Check, Calendar, CreditCard, Layers, User, Banknote } from "lucide-react";
+import { ArrowLeft, ArrowRight, Layers, Banknote, Plus, X } from "lucide-react";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { getClients, getServices, createProject } from "@/lib/actions";
@@ -20,24 +19,35 @@ interface CreateProjectWizardProps {
     onProjectCreated?: () => void;
 }
 
+type ClientOption = {
+    id: string;
+    name: string;
+    companyName?: string;
+};
+
+type ServiceOption = {
+    id: string;
+    name: string;
+};
+
 export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: CreateProjectWizardProps) {
     const fmt = useDateFormat();
     const { symbol } = useCurrency();
     const [step, setStep] = useState(1);
-    const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [serviceInput, setServiceInput] = useState("");
 
     // Data
-    const [clients, setClients] = useState<any[]>([]);
-    const [services, setServices] = useState<any[]>([]);
+    const [clients, setClients] = useState<ClientOption[]>([]);
+    const [services, setServices] = useState<ServiceOption[]>([]);
 
     // Form State
     const [formData, setFormData] = useState({
         name: "",
         slug: "", // Helper for URL
         clientId: "",
-        clientName: "", // Derived for display
-        services: [] as string[], // Helper for legacy support and selection
+        clientName: "",
+        services: [] as string[],
         serviceConfigs: [] as ProjectServiceConfig[],
         budget: 0,
         dueDate: ""
@@ -51,26 +61,22 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
     }, [open]);
 
     const loadData = async () => {
-        setLoading(true);
         try {
             const [c, s] = await Promise.all([getClients(), getServices()]);
             setClients(c);
             setServices(s);
         } catch (error) {
             console.error("Failed to load data", error);
-        } finally {
-            setLoading(false);
         }
     };
 
     const handleNext = () => {
         if (step === 2 && formData.serviceConfigs.length === 0) {
-            // Need to initialize configs based on selected services
             const configs = formData.services.map(svc => {
-                const existing = formData.serviceConfigs.find(c => c.serviceId === svc);
+                const existing = formData.serviceConfigs.find(c => c.serviceId === svc || c.name === svc);
                 return existing || {
                     serviceId: svc,
-                    name: services.find((s: any) => s.id === svc)?.name || svc, // Lookup name if possible
+                    name: svc,
                     paymentConfig: {
                         type: 'installment',
                         paymentDetailsLater: false,
@@ -87,19 +93,22 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
 
     const handleBack = () => setStep(prev => prev - 1);
 
-    const toggleService = (svcId: string, svcName: string) => {
+    const addServiceName = (rawName: string) => {
+        const normalized = rawName.trim().replace(/\s+/g, " ");
+        if (!normalized) return;
         setFormData(prev => {
-            const exists = prev.services.includes(svcId);
-            const newServices = exists
-                ? prev.services.filter(s => s !== svcId)
-                : [...prev.services, svcId];
+            const exists = prev.services.some(s => s.toLowerCase() === normalized.toLowerCase());
+            if (exists) return prev;
+            return { ...prev, services: [...prev.services, normalized] };
+        });
+        setServiceInput("");
+    };
 
-            // Sync configs if removing
-            const newConfigs = exists
-                ? prev.serviceConfigs.filter(c => c.serviceId !== svcId)
-                : prev.serviceConfigs;
-
-            return { ...prev, services: newServices, serviceConfigs: newConfigs };
+    const removeServiceName = (serviceName: string) => {
+        setFormData(prev => {
+            const updatedServices = prev.services.filter(s => s !== serviceName);
+            const updatedConfigs = prev.serviceConfigs.filter(c => c.serviceId !== serviceName && c.name !== serviceName);
+            return { ...prev, services: updatedServices, serviceConfigs: updatedConfigs };
         });
     };
 
@@ -170,7 +179,6 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
                 client: client?.name, // Optional: might be undefined
                 clientId: formData.clientId || undefined,
                 services: formData.services,
-                // @ts-ignore - Schema update pending in actions
                 serviceConfigs: formData.serviceConfigs,
                 budget: formData.budget,
                 dueDate: formData.dueDate
@@ -271,28 +279,69 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
 
     const renderStep2 = () => (
         <div className="space-y-4 py-4">
-            <Label>Select Services</Label>
-            <div className="grid grid-cols-2 gap-3">
-                {services.map(svc => {
-                    // Check ID or Name for backward compatibility/during transition, but form uses ID
-                    const selected = formData.services.includes(svc.id) || formData.services.includes(svc.name);
-                    return (
-                        <div
-                            key={svc.id}
-                            onClick={() => toggleService(svc.id, svc.name)}
-                            className={cn(
-                                "cursor-pointer rounded-lg border p-4 transition-all hover:bg-accent hover:text-accent-foreground hover:border-yellow-500/50 flex items-center justify-between",
-                                selected ? "border-yellow-500 bg-yellow-500/10 ring-1 ring-yellow-500" : "bg-card"
-                            )}
-                        >
-                            <span className="font-medium text-sm">{svc.name}</span>
-                            {selected && <Check className="h-4 w-4 text-primary" />}
-                        </div>
-                    );
-                })}
+            <Label>Project Services</Label>
+            <div className="flex gap-2">
+                <Input
+                    placeholder="Type service name and click Add"
+                    value={serviceInput}
+                    onChange={(e) => setServiceInput(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                            e.preventDefault();
+                            addServiceName(serviceInput);
+                        }
+                    }}
+                />
+                <Button type="button" variant="secondary" onClick={() => addServiceName(serviceInput)}>
+                    <Plus className="h-4 w-4 mr-1" /> Add
+                </Button>
             </div>
+
+            {services.length > 0 && (
+                <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Quick add from existing services</p>
+                    <div className="flex flex-wrap gap-2">
+                        {services.map((svc) => {
+                            const isSelected = formData.services.some(name => name.toLowerCase() === String(svc.name).toLowerCase());
+                            return (
+                                <button
+                                    key={svc.id}
+                                    type="button"
+                                    disabled={isSelected}
+                                    onClick={() => addServiceName(String(svc.name))}
+                                    className={cn(
+                                        "px-2.5 py-1.5 rounded-md border text-xs transition-colors",
+                                        isSelected
+                                            ? "bg-primary/10 text-primary border-primary/30 cursor-not-allowed"
+                                            : "bg-background hover:bg-accent border-border"
+                                    )}
+                                >
+                                    {svc.name}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {formData.services.length > 0 && (
+                <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Selected services</p>
+                    <div className="flex flex-wrap gap-2">
+                        {formData.services.map((serviceName) => (
+                            <span key={serviceName} className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-medium">
+                                {serviceName}
+                                <button type="button" onClick={() => removeServiceName(serviceName)} className="hover:text-red-500 transition-colors">
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {formData.services.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center pt-2">Please select at least one service</p>
+                <p className="text-sm text-muted-foreground text-center pt-2">Please add at least one service</p>
             )}
         </div>
     );
