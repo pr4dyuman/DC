@@ -190,7 +190,7 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
                                             if (projectName) return projectName;
                                             if (userName) return `${transaction.category} - ${userName}`;
                                             return transaction.category;
-                                        })()} â€¢ {fmt.date(transaction.date)}
+                                        })()} {'\u2022'} {fmt.date(transaction.date)}
                                     </p>
                                 </div>
                                 <div className="ml-auto font-medium flex items-center gap-4">

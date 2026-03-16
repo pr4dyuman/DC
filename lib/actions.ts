@@ -46,6 +46,7 @@ import {
     sendEmployeeAccountCreatedEmail,
 } from "./brevo-mail";
 import { DEFAULT_TASK_EMAIL_EVENTS } from "./email-constants";
+import { extractMentionedUserIds } from "./mention-utils";
 
 /** Check password against system-level enforceStrongPasswords setting */
 async function validatePasswordWithPolicy(password: string) {
@@ -2286,6 +2287,41 @@ export async function addComment(taskId: string, userId: string, text: string, t
         }
     } catch (notifError) {
         console.error('[Notification] Failed to create comment notifications:', notifError);
+    }
+
+    // Mention-specific notifications — notify mentioned users who are NOT already task participants
+    try {
+        const mentionedIds = extractMentionedUserIds(text);
+        const filteredMentionIds = mentionedIds.filter(id => id !== userId);
+        if (filteredMentionIds.length > 0 && await isNotifEnabled('task')) {
+            // Build set of already-notified participants
+            const alreadyNotified = new Set<string>();
+            if (task.assigneeId) alreadyNotified.add(task.assigneeId);
+            if (task.createdBy) alreadyNotified.add(task.createdBy);
+            task.comments?.forEach(c => alreadyNotified.add(c.userId));
+            alreadyNotified.delete(userId);
+
+            const newMentionIds = filteredMentionIds.filter(id => !alreadyNotified.has(id));
+            if (newMentionIds.length > 0) {
+                // Validate mentioned users belong to this agency
+                const validUsers = await UserModel.find({ id: { $in: newMentionIds }, agencyId: agency.id }).select('id').lean();
+                const validIds = new Set(validUsers.map((u: any) => u.id));
+                const verifiedIds = newMentionIds.filter(id => validIds.has(id));
+
+                if (verifiedIds.length > 0) {
+                    const commenterDoc = await getUser(userId);
+                    const commenterName = commenterDoc?.name || 'Someone';
+                    await NotificationModel.insertMany(verifiedIds.map(mid => ({
+                        id: generateId(), agencyId: agency.id, userId: mid,
+                        message: `${commenterName} mentioned you in a comment on "${task.title}"`,
+                        read: false, timestamp: new Date().toISOString(),
+                        link: `/dashboard/projects/${task.projectId}?task=${taskId}`
+                    })));
+                }
+            }
+        }
+    } catch (mentionError) {
+        console.error('[Notification] Failed to create mention notifications:', mentionError);
     }
 
     revalidatePath('/dashboard/projects/[id]', 'page');

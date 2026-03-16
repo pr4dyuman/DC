@@ -13,7 +13,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Task, Comment } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
+import { MentionTextarea } from "@/components/ui/mention-textarea";
+import { renderCommentText } from "@/lib/mention-utils";
 import { addComment } from "@/lib/actions";
 import {
     Calendar,
@@ -319,8 +320,8 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
                                                     {fmt.dateTimeShort(comment.timestamp)}
                                                 </span>
                                             </div>
-                                            <div className={`text-sm text-foreground p-3 rounded-lg border border-border ${isMe ? 'bg-indigo-500/10 rounded-tr-none ml-8' : 'bg-muted/50 rounded-tl-none mr-8'}`}>
-                                                {comment.text}
+                                            <div className={`text-sm text-foreground p-3 rounded-lg border border-border whitespace-pre-wrap ${isMe ? 'bg-indigo-500/10 rounded-tr-none ml-8' : 'bg-muted/50 rounded-tl-none mr-8'}`}>
+                                                {renderCommentText(comment.text)}
                                             </div>
                                         </div>
                                     </div>
@@ -338,10 +339,11 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
                                     </AvatarFallback>
                                 </Avatar>
                                 <div className="flex-1 space-y-2">
-                                    <Textarea
-                                        placeholder="Ask a question or post an update..."
+                                    <MentionTextarea
+                                        placeholder="Ask a question or post an update... Use @ to mention someone"
                                         value={commentText}
-                                        onChange={(e) => setCommentText(e.target.value)}
+                                        onChange={setCommentText}
+                                        users={users}
                                         onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddComment(); }}
                                         className="min-h-[72px] text-sm resize-none"
                                     />

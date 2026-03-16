@@ -65,7 +65,7 @@ export function PayrollManager({ items }: PayrollManagerProps) {
                         <CardDescription>
                             {items.length > 0 ? (
                                 <>
-                                    {items[0]?.month} Â· Total: {formatMoney(totalPayroll)} Â·
+                                    {items[0]?.month} {'\u00B7'} Total: {formatMoney(totalPayroll)} {'\u00B7'}
                                     <span className="text-emerald-500">{paidCount} paid</span>
                                     {pendingCount > 0 && <>, <span className="text-amber-500">{pendingCount} pending</span></>}
                                 </>
