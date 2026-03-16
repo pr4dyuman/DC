@@ -553,13 +553,26 @@ export async function executeTool(
                 }
 
                 let taskIdsToUpdate: string[] = args.taskIds || [];
+                // Map of taskId → individual completedAt date (for autoBackdate)
+                const perTaskDates: Record<string, string> = {};
 
                 // If projectId provided, fetch all tasks in that project
                 if (args.projectId && taskIdsToUpdate.length === 0) {
                     const projectTasks = await getTasks(args.projectId);
-                    taskIdsToUpdate = projectTasks
-                        .filter((t: any) => t.status !== targetStatus)
-                        .map((t: any) => t.id);
+                    const filtered = projectTasks.filter((t: any) => t.status !== targetStatus);
+                    taskIdsToUpdate = filtered.map((t: any) => t.id);
+
+                    // autoBackdate: calculate per-task completedAt from each task's dueDate
+                    if (args.autoBackdate && targetStatus === 'Done') {
+                        for (const t of filtered) {
+                            if (t.dueDate) {
+                                // Add 1-2 days after dueDate for realism
+                                const due = new Date(t.dueDate);
+                                due.setDate(due.getDate() + Math.floor(Math.random() * 2) + 1);
+                                perTaskDates[t.id] = due.toISOString().split('T')[0];
+                            }
+                        }
+                    }
                 }
 
                 if (taskIdsToUpdate.length === 0) {
@@ -575,7 +588,10 @@ export async function executeTool(
                 for (let i = 0; i < taskIdsToUpdate.length; i += BATCH_SIZE) {
                     const batch = taskIdsToUpdate.slice(i, i + BATCH_SIZE);
                     const results = await Promise.allSettled(
-                        batch.map(id => updateTaskStatus(id, targetStatus, args.completedAt || undefined))
+                        batch.map(id => {
+                            const dateForTask = perTaskDates[id] || args.completedAt || undefined;
+                            return updateTaskStatus(id, targetStatus, dateForTask);
+                        })
                     );
                     for (const r of results) {
                         if (r.status === 'fulfilled') updated++;
@@ -583,10 +599,11 @@ export async function executeTool(
                     }
                 }
 
+                const backdateInfo = args.autoBackdate ? ' (auto-backdated per task dueDate)' : (args.completedAt ? ` (backdated to ${args.completedAt})` : '');
                 return {
                     success: true,
                     data: { updated, failed, status: targetStatus, totalProcessed: taskIdsToUpdate.length },
-                    summary: `✅ ${updated}/${taskIdsToUpdate.length} tasks moved to "${targetStatus}"${failed > 0 ? ` (${failed} failed)` : ''}`,
+                    summary: `✅ ${updated}/${taskIdsToUpdate.length} tasks moved to "${targetStatus}"${failed > 0 ? ` (${failed} failed)` : ''}${backdateInfo}`,
                     rollbackData: [{
                         toolName: 'bulk_update_task_status',
                         actionType: 'update' as const,

@@ -145,6 +145,16 @@ export async function POST(req: NextRequest) {
                 console.error('[Singularity Agent] Context build failed:', ctxErr?.message || ctxErr);
                 systemInstruction = 'You are Singularity Agent — an AI assistant for agency management. Agency data could not be loaded.';
             }
+            // Model-aware prompt: add extra guardrails for weaker/lite models
+            const isLiteModel = modelId.includes('lite') || modelId.includes('flash-lite');
+            if (isLiteModel) {
+                systemInstruction += `\n\n⚠️ MODEL-SPECIFIC RULES (you are a lightweight model):
+- ALWAYS use bulk tools (bulk_create_tasks, bulk_update_task_status) instead of individual calls for batch operations.
+- When moving tasks to Done with realistic dates, use bulk_update_task_status with autoBackdate=true.
+- You MUST call a tool to perform an action. Reading data (get_project_tasks) does NOT modify anything.
+- If you only see "Fetching tasks" in the Actions, you have NOT updated any tasks.
+- Keep responses concise. Do not over-explain or repeat yourself.`;
+            }
             const agentPrompt = systemInstruction + '\n\n---\n\n' + fullPrompt;
 
             // Fetch AI permissions and filter tool declarations

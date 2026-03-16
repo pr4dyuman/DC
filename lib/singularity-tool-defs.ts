@@ -223,7 +223,7 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
     },
     {
         name: "bulk_update_task_status",
-        description: "Update the status of multiple tasks at once. Use this when the user asks to move many tasks to Done, Todo, In Progress, or Review. Supports filtering by projectId to update all tasks in a project. Provide EITHER a list of taskIds OR a projectId (to update ALL tasks in that project). For historical completions, provide a completedAt date.",
+        description: "Update the status of multiple tasks at once. Use this when the user asks to move many tasks to Done, Todo, In Progress, or Review. Supports filtering by projectId to update all tasks in a project. Provide EITHER a list of taskIds OR a projectId (to update ALL tasks in that project). For backdating, provide completedAt for a single date, or set autoBackdate to true to automatically use each task's dueDate as its completion date (realistic per-task dates).",
         parameters: {
             type: "OBJECT",
             properties: {
@@ -234,7 +234,8 @@ export const SINGULARITY_TOOL_DECLARATIONS = [
                     items: { type: "STRING" },
                 },
                 status: { type: "STRING", description: "The new status for all tasks", enum: ["Todo", "In Progress", "Review", "Done"] },
-                completedAt: { type: "STRING", description: "For backdating: the actual completion date in YYYY-MM-DD format. Use when moving historical tasks to Done so the contribution heatmap shows correct dates." },
+                completedAt: { type: "STRING", description: "For backdating: a single completion date in YYYY-MM-DD format applied to ALL tasks. Use autoBackdate instead if you want per-task dates." },
+                autoBackdate: { type: "BOOLEAN", description: "When true, automatically sets each task's completedAt to its dueDate (+ 1-2 days). Use this when moving historical tasks to Done so each task gets a realistic individual completion date based on its timeline." },
             },
             required: ["status"],
         },

@@ -248,7 +248,14 @@ GENERAL:
 - When creating a project with create_project, ALWAYS populate the services array with relevant category names from the SERVICES list.
 - Example: for a mobile app project → services: ["Mobile Development", "UI Design", "QA Testing"]
 - If a project already exists without categories, use update_project to add the services array.
-- NEVER create a project with an empty services array if the agency has services configured.`;
+- NEVER create a project with an empty services array if the agency has services configured.
+
+🛑 STRICT TOOL USAGE CONSTRAINTS — NEVER VIOLATE THESE:
+- You can ONLY perform actions by calling the appropriate tool. If no tool exists for an action, tell the user it is not possible.
+- NEVER claim to have completed an action unless you ACTUALLY called a tool and received a successful response.
+- If a tool call is not shown in the Actions panel, you did NOT perform that action. Do not pretend otherwise.
+- To move many tasks to Done at once, use bulk_update_task_status (with autoBackdate=true for per-task dates). Do NOT use update_task_status in a loop.
+- If you cannot complete a request in one turn, tell the user honestly and suggest breaking it into smaller steps.`;
 
     } catch (error) {
         console.error("[Singularity Context] Error building context:", error);
