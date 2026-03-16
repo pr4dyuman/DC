@@ -281,7 +281,7 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                                                         ) : "Submit Payment"}
                                                     </Button>
                                                 ) : invoice.status === 'Paid' ? (
-                                                    <span className=”text-xs text-emerald-500 font-medium”>{'\u2713'} Paid</span>
+                                                    <span className="text-xs text-emerald-500 font-medium">{'\u2713'} Paid</span>
                                                 ) : invoice.status === 'Processing' ? (
                                                     <span className="text-xs text-blue-400 font-medium">Under Review</span>
                                                 ) : null
@@ -308,7 +308,7 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                                                         </Button>
                                                     </div>
                                                 ) : invoice.status === 'Paid' ? (
-                                                    <span className=”text-xs text-emerald-500 font-medium”>{'\u2713'} Confirmed</span>
+                                                    <span className="text-xs text-emerald-500 font-medium">{'\u2713'} Confirmed</span>
                                                 ) : invoice.status === 'Pending' ? (
                                                     <span className="text-xs text-muted-foreground">Awaiting Client</span>
                                                 ) : null
