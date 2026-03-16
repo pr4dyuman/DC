@@ -74,7 +74,7 @@ export async function buildSingularityContext(userId: string): Promise<string> {
         let categorySection = "";
         if (services.length > 0) {
             categorySection = services
-                .map((s: any) => `- "${s.name}"${s.jobs?.length ? ` (Jobs: ${s.jobs.map((j: any) => j.title).join(", ")})` : ""}`)
+                .map((s: any) => `- "${s.name}"${s.employees?.length ? ` (Employees: ${s.employees.join(", ")})` : ""}`)
                 .join("\n");
         } else {
             categorySection = "(No services/categories configured)";

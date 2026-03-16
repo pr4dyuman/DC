@@ -47,9 +47,15 @@ export const dynamic = "force-dynamic";
 function isTooShort(text: string): boolean {
     const trimmed = text.trim();
     if (!trimmed) return true;
+    // Consider response complete if it has reasonable length (>80 chars)
+    if (trimmed.length > 80) return false;
     // Ends with sentence-ending punctuation → complete
     if (/[.!?]$/.test(trimmed)) return false;
-    return true;
+    // Ends with code block, list marker, closing tag, or other structural endings → complete
+    if (/```\s*$/.test(trimmed)) return false;
+    if (/[)}\]>:`"']$/.test(trimmed)) return false;
+    // Very short and no ending punctuation → possibly cut off
+    return trimmed.split('\n').filter(l => l.trim()).length < 2;
 }
 
 async function checkAndContinue(
@@ -182,22 +188,21 @@ export async function POST(req: NextRequest) {
                 const stream = new ReadableStream({
                     async start(controller) {
                         try {
-                            let currentPrompt = fullPrompt;
                             const MAX_TOOL_ROUNDS = 25;
 
-                            for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
-                                const result = await chat.sendMessage(currentPrompt);
-                                const response = result.response;
-                                const parts = response.candidates?.[0]?.content?.parts || [];
+                            // Send initial user message
+                            const initialResult = await chat.sendMessage(fullPrompt);
+                            let responseParts = initialResult.response.candidates?.[0]?.content?.parts || [];
 
+                            for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
                                 // Collect text parts
-                                const textParts = parts.filter((p: any) => p.text).map((p: any) => p.text);
+                                const textParts = responseParts.filter((p: any) => p.text).map((p: any) => p.text);
                                 if (textParts.length > 0) {
                                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response', text: textParts.join('') })}\n\n`));
                                 }
 
                                 // Check for function calls
-                                const functionCalls = parts.filter((p: any) => p.functionCall);
+                                const functionCalls = responseParts.filter((p: any) => p.functionCall);
                                 if (functionCalls.length === 0) break; // No more tool calls — done
 
                                 // Execute each tool call
@@ -221,23 +226,9 @@ export async function POST(req: NextRequest) {
                                     });
                                 }
 
-                                // Send tool results back to the model
+                                // Send tool results back to the model and process the response in the next iteration
                                 const toolResultMsg = await chat.sendMessage(functionResponses);
-                                const toolResponseParts = toolResultMsg.response.candidates?.[0]?.content?.parts || [];
-
-                                // Collect any text from the tool response
-                                const toolTextParts = toolResponseParts.filter((p: any) => p.text).map((p: any) => p.text);
-                                if (toolTextParts.length > 0) {
-                                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'response', text: toolTextParts.join('') })}\n\n`));
-                                }
-
-                                // Check if model wants more tool calls
-                                const moreCalls = toolResponseParts.filter((p: any) => p.functionCall);
-                                if (moreCalls.length === 0) break;
-
-                                // Continue loop with the new function calls as the next prompt
-                                // Re-enter the loop — the chat history is maintained by the SDK
-                                currentPrompt = moreCalls.map((p: any) => JSON.stringify(p.functionCall)).join('\n');
+                                responseParts = toolResultMsg.response.candidates?.[0]?.content?.parts || [];
                             }
                         } catch (err: any) {
                             console.error('[Singularity Agent] Non-live error:', err?.message || err);

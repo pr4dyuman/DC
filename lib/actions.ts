@@ -3398,7 +3398,7 @@ export async function payEmployee(userId: string, amount: number, month: string,
 
     const description = `Salary Payment - ${month} - ${userName}`;
 
-    await createTransaction({
+    const txn = await createTransaction({
         amount,
         type: 'expense',
         category: 'Salary',
@@ -3408,7 +3408,7 @@ export async function payEmployee(userId: string, amount: number, month: string,
     });
 
     revalidatePath('/dashboard/finance');
-    return { success: true };
+    return { success: true, transactionId: txn.id };
 }
 
 export async function getAgencyDashboardSettings() {

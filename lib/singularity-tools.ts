@@ -590,8 +590,10 @@ export async function executeTool(
                     return { success: false, data: null, summary: `No tasks to update (all may already be ${targetStatus})` };
                 }
 
-                // Snapshot first task for rollback reference
-                const firstSnapshot = await snapshotEntity('task', taskIdsToUpdate[0]);
+                // Snapshot ALL tasks for rollback (not just the first one)
+                const taskSnapshots = await Promise.all(
+                    taskIdsToUpdate.map(id => snapshotEntity('task', id))
+                );
                 let updated = 0;
                 let failed = 0;
                 const BATCH_SIZE = 20;
@@ -620,7 +622,7 @@ export async function executeTool(
                         actionType: 'update' as const,
                         entityType: 'task' as const,
                         entityId: taskIdsToUpdate[0],
-                        beforeSnapshot: firstSnapshot,
+                        beforeSnapshot: taskSnapshots.filter(Boolean),
                         createdEntityIds: taskIdsToUpdate,
                         executedAt: new Date().toISOString(),
                     }],
@@ -994,8 +996,7 @@ export async function executeTool(
                 if (args.role) empUpdates.role = args.role;
                 if (args.salary !== undefined) empUpdates.salary = args.salary;
                 if (args.phone) empUpdates.phone = args.phone;
-                // Note: Users are not in the same model as snapshotEntity expects
-                // We store a partial snapshot of only changed fields
+                // Snapshot via UserModel directly (not in snapshotEntity's modelMap)
                 const empBefore = await getUser(args.userId).catch(() => null);
                 await updateUser(args.userId, empUpdates);
                 const empName = await getUser(args.userId).catch(() => null);
@@ -1003,6 +1004,14 @@ export async function executeTool(
                     success: true,
                     data: { userId: args.userId, updates: empUpdates },
                     summary: `${empName?.name || "Employee"} updated — changed: ${Object.keys(empUpdates).join(", ")}`,
+                    rollbackData: empBefore ? [{
+                        toolName: 'update_employee',
+                        actionType: 'update',
+                        entityType: 'task' as any, // Re-use closest entity type; rollback handler uses beforeSnapshot
+                        entityId: args.userId,
+                        beforeSnapshot: empBefore,
+                        executedAt: new Date().toISOString(),
+                    }] : undefined,
                 };
             }
 
@@ -1145,14 +1154,14 @@ export async function executeTool(
 
                 const empUser = await getUser(args.userId);
                 const payDate = `${args.month}-15`; // Mid-month date
-                await payEmployee(args.userId, args.amount, args.month, empUser?.name || 'Employee');
+                const payResult = await payEmployee(args.userId, args.amount, args.month, empUser?.name || 'Employee');
                 return {
                     success: true,
                     data: { userId: args.userId, amount: args.amount, month: args.month },
                     summary: `Salary of ${fmtCur(args.amount)} paid to ${empUser?.name || 'employee'} for ${args.month}`,
                     rollbackData: [{
                         toolName: 'pay_employee', actionType: 'create', entityType: 'transaction',
-                        entityId: '', executedAt: new Date().toISOString(),
+                        entityId: payResult.transactionId || '', executedAt: new Date().toISOString(),
                     }],
                 };
             }
@@ -1162,15 +1171,21 @@ export async function executeTool(
                 if (!aiPerms.canPayroll) return { success: false, data: null, summary: '⛔ AI Payroll permission is disabled. Enable it in Settings → AI Settings.' };
 
                 const results: string[] = [];
+                const createdTxnIds: string[] = [];
                 for (const pay of args.payments) {
                     const emp = await getUser(pay.userId);
-                    await payEmployee(pay.userId, pay.amount, args.month, emp?.name || 'Employee');
+                    const payResult = await payEmployee(pay.userId, pay.amount, args.month, emp?.name || 'Employee');
+                    if (payResult.transactionId) createdTxnIds.push(payResult.transactionId);
                     results.push(`${emp?.name || pay.userId}: ${fmtCur(pay.amount)}`);
                 }
                 return {
                     success: true,
                     data: { count: args.payments.length, month: args.month },
                     summary: `Bulk payroll for ${args.month}: ${args.payments.length} employee(s) paid — ${results.join(', ')}`,
+                    rollbackData: createdTxnIds.length > 0 ? [{
+                        toolName: 'bulk_pay_employees', actionType: 'create', entityType: 'transaction',
+                        entityId: createdTxnIds[0], createdEntityIds: createdTxnIds, executedAt: new Date().toISOString(),
+                    }] : undefined,
                 };
             }
 
@@ -1326,6 +1341,13 @@ export async function executeTool(
                     success: true,
                     data: { id: newEmp.id, name: newEmp.name, email: newEmp.email, role: newEmp.role, temporaryPassword: generatedPassword },
                     summary: `Employee "${newEmp.name}" created (${newEmp.role}) — email: ${newEmp.email}. Temporary password: ${generatedPassword} — please change on first login.`,
+                    rollbackData: [{
+                        toolName: 'create_employee',
+                        actionType: 'create',
+                        entityType: 'task' as any, // Uses userId-based deletion in rollback handler
+                        entityId: newEmp.id,
+                        executedAt: new Date().toISOString(),
+                    }],
                 };
             }
 
@@ -1339,6 +1361,13 @@ export async function executeTool(
                 const projSnapshot = await snapshotEntity('project', args.projectId);
                 const proj = await ProjectModel.findOne({ id: args.projectId, agencyId: agency?.id }).lean();
                 if (!proj) return { success: false, data: null, summary: 'Project not found' };
+
+                // Snapshot cascaded data BEFORE deletion so rollback can restore it
+                const [cascadedTasks, cascadedInvoices, cascadedTransactions] = await Promise.all([
+                    TaskModel.find({ projectId: args.projectId, agencyId: agency?.id }).lean(),
+                    InvoiceModel.find({ projectId: args.projectId, agencyId: agency?.id }).lean(),
+                    TransactionModel.find({ projectId: args.projectId, agencyId: agency?.id }).lean(),
+                ]);
 
                 // Clean up uploaded files from blob storage (Vercel Blob + Azure) before deleting asset records
                 const projectAssets = await AssetModel.find({ projectId: args.projectId, agencyId: agency?.id }).select('url').lean();
@@ -1378,7 +1407,14 @@ export async function executeTool(
                     summary: `Project "${(proj as any).name}" and all its data deleted permanently`,
                     rollbackData: projSnapshot ? [{
                         toolName: 'delete_project', actionType: 'delete', entityType: 'project',
-                        entityId: args.projectId, beforeSnapshot: projSnapshot, executedAt: new Date().toISOString(),
+                        entityId: args.projectId,
+                        beforeSnapshot: {
+                            project: projSnapshot,
+                            tasks: cascadedTasks,
+                            invoices: cascadedInvoices,
+                            transactions: cascadedTransactions,
+                        },
+                        executedAt: new Date().toISOString(),
                     }] : undefined,
                 };
             }

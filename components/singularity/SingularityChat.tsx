@@ -64,6 +64,7 @@ interface CheckpointInfo {
     id: string;
     label: string;
     messageIndex: number;
+    messageId?: string; // Stable ID for matching undo button to message
     createdAt: string;
 }
 
@@ -434,21 +435,22 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
 
     // ===================== CHECKPOINT UNDO =====================
 
-    const saveCheckpoint = async (rollbackActions: any[], label: string) => {
-        if (!sessionId || rollbackActions.length === 0) return;
+    const saveCheckpoint = async (rollbackActions: any[], label: string, relatedMessageId?: string) => {
+        const activeSessionId = sessionIdRef.current;
+        if (!activeSessionId || rollbackActions.length === 0) return;
         try {
             const res = await fetch('/api/singularity/history/checkpoint', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    sessionId,
-                    messageIndex: messages.filter(m => !m.isStreaming).length,
+                    sessionId: activeSessionId,
+                    messageIndex: messagesRef.current.filter(m => !m.isStreaming).length,
                     actions: rollbackActions,
                     label,
                 }),
             });
             const data = await res.json();
-            setCheckpoints(prev => [{ id: data.checkpointId, label, messageIndex: messages.length, createdAt: new Date().toISOString() }, ...prev]);
+            setCheckpoints(prev => [{ id: data.checkpointId, label, messageIndex: messagesRef.current.length, messageId: relatedMessageId, createdAt: new Date().toISOString() }, ...prev]);
         } catch (err) {
             console.error('Failed to save checkpoint:', err);
         }
@@ -503,9 +505,9 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
             setCheckpoints(prev => prev.filter(c => c.id !== checkpointId));
             setRollbackModal(null);
 
-            // Save updated messages
-            const truncated = messages.slice(0, cp?.messageIndex || messages.length);
-            saveMessages(truncated, sessionId);
+            // Save updated messages using refs to avoid stale closure
+            const truncated = messagesRef.current.slice(0, cp?.messageIndex || messagesRef.current.length);
+            saveMessages(truncated, sessionIdRef.current);
         } catch (err) {
             console.error('Rollback failed:', err);
         }
@@ -875,7 +877,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                 const actions = [...pendingRollbackRef.current];
                 pendingRollbackRef.current = [];
                 const label = actions.map(a => a.toolName).join(', ');
-                saveCheckpoint(actions, label);
+                saveCheckpoint(actions, label, msgId);
             }
         }
     };
@@ -1653,8 +1655,11 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
 
                                                     {/* Undo button */}
                                                     {!msg.isStreaming && (() => {
-                                                        const msgIndex = messages.indexOf(msg);
-                                                        const cp = checkpoints.find(c => c.messageIndex >= msgIndex - 1 && c.messageIndex <= msgIndex + 2);
+                                                        // Match by stable messageId first, fallback to index range
+                                                        const cp = checkpoints.find(c => c.messageId ? c.messageId === msg.id : (() => {
+                                                            const msgIndex = messages.indexOf(msg);
+                                                            return c.messageIndex >= msgIndex - 1 && c.messageIndex <= msgIndex + 2;
+                                                        })());
                                                         if (!cp) return null;
                                                         return (
                                                             <div className="px-1.5 pb-1.5">
