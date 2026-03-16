@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { addService, deleteService, updateService, getProjectServices } from "@/lib/actions";
+import { addService, deleteService, updateService, getProjectServices, getServiceTaskCount } from "@/lib/actions";
 import { User } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { Plus, Trash2, Edit2, Users, Loader2, X, ChevronDown, Check } from "lucide-react";
+import { Plus, Trash2, Edit2, Users, Loader2, X, ChevronDown, Check, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 type ServiceItem = {
@@ -34,7 +34,8 @@ export function ProjectServices({ projectId, users }: Props) {
     const [loading, setLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editing, setEditing] = useState<ServiceItem | null>(null);
-    const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; taskCount: number } | null>(null);
+    const [checkingDelete, setCheckingDelete] = useState(false);
 
     // Form state
     const [name, setName] = useState("");
@@ -111,8 +112,20 @@ export function ProjectServices({ projectId, users }: Props) {
         }
     };
 
+    const handleDeleteClick = async (service: ServiceItem) => {
+        setCheckingDelete(true);
+        try {
+            const count = await getServiceTaskCount(service.name);
+            setDeleteTarget({ id: service.id, name: service.name, taskCount: count });
+        } catch {
+            toast.error("Failed to check service usage");
+        } finally {
+            setCheckingDelete(false);
+        }
+    };
+
     const handleConfirmDelete = async () => {
-        if (!deleteTarget) return;
+        if (!deleteTarget || deleteTarget.taskCount > 0) return;
         try {
             await deleteService(deleteTarget.id);
             toast.success(`"${deleteTarget.name}" deleted`);
@@ -169,9 +182,10 @@ export function ProjectServices({ projectId, users }: Props) {
                                         variant="ghost"
                                         size="icon"
                                         className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                        onClick={() => setDeleteTarget({ id: service.id, name: service.name })}
+                                        disabled={checkingDelete}
+                                        onClick={() => handleDeleteClick(service)}
                                     >
-                                        <Trash2 className="h-3 w-3" />
+                                        {checkingDelete ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
                                     </Button>
                                 </div>
                             </div>
@@ -207,18 +221,37 @@ export function ProjectServices({ projectId, users }: Props) {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete Service</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to delete <strong>&quot;{deleteTarget?.name}&quot;</strong>? This action cannot be undone.
+                        <AlertDialogDescription asChild>
+                            <div className="space-y-3">
+                                {deleteTarget && deleteTarget.taskCount > 0 ? (
+                                    <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                                        <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                                        <div className="text-sm">
+                                            <p className="font-semibold text-amber-600 dark:text-amber-400">
+                                                Cannot delete &quot;{deleteTarget.name}&quot;
+                                            </p>
+                                            <p className="text-muted-foreground mt-1">
+                                                <strong>{deleteTarget.taskCount} task{deleteTarget.taskCount !== 1 ? 's' : ''}</strong> {deleteTarget.taskCount === 1 ? 'is' : 'are'} still assigned to this service.
+                                                Please reassign those tasks to another service first.
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p>Are you sure you want to delete <strong>&quot;{deleteTarget?.name}&quot;</strong>? This action cannot be undone.</p>
+                                )}
+                            </div>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleConfirmDelete}
-                            className="bg-red-600 hover:bg-red-700 text-white"
-                        >
-                            Delete
-                        </AlertDialogAction>
+                        {deleteTarget && deleteTarget.taskCount === 0 && (
+                            <AlertDialogAction
+                                onClick={handleConfirmDelete}
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                            >
+                                Delete
+                            </AlertDialogAction>
+                        )}
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

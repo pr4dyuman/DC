@@ -1671,6 +1671,14 @@ export async function getProjectServices(projectId: string) {
     return services.map(sanitizeDoc);
 }
 
+export async function getServiceTaskCount(serviceName: string) {
+    await requireAuth();
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const count = await TaskModel.countDocuments({ agencyId: agency?.id, category: serviceName });
+    return count;
+}
+
 export async function createProject(project: Omit<Project, "id" | "status" | "createdAt" | "agencyId">) {
     const currentUser = await getCurrentUser();
     if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
