@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { updateTask, getUsers, getServices, deleteTask, aiEstimateTaskHours } from "@/lib/actions";
+import { updateTask, getUsers, getProjectServices, deleteTask, aiEstimateTaskHours } from "@/lib/actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, Trash2, AlertTriangle, Clock, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -41,7 +41,7 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
         if (open) {
             // Reset confirm delete state when reopened
             setConfirmDelete(false);
-            Promise.all([getUsers(), getServices()]).then(([u, s]) => {
+            Promise.all([getUsers(), getProjectServices(task.projectId)]).then(([u, s]) => {
                 setUsers(u);
                 setServices(s);
             });
@@ -114,12 +114,12 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
                         />
                     </div>
 
-                    {/* Category + Assignee */}
+                    {/* Service + Assignee */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1.5">
-                            <label className={labelCls}>Category</label>
+                            <label className={labelCls}>Service</label>
                             <select disabled={!canEdit} value={category} onChange={e => setCategory(e.target.value)} className={inputCls}>
-                                <option value="">No Category</option>
+                                <option value="">No Service</option>
                                 {services.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                             </select>
                         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createTask, getServices, getUsers, getCurrentUser, aiEstimateTaskHours } from "@/lib/actions";
+import { createTask, getProjectServices, getUsers, getCurrentUser, aiEstimateTaskHours } from "@/lib/actions";
 import type { ExtractedTaskFields } from "@/lib/actions";
 import { AIChatBox } from "./AIChatBox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -42,7 +42,7 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
 
     useEffect(() => {
         if (open) {
-            Promise.all([getUsers(), getServices(), getCurrentUser()]).then(([u, s, currentUser]) => {
+            Promise.all([getUsers(), getProjectServices(projectId), getCurrentUser()]).then(([u, s, currentUser]) => {
                 setUsers(u);
                 setServices(s);
                 if (currentUser) setCurrentUserId(currentUser.id);
@@ -118,12 +118,12 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                             />
                         </div>
 
-                        {/* Category + Assignee */}
+                        {/* Service + Assignee */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="space-y-1.5">
-                                <label className={labelCls}>Category</label>
+                                <label className={labelCls}>Service</label>
                                 <select value={category} onChange={e => setCategory(e.target.value)} className={inputCls}>
-                                    <option value="">No Category</option>
+                                    <option value="">No Service</option>
                                     {services.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                                 </select>
                             </div>

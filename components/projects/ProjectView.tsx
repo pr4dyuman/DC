@@ -195,9 +195,9 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                                         return (
                                             <Badge
                                                 key={svc}
-                                                variant={selectedCategory === svc ? "secondary" : "outline"}
-                                                className={`cursor-pointer text-[10px] transition-all ${selectedCategory === svc ? "bg-primary/15 text-primary hover:bg-primary/25 border-primary/30" : "text-muted-foreground hover:bg-muted border-border/50"}`}
-                                                onClick={() => setSelectedCategory(serviceObj ? serviceObj.id : svc)}
+                                                variant={selectedCategory === displayName ? "secondary" : "outline"}
+                                                className={`cursor-pointer text-[10px] transition-all ${selectedCategory === displayName ? "bg-primary/15 text-primary hover:bg-primary/25 border-primary/30" : "text-muted-foreground hover:bg-muted border-border/50"}`}
+                                                onClick={() => setSelectedCategory(displayName)}
                                             >
                                                 {displayName}
                                             </Badge>
