@@ -1,0 +1,48 @@
+warning: in the working copy of 'app/api/singularity/history/checkpoint/route.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app/api/singularity/history/route.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/chat/ChatComponents.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/chat/ChatOverlay.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/clients/ClientCard.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/dashboard/ClientAssetsSection.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/dashboard/ClientProjectsList.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/dashboard/RecentActivityList.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/finance/FinanceContent.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/layout/ProfileModal.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/layout/Topbar.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/projects/CreateProjectWizard.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/projects/PaymentSettingsCard.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/projects/ProjectServices.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/projects/ProjectsContent.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/singularity/SingularityChat.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/super-admin/AgencyTable.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'components/team/DocumentManager.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'lib/actions/auth.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'lib/auth.ts', LF will be replaced by CRLF the next time Git touches it
+app/api/singularity/history/checkpoint/route.ts
+app/api/singularity/history/route.ts
+components/chat/ChatComponents.tsx
+components/chat/ChatOverlay.tsx
+components/clients/ClientCard.tsx
+components/dashboard/ClientAssetsSection.tsx
+components/dashboard/ClientProjectsList.tsx
+components/dashboard/RecentActivityList.tsx
+components/finance/FinanceContent.tsx
+components/layout/AuthenticatedLayout.tsx
+components/layout/ProfileModal.tsx
+components/layout/Topbar.tsx
+components/projects/CreateProjectWizard.tsx
+components/projects/PaymentSettingsCard.tsx
+components/projects/ProjectServices.tsx
+components/projects/ProjectView.tsx
+components/projects/ProjectsContent.tsx
+components/singularity/SingularityChat.tsx
+components/super-admin/AgencyTable.tsx
+components/team/DocumentManager.tsx
+lib/actions.ts
+lib/actions/auth.ts
+lib/auth.ts
+lib/mongodb.ts
+lib/singularity-history.ts
+lib/singularity-tool-defs.ts
+lib/singularity-tools.ts
+lib/types.ts

@@ -10,6 +10,7 @@ import { Loader2, ArrowUpRight } from "lucide-react";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { Activity } from "@/lib/types";
 import Link from "next/link";
+import { toast } from "sonner";
 
 interface RecentActivityListProps {
     initialActivities: Activity[];
@@ -67,6 +68,7 @@ export function RecentActivityList({ initialActivities }: RecentActivityListProp
             setOffset((prev) => prev + 5);
         } catch (error) {
             console.error("Failed to load more activities", error);
+            toast.error("Failed to load more activity");
         } finally {
             setLoading(false);
         }

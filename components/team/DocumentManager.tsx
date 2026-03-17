@@ -53,6 +53,7 @@ export function DocumentManager({ user, open, onOpenChange, isAdmin, onSuccess }
                 if (onSuccess) onSuccess();
             } catch (error) {
                 console.error("Upload failed", error);
+                toast.error("Failed to upload document");
             }
         };
         reader.readAsDataURL(file);
@@ -75,6 +76,7 @@ export function DocumentManager({ user, open, onOpenChange, isAdmin, onSuccess }
             if (onSuccess) onSuccess();
         } catch (error) {
             console.error("Delete failed", error);
+            toast.error("Failed to delete document");
         } finally {
             setActionLoading(null);
         }
@@ -89,6 +91,7 @@ export function DocumentManager({ user, open, onOpenChange, isAdmin, onSuccess }
             if (onSuccess) onSuccess();
         } catch (error) {
             console.error(`${approve ? 'Approve' : 'Reject'} failed`, error);
+            toast.error(`Failed to ${approve ? 'approve' : 'reject'} documents`);
         } finally {
             setActionLoading(null);
         }
@@ -262,7 +265,7 @@ function DocumentCard({ url, index, type, label, isPending, onPreview, onDelete,
                 />
 
                 {/* Hover Overlay */}
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
+                <div className="absolute inset-0 bg-black/60 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
                     <button
                         onClick={() => onPreview(url)}
                         className="px-3 py-1.5 bg-white text-black rounded-md text-xs font-bold hover:bg-gray-200 transition-colors w-24"

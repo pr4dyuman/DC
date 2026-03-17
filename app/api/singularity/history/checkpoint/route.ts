@@ -10,10 +10,10 @@ import {
 import { getSessionUser } from "@/lib/auth";
 import { validateCsrfOrigin } from "@/lib/validation";
 
-// Helper: verify session ownership
-async function verifySessionOwnership(sessionId: string, authUserId: string): Promise<boolean> {
+// Helper: verify session ownership (scoped inside getSingularitySession)
+async function verifySessionOwnership(sessionId: string): Promise<boolean> {
     const chatSession = await getSingularitySession(sessionId);
-    return !!chatSession && (chatSession as any).userId === authUserId;
+    return !!chatSession;
 }
 
 // GET /api/singularity/history/checkpoint?sessionId=xxx — List checkpoints
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
         }
 
         // Verify ownership
-        if (!(await verifySessionOwnership(sessionId, session.userId))) {
+        if (!(await verifySessionOwnership(sessionId))) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
         if (body.action === "analyze") {
             // Verify ownership via checkpoint's session
             const cpSessionId = await getCheckpointSessionId(body.checkpointId);
-            if (!cpSessionId || !(await verifySessionOwnership(cpSessionId, session.userId))) {
+            if (!cpSessionId || !(await verifySessionOwnership(cpSessionId))) {
                 return NextResponse.json({ error: "Forbidden" }, { status: 403 });
             }
             const analysis = await analyzeRollback(body.checkpointId);
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Verify ownership
-        if (!(await verifySessionOwnership(sessionId, session.userId))) {
+        if (!(await verifySessionOwnership(sessionId))) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
@@ -111,7 +111,7 @@ export async function PUT(req: NextRequest) {
 
         // Verify ownership via the checkpoint's parent session
         const cpSessionId = await getCheckpointSessionId(checkpointId);
-        if (!cpSessionId || !(await verifySessionOwnership(cpSessionId, session.userId))) {
+        if (!cpSessionId || !(await verifySessionOwnership(cpSessionId))) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 

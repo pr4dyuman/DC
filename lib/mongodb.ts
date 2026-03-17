@@ -451,7 +451,8 @@ const InvoiceSchema = new Schema<Invoice>({
     projectId: { type: String, required: true },
     amount: { type: Number, required: true },
     status: { type: String, enum: ['Paid', 'Pending', 'Overdue', 'Processing'], required: true },
-    date: { type: String, required: true }
+    date: { type: String, required: true },
+    performedBy: { type: String }
 }, { timestamps: true });
 
 // Note: id already has index from unique constraint
@@ -494,6 +495,7 @@ const ServiceSchema = new Schema<Service>({
 }, { timestamps: true });
 
 // Note: id already has index from unique constraint
+ServiceSchema.index({ agencyId: 1, projectId: 1, name: 1 }, { unique: true });
 
 // Notification Schema
 const NotificationSchema = new Schema<Notification>({

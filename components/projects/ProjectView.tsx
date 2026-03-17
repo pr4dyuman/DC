@@ -17,6 +17,7 @@ import { AssetList } from "@/components/projects/AssetList";
 import { AddAssetModal } from "@/components/projects/AddAssetModal";
 import { PaymentSettingsCard } from "@/components/projects/PaymentSettingsCard";
 import { ProjectServices } from "@/components/projects/ProjectServices";
+import { toLocalCalendarDay } from "@/lib/date-utils";
 
 type ProjectViewProps = {
     project: Project;
@@ -32,7 +33,9 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
     const fmt = useDateFormat();
     const { format: formatMoney } = useCurrency();
     const projectServices = project.services || [];
-    const filteredCategories = categories.filter(c => projectServices.includes(c.id) || projectServices.includes(c.name));
+    const filteredCategories = categories.filter(c =>
+        c.projectId === project.id && (projectServices.includes(c.id) || projectServices.includes(c.name))
+    );
     const [selectedCategory, setSelectedCategory] = useState<string>("All");
     const [showTeamHours, setShowTeamHours] = useState(false);
 
@@ -99,9 +102,14 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                 {(() => {
                     const total = tasks.length;
                     const done = tasks.filter(t => t.status === 'Done').length;
-                    const today = new Date(); today.setHours(0, 0, 0, 0);
-                    const overdueTasks = tasks.filter(t => t.status !== 'Done' && t.dueDate && new Date(t.dueDate) < today).length;
-                    const isDue = project.dueDate && new Date(project.dueDate) < today && project.status !== 'Completed';
+                    const today = toLocalCalendarDay(new Date());
+                    const overdueTasks = tasks.filter(t => {
+                        if (t.status === 'Done') return false;
+                        const dueDate = toLocalCalendarDay(t.dueDate);
+                        return !!dueDate && !!today && dueDate < today;
+                    }).length;
+                    const projectDueDate = toLocalCalendarDay(project.dueDate);
+                    const isDue = !!projectDueDate && !!today && projectDueDate < today && project.status !== 'Completed';
                     const totalHours = tasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
                     const completedHours = tasks.filter(t => t.status === 'Done').reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
                     const hoursPct = totalHours > 0 ? Math.round((completedHours / totalHours) * 100) : 0;
@@ -190,7 +198,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                             {project.services && project.services.length > 0 && (
                                 <div className="flex flex-wrap gap-1.5">
                                     {project.services.map((svc: string) => {
-                                        const serviceObj = categories.find(c => c.id === svc || c.name === svc);
+                                        const serviceObj = filteredCategories.find(c => c.id === svc);
                                         const displayName = serviceObj ? serviceObj.name : svc;
                                         return (
                                             <Badge

@@ -315,7 +315,7 @@ export function ContactItem({ contact, isActive, onClick, onDelete }: ContactIte
                     <button
                         onClick={handleDeleteClick}
                         title="Delete conversation"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 text-muted-foreground"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 text-muted-foreground"
                     >
                         <Trash2 className="w-3.5 h-3.5" />
                     </button>

@@ -177,7 +177,18 @@ export default function AgencyTable({ agencies }: { agencies: any[] }) {
                     </thead>
                     <tbody className="bg-card divide-y divide-border">
                         {filteredAgencies.slice(0, visibleCount).map((agency) => (
-                            <tr key={agency.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => router.push(`/super-admin/agencies/${agency.id}`)}>
+                            <tr
+                                key={agency.id}
+                                className="hover:bg-muted/50 cursor-pointer"
+                                onClick={() => router.push(`/super-admin/agencies/${agency.id}`)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        router.push(`/super-admin/agencies/${agency.id}`);
+                                    }
+                                }}
+                                tabIndex={0}
+                            >
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div>
                                         <div className="font-medium text-foreground">{agency.name}</div>

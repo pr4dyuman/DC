@@ -8,12 +8,13 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Task, UserPermissions } from "@/lib/types";
 import { Sparkles, Calendar, Flag, ArrowRightLeft } from "lucide-react";
+import { toLocalCalendarDay } from "@/lib/date-utils";
 
 const STATUS_ORDER = ['Todo', 'In Progress', 'Review', 'Done'] as const;
 import { AIExplanationModal } from "./AIExplanationModal";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { updateTask } from "@/lib/actions";
+import { updateTask, getUsers } from "@/lib/actions";
 
 type TaskPriority = 'Low' | 'Medium' | 'High';
 const PRIORITY_CYCLE: TaskPriority[] = ['Low', 'Medium', 'High'];
@@ -52,8 +53,13 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, read
     const assigneeMenuRef = useRef<HTMLDivElement>(null);
     const [isPending, startTransition] = useTransition();
     const [mounted, setMounted] = useState(false);
+    const [assigneeOptions, setAssigneeOptions] = useState(users.filter(u => u.role?.toLowerCase() !== 'client'));
 
     useEffect(() => { setMounted(true); }, []);
+
+    useEffect(() => {
+        setAssigneeOptions(users.filter(u => u.role?.toLowerCase() !== 'client'));
+    }, [users]);
 
     useEffect(() => {
         if (shouldHighlight) {
@@ -75,14 +81,35 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, read
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
+    const canEdit = !readOnly && ((permissions?.canManageTasks ?? true) || permissions?.deleteAccess === 'any' || (permissions?.deleteAccess === 'own' && task.createdBy === currentUserId));
+
+    useEffect(() => {
+        if (!showAssigneeMenu || !canEdit) return;
+
+        let cancelled = false;
+        getUsers()
+            .then((loadedUsers) => {
+                if (!cancelled) {
+                    setAssigneeOptions(loadedUsers.filter((user) => user.role !== 'client'));
+                }
+            })
+            .catch((error) => {
+                console.error("Failed to load assignable users", error);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [showAssigneeMenu, canEdit]);
+
     const style: React.CSSProperties = dragOverlay
         ? { cursor: 'grabbing' }
         : disableDrag
             ? { opacity: 1 }
             : { opacity: isDragging ? 0.4 : 1, cursor: 'grab' };
 
-    const assignee = users.find(u => u.id === task.assigneeId);
-    const canEdit = !readOnly && ((permissions?.canManageTasks ?? true) || permissions?.deleteAccess === 'any' || (permissions?.deleteAccess === 'own' && task.createdBy === currentUserId));
+    const assigneeLookup = assigneeOptions.length > 0 ? assigneeOptions : users;
+    const assignee = assigneeLookup.find(u => u.id === task.assigneeId);
 
 
     // ── Quick: cycle priority ─────────────────────────────────────────────────
@@ -135,7 +162,7 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, read
     };
 
     const priority = task.priority as TaskPriority | undefined;
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const today = toLocalCalendarDay(fmt.dateKey(new Date()));
 
     return (
         <div ref={dragOverlay ? undefined : setNodeRef} style={style} {...(dragOverlay ? {} : attributes)} {...(dragOverlay || disableDrag ? {} : listeners)} className={`mb-3 ${disableDrag ? '' : 'touch-none'}`}>
@@ -213,7 +240,7 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, read
                                             Assign to
                                         </div>
                                         <div className="max-h-48 overflow-y-auto no-scrollbar">
-                                            {users.map(u => (
+                                        {assigneeOptions.map(u => (
                                                 <button
                                                     key={u.id}
                                                     onClick={(e) => handleAssigneeChange(e, u.id)}
@@ -249,8 +276,8 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, read
                     <div className="px-4 pb-3 pt-0">
                         <div className="flex items-center gap-2 text-[11px] sm:text-[10px] text-muted-foreground font-medium min-w-0 flex-wrap pt-2.5 border-t border-border/40">
                             {task.dueDate && (() => {
-                                const due = new Date(task.dueDate); due.setHours(0, 0, 0, 0);
-                                const isOverdue = due < today && task.status !== 'Done';
+                                const due = toLocalCalendarDay(fmt.dateKey(task.dueDate));
+                                const isOverdue = !!due && !!today && due < today && task.status !== 'Done';
                                 return (
                                     <div className={`flex items-center gap-1.5 shrink-0 ${isOverdue ? 'text-red-500' : ''}`}>
                                         <Calendar className={`w-3 h-3 shrink-0 ${isOverdue ? 'text-red-500' : 'text-yellow-500'}`} />

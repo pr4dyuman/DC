@@ -10,6 +10,7 @@ import { CreateProjectWizard } from "@/components/projects/CreateProjectWizard";
 import { useCurrency } from "@/context/CurrencyContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useProgressiveList } from "@/hooks/use-infinite-scroll";
+import { toLocalCalendarDay } from "@/lib/date-utils";
 
 const STATUS_STYLES: Record<string, string> = {
     Active: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
@@ -20,8 +21,9 @@ const STATUS_STYLES: Record<string, string> = {
 
 function DaysLabel({ dueDate, status }: { dueDate?: string; status: string }) {
     if (!dueDate || status === 'Completed') return null;
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const due = new Date(dueDate); due.setHours(0, 0, 0, 0);
+    const today = toLocalCalendarDay(new Date());
+    const due = toLocalCalendarDay(dueDate);
+    if (!due || !today) return null;
     const diff = differenceInCalendarDays(due, today);
 
     if (diff < 0) return (
@@ -75,7 +77,7 @@ export function ProjectsContent({
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager';
-    const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
+    const today = useMemo(() => toLocalCalendarDay(new Date()) ?? new Date(), []);
 
     // Per-project computed data
     const projectData = useMemo(() => {
@@ -86,7 +88,8 @@ export function ProjectsContent({
             const todo = pTasks.filter((t: any) => t.status === 'Todo').length;
             const total = pTasks.length;
             const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-            const isOverdue = p.dueDate && new Date(p.dueDate) < today && p.status !== 'Completed';
+            const due = toLocalCalendarDay(p.dueDate);
+            const isOverdue = !!due && due < today && p.status !== 'Completed';
             const assigneeIds = [...new Set(pTasks.map((t: any) => t.assigneeId).filter(Boolean))] as string[];
             const totalAssignees = assigneeIds.length;
             const assignees = assigneeIds.slice(0, 3).map(id => allUsers.find((u: any) => u.id === id)).filter(Boolean);
@@ -106,8 +109,8 @@ export function ProjectsContent({
             if (sortBy === 'name') return a.name.localeCompare(b.name);
             if (sortBy === 'budget') return (b.budget || 0) - (a.budget || 0);
             if (sortBy === 'progress') return b.pct - a.pct;
-            const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
-            const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+            const da = toLocalCalendarDay(a.dueDate)?.getTime() ?? Infinity;
+            const db = toLocalCalendarDay(b.dueDate)?.getTime() ?? Infinity;
             return da - db;
         });
         return list;
@@ -139,7 +142,7 @@ export function ProjectsContent({
                                     <Badge variant="outline" className="font-normal text-xs">{project.client}</Badge>
                                 )}
                                 {project.services?.slice(0, 2).map((svcId: string) => {
-                                    const svc = services.find((s: any) => s.id === svcId || s.name === svcId);
+                                    const svc = services.find((s: any) => s.id === svcId);
                                     return (
                                         <Badge key={svcId} variant="secondary" className="font-normal text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
                                             {svc?.name || svcId}

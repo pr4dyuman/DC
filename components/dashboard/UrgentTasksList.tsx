@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { differenceInCalendarDays } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useInView } from "react-intersection-observer";
 import { getHighPriorityTasks } from "@/lib/actions";
 import { Loader2, AlertCircle } from "lucide-react";
 import Link from "next/link";
+import { toLocalCalendarDay } from "@/lib/date-utils";
 
 interface Task {
     id: string;
@@ -54,8 +56,7 @@ export function UrgentTasksList({ initialTasks }: UrgentTasksListProps) {
         if (inView) loadMore();
     }, [inView]);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = toLocalCalendarDay(new Date());
 
     return (
         <Card className="col-span-4 transition-all duration-300 hover:shadow-md">
@@ -75,11 +76,10 @@ export function UrgentTasksList({ initialTasks }: UrgentTasksListProps) {
                             <p className="text-sm text-muted-foreground text-center py-8">🎉 No urgent tasks right now</p>
                         )}
                         {tasks.map((task) => {
-                            const due = new Date(task.dueDate);
-                            due.setHours(0, 0, 0, 0);
-                            const daysUntilDue = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                            const isOverdue = daysUntilDue < 0;
-                            const isDueSoon = daysUntilDue >= 0 && daysUntilDue <= 2;
+                            const due = toLocalCalendarDay(task.dueDate);
+                            const daysUntilDue = due && today ? differenceInCalendarDays(due, today) : null;
+                            const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
+                            const isDueSoon = daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 2;
 
                             return (
                                 <Link
@@ -99,7 +99,9 @@ export function UrgentTasksList({ initialTasks }: UrgentTasksListProps) {
                                             <span className="text-indigo-400">{task.projectName}</span>
                                         </p>
                                         <p className={`text-xs mt-0.5 font-medium ${isOverdue ? 'text-red-400' : isDueSoon ? 'text-amber-400' : 'text-muted-foreground'}`}>
-                                            {isOverdue
+                                            {daysUntilDue === null
+                                                ? 'No due date'
+                                                : isOverdue
                                                 ? `Overdue by ${Math.abs(daysUntilDue)}d`
                                                 : daysUntilDue === 0
                                                     ? 'Due today'

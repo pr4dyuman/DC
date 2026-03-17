@@ -534,7 +534,7 @@ export async function executeTool(
                 if (args.budget !== undefined) projUpdates.budget = args.budget;
                 if (args.dueDate) projUpdates.dueDate = args.dueDate;
                 if (args.status) projUpdates.status = args.status;
-                if (args.services) projUpdates.services = args.services;
+                if (Array.isArray(args.services)) projUpdates.services = args.services;
 
                 // Timestamp backdating (applied directly via MongoDB)
                 const projTimestamps: Record<string, any> = {};
@@ -695,12 +695,13 @@ export async function executeTool(
 
                 for (const task of projectTasks) {
                     try {
-                        const setFields: Record<string, any> = {};
+                        const editUpdates: Record<string, any> = {};
+                        const timestampUpdates: Record<string, any> = {};
 
                         // Apply common field updates
                         if (args.updates) {
-                            if (args.updates.priority) setFields.priority = args.updates.priority;
-                            if (args.updates.category) setFields.category = args.updates.category;
+                            if (args.updates.priority) editUpdates.priority = args.updates.priority;
+                            if (args.updates.category) editUpdates.category = args.updates.category;
                         }
 
                         // Auto-backdate createdAt: spread tasks across a date range
@@ -712,18 +713,25 @@ export async function executeTool(
                             const taskDate = new Date(rangeStart + fraction * (rangeEnd - rangeStart));
                             // Add small random offset (0-2 days) for realism
                             taskDate.setDate(taskDate.getDate() + Math.floor(Math.random() * 3));
-                            setFields.createdAt = taskDate.toISOString();
+                            timestampUpdates.createdAt = taskDate.toISOString();
                         }
 
                         // Auto-backdate updatedAt: set Done tasks' updatedAt to dueDate + 1-2 days
                         if (args.autoBackdateUpdatedAt && task.status === 'Done' && task.dueDate) {
                             const due = new Date(task.dueDate);
                             due.setDate(due.getDate() + Math.floor(Math.random() * 2) + 1);
-                            setFields.updatedAt = due.toISOString();
+                            timestampUpdates.updatedAt = due.toISOString();
                         }
 
-                        if (Object.keys(setFields).length > 0) {
-                            await TaskModel.updateOne({ id: task.id }, { $set: setFields }, { timestamps: false });
+                        if (Object.keys(editUpdates).length > 0) {
+                            await updateTask(task.id, editUpdates);
+                        }
+
+                        if (Object.keys(timestampUpdates).length > 0) {
+                            await TaskModel.updateOne({ id: task.id }, { $set: timestampUpdates }, { timestamps: false });
+                        }
+
+                        if (Object.keys(editUpdates).length > 0 || Object.keys(timestampUpdates).length > 0) {
                             edited++;
                         }
                     } catch (err: any) {
@@ -783,7 +791,9 @@ export async function executeTool(
                 if (args.startDate) {
                     startDate = new Date(args.startDate);
                 } else {
-                    const projectForDate = await ProjectModel.findOne({ id: args.projectId }).lean();
+                    const { getCurrentAgency } = await import('./agency-context');
+                    const agency = await getCurrentAgency();
+                    const projectForDate = await ProjectModel.findOne({ id: args.projectId, agencyId: agency?.id }).lean();
                     startDate = projectForDate?.createdAt ? new Date(projectForDate.createdAt as string) : new Date();
                 }
                 let currentDate = new Date(startDate);
@@ -844,7 +854,8 @@ export async function executeTool(
                         if (task.completedAt && taskStatus === 'Done') {
                             await TaskModel.updateOne(
                                 { id: newTask.id },
-                                { $set: { updatedAt: new Date(task.completedAt).toISOString() } }
+                                { $set: { updatedAt: new Date(task.completedAt).toISOString() } },
+                                { timestamps: false }
                             );
                         }
 
@@ -1251,7 +1262,7 @@ export async function executeTool(
 
             case "update_service": {
                 const svcSnapshot = await snapshotEntity('service', args.serviceId);
-                await updateService(args.serviceId, args.name, args.projectId || '', args.employees || []);
+                await updateService(args.serviceId, args.name, args.projectId, args.employees || []);
                 return {
                     success: true,
                     data: { serviceId: args.serviceId, name: args.name },

@@ -29,12 +29,12 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
     if (!project || !transactions) return null;
 
     const projectTransactions = transactions.filter(t => t.projectId === project.id);
-    const totalPaid = projectTransactions
-        .filter(t => t.type === 'income' && t.category === 'Project')
+    const completedIncomeTransactions = projectTransactions.filter(t => t.type === 'income' && t.status === 'completed');
+    const completedExpenseTransactions = projectTransactions.filter(t => t.type === 'expense' && t.status === 'completed');
+    const totalPaid = completedIncomeTransactions
         .reduce((acc, curr) => acc + curr.amount, 0);
 
-    const totalExpenses = projectTransactions
-        .filter(t => t.type === 'expense')
+    const totalExpenses = completedExpenseTransactions
         .reduce((acc, curr) => acc + curr.amount, 0);
 
     const netProfit = totalPaid - totalExpenses;
@@ -204,7 +204,7 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
                             {formatMoney(totalPaid)}
                         </div>
                         <p className="text-xs text-emerald-400/70 mt-1">
-                            {projectTransactions.filter(t => t.type === 'income').length} payment{projectTransactions.filter(t => t.type === 'income').length !== 1 ? 's' : ''} received
+                            {completedIncomeTransactions.length} payment{completedIncomeTransactions.length !== 1 ? 's' : ''} received
                         </p>
                     </CardContent>
                 </Card>

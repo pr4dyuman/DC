@@ -1,0 +1,605 @@
+PROJECT SYNC & CONSISTENCY AUDIT
+Generated: 2026-03-17
+Scope: Whole-project cross-feature data consistency and synchronization (static code audit)
+Focus: finance parity, project/task scope parity, role-flow parity, filtering parity, cross-page metric consistency
+
+========================================================================
+STATUS UPDATE (2026-03-17 AFTER PATCHES)
+========================================================================
+
+This file started as a static audit snapshot. The statuses below reflect the
+current codebase after the follow-up fixes applied on 2026-03-17.
+
+FIXED IN CODE:
+- SYNC-001 through SYNC-048
+
+FINAL STATUS:
+- No confirmed sync items from this audit remain open in code after the 2026-03-17 patch pass.
+- SYNC-022 + SYNC-025 closed by moving the remaining client-gated dashboard routes behind server route-entry guards.
+- SYNC-026 closed by moving chat overlay and messages page onto one shared chat state/polling hook.
+- SYNC-046 closed by routing `updateTaskStatus` through the same runtime status-change effects engine used by `updateTask`.
+- Manual smoke testing is still recommended after deployment, but the audit list itself is now fully closed.
+
+========================================================================
+A) CONFIRMED SYNC / CONSISTENCY BUGS
+========================================================================
+
+[HIGH] SYNC-001: Dashboard revenue metric and Finance revenue metric use different formulas
+Files:
+- lib/actions.ts:401
+- lib/actions.ts:3531-3533
+Evidence:
+- getDashboardMetrics() computes revenue as totalIncome - totalRefunds.
+- getFinanceStats() computes totalRevenue as completed income only, and refunds are only reflected in expenses.
+Impact:
+- "Total Revenue" on dashboard can differ from finance revenue for same date scope/data.
+
+[HIGH] SYNC-002: Dashboard revenue chart includes non-completed transactions while Finance chart excludes them
+Files:
+- lib/actions.ts:461-495
+- lib/actions.ts:3574-3581
+Evidence:
+- getRevenueData() aggregates by type without status filtering.
+- getFinanceChartData() includes only transactions where status === 'completed'.
+Impact:
+- Monthly chart values differ between Dashboard and Finance for the same agency.
+
+[HIGH] SYNC-003: Client "Total Due" logic is inconsistent across pages/status sets
+Files:
+- components/finance/FinanceContent.tsx:77
+- lib/actions.ts:3049
+- lib/actions.ts:596
+Evidence:
+- Client finance page total due counts only status 'Pending'.
+- getClientFinanceData() pendingAmount includes Pending + Processing + Overdue.
+- getClientDashboardData() pending invoices include Pending + Overdue.
+Impact:
+- Same client can see different "due" amount depending on page.
+
+[HIGH] SYNC-004: Client project filter can be overridden in transaction/invoice fetchers
+Files:
+- lib/actions.ts:3014-3024
+- lib/actions.ts:3231-3239
+Evidence:
+- When projectId is provided, query.projectId is set.
+- For client role, code overwrites query.projectId with all client project IDs.
+Impact:
+- Project-scoped views may silently return all client project data instead of selected project data.
+
+[MEDIUM] SYNC-005: Project finance summary counts pending/unapproved transactions in totals
+Files:
+- components/finance/ProjectFinanceSummary.tsx:31-38
+- lib/actions.ts:3029-3033
+Evidence:
+- ProjectFinanceSummary totals use all project transactions with no status check.
+- Data source getTransactions() returns mixed statuses.
+Impact:
+- "Collected", "Expenses", and "Net Profit" can include pending values and disagree with completed-only finance stats.
+
+[MEDIUM] SYNC-006: Project finance "Collected" excludes non-Project income categories
+Files:
+- components/finance/ProjectFinanceSummary.tsx:32-34
+- lib/actions.ts:3144-3147
+Evidence:
+- Summary counts paid only when type === 'income' AND category === 'Project'.
+- Project-linked "Retainer" income exists and can include projectId.
+Impact:
+- Project-level collected amount can be lower than actual received amount for the project.
+
+[MEDIUM] SYNC-007: Client detail invoice card mixes amount/count criteria
+Files:
+- app/dashboard/clients/[slug]/page.tsx:395
+- lib/actions.ts:3049
+Evidence:
+- Card amount uses financeData.stats.pendingAmount (Pending + Processing + Overdue).
+- Card subtitle count uses only invoices with status === 'Pending'.
+Impact:
+- Same card shows amount/count that are computed from different populations.
+
+[MEDIUM] SYNC-008: Export report currency labeling is hardcoded to Rs
+Files:
+- components/dashboard/ExportReportButton.tsx:61-67
+- components/dashboard/ExportReportButton.tsx:84
+- components/dashboard/ExportReportButton.tsx:94
+Evidence:
+- Summary and CSV headers hardcode "Rs" and "Amount (Rs)".
+Impact:
+- Exported financial reports can disagree with app currency settings and displayed values.
+
+[MEDIUM] SYNC-009: Topbar unread count can underreport for users with >50 notifications
+Files:
+- components/layout/Topbar.tsx:63-65
+- lib/actions.ts:666
+Evidence:
+- Topbar fetches notifications via getNotifications(user.id), default limit is 50.
+- unreadCount is computed only from fetched subset.
+Impact:
+- Bell badge can show stale/lower count than true unread notifications.
+
+[MEDIUM] SYNC-010: Two different client financial summary engines can diverge
+Files:
+- lib/actions.ts:563-623 (getClientDashboardData)
+- lib/actions.ts:3047-3057 (getClientFinanceData)
+- lib/actions.ts:4933-4943 (getClientFinancialSummary)
+Evidence:
+- Multiple functions compute similar client totals with different status/category handling paths.
+Impact:
+- Different screens/services can drift in totals over time when business rules evolve in only one function.
+
+[MEDIUM] SYNC-011: Refund deduction rules differ between client financial calculators
+Files:
+- lib/actions.ts:607
+- lib/actions.ts:3050
+- lib/actions.ts:4937
+Evidence:
+- getClientDashboardData() subtracts refunds using category === 'Refund' with no type check.
+- getClientFinanceData() and getClientFinancialSummary() subtract refunds only when type === 'expense' and category === 'Refund'.
+Impact:
+- Client totals can diverge between dashboard, client detail, and shared summary paths when transaction typing is inconsistent.
+
+[MEDIUM] SYNC-012: "Recent transactions" on client dashboard are not guaranteed to be recent
+Files:
+- lib/actions.ts:580
+- components/dashboard/ClientFinancialOverview.tsx:25
+Evidence:
+- getClientDashboardData() fetches transactions without explicit sort.
+- ClientFinancialOverview uses transactions.slice(0, 5) as "Recent Transactions".
+Impact:
+- The "Recent Transactions" panel can show arbitrary order depending on DB return order.
+
+[MEDIUM] SYNC-013: Client assets/tasks can show "Unknown Project" due to sliced project map
+Files:
+- components/dashboard/DashboardContent.tsx:24
+- components/dashboard/ClientDashboard.tsx:185-190
+- components/dashboard/ClientAssetsSection.tsx:29-31
+- components/dashboard/ClientTaskOverview.tsx:31-39
+Evidence:
+- ClientDashboard receives only data.projects.slice(0, 5) as project map.
+- Asset/task widgets resolve names/slugs from that limited subset and fallback to Unknown/empty.
+Impact:
+- Cross-widget mapping can break for valid data belonging to projects outside the first 5.
+
+[MEDIUM] SYNC-014: InvoiceManager omits Overdue from filter chips and action branches
+Files:
+- components/finance/InvoiceManager.tsx:208
+- components/finance/InvoiceManager.tsx:272-287
+- components/finance/InvoiceManager.tsx:312-314
+Evidence:
+- Status chip list includes all, Pending, Processing, Paid (no Overdue).
+- Client/admin action rendering has no explicit Overdue branch.
+Impact:
+- Overdue invoices behave inconsistently in UI and cannot be filtered/handled equivalently to pending invoices.
+
+[MEDIUM] SYNC-015: Dashboard overdue invoice counter includes Processing invoices
+Files:
+- lib/actions.ts:391
+- lib/actions.ts:414
+Evidence:
+- Source set includes Pending, Overdue, Processing.
+- Overdue count condition marks any invoice with date < today and status !== Paid as overdue.
+Impact:
+- "Overdue" metric can be inflated by Processing invoices that are awaiting admin approval, not unpaid by client.
+
+[MEDIUM] SYNC-016: Export summary uses narrower status model than in-app finance
+Files:
+- lib/exportActions.ts:49-50
+- lib/exportActions.ts:64-67
+- lib/types.ts:331
+Evidence:
+- Export "Pending" count excludes Processing.
+- Export task summary tracks Todo/In Progress/Done only and omits Review status.
+Impact:
+- Exported reports can disagree with dashboard/finance screens for the same period.
+
+[MEDIUM] SYNC-017: Project finance payment count and payment amount use different inclusion rules
+Files:
+- components/finance/ProjectFinanceSummary.tsx:32-34
+- components/finance/ProjectFinanceSummary.tsx:207
+Evidence:
+- Amount ("Collected") includes only income where category === 'Project'.
+- "payments received" count includes all income categories.
+Impact:
+- Same card can display a payment count that does not correspond to the amount shown.
+
+[MEDIUM] SYNC-018: Project drilldown cards and summary use different transaction status scopes
+Files:
+- components/finance/FinanceContent.tsx:118
+- components/finance/FinanceContent.tsx:254
+- components/finance/FinanceContent.tsx:265
+Evidence:
+- Summary stats come from getFinanceStats() (completed-only transaction math).
+- Project transaction cards in drilldown use transactions filtered by type only (includes pending).
+Impact:
+- A single project finance view can show cards/lists that do not reconcile with top summary figures.
+
+========================================================================
+B) RISK PATTERNS OBSERVED
+========================================================================
+
+- Financial totals are recalculated in multiple independent functions instead of one shared calculator.
+- Invoice "pending" semantics are inconsistent (Pending-only vs Pending+Overdue vs Pending+Processing+Overdue).
+- Project-scoped financial screens rely on actions that can broaden scope for client role.
+- Several UI cards mix count and amount from different status populations.
+
+========================================================================
+C) RECOMMENDED FIX ORDER
+========================================================================
+
+1) SYNC-004 (project-scope override bug in getTransactions/getInvoices)
+2) SYNC-001 + SYNC-002 (unify dashboard/finance formulas and status filters)
+3) SYNC-003 + SYNC-007 (standardize pending invoice statuses globally)
+4) SYNC-005 + SYNC-006 (project summary parity with finance definitions)
+5) SYNC-008 + SYNC-009 (export currency + unread count correctness)
+6) SYNC-010 (single shared financial summary utility for clients)
+7) SYNC-011 + SYNC-012 (align client-side financial calculators and ordering)
+8) SYNC-013 + SYNC-014 (fix sliced project mapping and overdue invoice UX gaps)
+9) SYNC-015 + SYNC-016 + SYNC-018 (unify overdue/pending/reporting scopes)
+10) SYNC-017 (align project payment count and amount rules)
+11) SYNC-019 (align employee project scope between dashboard and projects page)
+12) SYNC-021 + SYNC-022 (move critical access checks to server-page boundary)
+13) SYNC-020 + SYNC-024 (fix team/dashboard metric-definition mismatches)
+14) SYNC-023 (project-level user scoping for project detail data payload)
+15) SYNC-025 (convert client-guarded dashboard pages to server-gated pages)
+16) SYNC-026 (unify chat state/polling between overlay and messages page)
+17) SYNC-027 (normalize overdue date math across UTC/local timezone paths)
+18) SYNC-028 (fix invoice export field mapping to actual invoice schema)
+19) SYNC-029 (align chat error handling behavior across chat surfaces)
+20) SYNC-030 (fix payroll batch-result accounting mismatch)
+21) SYNC-031 (fix project auto-completion logic for On Hold projects)
+22) SYNC-032 (fix dashboard high-priority counter project scope)
+23) SYNC-033 (fix notification pagination skipping during old-entry deletion)
+24) SYNC-034 + SYNC-035 (unify employee project scope and block client metric leakage)
+25) SYNC-036 + SYNC-041 + SYNC-042 (unify project-level and global finance status/category rules)
+26) SYNC-037 + SYNC-038 (enforce service/category validation for tasks and transactions)
+27) SYNC-039 (fix project deletion cleanup for activity logs)
+28) SYNC-040 (add performedBy audit trail to invoices)
+29) SYNC-043 (align team investment logic with Investor category summary)
+30) SYNC-044 + SYNC-045 (align payroll and team finance logic with transaction status checks)
+31) SYNC-046 (unify updateTask and updateTaskStatus notification engines to prevent silent edits)
+32) SYNC-047 + SYNC-048 (cascade logical status overrides for projects and tasks when client or user is archived)
+
+========================================================================
+D) PRECISION NOTE
+========================================================================
+
+This report is from static code analysis only. It confirms logic-level inconsistency risks and deterministic mismatches in formulas/filters.
+Runtime validation (seeded fixtures + cross-page snapshot assertions) is recommended to quantify exact UI-visible deltas.
+
+========================================================================
+E) DEEPER PASS COVERAGE
+========================================================================
+
+- Additional deep pass scanned app/, components/, and lib/ for consistency signatures across finance, projects, tasks, team, clients, chat, settings, and route guards.
+- Source files included in pass: 234
+- Source lines traversed in pass: 46,129
+- Deep pass method: formula/status pattern sweeps + targeted file-level reads for reconciliation paths.
+
+========================================================================
+F) ADDITIONAL WHOLE-PROJECT FINDINGS (NON-FINANCE)
+========================================================================
+
+[HIGH] SYNC-019: Employee project scope differs between Dashboard and Projects pages
+Files:
+- components/dashboard/DashboardContent.tsx:127-130
+- lib/actions.ts:646, 653-654 (getEmployeeDashboardData)
+- app/dashboard/projects/page.tsx:9-15, 20-24
+- lib/actions.ts:702-708 (getProjects)
+- lib/actions.ts:2089-2097 (getAllProjectTasks)
+Evidence:
+- Employee dashboard derives projects from tasks assigned to that employee.
+- Projects page loads getProjects() + getAllProjectTasks() + getUsers() agency-wide.
+- getProjects() only narrows scope for clients, not employees.
+Impact:
+- Employees can see "My Projects" count on dashboard but browse a larger project universe on projects page, causing scope inconsistency.
+
+[MEDIUM] SYNC-020: Team page employee count logic conflicts with role filters
+Files:
+- app/dashboard/team/page.tsx:97
+- app/dashboard/team/page.tsx:104
+- app/dashboard/team/page.tsx:236-238
+Evidence:
+- "Employees" stat includes both employee + manager.
+- Employee filter itself matches only role === 'employee', while manager has separate filter.
+Impact:
+- Stats bar and filter chips disagree on what "Employee" means, producing inconsistent totals.
+
+[HIGH] SYNC-021: Team page fetches full member list before role guard redirect
+Files:
+- app/dashboard/team/page.tsx:47-50
+- app/dashboard/team/page.tsx:58-62
+Evidence:
+- loadData() fetches getUsers()/getArchivedUsers() before verifying current role.
+- Client redirect happens only after user data fetch and getUser() check.
+Impact:
+- Unauthorized role can trigger full team dataset fetch before being redirected, creating inconsistent access flow.
+
+[HIGH] SYNC-022: Client detail route relies on client-side fetching without server gate
+Files:
+- app/dashboard/clients/[slug]/page.tsx:1
+- app/dashboard/clients/[slug]/page.tsx:87
+- app/dashboard/clients/[slug]/page.tsx:117-127
+Evidence:
+- Route is a client component and loads target client data by slug via actions in browser-driven flow.
+- No server page-level access gate is executed before data fetch path starts.
+Impact:
+- Access policy depends on downstream action checks rather than route-level guard, making behavior inconsistent with server-guarded dashboard pages.
+
+[MEDIUM] SYNC-023: Project detail page overfetches full user directory for single project context
+Files:
+- app/dashboard/projects/[slug]/page.tsx:28-31
+- app/dashboard/projects/[slug]/page.tsx:50
+Evidence:
+- Project page always fetches getUsers() and passes complete users array into ProjectView.
+- Dataset is not constrained to assignees or project participants.
+Impact:
+- Single-project views can use a broader user context than project-scoped widgets elsewhere, causing data-scope drift and inconsistent UX.
+
+[MEDIUM] SYNC-024: Employee "Done This Week" metric uses task creation date
+Files:
+- components/dashboard/DashboardContent.tsx:176-181
+Evidence:
+- Metric counts done tasks where createdAt is within 7 days, not completion timestamp.
+Impact:
+- Weekly completion card can disagree with real completion activity and task timelines.
+
+[HIGH] SYNC-025: Multiple dashboard routes are client-gated instead of server-gated
+Files:
+- app/dashboard/settings/page.tsx:1, 87-96
+- app/dashboard/team/page.tsx:1, 47-50, 58-62
+- app/dashboard/clients/page.tsx:1
+- app/dashboard/team/[username]/page.tsx:1
+- app/dashboard/clients/[slug]/page.tsx:1
+Evidence:
+- Several dashboard pages are `use client` pages that perform role checks after mount.
+- Route access decision is deferred to client-side redirects rather than server-page guard.
+Impact:
+- Access behavior is inconsistent with server-guarded pages and can trigger unauthorized prefetch/data-load paths before redirect.
+
+[MEDIUM] SYNC-026: Chat overlay and dedicated messages page duplicate independent polling/state engines
+Files:
+- components/chat/ChatOverlay.tsx:21-67
+- app/dashboard/messages/MessagesPageClient.tsx:15-41
+Evidence:
+- Both surfaces maintain separate contact/message state, polling timers, and load/send/delete flows.
+- If both surfaces are active in a session, state freshness and polling workload can diverge.
+Impact:
+- Message/unread consistency can drift between chat entry points and duplicate polling increases stale-sync risk.
+
+[MEDIUM] SYNC-027: Overdue calculation logic mixes UTC-string and local-date comparisons
+Files:
+- lib/actions.ts:413-414
+- components/projects/ProjectsContent.tsx:89
+- components/projects/ProjectView.tsx:105-106
+- app/dashboard/team/[username]/page.tsx:36-39
+Evidence:
+- Finance dashboard overdue count compares invoice `date` to `todayStr` derived from `toISOString()` (UTC date string).
+- Project/task overdue indicators use `new Date(...) < new Date()` local-time comparisons.
+Impact:
+- Around timezone boundaries, finance overdue counters and project/task overdue badges can disagree for the same day.
+
+[MEDIUM] SYNC-028: Invoice export columns do not match invoice schema fields
+Files:
+- lib/exportActions.ts:77-83
+- components/dashboard/ExportReportButton.tsx:94-96
+- lib/mongodb.ts:448-455
+Evidence:
+- Export maps invoice rows using `clientId` and `description`.
+- Invoice schema defines `id, agencyId, projectId, amount, status, date` (no `clientId` or `description` fields).
+Impact:
+- Invoice CSV exports can contain empty/misleading columns, diverging from invoice data shown in the app.
+
+[MEDIUM] SYNC-029: Chat error handling behavior is inconsistent across chat entry points
+Files:
+- app/dashboard/messages/MessagesPageClient.tsx:55, 64
+- components/chat/ChatOverlay.tsx:85-88, 98-101
+Evidence:
+- Messages page suppresses contact/message load errors with empty catch blocks.
+- Chat overlay surfaces the same failures via toasts.
+Impact:
+- Users can see silent chat failures in one surface but explicit errors in another, producing inconsistent reliability signals.
+
+[MEDIUM] SYNC-030: Payroll "Pay All" failure summary can underreport failures
+Files:
+- components/finance/PayrollManager.tsx:31-53
+Evidence:
+- `handlePay()` catches errors internally and does not rethrow.
+- `handlePayAll()` uses `Promise.allSettled()` and counts rejected promises, but promises resolve even on failed payments.
+Impact:
+- Batch payroll completion summary can report fewer failures than actual outcomes, causing finance-operation feedback mismatch.
+
+[MEDIUM] SYNC-031: Project Auto-Completion Inconsistency
+Files:
+- lib/actions.ts:2333-2337
+Evidence:
+- Project auto-completion only triggers if project.status === 'Active'.
+Impact:
+- Projects marked as 'On Hold' will not auto-complete even if all tasks are finished, requiring manual status change.
+
+[LOW] SYNC-032: Dashboard Metrics excludes Completed/On Hold Projects from "High Priority" count
+Files:
+- lib/actions.ts:396, 427-431
+Evidence:
+- `highPriorityCount` only considers tasks belonging to projects with status === 'Active'.
+Impact:
+- High priority tasks in 'On Hold' or 'Completed' projects are hidden from the dashboard's high-priority counter.
+
+[MEDIUM] SYNC-033: Notification deletions during fetch cause pagination skips
+Files:
+- lib/actions.ts:678-685
+Evidence:
+- `getNotifications` deletes old notifications (30+ days) before fetching current page.
+Impact:
+- If notifications on page 1 are deleted while user is on page 2, the next page load (offset) will skip items that shifted up.
+
+[HIGH] SYNC-034: Project List Divergence for Employees
+Files:
+- lib/actions.ts:695-712 (getProjects)
+- app/dashboard/projects/page.tsx:9-15
+- lib/actions.ts:721-726 (getUserProjects)
+Evidence:
+- Projects page uses `getProjects()` which returns all agency projects for employees.
+- Dashboard views often use `getUserProjects()` or `getEmployeeDashboardData()` which filter by assignment.
+Impact:
+- Employees see a limited "My Projects" list on dashboard but a full agency-wide list on the projects page.
+
+[HIGH] SYNC-035: Dashboard Metrics Leak Project Count to Clients
+Files:
+- lib/actions.ts:392-393
+Evidence:
+- `getDashboardMetrics` counts all 'Active' projects in the agency without filtering by clientId.
+Impact:
+- Clients see the total number of active projects in the agency on their dashboard, revealing business volume.
+
+[MEDIUM] SYNC-036: Finance Stats vs. Transactions status logic
+Files:
+- lib/actions.ts:3531-3533
+- components/finance/ProjectFinanceSummary.tsx:31-38
+Evidence:
+- `getFinanceStats` only counts 'completed' transactions for revenue/expenses.
+- Project summary components often use all transactions regardless of status.
+Impact:
+- Project-level financial totals can disagree with global finance stats for the same project.
+
+[MEDIUM] SYNC-037: Task "Category" vs. "Project Service" Sync
+Files:
+- lib/actions.ts:2570 (createTask)
+- lib/actions.ts:1812 (createProject)
+Evidence:
+- Tasks can be created with arbitrary category names that don't exist in the project's service list.
+Impact:
+- Task grouping and service-level reporting can fail or show "Unknown" categories in project views.
+
+[MEDIUM] SYNC-038: Transaction "Category" vs. "Project Service" Sync
+Files:
+- lib/actions.ts:3106 (createTransaction)
+- components/finance/ProjectFinanceSummary.tsx:32-34
+Evidence:
+- Transactions can use specific service names as categories, but project summaries only look for category === 'Project'.
+Impact:
+- Service-specific income might not be counted in project "Collected" totals if category is not 'Project'.
+
+[MEDIUM] SYNC-039: Project Deletion leaves orphaned Activity logs
+Files:
+- lib/actions.ts:1957 (createProject)
+- lib/actions.ts:3010 (deleteProject)
+Evidence:
+- `createProject` logs activity with target = project.name.
+- `deleteProject` only deletes activities with target = project.id.
+Impact:
+- Activity log grows with orphaned entries that link to non-existent projects, potentially causing UI errors or stale data visibility.
+
+[MEDIUM] SYNC-040: Inconsistent Audit Trail for Financial Documents
+Files:
+- lib/actions.ts:3163 (createTransaction)
+- lib/actions.ts:3485 (createInvoice)
+Evidence:
+- Transactions track `performedBy` (user ID), but Invoices do not.
+Impact:
+- Financial audit trail is incomplete; admins cannot see who generated specific invoices in the database.
+
+[HIGH] SYNC-041: Project Budget vs. Invoice Totals Inconsistency
+Files:
+- components/finance/ProjectFinanceSummary.tsx:32-34
+- lib/actions.ts:3106 (createTransaction)
+Evidence:
+- Project summary calculates "Collected" using transactions where category === 'Project'.
+- Transactions can be created with service names (e.g., 'Mobile App') as categories.
+Impact:
+- Payments for specific project services are not reflected in the project's financial summary, showing incorrect "Remaining Budget".
+
+[HIGH] SYNC-042: Inconsistent Client vs. Project "Total Paid" logic
+Files:
+- lib/actions.ts:603 (getClientDashboardData)
+- lib/actions.ts:4933 (getClientFinancialSummary)
+- components/finance/ProjectFinanceSummary.tsx:32-34
+Evidence:
+- Client-level summaries count all income transactions for project-linked projects.
+- Project-level summary only counts transactions with category === 'Project'.
+Impact:
+- Client dashboard shows one total for "Spent", but adding up the "Collected" amounts for each of their projects results in a different total.
+
+[MEDIUM] SYNC-043: Team investment vs 'Investor' category scope mismatch
+Files:
+- components/finance/FinanceContent.tsx:176-193
+- lib/actions.ts:3094-3100
+Evidence:
+- Team view computes "Investment" using income where t.userId === selectedUser.id.
+- Investor category groups by description name (e.g., "Unknown Investor") rather than userId.
+Impact:
+- Investment totals differ between Team drilldown and Investor category summary for the same person/label.
+
+[HIGH] SYNC-044: Payroll status considers pending or failed transactions as "Paid"
+Files:
+- lib/actions.ts:3604-3614
+Evidence:
+- getPayrollStatus() fetches Salary transactions without filtering by status === 'completed'.
+- It marks employee as 'Paid' if any transaction exists for that month, regardless of status.
+Impact:
+- Employees with failed or pending salary payments will show as fully 'Paid' on the payroll dashboard.
+
+[MEDIUM] SYNC-045: Team finance "Total Salary" ignores transaction status
+Files:
+- components/finance/FinanceContent.tsx:179-183
+- components/finance/FinanceContent.tsx:191
+Evidence:
+- salaryTransactions filters only by type, category, and userId.
+- It includes 'pending' or 'failed' transactions in the totalSalary calculation.
+Impact:
+- Team member finance drill-down can inflate total salary payouts by including non-completed transactions.
+
+[HIGH] SYNC-046: Task quick-edit and edit forms bypass all status notifications
+Files:
+- lib/actions.ts:2419-2426 (updateTask)
+- lib/actions.ts:2267-2290 (updateTaskStatus)
+Evidence:
+- `updateTaskStatus` accurately dispatches in-app notifications and calls `sendTaskStatusChangedEmail`.
+- `updateTask`, which is used by `EditTaskModal` and mobile quick-actions (priority/status/assignee dropdowns), only logs an `ActivityModel` and skips all email and in-app notifications entirely.
+Impact:
+- State edits performed via forms or mobile dropdowns silently modify tasks, leaving assignees and clients completely unaware of reassignment or status progression.
+
+[HIGH] SYNC-047: Archived users retain invisible active task assignments
+Files:
+- lib/actions.ts:1474-1483 (deleteUser)
+- lib/actions.ts:758 (getUsers)
+Evidence:
+- Soft-deleting an employee (archive) does not clear their `assigneeId` from active tasks, unlike `permanentlyDeleteUser`.
+- `getUsers()` filters out archived users, so UI components mapping `assigneeId` to users fail to resolve.
+Impact:
+- Tasks assigned to archived employees visually appear "Unassigned" across the dashboard but remain technically assigned in the DB, poisoning workload metrics and hiding required reassignments.
+
+[MEDIUM] SYNC-048: Archiving a client leaves zombie Active projects
+Files:
+- lib/actions.ts:1270-1280 (deleteClient)
+- lib/actions.ts:392-393 (getDashboardMetrics)
+- lib/actions.ts:708 (getProjects)
+Evidence:
+- `deleteClient` marks a client as `archived: true` but does not cascade any status change to their associated projects.
+- `getProjects()` and `getDashboardMetrics()` do not join or check `archived: false` on the associated client model.
+Impact:
+- Archiving a client abandons their projects in the "Active" state. These continue to bloat global active project counts, pipeline stats, and high-priority counters unless manually closed.
+
+========================================================================
+G) CONFIDENCE & REMAINING RISK
+========================================================================
+
+Deep static-audit confidence (logic/filter/scope mismatches): HIGH (~95-99% for code-visible consistency faults in scanned paths).
+
+Not fully eliminable via static audit alone:
+- Runtime race/timing defects under real network latency and rapid UI interaction.
+- Browser/device timezone edge behavior without live session replay.
+- Data-dependent drift requiring seeded fixtures and cross-page snapshot assertions.
+
+To push practical confidence closer to 99% end-to-end:
+1) Run deterministic fixture tests for finance/project/task/client/chat flows.
+2) Execute role-by-role runtime walkthroughs (admin/manager/employee/client) in responsive viewports.
+3) Capture automated cross-page parity snapshots for key metrics and counters after each mutation flow.
+
+========================================================================
+H) PAGE-COVERAGE ADDENDUM (LATEST PASS)
+========================================================================
+
+- Page routes enumerated and reviewed from app/: 42
+- Dashboard page routes reviewed: 11/11
+- Super-admin page routes reviewed: 11/11
+- Remaining app routes reviewed (marketing/auth/plan): 20/20
+- This pass specifically targeted previously uncovered route-level entry points and their linked data flows.

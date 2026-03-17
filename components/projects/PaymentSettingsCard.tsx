@@ -142,7 +142,7 @@ export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {formConfig.type === 'installment' ? (
                                     <>
                                         <div className="space-y-1">
@@ -163,7 +163,7 @@ export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
                                                 onChange={(e) => setFormConfig({ ...formConfig, installmentAmount: parseInt(e.target.value) })}
                                             />
                                         </div>
-                                        <div className="space-y-1 col-span-2">
+                                        <div className="space-y-1 sm:col-span-2">
                                             <Label className="text-xs">First Payment Date</Label>
                                             <DateTimeInput
                                                 type="date"

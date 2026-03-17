@@ -42,11 +42,17 @@ export async function getExportData(startDate: string, endDate: string) {
     const invs = invoices as any[];
     const tsks = tasks as any[];
     const projs = projects as any[];
-
+    const invoiceProjectIds = Array.from(new Set(invs.map((invoice) => invoice.projectId).filter(Boolean)));
+    const invoiceProjects = invoiceProjectIds.length > 0
+        ? await ProjectModel.find({ ...agencyFilter, id: { $in: invoiceProjectIds } }).select('id name').lean()
+        : [];
+    const projectNameById = new Map((invoiceProjects as any[]).map((project) => [project.id, project.name] as const));
     const totalIncome = txns.filter(t => t.type === "income" && t.status === "completed").reduce((s, t) => s + (t.amount || 0), 0);
     const totalExpense = txns.filter(t => t.type === "expense" && t.status === "completed").reduce((s, t) => s + (t.amount || 0), 0);
     const invoicesPaid = invs.filter(i => i.status === "Paid").length;
     const invoicesPending = invs.filter(i => i.status === "Pending").length;
+    const invoicesUnsettled = invs.filter(i => ["Pending", "Processing", "Overdue"].includes(i.status)).length;
+    const invoicesProcessing = invs.filter(i => i.status === "Processing").length;
     const invoicesOverdue = invs.filter(i => i.status === "Overdue").length;
     const totalInvoiced = invs.reduce((s, i) => s + (i.amount || 0), 0);
     const totalPaid = invs.filter(i => i.status === "Paid").reduce((s, i) => s + (i.amount || 0), 0);
@@ -59,10 +65,13 @@ export async function getExportData(startDate: string, endDate: string) {
             totalInvoiced,
             totalPaid,
             invoicesPaid,
+            invoicesUnsettled,
             invoicesPending,
+            invoicesProcessing,
             invoicesOverdue,
             tasksDone: tsks.filter(t => t.status === "Done").length,
             tasksInProgress: tsks.filter(t => t.status === "In Progress").length,
+            tasksReview: tsks.filter(t => t.status === "Review").length,
             tasksTodo: tsks.filter(t => t.status === "Todo").length,
             newProjects: projs.length,
         },
@@ -76,8 +85,8 @@ export async function getExportData(startDate: string, endDate: string) {
         })),
         invoices: invs.map(i => ({
             date: i.date ?? "",
-            clientId: i.clientId ?? "",
-            description: i.description ?? "",
+            projectId: i.projectId ?? "",
+            projectName: projectNameById.get(i.projectId ?? "") ?? "",
             amount: i.amount ?? 0,
             status: i.status ?? "",
         })),

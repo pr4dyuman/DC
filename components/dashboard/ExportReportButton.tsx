@@ -5,6 +5,7 @@ import { Download, Loader2, X, FileSpreadsheet, Calendar } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { getExportData } from "@/lib/exportActions";
 import { useDateFormat } from "@/context/TimezoneContext";
+import { useCurrency } from "@/context/CurrencyContext";
 
 function toCSV(rows: (string | number)[][]): string {
     return rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -33,6 +34,7 @@ function defaultDates() {
 
 export function ExportReportButton() {
     const fmt = useDateFormat();
+    const { symbol } = useCurrency();
     const [open, setOpen] = useState(false);
     const [exporting, setExporting] = useState(false);
     const [error, setError] = useState("");
@@ -58,20 +60,23 @@ export function ExportReportButton() {
                     [`Generated: ${fmt.dateTime(new Date())}`],
                     [],
                     ["FINANCES"],
-                    ["Total Income", `Rs ${data.summary.totalIncome.toLocaleString()}`],
-                    ["Total Expenses", `Rs ${data.summary.totalExpense.toLocaleString()}`],
-                    ["Net Profit", `Rs ${data.summary.netProfit.toLocaleString()}`],
+                    ["Total Income", `${symbol} ${data.summary.totalIncome.toLocaleString()}`],
+                    ["Total Expenses", `${symbol} ${data.summary.totalExpense.toLocaleString()}`],
+                    ["Net Profit", `${symbol} ${data.summary.netProfit.toLocaleString()}`],
                     [],
                     ["INVOICES"],
-                    ["Total Invoiced", `Rs ${data.summary.totalInvoiced.toLocaleString()}`],
-                    ["Total Collected", `Rs ${data.summary.totalPaid.toLocaleString()}`],
+                    ["Total Invoiced", `${symbol} ${data.summary.totalInvoiced.toLocaleString()}`],
+                    ["Total Collected", `${symbol} ${data.summary.totalPaid.toLocaleString()}`],
+                    ["Unsettled", data.summary.invoicesUnsettled],
                     ["Paid", data.summary.invoicesPaid],
                     ["Pending", data.summary.invoicesPending],
+                    ["Processing", data.summary.invoicesProcessing],
                     ["Overdue", data.summary.invoicesOverdue],
                     [],
                     ["TASKS & PROJECTS"],
                     ["Tasks Completed", data.summary.tasksDone],
                     ["Tasks In Progress", data.summary.tasksInProgress],
+                    ["Tasks In Review", data.summary.tasksReview],
                     ["Tasks Todo", data.summary.tasksTodo],
                     ["New Projects", data.summary.newProjects],
                 ];
@@ -81,7 +86,7 @@ export function ExportReportButton() {
             if (exportType === "transactions" || exportType === "all") {
                 if (data.transactions.length > 0) {
                     const rows: (string | number)[][] = [
-                        ["Date", "Description", "Type", "Category", "Amount (Rs)", "Status"],
+                        ["Date", "Description", "Type", "Category", `Amount (${symbol})`, "Status"],
                         ...data.transactions.map(t => [t.date, t.description, t.type, t.category, t.amount, t.status]),
                     ];
                     downloadCSV(`transactions_${label}.csv`, toCSV(rows));
@@ -91,8 +96,8 @@ export function ExportReportButton() {
             if (exportType === "invoices" || exportType === "all") {
                 if (data.invoices.length > 0) {
                     const rows: (string | number)[][] = [
-                        ["Date", "Client ID", "Description", "Amount (Rs)", "Status"],
-                        ...data.invoices.map(i => [i.date, i.clientId, i.description, i.amount, i.status]),
+                        ["Date", "Project", "Project ID", `Amount (${symbol})`, "Status"],
+                        ...data.invoices.map(i => [i.date, i.projectName, i.projectId, i.amount, i.status]),
                     ];
                     downloadCSV(`invoices_${label}.csv`, toCSV(rows));
                 }

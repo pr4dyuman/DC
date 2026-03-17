@@ -254,16 +254,18 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
                                 {/* User Avatar & Name */}
                                 <div className="flex items-start gap-6">
                                     <div className="flex flex-col items-center gap-2">
-                                        <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                                            <Avatar className="h-20 w-20 border-2 border-border shadow-sm">
-                                                <AvatarImage src={avatar} className="object-cover" />
-                                                <AvatarFallback className="text-xl bg-primary/10 text-primary">
-                                                    {name ? name.substring(0, 2).toUpperCase() : "?"}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <Camera className="h-6 w-6 text-white" />
-                                            </div>
+                                        <div className="relative group">
+                                            <button type="button" className="relative rounded-full" onClick={() => fileInputRef.current?.click()} aria-label="Upload avatar image">
+                                                <Avatar className="h-20 w-20 border-2 border-border shadow-sm">
+                                                    <AvatarImage src={avatar} className="object-cover" />
+                                                    <AvatarFallback className="text-xl bg-primary/10 text-primary">
+                                                        {name ? name.substring(0, 2).toUpperCase() : "?"}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Camera className="h-6 w-6 text-white" />
+                                                </div>
+                                            </button>
                                             <input
                                                 type="file"
                                                 ref={fileInputRef}

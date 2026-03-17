@@ -48,10 +48,6 @@ export function ClientDashboard({
 }: ClientDashboardProps) {
     const fmt = useDateFormat();
     const { format: formatMoney } = useCurrency();
-    const pendingAmount = invoices
-        .filter(i => i.status === 'Pending' || i.status === 'Overdue')
-        .reduce((sum, inv) => sum + inv.amount, 0);
-
     // Next invoice due date
     const pendingInvoices = invoices
         .filter(i => i.status === 'Pending' || i.status === 'Overdue')
@@ -183,7 +179,7 @@ export function ClientDashboard({
                     transactions={transactions}
                     totalSpent={metrics.totalSpent}
                     totalBudget={metrics.totalBudget}
-                    pendingAmount={pendingAmount}
+                    pendingAmount={metrics.totalDue}
                 />
                 <ClientAssetsSection assets={assets} projects={initialProjects} />
             </div>

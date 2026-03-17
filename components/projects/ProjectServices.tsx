@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { addService, deleteService, updateService, getProjectServices, getServiceTaskCount } from "@/lib/actions";
+import { addService, deleteService, updateService, getProjectServices, getServiceTaskCount, getUsers } from "@/lib/actions";
 import { User } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,7 @@ type Props = {
 export function ProjectServices({ projectId, users }: Props) {
     const router = useRouter();
     const [services, setServices] = useState<ServiceItem[]>([]);
+    const [directoryUsers, setDirectoryUsers] = useState<User[]>(users.filter(u => u.role !== 'client'));
     const [loading, setLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editing, setEditing] = useState<ServiceItem | null>(null);
@@ -66,6 +67,30 @@ export function ProjectServices({ projectId, users }: Props) {
         loadServices();
     }, [loadServices]);
 
+    useEffect(() => {
+        setDirectoryUsers(users.filter(u => u.role !== 'client'));
+    }, [users]);
+
+    useEffect(() => {
+        if (!isDialogOpen) return;
+
+        let cancelled = false;
+        getUsers()
+            .then((loadedUsers) => {
+                if (!cancelled) {
+                    setDirectoryUsers(loadedUsers.filter((user) => user.role !== 'client'));
+                }
+            })
+            .catch((error) => {
+                console.error("Failed to load assignable users", error);
+                toast.error("Failed to load team members");
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isDialogOpen]);
+
     const handleOpenDialog = (service?: ServiceItem) => {
         if (service) {
             setEditing(service);
@@ -89,7 +114,7 @@ export function ProjectServices({ projectId, users }: Props) {
     };
 
     const getUserName = (uid: string) => {
-        return users.find(u => u.id === uid)?.name || uid;
+        return directoryUsers.find(u => u.id === uid)?.name || users.find(u => u.id === uid)?.name || uid;
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -118,7 +143,7 @@ export function ProjectServices({ projectId, users }: Props) {
     const handleDeleteClick = async (service: ServiceItem) => {
         setCheckingDelete(true);
         try {
-            const count = await getServiceTaskCount(service.name);
+            const count = await getServiceTaskCount(projectId, service.name);
             setDeleteTarget({ id: service.id, name: service.name, taskCount: count });
         } catch {
             toast.error("Failed to check service usage");
@@ -142,7 +167,7 @@ export function ProjectServices({ projectId, users }: Props) {
     };
 
     // Only show non-client users in the employee dropdown
-    const employeeUsers = users.filter(u => u.role !== 'client');
+    const employeeUsers = directoryUsers;
 
     if (loading) {
         return (
@@ -178,8 +203,8 @@ export function ProjectServices({ projectId, users }: Props) {
                         <div key={service.id} className="border rounded-lg p-4 bg-background/50 hover:bg-background/80 transition-all border-border hover:border-primary/50 group relative">
                             <div className="flex justify-between items-start mb-3">
                                 <div className="font-semibold text-sm">{service.name}</div>
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenDialog(service)}>
+                                <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenDialog(service)} aria-label={`Edit ${service.name}`} title={`Edit ${service.name}`}>
                                         <Edit2 className="h-3 w-3" />
                                     </Button>
                                     <Button
@@ -188,6 +213,8 @@ export function ProjectServices({ projectId, users }: Props) {
                                         className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                                         disabled={checkingDelete}
                                         onClick={() => handleDeleteClick(service)}
+                                        aria-label={`Delete ${service.name}`}
+                                        title={`Delete ${service.name}`}
                                     >
                                         {checkingDelete ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
                                     </Button>

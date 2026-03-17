@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { CheckCircle2, Clock, AlertCircle, Calendar } from "lucide-react";
 import { Task } from "@/lib/types";
 import { useDateFormat } from "@/context/TimezoneContext";
+import { toLocalCalendarDay } from "@/lib/date-utils";
 import Link from "next/link";
 
 interface ClientTaskOverviewProps {
@@ -18,14 +19,20 @@ export function ClientTaskOverview({ tasks, projects }: ClientTaskOverviewProps)
     const inProgressTasks = tasks.filter(t => t.status === 'In Progress').length;
     const reviewTasks = tasks.filter(t => t.status === 'Review').length;
     const doneTasks = tasks.filter(t => t.status === 'Done').length;
+    const today = toLocalCalendarDay(fmt.dateKey(new Date())) ?? new Date();
 
     // Get tasks requiring client review
     const tasksForReview = tasks.filter(t => t.status === 'Review').slice(0, 5);
 
     // Get upcoming deadlines
     const upcomingTasks = tasks
-        .filter(t => t.status !== 'Done' && t.dueDate && new Date(t.dueDate) > new Date())
-        .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime())
+        .filter(t => {
+            if (t.status === 'Done' || !t.dueDate) return false;
+            const dueDate = toLocalCalendarDay(fmt.dateKey(t.dueDate));
+            if (!dueDate) return false;
+            return dueDate >= today;
+        })
+        .sort((a, b) => fmt.dateKey(a.dueDate!).localeCompare(fmt.dateKey(b.dueDate!)))
         .slice(0, 5);
 
     const getProjectName = (projectId: string) => {

@@ -102,7 +102,7 @@ export function ClientAssetsSection({ assets, projects }: ClientAssetsSectionPro
                                             download
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition p-2 hover:bg-white/10 rounded"
+                                            className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition p-2 hover:bg-white/10 rounded"
                                             title="Download"
                                         >
                                             <Download className="h-4 w-4" />

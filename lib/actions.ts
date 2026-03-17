@@ -14,11 +14,12 @@ import { generateId, resolveUserOrClient } from "./utils-server";
 import { sanitizeName, sanitizeString, sanitizeUsername, validateEmail, validatePassword, validateStrongPassword, sanitizePhone, sanitizeUrl, sanitizeColor, sanitizeMongoInput, sanitizeUpdates, validateId, validateAmount } from "./validation";
 import { formatCurrency, getCurrencySymbol } from "./currency";
 import { getDefaultCurrency, getNotificationDefaults } from "./actions/super-admin";
+import { differenceInCalendarDays } from "date-fns";
 
 // Authentication
 import { connectDB, AgencyModel, UserModel, ClientModel, SuperAdminModel, ProjectModel, TaskModel, InvoiceModel, TransactionModel, ServiceModel, NotificationModel, ActivityModel, AssetModel, MessageModel, LeaveRequestModel, SettingsModel, decryptApiKey, SystemSettingsModel } from "./mongodb";
 import { getSessionUser } from "@/lib/auth";
-import { fmtDate } from "@/lib/date-utils";
+import { dateKeyTz, fmtDate, isDateOnlyString, toLocalCalendarDay, todayStrTz } from "@/lib/date-utils";
 import { getSessionId as authGetSessionId, login as authLogin, logout as authLogout } from "@/lib/auth";
 import { hashPassword, comparePassword } from "@/lib/auth";
 
@@ -335,6 +336,7 @@ export type SearchResult = {
 export async function getDashboardMetrics() {
     await requireRole('admin', 'manager');
     await connectDB();
+    const currentUser = await getCurrentUser();
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth(); // 0-11
 
@@ -349,14 +351,13 @@ export async function getDashboardMetrics() {
     const prevMonthYear = prevMonthDate.getFullYear();
 
     // Use aggregation pipelines for financial metrics instead of fetching all transactions
-    const [revenuePipeline, pendingInvoicesList, activeProjectsCount, projects, tasks, allUsers, pendingLeaves] = await Promise.all([
+    const [revenuePipeline, pendingInvoicesList, activeProjectsCount, allProjects, tasks, allUsers, pendingLeaves] = await Promise.all([
         TransactionModel.aggregate([
             { $match: { ...agencyFilter, status: 'completed' } },
             {
                 $group: {
                     _id: null,
                     totalIncome: { $sum: { $cond: [{ $eq: ['$type', 'income'] }, '$amount', 0] } },
-                    totalRefunds: { $sum: { $cond: [{ $eq: ['$category', 'Refund'] }, '$amount', 0] } },
                     currentMonthRevenue: {
                         $sum: {
                             $cond: [
@@ -390,15 +391,15 @@ export async function getDashboardMetrics() {
         ]),
         InvoiceModel.find({ ...agencyFilter, status: { $in: ['Pending', 'Overdue', 'Processing'] } }).lean(),
         ProjectModel.countDocuments({ ...agencyFilter, status: 'Active' }),
-        ProjectModel.find({ ...agencyFilter, status: 'Active' }).select('id').lean(),
+        ProjectModel.find(agencyFilter).select('id').lean(),
         TaskModel.find(agencyFilter).select('status priority projectId assigneeId').lean(),
         UserModel.find(agencyFilter).select('id role').lean(),
         LeaveRequestModel.countDocuments({ ...agencyFilter, status: 'Pending' })
     ]);
 
     // Extract aggregation results (default to 0 if no transactions)
-    const agg = revenuePipeline[0] || { totalIncome: 0, totalRefunds: 0, currentMonthRevenue: 0, prevMonthRevenue: 0 };
-    const totalRevenue = agg.totalIncome - agg.totalRefunds;
+    const agg = revenuePipeline[0] || { totalIncome: 0, currentMonthRevenue: 0, prevMonthRevenue: 0 };
+    const totalRevenue = agg.totalIncome;
 
     let growthPercentage = 0;
     if (agg.prevMonthRevenue > 0) {
@@ -410,15 +411,14 @@ export async function getDashboardMetrics() {
     // 2. Pending Invoices & Overdue
     const pendingInvoicesAmount = pendingInvoicesList.reduce((acc, curr) => acc + curr.amount, 0);
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    const overdueCount = pendingInvoicesList.filter(i => (i.date < todayStr && i.status !== 'Paid') || i.status === 'Overdue').length;
+    const overdueCount = pendingInvoicesList.filter((invoice) => isInvoiceOverdue(invoice, new Date(), currentUser?.timezone || 'UTC')).length;
 
     // 3. Active Projects & High Priority
     // Deduce "High Priority" projects as those with "High" priority active tasks.
-    const activeProjectIds = new Set(projects.map(p => p.id));
+    const knownProjectIds = new Set(allProjects.map(p => p.id));
     const highPriorityTaskProjects = new Set(
         tasks
-            .filter(t => t.status !== 'Done' && t.priority === 'High' && activeProjectIds.has(t.projectId))
+            .filter(t => t.status !== 'Done' && t.priority === 'High' && knownProjectIds.has(t.projectId))
             .map(t => t.projectId)
     );
     const highPriorityCount = highPriorityTaskProjects.size;
@@ -461,6 +461,7 @@ export async function getRevenueData() {
     const transactions = await TransactionModel.find({
         ...agencyFilter,
         date: { $gte: sixMonthsAgoStr },
+        status: 'completed',
     }).select('date type amount').lean();
 
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -511,12 +512,20 @@ export async function getProjectDistribution() {
 
     const distribution: Record<string, number> = {};
 
-    projects.forEach(p => {
-        p.services.forEach(svc => {
-            // Resolve ID to Name for display
-            const serviceObj = services.find(s => s.id === svc || s.name === svc);
-            const name = serviceObj ? serviceObj.name : svc;
-            distribution[name] = (distribution[name] || 0) + 1;
+    const serviceNameByScopedKey = new Map<string, string>();
+    services.forEach((s: any) => {
+        if (s.projectId) {
+            serviceNameByScopedKey.set(`${s.projectId}:id:${s.id}`, s.name);
+            serviceNameByScopedKey.set(`${s.projectId}:name:${String(s.name).toLowerCase()}`, s.name);
+        }
+    });
+
+    projects.forEach((p: any) => {
+        (p.services || []).forEach((svc: string) => {
+            const resolvedName = serviceNameByScopedKey.get(`${p.id}:id:${svc}`)
+                || serviceNameByScopedKey.get(`${p.id}:name:${String(svc).toLowerCase()}`)
+                || svc;
+            distribution[resolvedName] = (distribution[resolvedName] || 0) + 1;
         });
     });
 
@@ -537,13 +546,13 @@ export async function getUrgentTasks(limit = 5) {
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
-    const tasks = await TaskModel.find({ agencyId: agency?.id, status: { $ne: 'Done' } })
+    const tasks = await TaskModel.find({ ...agencyFilter, status: { $ne: 'Done' }, priority: 'High' })
         .sort({ dueDate: 1 })
         .limit(limit)
         .lean();
     const sanitized = tasks.map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' }));
     const projectIds = [...new Set(sanitized.map((t: any) => t.projectId))];
-    const projs = await ProjectModel.find({ id: { $in: projectIds } }).select('id name slug').lean();
+    const projs = await ProjectModel.find({ ...agencyFilter, id: { $in: projectIds } }).select('id name slug').lean();
     const projMap = new Map(projs.map((p: any) => [p.id, { name: p.name, slug: p.slug || p.id }]));
     return sanitized.map((t: any) => ({
         ...t,
@@ -576,40 +585,23 @@ export async function getClientDashboardData(clientId: string) {
     ]);
 
     const projects = clientProjects;
+    const financeSummary = buildClientFinanceSummary(projects as any[], invoices as any[], transactions as any[]);
 
-    const clientInvoices = invoices;
-    const clientTransactions = transactions;
+    const clientInvoices = [...invoices].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const clientTransactions = [...transactions].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const clientTasks = tasks;
     const clientAssets = assets;
 
-    // Metrics
-    const activeProjectsCount = projects.filter((p: any) => p.status === 'Active').length;
-    const completedProjectsCount = projects.filter((p: any) => p.status === 'Completed').length;
-    const pendingInvoices = clientInvoices.filter((i: any) => i.status === 'Pending' || i.status === 'Overdue');
-    const totalDue = pendingInvoices.reduce((acc: number, inv: any) => acc + inv.amount, 0);
-    const unreadNotificationsCount = notifications.filter((n: any) => !n.read).length; // Note: this is only from the latest 5. Ideally query count.
     const unreadCountReal = await NotificationModel.countDocuments({ userId: clientId, read: false, ...agencyFilter });
 
-
-    // Financials
-    const totalPaid = clientTransactions
-        .filter((t: any) => t.type === 'income' && t.status === 'completed')
-        .reduce((sum: number, t: any) => sum + t.amount, 0);
-    const totalRefunded = clientTransactions
-        .filter((t: any) => t.category === 'Refund' && t.status === 'completed')
-        .reduce((sum: number, t: any) => sum + t.amount, 0);
-
-    const totalSpent = totalPaid - totalRefunded;
-    const totalBudget = projects.reduce((sum: number, p: any) => sum + (p.budget || 0), 0);
-
     const clientMetrics = {
-        activeProjects: activeProjectsCount,
-        completedProjects: completedProjectsCount,
-        pendingInvoicesCount: pendingInvoices.length,
-        totalDue: totalDue,
+        activeProjects: financeSummary.activeProjectCount,
+        completedProjects: financeSummary.completedProjectCount,
+        pendingInvoicesCount: financeSummary.pendingInvoicesCount,
+        totalDue: financeSummary.pendingAmount,
         unreadNotificationsCount: unreadCountReal,
-        totalSpent,
-        totalBudget,
+        totalSpent: financeSummary.totalSpent,
+        totalBudget: financeSummary.totalBudget,
         totalTasks: clientTasks.length,
         completedTasks: clientTasks.filter((t: any) => t.status === 'Done').length
     };
@@ -640,9 +632,7 @@ export async function getEmployeeDashboardData(userId: string) {
         LeaveRequestModel.find({ userId, ...agencyFilter }).sort({ createdAt: -1 }).limit(5).lean()
     ]);
 
-    const activities = user
-        ? await ActivityModel.find({ $or: [{ userId }, { user: (user as any).name }], ...agencyFilter }).sort({ timestamp: -1 }).limit(5).lean()
-        : [];
+    const activities = await ActivityModel.find({ userId, ...agencyFilter }).sort({ timestamp: -1 }).limit(5).lean();
 
     const projectIds = [...new Set(tasks.map((t: any) => t.projectId))];
     const projects = await ProjectModel.find({ id: { $in: projectIds }, ...agencyFilter }).lean();
@@ -666,10 +656,6 @@ export async function getNotifications(userId: string, offset = 0, limit = 50): 
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-
-    // Clean up old notifications -- scoped to THIS USER only to avoid deleting other users' notifications
-    await NotificationModel.deleteMany({ userId, ...agencyFilter, timestamp: { $lt: thirtyDaysAgo } });
 
     const notifications = await NotificationModel.find({ userId, ...agencyFilter })
         .sort({ timestamp: -1 })
@@ -678,6 +664,18 @@ export async function getNotifications(userId: string, offset = 0, limit = 50): 
         .lean();
 
     return notifications.map(n => sanitizeDoc(n));
+}
+
+export async function getUnreadNotificationCount(userId: string): Promise<number> {
+    const caller = await requireAuth();
+    if (caller.id !== userId && caller.role !== 'admin' && caller.role !== 'manager') {
+        throw new Error('Unauthorized: You can only view your own notifications.');
+    }
+
+    await connectDB();
+    const agency = await getCurrentAgency();
+    const agencyFilter = requireAgencyFilter(agency);
+    return NotificationModel.countDocuments({ userId, read: false, ...agencyFilter });
 }
 
 
@@ -697,10 +695,14 @@ export async function getProjects(offset = 0, limit = 1000) {
     if (currentUser.role === 'client') {
         // STRICT: Only return projects owned by this client
         query.clientId = currentUserId;
+    } else if (currentUser.role === 'employee') {
+        const scopedProjectIds = await getScopedProjectIdsForCurrentUser(agencyFilter.agencyId);
+        query.id = { $in: scopedProjectIds || [] };
     }
 
     const projects = await ProjectModel.find(query).skip(offset).limit(limit).lean();
-    return projects.map(p => ({ ...sanitizeDoc(p), agencyId: p.agencyId || 'default-agency' }));
+    const hydratedProjects = await hydrateProjectsWithCurrentClients(projects as any[], agencyFilter.agencyId);
+    return hydratedProjects.map((project: any) => ({ ...sanitizeDoc(project), agencyId: project.agencyId || 'default-agency' }));
 }
 
 export async function getUserProjects(userId: string) {
@@ -712,11 +714,15 @@ export async function getUserProjects(userId: string) {
     // Check if user is a client
     const isClient = await ClientModel.exists({ id: userId, ...agencyFilter });
     if (isClient) {
-        return ProjectModel.find({ clientId: userId, ...agencyFilter }).lean().then(docs => docs.map(sanitizeDoc));
+        const projects = await ProjectModel.find({ clientId: userId, ...agencyFilter }).lean();
+        const hydratedProjects = await hydrateProjectsWithCurrentClients(projects as any[], agencyFilter.agencyId);
+        return hydratedProjects.map((project: any) => ({ ...sanitizeDoc(project), agencyId: project.agencyId || 'default-agency' }));
     }
     // For employees: find projects where they have assigned tasks
     const taskProjectIds = await TaskModel.distinct('projectId', { assigneeId: userId, ...agencyFilter });
-    return ProjectModel.find({ id: { $in: taskProjectIds }, ...agencyFilter }).lean().then(docs => docs.map(sanitizeDoc));
+    const projects = await ProjectModel.find({ id: { $in: taskProjectIds }, ...agencyFilter }).lean();
+    const hydratedProjects = await hydrateProjectsWithCurrentClients(projects as any[], agencyFilter.agencyId);
+    return hydratedProjects.map((project: any) => ({ ...sanitizeDoc(project), agencyId: project.agencyId || 'default-agency' }));
 }
 
 export async function getProject(id: string) {
@@ -726,7 +732,10 @@ export async function getProject(id: string) {
     const agencyFilter = requireAgencyFilter(agency);
     const project = await ProjectModel.findOne({ id, ...agencyFilter }).lean();
     if (!project) return undefined;
-    return { ...sanitizeDoc(project), agencyId: project.agencyId || 'default-agency' };
+    const canAccess = await canCurrentUserAccessProject(project.id, agencyFilter.agencyId);
+    if (!canAccess) return undefined;
+    const [hydratedProject] = await hydrateProjectsWithCurrentClients([project], agencyFilter.agencyId);
+    return { ...sanitizeDoc(hydratedProject), agencyId: hydratedProject.agencyId || 'default-agency' };
 }
 
 export async function getProjectBySlug(slug: string) {
@@ -736,7 +745,95 @@ export async function getProjectBySlug(slug: string) {
     const agencyFilter = requireAgencyFilter(agency);
     const project = await ProjectModel.findOne({ $or: [{ slug }, { id: slug }], ...agencyFilter }).lean();
     if (!project) return undefined;
-    return { ...sanitizeDoc(project), agencyId: project.agencyId || 'default-agency' };
+    const canAccess = await canCurrentUserAccessProject(project.id, agencyFilter.agencyId);
+    if (!canAccess) return undefined;
+    const [hydratedProject] = await hydrateProjectsWithCurrentClients([project], agencyFilter.agencyId);
+    return { ...sanitizeDoc(hydratedProject), agencyId: hydratedProject.agencyId || 'default-agency' };
+}
+
+export async function getProjectDirectoryUsers(projectId: string) {
+    await requireAuth();
+    await connectDB();
+
+    const agency = await getCurrentAgency();
+    if (!agency?.id) throw new Error('Agency context required');
+
+    const canAccess = await canCurrentUserAccessProject(projectId, agency.id);
+    if (!canAccess) {
+        throw new Error('Unauthorized: You cannot access this project.');
+    }
+
+    const [project, tasks, services, sessionUserId] = await Promise.all([
+        ProjectModel.findOne({ id: projectId, agencyId: agency.id }).select('id clientId').lean() as Promise<{ id: string; clientId?: string } | null>,
+        TaskModel.find({ projectId, agencyId: agency.id }).select('assigneeId createdBy comments').lean() as Promise<Array<{ assigneeId?: string; createdBy?: string; comments?: Array<{ userId?: string }> }>>,
+        ServiceModel.find({ projectId, agencyId: agency.id }).select('employees').lean() as Promise<Array<{ employees?: string[] }>>,
+        getSessionId(),
+    ]);
+
+    if (!project) throw new Error('Project not found');
+
+    const directoryUserIds = new Set<string>();
+    if (sessionUserId) directoryUserIds.add(sessionUserId);
+
+    tasks.forEach((task) => {
+        if (task.assigneeId) directoryUserIds.add(task.assigneeId);
+        if (task.createdBy) directoryUserIds.add(task.createdBy);
+        task.comments?.forEach((comment) => {
+            if (comment?.userId) directoryUserIds.add(comment.userId);
+        });
+    });
+
+    services.forEach((service) => {
+        service.employees?.forEach((employeeId) => {
+            if (employeeId) directoryUserIds.add(employeeId);
+        });
+    });
+
+    const teamUsersRaw = directoryUserIds.size > 0
+        ? await UserModel.find({
+            id: { $in: Array.from(directoryUserIds) },
+            agencyId: agency.id,
+            archived: { $ne: true }
+        }).select('id agencyId name email role username avatar jobTitle employmentType').lean()
+        : [];
+
+    const teamUsers = teamUsersRaw.map((user) => ({ ...sanitizeDoc(user), agencyId: user.agencyId || 'default-agency' }));
+
+    if (!project.clientId) {
+        return teamUsers;
+    }
+
+    const client = await ClientModel.findOne({
+        id: project.clientId,
+        agencyId: agency.id,
+        archived: { $ne: true }
+    }).select('id agencyId name email username companyName logo').lean() as {
+        id: string;
+        agencyId?: string;
+        name: string;
+        email: string;
+        username?: string;
+        companyName?: string;
+        logo?: string;
+    } | null;
+
+    if (!client) {
+        return teamUsers;
+    }
+
+    return [
+        ...teamUsers,
+        {
+            id: client.id,
+            agencyId: client.agencyId || 'default-agency',
+            name: client.name,
+            email: client.email,
+            role: 'client' as const,
+            username: client.username || client.id,
+            avatar: client.logo || '',
+            jobTitle: client.companyName || '',
+        }
+    ];
 }
 
 export async function getUsers() {
@@ -849,22 +946,9 @@ export async function getClientProjects(clientId: string) {
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
 
-    const client = await resolveUserOrClient(clientId, agency?.id);
-    const clientName = client ? client.name : null;
-
-    let query: any = { clientId: clientId, ...agencyFilter };
-    if (clientName) {
-        query = {
-            $or: [
-                { clientId: clientId },
-                { client: clientName }
-            ],
-            ...agencyFilter
-        };
-    }
-
-    const projects = await ProjectModel.find(query).lean();
-    return projects.map(p => ({ ...sanitizeDoc(p), agencyId: p.agencyId || 'default-agency' }));
+    const projects = await ProjectModel.find({ clientId, ...agencyFilter }).lean();
+    const hydratedProjects = await hydrateProjectsWithCurrentClients(projects as any[], agencyFilter.agencyId);
+    return hydratedProjects.map((project: any) => ({ ...sanitizeDoc(project), agencyId: project.agencyId || 'default-agency' }));
 }
 
 export async function getProjectTasks(projectIds: string[]) {
@@ -872,7 +956,16 @@ export async function getProjectTasks(projectIds: string[]) {
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
-    const tasks = await TaskModel.find({ projectId: { $in: projectIds }, ...agencyFilter }).lean();
+    const requestedProjectIds = Array.from(new Set((projectIds || []).filter(Boolean)));
+    if (requestedProjectIds.length === 0) return [];
+
+    const scopedProjectIds = await getScopedProjectIdsForCurrentUser(agencyFilter.agencyId);
+    const allowedProjectIds = scopedProjectIds === null
+        ? requestedProjectIds
+        : requestedProjectIds.filter((projectId) => scopedProjectIds.includes(projectId));
+    if (allowedProjectIds.length === 0) return [];
+
+    const tasks = await TaskModel.find({ projectId: { $in: allowedProjectIds }, ...agencyFilter }).lean();
     return tasks.map(t => ({ ...sanitizeDoc(t), agencyId: t.agencyId || 'default-agency' }));
 }
 
@@ -896,11 +989,7 @@ export async function getUserActivity(userId: string) {
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
-    const user = await getUser(userId);
-    if (!user) return [];
-
-    // Limit to last 20 for dashboard -- scoped to agency
-    const activities = await ActivityModel.find({ $or: [{ userId }, { user: user.name }], ...agencyFilter })
+    const activities = await ActivityModel.find({ userId, ...agencyFilter })
         .sort({ timestamp: -1 })
         .limit(20)
         .lean();
@@ -918,11 +1007,8 @@ export async function getUserContributionHistory(userId: string) {
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
-    const user = await getUser(userId);
-    if (!user) return [];
-
     const activities = await ActivityModel.find({
-        $or: [{ userId }, { user: user.name }],
+        userId,
         ...agencyFilter
     }).lean();
 
@@ -1049,6 +1135,346 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
 function sanitizeDoc(doc: any) {
     if (!doc) return null;
     return JSON.parse(JSON.stringify(doc));
+}
+
+type ProjectServiceSnapshot = {
+    id: string;
+    name: string;
+    projectId?: string;
+    employees?: string[];
+    agencyId?: string;
+};
+
+type ProjectServiceConfigSnapshot = {
+    serviceId?: string;
+    name?: string;
+    paymentConfig?: PaymentConfig;
+};
+
+const CLIENT_OUTSTANDING_INVOICE_STATUSES: Invoice['status'][] = ['Pending', 'Overdue'];
+const FINANCE_UNSETTLED_INVOICE_STATUSES: Invoice['status'][] = ['Pending', 'Processing', 'Overdue'];
+
+function sumAmounts(items: Array<{ amount?: number | null }> = []): number {
+    return items.reduce((sum, item) => sum + (Number(item?.amount) || 0), 0);
+}
+
+function isCompletedIncomeTransaction(transaction: Partial<Transaction> | null | undefined): boolean {
+    return transaction?.status === 'completed' && transaction?.type === 'income';
+}
+
+function isCompletedExpenseTransaction(transaction: Partial<Transaction> | null | undefined): boolean {
+    return transaction?.status === 'completed' && transaction?.type === 'expense';
+}
+
+function isCompletedRefundTransaction(transaction: Partial<Transaction> | null | undefined): boolean {
+    return isCompletedExpenseTransaction(transaction) && transaction?.category === 'Refund';
+}
+
+function isClientOutstandingInvoice(invoice: Partial<Invoice> | null | undefined): boolean {
+    return !!invoice?.status && CLIENT_OUTSTANDING_INVOICE_STATUSES.includes(invoice.status);
+}
+
+function isFinanceUnsettledInvoice(invoice: Partial<Invoice> | null | undefined): boolean {
+    return !!invoice?.status && FINANCE_UNSETTLED_INVOICE_STATUSES.includes(invoice.status);
+}
+
+function isInvoiceOverdue(invoice: Partial<Invoice> | null | undefined, now = new Date(), timezone?: string): boolean {
+    if (!invoice?.status) return false;
+    if (invoice.status === 'Overdue') return true;
+    if (invoice.status !== 'Pending' || !invoice.date) return false;
+
+    if (timezone) {
+        const todayKey = dateKeyTz(now, timezone);
+        const dueKey = dateKeyTz(invoice.date, timezone);
+        if (!isDateOnlyString(todayKey) || !isDateOnlyString(dueKey)) return false;
+        return dueKey < todayKey;
+    }
+
+    const today = toLocalCalendarDay(now);
+    const dueDate = toLocalCalendarDay(invoice.date);
+    return !!today && !!dueDate && dueDate < today;
+}
+
+function buildClientFinanceSummary(projects: any[], invoices: any[], transactions: any[]) {
+    const completedIncomeTransactions = transactions.filter(isCompletedIncomeTransaction);
+    const completedRefundTransactions = transactions.filter(isCompletedRefundTransaction);
+    const outstandingInvoices = invoices.filter(isClientOutstandingInvoice);
+    const processingInvoices = invoices.filter((invoice) => invoice?.status === 'Processing');
+
+    const totalPaid = sumAmounts(completedIncomeTransactions);
+    const totalRefunds = sumAmounts(completedRefundTransactions);
+    const totalSpent = totalPaid - totalRefunds;
+
+    return {
+        totalInvoiced: sumAmounts(invoices),
+        totalPaid,
+        totalRefunds,
+        totalSpent,
+        ltv: totalSpent,
+        pendingAmount: sumAmounts(outstandingInvoices),
+        pendingInvoicesCount: outstandingInvoices.length,
+        processingAmount: sumAmounts(processingInvoices),
+        processingInvoicesCount: processingInvoices.length,
+        totalBudget: projects.reduce((sum: number, project: any) => sum + (Number(project?.budget) || 0), 0),
+        projectCount: projects.length,
+        activeProjectCount: projects.filter((project: any) => project?.status === 'Active').length,
+        completedProjectCount: projects.filter((project: any) => project?.status === 'Completed').length,
+    };
+}
+
+function createDefaultProjectPaymentConfig(): PaymentConfig {
+    return {
+        type: 'installment',
+        paymentDetailsLater: true,
+        installments: 1,
+        installmentAmount: 0,
+        monthlyAmount: 0
+    };
+}
+
+async function hydrateProjectsWithCurrentClients(projects: any[], agencyId: string): Promise<any[]> {
+    if (!Array.isArray(projects) || projects.length === 0) return projects;
+
+    const clientIds = Array.from(new Set(
+        projects
+            .map((project) => String(project?.clientId || '').trim())
+            .filter(Boolean)
+    ));
+    if (clientIds.length === 0) return projects;
+
+    const clients = await ClientModel.find({ id: { $in: clientIds }, agencyId }).select('id name').lean() as Array<{ id: string; name: string }>;
+    const clientNameById = new Map(clients.map((client) => [String(client.id), String(client.name)] as const));
+
+    return projects.map((project) => {
+        const clientId = String(project?.clientId || '').trim();
+        if (!clientId) return project;
+        const clientName = clientNameById.get(clientId);
+        if (!clientName || clientName === project.client) return project;
+        return { ...project, client: clientName };
+    });
+}
+
+async function resolveProjectClientFields(clientIdValue: unknown, agencyId: string): Promise<{ clientId?: string; client?: string; unsetClient: boolean }> {
+    const normalizedClientId = typeof clientIdValue === 'string' ? clientIdValue.trim() : '';
+    if (!normalizedClientId) {
+        return { unsetClient: true };
+    }
+
+    const clientDoc = await ClientModel.findOne({ id: normalizedClientId, agencyId }).select('id name').lean() as { id: string; name: string } | null;
+    if (!clientDoc) throw new Error(`Client with ID ${normalizedClientId} not found`);
+
+    return {
+        clientId: String(clientDoc.id),
+        client: String(clientDoc.name),
+        unsetClient: false,
+    };
+}
+
+function getActiveProjectServiceDocs(projectServiceRefs: string[] | undefined, serviceDocs: ProjectServiceSnapshot[]): ProjectServiceSnapshot[] {
+    if (!Array.isArray(serviceDocs) || serviceDocs.length === 0) return [];
+    if (!Array.isArray(projectServiceRefs) || projectServiceRefs.length === 0) return [...serviceDocs];
+
+    const serviceById = new Map(serviceDocs.map((service) => [String(service.id), service] as const));
+    const serviceByName = new Map(serviceDocs.map((service) => [String(service.name).toLowerCase(), service] as const));
+    const activeServices: ProjectServiceSnapshot[] = [];
+    const seen = new Set<string>();
+
+    for (const rawRef of projectServiceRefs) {
+        const ref = String(rawRef || '');
+        const service = serviceById.get(ref) || serviceByName.get(ref.toLowerCase());
+        if (!service || seen.has(service.id)) continue;
+        seen.add(service.id);
+        activeServices.push(service);
+    }
+
+    return activeServices.length > 0 ? activeServices : [...serviceDocs];
+}
+
+function findMatchingProjectServiceConfig(
+    configs: ProjectServiceConfigSnapshot[] | undefined,
+    service: ProjectServiceSnapshot
+): ProjectServiceConfigSnapshot | undefined {
+    return (configs || []).find((config) => {
+        const rawServiceId = String(config?.serviceId || '');
+        const rawName = String(config?.name || '');
+        return rawServiceId === service.id
+            || rawServiceId.toLowerCase() === service.name.toLowerCase()
+            || rawName.toLowerCase() === service.name.toLowerCase();
+    });
+}
+
+function buildNormalizedProjectServiceConfigs(
+    services: ProjectServiceSnapshot[],
+    configs: ProjectServiceConfigSnapshot[] | undefined
+): ProjectServiceConfigSnapshot[] {
+    return services.map((service) => {
+        const existingConfig = findMatchingProjectServiceConfig(configs, service);
+        return {
+            serviceId: service.id,
+            name: service.name,
+            paymentConfig: existingConfig?.paymentConfig || createDefaultProjectPaymentConfig(),
+        };
+    });
+}
+
+async function getScopedProjectIdsForCurrentUser(agencyId: string): Promise<string[] | null> {
+    const currentUser = await requireAuth();
+    if (!currentUser) return [];
+
+    if (currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.role === 'superadmin') {
+        return null;
+    }
+
+    if (currentUser.role === 'client') {
+        return await ProjectModel.distinct('id', { clientId: currentUser.id, agencyId });
+    }
+
+    return await TaskModel.distinct('projectId', { assigneeId: currentUser.id, agencyId });
+}
+
+async function canCurrentUserAccessProject(projectId: string, agencyId: string): Promise<boolean> {
+    const currentUser = await requireAuth();
+    if (!currentUser) return false;
+
+    if (currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.role === 'superadmin') {
+        return true;
+    }
+
+    if (currentUser.role === 'client') {
+        return !!await ProjectModel.exists({ id: projectId, agencyId, clientId: currentUser.id });
+    }
+
+    return !!await TaskModel.exists({ projectId, agencyId, assigneeId: currentUser.id });
+}
+
+async function ensureProjectServiceReference(
+    projectId: string,
+    agencyId: string,
+    rawServiceRef: string
+): Promise<ProjectServiceSnapshot | null> {
+    const normalizedServiceRef = sanitizeName(String(rawServiceRef || ''), 200);
+    if (!normalizedServiceRef) return null;
+
+    const [projectDoc, existingServices] = await Promise.all([
+        ProjectModel.findOne({ id: projectId, agencyId }).select('services serviceConfigs').lean() as Promise<{ services?: string[]; serviceConfigs?: ProjectServiceConfigSnapshot[] } | null>,
+        ServiceModel.find({ agencyId, projectId }).select('id name projectId employees agencyId').lean() as Promise<ProjectServiceSnapshot[]>,
+    ]);
+
+    if (!projectDoc) throw new Error('Project not found');
+
+    const serviceById = new Map(existingServices.map((service) => [String(service.id), service] as const));
+    const serviceByName = new Map(existingServices.map((service) => [String(service.name).toLowerCase(), service] as const));
+    let resolvedService = serviceById.get(normalizedServiceRef) || serviceByName.get(normalizedServiceRef.toLowerCase());
+
+    if (!resolvedService) {
+        resolvedService = {
+            id: generateId(),
+            agencyId,
+            name: normalizedServiceRef,
+            projectId,
+            employees: [],
+        };
+        await ServiceModel.create(resolvedService);
+        existingServices.push(resolvedService);
+    }
+
+    const activeServices = getActiveProjectServiceDocs(projectDoc.services, existingServices);
+    const finalServices = activeServices.some((service) => service.id === resolvedService!.id)
+        ? activeServices
+        : [...activeServices, resolvedService];
+
+    await ProjectModel.updateOne(
+        { id: projectId, agencyId },
+        {
+            $set: {
+                services: finalServices.map((service) => service.id),
+                serviceConfigs: buildNormalizedProjectServiceConfigs(finalServices, projectDoc.serviceConfigs),
+            }
+        }
+    );
+
+    return resolvedService;
+}
+
+async function syncProjectServices(
+    projectId: string,
+    agencyId: string,
+    rawServiceRefs: unknown[]
+): Promise<{ services: string[]; serviceConfigs: ProjectServiceConfigSnapshot[] }> {
+    const [projectDoc, existingServices] = await Promise.all([
+        ProjectModel.findOne({ id: projectId, agencyId }).select('serviceConfigs').lean() as Promise<{ serviceConfigs?: ProjectServiceConfigSnapshot[] } | null>,
+        ServiceModel.find({ agencyId, projectId }).select('id name projectId employees agencyId').lean() as Promise<ProjectServiceSnapshot[]>,
+    ]);
+
+    if (!projectDoc) throw new Error('Project not found');
+
+    const serviceById = new Map(existingServices.map((service) => [String(service.id), service] as const));
+    const serviceByName = new Map(existingServices.map((service) => [String(service.name).toLowerCase(), service] as const));
+    const desiredServiceNames: string[] = [];
+    const desiredNamesLower = new Set<string>();
+
+    for (const rawRef of Array.isArray(rawServiceRefs) ? rawServiceRefs : []) {
+        const normalizedRef = sanitizeName(String(rawRef || ''), 200);
+        if (!normalizedRef) continue;
+
+        const existingService = serviceById.get(normalizedRef) || serviceByName.get(normalizedRef.toLowerCase());
+        const canonicalName = existingService?.name || normalizedRef;
+        const canonicalNameLower = canonicalName.toLowerCase();
+        if (desiredNamesLower.has(canonicalNameLower)) continue;
+
+        desiredNamesLower.add(canonicalNameLower);
+        desiredServiceNames.push(canonicalName);
+    }
+
+    const removedServices = existingServices.filter((service) => !desiredNamesLower.has(String(service.name).toLowerCase()));
+    if (removedServices.length > 0) {
+        const removedNames = removedServices.map((service) => service.name);
+        const taskCounts = await TaskModel.aggregate([
+            { $match: { agencyId, projectId, category: { $in: removedNames } } },
+            { $group: { _id: '$category', count: { $sum: 1 } } }
+        ]) as Array<{ _id: string; count: number }>;
+        const taskCountByName = new Map(taskCounts.map((item) => [String(item._id), Number(item.count)] as const));
+        const blockingServices = removedServices
+            .map((service) => ({ service, count: taskCountByName.get(service.name) || 0 }))
+            .filter((item) => item.count > 0);
+
+        if (blockingServices.length > 0) {
+            const details = blockingServices.map((item) => `"${item.service.name}" (${item.count})`).join(', ');
+            throw new Error(`Cannot remove service(s) still used by tasks: ${details}. Reassign those tasks first.`);
+        }
+    }
+
+    const newServices = desiredServiceNames
+        .filter((serviceName) => !serviceByName.has(serviceName.toLowerCase()))
+        .map((serviceName) => ({
+            id: generateId(),
+            agencyId,
+            name: serviceName,
+            projectId,
+            employees: [],
+        }));
+
+    if (newServices.length > 0) {
+        await ServiceModel.insertMany(newServices);
+    }
+
+    if (removedServices.length > 0) {
+        await ServiceModel.deleteMany({
+            agencyId,
+            projectId,
+            id: { $in: removedServices.map((service) => service.id) }
+        });
+    }
+
+    const createdServiceByName = new Map(newServices.map((service) => [service.name.toLowerCase(), service] as const));
+    const finalServices = desiredServiceNames
+        .map((serviceName) => serviceByName.get(serviceName.toLowerCase()) || createdServiceByName.get(serviceName.toLowerCase()))
+        .filter((service): service is ProjectServiceSnapshot => Boolean(service));
+
+    return {
+        services: finalServices.map((service) => service.id),
+        serviceConfigs: buildNormalizedProjectServiceConfigs(finalServices, projectDoc.serviceConfigs),
+    };
 }
 
 export async function getCurrentUser() {
@@ -1287,11 +1713,17 @@ export async function deleteClient(id: string) {
         { id, agencyId: agency?.id },
         { $set: { archived: true, archivedAt: new Date().toISOString() } }
     );
+    await ProjectModel.updateMany(
+        { clientId: id, agencyId: agency?.id, status: 'Active' },
+        { $set: { status: 'On Hold' } }
+    );
     // Clean up notifications for archived client
     await NotificationModel.deleteMany({ userId: id, agencyId: agency?.id });
     // Decrement agency usage counter
     if (agency) await decrementAgencyUsage(agency.id, 'clients');
     revalidatePath('/dashboard/clients');
+    revalidatePath('/dashboard/projects');
+    revalidatePath('/dashboard');
 }
 
 export async function getArchivedClients() {
@@ -1491,6 +1923,10 @@ export async function deleteUser(id: string, password: string) {
         { id, agencyId: agency?.id },
         { $set: { archived: true, archivedAt: new Date().toISOString() } }
     );
+    await TaskModel.updateMany(
+        { assigneeId: id, agencyId: agency?.id, status: { $ne: 'Done' } },
+        { $set: { assigneeId: '' } }
+    );
     // Clean up notifications for archived user
     await NotificationModel.deleteMany({ userId: id, agencyId: agency?.id });
     // Decrement agency usage counter
@@ -1566,7 +2002,12 @@ export async function getServices() {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const services = await ServiceModel.find(requireAgencyFilter(agency)).lean();
+    const agencyFilter = requireAgencyFilter(agency);
+    const scopedProjectIds = await getScopedProjectIdsForCurrentUser(agencyFilter.agencyId);
+    const serviceQuery = scopedProjectIds === null
+        ? agencyFilter
+        : { ...agencyFilter, projectId: { $in: scopedProjectIds || [] } };
+    const services = await ServiceModel.find(serviceQuery).lean();
     return services.map(sanitizeDoc);
 }
 
@@ -1579,6 +2020,16 @@ export async function addService(name: string, projectId: string, employees: str
     employees = (employees || []).filter(e => typeof e === 'string' && e.trim());
     await connectDB();
     const agency = await getCurrentAgency();
+    const projectExists = await ProjectModel.exists({ id: projectId, agencyId: agency?.id });
+    if (!projectExists) throw new Error('Project not found');
+    const existingService = await ServiceModel.findOne({ agencyId: agency?.id, projectId }).select('id name').lean();
+    if (existingService && String((existingService as any).name).toLowerCase() === name.toLowerCase()) {
+        throw new Error(`Service "${name}" already exists in this project`);
+    }
+    const duplicateByName = await ServiceModel.find({ agencyId: agency?.id, projectId }).select('id name').lean();
+    if ((duplicateByName as any[]).some((svc) => String(svc.name).toLowerCase() === name.toLowerCase())) {
+        throw new Error(`Service "${name}" already exists in this project`);
+    }
     const newService = { id: generateId(), agencyId: agency?.id, name, projectId, employees };
     await ServiceModel.create(newService);
     const defaultPaymentConfig: PaymentConfig = {
@@ -1590,14 +2041,14 @@ export async function addService(name: string, projectId: string, employees: str
     };
     await ProjectModel.updateOne(
         { id: projectId, agencyId: agency?.id },
-        { $addToSet: { services: newService.name } }
+        { $addToSet: { services: newService.id } }
     );
     const project = await ProjectModel.findOne({ id: projectId, agencyId: agency?.id })
         .select('serviceConfigs')
         .lean();
     const hasConfig = Array.isArray((project as any)?.serviceConfigs)
         && (project as any).serviceConfigs.some((cfg: any) =>
-            String(cfg?.serviceId || '').toLowerCase() === name.toLowerCase()
+            String(cfg?.serviceId || '').toLowerCase() === String(newService.id).toLowerCase()
             || String(cfg?.name || '').toLowerCase() === name.toLowerCase()
         );
     if (!hasConfig) {
@@ -1606,7 +2057,7 @@ export async function addService(name: string, projectId: string, employees: str
             {
                 $push: {
                     serviceConfigs: {
-                        serviceId: name,
+                        serviceId: newService.id,
                         name,
                         paymentConfig: defaultPaymentConfig
                     }
@@ -1628,10 +2079,12 @@ export async function deleteService(id: string) {
     const serviceToDelete = await ServiceModel.findOne({ id, agencyId: agency?.id }).lean();
     if (!serviceToDelete) throw new Error('Service not found');
     const serviceName = (serviceToDelete as any)?.name;
+    const serviceProjectId = (serviceToDelete as any)?.projectId;
 
     // Safety check: block deletion if any tasks reference this service as their category
     const tasksUsingService = await TaskModel.countDocuments({
         agencyId: agency?.id,
+        projectId: serviceProjectId,
         category: serviceName,
     });
     if (tasksUsingService > 0) {
@@ -1641,15 +2094,26 @@ export async function deleteService(id: string) {
     }
 
     await ServiceModel.deleteOne({ id, agencyId: agency?.id });
-    // Remove this service from all projects that reference it
-    await ProjectModel.updateMany(
-        { agencyId: agency?.id, services: { $in: [id, serviceName] } },
-        { $pull: { services: { $in: [id, serviceName] } } }
-    );
-    await ProjectModel.updateMany(
-        { agencyId: agency?.id },
-        { $pull: { serviceConfigs: { $or: [{ serviceId: { $in: [id, serviceName] } }, { name: { $in: [id, serviceName] } }] } } }
-    );
+    if (serviceProjectId) {
+        await ProjectModel.updateOne(
+            { agencyId: agency?.id, id: serviceProjectId },
+            {
+                $pull: {
+                    services: { $in: [id, serviceName] },
+                    serviceConfigs: { $or: [{ serviceId: { $in: [id, serviceName] } }, { name: serviceName }] }
+                }
+            }
+        );
+    } else {
+        await ProjectModel.updateMany(
+            { agencyId: agency?.id, services: id },
+            { $pull: { services: id } }
+        );
+        await ProjectModel.updateMany(
+            { agencyId: agency?.id, 'serviceConfigs.serviceId': id },
+            { $pull: { serviceConfigs: { serviceId: id } } }
+        );
+    }
     revalidatePath('/dashboard/settings');
     revalidatePath('/dashboard/projects');
     revalidatePath('/dashboard/projects/[slug]', 'page');
@@ -1668,60 +2132,67 @@ export async function updateService(id: string, name: string, projectId: string,
 
     // Get old name before updating — needed to propagate rename
     const oldService = await ServiceModel.findOne({ id, agencyId: agency?.id }).lean();
+    if (!oldService) throw new Error('Service not found');
     const oldName = (oldService as any)?.name;
+    const oldProjectId = (oldService as any)?.projectId || projectId;
+    const duplicateByName = await ServiceModel.find({ agencyId: agency?.id, projectId }).select('id name').lean();
+    if ((duplicateByName as any[]).some((svc) => svc.id !== id && String(svc.name).toLowerCase() === name.toLowerCase())) {
+        throw new Error(`Service "${name}" already exists in this project`);
+    }
 
     await ServiceModel.updateOne(
         { id, agencyId: agency?.id },
         { $set: { name, projectId, employees } });
 
-    // Propagate service rename to tasks and projects that reference the old name
-    if (oldName && oldName !== name) {
-        await Promise.all([
-            // Update task categories that use the old service name
-            TaskModel.updateMany(
-                { agencyId: agency?.id, category: oldName },
-                { $set: { category: name } }
-            ),
-            // Update project services arrays (replace old name/id with new name)
-            ProjectModel.updateMany(
-                { agencyId: agency?.id, services: oldName },
-                { $set: { 'services.$[svc]': name } },
-                { arrayFilters: [{ svc: oldName }] }
-            ),
-            ProjectModel.updateMany(
-                { agencyId: agency?.id, services: id },
-                { $set: { 'services.$[svc]': name } },
-                { arrayFilters: [{ svc: id }] }
-            ),
-            ProjectModel.updateMany(
-                { agencyId: agency?.id, 'serviceConfigs.serviceId': oldName },
-                { $set: { 'serviceConfigs.$[cfg].serviceId': name, 'serviceConfigs.$[cfg].name': name } },
-                { arrayFilters: [{ 'cfg.serviceId': oldName }] }
-            ),
-            ProjectModel.updateMany(
-                { agencyId: agency?.id, 'serviceConfigs.name': oldName },
-                { $set: { 'serviceConfigs.$[cfg].serviceId': name, 'serviceConfigs.$[cfg].name': name } },
-                { arrayFilters: [{ 'cfg.name': oldName }] }
-            ),
-            ProjectModel.updateMany(
-                { agencyId: agency?.id, 'serviceConfigs.serviceId': id },
-                { $set: { 'serviceConfigs.$[cfg].serviceId': name, 'serviceConfigs.$[cfg].name': name } },
-                { arrayFilters: [{ 'cfg.serviceId': id }] }
-            ),
-        ]);
+    if (oldName && oldName !== name && oldProjectId === projectId) {
+        await TaskModel.updateMany(
+            { agencyId: agency?.id, projectId: oldProjectId, category: oldName },
+            { $set: { category: name } }
+        );
     }
 
-    // Ensure service name is in the project's services array
+    if (oldProjectId !== projectId) {
+        await ProjectModel.updateOne(
+            { id: oldProjectId, agencyId: agency?.id },
+            {
+                $pull: {
+                    services: { $in: [id, oldName] },
+                    serviceConfigs: { $or: [{ serviceId: { $in: [id, oldName] } }, { name: oldName }] }
+                }
+            }
+        );
+    }
+
     await ProjectModel.updateOne(
         { id: projectId, agencyId: agency?.id },
-        { $addToSet: { services: name } }
+        { $addToSet: { services: id } }
     );
+    await ProjectModel.updateOne(
+        { id: projectId, agencyId: agency?.id },
+        { $pull: { services: oldName } }
+    );
+    await ProjectModel.updateOne(
+        { id: projectId, agencyId: agency?.id, 'serviceConfigs.serviceId': oldName },
+        { $set: { 'serviceConfigs.$[cfg].serviceId': id, 'serviceConfigs.$[cfg].name': name } },
+        { arrayFilters: [{ 'cfg.serviceId': oldName }] }
+    );
+    await ProjectModel.updateOne(
+        { id: projectId, agencyId: agency?.id, 'serviceConfigs.name': oldName },
+        { $set: { 'serviceConfigs.$[cfg].serviceId': id, 'serviceConfigs.$[cfg].name': name } },
+        { arrayFilters: [{ 'cfg.name': oldName }] }
+    );
+    await ProjectModel.updateOne(
+        { id: projectId, agencyId: agency?.id, 'serviceConfigs.serviceId': id },
+        { $set: { 'serviceConfigs.$[cfg].name': name } },
+        { arrayFilters: [{ 'cfg.serviceId': id }] }
+    );
+
     const project = await ProjectModel.findOne({ id: projectId, agencyId: agency?.id })
         .select('serviceConfigs')
         .lean();
     const hasConfig = Array.isArray((project as any)?.serviceConfigs)
         && (project as any).serviceConfigs.some((cfg: any) =>
-            String(cfg?.serviceId || '').toLowerCase() === name.toLowerCase()
+            String(cfg?.serviceId || '').toLowerCase() === String(id).toLowerCase()
             || String(cfg?.name || '').toLowerCase() === name.toLowerCase()
         );
     if (!hasConfig) {
@@ -1730,7 +2201,7 @@ export async function updateService(id: string, name: string, projectId: string,
             {
                 $push: {
                     serviceConfigs: {
-                        serviceId: name,
+                        serviceId: id,
                         name,
                         paymentConfig: {
                             type: 'installment',
@@ -1755,15 +2226,24 @@ export async function getProjectServices(projectId: string) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const services = await ServiceModel.find({ ...requireAgencyFilter(agency), projectId }).lean();
-    return services.map(sanitizeDoc);
+    const agencyFilter = requireAgencyFilter(agency);
+    const canAccess = await canCurrentUserAccessProject(projectId, agencyFilter.agencyId);
+    if (!canAccess) throw new Error('Unauthorized: You cannot access this project.');
+    const [project, services] = await Promise.all([
+        ProjectModel.findOne({ id: projectId, ...agencyFilter }).select('services').lean() as Promise<{ services?: string[] } | null>,
+        ServiceModel.find({ ...agencyFilter, projectId }).lean() as Promise<ProjectServiceSnapshot[]>,
+    ]);
+    if (!project) return [];
+
+    const activeServices = getActiveProjectServiceDocs(project.services, services);
+    return activeServices.map(sanitizeDoc);
 }
 
-export async function getServiceTaskCount(serviceName: string) {
+export async function getServiceTaskCount(projectId: string, serviceName: string) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const count = await TaskModel.countDocuments({ agencyId: agency?.id, category: serviceName });
+    const count = await TaskModel.countDocuments({ agencyId: agency?.id, projectId, category: serviceName });
     return count;
 }
 
@@ -1782,7 +2262,7 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
             .map((svc) => sanitizeName(String(svc || ''), 200))
             .filter(Boolean)
         : [];
-    const dedupedServices = Array.from(new Map(normalizedServices.map((name) => [name.toLowerCase(), name])).values());
+    const dedupedServices = Array.from(new Map(normalizedServices.map((svcName) => [svcName.toLowerCase(), svcName])).values());
     project.services = dedupedServices;
 
     if (Array.isArray(project.serviceConfigs)) {
@@ -1793,7 +2273,6 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
                 return {
                     ...config,
                     name: normalizedName,
-                    serviceId: normalizedName,
                 };
             })
             .filter((config): config is NonNullable<typeof config> => Boolean(config));
@@ -1819,6 +2298,16 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
     const projLimit = await checkAgencyLimit(agency.id, 'projects');
     if (!projLimit.allowed) throw new Error(`Plan limit reached: your plan allows ${projLimit.limit} projects (currently ${projLimit.current}).`);
 
+    const normalizedClientId = typeof project.clientId === 'string' ? project.clientId.trim() : '';
+    if (normalizedClientId) {
+        const clientFields = await resolveProjectClientFields(normalizedClientId, agency.id);
+        project.clientId = clientFields.clientId;
+        project.client = clientFields.client;
+    } else {
+        project.clientId = undefined;
+        project.client = project.client ? sanitizeName(project.client, 200) || undefined : undefined;
+    }
+
     // Unique slug check against DB
     let uniqueSlug = slug;
     let slugCounter = 1;
@@ -1832,17 +2321,37 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
         status: 'Active', createdAt: new Date().toISOString(), agencyId: agency.id
     };
 
-    // Validate client exists if specified
-    if (project.clientId) {
-        const clientExists = await ClientModel.exists({ id: project.clientId, agencyId: agency.id });
-        if (!clientExists) throw new Error(`Client with ID ${project.clientId} not found`);
-    }
+    const defaultPaymentConfig = createDefaultProjectPaymentConfig();
+    const configByName = new Map(
+        (project.serviceConfigs || [])
+            .map((cfg) => [String(cfg.name || cfg.serviceId).toLowerCase(), cfg] as const)
+    );
+    const allServiceNames = Array.from(new Map([
+        ...project.services.map((svcName) => [svcName.toLowerCase(), svcName] as const),
+        ...(project.serviceConfigs || []).map((cfg) => [String(cfg.name).toLowerCase(), cfg.name] as const),
+    ]).values());
+    const serviceDocs = allServiceNames.map((svcName) => ({
+        id: generateId(),
+        agencyId: agency.id,
+        name: svcName,
+        projectId: newProject.id,
+        employees: [],
+    }));
+    newProject.services = serviceDocs.map((doc) => doc.id);
+    newProject.serviceConfigs = serviceDocs.map((doc) => {
+        const existingConfig = configByName.get(doc.name.toLowerCase());
+        return {
+            serviceId: doc.id,
+            name: doc.name,
+            paymentConfig: existingConfig?.paymentConfig || defaultPaymentConfig
+        };
+    });
 
     // Generate invoices from serviceConfigs BEFORE saving
     const newInvoices: Invoice[] = [];
-    if (project.serviceConfigs && project.serviceConfigs.length > 0) {
-        const totalServices = project.serviceConfigs.length;
-        for (const serviceConfig of project.serviceConfigs) {
+    if (newProject.serviceConfigs && newProject.serviceConfigs.length > 0) {
+        const totalServices = newProject.serviceConfigs.length;
+        for (const serviceConfig of newProject.serviceConfigs) {
             const paymentConfig = serviceConfig.paymentConfig;
             if (!paymentConfig) continue;
 
@@ -1884,26 +2393,9 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
 
     // Save project + invoices
     await ProjectModel.create(newProject);
-    if (newProject.services.length > 0) {
+    if (serviceDocs.length > 0) {
         try {
-            const existing = await ServiceModel.find({
-                agencyId: agency.id,
-                projectId: newProject.id,
-                name: { $in: newProject.services },
-            }).select('name').lean();
-            const existingNames = new Set((existing as any[]).map((s) => String(s.name).toLowerCase()));
-            const missingDocs = newProject.services
-                .filter((name) => !existingNames.has(String(name).toLowerCase()))
-                .map((name) => ({
-                    id: generateId(),
-                    agencyId: agency.id,
-                    name,
-                    projectId: newProject.id,
-                    employees: [],
-                }));
-            if (missingDocs.length > 0) {
-                await ServiceModel.insertMany(missingDocs, { ordered: false });
-            }
+            await ServiceModel.insertMany(serviceDocs, { ordered: false });
         } catch (serviceSyncError) {
             console.error('[createProject] Service sync failed:', serviceSyncError);
         }
@@ -1927,7 +2419,9 @@ export async function createProject(project: Omit<Project, "id" | "status" | "cr
     await ActivityModel.create({
         id: generateId(), agencyId: agency.id, user: currentUser.name, userId: currentUser.id,
         action: 'created project', target: project.name,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        entityId: newProject.id,
+        entityType: 'project'
     });
 
     // Send email notification to client
@@ -1961,10 +2455,80 @@ export async function updateProjectPayment(projectId: string, serviceId: string,
     const agency = await getCurrentAgency();
     // Sanitize paymentConfig to prevent NoSQL injection
     paymentConfig = sanitizeMongoInput(paymentConfig);
-    await ProjectModel.updateOne(
-        { id: projectId, agencyId: agency?.id, 'serviceConfigs.serviceId': serviceId },
-        { $set: { 'serviceConfigs.$.paymentConfig': paymentConfig } }
+    const projectServices = await ServiceModel.find({ agencyId: agency?.id, projectId }).select('id name').lean() as Array<{ id: string; name: string }>;
+    const idMap = new Map(projectServices.map((svc) => [String(svc.id), svc] as const));
+    const nameMap = new Map(projectServices.map((svc) => [String(svc.name).toLowerCase(), svc] as const));
+    const canonicalService = idMap.get(String(serviceId)) || nameMap.get(String(serviceId).toLowerCase());
+    if (!canonicalService) throw new Error('Service not found for this project');
+
+    const projectDoc = await ProjectModel.findOne({ id: projectId, agencyId: agency?.id })
+        .select('services serviceConfigs')
+        .lean() as { services?: string[]; serviceConfigs?: Array<{ serviceId?: string; name?: string; paymentConfig?: PaymentConfig }> } | null;
+
+    const normalizedServices = Array.isArray(projectDoc?.services)
+        ? Array.from(new Set(projectDoc.services.map((rawSvc) => {
+            const rawValue = String(rawSvc || '');
+            if (idMap.has(rawValue)) return rawValue;
+            const byName = nameMap.get(rawValue.toLowerCase());
+            return byName ? String(byName.id) : rawValue;
+        })))
+        : [];
+
+    const normalizedServiceConfigs = Array.isArray(projectDoc?.serviceConfigs)
+        ? projectDoc.serviceConfigs.map((cfg) => {
+            const rawServiceId = String(cfg?.serviceId || '');
+            const rawName = String(cfg?.name || '');
+            const fromId = idMap.get(rawServiceId);
+            const fromName = nameMap.get(rawServiceId.toLowerCase()) || nameMap.get(rawName.toLowerCase());
+            const resolved = fromId || fromName;
+            if (!resolved) return cfg;
+            return {
+                ...cfg,
+                serviceId: String(resolved.id),
+                name: String(resolved.name),
+            };
+        })
+        : [];
+
+    if (projectDoc) {
+        const servicesChanged = JSON.stringify(projectDoc.services || []) !== JSON.stringify(normalizedServices);
+        const serviceConfigsChanged = JSON.stringify(projectDoc.serviceConfigs || []) !== JSON.stringify(normalizedServiceConfigs);
+        if (servicesChanged || serviceConfigsChanged) {
+            await ProjectModel.updateOne(
+                { id: projectId, agencyId: agency?.id },
+                {
+                    $set: {
+                        ...(servicesChanged ? { services: normalizedServices } : {}),
+                        ...(serviceConfigsChanged ? { serviceConfigs: normalizedServiceConfigs } : {}),
+                    }
+                }
+            );
+        }
+    }
+
+    const setResult = await ProjectModel.updateOne(
+        { id: projectId, agencyId: agency?.id, 'serviceConfigs.serviceId': canonicalService.id },
+        {
+            $set: {
+                'serviceConfigs.$.paymentConfig': paymentConfig,
+                'serviceConfigs.$.name': canonicalService.name
+            }
+        }
     );
+    if (setResult.matchedCount === 0) {
+        await ProjectModel.updateOne(
+            { id: projectId, agencyId: agency?.id },
+            {
+                $push: {
+                    serviceConfigs: {
+                        serviceId: canonicalService.id,
+                        name: canonicalService.name,
+                        paymentConfig,
+                    }
+                }
+            }
+        );
+    }
     revalidatePath('/dashboard/projects/[id]', 'page');
     revalidatePath('/dashboard/projects');
 }
@@ -1973,7 +2537,10 @@ export async function getTasks(projectId: string) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
-    const tasks = await TaskModel.find({ projectId, agencyId: agency?.id }).lean();
+    if (!agency?.id) throw new Error('Agency context required');
+    const canAccess = await canCurrentUserAccessProject(projectId, agency.id);
+    if (!canAccess) throw new Error('Unauthorized: You cannot access this project.');
+    const tasks = await TaskModel.find({ projectId, agencyId: agency.id }).lean();
     return tasks.map(sanitizeDoc);
 }
 
@@ -1992,7 +2559,11 @@ export async function getAllProjectTasks() {
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
-    const tasks = await TaskModel.find(agencyFilter)
+    const scopedProjectIds = await getScopedProjectIdsForCurrentUser(agencyFilter.agencyId);
+    const taskQuery = scopedProjectIds === null
+        ? agencyFilter
+        : { ...agencyFilter, projectId: { $in: scopedProjectIds || [] } };
+    const tasks = await TaskModel.find(taskQuery)
         .select('projectId status assigneeId')
         .lean();
     return tasks.map(sanitizeDoc);
@@ -2043,12 +2614,12 @@ export async function updateUserPermissions(targetUserId: string, permissions: U
 export async function deleteTask(taskId: string) {
     await requireAuth();
     await connectDB();
-    const currentUser = await getCurrentUser();
+    const currentUser = await requireAuth();
     const agency = await getCurrentAgency();
     if (!agency) throw new Error('No agency context');
 
-    const userName = currentUser ? currentUser.name : 'System';
-    const userId = currentUser ? currentUser.id : 'system';
+    const userName = currentUser.name;
+    const userId = currentUser.id;
     const permissions = await getUserPermissions(userId);
 
     const task = await TaskModel.findOne({ id: taskId, agencyId: agency.id }).lean();
@@ -2078,6 +2649,234 @@ export async function deleteTask(taskId: string) {
     revalidatePath('/dashboard/projects');
 }
 
+async function handleTaskStatusChangeEffects({
+    previousTask,
+    currentTask,
+    agency,
+    userName,
+    userId,
+    completedAt,
+}: {
+    previousTask: any;
+    currentTask: any;
+    agency: any;
+    userName: string;
+    userId: string;
+    completedAt?: string;
+}) {
+    const activityTimestamp = completedAt ? new Date(completedAt).toISOString() : new Date().toISOString();
+    await ActivityModel.create({
+        id: generateId(),
+        agencyId: agency.id,
+        user: userName,
+        userId,
+        action: 'moved task to ' + currentTask.status,
+        target: currentTask.title,
+        timestamp: activityTimestamp,
+        entityId: currentTask.id,
+        entityType: 'task'
+    });
+
+    const projectForNotif = await ProjectModel.findOne({ id: currentTask.projectId, agencyId: agency.id }).lean();
+    if (await isNotifEnabled('task')) {
+        const notifiedUserIds = new Set<string>();
+
+        if (currentTask.assigneeId && currentTask.assigneeId !== userId) {
+            await NotificationModel.create({
+                id: generateId(), agencyId: agency.id, userId: currentTask.assigneeId,
+                message: `${userName} moved your task "${currentTask.title}" to ${currentTask.status}`,
+                read: false, timestamp: new Date().toISOString(),
+                link: `/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`
+            });
+            notifiedUserIds.add(currentTask.assigneeId);
+        }
+
+        const adminsForTask = await UserModel.find({ agencyId: agency.id, role: { $in: ['admin', 'manager'] } }).select('-password').lean();
+        const adminNotifs = adminsForTask
+            .filter((admin: any) => admin.id !== userId && !notifiedUserIds.has(admin.id))
+            .map((admin: any) => {
+                notifiedUserIds.add(admin.id);
+                return {
+                    id: generateId(), agencyId: agency.id, userId: admin.id,
+                    message: `${userName} moved task "${currentTask.title}" to ${currentTask.status}`,
+                    read: false, timestamp: new Date().toISOString(),
+                    link: `/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`
+                };
+            });
+        if (adminNotifs.length > 0) await NotificationModel.insertMany(adminNotifs);
+
+        if (projectForNotif?.clientId && !notifiedUserIds.has(projectForNotif.clientId)) {
+            await NotificationModel.create({
+                id: generateId(), agencyId: agency.id, userId: projectForNotif.clientId,
+                message: `Task "${currentTask.title}" has been moved to ${currentTask.status}`,
+                read: false, timestamp: new Date().toISOString(),
+                link: `/dashboard/projects/${currentTask.projectId}`
+            });
+        }
+    }
+
+    const emailCats = agency.settings?.emailCategories || {} as any;
+    const taskEmailEvents = emailCats.taskEmailEvents || {};
+    const eventKey = currentTask.status === 'Done' ? 'taskDone' : (currentTask.status === 'In Progress' ? 'taskInProgress' : null);
+    const eventConfig = eventKey ? { ...DEFAULT_TASK_EMAIL_EVENTS[eventKey], ...taskEmailEvents[eventKey] } : null;
+    const shouldSendTaskEmail = emailCats.taskUpdates !== false && eventConfig?.enabled;
+
+    if (shouldSendTaskEmail) {
+        try {
+            if (eventConfig!.notifyAssignee && currentTask.assigneeId && currentTask.assigneeId !== userId) {
+                const assignee = await getUser(currentTask.assigneeId);
+                if (assignee?.email) {
+                    await sendTaskStatusChangedEmail({
+                        recipientEmail: assignee.email,
+                        recipientName: assignee.name,
+                        taskTitle: currentTask.title,
+                        oldStatus: previousTask.status,
+                        newStatus: currentTask.status,
+                        updatedBy: userName,
+                        taskLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`,
+                    });
+                }
+            }
+
+            if (eventConfig!.notifyClient && projectForNotif?.clientId) {
+                const clientDoc = await ClientModel.findOne({ id: projectForNotif.clientId, agencyId: agency.id }).select('-password').lean() as any;
+                if (clientDoc?.email) {
+                    await sendTaskStatusChangedEmail({
+                        recipientEmail: clientDoc.email,
+                        recipientName: clientDoc.name,
+                        taskTitle: currentTask.title,
+                        oldStatus: previousTask.status,
+                        newStatus: currentTask.status,
+                        updatedBy: userName,
+                        taskLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${currentTask.projectId}`,
+                    });
+                }
+            }
+        } catch (emailError) {
+            console.error('[Email] Failed to send task status change email:', emailError);
+        }
+    }
+
+    if (currentTask.status === 'Done') {
+        const projectTasks = await TaskModel.find({ projectId: currentTask.projectId, agencyId: agency.id }).lean();
+        const remainingOpen = projectTasks.filter((task: any) => task.id !== currentTask.id && task.status !== 'Done');
+        const allDone = remainingOpen.length === 0 && projectTasks.length > 0;
+
+        if (allDone) {
+            const project = await ProjectModel.findOne({ id: currentTask.projectId, agencyId: agency.id }).lean();
+            if (project && ['Active', 'On Hold'].includes(project.status)) {
+                await ProjectModel.updateOne({ id: currentTask.projectId, agencyId: agency.id }, { $set: { status: 'Completed' } });
+
+                if (project.clientId && await isNotifEnabled('project')) {
+                    await NotificationModel.create({
+                        id: generateId(), agencyId: agency.id, userId: project.clientId,
+                        message: `Project "${project.name}" has been completed! All tasks are done.`,
+                        read: false, timestamp: new Date().toISOString(),
+                        link: `/dashboard/projects/${project.id}`
+                    });
+                }
+
+                const admins = await UserModel.find({ agencyId: agency.id, role: 'admin' }).select('-password').lean();
+                if (await isNotifEnabled('project')) {
+                    await NotificationModel.insertMany(admins.map((admin: any) => ({
+                        id: generateId(), agencyId: agency.id, userId: admin.id,
+                        message: `Project "${project.name}" auto-completed - all tasks done`,
+                        read: false, timestamp: new Date().toISOString(),
+                        link: `/dashboard/projects/${project.id}`
+                    })));
+                }
+
+                try {
+                    const client = project.clientId ? await getClientById(project.clientId) : null;
+                    const adminEmails = admins.map((admin: any) => admin.email).filter(Boolean) as string[];
+                    if (client?.email || adminEmails.length > 0) {
+                        await sendProjectCompletedEmail({
+                            clientEmail: client?.email || '',
+                            adminEmails,
+                            clientName: client?.name || '',
+                            projectName: project.name,
+                            projectLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${project.id}`,
+                        });
+                    }
+                } catch (emailError) {
+                    console.error('[Email] Failed to send project completion email:', emailError);
+                }
+            }
+        }
+    }
+}
+
+async function handleTaskAssignmentChangeEffects({
+    previousTask,
+    currentTask,
+    agency,
+    userName,
+    userId,
+}: {
+    previousTask: any;
+    currentTask: any;
+    agency: any;
+    userName: string;
+    userId: string;
+}) {
+    if (!currentTask.assigneeId || currentTask.assigneeId === previousTask.assigneeId) return;
+
+    if (await isNotifEnabled('task') && currentTask.assigneeId !== userId) {
+        await NotificationModel.create({
+            id: generateId(),
+            agencyId: agency.id,
+            userId: currentTask.assigneeId,
+            message: `${userName} assigned you the task "${currentTask.title}"`,
+            read: false,
+            timestamp: new Date().toISOString(),
+            link: `/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`
+        });
+    }
+
+    const emailCats = agency.settings?.emailCategories || {} as any;
+    const taskEmailEvents = emailCats.taskEmailEvents || {};
+    const createdEventConfig = { ...DEFAULT_TASK_EMAIL_EVENTS.taskCreated, ...taskEmailEvents.taskCreated };
+    const shouldSendTaskEmail = emailCats.taskUpdates !== false && createdEventConfig.enabled;
+
+    if (!shouldSendTaskEmail) return;
+
+    try {
+        const project = await ProjectModel.findOne({ id: currentTask.projectId, agencyId: agency.id }).lean() as any;
+        const assignee = currentTask.assigneeId ? await getUser(currentTask.assigneeId) : null;
+
+        if (createdEventConfig.notifyAssignee && assignee?.email && project) {
+            await sendTaskAssignedEmail({
+                assigneeEmail: assignee.email,
+                assigneeName: assignee.name,
+                taskTitle: currentTask.title,
+                taskDescription: currentTask.description || '',
+                projectName: project.name,
+                dueDate: currentTask.dueDate || '',
+                priority: currentTask.priority || 'Medium',
+                taskLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`,
+            });
+        }
+
+        if (createdEventConfig.notifyClient && project?.clientId) {
+            const clientDoc = await ClientModel.findOne({ id: project.clientId, agencyId: agency.id }).select('-password').lean() as any;
+            if (clientDoc?.email) {
+                await sendTaskAssignedEmail({
+                    assigneeEmail: clientDoc.email,
+                    assigneeName: clientDoc.name,
+                    taskTitle: currentTask.title,
+                    taskDescription: currentTask.description || '',
+                    projectName: project.name,
+                    dueDate: currentTask.dueDate || '',
+                    priority: currentTask.priority || 'Medium',
+                    taskLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`,
+                });
+            }
+        }
+    } catch (emailError) {
+        console.error('[Email] Failed to send task assignment email:', emailError);
+    }
+}
+
 export async function updateTaskStatus(taskId: string, status: Task['status'], completedAt?: string) {
     // Validate status against allowed values
     const VALID_STATUSES = ['Todo', 'In Progress', 'Review', 'Done'];
@@ -2085,12 +2884,12 @@ export async function updateTaskStatus(taskId: string, status: Task['status'], c
         throw new Error(`Invalid task status: ${status}`);
     }
     await connectDB();
-    const currentUser = await getCurrentUser();
+    const currentUser = await requireAuth();
     const agency = await getCurrentAgency();
     if (!agency) throw new Error('No agency context');
 
-    const userName = currentUser ? currentUser.name : 'System';
-    const userId = currentUser ? currentUser.id : 'system';
+    const userName = currentUser.name;
+    const userId = currentUser.id;
     const permissions = await getUserPermissions(userId);
 
     if (status === 'Done') {
@@ -2111,6 +2910,23 @@ export async function updateTaskStatus(taskId: string, status: Task['status'], c
         { returnDocument: 'before', lean: true, timestamps: completedAt ? false : true }
     );
     if (!task) throw new Error('Task not found');
+    const currentTask = {
+        ...task,
+        id: task.id,
+        status,
+        updatedAt: completedAt ? new Date(completedAt).toISOString() : (task as any).updatedAt,
+    };
+
+    await handleTaskStatusChangeEffects({
+        previousTask: task,
+        currentTask,
+        agency,
+        userName,
+        userId,
+        completedAt,
+    });
+    return;
+    /*
 
     // Activity log — use backdated timestamp if provided
     const activityTimestamp = completedAt ? new Date(completedAt).toISOString() : new Date().toISOString();
@@ -2120,7 +2936,9 @@ export async function updateTaskStatus(taskId: string, status: Task['status'], c
         user: userName, userId,
         action: 'moved task to ' + status,
         target: task.title,
-        timestamp: activityTimestamp
+        timestamp: activityTimestamp,
+        entityId: task.id,
+        entityType: 'task'
     });
 
     // Collect unique notification recipients to avoid duplicates
@@ -2219,7 +3037,7 @@ export async function updateTaskStatus(taskId: string, status: Task['status'], c
 
         if (allDone) {
             const project = await ProjectModel.findOne({ id: task.projectId, agencyId: agency.id }).lean();
-            if (project && project.status === 'Active') {
+            if (project && ['Active', 'On Hold'].includes(project.status)) {
                 await ProjectModel.updateOne({ id: task.projectId, agencyId: agency.id }, { $set: { status: 'Completed' } });
 
                 // Notify client
@@ -2268,24 +3086,24 @@ export async function updateTaskStatus(taskId: string, status: Task['status'], c
 }
 
 export async function updateTask(taskId: string, updates: Partial<Task>) {
-    await requireAuth();
+    const currentUser = await requireAuth();
     await connectDB();
     // Input sanitization
     updates = sanitizeUpdates(updates) as Partial<Task>;
     if (updates.title) updates.title = sanitizeName(updates.title, 500);
+    if (typeof updates.category === 'string') updates.category = sanitizeName(updates.category, 200) || undefined;
     if (updates.description) updates.description = sanitizeString(updates.description, 10000);
-    const currentUser = await getCurrentUser();
     const agency = await getCurrentAgency();
     if (!agency) throw new Error('No agency context');
 
-    const userName = currentUser ? currentUser.name : 'System';
-    const userId = currentUser ? currentUser.id : 'system';
+    const userName = currentUser.name;
+    const userId = currentUser.id;
     const permissions = await getUserPermissions(userId);
 
     if (updates.status === 'Done' && !permissions.canMarkDone) {
         throw new Error('Unauthorized: You do not have permission to mark tasks as Done.');
     }
-    const isStatusOnly = Object.keys(updates).length === 1 && updates.status;
+    const isStatusOnly = Object.keys(updates).length === 1 && typeof updates.status === 'string';
     if (!isStatusOnly || (updates.status && updates.status !== 'Done')) {
         if (!permissions.canManageTasks) throw new Error('Unauthorized: You do not have permission to edit tasks.');
     }
@@ -2303,28 +3121,166 @@ export async function updateTask(taskId: string, updates: Partial<Task>) {
     const task = await TaskModel.findOne({ id: taskId, agencyId: agency.id }).lean();
     if (!task) throw new Error('Task not found');
 
-    await TaskModel.updateOne({ id: taskId, agencyId: agency.id }, { $set: updates });
-
-    // Auto-assign department to project if task category changes
-    if (updates.category && task.projectId) {
-        const service = await ServiceModel.findOne({
-            agencyId: agency.id,
-            $or: [{ name: updates.category }, { id: updates.category }]
-        }).lean();
-        const categoryIdOrName = service ? service.id : updates.category;
-        await ProjectModel.updateOne(
-            { id: task.projectId, agencyId: agency.id, services: { $ne: categoryIdOrName } },
-            { $push: { services: categoryIdOrName } }
-        );
+    const targetProjectId = updates.projectId || task.projectId;
+    const categoryToSync = typeof updates.category === 'string'
+        ? updates.category
+        : (updates.projectId ? task.category : undefined);
+    if (targetProjectId && categoryToSync) {
+        const canonicalService = await ensureProjectServiceReference(targetProjectId, agency.id, categoryToSync);
+        if (canonicalService?.name) {
+            updates.category = canonicalService.name;
+        }
     }
 
-    // Activity log
-    await ActivityModel.create({
-        id: generateId(), agencyId: agency.id, user: userName, userId,
-        action: 'updated task',
-        target: updates.title || task.title,
-        timestamp: new Date().toISOString()
-    });
+    await TaskModel.updateOne({ id: taskId, agencyId: agency.id }, { $set: updates });
+    const currentTask = {
+        ...task,
+        ...updates,
+        id: task.id,
+        projectId: targetProjectId,
+        assigneeId: Object.prototype.hasOwnProperty.call(updates, 'assigneeId') ? updates.assigneeId : task.assigneeId,
+        title: typeof updates.title === 'string' ? updates.title : task.title,
+        category: Object.prototype.hasOwnProperty.call(updates, 'category') ? updates.category : task.category,
+        description: Object.prototype.hasOwnProperty.call(updates, 'description') ? updates.description : task.description,
+        dueDate: Object.prototype.hasOwnProperty.call(updates, 'dueDate') ? updates.dueDate : task.dueDate,
+        priority: Object.prototype.hasOwnProperty.call(updates, 'priority') ? updates.priority : task.priority,
+        status: typeof updates.status === 'string' ? updates.status : task.status,
+    };
+    const changedKeys = Object.keys(updates);
+    const hasStatusChange = typeof updates.status === 'string' && updates.status !== task.status;
+    const hasAssigneeChange = Object.prototype.hasOwnProperty.call(updates, 'assigneeId') && updates.assigneeId !== task.assigneeId;
+
+    if (hasStatusChange) {
+        await handleTaskStatusChangeEffects({
+            previousTask: task,
+            currentTask,
+            agency,
+            userName,
+            userId,
+        });
+    }
+
+    if (hasAssigneeChange) {
+        await handleTaskAssignmentChangeEffects({
+            previousTask: task,
+            currentTask,
+            agency,
+            userName,
+            userId,
+        });
+    }
+
+    const hasNonStatusChanges = changedKeys.some((key) => key !== 'status');
+    if (hasNonStatusChanges || !hasStatusChange) {
+        await ActivityModel.create({
+            id: generateId(), agencyId: agency.id, user: userName, userId,
+            action: 'updated task',
+            target: currentTask.title,
+            timestamp: new Date().toISOString(),
+            entityId: task.id,
+            entityType: 'task'
+        });
+    }
+
+    revalidatePath('/dashboard/projects/[id]', 'page');
+    revalidatePath('/dashboard/projects');
+    */
+}
+
+export async function updateTask(taskId: string, updates: Partial<Task>) {
+    const currentUser = await requireAuth();
+    await connectDB();
+    updates = sanitizeUpdates(updates) as Partial<Task>;
+    if (updates.title) updates.title = sanitizeName(updates.title, 500);
+    if (typeof updates.category === 'string') updates.category = sanitizeName(updates.category, 200) || undefined;
+    if (updates.description) updates.description = sanitizeString(updates.description, 10000);
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error('No agency context');
+
+    const userName = currentUser.name;
+    const userId = currentUser.id;
+    const permissions = await getUserPermissions(userId);
+
+    if (updates.status === 'Done' && !permissions.canMarkDone) {
+        throw new Error('Unauthorized: You do not have permission to mark tasks as Done.');
+    }
+    const isStatusOnly = Object.keys(updates).length === 1 && typeof updates.status === 'string';
+    if (!isStatusOnly || (updates.status && updates.status !== 'Done')) {
+        if (!permissions.canManageTasks) throw new Error('Unauthorized: You do not have permission to edit tasks.');
+    }
+
+    if (updates.projectId) {
+        const projExists = await ProjectModel.exists({ id: updates.projectId, agencyId: agency.id });
+        if (!projExists) throw new Error(`Project with ID ${updates.projectId} not found`);
+    }
+    if (updates.assigneeId) {
+        const userExists = await UserModel.exists({ id: updates.assigneeId, agencyId: agency.id });
+        if (!userExists) throw new Error(`User with ID ${updates.assigneeId} not found`);
+    }
+
+    const task = await TaskModel.findOne({ id: taskId, agencyId: agency.id }).lean();
+    if (!task) throw new Error('Task not found');
+
+    const targetProjectId = updates.projectId || task.projectId;
+    const categoryToSync = typeof updates.category === 'string'
+        ? updates.category
+        : (updates.projectId ? task.category : undefined);
+    if (targetProjectId && categoryToSync) {
+        const canonicalService = await ensureProjectServiceReference(targetProjectId, agency.id, categoryToSync);
+        if (canonicalService?.name) {
+            updates.category = canonicalService.name;
+        }
+    }
+
+    await TaskModel.updateOne({ id: taskId, agencyId: agency.id }, { $set: updates });
+    const currentTask = {
+        ...task,
+        ...updates,
+        id: task.id,
+        projectId: targetProjectId,
+        assigneeId: Object.prototype.hasOwnProperty.call(updates, 'assigneeId') ? updates.assigneeId : task.assigneeId,
+        title: typeof updates.title === 'string' ? updates.title : task.title,
+        category: Object.prototype.hasOwnProperty.call(updates, 'category') ? updates.category : task.category,
+        description: Object.prototype.hasOwnProperty.call(updates, 'description') ? updates.description : task.description,
+        dueDate: Object.prototype.hasOwnProperty.call(updates, 'dueDate') ? updates.dueDate : task.dueDate,
+        priority: Object.prototype.hasOwnProperty.call(updates, 'priority') ? updates.priority : task.priority,
+        status: typeof updates.status === 'string' ? updates.status : task.status,
+    };
+    const changedKeys = Object.keys(updates);
+    const hasStatusChange = typeof updates.status === 'string' && updates.status !== task.status;
+    const hasAssigneeChange = Object.prototype.hasOwnProperty.call(updates, 'assigneeId') && updates.assigneeId !== task.assigneeId;
+
+    if (hasStatusChange) {
+        await handleTaskStatusChangeEffects({
+            previousTask: task,
+            currentTask,
+            agency,
+            userName,
+            userId,
+        });
+    }
+
+    if (hasAssigneeChange) {
+        await handleTaskAssignmentChangeEffects({
+            previousTask: task,
+            currentTask,
+            agency,
+            userName,
+            userId,
+        });
+    }
+
+    const hasNonStatusChanges = changedKeys.some((key) => key !== 'status');
+    if (hasNonStatusChanges || !hasStatusChange) {
+        await ActivityModel.create({
+            id: generateId(), agencyId: agency.id, user: userName, userId,
+            action: 'updated task',
+            target: currentTask.title,
+            timestamp: new Date().toISOString(),
+            entityId: task.id,
+            entityType: 'task'
+        });
+    }
 
     revalidatePath('/dashboard/projects/[id]', 'page');
     revalidatePath('/dashboard/projects');
@@ -2470,15 +3426,30 @@ export async function addComment(taskId: string, userId: string, text: string, t
 
 export async function createTask(task: Omit<Task, "id" | "agencyId">) {
     await requireRole('admin', 'manager');
+    const currentUser = await requireAuth();
     await connectDB();
-    const currentUser = await getCurrentUser();
     const agency = await getCurrentAgency();
     if (!agency) throw new Error('No agency context');
     // Input sanitization
     task = sanitizeMongoInput(task);
     task.title = sanitizeName(task.title, 500);
     if (!task.title) throw new Error('Task title is required');
+    if (typeof task.category === 'string') task.category = sanitizeName(task.category, 200) || undefined;
     if (task.description) task.description = sanitizeString(task.description, 10000);
+    if (!task.projectId) throw new Error('Project is required');
+
+    const projectExists = await ProjectModel.exists({ id: task.projectId, agencyId: agency.id });
+    if (!projectExists) throw new Error(`Project with ID ${task.projectId} not found`);
+
+    if (task.assigneeId) {
+        const userExists = await UserModel.exists({ id: task.assigneeId, agencyId: agency.id });
+        if (!userExists) throw new Error(`User with ID ${task.assigneeId} not found`);
+    }
+
+    if (task.category) {
+        const canonicalService = await ensureProjectServiceReference(task.projectId, agency.id, task.category);
+        if (canonicalService?.name) task.category = canonicalService.name;
+    }
 
     const newTask = {
         ...task,
@@ -2589,13 +3560,16 @@ export async function getClients() {
 }
 
 export async function getClientByUsername(username: string) {
-    await requireAuth();
+    const caller = await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const client = await ClientModel.findOne({
         agencyId: agency?.id,
         $or: [{ username }, { id: username }]
     }).select('-password').lean();
+    if (caller.role === 'client' && client && String((client as any).id) !== caller.id) {
+        throw new Error('Unauthorized: You can only view your own client profile.');
+    }
     return client ? sanitizeDoc(client) : null;
 }
 
@@ -2774,6 +3748,7 @@ export async function updateProject(id: string, updates: Partial<Project>) {
     // Input sanitization
     updates = sanitizeUpdates(updates) as Partial<Project>;
     if (updates.name) updates.name = sanitizeName(updates.name, 300);
+    if (typeof updates.client === 'string') updates.client = sanitizeName(updates.client, 200) || undefined;
     if ((updates as any).description) (updates as any).description = sanitizeString((updates as any).description, 10000);
     const agency = await getCurrentAgency();
     const oldProject = await ProjectModel.findOne({ id, agencyId: agency?.id }).lean();
@@ -2784,7 +3759,37 @@ export async function updateProject(id: string, updates: Partial<Project>) {
         if (openCount > 0) console.warn(`Warning: Marking project as Completed with ${openCount} unfinished tasks.`);
     }
 
-    await ProjectModel.updateOne({ id, agencyId: agency?.id }, { $set: updates });
+    const setUpdates: Record<string, any> = { ...updates };
+    const unsetUpdates: Record<string, ''> = {};
+
+    if (Object.prototype.hasOwnProperty.call(setUpdates, 'clientId')) {
+        const clientFields = await resolveProjectClientFields(setUpdates.clientId, agency!.id);
+        delete setUpdates.clientId;
+        delete setUpdates.client;
+        if (clientFields.unsetClient) {
+            unsetUpdates.clientId = '';
+            unsetUpdates.client = '';
+        } else {
+            setUpdates.clientId = clientFields.clientId;
+            setUpdates.client = clientFields.client;
+        }
+    }
+
+    if (Array.isArray(setUpdates.services)) {
+        const normalizedServices = await syncProjectServices(id, agency!.id, setUpdates.services);
+        setUpdates.services = normalizedServices.services;
+        setUpdates.serviceConfigs = normalizedServices.serviceConfigs;
+    }
+
+    if (Object.keys(setUpdates).length > 0 || Object.keys(unsetUpdates).length > 0) {
+        await ProjectModel.updateOne(
+            { id, agencyId: agency?.id },
+            {
+                ...(Object.keys(setUpdates).length > 0 ? { $set: setUpdates } : {}),
+                ...(Object.keys(unsetUpdates).length > 0 ? { $unset: unsetUpdates } : {}),
+            }
+        );
+    }
 
     // Notify client on status change
     if (updates.status && oldProject && (oldProject as any).status !== updates.status && (oldProject as any).clientId && await isNotifEnabled('project')) {
@@ -2851,6 +3856,7 @@ export async function deleteProject(id: string, password: string) {
     const isValid = await verifyAdminPassword(password);
     if (!isValid) throw new Error('Invalid password');
     const agency = await getCurrentAgency();
+    const project = await ProjectModel.findOne({ id, agencyId: agency?.id }).select('id name').lean() as { id: string; name: string } | null;
 
     // Clean up uploaded files from blob storage (Vercel Blob + Azure) before removing DB records
     try {
@@ -2891,7 +3897,14 @@ export async function deleteProject(id: string, password: string) {
         AssetModel.deleteMany({ projectId: id, agencyId: agency?.id }),
         InvoiceModel.deleteMany({ projectId: id, agencyId: agency?.id }),
         TransactionModel.deleteMany({ projectId: id, agencyId: agency?.id }),
-        ActivityModel.deleteMany({ target: id, agencyId: agency?.id }),
+        ActivityModel.deleteMany({
+            agencyId: agency?.id,
+            $or: [
+                { target: id },
+                { entityId: id, entityType: 'project' },
+                ...(project?.name ? [{ target: project.name, action: { $regex: 'project', $options: 'i' } }] : [])
+            ]
+        }),
         NotificationModel.deleteMany({ agencyId: agency?.id, link: { $regex: id } }),
     ]);
     // Decrement agency usage counter
@@ -2921,27 +3934,16 @@ export async function getTransactions(projectId?: string, userId?: string, categ
         const currentUser = await getCurrentUser();
         if (currentUser?.role === 'client') {
             const clientProjectIds = await ProjectModel.distinct('id', { clientId: currentUserId, ...agencyFilter });
-            query.projectId = { $in: clientProjectIds };
+            if (projectId) {
+                if (!clientProjectIds.includes(projectId)) return [];
+                query.projectId = projectId;
+            } else {
+                query.projectId = { $in: clientProjectIds };
+            }
         }
     }
 
-    // userId filter: use the userId DB field directly for reliable matching
-    if (userId) {
-        const user = await UserModel.findOne({ id: userId, ...agencyFilter }).select('-password').lean() as any;
-        if (user) {
-            const lower = user.name.toLowerCase();
-            // Primary: filter by userId field (set for Salary, Freelancer, Reimbursement, Internal Transfer)
-            // Fallback: also include description matches for legacy/Investor transactions
-            const withUserId = await TransactionModel.find({ ...query, userId }).lean();
-            const withoutUserId = await TransactionModel.find({ ...query, $or: [{ userId: { $exists: false } }, { userId: null }, { userId: '' }] }).lean();
-            const descMatches = withoutUserId.filter((t: any) => t.description?.toLowerCase().includes(lower));
-            const seen = new Set(withUserId.map((t: any) => t.id));
-            const merged = [...withUserId, ...descMatches.filter((t: any) => !seen.has(t.id))];
-            return merged
-                .map(sanitizeDoc)
-                .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        }
-    }
+    if (userId) query.userId = userId;
 
     const transactions = await TransactionModel.find(query).lean();
     return transactions
@@ -2950,32 +3952,39 @@ export async function getTransactions(projectId?: string, userId?: string, categ
 }
 
 export async function getClientFinanceData(clientId: string) {
-    await requireAuth();
+    const caller = await requireAuth();
+    if (caller.role === 'client' && caller.id !== clientId) {
+        throw new Error('Unauthorized: You can only view your own client finance data.');
+    }
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
     const clientProjectIds = await ProjectModel.distinct('id', { clientId, ...agencyFilter });
 
-    const [invoices, transactions] = await Promise.all([
+    const [projects, invoices, transactions] = await Promise.all([
+        ProjectModel.find({ clientId, ...agencyFilter }).lean(),
         InvoiceModel.find({ projectId: { $in: clientProjectIds }, ...agencyFilter }).lean(),
         TransactionModel.find({ projectId: { $in: clientProjectIds }, ...agencyFilter }).lean()
     ]);
-
-    const totalInvoiced = invoices.reduce((acc: number, i: any) => acc + i.amount, 0);
-    const totalPaid = transactions.filter((t: any) => t.type === 'income' && t.status === 'completed').reduce((acc: number, t: any) => acc + t.amount, 0);
-    const pendingAmount = invoices.filter((i: any) => ['Pending', 'Processing', 'Overdue'].includes(i.status)).reduce((acc: number, i: any) => acc + i.amount, 0);
-    const totalRefunds = transactions.filter((t: any) => t.type === 'expense' && t.category === 'Refund' && t.status === 'completed').reduce((acc: number, t: any) => acc + t.amount, 0);
-    const netPaid = totalPaid - totalRefunds;
+    const summary = buildClientFinanceSummary(projects as any[], invoices as any[], transactions as any[]);
 
     return {
         invoices: invoices.map(sanitizeDoc).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()),
         transactions: transactions.map(sanitizeDoc).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-        stats: { totalInvoiced, totalPaid, pendingAmount, ltv: netPaid }
+        stats: {
+            totalInvoiced: summary.totalInvoiced,
+            totalPaid: summary.totalPaid,
+            pendingAmount: summary.pendingAmount,
+            ltv: summary.ltv
+        }
     };
 }
 
 export async function getClientActivityLogs(clientId: string, limit = 20) {
-    await requireAuth();
+    const caller = await requireAuth();
+    if (caller.role === 'client' && caller.id !== clientId) {
+        throw new Error('Unauthorized: You can only view your own client activity.');
+    }
     await connectDB();
     const agency = await getCurrentAgency();
     const acts = await ActivityModel.find({ userId: clientId, agencyId: agency?.id })
@@ -2994,8 +4003,9 @@ export async function getCategoryMemberSummary(category: string) {
 
     if (category === 'Internal Transfer') {
         const users = await UserModel.find(agencyFilter).select('-password').lean() as any[];
+        const userById = new Map(users.map((u: any) => [u.id, u]));
         transactions.forEach((t: any) => {
-            const user = users.find((u: any) => t.description?.toLowerCase().includes(u.name.toLowerCase()));
+            const user = t.userId ? userById.get(t.userId) : null;
             if (user) {
                 const existing = summaryMap.get(user.id) || { id: user.id, name: user.name, total: 0, count: 0, avatar: user.avatar };
                 existing.total += t.amount; existing.count += 1;
@@ -3008,7 +4018,7 @@ export async function getCategoryMemberSummary(category: string) {
         });
     } else if (category === 'Investor') {
         transactions.forEach((t: any) => {
-            const name = t.description;
+            const name = String(t.description || '').trim() || 'Unknown Investor';
             const existing = summaryMap.get(name) || { id: name, name, total: 0, count: 0 };
             existing.total += t.amount; existing.count += 1;
             summaryMap.set(name, existing);
@@ -3061,6 +4071,9 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
         if (transaction.type !== 'income') throw new Error("Validation Error: Retainer must be Income.");
         if (!transaction.projectId) throw new Error("Validation Error: Retainer must be linked to a Project.");
     }
+    if (transaction.category === 'Investor' && !String(transaction.description || '').trim()) {
+        throw new Error("Validation Error: Investor transactions require an investor name in description.");
+    }
 
     // Note: Internal Transfer checks are harder without memberId in transaction object,
     // but the modal handles the description/type logic. We assume if category is Internal Transfer,
@@ -3075,6 +4088,10 @@ export async function createTransaction(transaction: Omit<Transaction, "id" | "s
     if (transaction.projectId) {
         const projectExists = await ProjectModel.exists({ id: transaction.projectId, agencyId: agency?.id });
         if (!projectExists) throw new Error(`Project with ID ${transaction.projectId} not found`);
+    }
+    if (transaction.userId) {
+        const userExists = await UserModel.exists({ id: transaction.userId, agencyId: agency?.id });
+        if (!userExists) throw new Error(`User with ID ${transaction.userId} not found`);
     }
 
     // BUG-291: Add performedBy audit trail
@@ -3148,7 +4165,12 @@ export async function getInvoices(projectId?: string) {
         const currentUser = await getCurrentUser();
         if (currentUser?.role === 'client') {
             const clientProjectIds = await ProjectModel.distinct('id', { clientId: currentUserId, ...agencyFilter });
-            query.projectId = { $in: clientProjectIds };
+            if (projectId) {
+                if (!clientProjectIds.includes(projectId)) return [];
+                query.projectId = projectId;
+            } else {
+                query.projectId = { $in: clientProjectIds };
+            }
         }
     }
 
@@ -3169,7 +4191,7 @@ export async function clientMarkInvoiceAsPaid(invoiceId: string) {
 
     const project = await ProjectModel.findOne({ id: invoice.projectId, agencyId: agency.id }).lean();
     if (!project || (project as any).clientId !== currentUser.id) throw new Error("Unauthorized: This invoice doesn't belong to you");
-    if (invoice.status !== 'Pending') throw new Error(`Cannot mark ${invoice.status} invoice as paid`);
+    if (!['Pending', 'Overdue'].includes(invoice.status)) throw new Error(`Cannot mark ${invoice.status} invoice as paid`);
 
     await InvoiceModel.updateOne({ id: invoiceId, agencyId: agency.id }, { $set: { status: 'Processing' } });
 
@@ -3356,14 +4378,15 @@ export async function deleteTransaction(transactionId: string, password: string)
 }
 
 export async function getHighPriorityTasks(offset = 0, limit = 5) {
-    await requireAuth();
+    await requireRole('admin', 'manager');
     await connectDB();
     const agency = await getCurrentAgency();
-    const tasks = await TaskModel.find({ agencyId: agency?.id, status: { $ne: 'Done' } })
+    const agencyFilter = requireAgencyFilter(agency);
+    const tasks = await TaskModel.find({ ...agencyFilter, status: { $ne: 'Done' }, priority: 'High' })
         .sort({ dueDate: 1 }).skip(offset).limit(limit).lean();
     const sanitized = tasks.map(sanitizeDoc);
     const projectIds = [...new Set(sanitized.map((t: any) => t.projectId))];
-    const projs = await ProjectModel.find({ id: { $in: projectIds } }).select('id name slug').lean();
+    const projs = await ProjectModel.find({ ...agencyFilter, id: { $in: projectIds } }).select('id name slug').lean();
     const projMap = new Map(projs.map((p: any) => [p.id, { name: p.name, slug: p.slug || p.id }]));
     return sanitized.map((t: any) => ({
         ...t,
@@ -3384,6 +4407,7 @@ export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "ag
 
     const agency = await getCurrentAgency();
     if (!agency) throw new Error('No agency context');
+    const currentUser = await getCurrentUser();
 
     // Plan limit check
     const invoiceLimit = await checkAgencyLimit(agency.id, 'monthlyInvoices');
@@ -3392,7 +4416,13 @@ export async function createInvoice(invoice: Omit<Invoice, "id" | "status" | "ag
     const project = await ProjectModel.findOne({ id: invoice.projectId, agencyId: agency.id }).lean();
     if (!project) throw new Error(`Project with ID ${invoice.projectId} not found`);
 
-    const newInvoice: Invoice = { ...invoice, id: generateId(), status: 'Pending', agencyId: agency.id };
+    const newInvoice: Invoice = {
+        ...invoice,
+        id: generateId(),
+        status: 'Pending',
+        agencyId: agency.id,
+        ...(currentUser ? { performedBy: currentUser.id } : {})
+    };
     await InvoiceModel.create(newInvoice);
 
     // Notify client
@@ -3434,20 +4464,12 @@ export async function getFinanceStats(projectId?: string, userId?: string, categ
     if (projectId) { txQuery.projectId = projectId; invQuery.projectId = projectId; }
     if (category) txQuery.category = category;
 
-    let [transactions, invoices, userForFilter] = await Promise.all([
+    let [transactions, invoices] = await Promise.all([
         TransactionModel.find(txQuery).lean(),
-        InvoiceModel.find(invQuery).lean(),
-        userId ? UserModel.findOne({ id: userId, ...agencyFilter }).select('-password').lean() : Promise.resolve(null)
+        InvoiceModel.find(invQuery).lean()
     ]);
 
-    if (userId && userForFilter) {
-        const name = (userForFilter as any).name.toLowerCase();
-        // Primary: match by userId DB field; fallback: description match for legacy transactions
-        transactions = transactions.filter((t: any) =>
-            t.userId === userId ||
-            (!t.userId && t.description?.toLowerCase().includes(name))
-        );
-    }
+    if (userId) transactions = transactions.filter((t: any) => t.userId === userId);
 
     const totalRevenue = transactions.filter((t: any) => t.type === 'income' && t.status === 'completed').reduce((a: number, t: any) => a + t.amount, 0);
     const totalExpenses = transactions.filter((t: any) => t.type === 'expense' && t.status === 'completed').reduce((a: number, t: any) => a + t.amount, 0);
@@ -3472,17 +4494,7 @@ export async function getFinanceChartData(projectId?: string, userId?: string, c
 
     let transactions = await TransactionModel.find(query).lean();
 
-    if (userId) {
-        const user = await UserModel.findOne({ id: userId, ...agencyFilter }).select('-password').lean() as any;
-        if (user) {
-            const lower = user.name.toLowerCase();
-            // Primary: match by userId DB field; fallback: description match for legacy transactions
-            transactions = transactions.filter((t: any) =>
-                t.userId === userId ||
-                (!t.userId && t.description?.toLowerCase().includes(lower))
-            );
-        }
-    }
+    if (userId) transactions = transactions.filter((t: any) => t.userId === userId);
 
     // Group by month (last 6 months) -- include year to prevent cross-year matching
     const monthKeys: string[] = [];
@@ -3535,6 +4547,7 @@ export async function getPayrollStatus(userId?: string) {
         TransactionModel.find({
             category: 'Salary',
             type: 'expense',
+            status: 'completed',
             date: { $gte: startOfMonth, $lte: endOfMonth },
             ...agencyFilter
         }).lean()
@@ -3542,12 +4555,7 @@ export async function getPayrollStatus(userId?: string) {
 
     return users.map((user: any) => {
         const salary = user.salary || 5000;
-        // Primary: match by userId DB field (set when salary transaction is created)
-        // Fallback: description match for legacy transactions without userId
-        const isPaid = transactions.some((t: any) =>
-            t.userId === user.id ||
-            (!t.userId && t.description?.includes(user.name) && t.description?.includes(currentMonth))
-        );
+        const isPaid = transactions.some((t: any) => t.userId === user.id);
         return { user: sanitizeDoc(user), salary, status: isPaid ? 'Paid' : 'Pending', month: currentMonth };
     });
 }
@@ -3759,6 +4767,9 @@ export async function getProjectAssets(projectId: string) {
     await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
+    if (!agency?.id) throw new Error('Agency context required');
+    const canAccess = await canCurrentUserAccessProject(projectId, agency.id);
+    if (!canAccess) throw new Error('Unauthorized: You cannot access this project.');
     const assets = await AssetModel.find({ projectId, agencyId: agency?.id }).lean();
     return assets.map(sanitizeDoc).sort((a: any, b: any) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
 }
@@ -4452,22 +5463,31 @@ export async function requestLeave(leaveData: Omit<LeaveRequest, 'id' | 'status'
     leaveData = sanitizeMongoInput(leaveData);
     if (leaveData.reason) leaveData.reason = sanitizeString(leaveData.reason, 2000);
 
-    // Validate dates
-    const startDate = new Date(leaveData.startDate);
-    const endDate = new Date(leaveData.endDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Validate dates against the requester's calendar day, not raw UTC parsing.
+    const timezone = currentUser.timezone || 'UTC';
+    const todayKey = todayStrTz(timezone);
+    const startKey = dateKeyTz(leaveData.startDate, timezone);
+    const endKey = dateKeyTz(leaveData.endDate, timezone);
 
-    if (startDate < today) {
+    if (!isDateOnlyString(startKey) || !isDateOnlyString(endKey)) {
+        throw new Error("Validation Error: Invalid leave dates");
+    }
+
+    if (startKey < todayKey) {
         throw new Error("Leave start date cannot be in the past");
     }
 
-    if (endDate < startDate) {
+    if (endKey < startKey) {
         throw new Error("Leave end date must be after start date");
     }
 
     // Calculate number of days
-    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const startDate = toLocalCalendarDay(startKey);
+    const endDate = toLocalCalendarDay(endKey);
+    if (!startDate || !endDate) {
+        throw new Error("Validation Error: Invalid leave dates");
+    }
+    const daysDiff = differenceInCalendarDays(endDate, startDate) + 1;
 
     // Validate leave type limits (standard office rules)
     if (leaveData.type === 'Casual' && daysDiff > 15) {
@@ -4858,26 +5878,21 @@ export async function getClientFinancialSummary(clientId: string) {
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
-    const projectIds = await ProjectModel.distinct('id', { clientId, ...agencyFilter });
-    const projectIdSet = new Set(projectIds);
     const clientProjectsAll = await ProjectModel.find({ clientId, ...agencyFilter }).lean() as any[];
+    const projectIds = clientProjectsAll.map((project: any) => project.id);
 
-    const transactions = await TransactionModel.find({
-        projectId: { $in: projectIds }, ...agencyFilter
-    }).lean() as any[];
-
-    const totalPaid = transactions
-        .filter((t: any) => t.type === 'income' && t.status === 'completed')
-        .reduce((sum: number, t: any) => sum + t.amount, 0);
-    const totalRefunds = transactions
-        .filter((t: any) => t.category === 'Refund' && t.status === 'completed')
-        .reduce((sum: number, t: any) => sum + t.amount, 0);
-    const lifetimeValue = totalPaid - totalRefunds;
+    const [invoices, transactions] = await Promise.all([
+        InvoiceModel.find({ projectId: { $in: projectIds }, ...agencyFilter }).lean() as Promise<any[]>,
+        TransactionModel.find({ projectId: { $in: projectIds }, ...agencyFilter }).lean() as Promise<any[]>,
+    ]);
+    const summary = buildClientFinanceSummary(clientProjectsAll, invoices, transactions);
 
     return {
-        totalPaid, totalRefunds, lifetimeValue,
-        projectCount: clientProjectsAll.length,
-        activeProjectCount: clientProjectsAll.filter((p: any) => p.status === 'Active').length
+        totalPaid: summary.totalPaid,
+        totalRefunds: summary.totalRefunds,
+        lifetimeValue: summary.ltv,
+        projectCount: summary.projectCount,
+        activeProjectCount: summary.activeProjectCount
     };
 }
 

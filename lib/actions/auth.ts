@@ -50,7 +50,11 @@ export async function login(email: string, password: string) {
     }
 
     // Check regular user
-    const user = await UserModel.findOne({ email }).lean();
+    const matchedUsers = await UserModel.find({ email }).lean();
+    if (matchedUsers.length > 1) {
+        return { success: false, error: "Multiple accounts found for this email. Please contact support." };
+    }
+    const user = matchedUsers[0];
     if (user) {
         if ((user as any).archived) {
             return { success: false, error: 'This account has been deactivated. Please contact your agency.' };
@@ -65,7 +69,11 @@ export async function login(email: string, password: string) {
     }
 
     // Check client
-    const client = await ClientModel.findOne({ email }).lean();
+    const matchedClients = await ClientModel.find({ email }).lean();
+    if (matchedClients.length > 1) {
+        return { success: false, error: "Multiple accounts found for this email. Please contact support." };
+    }
+    const client = matchedClients[0];
     if (client) {
         if ((client as any).archived) {
             return { success: false, error: 'This account has been deactivated. Please contact your agency.' };

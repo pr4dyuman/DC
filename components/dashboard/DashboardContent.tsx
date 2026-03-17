@@ -1,5 +1,5 @@
 import { Project, Invoice, Notification as AppNotification, Transaction, Task, Asset, User } from "@/lib/types";
-import { fmtDateShort, getLocaleForTimezone } from "@/lib/date-utils";
+import { dateKeyTz, fmtDateShort, getLocaleForTimezone, toLocalCalendarDay } from "@/lib/date-utils";
 import { getDashboardMetrics, getRevenueData, getProjectDistribution, getRecentActivity, getUrgentTasks, getClientDashboardData, getEmployeeDashboardData } from "@/lib/actions";
 
 import { MetricCard } from "@/components/dashboard/MetricCard";
@@ -21,7 +21,7 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
 
         return (
             <ClientDashboard
-                initialProjects={data.projects.slice(0, 5)}
+                initialProjects={data.projects}
                 initialNotifications={data.notifications}
                 clientName={currentUser.name}
                 clientId={currentUser.id}
@@ -130,19 +130,25 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
     const myLeaves = data.leaveRequests ?? [];
 
     // Upcoming deadlines: tasks not done, due within next 3 days
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
+    const userTimezone = currentUser.timezone || 'UTC';
+    const now = toLocalCalendarDay(dateKeyTz(new Date(), userTimezone)) ?? new Date();
     const threeDaysLater = new Date(now);
     threeDaysLater.setDate(now.getDate() + 3);
 
     const upcomingDeadlines = myTasks
         .filter((t: Task) => {
             if (t.status === 'Done') return false;
-            const due = new Date((t as any).dueDate);
-            due.setHours(0, 0, 0, 0);
+            const dueValue = (t as any).dueDate;
+            if (!dueValue) return false;
+            const due = toLocalCalendarDay(dateKeyTz(dueValue, userTimezone));
+            if (!due) return false;
             return due >= now && due <= threeDaysLater;
         })
-        .sort((a: Task, b: Task) => new Date((a as any).dueDate).getTime() - new Date((b as any).dueDate).getTime())
+        .sort((a: Task, b: Task) => {
+            const aKey = (a as any).dueDate ? dateKeyTz((a as any).dueDate, userTimezone) : '9999-12-31';
+            const bKey = (b as any).dueDate ? dateKeyTz((b as any).dueDate, userTimezone) : '9999-12-31';
+            return aKey.localeCompare(bKey);
+        })
         .slice(0, 3);
 
     // Most recent leave request for status card
@@ -177,7 +183,7 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
                         if (t.status !== 'Done') return false;
                         const weekAgo = new Date();
                         weekAgo.setDate(weekAgo.getDate() - 7);
-                        return new Date((t as any).createdAt || 0) >= weekAgo;
+                        return new Date(t.updatedAt || t.createdAt || 0) >= weekAgo;
                     }).length || 0}
                     description="Completed this week"
                     icon={CheckCircle2}
@@ -221,9 +227,8 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
                     <p className="text-xs font-semibold text-red-500 uppercase tracking-wide">⚠ Deadlines in the next 3 days</p>
                     <div className="flex flex-wrap gap-2">
                         {upcomingDeadlines.map((t: Task) => {
-                            const due = new Date((t as any).dueDate);
-                            due.setHours(0, 0, 0, 0);
-                            const daysLeft = Math.round((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                            const due = toLocalCalendarDay(dateKeyTz((t as any).dueDate, userTimezone));
+                            const daysLeft = due ? Math.round((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0;
                             const project = myProjects.find((p: any) => p.id === (t as any).projectId);
                             return (
                                 <Link

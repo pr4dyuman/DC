@@ -8,6 +8,7 @@ import { getProjects } from "@/lib/actions";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Project } from "@/lib/types";
+import { toast } from "sonner";
 
 interface ClientProjectsListProps {
     initialProjects: Project[];
@@ -35,6 +36,7 @@ export function ClientProjectsList({ initialProjects }: ClientProjectsListProps)
             setOffset((prev) => prev + 5);
         } catch (error) {
             console.error("Failed to load more projects", error);
+            toast.error("Failed to load more projects");
         } finally {
             setLoading(false);
         }

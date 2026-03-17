@@ -8,7 +8,7 @@ import { MobileSidebar } from "./MobileSidebar";
 import { User, Notification } from "@/lib/types";
 import { useDateFormat } from "@/context/TimezoneContext";
 
-import { getUsers, getNotifications, globalSearch, markNotificationAsRead, SearchResult } from "@/lib/actions";
+import { getUsers, getNotifications, getUnreadNotificationCount, globalSearch, markNotificationAsRead, SearchResult } from "@/lib/actions";
 import { logout } from "@/lib/auth";
 import {
     DropdownMenu,
@@ -21,6 +21,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface TopbarProps {
     currentUser?: User;
@@ -59,9 +60,12 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo, agencyPl
     // Fetch Notifications
     useEffect(() => {
         if (user) {
-            getNotifications(user.id).then(notes => {
+            Promise.all([
+                getNotifications(user.id),
+                getUnreadNotificationCount(user.id)
+            ]).then(([notes, unread]) => {
                 setNotifications(notes.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
-                setUnreadCount(notes.filter(n => !n.read).length);
+                setUnreadCount(unread);
             });
         }
     }, [user]);
@@ -85,6 +89,9 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo, agencyPl
                     setShowResults(true);
                 } catch (error) {
                     console.error("Search failed", error);
+                    setSearchResults([]);
+                    setShowResults(false);
+                    toast.error("Search failed. Please try again.");
                 } finally {
                     setIsSearching(false);
                 }
@@ -169,7 +176,7 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo, agencyPl
 
                         {/* Search Results Dropdown */}
                         {showResults && (
-                            <div className="absolute top-full mt-2 w-[400px] right-0 bg-background rounded-md border shadow-lg overflow-hidden z-[100]">
+                            <div className="absolute top-full mt-2 w-80 md:w-96 max-w-[calc(100vw-2rem)] right-0 bg-background rounded-md border shadow-lg overflow-hidden z-[100]">
                                 <div className="p-2">
                                     <h4 className="text-xs font-medium text-muted-foreground mb-2 px-2">
                                         {searchResults.length > 0 ? "Results" : "No results found"}
@@ -177,9 +184,10 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo, agencyPl
                                     {searchResults.length > 0 && (
                                         <div className="space-y-1">
                                             {searchResults.map((result) => (
-                                                <div
+                                                <button
+                                                    type="button"
                                                     key={result.id}
-                                                    className="flex items-start gap-3 p-2 rounded-sm hover:bg-accent cursor-pointer transition-colors"
+                                                    className="w-full text-left flex items-start gap-3 p-2 rounded-sm hover:bg-accent transition-colors"
                                                     onClick={() => {
                                                         router.push(result.url);
                                                         setShowResults(false);
@@ -195,7 +203,7 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo, agencyPl
                                                             <p className="text-xs text-muted-foreground truncate">{result.subtitle}</p>
                                                         )}
                                                     </div>
-                                                </div>
+                                                </button>
                                             ))}
                                         </div>
                                     )}
@@ -233,9 +241,10 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo, agencyPl
                                     ) : (
                                         <div className="flex flex-col">
                                             {notifications.map((notification) => (
-                                                <div
+                                                <button
+                                                    type="button"
                                                     key={notification.id}
-                                                    className={`p-4 border-b last:border-0 hover:bg-muted/50 transition-colors cursor-pointer ${!notification.read ? 'bg-muted/20' : ''}`}
+                                                    className={`w-full text-left p-4 border-b last:border-0 hover:bg-muted/50 transition-colors ${!notification.read ? 'bg-muted/20' : ''}`}
                                                     onClick={() => {
                                                         if (!notification.read) handleNotificationRead(notification.id);
                                                         if (notification.link) {
@@ -254,7 +263,7 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo, agencyPl
                                                     <p className="text-xs text-muted-foreground mt-1">
                                                         {fmt.dateTime(notification.timestamp)}
                                                     </p>
-                                                </div>
+                                                </button>
                                             ))}
                                         </div>
                                     )}
@@ -359,9 +368,10 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo, agencyPl
                                     {searchResults.length > 0 && (
                                         <div className="space-y-1">
                                             {searchResults.map((result) => (
-                                                <div
+                                                <button
+                                                    type="button"
                                                     key={result.id}
-                                                    className="flex items-start gap-3 p-2 rounded-sm hover:bg-accent cursor-pointer transition-colors"
+                                                    className="w-full text-left flex items-start gap-3 p-2 rounded-sm hover:bg-accent transition-colors"
                                                     onClick={() => {
                                                         router.push(result.url);
                                                         setShowResults(false);
@@ -378,7 +388,7 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo, agencyPl
                                                             <p className="text-xs text-muted-foreground truncate">{result.subtitle}</p>
                                                         )}
                                                     </div>
-                                                </div>
+                                                </button>
                                             ))}
                                         </div>
                                     )}

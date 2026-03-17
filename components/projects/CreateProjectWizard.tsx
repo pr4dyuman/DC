@@ -73,7 +73,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
     const handleNext = () => {
         if (step === 2 && formData.serviceConfigs.length === 0) {
             const configs = formData.services.map(svc => {
-                const existing = formData.serviceConfigs.find(c => c.serviceId === svc || c.name === svc);
+                const existing = formData.serviceConfigs.find(c => c.serviceId === svc);
                 return existing || {
                     serviceId: svc,
                     name: svc,
@@ -390,7 +390,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
 
                             <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${!config.paymentConfig?.paymentDetailsLater ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
                                 <div className="overflow-hidden">
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {config.paymentConfig?.type === 'installment' ? (
                                             <>
                                                 <div className="space-y-1">
@@ -414,9 +414,9 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
                                                         />
                                                     </div>
                                                 ) : (
-                                                    <div className="col-span-2 space-y-2 pt-2 border-t mt-2">
+                                                    <div className="sm:col-span-2 space-y-2 pt-2 border-t mt-2">
                                                         <Label className="text-xs font-semibold">Installment Schedule</Label>
-                                                        <div className="grid grid-cols-2 gap-2">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                             {Array.from({ length: config.paymentConfig?.installments || 0 }).map((_, i) => (
                                                                 <div key={i} className="space-y-1">
                                                                     <Label className="text-[10px] text-muted-foreground">Installment {i + 1}</Label>

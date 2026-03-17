@@ -1,0 +1,320 @@
+[1mdiff --git a/lib/singularity-history.ts b/lib/singularity-history.ts[m
+[1mindex eb3b954..f4d9e77 100644[m
+[1m--- a/lib/singularity-history.ts[m
+[1m+++ b/lib/singularity-history.ts[m
+[36m@@ -89,10 +89,8 @@[m [mexport async function getSingularitySession(sessionId: string) {[m
+     if (!session) throw new Error('Unauthorized');[m
+ [m
+     await connectDB();[m
+[31m-    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId }).lean();[m
+[32m+[m[32m    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId, userId: session.userId }).lean();[m
+     if (!chatSession) return null;[m
+[31m-    // Verify ownership[m
+[31m-    if ((chatSession as any).userId !== session.userId) throw new Error('Unauthorized: Session does not belong to you');[m
+     return {[m
+         id: (chatSession as any).id,[m
+         userId: (chatSession as any).userId,[m
+[36m@@ -141,8 +139,8 @@[m [mexport async function updateSingularitySession([m
+ [m
+     await connectDB();[m
+     // Verify ownership[m
+[31m-    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId }).select('userId').lean();[m
+[31m-    if (!chatSession || (chatSession as any).userId !== authSession.userId) throw new Error('Unauthorized: Session does not belong to you');[m
+[32m+[m[32m    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId, userId: authSession.userId }).select('id').lean();[m
+[32m+[m[32m    if (!chatSession) throw new Error('Unauthorized: Session does not belong to you');[m
+ [m
+     const now = new Date().toISOString();[m
+ [m
+[36m@@ -156,7 +154,7 @@[m [mexport async function updateSingularitySession([m
+     if (title) update.title = title;[m
+ [m
+     await SingularityChatSessionModel.updateOne([m
+[31m-        { id: sessionId },[m
+[32m+[m[32m        { id: sessionId, userId: authSession.userId },[m
+         { $set: update }[m
+     );[m
+ }[m
+[36m@@ -167,11 +165,11 @@[m [mexport async function updateSingularitySessionMode(sessionId: string, mode: 'cha[m
+ [m
+     await connectDB();[m
+     // Verify ownership[m
+[31m-    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId }).select('userId').lean();[m
+[31m-    if (!chatSession || (chatSession as any).userId !== authSession.userId) throw new Error('Unauthorized: Session does not belong to you');[m
+[32m+[m[32m    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId, userId: authSession.userId }).select('id').lean();[m
+[32m+[m[32m    if (!chatSession) throw new Error('Unauthorized: Session does not belong to you');[m
+ [m
+     await SingularityChatSessionModel.updateOne([m
+[31m-        { id: sessionId },[m
+[32m+[m[32m        { id: sessionId, userId: authSession.userId },[m
+         { $set: { mode, updatedAt: new Date().toISOString() } }[m
+     );[m
+ }[m
+[36m@@ -182,13 +180,13 @@[m [mexport async function deleteSingularitySession(sessionId: string) {[m
+ [m
+     await connectDB();[m
+     // Verify ownership[m
+[31m-    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId }).select('userId').lean();[m
+[31m-    if (!chatSession || (chatSession as any).userId !== authSession.userId) throw new Error('Unauthorized: Session does not belong to you');[m
+[32m+[m[32m    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId, userId: authSession.userId }).select('agencyId').lean();[m
+[32m+[m[32m    if (!chatSession) throw new Error('Unauthorized: Session does not belong to you');[m
+ [m
+     // Delete session and all associated checkpoints[m
+     await Promise.all([[m
+[31m-        SingularityChatSessionModel.deleteOne({ id: sessionId }),[m
+[31m-        SingularityCheckpointModel.deleteMany({ sessionId }),[m
+[32m+[m[32m        SingularityChatSessionModel.deleteOne({ id: sessionId, userId: authSession.userId }),[m
+[32m+[m[32m        SingularityCheckpointModel.deleteMany({ sessionId, ...(chatSession as any)?.agencyId ? { agencyId: (chatSession as any).agencyId } : {} }),[m
+     ]);[m
+ }[m
+ [m
+[36m@@ -201,8 +199,8 @@[m [mexport async function getCheckpointSessionId(checkpointId: string): Promise<stri[m
+     if (!authSession) throw new Error('Unauthorized');[m
+ [m
+     await connectDB();[m
+[31m-    const cp = await SingularityCheckpointModel.findOne({ id: checkpointId }).select('sessionId').lean();[m
+[31m-    return cp ? (cp as any).sessionId : null;[m
+[32m+[m[32m    const cp = await resolveOwnedCheckpoint(checkpointId, authSession.userId);[m
+[32m+[m[32m    return cp ? cp.sessionId : null;[m
+ }[m
+ export async function createCheckpoint([m
+     sessionId: string,[m
+[36m@@ -215,11 +213,11 @@[m [mexport async function createCheckpoint([m
+ [m
+     await connectDB();[m
+     // Verify session ownership[m
+[31m-    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId }).select('userId').lean();[m
+[31m-    if (!chatSession || (chatSession as any).userId !== authSession.userId) throw new Error('Unauthorized: Session does not belong to you');[m
+[32m+[m[32m    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId, userId: authSession.userId }).select('userId agencyId').lean();[m
+[32m+[m[32m    if (!chatSession) throw new Error('Unauthorized: Session does not belong to you');[m
+ [m
+     const agency = await getCurrentAgency();[m
+[31m-    const agencyId = agency?.id || 'default-agency';[m
+[32m+[m[32m    const agencyId = (chatSession as any)?.agencyId || agency?.id || 'default-agency';[m
+     const id = generateId();[m
+ [m
+     await SingularityCheckpointModel.create({[m
+[36m@@ -242,11 +240,11 @@[m [mexport async function getCheckpoints(sessionId: string) {[m
+ [m
+     await connectDB();[m
+     // Verify session ownership[m
+[31m-    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId }).select('userId').lean();[m
+[31m-    if (!chatSession || (chatSession as any).userId !== authSession.userId) throw new Error('Unauthorized: Session does not belong to you');[m
+[32m+[m[32m    const chatSession = await SingularityChatSessionModel.findOne({ id: sessionId, userId: authSession.userId }).select('agencyId').lean();[m
+[32m+[m[32m    if (!chatSession) throw new Error('Unauthorized: Session does not belong to you');[m
+ [m
+     const checkpoints = await SingularityCheckpointModel[m
+[31m-        .find({ sessionId, status: 'active' })[m
+[32m+[m[32m        .find({ sessionId, status: 'active', ...(chatSession as any)?.agencyId ? { agencyId: (chatSession as any).agencyId } : {} })[m
+         .sort({ createdAt: -1 })[m
+         .lean();[m
+ [m
+[36m@@ -281,10 +279,13 @@[m [mfunction getModelForEntity(entityType: string): any {[m
+ async function checkEntityConflict(action: CheckpointAction): Promise<ConflictInfo | null> {[m
+     const Model = getModelForEntity(action.entityType);[m
+     if (!Model) return null;[m
+[32m+[m[32m    const actionAgencyId = action.beforeSnapshot?.agencyId;[m
+ [m
+     if (action.actionType === 'create') {[m
+         // For created entities: check if it was modified since creation[m
+[31m-        const entity = await Model.findOne({ id: action.entityId }).lean() as any;[m
+[32m+[m[32m        const createFilter: any = { id: action.entityId };[m
+[32m+[m[32m        if (actionAgencyId) createFilter.agencyId = actionAgencyId;[m
+[32m+[m[32m        const entity = await Model.findOne(createFilter).lean() as any;[m
+         if (!entity) {[m
+             // Entity was already deleted by user — no conflict, but nothing to undo[m
+             return {[m
+[36m@@ -326,7 +327,10 @@[m [masync function checkEntityConflict(action: CheckpointAction): Promise<ConflictIn[m
+ [m
+         // For projects: check if tasks were added after creation[m
+         if (action.entityType === 'project') {[m
+[31m-            const childTasks = await TaskModel.find({ projectId: action.entityId }).lean();[m
+[32m+[m[32m            const projectTaskFilter: any = { projectId: action.entityId };[m
+[32m+[m[32m            const entityAgencyId = entity?.agencyId || actionAgencyId;[m
+[32m+[m[32m            if (entityAgencyId) projectTaskFilter.agencyId = entityAgencyId;[m
+[32m+[m[32m            const childTasks = await TaskModel.find(projectTaskFilter).lean();[m
+             // Filter tasks not created by AI in this checkpoint[m
+             const allCreatedIds = new Set(action.createdEntityIds || []);[m
+             const externalTasks = childTasks.filter((t: any) => !allCreatedIds.has(t.id));[m
+[36m@@ -345,7 +349,9 @@[m [masync function checkEntityConflict(action: CheckpointAction): Promise<ConflictIn[m
+ [m
+     if (action.actionType === 'update') {[m
+         // For updated entities: check if someone else changed it after the agent did[m
+[31m-        const entity = await Model.findOne({ id: action.entityId }).lean() as any;[m
+[32m+[m[32m        const updateFilter: any = { id: action.entityId };[m
+[32m+[m[32m        if (actionAgencyId) updateFilter.agencyId = actionAgencyId;[m
+[32m+[m[32m        const entity = await Model.findOne(updateFilter).lean() as any;[m
+         if (!entity) return null; // Entity deleted — nothing to restore[m
+ [m
+         const agentUpdateTime = new Date(action.executedAt).getTime();[m
+[36m@@ -367,25 +373,28 @@[m [masync function checkEntityConflict(action: CheckpointAction): Promise<ConflictIn[m
+     return null;[m
+ }[m
+ [m
+[31m-export async function analyzeRollback(checkpointId: string): Promise<RollbackAnalysis | null> {[m
+[31m-    const authSession = await getSessionUser();[m
+[31m-    if (!authSession) throw new Error('Unauthorized');[m
+[31m-[m
+[31m-    await connectDB();[m
+[31m-    const checkpoint = await SingularityCheckpointModel.findOne({ id: checkpointId }).lean() as any;[m
+[32m+[m[32masync function resolveOwnedCheckpoint(checkpointId: string, userId: string) {[m
+[32m+[m[32m    const checkpoint = await SingularityCheckpointModel[m
+[32m+[m[32m        .findOne({ id: checkpointId })[m
+[32m+[m[32m        .select('id sessionId agencyId messageIndex actions label')[m
+[32m+[m[32m        .lean() as any;[m
+     if (!checkpoint) return null;[m
+ [m
+[31m-    // Verify ownership via the parent session[m
+[31m-    const chatSession = await SingularityChatSessionModel.findOne({ id: checkpoint.sessionId }).select('userId').lean();[m
+[31m-    if (!chatSession || (chatSession as any).userId !== authSession.userId) throw new Error('Unauthorized: Checkpoint does not belong to you');[m
+[32m+[m[32m    const sessionFilter: any = { id: checkpoint.sessionId, userId };[m
+[32m+[m[32m    if (checkpoint.agencyId) sessionFilter.agencyId = checkpoint.agencyId;[m
+[32m+[m[32m    const ownedSession = await SingularityChatSessionModel.findOne(sessionFilter).select('id').lean();[m
+[32m+[m[32m    if (!ownedSession) return null;[m
+[32m+[m
+[32m+[m[32m    return checkpoint;[m
+[32m+[m[32m}[m
+ [m
+[32m+[m[32masync function buildRollbackAnalysis(checkpoint: any): Promise<RollbackAnalysis> {[m
+     const safeActions: CheckpointAction[] = [];[m
+     const conflictedActions: { action: CheckpointAction; conflict: ConflictInfo }[] = [];[m
+ [m
+[31m-    for (const action of checkpoint.actions) {[m
+[32m+[m[32m    for (const action of checkpoint.actions || []) {[m
+         const conflict = await checkEntityConflict(action);[m
+         if (conflict) {[m
+[31m-            // "Already deleted" is not really a conflict — just skip it[m
+             if (conflict.reason.includes('Already deleted')) continue;[m
+             conflictedActions.push({ action, conflict });[m
+         } else {[m
+[36m@@ -396,12 +405,22 @@[m [mexport async function analyzeRollback(checkpointId: string): Promise<RollbackAna[m
+     return {[m
+         checkpointId: checkpoint.id,[m
+         label: checkpoint.label,[m
+[31m-        totalActions: checkpoint.actions.length,[m
+[32m+[m[32m        totalActions: (checkpoint.actions || []).length,[m
+         safeActions,[m
+         conflictedActions,[m
+     };[m
+ }[m
+ [m
+[32m+[m[32mexport async function analyzeRollback(checkpointId: string): Promise<RollbackAnalysis | null> {[m
+[32m+[m[32m    const authSession = await getSessionUser();[m
+[32m+[m[32m    if (!authSession) throw new Error('Unauthorized');[m
+[32m+[m
+[32m+[m[32m    await connectDB();[m
+[32m+[m[32m    const checkpoint = await resolveOwnedCheckpoint(checkpointId, authSession.userId);[m
+[32m+[m[32m    if (!checkpoint) return null;[m
+[32m+[m[32m    return await buildRollbackAnalysis(checkpoint);[m
+[32m+[m[32m}[m
+[32m+[m
+ // ============================================================================[m
+ // ROLLBACK EXECUTION[m
+ // ============================================================================[m
+[36m@@ -414,16 +433,9 @@[m [mexport async function executeRollback([m
+     if (!authSession) throw new Error('Unauthorized');[m
+ [m
+     await connectDB();[m
+[31m-[m
+[31m-    // Verify ownership via the parent session[m
+[31m-    const cpDoc = await SingularityCheckpointModel.findOne({ id: checkpointId }).select('sessionId').lean();[m
+[31m-    if (cpDoc) {[m
+[31m-        const chatSession = await SingularityChatSessionModel.findOne({ id: (cpDoc as any).sessionId }).select('userId').lean();[m
+[31m-        if (!chatSession || (chatSession as any).userId !== authSession.userId) throw new Error('Unauthorized: Checkpoint does not belong to you');[m
+[31m-    }[m
+[31m-[m
+[31m-    const analysis = await analyzeRollback(checkpointId);[m
+[31m-    if (!analysis) return { success: false, rolledBack: 0, skipped: 0, errors: ['Checkpoint not found'] };[m
+[32m+[m[32m    const checkpoint = await resolveOwnedCheckpoint(checkpointId, authSession.userId);[m
+[32m+[m[32m    if (!checkpoint) return { success: false, rolledBack: 0, skipped: 0, errors: ['Checkpoint not found'] };[m
+[32m+[m[32m    const analysis = await buildRollbackAnalysis(checkpoint);[m
+ [m
+     const actionsToRollback = scope === 'all'[m
+         ? [...analysis.safeActions, ...analysis.conflictedActions.map(c => c.action)][m
+[36m@@ -446,21 +458,26 @@[m [mexport async function executeRollback([m
+ [m
+     // Mark checkpoint as rolled back[m
+     await SingularityCheckpointModel.updateOne([m
+[31m-        { id: checkpointId },[m
+[32m+[m[32m        { id: checkpointId, sessionId: checkpoint.sessionId, ...(checkpoint.agencyId ? { agencyId: checkpoint.agencyId } : {}) },[m
+         { $set: { status: 'rolled_back' } }[m
+     );[m
+ [m
+     // Also truncate the chat messages back to the checkpoint's messageIndex[m
+[31m-    const checkpoint = await SingularityCheckpointModel.findOne({ id: checkpointId }).lean() as any;[m
+[31m-    if (checkpoint) {[m
+[31m-        const session = await SingularityChatSessionModel.findOne({ id: checkpoint.sessionId }).lean() as any;[m
+[31m-        if (session && session.messages) {[m
+[31m-            const truncatedMessages = session.messages.slice(0, checkpoint.messageIndex);[m
+[31m-            await SingularityChatSessionModel.updateOne([m
+[31m-                { id: checkpoint.sessionId },[m
+[31m-                { $set: { messages: truncatedMessages, updatedAt: new Date().toISOString() } }[m
+[31m-            );[m
+[31m-        }[m
+[32m+[m[32m    const session = await SingularityChatSessionModel.findOne({[m
+[32m+[m[32m        id: checkpoint.sessionId,[m
+[32m+[m[32m        userId: authSession.userId,[m
+[32m+[m[32m        ...(checkpoint.agencyId ? { agencyId: checkpoint.agencyId } : {}),[m
+[32m+[m[32m    }).lean() as any;[m
+[32m+[m[32m    if (session && session.messages) {[m
+[32m+[m[32m        const truncatedMessages = session.messages.slice(0, checkpoint.messageIndex);[m
+[32m+[m[32m        await SingularityChatSessionModel.updateOne([m
+[32m+[m[32m            {[m
+[32m+[m[32m                id: checkpoint.sessionId,[m
+[32m+[m[32m                userId: authSession.userId,[m
+[32m+[m[32m                ...(checkpoint.agencyId ? { agencyId: checkpoint.agencyId } : {}),[m
+[32m+[m[32m            },[m
+[32m+[m[32m            { $set: { messages: truncatedMessages, updatedAt: new Date().toISOString() } }[m
+[32m+[m[32m        );[m
+     }[m
+ [m
+     return { success: errors.length === 0, rolledBack, skipped, errors };[m
+[36m@@ -498,8 +515,10 @@[m [masync function rollbackAction(action: CheckpointAction) {[m
+ [m
+             // Remove MongoDB internal fields from snapshot[m
+             const { _id, __v, ...restoreData } = action.beforeSnapshot;[m
+[32m+[m[32m            const updateFilter: any = { id: action.entityId };[m
+[32m+[m[32m            if (agencyId) updateFilter.agencyId = agencyId;[m
+             await Model.updateOne([m
+[31m-                { id: action.entityId },[m
+[32m+[m[32m                updateFilter,[m
+                 { $set: restoreData }[m
+             );[m
+             break;[m
+[36m@@ -510,6 +529,37 @@[m [masync function rollbackAction(action: CheckpointAction) {[m
+             if (!action.beforeSnapshot) {[m
+                 throw new Error('No snapshot available for delete rollback');[m
+             }[m
+[32m+[m[32m            if ([m
+[32m+[m[32m                action.entityType === 'project'[m
+[32m+[m[32m                && action.beforeSnapshot?.project[m
+[32m+[m[32m            ) {[m
+[32m+[m[32m                const projectDoc = action.beforeSnapshot.project;[m
+[32m+[m[32m                const tasks = Array.isArray(action.beforeSnapshot.tasks) ? action.beforeSnapshot.tasks : [];[m
+[32m+[m[32m                const invoices = Array.isArray(action.beforeSnapshot.invoices) ? action.beforeSnapshot.invoices : [];[m
+[32m+[m[32m                const transactions = Array.isArray(action.beforeSnapshot.transactions) ? action.beforeSnapshot.transactions : [];[m
+[32m+[m
+[32m+[m[32m                await ProjectModel.updateOne([m
+[32m+[m[32m                    { id: projectDoc.id, ...(projectDoc.agencyId ? { agencyId: projectDoc.agencyId } : {}) },[m
+[32m+[m[32m                    { $set: projectDoc },[m
+[32m+[m[32m                    { upsert: true }[m
+[32m+[m[32m                );[m
+[32m+[m[32m                if (tasks.length > 0) {[m
+[32m+[m[32m                    await Promise.all(tasks.map((task: any) =>[m
+[32m+[m[32m                        TaskModel.updateOne({ id: task.id }, { $set: task }, { upsert: true })[m
+[32m+[m[32m                    ));[m
+[32m+[m[32m                }[m
+[32m+[m[32m                if (invoices.length > 0) {[m
+[32m+[m[32m                    await Promise.all(invoices.map((invoice: any) =>[m
+[32m+[m[32m                        InvoiceModel.updateOne({ id: invoice.id }, { $set: invoice }, { upsert: true })[m
+[32m+[m[32m                    ));[m
+[32m+[m[32m                }[m
+[32m+[m[32m                if (transactions.length > 0) {[m
+[32m+[m[32m                    await Promise.all(transactions.map((transaction: any) =>[m
+[32m+[m[32m                        TransactionModel.updateOne({ id: transaction.id }, { $set: transaction }, { upsert: true })[m
+[32m+[m[32m                    ));[m
+[32m+[m[32m                }[m
+[32m+[m[32m                break;[m
+[32m+[m[32m            }[m
+ [m
+             const { _id, __v, ...createData } = action.beforeSnapshot;[m
+             await Model.create(createData);[m

@@ -1119,7 +1119,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                                                 <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 text-neutral-400 dark:text-neutral-500">
                                                     {s.mode === 'agent' ? <Bot className="w-3.5 h-3.5" /> : <MessageSquare className="w-3.5 h-3.5" />}
                                                 </div>
-                                                <div className="flex-1 min-w-0" onClick={() => loadSession(s.id)}>
+                                                <button type="button" className="flex-1 min-w-0 text-left" onClick={() => loadSession(s.id)}>
                                                     <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate">{s.title}</p>
                                                     <p className="text-[10px] text-neutral-400 mt-0.5 flex items-center gap-1.5">
                                                         <span>{s.messageCount} messages</span>
@@ -1134,10 +1134,12 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                                                             return `${Math.floor(hrs / 24)}d ago`;
                                                         })()}</span>
                                                     </p>
-                                                </div>
+                                                </button>
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); requestDeleteSession(s.id); }}
-                                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 rounded-lg transition-all mt-0.5"
+                                                    className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1 hover:bg-destructive/10 rounded-lg transition-all mt-0.5"
+                                                    aria-label="Delete conversation"
+                                                    title="Delete conversation"
                                                 >
                                                     <Trash2 className="w-3 h-3 text-neutral-400 hover:text-destructive" />
                                                 </button>

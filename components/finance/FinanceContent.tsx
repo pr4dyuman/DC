@@ -28,6 +28,10 @@ interface FinanceContentProps {
     // So FinanceContent should fetch it. It's cached.
 }
 
+function normalizeFinanceLabel(value: unknown) {
+    return String(value || '').trim().toLowerCase();
+}
+
 export async function FinanceContent({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
     const currency = await getDefaultCurrency();
     const params = searchParams;
@@ -74,7 +78,9 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
         const clientInvoices = await getInvoices(); // internally filters for client
         const clientTransactions = await getTransactions(); // internally filters for client
 
-        const pendingTotal = clientInvoices.filter(i => i.status === 'Pending').reduce((acc, curr) => acc + curr.amount, 0);
+        const pendingTotal = clientInvoices
+            .filter(i => i.status === 'Pending' || i.status === 'Overdue')
+            .reduce((acc, curr) => acc + curr.amount, 0);
 
         return (
             <div className="flex-1 space-y-4">
@@ -109,6 +115,7 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
         stats,
         chartData,
         transactions,
+        teamScopeTransactions,
         invoices,
         payroll,
         rawProjects,
@@ -118,6 +125,7 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
         getFinanceStats(projectId, userId, category),
         getFinanceChartData(projectId, userId, category),
         getTransactions(projectId, userId, category),
+        userId ? getTransactions(projectId, undefined, category) : Promise.resolve([] as Transaction[]),
         getInvoices(projectId),
         getPayrollStatus(userId),
         getProjects(),
@@ -134,18 +142,20 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
     let memberTransactions: Transaction[] = [];
     if (category && memberId) {
         if (category === 'Internal Transfer') {
-            const member = users.find(u => u.id === memberId);
-            if (member) {
-                memberTransactions = transactions.filter(t => t.description.toLowerCase().includes(member.name.toLowerCase()));
-            }
+            memberTransactions = memberId === 'unknown'
+                ? transactions.filter(t => !t.userId)
+                : transactions.filter(t => t.userId === memberId);
         } else if (category === 'Investor') {
-            // For investor, memberId is the name itself
-            memberTransactions = transactions.filter(t => t.description === memberId || t.description.includes(memberId));
+            memberTransactions = memberId === 'Unknown Investor'
+                ? transactions.filter(t => !String(t.description || '').trim())
+                : transactions.filter(t => t.description === memberId);
         }
     }
 
     const projects = rawProjects.map(p => {
-        const clientName = clients.find(c => c.id === p.clientId || c.name === p.client)?.name || p.client;
+        const clientName = p.clientId
+            ? clients.find(c => c.id === p.clientId)?.name
+            : p.client;
         return {
             id: p.id,
             title: p.name,
@@ -172,18 +182,27 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
     let investmentTransactions: Transaction[] = [];
 
     if (userId && selectedUser) {
+        const normalizedSelectedUserName = normalizeFinanceLabel(selectedUser.name);
+        const teamTransactionPool = teamScopeTransactions.length > 0 ? teamScopeTransactions : transactions;
+
         // Filter transactions for this user
         // Salary: Expense + Category 'Salary' + Description/User match
-        salaryTransactions = transactions.filter(t =>
+        salaryTransactions = teamTransactionPool.filter(t =>
             t.type === 'expense' &&
             t.category === 'Salary' &&
-            t.description.toLowerCase().includes(selectedUser.name.toLowerCase())
+            t.userId === selectedUser.id &&
+            t.status === 'completed'
         );
 
-        // Investment: Income + Description match (assuming user 'invested' or paid into company)
-        investmentTransactions = transactions.filter(t =>
+        // Investor contributions may be linked by userId or stored only in the description label.
+        investmentTransactions = teamTransactionPool.filter(t =>
             t.type === 'income' &&
-            t.description.toLowerCase().includes(selectedUser.name.toLowerCase())
+            t.category === 'Investor' &&
+            (
+                t.userId === selectedUser.id ||
+                (!t.userId && normalizeFinanceLabel(t.description) === normalizedSelectedUserName)
+            ) &&
+            t.status === 'completed'
         );
 
         teamStats.totalSalary = salaryTransactions.reduce((sum, t) => sum + t.amount, 0);
@@ -240,7 +259,12 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
                 </div>
             ) : projectId && selectedProjectName ? (
                 <div className="space-y-6">
-                    <ProjectFinanceSummary project={rawProjects.find(p => p.id === projectId)!} transactions={transactions} />
+                    <ProjectFinanceSummary
+                        project={rawProjects.find(p => p.id === projectId)!}
+                        transactions={transactions.filter(t => t.projectId === projectId && t.status === 'completed')}
+                    />
+
+                    <PendingPayablesList transactions={transactions.filter(t => t.projectId === projectId && t.status !== 'completed')} />
 
                     <div className="grid gap-6 md:grid-cols-2">
                         <Card>
@@ -249,7 +273,7 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
                             </CardHeader>
                             <CardContent>
                                 <TransactionList
-                                    transactions={transactions.filter(t => t.type === 'income')}
+                                    transactions={transactions.filter(t => t.projectId === projectId && t.type === 'income' && t.status === 'completed')}
                                     title="Received from Client"
                                 />
                             </CardContent>
@@ -260,7 +284,7 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
                             </CardHeader>
                             <CardContent>
                                 <TransactionList
-                                    transactions={transactions.filter(t => t.type === 'expense')}
+                                    transactions={transactions.filter(t => t.projectId === projectId && t.type === 'expense' && t.status === 'completed')}
                                     title="Spent on Project"
                                 />
                             </CardContent>

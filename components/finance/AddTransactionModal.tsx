@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { createTransaction } from "@/lib/actions";
+import { createTransaction, getUsers } from "@/lib/actions";
 import { Plus, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { TransactionCategory, TransactionType, User, Project, TRANSACTION_CATEGORIES } from "@/lib/types";
@@ -29,6 +29,7 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
     const { format: formatMoney } = useCurrency();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [availableUsers, setAvailableUsers] = useState<User[]>(users);
     const router = useRouter();
 
     // Main Category State
@@ -69,6 +70,29 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
         }
     }, [formData.baseSalary, formData.bonus, formData.deduction, selectedCategory]);
 
+    useEffect(() => {
+        setAvailableUsers(users);
+    }, [users]);
+
+    useEffect(() => {
+        if (!open || !isProjectScoped) return;
+
+        let cancelled = false;
+        getUsers()
+            .then((loadedUsers) => {
+                if (!cancelled) {
+                    setAvailableUsers(loadedUsers);
+                }
+            })
+            .catch((error) => {
+                console.error("Failed to load users for project transaction modal", error);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [open, isProjectScoped]);
+
     const handleCategoryChange = (val: string) => {
         const cat = val as TransactionCategory;
         if (cat === selectedCategory) return;
@@ -102,7 +126,7 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
     };
 
     const handleMemberChange = (memberId: string) => {
-        const member = users.find(u => u.id === memberId);
+        const member = availableUsers.find(u => u.id === memberId);
         if (member) {
             setFormData(prev => ({
                 ...prev,
@@ -129,7 +153,7 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
     }
 
     const handleDirectionChange = (val: "to_member" | "from_member") => {
-        const member = users.find(u => u.id === formData.memberId);
+        const member = availableUsers.find(u => u.id === formData.memberId);
         setFormData(prev => ({
             ...prev,
             transferDirection: val,
@@ -439,7 +463,7 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="" disabled>Select Employee</SelectItem>
-                                            {users.map(u => (
+                                            {availableUsers.map(u => (
                                                 <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                                             ))}
                                         </SelectContent>
@@ -523,7 +547,7 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="" disabled>Select Employee</SelectItem>
-                                            {users.map(u => (
+                                            {availableUsers.map(u => (
                                                 <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                                             ))}
                                         </SelectContent>
@@ -585,7 +609,7 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
 
                         {/* --- FREELANCER CATEGORY --- */}
                         {selectedCategory === "Freelancer" && (() => {
-                            const freelancers = users.filter(u => u.employmentType === 'Freelancer');
+                            const freelancers = availableUsers.filter(u => u.employmentType === 'Freelancer');
                             return (
                                 <>
                                     <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">
@@ -745,7 +769,7 @@ export function AddTransactionModal({ projectId, projectName, users = [], projec
 
                         {/* --- REIMBURSEMENT CATEGORY --- */}
                         {selectedCategory === "Reimbursement" && (() => {
-                            const employees = users.filter(u => u.role !== 'client');
+                            const employees = availableUsers.filter(u => u.role !== 'client');
                             return (
                                 <>
                                     <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-2 sm:gap-4">

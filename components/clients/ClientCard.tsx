@@ -22,7 +22,7 @@ export function ClientCard({ client, onEdit, onUnarchive, onDelete, onPermanentD
         <Link href={`/dashboard/clients/${client.username || client.id}`} className="block h-full">
             <Card className="group relative overflow-hidden transition-all hover:shadow-lg h-full border-border hover:border-pink-500/50 hover:bg-muted cursor-pointer">
                 {(onEdit || onUnarchive || onDelete) && (
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+                    <div className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex gap-1 z-10">
                         {isArchived && onUnarchive ? (
                             <button
                                 onClick={(e) => {
@@ -31,6 +31,7 @@ export function ClientCard({ client, onEdit, onUnarchive, onDelete, onPermanentD
                                     onUnarchive(client.id, client.name);
                                 }}
                                 className="p-2 bg-green-600 text-white rounded-full hover:bg-green-700"
+                                aria-label="Restore client"
                                 title="Restore client"
                             >
                                 <ArchiveRestore className="h-3 w-3" />
@@ -45,6 +46,7 @@ export function ClientCard({ client, onEdit, onUnarchive, onDelete, onPermanentD
                                             onEdit(client);
                                         }}
                                         className="p-2 bg-secondary text-secondary-foreground rounded-full hover:bg-secondary/80"
+                                        aria-label="Edit client"
                                         title="Edit client"
                                     >
                                         <span className="sr-only">Edit</span>
@@ -59,6 +61,7 @@ export function ClientCard({ client, onEdit, onUnarchive, onDelete, onPermanentD
                                             onDelete(client.id, client.name);
                                         }}
                                         className="p-2 bg-amber-600 text-white rounded-full hover:bg-amber-700"
+                                        aria-label="Archive client"
                                         title="Archive client"
                                     >
                                         <Archive className="h-3 w-3" />
@@ -72,6 +75,7 @@ export function ClientCard({ client, onEdit, onUnarchive, onDelete, onPermanentD
                                             onPermanentDelete(client);
                                         }}
                                         className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700"
+                                        aria-label="Permanently delete client"
                                         title="Permanently delete"
                                     >
                                         <Trash2 className="h-3 w-3" />

@@ -1,126 +1,43 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
-import { Message, Contact, getContacts, getMessages, sendMessage, markAsRead, deleteConversation } from "@/lib/chat";
 import { MessagesList, ContactItem, ContactSkeleton, MessagesSkeleton, EmojiPicker } from "@/components/chat/ChatComponents";
 import { ArrowLeft, Send, Search, Smile, MessageCircle, X, Trash2, MessageSquare, Loader2 } from "lucide-react";
-import { useActivePolling } from "@/hooks/use-active-polling";
 import { useDateFormat } from "@/context/TimezoneContext";
-import { toast } from "sonner";
+import { useChatPanelState } from "@/components/chat/useChatPanelState";
 
 export function MessagesPageClient({ currentUserId }: { currentUserId: string }) {
     const fmt = useDateFormat();
     const router = useRouter();
-    const [contacts, setContacts] = useState<Contact[]>([]);
-    const [activeContactId, setActiveContactId] = useState<string | null>(null);
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [newMessage, setNewMessage] = useState("");
-    const [viewMode, setViewMode] = useState<'chats' | 'users'>('chats');
-    const [searchQuery, setSearchQuery] = useState("");
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [mobileView, setMobileView] = useState<'sidebar' | 'chat'>('sidebar');
-    const [isLoadingContacts, setIsLoadingContacts] = useState(true);
-    const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-    const [isSending, setIsSending] = useState(false);
-    const [showEmoji, setShowEmoji] = useState(false);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-    useEffect(() => { if (currentUserId) loadContacts(); }, [currentUserId]);
-    useActivePolling(() => loadContacts(true), 120000, !!currentUserId);
-
-    useEffect(() => {
-        if (currentUserId && activeContactId) {
-            loadMessages();
-            markAsRead(currentUserId, activeContactId);
-        }
-        setShowDeleteConfirm(false);
-    }, [currentUserId, activeContactId]);
-    useActivePolling(() => loadMessages(true), 10000, !!currentUserId && !!activeContactId);
-
-    useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
-
-    // Auto-resize textarea
-    useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
-        }
-    }, [newMessage]);
-
-    async function loadContacts(silent = false) {
-        if (!currentUserId) return;
-        if (!silent) setIsLoadingContacts(true);
-        try { setContacts(await getContacts(currentUserId)); } catch { }
-        finally { setIsLoadingContacts(false); }
-    }
-    async function loadMessages(silent = false) {
-        if (!currentUserId || !activeContactId) return;
-        if (!silent) setIsLoadingMessages(true);
-        try {
-            const serverMessages = await getMessages(currentUserId, activeContactId);
-            setMessages(serverMessages);
-        } catch { }
-        finally { setIsLoadingMessages(false); }
-    }
-    async function handleSend() {
-        if (!currentUserId || !activeContactId || !newMessage.trim() || isSending) return;
-        const content = newMessage.trim();
-        const optimistic: Message = { id: "temp-" + Date.now(), senderId: currentUserId, receiverId: activeContactId, content, timestamp: new Date().toISOString(), read: false, type: 'text', agencyId: 'optimistic' };
-        setMessages(prev => [...prev, optimistic]);
-        setNewMessage("");
-        setIsSending(true);
-        setShowEmoji(false);
-        try {
-            await sendMessage(currentUserId, activeContactId, content);
-            await loadMessages(true);
-            await loadContacts(true);
-        } catch {
-            toast.error("Failed to send message");
-        } finally {
-            setIsSending(false);
-            textareaRef.current?.focus();
-        }
-    }
-    async function handleDeleteConversation(contactId?: string) {
-        const targetId = contactId || activeContactId;
-        if (!currentUserId || !targetId) return;
-        try {
-            await deleteConversation(currentUserId, targetId);
-            setMessages([]);
-            if (targetId === activeContactId) {
-                setActiveContactId(null);
-                setMobileView('sidebar');
-            }
-            await loadContacts(true);
-            toast.success("Conversation deleted");
-        } catch {
-            toast.error("Failed to delete conversation");
-        }
-    }
-
-    function selectContact(id: string) {
-        setActiveContactId(id);
-        setMobileView('chat');
-    }
-
-    function handleEmojiSelect(emoji: string) {
-        setNewMessage(prev => prev + emoji);
-        textareaRef.current?.focus();
-    }
-
-    function handleKeyDown(e: React.KeyboardEvent) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSend();
-        }
-    }
-
-    const filteredContacts = searchQuery.trim()
-        ? contacts.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.role?.toLowerCase().includes(searchQuery.toLowerCase()))
-        : contacts;
-    const activeContact = contacts.find(c => c.id === activeContactId);
+    const {
+        contacts,
+        activeContactId,
+        messages,
+        newMessage,
+        viewMode,
+        searchQuery,
+        showDeleteConfirm,
+        mobileView,
+        isLoadingContacts,
+        isLoadingMessages,
+        isSending,
+        showEmoji,
+        messagesEndRef,
+        textareaRef,
+        filteredContacts,
+        activeContact,
+        setNewMessage,
+        setViewMode,
+        setSearchQuery,
+        setShowDeleteConfirm,
+        setMobileView,
+        setShowEmoji,
+        handleSend,
+        handleDeleteConversation,
+        selectContact,
+        handleEmojiSelect,
+        handleKeyDown,
+    } = useChatPanelState({ currentUserId });
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background p-4 md:p-8">

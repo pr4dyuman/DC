@@ -205,7 +205,7 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
             <CardContent>
                 <div className="mb-4 flex flex-wrap items-center gap-2">
                     <div className="flex items-center gap-1 rounded-lg border p-1">
-                        {['all', 'Pending', 'Processing', 'Paid'].map((status) => (
+                        {['all', 'Pending', 'Processing', 'Overdue', 'Paid'].map((status) => (
                             <button
                                 key={status}
                                 onClick={() => setStatusFilter(status)}
@@ -213,6 +213,7 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                                     ? status === 'Paid' ? 'bg-emerald-500/15 text-emerald-500'
                                         : status === 'Pending' ? 'bg-amber-500/15 text-amber-500'
                                             : status === 'Processing' ? 'bg-blue-500/15 text-blue-500'
+                                                : status === 'Overdue' ? 'bg-red-500/15 text-red-500'
                                                 : 'bg-primary/10 text-primary'
                                     : 'text-muted-foreground hover:text-foreground'
                                     }`}
@@ -269,7 +270,7 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                                         </TableCell>
                                         <TableCell>
                                             {isClient ? (
-                                                invoice.status === 'Pending' ? (
+                                                invoice.status === 'Pending' || invoice.status === 'Overdue' ? (
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
@@ -309,7 +310,7 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                                                     </div>
                                                 ) : invoice.status === 'Paid' ? (
                                                     <span className="text-xs text-emerald-500 font-medium">{'\u2713'} Confirmed</span>
-                                                ) : invoice.status === 'Pending' ? (
+                                                ) : invoice.status === 'Pending' || invoice.status === 'Overdue' ? (
                                                     <span className="text-xs text-muted-foreground">Awaiting Client</span>
                                                 ) : null
                                             )}

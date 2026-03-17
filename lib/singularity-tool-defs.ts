@@ -444,7 +444,7 @@ Always follow these rules strictly. The system will reject invalid combinations.
                     items: { type: "STRING" },
                 },
             },
-            required: ["serviceId", "name"],
+            required: ["serviceId", "name", "projectId"],
         },
     },
     {

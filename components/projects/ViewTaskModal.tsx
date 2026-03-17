@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { MentionTextarea } from "@/components/ui/mention-textarea";
 import { renderCommentText } from "@/lib/mention-utils";
 import { addComment } from "@/lib/actions";
+import { hasExplicitTime, toLocalCalendarDay } from "@/lib/date-utils";
 import {
     Calendar,
     Clock,
@@ -86,9 +87,11 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
     };
 
     // Overdue/days calculation
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const dueDiff = task.dueDate ? differenceInCalendarDays(new Date(task.dueDate), today) : null;
+    const today = toLocalCalendarDay(fmt.dateKey(new Date()));
+    const dueDate = task.dueDate ? toLocalCalendarDay(fmt.dateKey(task.dueDate)) : null;
+    const dueDiff = dueDate && today ? differenceInCalendarDays(dueDate, today) : null;
     const isOverdue = dueDiff !== null && dueDiff < 0 && task.status !== 'Done';
+    const showDueTime = hasExplicitTime(task.dueDate);
 
     const statusConfig = STATUS_CONFIGS[task.status] || STATUS_CONFIGS.Todo;
     const StatusIcon = statusConfig.icon;
@@ -198,8 +201,12 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
                                             {fmt.dateLong(task.dueDate)}
                                         </span>
                                         <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-                                            <Clock className="w-3 h-3" />
-                                            {fmt.time12(task.dueDate)}
+                                            {showDueTime && (
+                                                <>
+                                                    <Clock className="w-3 h-3" />
+                                                    {fmt.time12(task.dueDate)}
+                                                </>
+                                            )}
                                             {dueDiff !== null && (
                                                 <span className={isOverdue ? 'text-red-500 font-semibold' : dueDiff <= 3 ? 'text-amber-500 font-semibold' : ''}>
                                                     {isOverdue ? ` • ${Math.abs(dueDiff)}d overdue` : dueDiff === 0 ? ' • Due today' : ` • ${dueDiff}d left`}

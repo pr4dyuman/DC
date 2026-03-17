@@ -1,9 +1,6 @@
-// ─── Centralized timezone-aware date formatting ─────────────────────────────
+// Centralized timezone-aware date formatting.
 // All date display should go through these functions.
-// Dates are stored in UTC (ISO strings). These functions convert to the
-// user's timezone for display using the native Intl.DateTimeFormat API.
-
-// ── Timezone → Locale mapping ───────────────────────────────────────────────
+// Dates may be stored either as full ISO timestamps or as date-only YYYY-MM-DD strings.
 
 const TZ_LOCALE: Record<string, string> = {
     // India
@@ -66,20 +63,77 @@ const TZ_LOCALE: Record<string, string> = {
     'Africa/Nairobi': 'en-KE',
 };
 
+const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+type DateOnlyParts = {
+    year: number;
+    month: number;
+    day: number;
+};
+
 export function getLocaleForTimezone(tz: string): string {
     if (TZ_LOCALE[tz]) return TZ_LOCALE[tz];
-    // Region-based fallback
     if (tz.startsWith('America/')) return 'en-US';
     if (tz.startsWith('Europe/')) return 'en-GB';
     if (tz.startsWith('Australia/') || tz.startsWith('Pacific/')) return 'en-AU';
     return 'en-US';
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+function parseDateOnlyParts(value: string): DateOnlyParts | null {
+    const match = DATE_ONLY_RE.exec(value.trim());
+    if (!match) return null;
 
-function toDate(d: string | Date | undefined): Date {
-    if (!d) return new Date(NaN);
-    return typeof d === 'string' ? new Date(d) : d;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+
+    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+    return { year, month, day };
+}
+
+function toDateOnlyAnchorUtc(value: string): Date {
+    const parts = parseDateOnlyParts(value);
+    if (!parts) return new Date(NaN);
+    return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 12));
+}
+
+function formatDateKey(date: Date, tz: string): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: tz,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(date);
+
+    const year = parts.find((part) => part.type === 'year')?.value;
+    const month = parts.find((part) => part.type === 'month')?.value;
+    const day = parts.find((part) => part.type === 'day')?.value;
+
+    if (!year || !month || !day) {
+        throw new Error('Invalid date parts');
+    }
+
+    return `${year}-${month}-${day}`;
+}
+
+function formatCalendarDate(
+    date: string | Date | undefined,
+    tz: string,
+    locale: string,
+    options: Intl.DateTimeFormatOptions
+): string {
+    if (typeof date === 'string' && parseDateOnlyParts(date)) {
+        return new Intl.DateTimeFormat(locale, { ...options, timeZone: 'UTC' }).format(toDateOnlyAnchorUtc(date));
+    }
+
+    return new Intl.DateTimeFormat(locale, { ...options, timeZone: tz }).format(toDate(date));
+}
+
+function toDate(date: string | Date | undefined): Date {
+    if (!date) return new Date(NaN);
+    return typeof date === 'string' ? new Date(date) : date;
 }
 
 function safe(fn: () => string, fallback = '—'): string {
@@ -91,63 +145,96 @@ function safe(fn: () => string, fallback = '—'): string {
     }
 }
 
-// ── Display formatters ──────────────────────────────────────────────────────
+export function isDateOnlyString(value: unknown): value is string {
+    return typeof value === 'string' && parseDateOnlyParts(value) !== null;
+}
 
-/** "Mar 10, 2026" — medium date */
+export function hasExplicitTime(date: string | Date | undefined | null): boolean {
+    if (!date) return false;
+    if (date instanceof Date) return true;
+    return /[T ]\d{2}:\d{2}/.test(date);
+}
+
+export function toLocalCalendarDay(date: string | Date | undefined | null): Date | null {
+    if (!date) return null;
+
+    if (typeof date === 'string') {
+        const parts = parseDateOnlyParts(date);
+        if (parts) {
+            return new Date(parts.year, parts.month - 1, parts.day);
+        }
+    }
+
+    const parsed = date instanceof Date ? new Date(date) : new Date(date);
+    if (Number.isNaN(parsed.getTime())) return null;
+    parsed.setHours(0, 0, 0, 0);
+    return parsed;
+}
+
 export function fmtDate(date: string | Date | undefined, tz: string, locale: string): string {
-    return safe(() => toDate(date).toLocaleDateString(locale, {
-        day: 'numeric', month: 'short', year: 'numeric', timeZone: tz,
+    return safe(() => formatCalendarDate(date, tz, locale, {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
     }));
 }
 
-/** "10 Mar" or "Mar 10" — short date without year */
 export function fmtDateShort(date: string | Date | undefined, tz: string, locale: string): string {
-    return safe(() => toDate(date).toLocaleDateString(locale, {
-        day: 'numeric', month: 'short', timeZone: tz,
+    return safe(() => formatCalendarDate(date, tz, locale, {
+        day: 'numeric',
+        month: 'short',
     }));
 }
 
-/** "March 10, 2026" — long date */
 export function fmtDateLong(date: string | Date | undefined, tz: string, locale: string): string {
-    return safe(() => toDate(date).toLocaleDateString(locale, {
-        day: 'numeric', month: 'long', year: 'numeric', timeZone: tz,
+    return safe(() => formatCalendarDate(date, tz, locale, {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
     }));
 }
 
-/** "14:30" — 24-hour time (consistent colon separator via en-GB) */
 export function fmtTime(date: string | Date | undefined, tz: string): string {
     return safe(() => toDate(date).toLocaleTimeString('en-GB', {
-        hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: tz,
     }));
 }
 
-/** "2:30 PM" — 12-hour time */
 export function fmtTime12(date: string | Date | undefined, tz: string, locale: string): string {
     return safe(() => toDate(date).toLocaleTimeString(locale, {
-        hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz,
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: tz,
     }));
 }
 
-/** "Mar 10, 2026, 2:30 PM" — date + time */
 export function fmtDateTime(date: string | Date | undefined, tz: string, locale: string): string {
     return safe(() => toDate(date).toLocaleString(locale, {
-        dateStyle: 'medium', timeStyle: 'short', timeZone: tz,
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: tz,
     }));
 }
 
-/** "10 Mar 14:30" — compact date + 24h time (for chat last-seen) */
 export function fmtDateTimeShort(date: string | Date | undefined, tz: string, locale: string): string {
     return safe(() => toDate(date).toLocaleString(locale, {
-        day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-        hour12: false, timeZone: tz,
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: tz,
     }));
 }
 
-/** "2h ago", "3d ago" — relative time (timezone-neutral) */
 export function fmtRelative(date: string | Date | undefined): string {
     return safe(() => {
         const diff = Date.now() - toDate(date).getTime();
-        if (isNaN(diff)) return '—';
+        if (Number.isNaN(diff)) return '—';
         const mins = Math.floor(diff / 60000);
         if (mins < 1) return 'Just now';
         if (mins < 60) return `${mins}m ago`;
@@ -161,12 +248,11 @@ export function fmtRelative(date: string | Date | undefined): string {
     });
 }
 
-/** "Online" / "5m ago" — presence status with Online threshold */
 export function fmtPresence(date: string | Date | undefined, tz: string, locale: string): string {
     if (!date) return '';
     return safe(() => {
         const diff = Date.now() - toDate(date).getTime();
-        if (isNaN(diff)) return '';
+        if (Number.isNaN(diff)) return '';
         const mins = Math.floor(diff / 60000);
         if (mins < 5) return 'Online';
         if (mins < 60) return `${mins}m ago`;
@@ -178,60 +264,57 @@ export function fmtPresence(date: string | Date | undefined, tz: string, locale:
     }, '');
 }
 
-/** Is the date "today" in the given timezone? */
 export function isTodayTz(date: string | Date, tz: string): boolean {
     try {
-        const dStr = toDate(date).toLocaleDateString('en-CA', { timeZone: tz });
-        const nStr = new Date().toLocaleDateString('en-CA', { timeZone: tz });
-        return dStr === nStr;
-    } catch { return false; }
+        return dateKeyTz(date, tz) === todayStrTz(tz);
+    } catch {
+        return false;
+    }
 }
 
-/** Is the date "yesterday" in the given timezone? */
 export function isYesterdayTz(date: string | Date, tz: string): boolean {
     try {
-        const dStr = toDate(date).toLocaleDateString('en-CA', { timeZone: tz });
-        const y = new Date();
-        y.setDate(y.getDate() - 1);
-        const yStr = y.toLocaleDateString('en-CA', { timeZone: tz });
-        return dStr === yStr;
-    } catch { return false; }
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        return dateKeyTz(date, tz) === dateKeyTz(yesterday, tz);
+    } catch {
+        return false;
+    }
 }
 
-/** "March 2026" — month + year */
 export function fmtMonthYear(date: string | Date | undefined, tz: string, locale: string): string {
-    return safe(() => toDate(date).toLocaleDateString(locale, {
-        month: 'long', year: 'numeric', timeZone: tz,
+    return safe(() => formatCalendarDate(date, tz, locale, {
+        month: 'long',
+        year: 'numeric',
     }));
 }
 
-/** "Mar" — short month name */
 export function fmtMonthShort(date: string | Date | undefined, tz: string, locale: string): string {
-    return safe(() => toDate(date).toLocaleDateString(locale, {
-        month: 'short', timeZone: tz,
+    return safe(() => formatCalendarDate(date, tz, locale, {
+        month: 'short',
     }));
 }
 
-/** "Mon, Mar 10, 2026" — date with weekday */
 export function fmtDateWithDay(date: string | Date | undefined, tz: string, locale: string): string {
-    return safe(() => toDate(date).toLocaleDateString(locale, {
-        weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: tz,
+    return safe(() => formatCalendarDate(date, tz, locale, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
     }));
 }
 
-/** "2026-03-10" — ISO date key in the given timezone (for data grouping) */
 export function dateKeyTz(date: string | Date, tz: string): string {
-    return safe(() => toDate(date).toLocaleDateString('en-CA', { timeZone: tz }));
+    if (typeof date === 'string' && parseDateOnlyParts(date)) return date;
+    return safe(() => formatDateKey(toDate(date), tz));
 }
 
-/** Today's date as "YYYY-MM-DD" in the given timezone (for backend comparisons) */
 export function todayStrTz(tz: string): string {
-    return new Date().toLocaleDateString('en-CA', { timeZone: tz });
+    return formatDateKey(new Date(), tz);
 }
 
-/** "Mon" / "Tue" — short weekday in locale */
 export function fmtWeekday(date: string | Date | undefined, tz: string, locale: string): string {
-    return safe(() => toDate(date).toLocaleDateString(locale, {
-        weekday: 'short', timeZone: tz,
+    return safe(() => formatCalendarDate(date, tz, locale, {
+        weekday: 'short',
     }));
 }

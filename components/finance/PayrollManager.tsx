@@ -28,17 +28,34 @@ export function PayrollManager({ items }: PayrollManagerProps) {
     const { format: formatMoney } = useCurrency();
     const [loadingIds, setLoadingIds] = useState<string[]>([]);
 
-    const handlePay = async (userId: string, salary: number, month: string, userName: string) => {
+    const runPay = async (
+        userId: string,
+        salary: number,
+        month: string,
+        userName: string,
+        options: { showToast?: boolean; refresh?: boolean } = {}
+    ) => {
+        const { showToast = true, refresh = true } = options;
         setLoadingIds(prev => [...prev, userId]);
         try {
             await payEmployee(userId, salary, month, userName);
-            toast.success(`${userName} paid successfully`);
-            router.refresh();
+            if (showToast) toast.success(`${userName} paid successfully`);
+            if (refresh) router.refresh();
+            return true;
         } catch (error) {
             console.error(error);
-            toast.error(`Failed to pay ${userName}`);
+            if (showToast) toast.error(`Failed to pay ${userName}`);
+            throw error;
         } finally {
             setLoadingIds(prev => prev.filter(id => id !== userId));
+        }
+    };
+
+    const handlePay = async (userId: string, salary: number, month: string, userName: string) => {
+        try {
+            await runPay(userId, salary, month, userName);
+        } catch {
+            // Toast is already shown in runPay for single-item actions.
         }
     };
 
@@ -46,9 +63,12 @@ export function PayrollManager({ items }: PayrollManagerProps) {
         const pending = items.filter(i => i.status !== 'Paid');
         if (pending.length === 0) return;
         const results = await Promise.allSettled(
-            pending.map(item => handlePay(item.user.id, item.salary, item.month, item.user.name))
+            pending.map(item => runPay(item.user.id, item.salary, item.month, item.user.name, { showToast: false, refresh: false }))
         );
+        router.refresh();
+        const succeeded = results.filter(r => r.status === 'fulfilled').length;
         const failed = results.filter(r => r.status === 'rejected').length;
+        if (succeeded > 0) toast.success(`${succeeded} of ${pending.length} payments completed`);
         if (failed > 0) toast.error(`${failed} of ${pending.length} payments failed`);
     };
 

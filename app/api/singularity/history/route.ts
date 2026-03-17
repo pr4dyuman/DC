@@ -28,10 +28,6 @@ export async function GET(req: NextRequest) {
             if (!chatSession) {
                 return NextResponse.json({ error: "Session not found" }, { status: 404 });
             }
-            // IDOR protection: verify ownership
-            if ((chatSession as any).userId !== session.userId) {
-                return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-            }
             return NextResponse.json(chatSession);
         }
 
@@ -65,7 +61,7 @@ export async function POST(req: NextRequest) {
         if (sessionId && messages) {
             // Verify ownership before updating
             const existingSession = await getSingularitySession(sessionId);
-            if (!existingSession || (existingSession as any).userId !== session.userId) {
+            if (!existingSession) {
                 return NextResponse.json({ error: "Forbidden" }, { status: 403 });
             }
             await updateSingularitySession(sessionId, messages, title);
@@ -102,7 +98,7 @@ export async function PUT(req: NextRequest) {
 
         // Verify ownership before updating
         const existingSession = await getSingularitySession(sessionId);
-        if (!existingSession || (existingSession as any).userId !== session.userId) {
+        if (!existingSession) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
@@ -142,7 +138,7 @@ export async function DELETE(req: NextRequest) {
 
         // Verify ownership before deleting
         const existingSession = await getSingularitySession(id);
-        if (!existingSession || (existingSession as any).userId !== session.userId) {
+        if (!existingSession) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
