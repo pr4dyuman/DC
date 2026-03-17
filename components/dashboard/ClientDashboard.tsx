@@ -62,7 +62,7 @@ export function ClientDashboard({
         const done = pTasks.filter(t => t.status === 'Done').length;
         const total = pTasks.length;
         const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-        return { id: p.id, name: p.name, slug: (p as any).slug || p.id, pct, done, total };
+        return { id: p.id, name: p.name, slug: p.slug || p.id, pct, done, total };
     }).filter(p => p.total > 0).slice(0, 3);
 
     return (

@@ -36,8 +36,6 @@ export function PendingPayablesList({ transactions }: PendingPayablesListProps) 
         }
     };
 
-    const totalPending = transactions.reduce((sum, t) => sum + t.amount, 0);
-
     return (
         <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
             <CardHeader className="pb-2">

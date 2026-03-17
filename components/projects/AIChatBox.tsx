@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, X, Sparkles, User, Bot, CornerDownLeft, ArrowRight, Check, Loader2 } from "lucide-react";
-import { chatWithTaskAI, createAISession, sendAIMessage, closeAISession, extractTaskFields } from "@/lib/actions";
+import { X, Sparkles, User, Bot, ArrowRight, Loader2 } from "lucide-react";
+import { createAISession, sendAIMessage, closeAISession, extractTaskFields } from "@/lib/actions";
 import type { ChatMessage, ExtractedTaskFields } from "@/lib/actions";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface AIChatBoxProps {

@@ -17,7 +17,7 @@ interface ClientProjectsListProps {
 export function ClientProjectsList({ initialProjects }: ClientProjectsListProps) {
     const [projects, setProjects] = useState<Project[]>(initialProjects);
     const [offset, setOffset] = useState(initialProjects.length);
-    const [hasMore, setHasMore] = useState(true);
+    const [hasMore, setHasMore] = useState(initialProjects.length >= 5);
     const [loading, setLoading] = useState(false);
     const { ref, inView } = useInView();
 

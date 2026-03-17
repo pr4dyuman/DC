@@ -1,8 +1,6 @@
 // Fix database: normalize agencyId + create new admin account
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const fs = require('fs');
-const path = require('path');
 require('dotenv').config();
 
 const MONGODB_URI = process.env.MONGODB_URI;

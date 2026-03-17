@@ -3,12 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Search, Settings, LogOut, User as UserIcon, Loader2, Check, X, FileText, Briefcase, Users, Building2 } from "lucide-react";
+import { Bell, Search, Settings, LogOut, User as UserIcon, Loader2, FileText, Briefcase, Users, Building2 } from "lucide-react";
 import { MobileSidebar } from "./MobileSidebar";
 import { User, Notification } from "@/lib/types";
 import { useDateFormat } from "@/context/TimezoneContext";
 
-import { getUsers, getNotifications, getUnreadNotificationCount, globalSearch, markNotificationAsRead, SearchResult } from "@/lib/actions";
+import { getNotifications, getUnreadNotificationCount, globalSearch, markNotificationAsRead, SearchResult } from "@/lib/actions";
 import { logout } from "@/lib/auth";
 import {
     DropdownMenu,
@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 interface TopbarProps {

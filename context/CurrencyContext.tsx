@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useMemo } from "react";
-import { formatCurrency, getCurrencySymbol, getCurrencyInfo, type CurrencyInfo } from "@/lib/currency";
+import { formatCurrency, getCurrencyInfo, type CurrencyInfo } from "@/lib/currency";
 
 // ── Context ─────────────────────────────────────────────────────────────────
 

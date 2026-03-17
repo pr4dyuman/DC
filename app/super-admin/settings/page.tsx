@@ -7,10 +7,23 @@ import { useDateFormat } from "@/context/TimezoneContext";
 import { CURRENCIES } from "@/lib/currency";
 import { getSystemSettings, updateSystemSettings, getAllAgenciesWithStats, getDefaultAiConfig, saveDefaultAiConfig } from "@/lib/actions/super-admin";
 import { AI_MODELS } from "@/lib/ai-models";
-import { AIProvider, AIConfig } from "@/lib/types";
+import { AIConfig, Agency, AIProvider } from "@/lib/types";
 import { Switch } from "@/components/ui/switch";
 import { EMAIL_CATEGORY_INFO, DEFAULT_EMAIL_CATEGORIES, TASK_EMAIL_EVENTS, DEFAULT_TASK_EMAIL_EVENTS } from "@/lib/email-constants";
 import type { EmailCategory, TaskEmailEventKey, TaskEmailEventConfig } from "@/lib/email-constants";
+import { toast } from "sonner";
+
+type AgencyWithStats = Agency & {
+    stats: {
+        users: number;
+        projects: number;
+        clients: number;
+    };
+};
+
+function getErrorMessage(error: unknown, fallback: string) {
+    return error instanceof Error ? error.message : fallback;
+}
 
 export default function SystemSettingsPage() {
     const fmt = useDateFormat();
@@ -55,7 +68,7 @@ export default function SystemSettingsPage() {
     const [updatingNotif, setUpdatingNotif] = useState<string | null>(null);
 
     // Agencies for AI config
-    const [agencies, setAgencies] = useState<any[]>([]);
+    const [agencies, setAgencies] = useState<AgencyWithStats[]>([]);
 
     // Default AI config state
     const [defaultAi, setDefaultAi] = useState<{ provider: AIProvider; apiKey: string; model: string; customModelId: string }>({ provider: 'gemini', apiKey: '', model: '', customModelId: '' });
@@ -107,7 +120,7 @@ export default function SystemSettingsPage() {
                         });
                     }
                 }
-                setAgencies(agencyList);
+                setAgencies((agencyList as AgencyWithStats[]) || []);
                 // Load default AI config
                 try {
                     const daiConfig = await getDefaultAiConfig();
@@ -118,6 +131,7 @@ export default function SystemSettingsPage() {
                 } catch { /* ignore if not configured */ }
             } catch (e) {
                 console.error("Failed to load settings:", e);
+                toast.error("Failed to load system settings");
             } finally {
                 setLoading(false);
             }
@@ -133,6 +147,7 @@ export default function SystemSettingsPage() {
             setTimeout(() => setSaved(""), 2500);
         } catch (e) {
             console.error("Failed to save:", e);
+            toast.error("Failed to save changes");
         } finally {
             setSaving("");
         }
@@ -148,6 +163,7 @@ export default function SystemSettingsPage() {
         } catch (e) {
             console.error('Failed to toggle email:', e);
             setEmailGlobalEnabled(!checked);
+            toast.error("Failed to update email service");
         } finally {
             setUpdatingEmail(null);
         }
@@ -161,6 +177,7 @@ export default function SystemSettingsPage() {
         } catch (e) {
             console.error('Failed to toggle category:', e);
             setEmailCategories(prev => ({ ...prev, [category]: !checked }));
+            toast.error("Failed to update email category");
         } finally {
             setUpdatingEmail(null);
         }
@@ -182,6 +199,7 @@ export default function SystemSettingsPage() {
                 ...prev,
                 [eventKey]: { ...prev[eventKey], [field]: !checked },
             }));
+            toast.error("Failed to update task email event");
         } finally {
             setUpdatingEmail(null);
         }
@@ -195,6 +213,7 @@ export default function SystemSettingsPage() {
         } catch (e) {
             console.error('Failed to toggle notification:', e);
             setNotificationDefaults(prev => ({ ...prev, [key]: !checked }));
+            toast.error("Failed to update notification default");
         } finally {
             setUpdatingNotif(null);
         }
@@ -208,6 +227,7 @@ export default function SystemSettingsPage() {
         } catch (e) {
             console.error('Failed to toggle alert:', e);
             setNotifications(prev => ({ ...prev, [key]: !checked }));
+            toast.error("Failed to update alert setting");
         } finally {
             setUpdatingEmail(null);
         }
@@ -368,7 +388,6 @@ export default function SystemSettingsPage() {
                                             <p className="text-xs text-muted-foreground mb-1">Configure task email events and recipients:</p>
                                             {(Object.entries(TASK_EMAIL_EVENTS) as [TaskEmailEventKey, typeof TASK_EMAIL_EVENTS[TaskEmailEventKey]][]).map(([eventKey, eventInfo]) => {
                                                 const eventConfig = taskEmailEvents[eventKey] || DEFAULT_TASK_EMAIL_EVENTS[eventKey];
-                                                const eventUpdating = updatingEmail?.startsWith(`event-${eventKey}`);
                                                 return (
                                                     <div key={eventKey} className="rounded-lg bg-muted/20 p-2">
                                                         <div className="flex items-center justify-between py-1">
@@ -577,7 +596,7 @@ export default function SystemSettingsPage() {
                                 className="w-full h-9 rounded-lg border border-border bg-background px-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
                             >
                                 <option value="">Select a model...</option>
-                                {(AI_MODELS[defaultAi.provider] || []).map((m: any) => (
+                                {(AI_MODELS[defaultAi.provider] || []).map((m) => (
                                     <option key={m.id} value={m.id}>{m.name}</option>
                                 ))}
                             </select>
@@ -603,7 +622,7 @@ export default function SystemSettingsPage() {
                                     if (!defaultAi.model) return;
                                     setSavingDefaultAi(true);
                                     try {
-                                        const configToSave: any = {
+                                        const configToSave: AIConfig = {
                                             provider: defaultAi.provider,
                                             apiKey: defaultAi.apiKey || '', // Empty = keep existing (server handles it)
                                             model: defaultAi.model,
@@ -614,8 +633,10 @@ export default function SystemSettingsPage() {
                                         setDefaultAi(prev => ({ ...prev, apiKey: '' })); // Clear after save
                                         setSavedDefaultAi('Saved!');
                                         setTimeout(() => setSavedDefaultAi(''), 3000);
-                                    } catch (err: any) {
-                                        setSavedDefaultAi(err?.message || 'Failed');
+                                    } catch (err) {
+                                        const message = getErrorMessage(err, 'Failed to save default AI config');
+                                        toast.error(message);
+                                        setSavedDefaultAi(message);
                                         setTimeout(() => setSavedDefaultAi(''), 3000);
                                     } finally {
                                         setSavingDefaultAi(false);
@@ -636,7 +657,9 @@ export default function SystemSettingsPage() {
                                             setDefaultAiConfigured(false);
                                             setSavedDefaultAi('Removed');
                                             setTimeout(() => setSavedDefaultAi(''), 3000);
-                                        } catch { } finally { setSavingDefaultAi(false); }
+                                        } catch {
+                                            toast.error('Failed to remove default AI config');
+                                        } finally { setSavingDefaultAi(false); }
                                     }}
                                     className="px-3 py-1.5 text-red-500 hover:bg-red-500/10 rounded-lg text-xs font-medium transition"
                                 >
@@ -653,7 +676,7 @@ export default function SystemSettingsPage() {
                     <p className="text-sm text-muted-foreground">No agencies found.</p>
                 ) : (
                     <div className="divide-y divide-border">
-                        {agencies.map((agency: any) => (
+                        {agencies.map((agency) => (
                             <Link
                                 key={agency.id}
                                 href={`/super-admin/settings/ai/${agency.id}`}
@@ -771,21 +794,23 @@ function SectionAccordion({
 }) {
     return (
         <div className="border rounded-lg bg-card text-card-foreground shadow-sm">
-            <div
+            <button
+                type="button"
                 onClick={onToggle}
-                className="flex flex-row items-center justify-between p-6 cursor-pointer hover:bg-accent/50 transition-colors"
+                aria-expanded={isOpen}
+                className="w-full text-left flex flex-row items-center justify-between p-6 hover:bg-accent/50 transition-colors"
             >
-                <div className="flex items-center gap-4">
-                    <div className={`p-2 ${iconBg} rounded-full`}>
+                <span className="flex items-center gap-4">
+                    <span className={`p-2 ${iconBg} rounded-full inline-flex`}>
                         {icon}
-                    </div>
-                    <div>
-                        <h2 className="text-lg font-semibold">{title}</h2>
-                        <p className="text-sm text-muted-foreground">{description}</p>
-                    </div>
-                </div>
+                    </span>
+                    <span>
+                        <span className="block text-lg font-semibold">{title}</span>
+                        <span className="block text-sm text-muted-foreground">{description}</span>
+                    </span>
+                </span>
                 {isOpen ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : <ChevronRight className="h-5 w-5 text-muted-foreground" />}
-            </div>
+            </button>
 
             <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
                 <div className="overflow-hidden">

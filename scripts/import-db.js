@@ -52,7 +52,7 @@ async function importAll() {
         }
 
         // Drop existing collection if any, then insert
-        try { await db.collection(collectionName).drop(); } catch (e) { /* doesn't exist yet */ }
+        try { await db.collection(collectionName).drop(); } catch { /* doesn't exist yet */ }
         await db.collection(collectionName).insertMany(data);
         console.log(`✅ ${collectionName}: ${data.length} documents imported`);
         totalDocs += data.length;

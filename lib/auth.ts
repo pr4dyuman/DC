@@ -12,12 +12,41 @@ import { validateEmail } from "./validation";
 const MAX_LOGIN_ATTEMPTS = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
+type RateLimitRecord = {
+    count?: number;
+};
+
+type SecuritySettingsRecord = {
+    security?: {
+        enforceStrongPasswords?: boolean;
+    };
+};
+
+type ArchivedLoginCandidate = {
+    archived?: boolean;
+    password?: string;
+    id: string;
+    agencyId?: string;
+};
+
+type ArchivedUserCandidate = ArchivedLoginCandidate & {
+    role: string;
+};
+
+type PasswordDocument = {
+    password?: string;
+};
+
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error && error.message ? error.message : fallback;
+}
+
 async function checkLoginRateLimit(email: string): Promise<void> {
     const key = `login:${email.toLowerCase().trim()}`;
     const now = new Date();
     const record = await RateLimitModel.findOne({ key, expiresAt: { $gt: now } }).lean();
     if (record) {
-        if ((record as any).count >= MAX_LOGIN_ATTEMPTS) {
+        if (((record as RateLimitRecord).count ?? 0) >= MAX_LOGIN_ATTEMPTS) {
             throw new Error('Too many login attempts. Please try again later.');
         }
         await RateLimitModel.updateOne({ key }, { $inc: { count: 1 } });
@@ -131,8 +160,8 @@ export async function authenticateUser(email: string, password: string): Promise
         await connectDB();
         // Rate limiting check
         await checkLoginRateLimit(email);
-    } catch (e: any) {
-        return { success: false, error: e.message || 'Too many login attempts. Please try again later.' };
+    } catch (error: unknown) {
+        return { success: false, error: getErrorMessage(error, 'Too many login attempts. Please try again later.') };
     }
 
     // 1. Check Super Admin
@@ -150,9 +179,9 @@ export async function authenticateUser(email: string, password: string): Promise
     if (matchedUsers.length > 1) {
         return { success: false, error: "Multiple accounts found for this email. Please contact support." };
     }
-    const user = matchedUsers[0];
+    const user = matchedUsers[0] as ArchivedUserCandidate | undefined;
     if (user) {
-        if ((user as any).archived) {
+        if (user.archived) {
             return { success: false, error: 'This account has been deactivated. Please contact your agency.' };
         }
         if (user.password && await comparePassword(password, user.password)) {
@@ -167,9 +196,9 @@ export async function authenticateUser(email: string, password: string): Promise
     if (matchedClients.length > 1) {
         return { success: false, error: "Multiple accounts found for this email. Please contact support." };
     }
-    const client = matchedClients[0];
+    const client = matchedClients[0] as ArchivedLoginCandidate | undefined;
     if (client) {
-        if ((client as any).archived) {
+        if (client.archived) {
             return { success: false, error: 'This account has been deactivated. Please contact your agency.' };
         }
         if (client.password && await comparePassword(password, client.password)) {
@@ -193,30 +222,26 @@ export async function updatePassword(currentPassword: string, newPassword: strin
         const sys = await SystemSettingsModel.findOne(
             { key: 'global' },
             { 'security.enforceStrongPasswords': 1 }
-        ).lean() as any;
+        ).lean() as SecuritySettingsRecord | null;
         const enforceStrong = sys?.security?.enforceStrongPasswords ?? true;
         if (enforceStrong) {
             validateStrongPassword(newPassword);
         } else {
             validatePassword(newPassword);
         }
-    } catch (e: any) {
-        return { success: false, error: e.message || 'Invalid password' };
+    } catch (error: unknown) {
+        return { success: false, error: getErrorMessage(error, 'Invalid password') };
     }
 
     // 1. Fetch User Document
-    let user: any;
-    let model: any;
+    let user: PasswordDocument | null = null;
 
     if (session.role === 'superadmin') {
         user = await SuperAdminModel.findOne({ id: session.userId });
-        model = SuperAdminModel;
     } else if (session.role === 'client') {
         user = await ClientModel.findOne({ id: session.userId });
-        model = ClientModel;
     } else {
         user = await UserModel.findOne({ id: session.userId });
-        model = UserModel;
     }
 
     if (!user) {
@@ -237,7 +262,13 @@ export async function updatePassword(currentPassword: string, newPassword: strin
     // 3. Hash & Update
     const hashedPassword = await hashPassword(newPassword);
 
-    await model.findOneAndUpdate({ id: session.userId }, { password: hashedPassword });
+    if (session.role === 'superadmin') {
+        await SuperAdminModel.findOneAndUpdate({ id: session.userId }, { password: hashedPassword });
+    } else if (session.role === 'client') {
+        await ClientModel.findOneAndUpdate({ id: session.userId }, { password: hashedPassword });
+    } else {
+        await UserModel.findOneAndUpdate({ id: session.userId }, { password: hashedPassword });
+    }
 
     return { success: true };
 }

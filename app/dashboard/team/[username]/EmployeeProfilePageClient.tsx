@@ -17,7 +17,7 @@ import {
     Mail, Briefcase, Calendar, Banknote,
     CheckCircle2, Clock, Activity as ActivityIcon, ArrowLeft,
     Zap, Pencil, MessageCircle,
-    Eye, ListTodo, FolderOpen, Search, ChevronDown, Phone, AlertCircle, Flame, Share2, Download, Loader2
+    Eye, ListTodo, FolderOpen, Search, Phone, AlertCircle, Flame, Download, Loader2
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { toLocalCalendarDay } from "@/lib/date-utils";
+import { toast } from "sonner";
 
 // Helper: check if a task is overdue
 function isOverdue(task: Task): boolean {
@@ -45,7 +46,7 @@ function isOverdue(task: Task): boolean {
 function calculateStreak(contributionStats: Record<string, DailyStats>): number {
     const today = new Date();
     let streak = 0;
-    let checkDate = new Date(today);
+    const checkDate = new Date(today);
 
     // Start from today and go backwards
     for (let i = 0; i < 365; i++) {
@@ -267,7 +268,7 @@ export default function EmployeeProfilePage({ username }: { username: string }) 
                 .forEach(task => {
                     const titleKey = task.title.toLowerCase().trim();
                     if (!countedTitles.has(titleKey)) {
-                        const timestamp = (task as any).updatedAt || task.createdAt;
+                        const timestamp = task.updatedAt || task.createdAt;
                         if (timestamp) {
                             const dateStr = typeof timestamp === 'string'
                                 ? timestamp.split('T')[0]
@@ -339,7 +340,7 @@ export default function EmployeeProfilePage({ username }: { username: string }) 
                     const approvedLeaves = leaves.filter(l => l.status === 'Approved');
                     const dates: string[] = [];
                     approvedLeaves.forEach(leave => {
-                        let current = new Date(leave.startDate);
+                        const current = new Date(leave.startDate);
                         const end = new Date(leave.endDate);
                         while (current <= end) {
                             dates.push(current.toISOString().split('T')[0]);
@@ -358,6 +359,7 @@ export default function EmployeeProfilePage({ username }: { username: string }) 
             }
         } catch (error) {
             console.error("Failed to load profile", error);
+            toast.error("Failed to load profile");
         } finally {
             setLoading(false);
         }
@@ -391,7 +393,7 @@ export default function EmployeeProfilePage({ username }: { username: string }) 
             groups[groups.length - 1].items.push(activity);
         });
         return groups;
-    }, [visibleActivities]);
+    }, [fmt, visibleActivities]);
 
     // Task completion streak (must be before early returns)
     const streak = useMemo(() => calculateStreak(contributionStats), [contributionStats]);
@@ -424,7 +426,6 @@ export default function EmployeeProfilePage({ username }: { username: string }) 
     }
 
     const completedTasks = tasks.filter(t => t.status === 'Done').length;
-    const pendingTasks = tasks.filter(t => t.status !== 'Done').length;
     const overdueTasks = tasks.filter(t => isOverdue(t)).length;
     const efficiency = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : null;
 

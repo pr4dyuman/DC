@@ -43,7 +43,7 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
         // We need enough days to cover the whole year up to the last week
         // Loop until we reach a date > endDate AND it's the end of a week (Saturday)
 
-        let currentDate = new Date(gridStartDate);
+        const currentDate = new Date(gridStartDate);
 
         // Safety break
         let count = 0;
@@ -115,8 +115,6 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
     const months = useMemo(() => {
         const monthLabels: { label: string, index: number }[] = [];
         weeks.forEach((week, index) => {
-            const firstDay = week[0];
-
             // Logic to place month label at the start of the month
             // If the week contains the 1st of a month, label it.
             const hasFirstOfMonth = week.some(d => d.getDate() === 1 && d.getFullYear() === year);
@@ -145,7 +143,7 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
                     {weeks.map((week, wIndex) => (
                         <div key={wIndex} className="flex flex-col gap-1 sm:gap-1 flex-1 min-w-0">
                             {week.map((day, dIndex) => {
-                                const { colorClass, count, dateStr, isLeave, isCurrentYear } = getCellProps(day);
+                                const { colorClass, count, isLeave, isCurrentYear } = getCellProps(day);
                                 const niceDate = fmt.dateWithDay(day);
 
                                 if (!isCurrentYear) {
@@ -207,8 +205,6 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
 
                     // Sort dates to ensure streak calculation is correct
                     const sortedDates = Object.keys(data).sort();
-                    const todayStr = new Date().toISOString().split('T')[0];
-
                     sortedDates.forEach((dateStr) => {
                         if (data[dateStr].count > 0) {
                             tempStreak++;
@@ -221,7 +217,7 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
                     // Check current streak (working backwards from today)
                     // Simple check: if today has data, start count, else 0 (or check yesterday if today is empty?)
                     // For simplicity, we check contiguous active days ending today or yesterday.
-                    let checkDate = new Date();
+                    const checkDate = new Date();
                     while (true) {
                         const dStr = checkDate.toISOString().split('T')[0];
                         if (data[dStr] && data[dStr].count > 0) {

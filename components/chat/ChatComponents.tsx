@@ -1,7 +1,7 @@
 import { Message, Contact } from "@/lib/chat";
 import { cn } from "@/lib/utils";
 import { useDateFormat } from "@/context/TimezoneContext";
-import { Check, CheckCheck, User, Image as ImageIcon, Trash2, Smile, X, Loader2 } from "lucide-react";
+import { Check, CheckCheck, User, Image as ImageIcon, Trash2, X, Loader2 } from "lucide-react";
 import NextImage from 'next/image';
 import { useState, useRef, useEffect } from "react";
 

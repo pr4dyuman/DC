@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import {
@@ -12,13 +11,9 @@ import {
     CheckCircle2,
     Zap,
     Shield,
-    Clock,
-    FileText,
     TrendingUp,
     MessageSquare,
-    CalendarDays,
     BriefcaseBusiness,
-    Send,
 } from "lucide-react";
 
 const platformFeatures = [
@@ -226,7 +221,7 @@ export default function GetStartedPage() {
             } else {
                 setError(data.error || "Failed to send verification code");
             }
-        } catch (err) {
+        } catch {
             setError("Network error. Please try again.");
         } finally {
             setSendingOtp(false);
@@ -265,7 +260,7 @@ export default function GetStartedPage() {
             } else {
                 setError(data.error || "Something went wrong");
             }
-        } catch (err) {
+        } catch {
             setError("Network error. Please try again.");
         } finally {
             setSubmitting(false);

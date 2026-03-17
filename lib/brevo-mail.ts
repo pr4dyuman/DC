@@ -4,7 +4,6 @@
  */
 
 import { EMAIL_TEMPLATES, TEMPLATE_TO_CATEGORY, DEFAULT_EMAIL_CATEGORIES } from "./email-constants";
-import type { EmailCategory } from "./email-constants";
 import { getCurrentAgency } from "./agency-context";
 import { formatCurrency } from "./currency";
 import { getDefaultCurrency } from "./actions/super-admin";

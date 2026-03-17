@@ -8,9 +8,6 @@ import {
     Briefcase,
     DollarSign,
     Settings,
-    CheckSquare,
-    FileText,
-    PieChart,
     Building2,
     MessageCircle,
     Sparkles
@@ -26,7 +23,7 @@ interface SidebarProps {
     agencyPlan?: string;
 }
 
-export function Sidebar({ currentUserId, currentUserUsername, currentUserRole, agencyName = "Agency OS", agencyLogo, agencyPlan }: SidebarProps) {
+export function Sidebar({ currentUserUsername, currentUserRole, agencyName = "Agency OS", agencyLogo, agencyPlan }: SidebarProps) {
     const pathname = usePathname();
 
 

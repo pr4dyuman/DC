@@ -55,7 +55,7 @@ async function checkDB() {
         try {
             const indexes = await db.collection(col).indexes();
             console.log(`${col}: ${indexes.map(i => Object.keys(i.key).join('+')).join(', ')}`);
-        } catch (e) {
+        } catch {
             console.log(`${col}: ⚠️ collection not found`);
         }
     }

@@ -2,9 +2,8 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useForm } from "react-hook-form"
-import { Send } from "lucide-react"
 
 const ContactPage = () => {
   const [toast, setToast] = useState({ show: false, message: "", isSuccess: true })
@@ -35,7 +34,7 @@ const ContactPage = () => {
 
   const [buttonTransform, setButtonTransform] = useState({ x: 0, y: 0 })
 
-  const handleMouseMove = (e) => {
+  const handleMouseMove = () => {
     const intensity = 4 // Adjust intensity as needed
     const x = (Math.random() - 0.5) * intensity
     const y = (Math.random() - 0.5) * intensity

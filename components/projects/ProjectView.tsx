@@ -8,7 +8,6 @@ import { KanbanBoard } from "@/components/projects/KanbanBoard";
 import { CreateTaskModal } from "@/components/projects/CreateTaskModal";
 import { ProjectSettingsModal } from "@/components/projects/ProjectSettingsModal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProjectFinanceSummary } from "@/components/finance/ProjectFinanceSummary";
 import { TransactionList } from "@/components/finance/TransactionList";
@@ -201,18 +200,26 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                                         const serviceObj = filteredCategories.find(c => c.id === svc);
                                         const displayName = serviceObj ? serviceObj.name : svc;
                                         return (
-                                            <Badge
+                                            <button
+                                                type="button"
                                                 key={svc}
-                                                variant={selectedCategory === displayName ? "secondary" : "outline"}
-                                                className={`cursor-pointer text-[10px] transition-all ${selectedCategory === displayName ? "bg-primary/15 text-primary hover:bg-primary/25 border-primary/30" : "text-muted-foreground hover:bg-muted border-border/50"}`}
+                                                aria-pressed={selectedCategory === displayName}
+                                                className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold transition-colors ${selectedCategory === displayName ? "bg-primary/15 text-primary hover:bg-primary/25 border-primary/30" : "text-muted-foreground hover:bg-muted border-border/50"}`}
                                                 onClick={() => setSelectedCategory(displayName)}
                                             >
                                                 {displayName}
-                                            </Badge>
+                                            </button>
                                         );
                                     })}
                                     {selectedCategory !== 'All' && (
-                                        <Badge variant="outline" className="cursor-pointer hover:bg-accent text-muted-foreground text-[10px]" onClick={() => setSelectedCategory('All')}>All ×</Badge>
+                                        <button
+                                            type="button"
+                                            aria-pressed={selectedCategory === 'All'}
+                                            className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold transition-colors text-muted-foreground hover:bg-accent border-border/50"
+                                            onClick={() => setSelectedCategory('All')}
+                                        >
+                                            Clear
+                                        </button>
                                     )}
                                 </div>
                             )}

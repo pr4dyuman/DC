@@ -11,6 +11,7 @@ import { useCurrency } from "@/context/CurrencyContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 import { toLocalCalendarDay } from "@/lib/date-utils";
+import { Project, Service, Task, User } from "@/lib/types";
 
 const STATUS_STYLES: Record<string, string> = {
     Active: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
@@ -47,12 +48,26 @@ function TaskStatusPills({ todo, inProgress, done }: { todo: number; inProgress:
     );
 }
 
+type SortOption = "dueDate" | "budget" | "name" | "progress";
+type ProjectServiceSummary = Pick<Service, "id" | "name">;
+type ProjectAssignee = Pick<User, "id" | "name" | "avatar">;
+type ProjectSummary = Project & {
+    pct: number;
+    done: number;
+    inProgress: number;
+    todo: number;
+    total: number;
+    isOverdue: boolean;
+    assignees: ProjectAssignee[];
+    totalAssignees: number;
+};
+
 interface ProjectsContentProps {
-    initialProjects: any[];
-    initialServices: any[];
-    initialTasks: any[];
-    initialUsers: any[];
-    currentUser: any;
+    initialProjects: Project[];
+    initialServices: ProjectServiceSummary[];
+    initialTasks: Task[];
+    initialUsers: ProjectAssignee[];
+    currentUser: Pick<User, "role">;
 }
 
 export function ProjectsContent({
@@ -62,18 +77,18 @@ export function ProjectsContent({
     initialUsers,
     currentUser,
 }: ProjectsContentProps) {
-    const [projects, setProjects] = useState(initialProjects);
+    const [projects, setProjects] = useState<Project[]>(initialProjects);
     const { format: formatMoney } = useCurrency();
-    const [services] = useState(initialServices);
-    const [allTasks] = useState(initialTasks);
-    const [allUsers] = useState(initialUsers);
+    const [services] = useState<ProjectServiceSummary[]>(initialServices);
+    const [allTasks] = useState<Task[]>(initialTasks);
+    const [allUsers] = useState<ProjectAssignee[]>(initialUsers);
     const [showWizard, setShowWizard] = useState(false);
 
     // Filters
     const [search, setSearch] = useState("");
     const [searchExpanded, setSearchExpanded] = useState(false);
     const [statusFilter, setStatusFilter] = useState("All");
-    const [sortBy, setSortBy] = useState<"dueDate" | "budget" | "name" | "progress">("dueDate");
+    const [sortBy, setSortBy] = useState<SortOption>("dueDate");
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager';
@@ -82,17 +97,20 @@ export function ProjectsContent({
     // Per-project computed data
     const projectData = useMemo(() => {
         return projects.map(p => {
-            const pTasks = allTasks.filter((t: any) => t.projectId === p.id);
-            const done = pTasks.filter((t: any) => t.status === 'Done').length;
-            const inProgress = pTasks.filter((t: any) => t.status === 'In Progress').length;
-            const todo = pTasks.filter((t: any) => t.status === 'Todo').length;
+            const pTasks = allTasks.filter((task) => task.projectId === p.id);
+            const done = pTasks.filter((task) => task.status === 'Done').length;
+            const inProgress = pTasks.filter((task) => task.status === 'In Progress').length;
+            const todo = pTasks.filter((task) => task.status === 'Todo').length;
             const total = pTasks.length;
             const pct = total > 0 ? Math.round((done / total) * 100) : 0;
             const due = toLocalCalendarDay(p.dueDate);
             const isOverdue = !!due && due < today && p.status !== 'Completed';
-            const assigneeIds = [...new Set(pTasks.map((t: any) => t.assigneeId).filter(Boolean))] as string[];
+            const assigneeIds = [...new Set(pTasks.map((task) => task.assigneeId).filter(Boolean))] as string[];
             const totalAssignees = assigneeIds.length;
-            const assignees = assigneeIds.slice(0, 3).map(id => allUsers.find((u: any) => u.id === id)).filter(Boolean);
+            const assignees = assigneeIds
+                .slice(0, 3)
+                .map((id) => allUsers.find((user) => user.id === id))
+                .filter((user): user is ProjectAssignee => Boolean(user));
             return { ...p, pct, done, inProgress, todo, total, isOverdue, assignees, totalAssignees };
         });
     }, [projects, allTasks, allUsers, today]);
@@ -123,11 +141,11 @@ export function ProjectsContent({
     const handleProjectCreated = async () => {
         // Re-fetch projects from the server after creation
         const { getProjects } = await import("@/lib/actions");
-        const freshProjects = await getProjects();
+        const freshProjects = await getProjects() as Project[];
         setProjects(freshProjects);
     };
 
-    const ProjectCard = ({ project }: { project: any }) => (
+    const ProjectCard = ({ project }: { project: ProjectSummary }) => (
         <Link href={`/dashboard/projects/${project.slug || project.id}`} className="block group">
             <Card className={`h-full transition-all border-border hover:border-primary/50 hover:shadow-lg ${project.isOverdue ? 'border-red-500/30' : ''}`}>
                 <CardHeader className="pb-2">
@@ -142,7 +160,7 @@ export function ProjectsContent({
                                     <Badge variant="outline" className="font-normal text-xs">{project.client}</Badge>
                                 )}
                                 {project.services?.slice(0, 2).map((svcId: string) => {
-                                    const svc = services.find((s: any) => s.id === svcId);
+                                    const svc = services.find((service) => service.id === svcId);
                                     return (
                                         <Badge key={svcId} variant="secondary" className="font-normal text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
                                             {svc?.name || svcId}
@@ -180,11 +198,11 @@ export function ProjectsContent({
                         {/* Assignee Avatars */}
                         <div className="flex items-center gap-1.5">
                             <div className="flex -space-x-2">
-                                {project.assignees.length > 0 ? project.assignees.map((u: any) => (
-                                    <Avatar key={u.id} className="h-6 w-6 border-2 border-background" title={u.name}>
-                                        <AvatarImage src={u.avatar} alt={u.name || 'Team member'} />
+                                {project.assignees.length > 0 ? project.assignees.map((user) => (
+                                    <Avatar key={user.id} className="h-6 w-6 border-2 border-background" title={user.name}>
+                                        <AvatarImage src={user.avatar} alt={user.name || 'Team member'} />
                                         <AvatarFallback className="text-[8px] bg-primary/10 text-primary font-bold">
-                                            {u.name?.substring(0, 2).toUpperCase()}
+                                            {user.name?.substring(0, 2).toUpperCase()}
                                         </AvatarFallback>
                                     </Avatar>
                                 )) : (
@@ -210,7 +228,7 @@ export function ProjectsContent({
         </Link>
     );
 
-    const ProjectRow = ({ project }: { project: any }) => (
+    const ProjectRow = ({ project }: { project: ProjectSummary }) => (
         <Link href={`/dashboard/projects/${project.slug || project.id}`} className="block group">
             <div className={`flex items-center gap-4 rounded-lg border px-4 py-3 bg-card transition-all hover:border-primary/50 hover:shadow-md ${project.isOverdue ? 'border-red-500/30' : 'border-border'}`}>
                 {/* Name + badges */}
@@ -237,10 +255,10 @@ export function ProjectsContent({
 
                 {/* Avatars */}
                 <div className="hidden md:flex -space-x-1.5">
-                    {project.assignees.map((u: any) => (
-                        <Avatar key={u.id} className="h-5 w-5 border border-background" title={u.name}>
-                            <AvatarImage src={u.avatar} alt={u.name || 'Team member'} />
-                            <AvatarFallback className="text-[7px] bg-primary/10 text-primary font-bold">{u.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
+                    {project.assignees.map((user) => (
+                        <Avatar key={user.id} className="h-5 w-5 border border-background" title={user.name}>
+                            <AvatarImage src={user.avatar} alt={user.name || 'Team member'} />
+                            <AvatarFallback className="text-[7px] bg-primary/10 text-primary font-bold">{user.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
                         </Avatar>
                     ))}
                     {project.totalAssignees > 3 && (
@@ -292,7 +310,7 @@ export function ProjectsContent({
                     <select
                         aria-label="Sort projects"
                         value={sortBy}
-                        onChange={e => setSortBy(e.target.value as any)}
+                        onChange={e => setSortBy(e.target.value as SortOption)}
                         className="h-9 rounded-md border border-input bg-background px-3 text-sm text-muted-foreground cursor-pointer"
                     >
                         <option value="dueDate">Sort: Due Date</option>

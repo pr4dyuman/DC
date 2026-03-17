@@ -7,7 +7,6 @@ import { AIChatBox } from "./AIChatBox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Loader2, Sparkles, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Task } from "@/lib/types";
 import { toast } from "sonner";
 import { DateTimeInput } from "@/components/ui/DateTimeInput";
 

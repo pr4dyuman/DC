@@ -7,10 +7,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
-    Mail, Phone, MapPin, Building, ExternalLink, Calendar,
-    CreditCard, TrendingUp, Activity, FileText, CheckCircle2, Clock,
+    Mail, Phone, MapPin, Building,
+    CreditCard, TrendingUp, Activity, FileText, CheckCircle2,
     ArrowUpRight, ArrowDownRight, Download, ArrowLeft, Pencil,
-    MessageCircle, ChevronDown, AlertCircle, Loader2
+    MessageCircle, AlertCircle, Loader2
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";

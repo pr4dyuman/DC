@@ -2,13 +2,13 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Image, Code, Link as LinkIcon, Download } from "lucide-react";
-import { Asset } from "@/lib/types";
+import { FileText, Image as ImageIcon, Code, Link as LinkIcon, Download } from "lucide-react";
+import { Asset, Project } from "@/lib/types";
 import { useDateFormat } from "@/context/TimezoneContext";
 
 interface ClientAssetsSectionProps {
     assets: Asset[];
-    projects: any[];
+    projects: Project[];
 }
 
 export function ClientAssetsSection({ assets, projects }: ClientAssetsSectionProps) {
@@ -34,7 +34,7 @@ export function ClientAssetsSection({ assets, projects }: ClientAssetsSectionPro
     const getAssetIcon = (type: string) => {
         switch (type) {
             case 'image':
-                return <Image className="h-4 w-4 text-purple-400" />;
+                return <ImageIcon className="h-4 w-4 text-purple-400" />;
             case 'code':
             case 'zip':
                 return <Code className="h-4 w-4 text-blue-400" />;
@@ -54,7 +54,7 @@ export function ClientAssetsSection({ assets, projects }: ClientAssetsSectionPro
                 {/* Asset Type Distribution */}
                 <div className="grid grid-cols-3 gap-2 mb-6">
                     <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-center">
-                        <Image className="h-4 w-4 text-purple-400 mx-auto mb-1" />
+                        <ImageIcon className="h-4 w-4 text-purple-400 mx-auto mb-1" />
                         <div className="text-lg font-bold">{assetsByType.image}</div>
                         <div className="text-xs text-muted-foreground">Images</div>
                     </div>

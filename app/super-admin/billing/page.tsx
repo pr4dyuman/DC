@@ -1,5 +1,6 @@
 import { getAllAgenciesWithStats } from "@/lib/actions/super-admin";
 import Link from "next/link";
+import type { Agency } from "@/lib/types";
 
 const PLAN_PRICING: Record<string, number> = {
     free: 0,
@@ -8,13 +9,19 @@ const PLAN_PRICING: Record<string, number> = {
     enterprise: 199,
 };
 
-export default async function BillingPage() {
-    const agencies = await getAllAgenciesWithStats();
+type BillingAgency = Agency & {
+    stats?: {
+        users?: number;
+    };
+};
 
-    const starterAgencies = agencies.filter((a: any) => a.plan === 'starter').length;
-    const proAgencies = agencies.filter((a: any) => a.plan === 'pro').length;
-    const enterpriseAgencies = agencies.filter((a: any) => a.plan === 'enterprise').length;
-    const estimatedMRR = agencies.reduce((sum: number, a: any) => sum + (PLAN_PRICING[a.plan] || 0), 0);
+export default async function BillingPage() {
+    const agencies = await getAllAgenciesWithStats() as BillingAgency[];
+
+    const starterAgencies = agencies.filter((agency) => agency.plan === 'starter').length;
+    const proAgencies = agencies.filter((agency) => agency.plan === 'pro').length;
+    const enterpriseAgencies = agencies.filter((agency) => agency.plan === 'enterprise').length;
+    const estimatedMRR = agencies.reduce((sum, agency) => sum + (PLAN_PRICING[agency.plan] || 0), 0);
 
     return (
         <div className="space-y-6">
@@ -71,8 +78,8 @@ export default async function BillingPage() {
                         </thead>
                         <tbody className="divide-y divide-border">
                             {agencies
-                                .sort((a: any, b: any) => (PLAN_PRICING[b.plan] || 0) - (PLAN_PRICING[a.plan] || 0))
-                                .map((agency: any) => (
+                                .sort((a, b) => (PLAN_PRICING[b.plan] || 0) - (PLAN_PRICING[a.plan] || 0))
+                                .map((agency) => (
                                     <tr key={agency.id} className="hover:bg-muted/50">
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="font-medium text-foreground">{agency.name}</div>

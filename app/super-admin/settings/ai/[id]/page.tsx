@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Sparkles, Eye, EyeOff, Check, AlertCircle, Trash2, Brain } from "lucide-react";
 import { getAgencyDetails, getAgencyAIConfigSuperAdmin, updateAgencyAIConfigSuperAdmin, removeAgencyAIConfig } from "@/lib/actions/super-admin";
@@ -40,7 +39,6 @@ const PROVIDER_INFO: Record<AIProvider, { name: string; label: string; keyLabel:
 };
 
 export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: string }> }) {
-    const router = useRouter();
     const [agencyId, setAgencyId] = useState<string>("");
     const [agencyName, setAgencyName] = useState("");
     const [loading, setLoading] = useState(true);
@@ -74,8 +72,8 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
                     setCustomModelId(config.customModelId || "");
                     setIsConfigured(true);
                 }
-            } catch (err: any) {
-                setError(err.message);
+            } catch (error) {
+                setError(error instanceof Error ? error.message : "Failed to load AI configuration");
             } finally {
                 setLoading(false);
             }
@@ -119,8 +117,8 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
             setApiKey(""); // Clear after save
             setSuccess("Singularity AI configured successfully!");
             setTimeout(() => setSuccess(""), 3000);
-        } catch (err: any) {
-            setError(err.message || "Failed to save");
+        } catch (error) {
+            setError(error instanceof Error ? error.message : "Failed to save");
         } finally {
             setSaving(false);
         }
@@ -138,8 +136,8 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
             setIsConfigured(false);
             setSuccess("AI configuration removed.");
             setTimeout(() => setSuccess(""), 3000);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (error) {
+            setError(error instanceof Error ? error.message : "Failed to remove AI configuration");
         } finally {
             setRemoving(false);
         }

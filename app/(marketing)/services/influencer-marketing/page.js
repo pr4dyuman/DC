@@ -41,7 +41,7 @@ useEffect(() => {
     }
   };
 
-  const handleMouseEnter = (e) => {
+  const handleMouseEnter = () => {
     isHovered = true;
     const fill = btn.querySelector('.fill-effect');
     if (fill) {

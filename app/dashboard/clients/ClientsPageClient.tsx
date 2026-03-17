@@ -6,7 +6,7 @@ import { getClients, getArchivedClients, unarchiveClient, deleteClient, permanen
 import { Client } from "@/lib/types";
 import { ClientCard } from "@/components/clients/ClientCard";
 import { EditClientDialog } from "@/components/clients/EditClientDialog";
-import { Plus, Archive, ArchiveRestore, Search, Trash2 } from "lucide-react";
+import { Plus, Archive, ArchiveRestore, Search } from "lucide-react";
 import { ClientsSkeleton } from "@/components/clients/ClientsSkeleton";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";

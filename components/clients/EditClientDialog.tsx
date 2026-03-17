@@ -2,13 +2,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { Client } from "@/lib/types";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2 } from "lucide-react";
 import { createClient, updateClient } from "@/lib/actions";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+
+function getErrorMessage(error: unknown, fallback: string) {
+    return error instanceof Error ? error.message : fallback;
+}
 
 interface EditClientDialogProps {
     client?: Client | null;
@@ -18,7 +22,6 @@ interface EditClientDialogProps {
 }
 
 export function EditClientDialog({ client, open, onOpenChange, onSuccess }: EditClientDialogProps) {
-    const router = useRouter();
     const [submitting, setSubmitting] = useState(false);
 
     const [formData, setFormData] = useState<Omit<Client, "id" | "agencyId">>({
@@ -77,8 +80,8 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
             }
             if (onSuccess) onSuccess();
             onOpenChange(false);
-        } catch (error: any) {
-            toast.error(error.message || 'An error occurred');
+        } catch (error) {
+            toast.error(getErrorMessage(error, 'An error occurred'));
         } finally {
             setSubmitting(false);
         }
@@ -133,7 +136,7 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
 
                         {/* Fields Section */}
                         <div className="flex-1 space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Company Name</label>
                                     <input required value={formData.companyName} onChange={e => setFormData({ ...formData, companyName: e.target.value })}
@@ -163,13 +166,13 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
 
                             <div className="space-y-4 pt-2 border-t border-border">
                                 <h4 className="text-sm font-semibold text-muted-foreground">Legal Details</h4>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Aadhar Card</label>
                                         <div className="flex items-center gap-4">
                                             {formData.adharCardImage && (
                                                 <div className="relative w-16 h-10 rounded border border-border overflow-hidden">
-                                                    <img src={formData.adharCardImage} alt="Aadhar" className="w-full h-full object-cover" />
+                                                    <Image src={formData.adharCardImage} alt="Aadhar" fill sizes="64px" className="object-cover" unoptimized />
                                                 </div>
                                             )}
                                             <label className="flex-1 cursor-pointer">
@@ -196,7 +199,7 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
                                         <div className="flex items-center gap-4">
                                             {formData.panCardImage && (
                                                 <div className="relative w-16 h-10 rounded border border-border overflow-hidden">
-                                                    <img src={formData.panCardImage} alt="PAN" className="w-full h-full object-cover" />
+                                                    <Image src={formData.panCardImage} alt="PAN" fill sizes="64px" className="object-cover" unoptimized />
                                                 </div>
                                             )}
                                             <label className="flex-1 cursor-pointer">

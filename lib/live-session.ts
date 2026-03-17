@@ -311,7 +311,7 @@ export function closeSession(sessionId: string): void {
 
     try {
         s.session?.close();
-    } catch (e) {
+    } catch {
         // Ignore close errors
     }
 

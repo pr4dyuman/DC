@@ -1,6 +1,5 @@
 "use server";
 
-import { User } from "../db";
 import { getSessionId, comparePassword } from "../auth";
 import { SuperAdminModel, UserModel, ClientModel, connectDB, RateLimitModel } from "../mongodb";
 import { login as authLogin } from "../auth";
@@ -10,6 +9,12 @@ export { getSessionId };
 
 const MAX_LOGIN_ATTEMPTS = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function withoutPassword<T extends { password?: unknown }>(value: T) {
+    const clone = { ...value };
+    delete clone.password;
+    return clone;
+}
 
 export async function login(email: string, password: string) {
     // Validate email format and normalize to lowercase before DB queries
@@ -44,8 +49,7 @@ export async function login(email: string, password: string) {
         if (superAdmin.password && await comparePassword(password, superAdmin.password)) {
             await RateLimitModel.deleteOne({ key: rateKey });
             await authLogin(superAdmin.id, 'superadmin');
-            const { password: _, ...safeAdmin } = superAdmin;
-            return { success: true, user: safeAdmin, isSuperAdmin: true };
+            return { success: true, user: withoutPassword(superAdmin), isSuperAdmin: true };
         }
     }
 
@@ -63,8 +67,7 @@ export async function login(email: string, password: string) {
             await RateLimitModel.deleteOne({ key: rateKey });
             await authLogin(user.id, user.role, user.agencyId);
             await UserModel.updateOne({ id: user.id }, { $set: { lastActiveAt: new Date().toISOString() } });
-            const { password: _, ...safeUser } = user;
-            return { success: true, user: safeUser, isSuperAdmin: false };
+            return { success: true, user: withoutPassword(user), isSuperAdmin: false };
         }
     }
 
@@ -82,8 +85,7 @@ export async function login(email: string, password: string) {
             await RateLimitModel.deleteOne({ key: rateKey });
             await authLogin(client.id, 'client', client.agencyId);
             await ClientModel.updateOne({ id: client.id }, { $set: { lastActiveAt: new Date().toISOString() } });
-            const { password: _, ...safeClient } = client;
-            return { success: true, user: safeClient, isSuperAdmin: false };
+            return { success: true, user: withoutPassword(client), isSuperAdmin: false };
         }
     }
 

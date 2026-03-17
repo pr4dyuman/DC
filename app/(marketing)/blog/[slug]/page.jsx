@@ -1,7 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Calendar, User, Share2, Clock } from "lucide-react";
+import { ArrowLeft, Calendar, User, Clock } from "lucide-react";
 import DOMPurify from "isomorphic-dompurify";
 import dbConnect from '@/lib/marketing-db';
 import Blog from '@/models/marketing/Blog';

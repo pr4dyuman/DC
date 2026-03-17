@@ -1,8 +1,8 @@
 "use server";
 
-import { Message, User, Client } from "./db";
+import { Message } from "./db";
 import { revalidatePath } from "next/cache";
-import { withAgencyId, getCurrentAgency } from "./agency-context";
+import { getCurrentAgency } from "./agency-context";
 import { generateId } from "./utils-server";
 import { UserModel, ClientModel, MessageModel, connectDB } from "./mongodb";
 import { sanitizeString } from "./validation";
@@ -43,6 +43,7 @@ function serializeMessage(m: any): Message {
 }
 
 export async function heartbeat(_userId?: string) {
+    void _userId;
     const session = await getSessionUser();
     if (!session) return;
     const authedUserId = session.userId;
@@ -66,6 +67,7 @@ export async function heartbeat(_userId?: string) {
 }
 
 export async function getTotalUnreadCount(_currentUserId?: string): Promise<number> {
+    void _currentUserId;
     const session = await getSessionUser();
     if (!session) return 0;
     const authedUserId = session.userId;
@@ -80,6 +82,7 @@ export async function getTotalUnreadCount(_currentUserId?: string): Promise<numb
 }
 
 export async function getContacts(_currentUserId?: string): Promise<Contact[]> {
+    void _currentUserId;
     const session = await getSessionUser();
     if (!session) throw new Error('Unauthorized');
     const currentUserId = session.userId;
@@ -153,6 +156,7 @@ export async function getContacts(_currentUserId?: string): Promise<Contact[]> {
 }
 
 export async function getMessages(_currentUserId: string, otherUserId: string): Promise<Message[]> {
+    void _currentUserId;
     const session = await getSessionUser();
     if (!session) throw new Error('Unauthorized');
     const currentUserId = session.userId;
@@ -220,6 +224,7 @@ export async function sendMessage(_senderId: string, receiverId: string, content
 }
 
 export async function markAsRead(_currentUserId: string, senderId: string) {
+    void _currentUserId;
     const session = await getSessionUser();
     if (!session) return;
     const currentUserId = session.userId;
@@ -238,6 +243,7 @@ export async function markAsRead(_currentUserId: string, senderId: string) {
 }
 
 export async function deleteConversation(_currentUserId: string, otherUserId: string) {
+    void _currentUserId;
     const session = await getSessionUser();
     if (!session) throw new Error('Unauthorized');
     const currentUserId = session.userId;

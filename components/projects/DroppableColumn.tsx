@@ -1,19 +1,21 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
-import { Task } from "@/lib/types";
+import { Task, User, UserPermissions } from "@/lib/types";
 import { TaskCard } from "./TaskCard";
+
+type TaskAssignee = Pick<User, "id" | "name" | "avatar" | "jobTitle" | "role">;
 
 interface DroppableColumnProps {
     id: string;
     title: string;
     tasks: Task[];
-    users: any[];
+    users: TaskAssignee[];
     onViewTask: (task: Task) => void;
     onEditTask: (task: Task) => void;
     currentUserId?: string;
     readOnly?: boolean;
-    permissions?: any;
+    permissions?: UserPermissions;
     onQuickEdit?: (taskId: string, patch: Partial<Task>) => void;
     disableDrag?: boolean;
     onStatusChange?: (taskId: string, newStatus: Task['status']) => void;

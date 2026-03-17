@@ -16,6 +16,10 @@ interface DateTimeInputProps {
     required?: boolean;
 }
 
+type PickerInput = HTMLInputElement & {
+    showPicker?: () => void;
+};
+
 /**
  * A theme-aware date/datetime input that shows a visible Lucide
  * Calendar icon regardless of the browser's color-scheme quirks.
@@ -34,11 +38,12 @@ export function DateTimeInput({
     const inputRef = useRef<HTMLInputElement>(null);
 
     const handleIconClick = () => {
-        if (disabled || !inputRef.current) return;
+        const input = inputRef.current as PickerInput | null;
+        if (disabled || !input) return;
         try {
-            (inputRef.current as any).showPicker?.();
+            input.showPicker?.();
         } catch {
-            inputRef.current.focus();
+            input.focus();
         }
     };
 

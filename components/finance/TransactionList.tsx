@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { isAfter, startOfMonth, subMonths, startOfYear } from "date-fns";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { useCurrency } from "@/context/CurrencyContext";
@@ -22,7 +22,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowDownRight, ArrowUpRight, Search, MoreHorizontal, Trash, Loader2, Calendar, Filter } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Search, MoreHorizontal, Trash, Loader2 } from "lucide-react";
 import { deleteTransaction } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
@@ -100,8 +100,8 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
             toast.success("Transaction deleted");
             setVerifyOpen(false);
             router.refresh();
-        } catch (err: any) {
-            setError(err.message || "Failed to delete transaction");
+        } catch (error) {
+            setError(error instanceof Error ? error.message : "Failed to delete transaction");
         } finally {
             setLoading(false);
         }

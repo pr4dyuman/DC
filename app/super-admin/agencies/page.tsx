@@ -1,11 +1,12 @@
 import { getAllAgenciesWithStats } from "@/lib/actions/super-admin";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { Plus } from "lucide-react";
 import AgencyTable from "@/components/super-admin/AgencyTable";
 
 export default async function AgenciesPage() {
+    type AgencyWithStats = Awaited<ReturnType<typeof getAllAgenciesWithStats>>[number];
     // JSON round-trip needed because AgencyTable is a client component
-    const agencies = JSON.parse(JSON.stringify(await getAllAgenciesWithStats()));
+    const agencies = JSON.parse(JSON.stringify(await getAllAgenciesWithStats())) as AgencyWithStats[];
 
     return (
         <div className="space-y-6">
@@ -32,25 +33,25 @@ export default async function AgenciesPage() {
                 <div className="bg-card rounded-lg shadow border border-border p-4">
                     <p className="text-sm text-muted-foreground">Active</p>
                     <p className="text-2xl font-bold text-green-500 mt-1">
-                        {agencies.filter((a: any) => a.status === 'active').length}
+                        {agencies.filter((a) => a.status === 'active').length}
                     </p>
                 </div>
                 <div className="bg-card rounded-lg shadow border border-border p-4">
                     <p className="text-sm text-muted-foreground">Trial</p>
                     <p className="text-2xl font-bold text-blue-500 mt-1">
-                        {agencies.filter((a: any) => a.status === 'trial').length}
+                        {agencies.filter((a) => a.status === 'trial').length}
                     </p>
                 </div>
                 <div className="bg-card rounded-lg shadow border border-border p-4">
                     <p className="text-sm text-muted-foreground">Suspended</p>
                     <p className="text-2xl font-bold text-red-500 mt-1">
-                        {agencies.filter((a: any) => a.status === 'suspended').length}
+                        {agencies.filter((a) => a.status === 'suspended').length}
                     </p>
                 </div>
                 <div className="bg-card rounded-lg shadow border border-border p-4">
                     <p className="text-sm text-muted-foreground">Total Users</p>
                     <p className="text-2xl font-bold text-foreground mt-1">
-                        {agencies.reduce((sum: number, a: any) => sum + (a.stats?.users || 0), 0)}
+                        {agencies.reduce((sum, a) => sum + (a.stats?.users || 0), 0)}
                     </p>
                 </div>
             </div>

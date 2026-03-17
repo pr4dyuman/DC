@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Wallet, CreditCard, DollarSign, Banknote } from "lucide-react";
+import { Wallet, CreditCard, Banknote } from "lucide-react";
 import { Transaction } from "@/lib/types";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { useCurrency } from "@/context/CurrencyContext";
@@ -104,7 +104,6 @@ export function ClientFinancialOverview({
                                     // From CLIENT perspective:
                                     // - "income" type = Payment TO agency = EXPENSE (red, minus)
                                     // - "expense" type = Refund FROM agency = INCOME (green, plus)
-                                    const isExpense = transaction.type === 'income';
                                     const isIncome = transaction.type === 'expense';
 
                                     return (

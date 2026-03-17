@@ -7,7 +7,7 @@ import { useDraggable } from "@dnd-kit/core";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Task, UserPermissions } from "@/lib/types";
-import { Sparkles, Calendar, Flag, ArrowRightLeft } from "lucide-react";
+import { Sparkles, Calendar, ArrowRightLeft } from "lucide-react";
 import { toLocalCalendarDay } from "@/lib/date-utils";
 
 const STATUS_ORDER = ['Todo', 'In Progress', 'Review', 'Done'] as const;

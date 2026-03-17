@@ -1,6 +1,6 @@
 "use client";
 
-import { DollarSign, TrendingUp, TrendingDown, Briefcase } from "lucide-react";
+import { DollarSign, TrendingUp, Briefcase } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCurrency } from "@/context/CurrencyContext";
 
@@ -15,7 +15,6 @@ interface TeamFinanceSummaryProps {
 
 export function TeamFinanceSummary({ stats, userName, salary }: TeamFinanceSummaryProps) {
     const { format: formatMoney } = useCurrency();
-    const netBalance = stats.totalSalary - stats.totalInvestment; // Just a stat, maybe not "balance" in pure accounting terms for user
     const hasInvested = stats.totalInvestment > 0;
 
     return (

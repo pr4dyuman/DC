@@ -8,6 +8,7 @@ import { getNotifications } from "@/lib/actions";
 import { Loader2, Activity } from "lucide-react";
 import { Notification } from "@/lib/types";
 import { useDateFormat } from "@/context/TimezoneContext";
+import { toast } from "sonner";
 
 interface ClientNotificationsListProps {
     initialNotifications: Notification[];
@@ -18,7 +19,7 @@ export function ClientNotificationsList({ initialNotifications, userId }: Client
     const fmt = useDateFormat();
     const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
     const [offset, setOffset] = useState(initialNotifications.length);
-    const [hasMore, setHasMore] = useState(true);
+    const [hasMore, setHasMore] = useState(initialNotifications.length >= 5);
     const [loading, setLoading] = useState(false);
     const { ref, inView } = useInView();
 
@@ -34,6 +35,7 @@ export function ClientNotificationsList({ initialNotifications, userId }: Client
             setOffset((prev) => prev + 5);
         } catch (error) {
             console.error("Failed to load more notifications", error);
+            toast.error("Failed to load more notifications");
         } finally {
             setLoading(false);
         }

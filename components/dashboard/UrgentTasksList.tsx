@@ -9,6 +9,7 @@ import { getHighPriorityTasks } from "@/lib/actions";
 import { Loader2, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { toLocalCalendarDay } from "@/lib/date-utils";
+import { toast } from "sonner";
 
 interface Task {
     id: string;
@@ -27,7 +28,7 @@ interface UrgentTasksListProps {
 export function UrgentTasksList({ initialTasks }: UrgentTasksListProps) {
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [offset, setOffset] = useState(initialTasks.length);
-    const [hasMore, setHasMore] = useState(true);
+    const [hasMore, setHasMore] = useState(initialTasks.length >= 5);
     const [loading, setLoading] = useState(false);
     const { ref, inView } = useInView();
     const loadingRef = useRef(false);
@@ -46,6 +47,7 @@ export function UrgentTasksList({ initialTasks }: UrgentTasksListProps) {
             setOffset((prev) => prev + newTasks.length);
         } catch (error) {
             console.error("Failed to load more urgent tasks", error);
+            toast.error("Failed to load more urgent tasks");
         } finally {
             setLoading(false);
             loadingRef.current = false;

@@ -1,7 +1,7 @@
 import { getSystemAnalytics } from "@/lib/actions/super-admin";
-import { fmtDate, getLocaleForTimezone } from "@/lib/date-utils";
+import { fmtDate } from "@/lib/date-utils";
 import Link from "next/link";
-import { Building2, Users, FolderKanban, DollarSign, TrendingUp, AlertCircle } from "lucide-react";
+import { Building2, Users, TrendingUp, AlertCircle } from "lucide-react";
 
 export default async function SuperAdminDashboard() {
     const analytics = await getSystemAnalytics();
@@ -97,7 +97,7 @@ export default async function SuperAdminDashboard() {
                     <h2 className="text-xl font-bold text-foreground">Recent Agencies</h2>
                 </div>
                 <div className="divide-y divide-border">
-                    {analytics.recentAgencies.map((agency: any) => (
+                    {analytics.recentAgencies.map((agency) => (
                         <Link
                             key={agency.id}
                             href={`/super-admin/agencies/${agency.id}`}

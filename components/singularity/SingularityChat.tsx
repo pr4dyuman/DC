@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import Image from "next/image";
 import {
     Sparkles, User, ChevronDown, ChevronRight,
-    Brain, Copy, Check, Trash2, ArrowRight, Image as ImageIcon, X,
+    Brain, Copy, Check, Trash2, Image as ImageIcon, X,
     Bot, MessageSquare, Wrench, CheckCircle2, AlertCircle, Loader2,
     Paperclip, FileText, FileSpreadsheet, FileCode,
     Plus, Clock, Undo2, History, AlertTriangle, Menu, Send, Square,
-    Home, LayoutDashboard, FolderKanban, Mail, Users, DollarSign, UserCircle, Settings
+    LayoutDashboard, FolderKanban, Mail, Users, DollarSign, UserCircle, Settings
 } from "lucide-react";
 import Link from "next/link";
 import DOMPurify from "dompurify";
@@ -31,7 +32,7 @@ interface ToolAction {
     status: 'calling' | 'done' | 'error';
     summary?: string;
     success?: boolean;
-    rollbackData?: any[];
+    rollbackData?: CheckpointAction[];
 }
 
 interface MessageAttachment {
@@ -72,8 +73,54 @@ interface RollbackAnalysis {
     checkpointId: string;
     label: string;
     totalActions: number;
-    safeActions: any[];
-    conflictedActions: { action: any; conflict: { entityType: string; entityId: string; entityName: string; reason: string } }[];
+    safeActions: CheckpointAction[];
+    conflictedActions: { action: CheckpointAction; conflict: ConflictInfo }[];
+}
+
+interface CheckpointAction {
+    toolName: string;
+    actionType: 'create' | 'update' | 'delete';
+    entityType: 'task' | 'project' | 'client' | 'invoice' | 'transaction' | 'service' | 'leaveRequest' | 'comment';
+    entityId: string;
+    beforeSnapshot?: unknown;
+    createdEntityIds?: string[];
+    executedAt: string;
+}
+
+interface ConflictInfo {
+    entityType: string;
+    entityId: string;
+    entityName: string;
+    reason: string;
+}
+
+interface PersistedMessage {
+    id?: string;
+    role: 'user' | 'model';
+    content: string;
+    thinking?: string;
+    images?: string[];
+    attachments?: MessageAttachment[];
+    timestamp: string;
+    toolActions?: Omit<ToolAction, 'rollbackData'>[];
+}
+
+interface SessionResponse {
+    mode?: 'chat' | 'agent';
+    messages?: PersistedMessage[];
+}
+
+interface CheckpointCreateResponse {
+    checkpointId: string;
+}
+
+interface SingularityRequestBody {
+    history: Array<{ role: 'user' | 'model'; content: string }>;
+    message: string;
+    mode: 'chat' | 'agent';
+    userId?: string;
+    images?: Array<{ base64: string; mimeType: string }>;
+    documents?: Array<{ fileName?: string; mimeType: string; textContent?: string; base64?: string }>;
 }
 
 const CHAT_SUGGESTIONS = [
@@ -91,6 +138,9 @@ const AGENT_SUGGESTIONS = [
     { emoji: "\uD83D\uDCCB", label: "List projects" },
     { emoji: "\u2705", label: "Add a client" },
 ];
+
+const ACCEPTED_DOCS = ['application/pdf', 'text/plain', 'text/markdown', 'text/csv', 'application/json', 'text/html'];
+const DOC_EXTENSIONS = ['.pdf', '.txt', '.md', '.csv', '.json', '.html', '.prd', '.doc', '.docx'];
 
 // Seed histories for suggestion pills so AI gets context on first click
 const SUGGESTION_SEED_HISTORY: Record<string, { role: 'user' | 'model'; content: string }[]> = {
@@ -181,7 +231,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
     const [showModeDropdown, setShowModeDropdown] = useState(false);
     const [undoingCheckpoint, setUndoingCheckpoint] = useState<string | null>(null);
 
-    const pendingRollbackRef = useRef<any[]>([]); // Accumulates rollback data during a single agent response
+    const pendingRollbackRef = useRef<CheckpointAction[]>([]); // Accumulates rollback data during a single agent response
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -219,29 +269,6 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
         }
     }, [inputValue]);
 
-    const toggleThinking = (id: string) => {
-        setExpandedThinking(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-    };
-
-    const copyToClipboard = async (text: string, id: string) => {
-        await navigator.clipboard.writeText(text);
-        setCopiedId(id);
-        setTimeout(() => setCopiedId(null), 2000);
-    };
-
-    const clearChat = () => {
-        // Check if there are agent messages with tool actions
-        const hasAgentActions = messages.some(m => m.role === 'model' && m.toolActions && m.toolActions.length > 0);
-        if (messages.length > 0) {
-            setDeleteConfirmModal({ type: 'clear', hasAgentMessages: hasAgentActions, password: '', passwordError: '', verifying: false });
-        }
-    };
-
     const executeClearChat = () => {
         setMessages([]);
         setAttachments([]);
@@ -254,13 +281,6 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
     };
 
     // ===================== SESSION MANAGEMENT =====================
-
-    // Initialize a new session on mount
-    useEffect(() => {
-        if (userId) {
-            fetchSessions();
-        }
-    }, [userId]);
 
     const createNewSession = async () => {
         if (!userId) return;
@@ -278,7 +298,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
         }
     };
 
-    const fetchSessions = async () => {
+    const fetchSessions = useCallback(async () => {
         if (!userId) return;
         try {
             const res = await fetch(`/api/singularity/history?userId=${userId}`);
@@ -287,15 +307,22 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
         } catch (err) {
             console.error('Failed to fetch sessions:', err);
         }
-    };
+    }, [userId]);
+
+    // Initialize a new session on mount
+    useEffect(() => {
+        if (userId) {
+            fetchSessions();
+        }
+    }, [fetchSessions, userId]);
 
     const loadSession = async (sid: string) => {
         try {
             const res = await fetch(`/api/singularity/history?sessionId=${sid}`);
-            const data = await res.json();
+            const data: SessionResponse = await res.json();
             setSessionId(sid);
             setMode(data.mode || 'chat');
-            setMessages((data.messages || []).map((m: any, i: number) => ({
+            setMessages((data.messages || []).map((m: PersistedMessage, i: number) => ({
                 ...m,
                 id: m.id || `msg-${i}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 timestamp: new Date(m.timestamp),
@@ -403,7 +430,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
             saveTimeoutRef.current = setTimeout(fetchSessions, 800);
         }
         return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
-    }, [messages, sessionId]);
+    }, [fetchSessions, messages, saveMessages, sessionId]);
 
     // ---- Emergency save on navigation / tab-close ----
     // Uses sendBeacon (fire-and-forget, survives page unload)
@@ -435,7 +462,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
 
     // ===================== CHECKPOINT UNDO =====================
 
-    const saveCheckpoint = async (rollbackActions: any[], label: string, relatedMessageId?: string) => {
+    const saveCheckpoint = async (rollbackActions: CheckpointAction[], label: string, relatedMessageId?: string) => {
         const activeSessionId = sessionIdRef.current;
         if (!activeSessionId || rollbackActions.length === 0) return;
         try {
@@ -449,7 +476,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                     label,
                 }),
             });
-            const data = await res.json();
+            const data: CheckpointCreateResponse = await res.json();
             setCheckpoints(prev => [{ id: data.checkpointId, label, messageIndex: messagesRef.current.length, messageId: relatedMessageId, createdAt: new Date().toISOString() }, ...prev]);
         } catch (err) {
             console.error('Failed to save checkpoint:', err);
@@ -492,7 +519,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ checkpointId, scope }),
             });
-            const result = await res.json();
+            await res.json();
 
             // Find the checkpoint to get messageIndex
             const cp = checkpoints.find(c => c.id === checkpointId);
@@ -528,10 +555,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
     };
 
     // File handling-- images AND documents
-    const ACCEPTED_DOCS = ['application/pdf', 'text/plain', 'text/markdown', 'text/csv', 'application/json', 'text/html'];
-    const DOC_EXTENSIONS = ['.pdf', '.txt', '.md', '.csv', '.json', '.html', '.prd', '.doc', '.docx'];
-
-    const processFile = async (file: File): Promise<Attachment | null> => {
+    const processFile = useCallback(async (file: File): Promise<Attachment | null> => {
         // Image files-- same as before
         if (file.type.startsWith('image/')) {
             if (file.size > 10 * 1024 * 1024) return null;
@@ -601,9 +625,9 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
         } catch {
             return null;
         }
-    };
+    }, []);
 
-    const handleFileSelect = async (files: FileList | null) => {
+    const handleFileSelect = useCallback(async (files: FileList | null) => {
         if (!files) return;
         const newAttachments: Attachment[] = [];
         for (const file of Array.from(files).slice(0, 4)) {
@@ -611,7 +635,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
             if (att) newAttachments.push(att);
         }
         setAttachments(prev => [...prev, ...newAttachments].slice(0, 4));
-    };
+    }, [processFile]);
 
     const removeAttachment = (id: string) => {
         setAttachments(prev => prev.filter(a => a.id !== id));
@@ -627,7 +651,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
         e.preventDefault();
         setIsDragOver(false);
         await handleFileSelect(e.dataTransfer.files);
-    }, []);
+    }, [handleFileSelect]);
 
     const handleStop = useCallback(() => {
         if (abortControllerRef.current) {
@@ -687,10 +711,6 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
             setExpandedThinking(prev => new Set(prev).add(msgId));
         }
 
-        // Hoisted above try so finally block can access them for sendBeacon save
-        let accumContent = '';
-        let accumThinking = '';
-
         try {
             let history = messages
                 .filter(m => !m.isStreaming)
@@ -701,7 +721,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                 history = SUGGESTION_SEED_HISTORY[overrideMessage];
             }
 
-            const body: any = { history, message: msg, mode };
+            const body: SingularityRequestBody = { history, message: msg, mode };
             if (userId) body.userId = userId;
 
             // Separate images and documents
@@ -754,13 +774,11 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                             const data = JSON.parse(line.slice(6));
 
                             if (data.type === 'thinking') {
-                                accumThinking += data.text;
                                 setStreamingPhase('thinking');
                                 setMessages(prev => prev.map(m =>
                                     m.id === msgId ? { ...m, thinking: (m.thinking || '') + data.text } : m
                                 ));
                             } else if (data.type === 'response') {
-                                accumContent += data.text;
                                 setStreamingPhase('responding');
                                 setMessages(prev => prev.map(m =>
                                     m.id === msgId ? { ...m, content: (m.content || '') + data.text } : m
@@ -808,8 +826,6 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                                 });
                             } else if (data.type === 'clear') {
                                 // Server is retrying — reset accumulated response
-                                accumContent = '';
-                                accumThinking = '';
                                 setMessages(prev => prev.map(m =>
                                     m.id === msgId ? { ...m, content: '', thinking: mode === 'chat' ? '' : undefined, toolActions: mode === 'agent' ? [] : undefined } : m
                                 ));
@@ -831,7 +847,6 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                         try {
                             const data = JSON.parse(line.slice(6));
                             if (data.type === 'response') {
-                                accumContent += data.text;
                                 setMessages(prev => prev.map(m =>
                                     m.id === msgId ? { ...m, content: (m.content || '') + data.text } : m
                                 ));
@@ -1205,7 +1220,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                             </div>
 
                             <p className="text-[10px] text-muted-foreground text-center">
-                                ⚠️ "Force Undo All" will discard changes you made after the AI created these items
+                                Warning: &quot;Force Undo All&quot; will discard changes you made after the AI created these items
                             </p>
                         </div>
                     </div>
@@ -1383,14 +1398,21 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                                         {attachments.map(att => (
                                             <div key={att.id} className="relative group">
                                                 {att.fileType === 'image' ? (
-                                                    <img src={att.preview} alt="Attachment" className="w-16 h-16 object-cover rounded-xl border border-neutral-200 dark:border-neutral-700" />
+                                                    <div className="relative w-16 h-16">
+                                                        <Image src={att.preview} alt="Attachment" fill sizes="64px" className="object-cover rounded-xl border border-neutral-200 dark:border-neutral-700" unoptimized />
+                                                    </div>
                                                 ) : (
                                                     <div className="w-16 h-16 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 flex flex-col items-center justify-center gap-1">
                                                         <FileText className="w-5 h-5 text-neutral-500" />
                                                         <span className="text-[9px] font-medium text-neutral-500 text-center leading-tight px-1 truncate w-full">{att.fileName?.split('.').pop()?.toUpperCase()}</span>
                                                     </div>
                                                 )}
-                                                <button onClick={() => removeAttachment(att.id)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-neutral-800 dark:bg-neutral-200 text-white dark:text-black rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-sm">
+                                                <button
+                                                    onClick={() => removeAttachment(att.id)}
+                                                    aria-label={`Remove attachment ${att.fileName || ''}`.trim()}
+                                                    title="Remove attachment"
+                                                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-neutral-800 dark:bg-neutral-200 text-white dark:text-black rounded-full flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 shadow-sm"
+                                                >
                                                     <X className="w-3 h-3" />
                                                 </button>
                                             </div>
@@ -1558,7 +1580,11 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                                                     <button
                                                         onClick={() => setExpandedThinking(prev => {
                                                             const next = new Set(prev);
-                                                            next.has(msg.id) ? next.delete(msg.id) : next.add(msg.id);
+                                                            if (next.has(msg.id)) {
+                                                                next.delete(msg.id);
+                                                            } else {
+                                                                next.add(msg.id);
+                                                            }
                                                             return next;
                                                         })}
                                                         className="flex items-center gap-2 w-full px-3 py-2 text-xs font-medium text-neutral-500 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
@@ -1579,6 +1605,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                                             {msg.images && msg.images.filter(Boolean).length > 0 && (
                                                 <div className="flex gap-2 flex-wrap">
                                                     {msg.images.filter(Boolean).map((img, i) => (
+                                                        /* eslint-disable-next-line @next/next/no-img-element -- dynamic chat images are user-generated data URLs with unknown aspect ratios */
                                                         <img key={i} src={img} alt="Attached" className="max-w-[200px] max-h-[200px] rounded-xl border border-neutral-200 dark:border-neutral-700 object-cover" />
                                                     ))}
                                                 </div>
@@ -1706,7 +1733,9 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                                                                 setCopiedId(msg.id);
                                                                 setTimeout(() => setCopiedId(null), 2000);
                                                             }}
-                                                            className="absolute -bottom-1 right-0 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-all duration-200 shadow-sm"
+                                                            aria-label="Copy message"
+                                                            title="Copy message"
+                                                            className="absolute -bottom-1 right-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-all duration-200 shadow-sm"
                                                         >
                                                             {copiedId === msg.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                                                         </button>
@@ -1790,14 +1819,21 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                                         {attachments.map(att => (
                                             <div key={att.id} className="relative group">
                                                 {att.fileType === 'image' ? (
-                                                    <img src={att.preview} alt="Attachment" className="w-14 h-14 object-cover rounded-xl border border-neutral-200 dark:border-neutral-700" />
+                                                    <div className="relative w-14 h-14">
+                                                        <Image src={att.preview} alt="Attachment" fill sizes="56px" className="object-cover rounded-xl border border-neutral-200 dark:border-neutral-700" unoptimized />
+                                                    </div>
                                                 ) : (
                                                     <div className="w-14 h-14 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 flex flex-col items-center justify-center gap-1">
                                                         <FileText className="w-4 h-4 text-neutral-500" />
                                                         <span className="text-[8px] font-medium text-neutral-400 text-center">{att.fileName?.split('.').pop()?.toUpperCase()}</span>
                                                     </div>
                                                 )}
-                                                <button onClick={() => removeAttachment(att.id)} className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-neutral-800 dark:bg-neutral-200 text-white dark:text-black rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200">
+                                                <button
+                                                    onClick={() => removeAttachment(att.id)}
+                                                    aria-label={`Remove attachment ${att.fileName || ''}`.trim()}
+                                                    title="Remove attachment"
+                                                    className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-neutral-800 dark:bg-neutral-200 text-white dark:text-black rounded-full flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200"
+                                                >
                                                     <X className="w-2.5 h-2.5" />
                                                 </button>
                                             </div>

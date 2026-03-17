@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Loader2, X, FileSpreadsheet, Calendar } from "lucide-react";
+import { Download, Loader2, FileSpreadsheet, Calendar } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { getExportData } from "@/lib/exportActions";
 import { useDateFormat } from "@/context/TimezoneContext";
@@ -104,7 +104,7 @@ export function ExportReportButton() {
             }
 
             setOpen(false);
-        } catch (e) {
+        } catch {
             setError("Export failed. Please try again.");
         } finally {
             setExporting(false);

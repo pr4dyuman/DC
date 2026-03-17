@@ -16,6 +16,14 @@ const ALLOWED_LOGO_MIME_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/
 const MAX_SIGNUPS = 5;
 const SIGNUP_WINDOW = 60 * 60 * 1000; // 1 hour
 
+type RateLimitRecord = {
+    count?: number;
+};
+
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export async function POST(request: Request) {
     try {
         const csrf = validateCsrfOrigin(request);
@@ -43,7 +51,7 @@ export async function POST(request: Request) {
         const rateKey = `signup:ip:${ip}`;
         const ipRecord = await RateLimitModel.findOne({ key: rateKey, expiresAt: { $gt: now } }).lean();
         if (ipRecord) {
-            if ((ipRecord as any).count >= MAX_SIGNUPS) {
+            if (((ipRecord as RateLimitRecord).count ?? 0) >= MAX_SIGNUPS) {
                 return NextResponse.json(
                     { error: 'Too many signup attempts. Please try again later.' },
                     { status: 429 }
@@ -102,8 +110,8 @@ export async function POST(request: Request) {
         let validatedEmail: string;
         try {
             validatedEmail = validateEmail(email);
-        } catch (e: any) {
-            return NextResponse.json({ error: e.message }, { status: 400 });
+        } catch (error: unknown) {
+            return NextResponse.json({ error: getErrorMessage(error, 'Invalid email address') }, { status: 400 });
         }
 
         try {
@@ -112,8 +120,8 @@ export async function POST(request: Request) {
             } else {
                 validatePassword(password);
             }
-        } catch (e: any) {
-            return NextResponse.json({ error: e.message }, { status: 400 });
+        } catch (error: unknown) {
+            return NextResponse.json({ error: getErrorMessage(error, 'Invalid password') }, { status: 400 });
         }
 
         // Sanitize phone
@@ -150,8 +158,8 @@ export async function POST(request: Request) {
         // --- Verify OTP ---
         try {
             await verifyOtp(validatedEmail, otp.toString().trim());
-        } catch (e: any) {
-            return NextResponse.json({ error: e.message }, { status: 400 });
+        } catch (error: unknown) {
+            return NextResponse.json({ error: getErrorMessage(error, 'Invalid verification code') }, { status: 400 });
         }
 
         // --- Connect to DB ---
@@ -233,7 +241,7 @@ export async function POST(request: Request) {
         const hashedPassword = await bcrypt.hash(password, 12); // Increased from 10 to 12 rounds
 
         // Generate unique username from email prefix
-        let baseUsername = validatedEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+        const baseUsername = validatedEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
         let username = baseUsername;
         let counter = 1;
         while (await UserModel.exists({ username, agencyId }) || await ClientModel.exists({ username, agencyId })) {
@@ -289,10 +297,10 @@ export async function POST(request: Request) {
             trialEndsAt: trialEnd.toISOString()
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Signup error:', error);
         return NextResponse.json(
-            { error: error.message || 'Something went wrong. Please try again.' },
+            { error: getErrorMessage(error, 'Something went wrong. Please try again.') },
             { status: 500 }
         );
     }

@@ -12,7 +12,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Task, Comment } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { MentionTextarea } from "@/components/ui/mention-textarea";
 import { renderCommentText } from "@/lib/mention-utils";
 import { addComment } from "@/lib/actions";
@@ -31,16 +30,22 @@ import {
     MessageSquare,
     Send,
     Flag,
+    type LucideIcon,
 } from "lucide-react";
+import { UserPermissions, User as AppUser } from "@/lib/types";
+
+type TaskAssignee = Pick<AppUser, "id" | "name" | "avatar" | "jobTitle" | "role"> & {
+    email?: string;
+};
 
 interface ViewTaskModalProps {
     task: Task;
     open: boolean;
     setOpen: (open: boolean) => void;
     onEdit: () => void;
-    users?: any[];
+    users?: TaskAssignee[];
     readOnly?: boolean;
-    permissions?: any;
+    permissions?: UserPermissions;
     currentUserId?: string;
 }
 
@@ -50,7 +55,7 @@ const PRIORITY_STYLES: Record<string, string> = {
     Low: "bg-blue-500/15 text-blue-500 border-blue-500/30",
 };
 
-const STATUS_CONFIGS: Record<string, { color: string; icon: any }> = {
+const STATUS_CONFIGS: Record<string, { color: string; icon: LucideIcon }> = {
     Done: { color: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30", icon: CheckCircle2 },
     "In Progress": { color: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30", icon: Timer },
     Review: { color: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30", icon: AlertCircle },

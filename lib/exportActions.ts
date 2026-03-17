@@ -4,6 +4,31 @@ import { connectDB, TransactionModel, InvoiceModel, TaskModel, ProjectModel } fr
 import { getCurrentAgency } from "@/lib/agency-context";
 import { getSessionUser } from "@/lib/auth";
 
+type ExportTransactionRecord = {
+    date?: string;
+    description?: string;
+    type?: string;
+    category?: string;
+    amount?: number;
+    status?: string;
+};
+
+type ExportInvoiceRecord = {
+    date?: string;
+    projectId?: string;
+    amount?: number;
+    status?: string;
+};
+
+type ExportTaskRecord = {
+    status?: string;
+};
+
+type ExportProjectRecord = {
+    id?: string;
+    name?: string;
+};
+
 export async function getExportData(startDate: string, endDate: string) {
     // Auth check — only admin/manager can export financial data
     const session = await getSessionUser();
@@ -32,26 +57,32 @@ export async function getExportData(startDate: string, endDate: string) {
     const endDt = new Date(`${endDate}T23:59:59.999Z`);
 
     const [transactions, invoices, tasks, projects] = await Promise.all([
-        TransactionModel.find({ ...agencyFilter, date: { $gte: startStr, $lte: endStr } } as any).lean(),
-        InvoiceModel.find({ ...agencyFilter, date: { $gte: startStr, $lte: endStr } } as any).lean(),
-        TaskModel.find({ ...agencyFilter, createdAt: { $gte: startDt, $lte: endDt } } as any).lean(),
-        ProjectModel.find({ ...agencyFilter, createdAt: { $gte: startDt, $lte: endDt } } as any).lean(),
+        TransactionModel.find({ ...agencyFilter, date: { $gte: startStr, $lte: endStr } } as Record<string, unknown>).lean(),
+        InvoiceModel.find({ ...agencyFilter, date: { $gte: startStr, $lte: endStr } } as Record<string, unknown>).lean(),
+        TaskModel.find({ ...agencyFilter, createdAt: { $gte: startDt, $lte: endDt } } as Record<string, unknown>).lean(),
+        ProjectModel.find({ ...agencyFilter, createdAt: { $gte: startDt, $lte: endDt } } as Record<string, unknown>).lean(),
     ]);
 
-    const txns = transactions as any[];
-    const invs = invoices as any[];
-    const tsks = tasks as any[];
-    const projs = projects as any[];
-    const invoiceProjectIds = Array.from(new Set(invs.map((invoice) => invoice.projectId).filter(Boolean)));
+    const txns = transactions as ExportTransactionRecord[];
+    const invs = invoices as ExportInvoiceRecord[];
+    const tsks = tasks as ExportTaskRecord[];
+    const projs = projects as ExportProjectRecord[];
+    const invoiceProjectIds = Array.from(
+        new Set(invs.map((invoice) => invoice.projectId).filter((projectId): projectId is string => Boolean(projectId)))
+    );
     const invoiceProjects = invoiceProjectIds.length > 0
         ? await ProjectModel.find({ ...agencyFilter, id: { $in: invoiceProjectIds } }).select('id name').lean()
         : [];
-    const projectNameById = new Map((invoiceProjects as any[]).map((project) => [project.id, project.name] as const));
+    const projectNameById = new Map(
+        (invoiceProjects as ExportProjectRecord[])
+            .filter((project): project is ExportProjectRecord & { id: string; name: string } => typeof project.id === 'string' && typeof project.name === 'string')
+            .map((project) => [project.id, project.name] as const)
+    );
     const totalIncome = txns.filter(t => t.type === "income" && t.status === "completed").reduce((s, t) => s + (t.amount || 0), 0);
     const totalExpense = txns.filter(t => t.type === "expense" && t.status === "completed").reduce((s, t) => s + (t.amount || 0), 0);
     const invoicesPaid = invs.filter(i => i.status === "Paid").length;
     const invoicesPending = invs.filter(i => i.status === "Pending").length;
-    const invoicesUnsettled = invs.filter(i => ["Pending", "Processing", "Overdue"].includes(i.status)).length;
+    const invoicesUnsettled = invs.filter(i => ["Pending", "Processing", "Overdue"].includes(i.status ?? "")).length;
     const invoicesProcessing = invs.filter(i => i.status === "Processing").length;
     const invoicesOverdue = invs.filter(i => i.status === "Overdue").length;
     const totalInvoiced = invs.reduce((s, i) => s + (i.amount || 0), 0);

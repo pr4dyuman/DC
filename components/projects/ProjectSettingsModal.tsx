@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Settings, ShieldAlert, Plus, Users, Mail, Phone, Pencil, Sparkles, Check, FileText, Code, ImageIcon, FileJson, X, Brain } from "lucide-react";
-import { getClients, createClient, updateProject, deleteProject, getProjectAssets, toggleAssetAI, getUsers, getProject, getAgencyAIConfig } from "@/lib/actions";
-import { Client, Asset } from "@/lib/types";
+import { Settings, ShieldAlert, Plus, Users, Mail, Pencil, Sparkles, Check, FileText, Code, ImageIcon, Brain } from "lucide-react";
+import { getClients, createClient, updateProject, deleteProject, getProjectAssets, toggleAssetAI, getProject, getAgencyAIConfig } from "@/lib/actions";
+import { Client, Asset, Project } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -19,10 +19,10 @@ interface ProjectSettingsModalProps {
     currentUserId?: string;
 }
 
-export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, currentUserId }: ProjectSettingsModalProps) {
+export function ProjectSettingsModal({ projectId, currentSlug, currentClientId }: ProjectSettingsModalProps) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
-    const [status, setStatus] = useState<string>("");
+    const [status, setStatus] = useState<Project["status"] | "">("");
     const [statusLoading, setStatusLoading] = useState(false);
     const [statusError, setStatusError] = useState("");
 
@@ -30,7 +30,6 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
     const [clients, setClients] = useState<Client[]>([]);
     const [selectedClientId, setSelectedClientId] = useState(currentClientId || "");
     const [name, setName] = useState("");
-    const [slug, setSlug] = useState(currentSlug || "");
     const [isCreatingClient, setIsCreatingClient] = useState(false);
     const [isEditingSelection, setIsEditingSelection] = useState(!currentClientId);
     const [newClient, setNewClient] = useState({ name: "", email: "", companyName: "", password: "" });
@@ -38,7 +37,6 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
 
     // AI State
     const [assets, setAssets] = useState<Asset[]>([]);
-    const [aiLoading, setAiLoading] = useState(false);
     const [aiConfigured, setAiConfigured] = useState(false);
 
     // Delete State
@@ -47,17 +45,7 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
     const [deleteError, setDeleteError] = useState("");
     const [deleteLoading, setDeleteLoading] = useState(false);
 
-    useEffect(() => {
-        if (open) {
-            loadData();
-        }
-    }, [open]);
-
-    useEffect(() => {
-        setSelectedClientId(currentClientId || "");
-    }, [currentClientId]);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         const [clientsData, assetsData, projectData, aiConfig] = await Promise.all([
             getClients(),
             getProjectAssets(projectId),
@@ -71,7 +59,17 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
             setName(projectData.name);
         }
         setAiConfigured(!!aiConfig);
-    };
+    }, [projectId]);
+
+    useEffect(() => {
+        if (open) {
+            loadData();
+        }
+    }, [open, loadData]);
+
+    useEffect(() => {
+        setSelectedClientId(currentClientId || "");
+    }, [currentClientId]);
 
     // --- Client Handlers ---
     const handleAssignClient = async (clientId: string) => {
@@ -99,16 +97,16 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
     };
 
 
-    const handleUpdateStatus = async (newStatus: string) => {
+    const handleUpdateStatus = async (newStatus: Project["status"]) => {
         setStatusError("");
         setStatusLoading(true);
         try {
-            await updateProject(projectId, { status: newStatus as any });
+            await updateProject(projectId, { status: newStatus });
             setStatus(newStatus);
             router.refresh();
-        } catch (err: any) {
-            console.error(err);
-            setStatusError(err.message || "Failed to update status");
+        } catch (error) {
+            console.error(error);
+            setStatusError(error instanceof Error ? error.message : "Failed to update status");
         } finally {
             setStatusLoading(false);
         }
@@ -133,7 +131,7 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
         setAssets(prev => prev.map(a => a.id === assetId ? { ...a, aiEnabled: !currentState } : a));
         try {
             await toggleAssetAI(assetId, !currentState);
-        } catch (error) {
+        } catch {
             // Revert on error
             setAssets(prev => prev.map(a => a.id === assetId ? { ...a, aiEnabled: currentState } : a));
         }
@@ -158,7 +156,7 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
             await deleteProject(projectId, deletePassword);
             setOpen(false);
             router.push('/dashboard/projects');
-        } catch (err) {
+        } catch {
             setDeleteError("Invalid Admin Password");
         } finally {
             setDeleteLoading(false);
@@ -203,7 +201,7 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
                             <label className="text-sm font-medium">Project Status</label>
                             <div className="flex flex-col gap-2">
                                 <div className="flex gap-2">
-                                    {['Active', 'On Hold', 'Completed'].map((s) => (
+                                    {(['Active', 'On Hold', 'Completed'] as const).map((s) => (
                                         <Button
                                             key={s}
                                             type="button"

@@ -2,6 +2,31 @@ import { getAgencyDetails } from "@/lib/actions/super-admin";
 import Link from "next/link";
 import { ArrowLeft, Users, FolderKanban, UserCircle, Brain, AlertTriangle, Shield } from "lucide-react";
 import AgencyActions from "@/components/super-admin/AgencyActions";
+import type { Agency } from "@/lib/types";
+
+type AgencyDetailsAgency = Agency & {
+    suspendedAt?: string;
+    suspensionReason?: string;
+};
+
+type AgencyDetailsStats = {
+    users: number;
+    projects: number;
+    clients: number;
+};
+
+type AgencyDetailsUser = {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+};
+
+type AgencyDetailsPayload = {
+    agency: AgencyDetailsAgency;
+    stats: AgencyDetailsStats;
+    users: AgencyDetailsUser[];
+};
 
 function UsageBar({ used, limit, label }: { used: number; limit: number; label: string }) {
     const isUnlimited = limit === -1;
@@ -34,7 +59,8 @@ const statusBadge = (status: string) => {
 
 export default async function AgencyDetailsPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const { agency, stats, users } = JSON.parse(JSON.stringify(await getAgencyDetails(id)));
+    const { agency, stats, users } = JSON.parse(JSON.stringify(await getAgencyDetails(id))) as AgencyDetailsPayload;
+    const aiConfig = agency.aiConfig;
 
     return (
         <div className="space-y-6">
@@ -159,14 +185,14 @@ export default async function AgencyDetailsPage({ params }: { params: Promise<{ 
                         <div>
                             <h3 className="font-semibold text-foreground">Singularity AI</h3>
                             <p className="text-sm text-muted-foreground">
-                                {(agency as any).aiConfig
-                                    ? `${((agency as any).aiConfig?.provider || '').toUpperCase()} — ${(agency as any).aiConfig?.model || ''}`
+                                {aiConfig
+                                    ? `${(aiConfig.provider || '').toUpperCase()} — ${aiConfig.model || ''}`
                                     : "Not configured"}
                             </p>
                         </div>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${(agency as any).aiConfig ? 'bg-green-500/10 text-green-500' : 'bg-amber-500/10 text-amber-500'}`}>
-                        {(agency as any).aiConfig ? "Active" : "Setup Required"}
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${aiConfig ? 'bg-green-500/10 text-green-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                        {aiConfig ? "Active" : "Setup Required"}
                     </span>
                 </div>
             </Link>
@@ -180,7 +206,7 @@ export default async function AgencyDetailsPage({ params }: { params: Promise<{ 
                     <div className="p-8 text-center text-muted-foreground">No users found</div>
                 ) : (
                     <div className="divide-y divide-border">
-                        {users.map((user: any) => (
+                        {users.map((user) => (
                             <div key={user.id} className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                                 <div className="flex items-center gap-2">
                                     {user.role === 'admin' && <Shield className="w-4 h-4 text-blue-500" />}

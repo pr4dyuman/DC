@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import {
     Brain, Zap, Server, HardDrive, ChevronDown, ChevronUp, ArrowUpDown,
     Users, Building2, BarChart3, Activity, CheckCircle2, Clock,
-    Search, TrendingUp, AlertTriangle, Gauge, Sparkles, Filter
+    Search, TrendingUp, AlertTriangle, Sparkles, Filter
 } from "lucide-react";
 
 // ============================================================================

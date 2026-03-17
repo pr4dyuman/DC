@@ -6,7 +6,7 @@ import { getSessionUser } from "../auth";
 import { generateId } from "../utils-server";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
-import { sanitizeName, sanitizeString, sanitizePhone, sanitizeMongoInput, sanitizeUpdates, validateEmail, validatePassword, validateStrongPassword } from "../validation";
+import { sanitizeName, sanitizeString, sanitizePhone, sanitizeUpdates, validateEmail, validatePassword, validateStrongPassword } from "../validation";
 
 /**
  * Verify current user is super admin
@@ -276,7 +276,7 @@ export async function createAgency(data: {
     };
 
     // Generate unique username
-    let baseUsername = data.ownerEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+    const baseUsername = data.ownerEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
     let username = baseUsername;
     let counter = 1;
     while (await UserModel.exists({ username, agencyId }) || await ClientModel.exists({ username, agencyId })) {

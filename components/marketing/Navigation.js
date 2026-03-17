@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { X, Menu, LogIn, LayoutDashboard } from "lucide-react";
+import { X, Menu } from "lucide-react";
 
 export default function Navigation() {
   const [mobileOpen, setMobileOpen] = useState(false);

@@ -8,6 +8,18 @@ const MAX_OTP_REQUESTS = 5;
 const OTP_RATE_WINDOW = 60 * 60 * 1000; // 1 hour
 const MAX_IP_REQUESTS = 10;
 
+type RateLimitRecord = {
+    count?: number;
+};
+
+type ArchivedAccountRecord = {
+    archived?: boolean;
+};
+
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error && error.message ? error.message : fallback;
+}
+
 function generateOtp(): string {
     return randomInt(100000, 999999).toString();
 }
@@ -28,8 +40,8 @@ export async function POST(request: Request) {
         let validatedEmail: string;
         try {
             validatedEmail = validateEmail(email);
-        } catch (e: any) {
-            return NextResponse.json({ error: e.message }, { status: 400 });
+        } catch (error: unknown) {
+            return NextResponse.json({ error: getErrorMessage(error, 'Invalid email address') }, { status: 400 });
         }
 
         await connectDB();
@@ -39,7 +51,7 @@ export async function POST(request: Request) {
         const emailRateKey = `pwd-reset-otp:email:${validatedEmail}`;
         const emailRecord = await RateLimitModel.findOne({ key: emailRateKey, expiresAt: { $gt: now } }).lean();
         if (emailRecord) {
-            if ((emailRecord as any).count >= MAX_OTP_REQUESTS) {
+            if (((emailRecord as RateLimitRecord).count ?? 0) >= MAX_OTP_REQUESTS) {
                 return NextResponse.json(
                     { error: 'Too many OTP requests. Please try again later.' },
                     { status: 429 }
@@ -61,7 +73,7 @@ export async function POST(request: Request) {
         const ipRateKey = `pwd-reset-otp:ip:${ip}`;
         const ipRecord = await RateLimitModel.findOne({ key: ipRateKey, expiresAt: { $gt: now } }).lean();
         if (ipRecord) {
-            if ((ipRecord as any).count >= MAX_IP_REQUESTS) {
+            if (((ipRecord as RateLimitRecord).count ?? 0) >= MAX_IP_REQUESTS) {
                 return NextResponse.json(
                     { error: 'Too many requests from this device. Please try again later.' },
                     { status: 429 }
@@ -92,7 +104,7 @@ export async function POST(request: Request) {
         }
 
         // Check if account is archived/deactivated
-        if ((existingUser && (existingUser as any).archived) || (existingClient && (existingClient as any).archived)) {
+        if ((existingUser && (existingUser as ArchivedAccountRecord).archived) || (existingClient && (existingClient as ArchivedAccountRecord).archived)) {
             return NextResponse.json({
                 success: true,
                 message: 'If an account with this email exists, you will receive a reset code shortly.',
@@ -121,7 +133,7 @@ export async function POST(request: Request) {
             message: 'If an account with this email exists, you will receive a reset code shortly.',
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Forgot password send OTP error:', error);
         return NextResponse.json(
             { error: 'Something went wrong. Please try again.' },

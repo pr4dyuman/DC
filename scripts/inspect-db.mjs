@@ -237,7 +237,7 @@ async function inspect() {
                 if (missingCount > 0) {
                     log(`  ❌ ${colName}: ${missingCount} documents missing agencyId`);
                 }
-            } catch (e) { }
+            } catch { }
         }
         log('  ✅ agencyId check complete');
 
@@ -252,7 +252,7 @@ async function inspect() {
                 if (dupes.length > 0) {
                     log(`  ❌ ${colName}: ${dupes.length} duplicate IDs: ${dupes.map(d => `"${d._id}" (${d.count}x)`).join(', ')}`);
                 }
-            } catch (e) { }
+            } catch { }
         }
         log('  ✅ Duplicate ID check complete');
 

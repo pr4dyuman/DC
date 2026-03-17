@@ -2,7 +2,6 @@
 
 import { MessagesList, ContactItem, ContactSkeleton, MessagesSkeleton, EmojiPicker } from "./ChatComponents";
 import { X, Send, Search, Smile, MessageCircle, Trash2, ArrowLeft, MessageSquare, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { useChatPanelState } from "./useChatPanelState";
 

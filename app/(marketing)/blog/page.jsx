@@ -7,13 +7,6 @@ import BlogList from '@/components/marketing/BlogList';
 // Cache for 60 seconds
 export const revalidate = 60;
 
-// Helper to calculate reading time
-function getReadTime(content) {
-  const wordsPerMinute = 200;
-  const words = content.split(/\s+/).length;
-  return Math.ceil(words / wordsPerMinute) + " MIN READ";
-}
-
 // Helper to truncate text
 function truncate(str, length) {
   if (str.length <= length) return str;

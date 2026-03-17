@@ -3,14 +3,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CheckCircle2, Clock, AlertCircle, Calendar } from "lucide-react";
-import { Task } from "@/lib/types";
+import { Project, Task } from "@/lib/types";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { toLocalCalendarDay } from "@/lib/date-utils";
 import Link from "next/link";
 
 interface ClientTaskOverviewProps {
     tasks: Task[];
-    projects: any[];
+    projects: Project[];
 }
 
 export function ClientTaskOverview({ tasks, projects }: ClientTaskOverviewProps) {

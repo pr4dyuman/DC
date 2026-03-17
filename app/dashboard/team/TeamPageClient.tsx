@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { getUsers, createUser, updateUser, deleteUser, getUser, getLeaveRequests, getArchivedUsers, unarchiveUser } from "@/lib/actions";
+import { getUsers, getUser, getLeaveRequests, getArchivedUsers, unarchiveUser } from "@/lib/actions";
 import { User, LeaveRequest } from "@/lib/types";
 import { getSessionId } from "@/lib/auth";
 import { LeaveRequestsList } from "@/components/leave-requests-list";
@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const ROLE_FILTERS = [
     { key: "all", label: "All", icon: Users },
@@ -25,8 +26,6 @@ const ROLE_FILTERS = [
     { key: "manager", label: "Manager", icon: Shield },
     { key: "employee", label: "Employee", icon: UserCheck },
 ] as const;
-
-
 
 export default function TeamPage() {
     const [users, setUsers] = useState<User[]>([]);
@@ -42,7 +41,7 @@ export default function TeamPage() {
     const { openChat } = useChat();
     const router = useRouter();
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         setLoading(true);
         try {
             const currentId = await getSessionId();
@@ -76,14 +75,15 @@ export default function TeamPage() {
             setLeaveRequests(requests.filter(r => r.status === 'Pending'));
         } catch (e) {
             console.error("Failed to load team page", e);
+            toast.error("Failed to load team page");
         } finally {
             setLoading(false);
         }
-    };
+    }, [router, showArchived]);
 
     useEffect(() => {
         loadData();
-    }, [showArchived]);
+    }, [loadData]);
 
     const handleOpenDialog = (user?: User) => {
         setEditingUser(user || null);
@@ -117,6 +117,7 @@ export default function TeamPage() {
             loadData();
         } catch (error) {
             console.error("Failed to restore user", error);
+            toast.error(`Failed to restore ${userName}`);
         }
     };
 
@@ -274,23 +275,31 @@ export default function TeamPage() {
                             <Link href={`/dashboard/team/${user.username || user.id}`} key={user.id} className="block h-full">
                                 <Card className={cn("group relative overflow-hidden transition-all hover:shadow-lg h-full border-border hover:border-primary/50 hover:bg-muted cursor-pointer", showArchived && "opacity-70")}>
                                     {/* Quick Actions (hover) */}
-                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
-                                        {user.id !== currentUserId && (
-                                            <button
-                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); openChat(user.id); }}
-                                                className="p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition shadow-sm"
-                                                title="Send Message"
-                                            >
-                                                <MessageCircle className="h-3 w-3" />
-                                            </button>
-                                        )}
-                                        {(currentUserRole === 'admin' || currentUserRole === 'manager' || currentUserId === user.id) && (
-                                            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOpenDialog(user); }} className="p-2 bg-secondary text-secondary-foreground rounded-full hover:bg-secondary/80 transition shadow-sm">
-                                                <span className="sr-only">Edit</span>
-                                                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-3 w-3"><path d="M11.8536 1.14645C11.6583 0.951184 11.3417 0.951184 11.1464 1.14645L3.71455 8.57829C3.64584 8.647 3.58564 8.72531 3.53033 8.80868L3.53033 8.80868L2 12.9999L6.19122 11.4696L6.19122 11.4696C6.27463 11.4143 6.35304 11.3541 6.42171 11.2854L13.8536 3.85355C14.0488 3.65829 14.0488 3.34171 13.8536 3.14645L11.8536 1.14645ZM4.41421 9.41421L3.99998 12.0001L6.58579 11.5858L10.5 7.67157L8.32843 5.5L4.41421 9.41421ZM11.4142 2.41421L12.5858 3.58579L11.5 4.67157L10.3284 3.5L11.4142 2.41421Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
-                                            </button>
-                                        )}
-                                    </div>
+                                    {!showArchived && (
+                                        <div className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+                                            {user.id !== currentUserId && (
+                                                <button
+                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openChat(user.id); }}
+                                                    className="p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition shadow-sm"
+                                                    aria-label={`Message ${user.name}`}
+                                                    title="Send Message"
+                                                >
+                                                    <MessageCircle className="h-3 w-3" />
+                                                </button>
+                                            )}
+                                            {(currentUserRole === 'admin' || currentUserRole === 'manager' || currentUserId === user.id) && (
+                                                <button
+                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOpenDialog(user); }}
+                                                    className="p-2 bg-secondary text-secondary-foreground rounded-full hover:bg-secondary/80 transition shadow-sm"
+                                                    aria-label={`Edit ${user.name}`}
+                                                    title="Edit profile"
+                                                >
+                                                    <span className="sr-only">Edit</span>
+                                                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-3 w-3"><path d="M11.8536 1.14645C11.6583 0.951184 11.3417 0.951184 11.1464 1.14645L3.71455 8.57829C3.64584 8.647 3.58564 8.72531 3.53033 8.80868L3.53033 8.80868L2 12.9999L6.19122 11.4696L6.19122 11.4696C6.27463 11.4143 6.35304 11.3541 6.42171 11.2854L13.8536 3.85355C14.0488 3.65829 14.0488 3.34171 13.8536 3.14645L11.8536 1.14645ZM4.41421 9.41421L3.99998 12.0001L6.58579 11.5858L10.5 7.67157L8.32843 5.5L4.41421 9.41421ZM11.4142 2.41421L12.5858 3.58579L11.5 4.67157L10.3284 3.5L11.4142 2.41421Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* Role Badge */}
                                     <div className="absolute top-3 left-3 z-10 flex gap-1">

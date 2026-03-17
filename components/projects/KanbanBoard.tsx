@@ -12,11 +12,12 @@ import {
     useSensors,
     DragStartEvent,
     DragEndEvent,
+    type Collision,
     rectIntersection,
     CollisionDetection,
 } from "@dnd-kit/core";
-import { Task, UserPermissions } from "@/lib/types";
-import { updateTaskStatus, updateTask } from "@/lib/actions";
+import { Task, User, UserPermissions } from "@/lib/types";
+import { updateTaskStatus } from "@/lib/actions";
 import { TaskCard } from "./TaskCard";
 import { toast } from "sonner";
 import { DroppableColumn } from "./DroppableColumn";
@@ -32,11 +33,13 @@ const COLUMN_COLORS: Record<string, string> = {
     "Done": "text-emerald-500",
 };
 
+type TaskAssignee = Pick<User, "id" | "name" | "avatar" | "jobTitle" | "role">;
+
 interface KanbanBoardProps {
     initialTasks: Task[];
     projectId: string;
     categories?: { id: string; name: string }[];
-    users?: any[];
+    users?: TaskAssignee[];
     currentUserId?: string;
     selectedCategory?: string;
     readOnly?: boolean;
@@ -50,7 +53,7 @@ const kanbanCollision: CollisionDetection = (args) => {
     if (!pointerCoordinates) return rectIntersection(args);
 
     const { x, y } = pointerCoordinates;
-    const collisions: { id: string | number; data: { droppableContainer: any; value: number } }[] = [];
+    const collisions: Collision[] = [];
 
     for (const container of droppableContainers) {
         const id = container.id as string;
@@ -74,7 +77,7 @@ const kanbanCollision: CollisionDetection = (args) => {
     return collisions;
 };
 
-export function KanbanBoard({ initialTasks, projectId, users, categories = [], currentUserId, selectedCategory = "All", readOnly = false, permissions }: KanbanBoardProps) {
+export function KanbanBoard({ initialTasks, users, currentUserId, selectedCategory = "All", readOnly = false, permissions }: KanbanBoardProps) {
     const [mounted, setMounted] = useState(false);
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -171,7 +174,7 @@ export function KanbanBoard({ initialTasks, projectId, users, categories = [], c
 
         try {
             await updateTaskStatus(taskId, newStatus as Task['status']);
-        } catch (e) {
+        } catch {
             setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: draggedTask.status } : t));
             toast.error("Failed to move task");
         }

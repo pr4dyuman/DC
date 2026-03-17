@@ -3,7 +3,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GoogleGenAI, Modality } from "@google/genai";
 import type { LiveServerMessage } from "@google/genai";
-import { AIConfig, AIProvider } from "./types";
+import { AIConfig } from "./types";
 import type { ChatMessage } from "./ai-models";
 
 // =============================================================================

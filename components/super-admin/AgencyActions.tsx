@@ -4,18 +4,25 @@ import { useState } from "react";
 import { suspendAgency, activateAgency, deleteAgency, updateAgencyPlan, extendTrial } from "@/lib/actions/super-admin";
 import { Ban, CheckCircle, Trash2, Edit, X, AlertTriangle, Shield, Lock, Eye, EyeOff, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
+import type { Agency } from "@/lib/types";
 
 type ModalType = "suspend" | "delete" | "plan" | "trial" | null;
+type AgencyPlanDuration = NonNullable<Agency['planDuration']>;
+type AgencyActionAgency = Pick<Agency, "id" | "name" | "plan" | "status" | "planDuration" | "trialEndsAt">;
 
-export default function AgencyActions({ agency }: { agency: any }) {
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error && error.message ? error.message : fallback;
+}
+
+export default function AgencyActions({ agency }: { agency: AgencyActionAgency }) {
     const router = useRouter();
     const [modal, setModal] = useState<ModalType>(null);
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [reason, setReason] = useState("");
     const [deleteConfirmText, setDeleteConfirmText] = useState("");
-    const [selectedPlan, setSelectedPlan] = useState(agency.plan);
-    const [selectedDuration, setSelectedDuration] = useState<string>(agency.planDuration || 'lifetime');
+    const [selectedPlan, setSelectedPlan] = useState<Agency['plan']>(agency.plan);
+    const [selectedDuration, setSelectedDuration] = useState<AgencyPlanDuration>(agency.planDuration || 'lifetime');
     const [trialDays, setTrialDays] = useState(7);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -39,8 +46,8 @@ export default function AgencyActions({ agency }: { agency: any }) {
             await suspendAgency(agency.id, password, reason || undefined);
             router.refresh();
             resetModal();
-        } catch (err: any) {
-            setError(err.message || "Failed to suspend agency");
+        } catch (error: unknown) {
+            setError(getErrorMessage(error, "Failed to suspend agency"));
         } finally {
             setLoading(false);
         }
@@ -52,8 +59,8 @@ export default function AgencyActions({ agency }: { agency: any }) {
             await activateAgency(agency.id);
             router.refresh();
             resetModal();
-        } catch (err: any) {
-            setError(err.message || "Failed to activate agency");
+        } catch (error: unknown) {
+            setError(getErrorMessage(error, "Failed to activate agency"));
         } finally {
             setLoading(false);
         }
@@ -67,8 +74,8 @@ export default function AgencyActions({ agency }: { agency: any }) {
         try {
             await deleteAgency(agency.id, password);
             router.push("/super-admin/agencies");
-        } catch (err: any) {
-            setError(err.message || "Failed to delete agency");
+        } catch (error: unknown) {
+            setError(getErrorMessage(error, "Failed to delete agency"));
             setLoading(false);
         }
     };
@@ -78,11 +85,11 @@ export default function AgencyActions({ agency }: { agency: any }) {
         setLoading(true);
         setError("");
         try {
-            await updateAgencyPlan(agency.id, selectedPlan, selectedDuration as any);
+            await updateAgencyPlan(agency.id, selectedPlan, selectedDuration);
             router.refresh();
             resetModal();
-        } catch (err: any) {
-            setError(err.message || "Failed to update plan");
+        } catch (error: unknown) {
+            setError(getErrorMessage(error, "Failed to update plan"));
             setLoading(false);
         }
     };
@@ -95,8 +102,8 @@ export default function AgencyActions({ agency }: { agency: any }) {
             await extendTrial(agency.id, trialDays);
             router.refresh();
             resetModal();
-        } catch (err: any) {
-            setError(err.message || "Failed to extend trial");
+        } catch (error: unknown) {
+            setError(getErrorMessage(error, "Failed to extend trial"));
             setLoading(false);
         }
     };
@@ -353,7 +360,7 @@ export default function AgencyActions({ agency }: { agency: any }) {
                                                 name="plan"
                                                 value={plan.value}
                                                 checked={selectedPlan === plan.value}
-                                                onChange={(e) => setSelectedPlan(e.target.value)}
+                                                onChange={(e) => setSelectedPlan(e.target.value as Agency['plan'])}
                                                 className="w-4 h-4 accent-blue-500"
                                             />
                                             <div>
@@ -384,7 +391,7 @@ export default function AgencyActions({ agency }: { agency: any }) {
                                                 <button
                                                     key={d.value}
                                                     type="button"
-                                                    onClick={() => setSelectedDuration(d.value)}
+                                                    onClick={() => setSelectedDuration(d.value as AgencyPlanDuration)}
                                                     className={`px-3 py-2 text-sm rounded-lg border transition-all font-medium ${
                                                         selectedDuration === d.value
                                                             ? 'border-blue-500 bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/30'

@@ -125,7 +125,7 @@ export default function AdminPage() {
       } else {
         setLoginError(data.error || 'Login failed');
       }
-    } catch (err) {
+    } catch {
       setLoginError('An error occurred. Please try again.');
     }
   };
@@ -149,7 +149,7 @@ export default function AdminPage() {
       } else {
         setCategoryStatus(data.error || 'Failed');
       }
-    } catch (err) {
+    } catch {
       setCategoryStatus('Error');
     }
   };

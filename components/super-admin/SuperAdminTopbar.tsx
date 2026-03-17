@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Building2, ChevronDown, Menu } from "lucide-react";
 import { getAllAgencies, switchAgency, clearAgencySelection } from "@/lib/agency-context";
 import Cookies from "js-cookie";
+import type { Agency } from "@/lib/types";
 
 interface SuperAdminTopbarProps {
     onMenuClick?: () => void;
@@ -12,7 +13,7 @@ interface SuperAdminTopbarProps {
 
 export default function SuperAdminTopbar({ onMenuClick }: SuperAdminTopbarProps) {
     const router = useRouter();
-    const [agencies, setAgencies] = useState<any[]>([]);
+    const [agencies, setAgencies] = useState<Agency[]>([]);
     const [selectedAgency, setSelectedAgency] = useState<string | null>(null);
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(true);

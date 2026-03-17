@@ -2,11 +2,10 @@
 "use client";
 
 import { Client } from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Mail, Briefcase, Phone, MapPin, ArchiveRestore, Archive, Trash2 } from "lucide-react";
+import { Mail, Phone, MapPin, ArchiveRestore, Archive, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 
 interface ClientCardProps {
     client: Client;

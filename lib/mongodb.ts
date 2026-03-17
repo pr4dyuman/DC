@@ -1,4 +1,4 @@
-import mongoose, { Schema, Model, Document } from 'mongoose';
+import mongoose, { Schema, Model } from 'mongoose';
 import crypto from 'crypto';
 import {
     Agency, SuperAdmin,
@@ -56,7 +56,7 @@ declare global {
     var mongoose: MongooseConnection | undefined;
 }
 
-let cached: MongooseConnection = global.mongoose || { conn: null, promise: null };
+const cached: MongooseConnection = global.mongoose || { conn: null, promise: null };
 
 if (!global.mongoose) {
     global.mongoose = cached;

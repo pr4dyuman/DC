@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { User, Client } from "@/lib/types";
 import { approveDocumentUpdate, updateUser } from "@/lib/actions";
-import { AlertCircle, FileText, CheckCircle2, Clock, Trash2, Eye, Upload, ShieldAlert, X, Loader2 } from "lucide-react";
+import { AlertCircle, FileText, Clock, Eye, Upload, ShieldAlert, X, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
@@ -245,7 +245,7 @@ export function DocumentManager({ user, open, onOpenChange, isAdmin, onSuccess }
                             <button onClick={() => setPreviewImage(null)} className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full z-50">
                                 <X className="w-6 h-6" />
                             </button>
-                            <img src={previewImage} className="max-w-full max-h-full object-contain" />
+                            <img src={previewImage} alt="Document preview" className="max-w-full max-h-full object-contain" />
                         </div>
                     </DialogContent>
                 </Dialog>
@@ -357,9 +357,13 @@ function IdentityCard({ title, image, pendingImage, isRequired, isAdmin, onAppro
                     <div className="aspect-[4/3] relative rounded-lg border-2 border-dashed border-muted-foreground/20 bg-muted/5 flex items-center justify-center overflow-hidden group">
                         {image ? (
                             <>
-                                <img src={image} className="w-full h-full object-cover object-top transition-transform group-hover:scale-105" />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                    <button onClick={() => onPreview(image)} className="p-2 bg-background/20 backdrop-blur text-white rounded-full hover:bg-background/40">
+                                <img src={image} alt={title} className="w-full h-full object-cover object-top transition-transform group-hover:scale-105" />
+                                <div className="absolute inset-0 bg-black/40 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                    <button
+                                        onClick={() => onPreview(image)}
+                                        aria-label={`Preview ${title}`}
+                                        className="p-2 bg-background/20 backdrop-blur text-white rounded-full hover:bg-background/40"
+                                    >
                                         <Eye className="w-5 h-5" />
                                     </button>
                                 </div>
@@ -386,10 +390,14 @@ function IdentityCard({ title, image, pendingImage, isRequired, isAdmin, onAppro
                         <div className="absolute -top-3 left-0 bg-yellow-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold z-10">
                             PENDING
                         </div>
-                        <div className="aspect-[4/3] relative rounded-lg border-2 border-yellow-500/30 bg-yellow-500/5 flex items-center justify-center overflow-hidden">
-                            <img src={pendingImage} className="w-full h-full object-cover object-top" />
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                                <button onClick={() => onPreview(pendingImage!)} className="p-2 bg-black/40 text-white rounded-full">
+                        <div className="group aspect-[4/3] relative rounded-lg border-2 border-yellow-500/30 bg-yellow-500/5 flex items-center justify-center overflow-hidden">
+                            <img src={pendingImage} alt={`Pending ${title}`} className="w-full h-full object-cover object-top" />
+                            <div className="absolute inset-0 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                <button
+                                    onClick={() => onPreview(pendingImage!)}
+                                    aria-label={`Preview pending ${title}`}
+                                    className="p-2 bg-black/40 text-white rounded-full"
+                                >
                                     <Eye className="w-5 h-5" />
                                 </button>
                             </div>

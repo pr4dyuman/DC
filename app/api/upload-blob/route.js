@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { handleUpload } from '@vercel/blob/client';
 import { getSessionUser } from '@/lib/auth';
-import { validateCsrfOrigin } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,7 +53,7 @@ export async function POST(req) {
           }),
         };
       },
-      onUploadCompleted: async ({ blob, tokenPayload }) => {
+      onUploadCompleted: async ({ blob }) => {
         // Called after successful upload
         console.log(`[Blob Client Upload] Completed: ${blob.pathname} (${blob.size} bytes)`);
       },

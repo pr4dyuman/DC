@@ -57,11 +57,19 @@ export interface RollbackAnalysis {
     conflictedActions: { action: CheckpointAction; conflict: ConflictInfo }[];
 }
 
+function withoutMongoMeta<T extends Record<string, unknown>>(value: T) {
+    const clone = { ...value };
+    delete (clone as { _id?: unknown })._id;
+    delete (clone as { __v?: unknown }).__v;
+    return clone;
+}
+
 // ============================================================================
 // CHAT SESSION CRUD
 // ============================================================================
 
 export async function getSingularitySessions(_userId?: string): Promise<ChatSessionSummary[]> {
+    void _userId;
     const session = await getSessionUser();
     if (!session) throw new Error('Unauthorized');
     const userId = session.userId;
@@ -103,6 +111,7 @@ export async function getSingularitySession(sessionId: string) {
 }
 
 export async function createSingularitySession(_userId: string, mode: 'chat' | 'agent'): Promise<string> {
+    void _userId;
     const session = await getSessionUser();
     if (!session) throw new Error('Unauthorized');
     const userId = session.userId;
@@ -514,7 +523,7 @@ async function rollbackAction(action: CheckpointAction) {
             }
 
             // Remove MongoDB internal fields from snapshot
-            const { _id, __v, ...restoreData } = action.beforeSnapshot;
+            const restoreData = withoutMongoMeta(action.beforeSnapshot as Record<string, unknown>);
             const updateFilter: any = { id: action.entityId };
             if (agencyId) updateFilter.agencyId = agencyId;
             await Model.updateOne(
@@ -561,7 +570,7 @@ async function rollbackAction(action: CheckpointAction) {
                 break;
             }
 
-            const { _id, __v, ...createData } = action.beforeSnapshot;
+            const createData = withoutMongoMeta(action.beforeSnapshot as Record<string, unknown>);
             await Model.create(createData);
             break;
         }

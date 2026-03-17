@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { getAgencySettings, getCurrentUser } from "@/lib/actions";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Agency } from "@/lib/types";
 import {
     ChevronDown, ChevronRight, Settings, Shield, Palette,
     Sun, Moon, Lock, Bot
@@ -17,13 +17,15 @@ import { EmailSettings } from "@/components/settings/EmailSettings";
 import { useTheme } from "@/components/providers/ThemeProvider";
 import { AISettings } from "@/components/settings/AISettings";
 
+type AgencyEmailCategories = Agency["settings"]["emailCategories"];
+
 type AgencySettingsData = {
     name: string;
     logo: string;
     primaryColor?: string;
     secondaryColor?: string;
     emailNotificationsEnabled: boolean;
-    emailCategories?: Record<string, any>;
+    emailCategories?: AgencyEmailCategories;
 };
 
 export default function SettingsPage() {
@@ -244,21 +246,23 @@ function SectionAccordion({
 }) {
     return (
         <div className="border rounded-lg bg-card text-card-foreground shadow-sm">
-            <div
+            <button
+                type="button"
                 onClick={onToggle}
-                className="flex flex-row items-center justify-between p-6 cursor-pointer hover:bg-accent/50 transition-colors"
+                aria-expanded={isOpen}
+                className="w-full text-left flex flex-row items-center justify-between p-6 hover:bg-accent/50 transition-colors"
             >
-                <div className="flex items-center gap-4">
-                    <div className={`p-2 ${iconBg} rounded-full`}>
+                <span className="flex items-center gap-4">
+                    <span className={`p-2 ${iconBg} rounded-full inline-flex`}>
                         {icon}
-                    </div>
-                    <div>
-                        <h2 className="text-lg font-semibold">{title}</h2>
-                        <p className="text-sm text-muted-foreground">{description}</p>
-                    </div>
-                </div>
+                    </span>
+                    <span>
+                        <span className="block text-lg font-semibold">{title}</span>
+                        <span className="block text-sm text-muted-foreground">{description}</span>
+                    </span>
+                </span>
                 {isOpen ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : <ChevronRight className="h-5 w-5 text-muted-foreground" />}
-            </div>
+            </button>
 
             <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
                 <div className="overflow-hidden">

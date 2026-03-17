@@ -1,23 +1,21 @@
 "use server";
 
-import { User, Project, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig, LeaveRequest, LeaveType, LeaveStatus, UserPermissions, Transaction, TransactionType, TransactionCategory } from "./db";
+import { User, Project, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig, LeaveRequest, LeaveStatus, UserPermissions, Transaction } from "./db";
 import { revalidatePath } from "next/cache";
 import { generateContent, generateContentWithParts, generateContentWithChat } from "./ai-provider";
-import type { TokenUsage } from "./ai-provider";
 import { logAIUsage } from "./ai-usage";
-import type { AIFeature } from "./ai-usage";
-import { createSession, sendMessage, closeSession, isSessionActive } from "./live-session";
+import { createSession, sendMessage, closeSession } from "./live-session";
 import type { AIConfig, AIPermissions } from "./types";
 import { DEFAULT_AI_PERMISSIONS } from "./types";
 import { withAgencyId, getCurrentAgency, checkAgencyLimit, incrementAgencyUsage, decrementAgencyUsage } from "./agency-context";
 import { generateId, resolveUserOrClient } from "./utils-server";
-import { sanitizeName, sanitizeString, sanitizeUsername, validateEmail, validatePassword, validateStrongPassword, sanitizePhone, sanitizeUrl, sanitizeColor, sanitizeMongoInput, sanitizeUpdates, validateId, validateAmount } from "./validation";
-import { formatCurrency, getCurrencySymbol } from "./currency";
+import { sanitizeName, sanitizeString, sanitizeUsername, validateEmail, validatePassword, validateStrongPassword, sanitizePhone, sanitizeUrl, sanitizeColor, sanitizeMongoInput, sanitizeUpdates } from "./validation";
+import { formatCurrency } from "./currency";
 import { getDefaultCurrency, getNotificationDefaults } from "./actions/super-admin";
 import { differenceInCalendarDays } from "date-fns";
 
 // Authentication
-import { connectDB, AgencyModel, UserModel, ClientModel, SuperAdminModel, ProjectModel, TaskModel, InvoiceModel, TransactionModel, ServiceModel, NotificationModel, ActivityModel, AssetModel, MessageModel, LeaveRequestModel, SettingsModel, decryptApiKey, SystemSettingsModel } from "./mongodb";
+import { connectDB, AgencyModel, UserModel, ClientModel, SuperAdminModel, ProjectModel, TaskModel, InvoiceModel, TransactionModel, ServiceModel, NotificationModel, ActivityModel, AssetModel, MessageModel, LeaveRequestModel, SettingsModel, SystemSettingsModel } from "./mongodb";
 import { getSessionUser } from "@/lib/auth";
 import { dateKeyTz, fmtDate, isDateOnlyString, toLocalCalendarDay, todayStrTz } from "@/lib/date-utils";
 import { getSessionId as authGetSessionId, login as authLogin, logout as authLogout } from "@/lib/auth";
@@ -41,8 +39,6 @@ import {
     sendLeaveCancelledEmail,
     sendSalaryPaidEmail,
     sendRefundIssuedEmail,
-    sendDocumentUpdateRequestedEmail,
-    sendDocumentUpdateResponseEmail,
     sendClientAccountCreatedEmail,
     sendEmployeeAccountCreatedEmail,
 } from "./brevo-mail";
@@ -465,8 +461,6 @@ export async function getRevenueData() {
     }).select('date type amount').lean();
 
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const currentYear = new Date().getFullYear();
-
     // Initialize last 6 months
     const result: any[] = [];
     for (let i = 5; i >= 0; i--) {
@@ -533,11 +527,21 @@ export async function getProjectDistribution() {
 }
 
 export async function getRecentActivity(offset = 0, limit = 5): Promise<Activity[]> {
-    await requireRole('admin', 'manager');
+    const currentUser = await requireAuth();
     await connectDB();
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
-    const activities = await ActivityModel.find(agencyFilter).sort({ timestamp: -1 }).skip(offset).limit(limit).lean();
+
+    const activityQuery = currentUser.role === 'admin' || currentUser.role === 'manager'
+        ? agencyFilter
+        : { userId: currentUser.id, ...agencyFilter };
+
+    const activities = await ActivityModel.find(activityQuery)
+        .sort({ timestamp: -1 })
+        .skip(offset)
+        .limit(limit)
+        .lean();
+
     return activities.map(a => sanitizeDoc(a));
 }
 
@@ -691,7 +695,7 @@ export async function getProjects(offset = 0, limit = 1000) {
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
 
-    let query: any = { ...agencyFilter };
+    const query: any = { ...agencyFilter };
     if (currentUser.role === 'client') {
         // STRICT: Only return projects owned by this client
         query.clientId = currentUserId;
@@ -849,18 +853,14 @@ export async function getUsers() {
     const users = usersRaw.map(u => ({ ...sanitizeDoc(u), agencyId: u.agencyId || 'default-agency' }));
 
     if (currentUser?.role === 'client') {
-        return users.map(user => {
-            const { salary, password, adharCardImage, panCardImage, pendingAdharCardImage, pendingPanCardImage, contracts, otherDocuments, ...redacted } = user as any;
-            return redacted as User;
-        });
+        return users.map(user => redactSensitiveUserFields(user as Record<string, unknown>, true) as User);
     }
 
     return users.map(user => {
         if (isAdmin || user.id === currentUserId) {
             return user as User;
         }
-        const { salary, adharCardImage, panCardImage, pendingAdharCardImage, pendingPanCardImage, contracts, otherDocuments, ...redacted } = user as any;
-        return redacted as User;
+        return redactSensitiveUserFields(user as Record<string, unknown>) as User;
     });
 }
 
@@ -883,8 +883,7 @@ export async function getUser(id: string) {
     }
 
     // 3. Redact
-    const { salary, adharCardImage, panCardImage, pendingAdharCardImage, pendingPanCardImage, contracts, otherDocuments, ...redacted } = targetUser;
-    return sanitizeDoc(redacted as User);
+    return sanitizeDoc(redactSensitiveUserFields(targetUser)) as User;
 }
 
 
@@ -905,8 +904,7 @@ export async function getUserByUsername(username: string) {
     }
 
     // 3. Redact
-    const { salary, password, adharCardImage, panCardImage, pendingAdharCardImage, pendingPanCardImage, contracts, otherDocuments, ...redacted } = user;
-    return sanitizeDoc(redacted as User);
+    return sanitizeDoc(redactSensitiveUserFields(user, true)) as User;
 }
 
 export async function getUserTasks(userId: string, offset = 0, limit = 1000) {
@@ -1152,10 +1150,29 @@ type ProjectServiceConfigSnapshot = {
 };
 
 const CLIENT_OUTSTANDING_INVOICE_STATUSES: Invoice['status'][] = ['Pending', 'Overdue'];
-const FINANCE_UNSETTLED_INVOICE_STATUSES: Invoice['status'][] = ['Pending', 'Processing', 'Overdue'];
-
 function sumAmounts(items: Array<{ amount?: number | null }> = []): number {
     return items.reduce((sum, item) => sum + (Number(item?.amount) || 0), 0);
+}
+
+const REDACTED_USER_FIELDS = [
+    'salary',
+    'adharCardImage',
+    'panCardImage',
+    'pendingAdharCardImage',
+    'pendingPanCardImage',
+    'contracts',
+    'otherDocuments',
+] as const;
+
+function redactSensitiveUserFields<T extends Record<string, unknown>>(value: T, includePassword = false) {
+    const clone = { ...value };
+    if (includePassword) {
+        delete (clone as { password?: unknown }).password;
+    }
+    for (const field of REDACTED_USER_FIELDS) {
+        delete (clone as Record<string, unknown>)[field];
+    }
+    return clone;
 }
 
 function isCompletedIncomeTransaction(transaction: Partial<Transaction> | null | undefined): boolean {
@@ -1172,10 +1189,6 @@ function isCompletedRefundTransaction(transaction: Partial<Transaction> | null |
 
 function isClientOutstandingInvoice(invoice: Partial<Invoice> | null | undefined): boolean {
     return !!invoice?.status && CLIENT_OUTSTANDING_INVOICE_STATUSES.includes(invoice.status);
-}
-
-function isFinanceUnsettledInvoice(invoice: Partial<Invoice> | null | undefined): boolean {
-    return !!invoice?.status && FINANCE_UNSETTLED_INVOICE_STATUSES.includes(invoice.status);
 }
 
 function isInvoiceOverdue(invoice: Partial<Invoice> | null | undefined, now = new Date(), timezone?: string): boolean {
@@ -1646,7 +1659,7 @@ export async function updateUser(id: string, updates: Partial<User>, oldPassword
     }
 
     // Approval Logic for Documents
-    let finalUpdates = { ...updates };
+    const finalUpdates = { ...updates };
     let notifyAdmin = false;
 
 
@@ -1843,7 +1856,16 @@ export async function approveDocumentUpdate(userId: string, type: 'adhar' | 'pan
     const user = await UserModel.findOne({ id: userId, agencyId: agency?.id }).select('-password').lean();
     if (!user) { revalidatePath('/dashboard/team'); return; }
 
-    let updates: any = {};
+    const updates: {
+        adharCardImage?: string | null;
+        panCardImage?: string | null;
+        contracts?: string[] | null;
+        otherDocuments?: string[] | null;
+        pendingAdharCardImage?: string | null;
+        pendingPanCardImage?: string | null;
+        pendingContracts?: string[] | null;
+        pendingOtherDocuments?: string[] | null;
+    } = {};
     if (approve) {
         if ((type === 'adhar' || type === 'both') && user.pendingAdharCardImage) {
             updates.adharCardImage = user.pendingAdharCardImage;
@@ -4464,10 +4486,11 @@ export async function getFinanceStats(projectId?: string, userId?: string, categ
     if (projectId) { txQuery.projectId = projectId; invQuery.projectId = projectId; }
     if (category) txQuery.category = category;
 
-    let [transactions, invoices] = await Promise.all([
+    const [loadedTransactions, invoices] = await Promise.all([
         TransactionModel.find(txQuery).lean(),
         InvoiceModel.find(invQuery).lean()
     ]);
+    let transactions = loadedTransactions;
 
     if (userId) transactions = transactions.filter((t: any) => t.userId === userId);
 
@@ -4525,7 +4548,7 @@ export async function getFinanceChartData(projectId?: string, userId?: string, c
     });
 
     // Strip the internal key before returning
-    return chartData.map(({ key, ...rest }) => rest);
+    return chartData.map(({ name, income, expense }) => ({ name, income, expense }));
 }
 
 export async function getPayrollStatus(userId?: string) {
@@ -4923,7 +4946,7 @@ Return ONLY valid JSON. No markdown fences, no extra text. Example:
     const prompt = `Extract task fields from this AI response:\n\n${aiResponseText}`;
 
     try {
-        const { text, tokens } = await generateContent(aiConfig, prompt, systemInstruction);
+        const { text } = await generateContent(aiConfig, prompt, systemInstruction);
         // Strip any markdown fences the model might add
         const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
         const parsed = JSON.parse(cleaned) as ExtractedTaskFields;
@@ -5214,6 +5237,7 @@ export async function createAISession(
     userId: string
 ): Promise<string> {
     await requireAuth();
+    void userId;
     const aiConfig = await getAgencyAIConfigInternal();
     if (!aiConfig) throw new Error("Singularity is not configured.");
 

@@ -52,7 +52,7 @@ export function RecentActivityList({ initialActivities }: RecentActivityListProp
     const fmt = useDateFormat();
     const [activities, setActivities] = useState<Activity[]>(initialActivities);
     const [offset, setOffset] = useState(initialActivities.length);
-    const [hasMore, setHasMore] = useState(true);
+    const [hasMore, setHasMore] = useState(initialActivities.length >= 5);
     const [loading, setLoading] = useState(false);
     const { ref, inView } = useInView();
 

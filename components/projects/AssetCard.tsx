@@ -90,20 +90,39 @@ export function AssetCard({ asset, onDelete }: AssetCardProps) {
                 {/* Actions — always visible on mobile, hover-reveal on desktop */}
                 <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity self-start pt-1">
                     {canView && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => setViewerOpen(true)} title="View">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                            onClick={() => setViewerOpen(true)}
+                            aria-label={`View ${asset.name}`}
+                            title="View"
+                        >
                             <EyeIcon className="h-4 w-4" />
                         </Button>
                     )}
 
                     <a href={asset.url} target="_blank" rel="noopener noreferrer" download={!asset.url.startsWith('http')}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" title="Download">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                            aria-label={`Download ${asset.name}`}
+                            title="Download"
+                        >
                             <DownloadIcon className="h-4 w-4" />
                         </Button>
                     </a>
 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                aria-label={`More actions for ${asset.name}`}
+                                title="More actions"
+                            >
                                 <MoreVerticalIcon className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>

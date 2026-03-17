@@ -4,6 +4,20 @@ import { validateEmail, validatePassword, validateStrongPassword, validateCsrfOr
 import { verifyOtp } from '@/app/api/signup/send-otp/route';
 import bcrypt from 'bcryptjs';
 
+type SecuritySettingsRecord = {
+    security?: {
+        enforceStrongPasswords?: boolean;
+    };
+};
+
+type ArchivedAccountRecord = {
+    archived?: boolean;
+};
+
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export async function POST(request: Request) {
     try {
         const csrf = validateCsrfOrigin(request);
@@ -24,15 +38,15 @@ export async function POST(request: Request) {
         let validatedEmail: string;
         try {
             validatedEmail = validateEmail(email);
-        } catch (e: any) {
-            return NextResponse.json({ error: e.message }, { status: 400 });
+        } catch (error: unknown) {
+            return NextResponse.json({ error: getErrorMessage(error, 'Invalid email address') }, { status: 400 });
         }
 
         // --- Verify OTP ---
         try {
             await verifyOtp(validatedEmail, otp.toString().trim(), 'password-reset');
-        } catch (e: any) {
-            return NextResponse.json({ error: e.message }, { status: 400 });
+        } catch (error: unknown) {
+            return NextResponse.json({ error: getErrorMessage(error, 'Invalid verification code') }, { status: 400 });
         }
 
         await connectDB();
@@ -42,15 +56,15 @@ export async function POST(request: Request) {
             const sys = await SystemSettingsModel.findOne(
                 { key: 'global' },
                 { 'security.enforceStrongPasswords': 1 }
-            ).lean() as any;
+            ).lean() as SecuritySettingsRecord | null;
             const enforceStrong = sys?.security?.enforceStrongPasswords ?? true;
             if (enforceStrong) {
                 validateStrongPassword(newPassword);
             } else {
                 validatePassword(newPassword);
             }
-        } catch (e: any) {
-            return NextResponse.json({ error: e.message }, { status: 400 });
+        } catch (error: unknown) {
+            return NextResponse.json({ error: getErrorMessage(error, 'Invalid password') }, { status: 400 });
         }
 
         // --- Find user and update password ---
@@ -72,7 +86,7 @@ export async function POST(request: Request) {
         // Check User
         const user = await UserModel.findOne({ email: validatedEmail }).lean();
         if (user) {
-            if ((user as any).archived) {
+            if ((user as ArchivedAccountRecord).archived) {
                 return NextResponse.json(
                     { error: 'This account has been deactivated. Please contact your agency.' },
                     { status: 403 }
@@ -91,7 +105,7 @@ export async function POST(request: Request) {
         // Check Client
         const client = await ClientModel.findOne({ email: validatedEmail }).lean();
         if (client) {
-            if ((client as any).archived) {
+            if ((client as ArchivedAccountRecord).archived) {
                 return NextResponse.json(
                     { error: 'This account has been deactivated. Please contact your agency.' },
                     { status: 403 }
@@ -113,10 +127,10 @@ export async function POST(request: Request) {
             { status: 404 }
         );
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Password reset error:', error);
         return NextResponse.json(
-            { error: error.message || 'Something went wrong. Please try again.' },
+            { error: getErrorMessage(error, 'Something went wrong. Please try again.') },
             { status: 500 }
         );
     }

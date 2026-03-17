@@ -1,16 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User } from "@/lib/types";
+import { Service, User } from "@/lib/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, Trash2, AlertTriangle, Archive } from "lucide-react";
 import { toast } from "sonner";
-import { createUser, updateUser, deleteUser, adminResetPassword, getServices, approveDocumentUpdate, permanentlyDeleteUser } from "@/lib/actions";
+import { createUser, updateUser, deleteUser, adminResetPassword, getServices, permanentlyDeleteUser } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { useCurrency } from "@/context/CurrencyContext";
 import { DocumentManager } from "./DocumentManager";
 import { PermanentDeleteDialog } from "@/components/PermanentDeleteDialog";
+
+type UserFormData = Omit<User, "id" | "agencyId">;
+
+function getErrorMessage(error: unknown, fallback: string) {
+    return error instanceof Error ? error.message : fallback;
+}
 
 interface EditUserDialogProps {
     user?: User | null;
@@ -27,10 +33,9 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
     const [submitting, setSubmitting] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deletePassword, setDeletePassword] = useState("");
-    const [deleting, setDeleting] = useState(false);
     const [archiving, setArchiving] = useState(false);
     const [showPermanentDelete, setShowPermanentDelete] = useState(false);
-    const [services, setServices] = useState<any[]>([]);
+    const [services, setServices] = useState<Service[]>([]);
     const [loadingRoles, setLoadingRoles] = useState(false);
     const [showDocumentManager, setShowDocumentManager] = useState(false);
     // Self password-change fields
@@ -43,7 +48,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
     const isManager = currentUserRole === 'manager';
     const canManageFinances = isAdmin || isManager;
 
-    const [formData, setFormData] = useState<Omit<User, "id" | "agencyId">>({
+    const [formData, setFormData] = useState<UserFormData>({
         name: "",
         username: "",
         email: "",
@@ -96,7 +101,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                     panCardImage: "",
                     password: "",
                     createdAt: new Date().toISOString().split('T')[0] // Default: today
-                } as any);
+                });
             }
             setShowDeleteConfirm(false);
             setDeletePassword("");
@@ -146,7 +151,8 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                 } else if (formData.password) {
                     // Admin force-reset (no old password needed)
                     await adminResetPassword(user.id, formData.password);
-                    const { password, ...updateData } = formData;
+                    const updateData: Partial<typeof formData> = { ...formData };
+                    delete updateData.password;
                     await updateUser(user.id, updateData);
                 } else {
                     await updateUser(user.id, formData);
@@ -164,13 +170,13 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                     }
                 }
             } else {
-                await createUser(formData as any);
+                await createUser(formData);
             }
             if (onSuccess) onSuccess();
             onOpenChange(false);
             toast.success(user ? "Profile updated successfully" : "Member created successfully");
-        } catch (error: any) {
-            toast.error(error.message || "Something went wrong");
+        } catch (error) {
+            toast.error(getErrorMessage(error, "Something went wrong"));
         } finally {
             setSubmitting(false);
         }
@@ -187,8 +193,8 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
             if (onSuccess) onSuccess();
             onOpenChange(false);
             toast.success(`${user.name} has been deactivated (archived). They can be restored anytime.`);
-        } catch (error: any) {
-            toast.error(error.message || "Failed to archive user");
+        } catch (error) {
+            toast.error(getErrorMessage(error, "Failed to archive user"));
         } finally {
             setArchiving(false);
         }
@@ -254,7 +260,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
 
                                 {/* Fields Section */}
                                 <div className="flex-1 space-y-3">
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <div className="space-y-1.5">
                                             <label className="text-xs font-medium text-muted-foreground">Full Name</label>
                                             <input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
@@ -273,12 +279,12 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                     </div>
 
                                     {formData.role !== 'client' && (
-                                        <div className="grid grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <div className="space-y-1.5">
                                                 <label className="text-xs font-medium text-muted-foreground">Role</label>
                                                 <select
                                                     value={formData.role}
-                                                    onChange={e => setFormData({ ...formData, role: e.target.value as any })}
+                                                    onChange={e => setFormData({ ...formData, role: e.target.value as User["role"] })}
                                                     disabled={!isAdmin}
                                                     className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed">
                                                     <option value="employee">Employee</option>
@@ -299,7 +305,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                                     />
                                                     <datalist id="job-titles">
                                                         {services.map(service => (
-                                                            service.jobs.map((job: any, idx: number) => (
+                                                            (service.jobs || []).map((job, idx) => (
                                                                 <option key={`${service.id}-${idx}`} value={job.title}>{service.name} - {job.title}</option>
                                                             ))
                                                         ))}
@@ -309,13 +315,13 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                         </div>
                                     )}
 
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {formData.role !== 'client' && (
                                             <div className="space-y-1.5">
                                                 <label className="text-xs font-medium text-muted-foreground">Employment</label>
                                                 <select
                                                     value={formData.employmentType}
-                                                    onChange={e => setFormData({ ...formData, employmentType: e.target.value as any })}
+                                                    onChange={e => setFormData({ ...formData, employmentType: e.target.value as NonNullable<User["employmentType"]> })}
                                                     disabled={!canManageFinances}
                                                     className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed">
                                                     <option value="Salary">On Salary</option>
@@ -328,7 +334,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                             <label className="text-xs font-medium text-muted-foreground">Gender</label>
                                             <select
                                                 value={formData.gender || "Male"}
-                                                onChange={e => setFormData({ ...formData, gender: e.target.value as any })}
+                                                onChange={e => setFormData({ ...formData, gender: e.target.value as NonNullable<User["gender"]> })}
                                                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary">
                                                 <option value="Male">Male</option>
                                                 <option value="Female">Female</option>
@@ -352,8 +358,8 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                             <label className="text-xs font-medium text-muted-foreground">Join Date</label>
                                             <input
                                                 type="date"
-                                                value={(formData as any).createdAt || new Date().toISOString().split('T')[0]}
-                                                onChange={e => setFormData({ ...formData, createdAt: e.target.value } as any)}
+                                                value={formData.createdAt || new Date().toISOString().split('T')[0]}
+                                                onChange={e => setFormData({ ...formData, createdAt: e.target.value })}
                                                 max={new Date().toISOString().split('T')[0]}
                                                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary"
                                             />
@@ -378,7 +384,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                                     className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary"
                                                 />
                                             </div>
-                                            <div className="grid grid-cols-2 gap-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 <div className="space-y-1.5">
                                                     <label className="text-xs font-medium text-muted-foreground">New Password</label>
                                                     <input
@@ -409,7 +415,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess, currentUse
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <div className="space-y-1.5">
                                                 <label className="text-xs font-medium text-muted-foreground">Reset Password</label>
                                                 <input

@@ -5,15 +5,18 @@ import { updateTask, getUsers, getProjectServices, deleteTask, aiEstimateTaskHou
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, Trash2, AlertTriangle, Clock, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Task } from "@/lib/types";
+import { Task, User, UserPermissions } from "@/lib/types";
 import { toast } from "sonner";
 import { DateTimeInput } from "@/components/ui/DateTimeInput";
+
+type TaskAssignee = Pick<User, "id" | "name" | "avatar" | "jobTitle" | "role">;
+type ProjectServiceOption = { id: string; name: string };
 
 interface EditTaskModalProps {
     task: Task;
     open: boolean;
     setOpen: (open: boolean) => void;
-    permissions?: any;
+    permissions?: UserPermissions;
     currentUserId?: string;
 }
 
@@ -34,8 +37,8 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
     const [priority, setPriority] = useState<Task['priority']>(task.priority || "Medium");
     const [estimatedHours, setEstimatedHours] = useState<number>(task.estimatedHours || 0);
 
-    const [users, setUsers] = useState<any[]>([]);
-    const [services, setServices] = useState<any[]>([]);
+    const [users, setUsers] = useState<TaskAssignee[]>([]);
+    const [services, setServices] = useState<ProjectServiceOption[]>([]);
 
     useEffect(() => {
         if (open) {
@@ -46,7 +49,7 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
                 setServices(s);
             });
         }
-    }, [open]);
+    }, [open, task.projectId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -174,8 +177,8 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
                                             const hours = await aiEstimateTaskHours(task.projectId, title, description, priority || 'Medium');
                                             setEstimatedHours(hours);
                                             toast.success(`Estimated: ${hours}h`);
-                                        } catch (e: any) {
-                                            toast.error(e.message || 'Failed to estimate');
+                                        } catch (error) {
+                                            toast.error(error instanceof Error ? error.message : 'Failed to estimate');
                                         } finally {
                                             setEstimating(false);
                                         }

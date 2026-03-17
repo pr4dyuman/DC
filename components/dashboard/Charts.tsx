@@ -4,8 +4,21 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCurrency } from "@/context/CurrencyContext";
 
+interface RevenueChartPoint {
+    [key: string]: string | number;
+    name: string;
+    revenue: number;
+    expenses: number;
+}
+
+interface ProjectDistributionPoint {
+    [key: string]: string | number;
+    name: string;
+    value: number;
+}
+
 interface RevenueChartProps {
-    data: any[];
+    data: RevenueChartPoint[];
 }
 
 export function RevenueChart({ data }: RevenueChartProps) {
@@ -50,7 +63,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
 
 const COLORS = ['#a78bfa', '#34d399', '#fbbf24', '#fb7185'];
 
-export function ProjectDistributionChart({ data }: { data: any[] }) {
+export function ProjectDistributionChart({ data }: { data: ProjectDistributionPoint[] }) {
     return (
         <Card className="col-span-3">
             <CardHeader>

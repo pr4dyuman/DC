@@ -4,6 +4,20 @@ import { useState, useEffect, useRef } from "react";
 import { createAgency, getPublicSecuritySettings } from "@/lib/actions/super-admin";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Upload, X, CheckCircle, XCircle } from "lucide-react";
+import type { AgencyPlan } from "@/lib/types";
+
+type StrongPasswordChecks = {
+    length: boolean;
+    upper: boolean;
+    lower: boolean;
+    number: boolean;
+    special: boolean;
+};
+
+type SimplePasswordChecks = {
+    length: boolean;
+    hasLetterAndNumber: boolean;
+};
 
 export default function CreateAgencyForm() {
     const router = useRouter();
@@ -21,7 +35,7 @@ export default function CreateAgencyForm() {
         ownerPassword: "",
         confirmPassword: "",
         ownerPhone: "",
-        plan: "free" as "free" | "starter" | "pro" | "enterprise",
+        plan: "free" as AgencyPlan,
         logo: "" as string,
         createdAt: new Date().toISOString().split('T')[0], // Default today, can backdate
     });
@@ -32,16 +46,18 @@ export default function CreateAgencyForm() {
 
     // Password strength checks
     const pw = formData.ownerPassword;
-    const pwChecks = enforceStrong ? {
+    const strongPwChecks: StrongPasswordChecks = {
         length: pw.length >= 10,
         upper: /[A-Z]/.test(pw),
         lower: /[a-z]/.test(pw),
         number: /\d/.test(pw),
         special: /[^A-Za-z0-9]/.test(pw),
-    } : {
+    };
+    const simplePwChecks: SimplePasswordChecks = {
         length: pw.length >= 6,
         hasLetterAndNumber: /[a-zA-Z]/.test(pw) && /\d/.test(pw),
     };
+    const pwChecks = enforceStrong ? strongPwChecks : simplePwChecks;
     const pwValid = Object.values(pwChecks).every(Boolean);
     const passwordsMatch = pw && formData.confirmPassword && pw === formData.confirmPassword;
 
@@ -96,8 +112,8 @@ export default function CreateAgencyForm() {
                 createdAt: formData.createdAt || undefined,
             });
             router.push("/super-admin/agencies");
-        } catch (err: any) {
-            setError(err.message || "Failed to create agency");
+        } catch (error) {
+            setError(error instanceof Error ? error.message : "Failed to create agency");
         } finally {
             setLoading(false);
         }
@@ -164,7 +180,7 @@ export default function CreateAgencyForm() {
                 <label className="block text-sm font-medium text-foreground mb-2">Plan *</label>
                 <select
                     value={formData.plan}
-                    onChange={(e) => setFormData({ ...formData, plan: e.target.value as any })}
+                    onChange={(e) => setFormData({ ...formData, plan: e.target.value as AgencyPlan })}
                     className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                     <option value="free">Free (3 users, 5 projects)</option>
@@ -270,16 +286,16 @@ export default function CreateAgencyForm() {
                     <p className="text-xs font-medium text-muted-foreground mb-1">Password requirements:</p>
                     {enforceStrong ? (
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                            <div className="flex items-center gap-1.5 text-xs"><Check ok={(pwChecks as any).length} /> <span>10+ characters</span></div>
-                            <div className="flex items-center gap-1.5 text-xs"><Check ok={(pwChecks as any).upper} /> <span>Uppercase letter</span></div>
-                            <div className="flex items-center gap-1.5 text-xs"><Check ok={(pwChecks as any).lower} /> <span>Lowercase letter</span></div>
-                            <div className="flex items-center gap-1.5 text-xs"><Check ok={(pwChecks as any).number} /> <span>Number</span></div>
-                            <div className="flex items-center gap-1.5 text-xs"><Check ok={(pwChecks as any).special} /> <span>Special character</span></div>
+                            <div className="flex items-center gap-1.5 text-xs"><Check ok={strongPwChecks.length} /> <span>10+ characters</span></div>
+                            <div className="flex items-center gap-1.5 text-xs"><Check ok={strongPwChecks.upper} /> <span>Uppercase letter</span></div>
+                            <div className="flex items-center gap-1.5 text-xs"><Check ok={strongPwChecks.lower} /> <span>Lowercase letter</span></div>
+                            <div className="flex items-center gap-1.5 text-xs"><Check ok={strongPwChecks.number} /> <span>Number</span></div>
+                            <div className="flex items-center gap-1.5 text-xs"><Check ok={strongPwChecks.special} /> <span>Special character</span></div>
                         </div>
                     ) : (
                         <div className="space-y-1">
-                            <div className="flex items-center gap-1.5 text-xs"><Check ok={(pwChecks as any).length} /> <span>6+ characters</span></div>
-                            <div className="flex items-center gap-1.5 text-xs"><Check ok={(pwChecks as any).hasLetterAndNumber} /> <span>Letter + number</span></div>
+                            <div className="flex items-center gap-1.5 text-xs"><Check ok={simplePwChecks.length} /> <span>6+ characters</span></div>
+                            <div className="flex items-center gap-1.5 text-xs"><Check ok={simplePwChecks.hasLetterAndNumber} /> <span>Letter + number</span></div>
                         </div>
                     )}
                     {formData.confirmPassword && (

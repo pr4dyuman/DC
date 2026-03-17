@@ -9,6 +9,17 @@ import { TimezoneProvider } from "@/context/TimezoneContext";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import { DynamicFavicon } from "@/components/layout/DynamicFavicon";
 
+type DashboardUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>> & {
+    id: string;
+    role: string;
+    timezone?: string;
+    username?: string;
+};
+
+type AgencySettingsWithFavicon = Awaited<ReturnType<typeof getAgencySettings>> & {
+    favicon?: string;
+};
+
 export async function AuthenticatedLayout({
     children
 }: {
@@ -40,15 +51,16 @@ export async function AuthenticatedLayout({
         redirect("/plan-expired");
     }
 
-    const dashboardUser = user as any;
+    const dashboardUser = user as DashboardUser;
+    const currentAgencySettings = agencySettings as AgencySettingsWithFavicon;
 
-    const agencyName = agencySettings?.name || "Agency OS";
-    const agencyLogo = agencySettings?.logo;
-    const agencyFavicon = (agencySettings as any)?.favicon;
+    const agencyName = currentAgencySettings?.name || "Agency OS";
+    const agencyLogo = currentAgencySettings?.logo;
+    const agencyFavicon = currentAgencySettings?.favicon;
 
     return (
         <TimezoneProvider userTimezone={dashboardUser.timezone} onDetected={updateUserTimezone}>
-        <CurrencyProvider currency={agencySettings?.currency || "USD"}>
+        <CurrencyProvider currency={currentAgencySettings?.currency || "USD"}>
         <DashboardChatProvider currentUserId={dashboardUser.id}>
             {agencyFavicon && <DynamicFavicon faviconUrl={agencyFavicon} />}
             <div className="h-full relative">

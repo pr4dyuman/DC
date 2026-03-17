@@ -319,7 +319,7 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
                                         <p className="text-xs text-muted-foreground">Lowercase letters, numbers, underscores and hyphens only.</p>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="grid gap-2">
                                             <Label htmlFor="jobTitle" className="flex items-center gap-1.5">
                                                 <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
@@ -346,7 +346,7 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="grid gap-2">
                                             <Label className="text-muted-foreground">My Role</Label>
                                             <div className="text-sm font-medium text-foreground capitalize flex items-center gap-2">
@@ -377,18 +377,22 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
 
                                             <div className="flex items-start gap-6">
                                                 <div className="flex flex-col items-center gap-2">
-                                                    <div
-                                                        className="h-20 w-20 border-2 border-dashed border-border rounded-lg flex items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors relative group overflow-hidden"
-                                                        onClick={() => systemLogoRef.current?.click()}
-                                                    >
-                                                        {systemLogo ? (
-                                                            <img src={systemLogo} alt="System Logo" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <Upload className="h-6 w-6 text-muted-foreground" />
-                                                        )}
-                                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <Camera className="h-6 w-6 text-white" />
-                                                        </div>
+                                                    <div className="relative group">
+                                                        <button
+                                                            type="button"
+                                                            className="h-20 w-20 border-2 border-dashed border-border rounded-lg flex items-center justify-center hover:border-primary/50 hover:bg-primary/5 transition-colors relative overflow-hidden"
+                                                            onClick={() => systemLogoRef.current?.click()}
+                                                            aria-label="Upload system logo"
+                                                        >
+                                                            {systemLogo ? (
+                                                                <img src={systemLogo} alt="System Logo" className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <Upload className="h-6 w-6 text-muted-foreground" />
+                                                            )}
+                                                            <span className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <Camera className="h-6 w-6 text-white" />
+                                                            </span>
+                                                        </button>
                                                         <input
                                                             type="file"
                                                             ref={systemLogoRef}
@@ -456,7 +460,7 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             <div className="grid gap-2">
                                                 <Label htmlFor="new-password">New Password</Label>
                                                 <div className="relative">
@@ -510,7 +514,7 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
                                         <Shield className="h-4 w-4 text-muted-foreground" />
                                         Account Info
                                     </h4>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-1">
                                             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                                                 <Shield className="h-3 w-3" /> Role

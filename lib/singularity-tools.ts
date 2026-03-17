@@ -41,11 +41,9 @@ import {
     TransactionModel, ServiceModel, LeaveRequestModel,
     UserModel, ActivityModel, NotificationModel, AssetModel,
 } from "./mongodb";
-import { generateId } from "./utils-server";
-import { formatCurrency, getCurrencySymbol } from "./currency";
+import { formatCurrency } from "./currency";
 import { getDefaultCurrency } from "./actions/super-admin";
 import crypto from "crypto";
-import type { AIPermissions } from "./types";
 
 // =============================================================================
 // TOOL EXECUTOR — Calls existing server actions
@@ -120,21 +118,6 @@ const TOOL_PERMISSIONS: Record<string, RoleType[]> = {
 };
 
 // AI Permission flag → tool name mapping for permission-gated tools
-const AI_PERMISSION_MAP: Record<string, keyof AIPermissions> = {
-    pay_employee: 'canPayroll',
-    bulk_pay_employees: 'canPayroll',
-    approve_invoice_payment: 'canManageInvoices',
-    reject_invoice_payment: 'canManageInvoices',
-    update_invoice_status: 'canManageInvoices',
-    bulk_create_invoices: 'canManageInvoices',
-    create_refund: 'canRefund',
-    create_employee: 'canCreateEmployee',
-    delete_project: 'canDelete',
-    delete_client: 'canDelete',
-    delete_transaction: 'canDelete',
-    delete_service: 'canDelete',
-};
-
 export interface RollbackAction {
     toolName: string;
     actionType: 'create' | 'update' | 'delete';
@@ -734,7 +717,7 @@ export async function executeTool(
                         if (Object.keys(editUpdates).length > 0 || Object.keys(timestampUpdates).length > 0) {
                             edited++;
                         }
-                    } catch (err: any) {
+                    } catch {
                         failed++;
                     }
                 }
@@ -796,8 +779,6 @@ export async function executeTool(
                     const projectForDate = await ProjectModel.findOne({ id: args.projectId, agencyId: agency?.id }).lean();
                     startDate = projectForDate?.createdAt ? new Date(projectForDate.createdAt as string) : new Date();
                 }
-                let currentDate = new Date(startDate);
-
                 // Track per-assignee schedule for parallelism
                 const assigneeSchedule = new Map<string, Date>();
 
@@ -1296,7 +1277,6 @@ export async function executeTool(
                 if (!aiPerms.canPayroll) return { success: false, data: null, summary: '⛔ AI Payroll permission is disabled. Enable it in Settings → AI Settings.' };
 
                 const empUser = await getUser(args.userId);
-                const payDate = `${args.month}-15`; // Mid-month date
                 const payResult = await payEmployee(args.userId, args.amount, args.month, empUser?.name || 'Employee');
                 return {
                     success: true,

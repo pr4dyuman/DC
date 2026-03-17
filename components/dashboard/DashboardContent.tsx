@@ -1,4 +1,4 @@
-import { Project, Invoice, Notification as AppNotification, Transaction, Task, Asset, User } from "@/lib/types";
+import { LeaveRequest, Project, Task, User } from "@/lib/types";
 import { dateKeyTz, fmtDateShort, getLocaleForTimezone, toLocalCalendarDay } from "@/lib/date-utils";
 import { getDashboardMetrics, getRevenueData, getProjectDistribution, getRecentActivity, getUrgentTasks, getClientDashboardData, getEmployeeDashboardData } from "@/lib/actions";
 
@@ -13,6 +13,10 @@ import { getDefaultCurrency } from "@/lib/actions/super-admin";
 import { ClientDashboard } from "@/components/dashboard/ClientDashboard";
 import { ExportReportButton } from "@/components/dashboard/ExportReportButton";
 import Link from "next/link";
+
+type DashboardLeaveRequest = LeaveRequest & {
+    leaveType?: string;
+};
 
 export async function DashboardContent({ currentUser }: { currentUser: User }) {
     // Client Dashboard View
@@ -125,9 +129,9 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
 
     // EMPLOYEE VIEW
     const data = await getEmployeeDashboardData(userId);
-    const myTasks = data.tasks;
-    const myProjects = data.projects;
-    const myLeaves = data.leaveRequests ?? [];
+    const myTasks = data.tasks as Task[];
+    const myProjects = data.projects as Project[];
+    const myLeaves = (data.leaveRequests ?? []) as DashboardLeaveRequest[];
 
     // Upcoming deadlines: tasks not done, due within next 3 days
     const userTimezone = currentUser.timezone || 'UTC';
@@ -137,23 +141,21 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
 
     const upcomingDeadlines = myTasks
         .filter((t: Task) => {
-            if (t.status === 'Done') return false;
-            const dueValue = (t as any).dueDate;
-            if (!dueValue) return false;
-            const due = toLocalCalendarDay(dateKeyTz(dueValue, userTimezone));
+            if (t.status === 'Done' || !t.dueDate) return false;
+            const due = toLocalCalendarDay(dateKeyTz(t.dueDate, userTimezone));
             if (!due) return false;
             return due >= now && due <= threeDaysLater;
         })
         .sort((a: Task, b: Task) => {
-            const aKey = (a as any).dueDate ? dateKeyTz((a as any).dueDate, userTimezone) : '9999-12-31';
-            const bKey = (b as any).dueDate ? dateKeyTz((b as any).dueDate, userTimezone) : '9999-12-31';
+            const aKey = a.dueDate ? dateKeyTz(a.dueDate, userTimezone) : '9999-12-31';
+            const bKey = b.dueDate ? dateKeyTz(b.dueDate, userTimezone) : '9999-12-31';
             return aKey.localeCompare(bKey);
         })
         .slice(0, 3);
 
     // Most recent leave request for status card
     const latestLeave = myLeaves[0];
-    const pendingLeave = myLeaves.find((l: any) => l.status === 'Pending');
+    const pendingLeave = myLeaves.find((leave) => leave.status === 'Pending');
 
     return (
         <div className="flex-1 space-y-4">
@@ -209,7 +211,7 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
                                 <p className={`text-lg font-bold ${latestLeave.status === 'Pending' ? 'text-amber-500' :
                                     latestLeave.status === 'Approved' ? 'text-emerald-500' : 'text-red-500'
                                     }`}>{latestLeave.status}</p>
-                                <p className="text-xs text-muted-foreground truncate mt-0.5">{(latestLeave as any).leaveType || 'Leave'}</p>
+                                <p className="text-xs text-muted-foreground truncate mt-0.5">{latestLeave.leaveType || latestLeave.type || 'Leave'}</p>
                             </>
                         ) : (
                             <>
@@ -227,13 +229,13 @@ export async function DashboardContent({ currentUser }: { currentUser: User }) {
                     <p className="text-xs font-semibold text-red-500 uppercase tracking-wide">⚠ Deadlines in the next 3 days</p>
                     <div className="flex flex-wrap gap-2">
                         {upcomingDeadlines.map((t: Task) => {
-                            const due = toLocalCalendarDay(dateKeyTz((t as any).dueDate, userTimezone));
+                            const due = t.dueDate ? toLocalCalendarDay(dateKeyTz(t.dueDate, userTimezone)) : null;
                             const daysLeft = due ? Math.round((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0;
-                            const project = myProjects.find((p: any) => p.id === (t as any).projectId);
+                            const project = myProjects.find((p) => p.id === t.projectId);
                             return (
                                 <Link
                                     key={t.id}
-                                    href={`/dashboard/projects/${(project as any)?.slug || (t as any).projectId}?task=${t.id}`}
+                                    href={`/dashboard/projects/${project?.slug || t.projectId}?task=${t.id}`}
                                     className="flex items-center gap-2 rounded-md border border-red-500/20 bg-background px-3 py-1.5 text-xs hover:bg-muted transition-colors"
                                 >
                                     <span className="font-medium truncate max-w-[150px]">{t.title}</span>

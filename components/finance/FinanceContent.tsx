@@ -21,13 +21,6 @@ import { ArrowLeft } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { getDefaultCurrency } from "@/lib/actions/super-admin";
 
-interface FinanceContentProps {
-    searchParams: { [key: string]: string | string[] | undefined };
-    currentUser: any; // Passed from parent to avoid re-fetching if possible, but page.tsx might not have it.
-    // Actually page.tsx doesn't have currentUser easily available without blocking.
-    // So FinanceContent should fetch it. It's cached.
-}
-
 function normalizeFinanceLabel(value: unknown) {
     return String(value || '').trim().toLowerCase();
 }

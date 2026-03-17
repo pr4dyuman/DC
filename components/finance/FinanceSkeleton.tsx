@@ -1,6 +1,4 @@
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
 export function FinanceSkeleton() {
     return (
         <div className="flex-1 space-y-4 animate-pulse">

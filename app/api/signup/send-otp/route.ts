@@ -9,6 +9,20 @@ const MAX_OTP_REQUESTS = 5;
 const OTP_RATE_WINDOW = 60 * 60 * 1000; // 1 hour
 const MAX_IP_REQUESTS = 10;
 
+type RateLimitRecord = {
+    count?: number;
+};
+
+type OtpRecord = {
+    expiresAt?: string | Date;
+    attempts?: number;
+    otp?: string;
+};
+
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error && error.message ? error.message : fallback;
+}
+
 function generateOtp(): string {
     return randomInt(100000, 999999).toString();
 }
@@ -38,8 +52,8 @@ export async function POST(request: Request) {
         let validatedEmail: string;
         try {
             validatedEmail = validateEmail(email);
-        } catch (e: any) {
-            return NextResponse.json({ error: e.message }, { status: 400 });
+        } catch (error: unknown) {
+            return NextResponse.json({ error: getErrorMessage(error, 'Invalid email address') }, { status: 400 });
         }
 
         await connectDB();
@@ -49,7 +63,7 @@ export async function POST(request: Request) {
         const emailRateKey = `otp:email:${validatedEmail}`;
         const emailRecord = await RateLimitModel.findOne({ key: emailRateKey, expiresAt: { $gt: now } }).lean();
         if (emailRecord) {
-            if ((emailRecord as any).count >= MAX_OTP_REQUESTS) {
+            if (((emailRecord as RateLimitRecord).count ?? 0) >= MAX_OTP_REQUESTS) {
                 return NextResponse.json(
                     { error: 'Too many OTP requests. Please try again later.' },
                     { status: 429 }
@@ -71,7 +85,7 @@ export async function POST(request: Request) {
         const ipRateKey = `otp:ip:${ip}`;
         const ipRecord = await RateLimitModel.findOne({ key: ipRateKey, expiresAt: { $gt: now } }).lean();
         if (ipRecord) {
-            if ((ipRecord as any).count >= MAX_IP_REQUESTS) {
+            if (((ipRecord as RateLimitRecord).count ?? 0) >= MAX_IP_REQUESTS) {
                 return NextResponse.json(
                     { error: 'Too many requests from this device. Please try again later.' },
                     { status: 429 }
@@ -123,7 +137,7 @@ export async function POST(request: Request) {
             message: 'Verification code sent to your email',
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Send OTP error:', error);
         return NextResponse.json(
             { error: 'Something went wrong. Please try again.' },
@@ -143,21 +157,22 @@ export async function verifyOtp(email: string, otp: string, purpose: 'signup' | 
     if (!record) {
         throw new Error('No verification code found. Please request a new one.');
     }
+    const otpRecord = record as OtpRecord;
 
-    if (new Date() > new Date((record as any).expiresAt)) {
+    if (!otpRecord.expiresAt || new Date() > new Date(otpRecord.expiresAt)) {
         await OtpModel.deleteOne(query);
         throw new Error('Verification code expired. Please request a new one.');
     }
 
     // Max 3 wrong attempts
-    if ((record as any).attempts >= 3) {
+    if ((otpRecord.attempts ?? 0) >= 3) {
         await OtpModel.deleteOne(query);
         throw new Error('Too many wrong attempts. Please request a new code.');
     }
 
-    if ((record as any).otp !== otp) {
+    if (otpRecord.otp !== otp) {
         await OtpModel.updateOne(query, { $inc: { attempts: 1 } });
-        const remaining = 3 - ((record as any).attempts + 1);
+        const remaining = 3 - ((otpRecord.attempts ?? 0) + 1);
         throw new Error(`Invalid verification code. ${remaining} attempts remaining.`);
     }
 

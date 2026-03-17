@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useInView } from "react-intersection-observer";
@@ -9,11 +9,12 @@ import { Loader2, Calendar } from "lucide-react";
 import { useDateFormat } from "@/context/TimezoneContext";
 import Link from 'next/link';
 import { Project } from "@/lib/types";
+import { toast } from "sonner";
 
 interface Task {
     id: string;
     title: string;
-    dueDate: string;
+    dueDate?: string;
     status: string;
     priority?: string;
     projectId: string;
@@ -29,11 +30,11 @@ export function EmployeeTasksList({ initialTasks, userId, allProjects }: Employe
     const fmt = useDateFormat();
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [offset, setOffset] = useState(initialTasks.length);
-    const [hasMore, setHasMore] = useState(true);
+    const [hasMore, setHasMore] = useState(initialTasks.length >= 5);
     const [loading, setLoading] = useState(false);
     const { ref, inView } = useInView();
 
-    const loadMore = async () => {
+    const loadMore = useCallback(async () => {
         if (loading || !hasMore) return;
         setLoading(true);
         try {
@@ -47,16 +48,17 @@ export function EmployeeTasksList({ initialTasks, userId, allProjects }: Employe
             setOffset((prev) => prev + 5);
         } catch (error) {
             console.error("Failed to load more employee tasks", error);
+            toast.error("Failed to load more tasks");
         } finally {
             setLoading(false);
         }
-    };
+    }, [hasMore, loading, offset, tasks, userId]);
 
     useEffect(() => {
         if (inView) {
             loadMore();
         }
-    }, [inView]);
+    }, [inView, loadMore]);
 
     const activeTasks = tasks.filter(t => t.status === 'In Progress' || t.status === 'Todo');
 
@@ -85,7 +87,7 @@ export function EmployeeTasksList({ initialTasks, userId, allProjects }: Employe
                                     <div className="flex-1 space-y-1">
                                         <p className="text-sm font-medium leading-none text-foreground">{task.title}</p>
                                         <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                            <Calendar className="w-3 h-3 text-yellow-500" /> Due {fmt.date(task.dueDate)}
+                                            <Calendar className="w-3 h-3 text-yellow-500" /> {task.dueDate ? `Due ${fmt.date(task.dueDate)}` : "No due date"}
                                         </p>
                                     </div>
                                     <div className={`px-2 py-1 rounded text-xs font-medium ${task.priority === 'High' ? 'bg-red-500/10 text-red-500' : 'bg-slate-500/10 text-slate-500'}`}>

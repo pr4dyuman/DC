@@ -3,7 +3,7 @@
 import { cache } from 'react';
 import { cookies } from "next/headers";
 import { AgencyModel, UserModel, ClientModel, SuperAdminModel, connectDB } from "./mongodb";
-import { Agency, User, Client, AGENCY_PLANS, SuperAdmin } from "./types";
+import { Agency } from "./types";
 import { getSessionUser } from "./auth";
 
 // Serialize Mongoose lean objects to plain JS objects (strips ObjectId, __v, etc.)

@@ -1,17 +1,17 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { PlusIcon, AlertTriangle, FileIcon, CheckCircle2, Loader2, ShieldCheck, Ban } from "lucide-react";
+import { PlusIcon, AlertTriangle, FileIcon, Loader2, ShieldCheck } from "lucide-react";
 import { addProjectAsset } from "@/lib/actions";
 import { AssetType } from "@/lib/types";
 import { useRouter } from "next/navigation";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { upload } from "@vercel/blob/client";
 
@@ -68,7 +68,7 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
     });
 
     const [file, setFile] = useState<File | null>(null);
-    const [base64Data, setBase64Data] = useState<string | null>(null);
+    const [, setBase64Data] = useState<string | null>(null);
 
     // Helper to format file size
     const formatBytes = (bytes: number, decimals = 2) => {
@@ -138,9 +138,9 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                         });
                         uploadUrl = blob.url;
                         setUploadProgress(100);
-                    } catch (blobErr: any) {
+                    } catch (error) {
                         // If Vercel Blob fails (e.g. storage full), fall back to server upload
-                        throw new Error(blobErr?.message || 'Large file upload failed. Storage may be full.');
+                        throw new Error(error instanceof Error ? error.message : 'Large file upload failed. Storage may be full.');
                     }
                 } else {
                     // Small file: use server route (includes image validation)
@@ -213,8 +213,8 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                 setInputMode("link");
                 resetState();
                 router.refresh();
-            } catch (err: any) {
-                const msg = err?.message || "Upload failed.";
+            } catch (error) {
+                const msg = error instanceof Error ? error.message : "Upload failed.";
                 // Make messages more user-friendly
                 if (msg.includes('413') || msg.toLowerCase().includes('too large') || msg.toLowerCase().includes('body exceeded')) {
                     setError("File is too large. Maximum upload size is 50MB.");
@@ -237,7 +237,7 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
 
     const finalizeSubmission = async () => {
         try {
-            let finalUrl = formData.url;
+            const finalUrl = formData.url;
             let finalName = formData.name;
 
             if (inputMode === "link") {

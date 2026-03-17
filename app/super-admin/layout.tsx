@@ -4,6 +4,7 @@ import SuperAdminShell from "@/components/super-admin/SuperAdminShell";
 import { TimezoneProvider } from "@/context/TimezoneContext";
 import { updateUserTimezone } from "@/lib/actions";
 import { connectDB, SuperAdminModel } from "@/lib/mongodb";
+import type { SuperAdmin } from "@/lib/types";
 
 export default async function SuperAdminLayout({
     children,
@@ -17,8 +18,8 @@ export default async function SuperAdminLayout({
     }
 
     await connectDB();
-    const admin = await SuperAdminModel.findOne({ id: sessionUser.userId }).select('timezone').lean();
-    const userTimezone = (admin as any)?.timezone;
+    const admin = await SuperAdminModel.findOne({ id: sessionUser.userId }).select('timezone').lean() as Pick<SuperAdmin, "timezone"> | null;
+    const userTimezone = admin?.timezone;
 
     return (
         <TimezoneProvider userTimezone={userTimezone} onDetected={updateUserTimezone}>

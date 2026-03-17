@@ -10,21 +10,37 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { EMAIL_CATEGORY_INFO, DEFAULT_EMAIL_CATEGORIES, TASK_EMAIL_EVENTS, DEFAULT_TASK_EMAIL_EVENTS } from "@/lib/email-constants";
 import type { EmailCategory, TaskEmailEventKey, TaskEmailEventConfig } from "@/lib/email-constants";
+import type { Agency } from "@/lib/types";
+
+type EmailCategorySettings = NonNullable<Agency["settings"]["emailCategories"]>;
 
 interface EmailSettingsProps {
     initialEnabled?: boolean;
-    initialCategories?: Record<string, any>;
+    initialCategories?: EmailCategorySettings;
     loading?: boolean;
 }
 
 const DEFAULT_EVENTS = { ...DEFAULT_TASK_EMAIL_EVENTS };
 
+function getCategoryState(initialCategories?: EmailCategorySettings): Record<EmailCategory, boolean> {
+    const categories = { ...DEFAULT_EMAIL_CATEGORIES };
+    if (!initialCategories) {
+        return categories;
+    }
+
+    for (const key of Object.keys(DEFAULT_EMAIL_CATEGORIES) as EmailCategory[]) {
+        if (typeof initialCategories[key] === "boolean") {
+            categories[key] = initialCategories[key];
+        }
+    }
+
+    return categories;
+}
+
 export function EmailSettings({ initialEnabled = true, initialCategories, loading: parentLoading }: EmailSettingsProps) {
     const [enabled, setEnabled] = useState(initialEnabled);
     const [updating, setUpdating] = useState(false);
-    const [categories, setCategories] = useState<Record<string, boolean>>(
-        initialCategories || { ...DEFAULT_EMAIL_CATEGORIES }
-    );
+    const [categories, setCategories] = useState<Record<EmailCategory, boolean>>(() => getCategoryState(initialCategories));
     const [taskEmailEvents, setTaskEmailEvents] = useState<Record<TaskEmailEventKey, TaskEmailEventConfig>>(() => {
         const events = { ...DEFAULT_EVENTS };
         if (initialCategories?.taskEmailEvents) {
@@ -45,13 +61,14 @@ export function EmailSettings({ initialEnabled = true, initialCategories, loadin
 
     useEffect(() => {
         if (initialCategories) {
-            setCategories({ ...DEFAULT_EMAIL_CATEGORIES, ...initialCategories });
-            if (initialCategories.taskEmailEvents) {
+            setCategories(getCategoryState(initialCategories));
+            const initialTaskEmailEvents = initialCategories.taskEmailEvents;
+            if (initialTaskEmailEvents) {
                 setTaskEmailEvents(prev => {
                     const merged = { ...prev };
                     for (const key of Object.keys(prev) as TaskEmailEventKey[]) {
-                        if (initialCategories.taskEmailEvents[key]) {
-                            merged[key] = { ...prev[key], ...initialCategories.taskEmailEvents[key] };
+                        if (initialTaskEmailEvents[key]) {
+                            merged[key] = { ...prev[key], ...initialTaskEmailEvents[key] };
                         }
                     }
                     return merged;

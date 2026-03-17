@@ -5,6 +5,20 @@
 // Protects against: XSS, NoSQL injection, HTML injection, script injection
 // ============================================================================
 
+type SanitizedValue =
+    | string
+    | number
+    | boolean
+    | null
+    | undefined
+    | Date
+    | SanitizedValue[]
+    | { [key: string]: SanitizedValue };
+
+function isSanitizableRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date);
+}
+
 /**
  * Strip HTML tags to prevent stored XSS.
  * Allows plain text only — removes all <tags>.
@@ -139,7 +153,7 @@ export function sanitizeUrl(input: string): string {
 /**
  * Validate a monetary amount.
  */
-export function validateAmount(input: any): number {
+export function validateAmount(input: unknown): number {
     const num = typeof input === 'string' ? parseFloat(input) : Number(input);
     if (isNaN(num) || !isFinite(num)) throw new Error('Invalid amount');
     if (num < 0) throw new Error('Amount cannot be negative');
@@ -150,7 +164,7 @@ export function validateAmount(input: any): number {
 /**
  * Validate a salary amount (can be 0).
  */
-export function validateSalary(input: any): number {
+export function validateSalary(input: unknown): number {
     const num = typeof input === 'string' ? parseFloat(input) : Number(input);
     if (isNaN(num) || !isFinite(num)) throw new Error('Invalid salary');
     if (num < 0) throw new Error('Salary cannot be negative');
@@ -162,26 +176,26 @@ export function validateSalary(input: any): number {
  * Prevent NoSQL injection by stripping MongoDB operators from object keys.
  * Removes any key starting with '$' and deeply nested objects.
  */
-export function sanitizeMongoInput(input: any): any {
+export function sanitizeMongoInput<T>(input: T): T {
     if (input === null || input === undefined) return input;
     if (typeof input === 'string') return input;
     if (typeof input === 'number' || typeof input === 'boolean') return input;
     if (input instanceof Date) return input;
 
     if (Array.isArray(input)) {
-        return input.map(sanitizeMongoInput);
+        return input.map(item => sanitizeMongoInput(item) as SanitizedValue) as T;
     }
 
-    if (typeof input === 'object') {
-        const sanitized: any = {};
+    if (isSanitizableRecord(input)) {
+        const sanitized: Record<string, SanitizedValue> = {};
         for (const key of Object.keys(input)) {
             // Block MongoDB operators ($gt, $ne, $regex, etc.)
             if (key.startsWith('$')) continue;
             // Block prototype pollution
             if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
-            sanitized[key] = sanitizeMongoInput(input[key]);
+            sanitized[key] = sanitizeMongoInput(input[key]) as SanitizedValue;
         }
-        return sanitized;
+        return sanitized as T;
     }
 
     return input;
@@ -191,21 +205,25 @@ export function sanitizeMongoInput(input: any): any {
  * Sanitize an entire object of updates (for updateUser, updateClient, etc.).
  * Strips MongoDB operators and HTML from string values.
  */
-export function sanitizeUpdates(updates: Record<string, any>): Record<string, any> {
+export function sanitizeUpdates<T extends object>(updates: T): T {
     const sanitized = sanitizeMongoInput(updates);
+    if (!isSanitizableRecord(sanitized)) {
+        return updates;
+    }
+    const sanitizedRecord: Record<string, unknown> = { ...sanitized };
     // Additionally strip HTML from all string values
-    for (const key of Object.keys(sanitized)) {
-        if (typeof sanitized[key] === 'string') {
-            sanitized[key] = stripHtml(sanitized[key]).trim();
+    for (const key of Object.keys(sanitizedRecord)) {
+        if (typeof sanitizedRecord[key] === 'string') {
+            sanitizedRecord[key] = stripHtml(sanitizedRecord[key]).trim();
         }
     }
-    return sanitized;
+    return sanitizedRecord as T;
 }
 
 /**
  * Validate an ID format (should be a simple string, no operators).
  */
-export function validateId(input: any): string {
+export function validateId(input: unknown): string {
     if (typeof input !== 'string') throw new Error('ID must be a string');
     // IDs should only contain alphanumeric, hyphens, underscores
     const sanitized = input.replace(/[^a-zA-Z0-9_-]/g, '');
