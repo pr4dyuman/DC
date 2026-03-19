@@ -4,9 +4,13 @@ import type { Asset, Task, User } from "../db";
 import type { AIConfig } from "../types";
 import { generateContent, generateContentWithParts } from "../ai-provider";
 import { logAIUsage } from "../ai-usage";
-import { AssetModel, ProjectModel, TaskModel, UserModel, connectDB } from "../mongodb";
+import { AssetModel, ProjectModel, ServiceModel, TaskModel, UserModel, connectDB } from "../mongodb";
 import { getErrorMessage } from "./shared";
-import type { ProjectLike } from "./projects-shared";
+import {
+    getProjectServiceDisplayNames,
+    type ProjectLike,
+    type ProjectServiceSnapshot,
+} from "./projects-shared";
 
 type AssetPromptPart =
     | { text: string }
@@ -131,13 +135,16 @@ export async function explainTaskImpl(
     const task = await TaskModel.findOne({ id: taskId, agencyId }).lean() as Task | null;
     if (!task) throw new Error("Task not found");
 
-    const [project, assignee, allProjectTasks, projectAssetsRaw] = await Promise.all([
+    const [project, assignee, allProjectTasks, projectAssetsRaw, projectServices] = await Promise.all([
         ProjectModel.findOne({ id: task.projectId, agencyId }).lean() as Promise<ProjectLike | null>,
         task.assigneeId
             ? UserModel.findOne({ id: task.assigneeId, agencyId }).select("-password").lean() as Promise<Pick<User, "name"> | null>
             : Promise.resolve(null),
         TaskModel.find({ projectId: task.projectId, agencyId }).lean() as Promise<Task[]>,
         AssetModel.find({ projectId: task.projectId, aiEnabled: true, agencyId }).lean() as Promise<Asset[]>,
+        ServiceModel.find({ projectId: task.projectId, agencyId })
+            .select("id name projectId employees agencyId")
+            .lean() as Promise<ProjectServiceSnapshot[]>,
     ]);
 
     const userIds = [...new Set(allProjectTasks.map((projectTask) => projectTask.assigneeId).filter((id): id is string => Boolean(id)))];
@@ -177,7 +184,7 @@ export async function explainTaskImpl(
         },
         project: project ? {
             name: project.client || "Unknown Client",
-            departments: project.services?.join(", ") || "General",
+            departments: getProjectServiceDisplayNames(project.services, projectServices).join(", ") || "General",
         } : null,
         comments: task.comments || [],
     };

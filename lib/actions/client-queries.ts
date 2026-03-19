@@ -1,9 +1,14 @@
 import "server-only";
 
 import type { Client } from "../db";
-import { ClientModel, ProjectModel, connectDB } from "../mongodb";
+import { ClientModel, ProjectModel, ServiceModel, connectDB } from "../mongodb";
 import { sanitizeDoc, withAgencyIdFallback } from "./shared";
-import { hydrateProjectsWithCurrentClients, type ProjectLike } from "./projects-shared";
+import {
+    hydrateProjectsWithCurrentClients,
+    hydrateProjectsWithCurrentServiceNames,
+    type ProjectLike,
+    type ProjectServiceSnapshot,
+} from "./projects-shared";
 
 type ClientQueryActor = {
     id: string;
@@ -36,7 +41,13 @@ export async function getClientByIdImpl(agencyId: string, id: string) {
     return client ? sanitizeDoc(client) : null;
 }
 
-export async function getClientProjectsImpl(actor: ClientQueryActor, agencyId: string, clientId: string) {
+export async function getClientProjectsImpl(
+    actor: ClientQueryActor,
+    agencyId: string,
+    clientId: string,
+    offset = 0,
+    limit = 1000
+) {
     const isPrivileged = actor.role === "admin" || actor.role === "manager";
     const isSelfClient = actor.role === "client" && actor.id === clientId;
 
@@ -45,7 +56,15 @@ export async function getClientProjectsImpl(actor: ClientQueryActor, agencyId: s
     }
 
     await connectDB();
-    const projects = await ProjectModel.find({ clientId, agencyId }).lean() as ProjectLike[];
+    const projects = await ProjectModel.find({ clientId, agencyId }).skip(offset).limit(limit).lean() as ProjectLike[];
     const hydratedProjects = await hydrateProjectsWithCurrentClients(projects, agencyId);
-    return hydratedProjects.map((project) => withAgencyIdFallback(sanitizeDoc(project) as ProjectLike & { agencyId?: string }, agencyId));
+    const projectIds = hydratedProjects.map((project) => project.id);
+    const services = projectIds.length > 0
+        ? await ServiceModel.find({ agencyId, projectId: { $in: projectIds } })
+            .select("id name projectId employees agencyId")
+            .lean() as ProjectServiceSnapshot[]
+        : [];
+    const normalizedProjects = hydrateProjectsWithCurrentServiceNames(hydratedProjects, services);
+
+    return normalizedProjects.map((project) => withAgencyIdFallback(sanitizeDoc(project) as ProjectLike & { agencyId?: string }, agencyId));
 }

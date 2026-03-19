@@ -189,7 +189,7 @@ export function ClientDashboard({
 
             {/* Projects & Notifications */}
             <div className="grid gap-6 md:grid-cols-2">
-                <ClientProjectsList initialProjects={initialProjects} />
+                <ClientProjectsList clientId={clientId} initialProjects={initialProjects} />
                 <ClientNotificationsList initialNotifications={initialNotifications} userId={clientId} />
             </div>
         </div>

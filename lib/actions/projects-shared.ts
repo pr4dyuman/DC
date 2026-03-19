@@ -130,6 +130,53 @@ export function normalizeProjectServiceRefs(
     return getActiveProjectServiceDocs(projectServiceRefs, serviceDocs).map((service) => service.id);
 }
 
+export function getProjectServiceDisplayNames(
+    projectServiceRefs: string[] | undefined,
+    serviceDocs: ProjectServiceSnapshot[]
+): string[] {
+    const activeServices = getActiveProjectServiceDocs(projectServiceRefs, serviceDocs);
+    if (activeServices.length > 0) {
+        return Array.from(
+            new Map(activeServices.map((service) => [service.name.toLowerCase(), service.name] as const)).values()
+        );
+    }
+
+    return normalizeProjectServiceRefs(projectServiceRefs, serviceDocs);
+}
+
+export function hydrateProjectsWithCurrentServiceNames<T extends { id: string; services?: string[] }>(
+    projects: T[],
+    services: ProjectServiceSnapshot[]
+): T[] {
+    if (!Array.isArray(projects) || projects.length === 0) return projects;
+
+    const servicesByProjectId = new Map<string, ProjectServiceSnapshot[]>();
+    services.forEach((service) => {
+        const projectId = String(service.projectId || "").trim();
+        if (!projectId) return;
+        const projectServices = servicesByProjectId.get(projectId) || [];
+        projectServices.push(service);
+        servicesByProjectId.set(projectId, projectServices);
+    });
+
+    return projects.map((project) => {
+        const serviceNames = getProjectServiceDisplayNames(
+            project.services,
+            servicesByProjectId.get(project.id) || []
+        );
+
+        const currentServices = Array.isArray(project.services) ? project.services : [];
+        if (JSON.stringify(currentServices) === JSON.stringify(serviceNames)) {
+            return project;
+        }
+
+        return {
+            ...project,
+            services: serviceNames,
+        };
+    });
+}
+
 function findMatchingProjectServiceConfig(
     configs: ProjectServiceConfigSnapshot[] | undefined,
     service: ProjectServiceSnapshot

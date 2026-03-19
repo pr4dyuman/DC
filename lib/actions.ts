@@ -481,12 +481,12 @@ export async function getUserTasks(userId: string, offset = 0, limit = 1000) {
 }
 
 // For Client Profile: Get projects they OWN
-export async function getClientProjects(clientId: string) {
+export async function getClientProjects(clientId: string, offset = 0, limit = 1000) {
     const caller = await requireAuth();
     // S3 fix: IDOR protection — clients can only access their own projects
     const agency = await getCurrentAgency();
     if (!agency?.id) throw new Error('Agency context required');
-    return getClientProjectsImpl(toActionActor(caller), agency.id, clientId);
+    return getClientProjectsImpl(toActionActor(caller), agency.id, clientId, offset, limit);
 }
 
 export async function getProjectTasks(projectIds: string[]) {

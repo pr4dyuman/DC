@@ -4,17 +4,18 @@ import { useState, useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useInView } from "react-intersection-observer";
-import { getProjects } from "@/lib/actions";
+import { getClientProjects } from "@/lib/actions";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Project } from "@/lib/types";
 import { toast } from "sonner";
 
 interface ClientProjectsListProps {
+    clientId: string;
     initialProjects: Project[];
 }
 
-export function ClientProjectsList({ initialProjects }: ClientProjectsListProps) {
+export function ClientProjectsList({ clientId, initialProjects }: ClientProjectsListProps) {
     const [projects, setProjects] = useState<Project[]>(initialProjects);
     const [offset, setOffset] = useState(initialProjects.length);
     const [hasMore, setHasMore] = useState(initialProjects.length >= 5);
@@ -26,10 +27,7 @@ export function ClientProjectsList({ initialProjects }: ClientProjectsListProps)
         if (loading || !hasMore) return;
         setLoading(true);
         try {
-            // Note: getProjects checks for client role internally via CurrentUser, but here we call it from client side?
-            // Actually Server Actions calleed from Client Components run on Server, so `getCurrentUser()` inside `getProjects` will work 
-            // and identify the user correctly as the logged in client.
-            const newProjects = await getProjects(offset, 5);
+            const newProjects = await getClientProjects(clientId, offset, 5);
             if (newProjects.length < 5) {
                 setHasMore(false);
             }

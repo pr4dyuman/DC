@@ -20,7 +20,11 @@ import { dateKeyTz, isDateOnlyString, toLocalCalendarDay } from "@/lib/date-util
 import { sanitizeName, sanitizeUrl } from "../validation";
 import { sanitizeDoc, sortByDateDesc, withAgencyIdFallback } from "./shared";
 import { buildClientFinanceSummary } from "./finance-shared";
-import { getActiveProjectServiceDocs, type ProjectServiceSnapshot } from "./projects-shared";
+import {
+    getActiveProjectServiceDocs,
+    hydrateProjectsWithCurrentServiceNames,
+    type ProjectServiceSnapshot,
+} from "./projects-shared";
 
 type DashboardActor = {
     id: string;
@@ -299,19 +303,25 @@ export async function getClientDashboardDataImpl(actor: DashboardActor, clientId
     const clientProjects = await ProjectModel.find({ clientId, agencyId }).lean() as Project[];
     const projectIds = clientProjects.map((project) => project.id);
 
-    const [invoices, transactions, tasks, assets, notifications] = await Promise.all([
+    const [invoices, transactions, tasks, assets, notifications, projectServices] = await Promise.all([
         InvoiceModel.find({ projectId: { $in: projectIds }, agencyId }).lean() as Promise<Invoice[]>,
         TransactionModel.find({ projectId: { $in: projectIds }, agencyId }).lean() as Promise<Transaction[]>,
         TaskModel.find({ projectId: { $in: projectIds }, agencyId }).lean() as Promise<Task[]>,
         AssetModel.find({ projectId: { $in: projectIds }, agencyId }).lean() as Promise<Asset[]>,
         NotificationModel.find({ userId: clientId, agencyId }).sort({ timestamp: -1 }).limit(5).lean() as Promise<Notification[]>,
+        projectIds.length > 0
+            ? ServiceModel.find({ agencyId, projectId: { $in: projectIds } })
+                .select("id name projectId employees agencyId")
+                .lean() as Promise<ProjectServiceSnapshot[]>
+            : Promise.resolve([] as ProjectServiceSnapshot[]),
     ]);
 
     const financeSummary = buildClientFinanceSummary(clientProjects, invoices, transactions);
     const unreadCountReal = await NotificationModel.countDocuments({ userId: clientId, read: false, agencyId });
+    const normalizedClientProjects = hydrateProjectsWithCurrentServiceNames(clientProjects, projectServices);
 
     return {
-        projects: clientProjects.map((project) => withAgencyIdFallback(sanitizeDoc(project) as Project & { agencyId?: string }, agencyId)),
+        projects: normalizedClientProjects.map((project) => withAgencyIdFallback(sanitizeDoc(project) as Project & { agencyId?: string }, agencyId)),
         invoices: [...invoices].sort(sortByDateDesc).map((invoice) => sanitizeDoc(invoice)),
         transactions: [...transactions].sort(sortByDateDesc).map((transaction) => sanitizeDoc(transaction)),
         tasks: tasks.map((task) => withAgencyIdFallback(sanitizeDoc(task) as Task & { agencyId?: string }, agencyId)),
