@@ -3,11 +3,10 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Search, Settings, LogOut, User as UserIcon, Loader2, FileText, Briefcase, Users, Building2 } from "lucide-react";
+import { Search, Settings, LogOut, User as UserIcon, Building2 } from "lucide-react";
 import { MobileSidebar } from "./MobileSidebar";
-import { User, Notification } from "@/lib/types";
-import { useDateFormat } from "@/context/TimezoneContext";
-
+import { Notification } from "@/lib/types";
+import type { CurrentUserResult } from "@/lib/actions";
 import { getNotifications, getUnreadNotificationCount, globalSearch, markNotificationAsRead, SearchResult } from "@/lib/actions";
 import { logout } from "@/lib/auth";
 import {
@@ -19,21 +18,22 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
+import { TopbarDesktopSearch } from "./TopbarDesktopSearch";
+import { TopbarMobileSearch } from "./TopbarMobileSearch";
+import { TopbarNotificationsMenu } from "./TopbarNotificationsMenu";
 
 interface TopbarProps {
-    currentUser?: User;
+    currentUser?: CurrentUserResult;
     agencyName?: string;
     agencyLogo?: string;
     agencyPlan?: string;
 }
 
 export function Topbar({ currentUser: propUser, agencyName, agencyLogo, agencyPlan }: TopbarProps) {
-    const fmt = useDateFormat();
     const router = useRouter();
 
-    const [user, setUser] = useState<User | undefined>(propUser);
+    const [user, setUser] = useState<CurrentUserResult | undefined>(propUser);
 
     // Search State
     const [query, setQuery] = useState("");
@@ -125,16 +125,6 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo, agencyPl
         await markNotificationAsRead(id);
     };
 
-    const getIconForType = (type: SearchResult['type']) => {
-        switch (type) {
-            case 'project': return <Briefcase className="h-4 w-4 text-blue-500" />;
-            case 'client': return <Users className="h-4 w-4 text-green-500" />;
-            case 'task': return <FileText className="h-4 w-4 text-orange-500" />;
-            case 'user': return <UserIcon className="h-4 w-4 text-indigo-500" />;
-            default: return <Search className="h-4 w-4" />;
-        }
-    };
-
     if (!user) return null;
 
     return (
@@ -156,124 +146,26 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo, agencyPl
                     >
                         <Search className="h-5 w-5 text-muted-foreground" />
                     </button>
-                    {/* Global Search */}
-                    <div className="relative w-64 hidden sm:block" ref={searchRef}>
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <input
-                            type="text"
-                            placeholder="Search projects, tasks..."
-                            className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 pl-9 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            onFocus={() => query.length >= 2 && setShowResults(true)}
-                        />
-                        {isSearching && (
-                            <div className="absolute right-2.5 top-2.5">
-                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            </div>
-                        )}
+                    <TopbarDesktopSearch
+                        query={query}
+                        searchResults={searchResults}
+                        isSearching={isSearching}
+                        showResults={showResults}
+                        searchRef={searchRef}
+                        onQueryChange={setQuery}
+                        onShowResultsChange={setShowResults}
+                        onSelectResult={() => {
+                            setShowResults(false);
+                            setQuery("");
+                        }}
+                    />
 
-                        {/* Search Results Dropdown */}
-                        {showResults && (
-                            <div className="absolute top-full mt-2 w-80 md:w-96 max-w-[calc(100vw-2rem)] right-0 bg-background rounded-md border shadow-lg overflow-hidden z-[100]">
-                                <div className="p-2">
-                                    <h4 className="text-xs font-medium text-muted-foreground mb-2 px-2">
-                                        {searchResults.length > 0 ? "Results" : "No results found"}
-                                    </h4>
-                                    {searchResults.length > 0 && (
-                                        <div className="space-y-1">
-                                            {searchResults.map((result) => (
-                                                <button
-                                                    type="button"
-                                                    key={result.id}
-                                                    className="w-full text-left flex items-start gap-3 p-2 rounded-sm hover:bg-accent transition-colors"
-                                                    onClick={() => {
-                                                        router.push(result.url);
-                                                        setShowResults(false);
-                                                        setQuery("");
-                                                    }}
-                                                >
-                                                    <div className="mt-1">
-                                                        {getIconForType(result.type)}
-                                                    </div>
-                                                    <div className="flex-1 overflow-hidden">
-                                                        <p className="text-sm font-medium truncate">{result.title}</p>
-                                                        {result.subtitle && (
-                                                            <p className="text-xs text-muted-foreground truncate">{result.subtitle}</p>
-                                                        )}
-                                                    </div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Notifications */}
-                    {mounted ? (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button aria-label="Notifications" className="relative p-2 rounded-full hover:bg-accent transition-colors outline-none">
-                                    <Bell className="h-5 w-5 text-muted-foreground" />
-                                    {unreadCount > 0 && (
-                                        <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-600 border border-background" />
-                                    )}
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-80">
-                                <DropdownMenuLabel className="flex items-center justify-between">
-                                    <span>Notifications</span>
-                                    {unreadCount > 0 && (
-                                        <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">
-                                            {unreadCount} New
-                                        </span>
-                                    )}
-                                </DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <ScrollArea className="h-[300px]">
-                                    {notifications.length === 0 ? (
-                                        <div className="p-4 text-center text-sm text-muted-foreground">
-                                            No notifications yet.
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col">
-                                            {notifications.map((notification) => (
-                                                <button
-                                                    type="button"
-                                                    key={notification.id}
-                                                    className={`w-full text-left p-4 border-b last:border-0 hover:bg-muted/50 transition-colors ${!notification.read ? 'bg-muted/20' : ''}`}
-                                                    onClick={() => {
-                                                        if (!notification.read) handleNotificationRead(notification.id);
-                                                        if (notification.link) {
-                                                            router.push(notification.link);
-                                                        }
-                                                    }}
-                                                >
-                                                    <div className="flex items-start justify-between gap-2">
-                                                        <p className={`text-sm ${!notification.read ? 'font-medium' : 'text-muted-foreground'}`}>
-                                                            {notification.message}
-                                                        </p>
-                                                        {!notification.read && (
-                                                            <div className="h-2 w-2 shrink-0 rounded-full bg-blue-500 mt-1.5" />
-                                                        )}
-                                                    </div>
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        {fmt.dateTime(notification.timestamp)}
-                                                    </p>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </ScrollArea>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    ) : (
-                        <button aria-label="Notifications" className="relative p-2 rounded-full hover:bg-accent transition-colors outline-none">
-                            <Bell className="h-5 w-5 text-muted-foreground" />
-                        </button>
-                    )}
+                    <TopbarNotificationsMenu
+                        mounted={mounted}
+                        notifications={notifications}
+                        unreadCount={unreadCount}
+                        onNotificationRead={handleNotificationRead}
+                    />
 
                     {mounted ? (
                         <DropdownMenu>
@@ -341,61 +233,20 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo, agencyPl
 
             {/* Mobile Search Panel */}
             {showMobileSearch && (
-                <div className="sm:hidden border-b bg-background px-4 py-2" ref={mobileSearchRef}>
-                    <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <input
-                            type="text"
-                            placeholder="Search projects, tasks..."
-                            className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 pl-9 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            onFocus={() => query.length >= 2 && setShowResults(true)}
-                            autoFocus
-                        />
-                        {isSearching && (
-                            <div className="absolute right-2.5 top-2.5">
-                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            </div>
-                        )}
-                        {showResults && (
-                            <div className="absolute top-full mt-2 w-full bg-background rounded-md border shadow-lg overflow-hidden z-[100]">
-                                <div className="p-2">
-                                    <h4 className="text-xs font-medium text-muted-foreground mb-2 px-2">
-                                        {searchResults.length > 0 ? "Results" : "No results found"}
-                                    </h4>
-                                    {searchResults.length > 0 && (
-                                        <div className="space-y-1">
-                                            {searchResults.map((result) => (
-                                                <button
-                                                    type="button"
-                                                    key={result.id}
-                                                    className="w-full text-left flex items-start gap-3 p-2 rounded-sm hover:bg-accent transition-colors"
-                                                    onClick={() => {
-                                                        router.push(result.url);
-                                                        setShowResults(false);
-                                                        setShowMobileSearch(false);
-                                                        setQuery("");
-                                                    }}
-                                                >
-                                                    <div className="mt-1">
-                                                        {getIconForType(result.type)}
-                                                    </div>
-                                                    <div className="flex-1 overflow-hidden">
-                                                        <p className="text-sm font-medium truncate">{result.title}</p>
-                                                        {result.subtitle && (
-                                                            <p className="text-xs text-muted-foreground truncate">{result.subtitle}</p>
-                                                        )}
-                                                    </div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <TopbarMobileSearch
+                    query={query}
+                    searchResults={searchResults}
+                    isSearching={isSearching}
+                    showResults={showResults}
+                    mobileSearchRef={mobileSearchRef}
+                    onQueryChange={setQuery}
+                    onShowResultsChange={setShowResults}
+                    onSelectResult={() => {
+                        setShowResults(false);
+                        setShowMobileSearch(false);
+                        setQuery("");
+                    }}
+                />
             )}
 
         </>

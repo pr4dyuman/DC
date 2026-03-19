@@ -122,8 +122,9 @@ export async function uploadFile(
       } else {
         console.log(`[Storage] Vercel Blob at ${(currentUsage / (1024 * 1024)).toFixed(1)}MB — over threshold, routing to Azure`);
       }
-    } catch (error: any) {
-      console.error(`[Storage] ❌ Vercel Blob failed (${error?.message || error}), falling back to Azure`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[Storage] ❌ Vercel Blob failed (${message}), falling back to Azure`);
     }
   } else {
     console.log('[Storage] BLOB_READ_WRITE_TOKEN not set — using Azure');

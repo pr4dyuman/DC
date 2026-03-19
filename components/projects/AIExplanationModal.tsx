@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -25,20 +25,9 @@ export function AIExplanationModal({ taskId, open, onOpenChange, userId }: AIExp
     const [explanation, setExplanation] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const handleExplainRef = useRef<() => Promise<void>>(async () => { });
 
-    useEffect(() => {
-        if (open && taskId) {
-            // Always fetch fresh when opening
-            handleExplain();
-        }
-        if (!open) {
-            // Reset on close so next open gets fresh data
-            setExplanation(null);
-            setError(null);
-        }
-    }, [open, taskId]);
-
-    const handleExplain = async () => {
+    async function handleExplain() {
         if (!taskId) return;
         setLoading(true);
         setError(null);
@@ -52,7 +41,21 @@ export function AIExplanationModal({ taskId, open, onOpenChange, userId }: AIExp
         } finally {
             setLoading(false);
         }
-    };
+    }
+
+    handleExplainRef.current = handleExplain;
+
+    useEffect(() => {
+        if (open && taskId) {
+            // Always fetch fresh when opening
+            void handleExplainRef.current();
+        }
+        if (!open) {
+            // Reset on close so next open gets fresh data
+            setExplanation(null);
+            setError(null);
+        }
+    }, [open, taskId]);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

@@ -1,17 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { TrendingUp, Wallet, Target, CalendarClock, CreditCard, BarChart3, ArrowUpRight, ArrowDownRight, Pencil, Check, X } from "lucide-react";
+import { CalendarClock, BarChart3, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Project, Transaction } from "@/lib/types";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { updateProject } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { ProjectFinanceInsights } from "@/components/finance/ProjectFinanceInsights";
+import { ProjectFinanceMetrics } from "@/components/finance/ProjectFinanceMetrics";
 
 interface ProjectFinanceSummaryProps {
     project: Project;
@@ -103,158 +103,47 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                <h3 className="text-xl font-semibold tracking-tight">
-                    Financial Overview
-                </h3>
-                <div className="flex items-center gap-2">
-                    {totalMonthlyRate > 0 && (
-                        <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-400 rounded-full text-sm font-medium border border-blue-500/20">
-                            <CalendarClock className="w-4 h-4" />
-                            <span>Recurring: {formatMoney(totalMonthlyRate)}/mo</span>
-                        </div>
-                    )}
-                </div>
-            </div>
+            <ProjectFinanceMetrics
+                totalMonthlyRate={totalMonthlyRate}
+                formatMoney={formatMoney}
+                editingBudget={editingBudget}
+                totalFixedBudget={totalFixedBudget}
+                displayBudget={displayBudget}
+                budgetInput={budgetInput}
+                saving={saving}
+                totalPaid={totalPaid}
+                completedIncomeCount={completedIncomeTransactions.length}
+                remainingFixedBalance={remainingFixedBalance}
+                budgetProgress={budgetProgress}
+                netProfit={netProfit}
+                profitMargin={profitMargin}
+                onStartEditing={() => {
+                    setBudgetInput(String(project.budget || ""));
+                    setEditingBudget(true);
+                }}
+                onBudgetInputChange={setBudgetInput}
+                onSaveBudget={handleSaveBudget}
+                onCancelEditing={() => setEditingBudget(false)}
+                onScrollToServicePayments={scrollToServicePayments}
+            />
 
-            <div className="grid gap-4 md:grid-cols-4">
-                {/* 1. Total Deal Value / Budget */}
-                <Card className="bg-gradient-to-br from-purple-500/10 to-purple-900/5 border-purple-500/20">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-purple-400">Deal Value</CardTitle>
-                        {!editingBudget && totalFixedBudget === 0 && (
-                            <button
-                                onClick={() => { setBudgetInput(String(project.budget || '')); setEditingBudget(true); }}
-                                className="text-purple-400 hover:text-purple-300 transition-colors"
-                                title={displayBudget > 0 ? "Edit deal value" : "Set deal value"}
-                            >
-                                {displayBudget > 0 ? <Pencil className="h-4 w-4" /> : <Target className="h-4 w-4" />}
-                            </button>
-                        )}
-                        {!editingBudget && totalFixedBudget > 0 && (
-                            <Target className="h-4 w-4 text-purple-400" />
-                        )}
-                    </CardHeader>
-                    <CardContent>
-                        {editingBudget ? (
-                            <div className="space-y-2">
-                                <Input
-                                    type="number"
-                                    min="1"
-                                    value={budgetInput}
-                                    onChange={(e) => setBudgetInput(e.target.value)}
-                                    placeholder="Enter deal value..."
-                                    className="h-8 bg-purple-500/10 border-purple-500/30 text-purple-200 placeholder:text-purple-400/50"
-                                    autoFocus
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleSaveBudget();
-                                        if (e.key === 'Escape') setEditingBudget(false);
-                                    }}
-                                />
-                                <div className="flex gap-1.5">
-                                    <Button
-                                        size="sm"
-                                        className="h-7 px-2 bg-purple-600 hover:bg-purple-700 text-xs"
-                                        onClick={handleSaveBudget}
-                                        disabled={saving || !budgetInput}
-                                    >
-                                        <Check className="h-3 w-3 mr-1" />
-                                        {saving ? 'Saving...' : 'Save'}
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-7 px-2 text-xs text-purple-400 hover:text-purple-300"
-                                        onClick={() => setEditingBudget(false)}
-                                        disabled={saving}
-                                    >
-                                        <X className="h-3 w-3 mr-1" />
-                                        Cancel
-                                    </Button>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="text-2xl font-bold text-purple-300">
-                                    {displayBudget > 0 ? formatMoney(displayBudget) : 'Not Set'}
-                                </div>
-                                <p className="text-xs text-purple-400/70 mt-1">
-                                    {totalFixedBudget > 0 ? 'From service configs' : displayBudget > 0 ? 'Project budget' : (
-                                        <button
-                                            onClick={scrollToServicePayments}
-                                            className="underline hover:text-purple-300 transition-colors cursor-pointer"
-                                        >
-                                            Click to set deal value
-                                        </button>
-                                    )}
-                                </p>
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+            <ProjectFinanceInsights
+                totalMonthlyRate={totalMonthlyRate}
+                excessPayment={excessPayment}
+                monthsCovered={monthsCovered}
+                displayBudget={displayBudget}
+                budgetProgress={budgetProgress}
+                totalPaid={totalPaid}
+                hasData={hasData}
+                incomePercent={incomePercent}
+                totalExpenses={totalExpenses}
+                recentTransactions={recentTxns}
+                formatMoney={formatMoney}
+                formatDateShort={fmt.dateShort}
+            />
 
-                {/* 2. Total Received */}
-                <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-900/5 border-emerald-500/20">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-emerald-400">Total Received</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-emerald-400" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-emerald-300">
-                            {formatMoney(totalPaid)}
-                        </div>
-                        <p className="text-xs text-emerald-400/70 mt-1">
-                            {completedIncomeTransactions.length} payment{completedIncomeTransactions.length !== 1 ? 's' : ''} received
-                        </p>
-                    </CardContent>
-                </Card>
-
-                {/* 3. Remaining */}
-                <Card className={`bg-gradient-to-br ${remainingFixedBalance > 0 ? 'from-amber-500/10 to-amber-900/5 border-amber-500/20' : 'from-emerald-500/5 to-emerald-900/5 border-emerald-500/15'}`}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className={`text-sm font-medium ${remainingFixedBalance > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>Remaining</CardTitle>
-                        <CreditCard className={`h-4 w-4 ${remainingFixedBalance > 0 ? 'text-amber-400' : 'text-emerald-400'}`} />
-                    </CardHeader>
-                    <CardContent>
-                        <div className={`text-2xl font-bold ${remainingFixedBalance > 0 ? 'text-amber-300' : 'text-emerald-300'}`}>
-                            {displayBudget > 0
-                                ? (remainingFixedBalance > 0 ? formatMoney(remainingFixedBalance) : '\u2713 Paid')
-                                : '\u2014'
-                            }
-                        </div>
-                        <p className={`text-xs mt-1 ${remainingFixedBalance > 0 ? 'text-amber-400/70' : 'text-emerald-400/70'}`}>
-                            {displayBudget > 0
-                                ? (remainingFixedBalance > 0 ? `${(100 - budgetProgress).toFixed(0)}% pending` : 'Fully collected')
-                                : (
-                                    <button
-                                        onClick={scrollToServicePayments}
-                                        className="underline hover:text-amber-300 transition-colors cursor-pointer"
-                                    >
-                                        Set deal value first
-                                    </button>
-                                )
-                            }
-                        </p>
-                    </CardContent>
-                </Card>
-
-                {/* 4. Net Profit */}
-                <Card className={`bg-gradient-to-br ${netProfit >= 0 ? 'from-blue-500/10 to-blue-900/5 border-blue-500/20' : 'from-red-500/10 to-red-900/5 border-red-500/20'}`}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className={`text-sm font-medium ${netProfit >= 0 ? 'text-blue-400' : 'text-red-400'}`}>Net Profit</CardTitle>
-                        <Wallet className={`h-4 w-4 ${netProfit >= 0 ? 'text-blue-400' : 'text-red-400'}`} />
-                    </CardHeader>
-                    <CardContent>
-                        <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-blue-300' : 'text-red-300'}`}>
-                            {formatMoney(netProfit)}
-                        </div>
-                        <p className={`text-xs mt-1 ${netProfit >= 0 ? 'text-blue-400/70' : 'text-red-400/70'}`}>
-                            {totalPaid > 0 ? `Margin: ${profitMargin.toFixed(1)}%` : 'No income yet'}
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
-
+            {false && (
+            <>
             {/* Monthly Coverage Notice */}
             {(totalMonthlyRate > 0 && excessPayment > 0) && (
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 flex items-start gap-3">
@@ -365,6 +254,8 @@ export function ProjectFinanceSummary({ project, transactions }: ProjectFinanceS
                         ))}
                     </CardContent>
                 </Card>
+            )}
+            </>
             )}
         </div>
     );

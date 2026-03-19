@@ -1,15 +1,35 @@
 import { getAllAgenciesWithStats, getSystemLogs } from "@/lib/actions/super-admin";
 import { fmtDate, fmtTime } from "@/lib/date-utils";
 import { FileText, Building2, CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
+import type { Agency } from "@/lib/types";
+
+type AgencyWithStats = Agency & {
+    stats?: {
+        users?: number;
+    };
+};
+
+type SystemLogEntry = {
+    _id?: {
+        toString(): string;
+    };
+    event: string;
+    status: "success" | "error" | "warning" | "info";
+    type: "agency" | "security" | "error" | "system" | "user";
+    detail: string;
+    createdAt?: string;
+};
 
 export default async function SystemLogsPage() {
-    const [agencies, logs] = await Promise.all([
+    const [agenciesRaw, logsRaw] = await Promise.all([
         getAllAgenciesWithStats(),
         getSystemLogs(100),
     ]);
+    const agencies = agenciesRaw as AgencyWithStats[];
+    const logs = logsRaw as unknown as SystemLogEntry[];
 
-    const totalActive = agencies.filter((a: any) => a.status === "active").length;
-    const totalSuspended = agencies.filter((a: any) => a.status === "suspended").length;
+    const totalActive = agencies.filter((agency) => agency.status === "active").length;
+    const totalSuspended = agencies.filter((agency) => agency.status === "suspended").length;
 
     return (
         <div className="space-y-6">
@@ -66,7 +86,7 @@ export default async function SystemLogsPage() {
                     </div>
                 ) : (
                     <div className="divide-y divide-border">
-                        {logs.map((log: any, idx: number) => (
+                        {logs.map((log, idx) => (
                             <div key={log._id?.toString() || idx} className="p-4 sm:p-5 flex items-start gap-4 hover:bg-muted/40 transition-colors">
                                 <div className={`mt-0.5 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${log.status === "success"
                                         ? "bg-green-500/10"
@@ -104,10 +124,10 @@ export default async function SystemLogsPage() {
                                 </div>
                                 <div className="flex-shrink-0 text-right">
                                     <p className="text-xs text-muted-foreground">
-                                        {fmtDate(log.createdAt, 'UTC', 'en-US')}
+                                        {log.createdAt ? fmtDate(log.createdAt, 'UTC', 'en-US') : '--'}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        {fmtTime(log.createdAt, 'UTC')}
+                                        {log.createdAt ? fmtTime(log.createdAt, 'UTC') : '--'}
                                     </p>
                                 </div>
                             </div>

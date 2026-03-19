@@ -1,7 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { SuperAdminModel, UserModel, ClientModel, connectDB, RateLimitModel, SystemSettingsModel } from "./mongodb";
+import { SuperAdminModel, UserModel, ClientModel, AgencyModel, connectDB, RateLimitModel, SystemSettingsModel } from "./mongodb";
 import bcrypt from "bcryptjs";
 import { signToken, verifyToken, AuthSession } from "./auth-utils";
 import { validatePassword, validateStrongPassword } from "./validation";
@@ -37,8 +37,36 @@ type PasswordDocument = {
     password?: string;
 };
 
+type AgencyStatusRecord = {
+    status?: string;
+};
+
 function getErrorMessage(error: unknown, fallback: string): string {
     return error instanceof Error && error.message ? error.message : fallback;
+}
+
+async function getSessionAgencyId(session: AuthSession): Promise<string | undefined> {
+    if (session.role === 'superadmin') return undefined;
+    if (session.agencyId) return session.agencyId;
+
+    await connectDB();
+
+    const user = await UserModel.findOne({ id: session.userId }).select('agencyId').lean() as { agencyId?: string } | null;
+    if (user?.agencyId) return user.agencyId;
+
+    const client = await ClientModel.findOne({ id: session.userId }).select('agencyId').lean() as { agencyId?: string } | null;
+    return client?.agencyId;
+}
+
+async function isSessionAgencyAccessible(session: AuthSession): Promise<boolean> {
+    if (session.role === 'superadmin') return true;
+
+    const agencyId = await getSessionAgencyId(session);
+    if (!agencyId) return false;
+
+    await connectDB();
+    const agency = await AgencyModel.findOne({ id: agencyId }).select('status').lean() as AgencyStatusRecord | null;
+    return !!agency && agency.status !== 'suspended';
 }
 
 async function checkLoginRateLimit(email: string): Promise<void> {
@@ -82,14 +110,8 @@ export async function comparePassword(plain: string, stored: string): Promise<bo
 // --- Session Management ---
 
 export async function getSessionId() {
-    const cookieStore = await cookies();
-    // Only accept JWT — legacy cookie fallback removed for security
-    const token = cookieStore.get("auth_token")?.value;
-    if (token) {
-        const session = await verifyToken(token);
-        if (session) return session.userId;
-    }
-    return undefined;
+    const session = await getSessionUser();
+    return session?.userId;
 }
 
 export async function login(userId: string, role: string, agencyId?: string): Promise<void> {
@@ -135,7 +157,10 @@ export async function getSessionUser(): Promise<AuthSession | null> {
     const token = cookieStore.get("auth_token")?.value;
 
     if (token) {
-        return verifyToken(token);
+        const session = await verifyToken(token);
+        if (!session) return null;
+        if (!(await isSessionAgencyAccessible(session))) return null;
+        return session;
     }
 
     // No JWT token = not authenticated (legacy fallback removed for security)
@@ -185,6 +210,14 @@ export async function authenticateUser(email: string, password: string): Promise
             return { success: false, error: 'This account has been deactivated. Please contact your agency.' };
         }
         if (user.password && await comparePassword(password, user.password)) {
+            const agencyAccessible = await isSessionAgencyAccessible({
+                userId: user.id,
+                role: user.role,
+                agencyId: user.agencyId,
+            });
+            if (!agencyAccessible) {
+                return { success: false, error: 'This agency has been suspended. Please contact support.' };
+            }
             await resetLoginRateLimit(email);
             await login(user.id, user.role, user.agencyId);
             return { success: true, redirectTo: '/dashboard' };
@@ -202,6 +235,14 @@ export async function authenticateUser(email: string, password: string): Promise
             return { success: false, error: 'This account has been deactivated. Please contact your agency.' };
         }
         if (client.password && await comparePassword(password, client.password)) {
+            const agencyAccessible = await isSessionAgencyAccessible({
+                userId: client.id,
+                role: 'client',
+                agencyId: client.agencyId,
+            });
+            if (!agencyAccessible) {
+                return { success: false, error: 'This agency has been suspended. Please contact support.' };
+            }
             await resetLoginRateLimit(email);
             await login(client.id, 'client', client.agencyId);
             return { success: true, redirectTo: '/dashboard' };

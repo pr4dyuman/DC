@@ -94,7 +94,10 @@ export function Sidebar({ currentUserUsername, currentUserRole, agencyName = "Ag
                 <Link href="/dashboard" className="flex items-center pl-3 mb-14 transition hover:opacity-75 gap-3">
                     <div className="relative flex-shrink-0 w-9 h-9">
                         {agencyLogo ? (
-                            <img src={agencyLogo} alt="Logo" className="w-9 h-9 rounded-md object-cover" />
+                            <>
+                                {/* eslint-disable-next-line @next/next/no-img-element -- agency logos can be tenant-provided remote URLs, so raw img avoids loader/domain breakage */}
+                                <img src={agencyLogo} alt="Logo" className="w-9 h-9 rounded-md object-cover" />
+                            </>
                         ) : (
                             <div className="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-xl">
                                 A

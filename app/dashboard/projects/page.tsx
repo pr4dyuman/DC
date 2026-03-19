@@ -6,15 +6,16 @@ import { ProjectsContent } from "@/components/projects/ProjectsContent";
 import { ProjectsSkeleton } from "@/components/projects/ProjectsSkeleton";
 
 async function ProjectsData() {
-    const [currentUser, projects, services, tasks, users] = await Promise.all([
-        getCurrentUser(),
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser) redirect('/login');
+
+    const [projects, services, tasks, users] = await Promise.all([
         getProjects(),
         getServices(),
         getAllProjectTasks(),
         getUsers(),
     ]);
-
-    if (!currentUser) redirect('/login');
 
     return (
         <ProjectsContent

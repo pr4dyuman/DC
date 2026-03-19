@@ -1,7 +1,11 @@
 import mongoose, { Schema, Model } from 'mongoose';
-import crypto from 'crypto';
+import { decryptApiKey as decryptApiKeyImpl, encryptApiKey as encryptApiKeyImpl } from "./ai-key-crypto";
+export { OtpModel, RateLimitModel } from "./mongodb-auth-models";
+export { AIUsageLogModel, SystemLogModel, SystemSettingsModel } from "./mongodb-platform-models";
+export { AgencyModel, SuperAdminModel } from "./mongodb-tenant-models";
+export { SingularityChatSessionModel, SingularityCheckpointModel } from "./mongodb-singularity-models";
+import { connectMongo } from "./mongodb-connection";
 import {
-    Agency, SuperAdmin,
     User, Client, Project, Task, Invoice, Transaction, Service,
     Notification, Activity, Asset, Message, LeaveRequest, Settings,
     PaymentConfig, ProjectServiceConfig, Comment, Job
@@ -9,93 +13,18 @@ import {
 
 // ============================================================================
 // API KEY ENCRYPTION HELPERS (AES-256-GCM)
-// Set AI_ENCRYPT_KEY=<32-byte hex> in your environment variables
+// Kept as thin wrappers so existing imports keep working.
 // ============================================================================
-const AI_ENCRYPT_KEY = process.env.AI_ENCRYPT_KEY;
-
 export function encryptApiKey(plaintext: string): string {
-    if (!AI_ENCRYPT_KEY) {
-        console.warn('AI_ENCRYPT_KEY not set — API key stored unencrypted');
-        return plaintext;
-    }
-    const key = Buffer.from(AI_ENCRYPT_KEY, 'hex');
-    if (key.length !== 32) throw new Error('AI_ENCRYPT_KEY must be exactly 32 bytes (64 hex characters)');
-    const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-    const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-    const tag = cipher.getAuthTag();
-    return `enc:${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`;
+    return encryptApiKeyImpl(plaintext);
 }
 
 export function decryptApiKey(value: string): string {
-    if (!value.startsWith('enc:')) return value; // Not encrypted — return as-is
-    if (!AI_ENCRYPT_KEY) throw new Error('AI_ENCRYPT_KEY is required to decrypt API keys. Set it in your environment variables.');
-    const key = Buffer.from(AI_ENCRYPT_KEY, 'hex');
-    const [, ivHex, tagHex, encHex] = value.split(':');
-    const iv = Buffer.from(ivHex, 'hex');
-    const tag = Buffer.from(tagHex, 'hex');
-    const encrypted = Buffer.from(encHex, 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAuthTag(tag);
-    return decipher.update(encrypted).toString('utf8') + decipher.final('utf8');
-}
-
-// MongoDB Connection
-const MONGODB_URI = process.env.MONGODB_URI;
-
-if (!MONGODB_URI) {
-    throw new Error('Please define the MONGODB_URI environment variable in .env.local');
-}
-
-interface MongooseConnection {
-    conn: typeof mongoose | null;
-    promise: Promise<typeof mongoose> | null;
-}
-
-declare global {
-    var mongoose: MongooseConnection | undefined;
-}
-
-const cached: MongooseConnection = global.mongoose || { conn: null, promise: null };
-
-if (!global.mongoose) {
-    global.mongoose = cached;
+    return decryptApiKeyImpl(value);
 }
 
 export async function connectDB() {
-    if (cached.conn) {
-        return cached.conn;
-    }
-
-    if (!cached.promise) {
-        const opts = {
-            bufferCommands: false,
-            serverSelectionTimeoutMS: 10000,
-            socketTimeoutMS: 45000,
-        };
-
-        console.log('🔌 Attempting to connect to MongoDB...');
-
-        cached.promise = mongoose.connect(MONGODB_URI!, opts)
-            .then((mongoose) => {
-                console.log('✅ MongoDB Connected Successfully');
-                return mongoose;
-            })
-            .catch((error) => {
-                console.error('❌ MongoDB Connection Error:', error.message);
-                throw error;
-            });
-    }
-
-    try {
-        cached.conn = await cached.promise;
-    } catch (e: any) {
-        cached.promise = null;
-        console.error('❌ Failed to establish MongoDB connection:', e.message);
-        throw e;
-    }
-
-    return cached.conn;
+    return connectMongo();
 }
 
 // ============================================================================
@@ -136,196 +65,9 @@ const ProjectServiceConfigSchema = new Schema<ProjectServiceConfig>({
 }, { _id: false });
 
 // ============================================================================
-// MULTI-TENANCY SCHEMAS
+// TENANT & ADMIN MODELS
+// Extracted to mongodb-tenant-models.ts and re-exported above.
 // ============================================================================
-
-// Agency Limits Schema (Embedded)
-const AgencyLimitsSchema = new Schema({
-    maxUsers: { type: Number, required: true },
-    maxProjects: { type: Number, required: true },
-    maxClients: { type: Number, required: true },
-    maxStorage: { type: Number, required: true },
-    maxMonthlyInvoices: { type: Number, required: true },
-    aiEnabled: { type: Boolean, required: true },
-    customBranding: { type: Boolean, required: true }
-}, { _id: false });
-
-// Agency Usage Schema (Embedded)
-const AgencyUsageSchema = new Schema({
-    users: { type: Number, default: 0 },
-    projects: { type: Number, default: 0 },
-    clients: { type: Number, default: 0 },
-    storage: { type: Number, default: 0 },
-    monthlyInvoices: { type: Number, default: 0 }
-}, { _id: false });
-
-// Agency Settings Schema (Embedded)
-const TaskEmailEventSchema = new Schema({
-    enabled: { type: Boolean, default: false },
-    notifyAssignee: { type: Boolean, default: true },
-    notifyClient: { type: Boolean, default: false },
-}, { _id: false });
-
-const TaskEmailEventsSchema = new Schema({
-    taskCreated: { type: TaskEmailEventSchema, default: () => ({ enabled: true, notifyAssignee: true, notifyClient: false }) },
-    taskInProgress: { type: TaskEmailEventSchema, default: () => ({ enabled: false, notifyAssignee: true, notifyClient: false }) },
-    taskDone: { type: TaskEmailEventSchema, default: () => ({ enabled: false, notifyAssignee: true, notifyClient: true }) },
-}, { _id: false });
-
-const EmailCategoriesSchema = new Schema({
-    accountCreation: { type: Boolean, default: true },
-    invoicePayment: { type: Boolean, default: true },
-    salaryPayroll: { type: Boolean, default: true },
-    refund: { type: Boolean, default: true },
-    projectUpdates: { type: Boolean, default: false },
-    taskUpdates: { type: Boolean, default: false },
-    leaveManagement: { type: Boolean, default: false },
-    documentApproval: { type: Boolean, default: false },
-    taskEmailPriorities: { type: Schema.Types.Mixed, default: undefined },
-    taskEmailEvents: { type: TaskEmailEventsSchema, default: () => ({}) },
-}, { _id: false });
-
-const AgencySettingsSchema = new Schema({
-    systemName: { type: String, required: true },
-    timezone: { type: String, default: 'UTC' },
-    currency: { type: String, default: 'USD' },
-    dateFormat: { type: String, default: 'MM/DD/YYYY' },
-    allowClientRegistration: { type: Boolean, default: false },
-    requireEmailVerification: { type: Boolean, default: false },
-    enableTwoFactor: { type: Boolean, default: false },
-    emailNotificationsEnabled: { type: Boolean, default: true },
-    emailCategories: { type: EmailCategoriesSchema, default: () => ({}) }
-}, { _id: false });
-
-// Agency Features Schema (Embedded)
-const AgencyFeaturesSchema = new Schema({
-    aiAssistant: { type: Boolean, default: false },
-    advancedReporting: { type: Boolean, default: false },
-    apiAccess: { type: Boolean, default: false },
-    whiteLabel: { type: Boolean, default: false },
-    customDomain: { type: Boolean, default: false },
-    ssoEnabled: { type: Boolean, default: false }
-}, { _id: false });
-
-// AI Config Schema (Embedded in Agency)
-const AIConfigSchema = new Schema({
-    provider: { type: String, enum: ['gemini', 'openai', 'nvidia', 'github'], required: true },
-    apiKey: { type: String, required: true },
-    model: { type: String, required: true },
-    customModelId: { type: String }
-}, { _id: false });
-
-// AI Permissions Schema (Embedded in Agency)
-const AIPermissionsSchema = new Schema({
-    canPayroll: { type: Boolean, default: false },
-    canManageInvoices: { type: Boolean, default: false },
-    canRefund: { type: Boolean, default: false },
-    canCreateEmployee: { type: Boolean, default: false },
-    canDelete: { type: Boolean, default: false },
-}, { _id: false });
-
-// Agency Schema
-const AgencySchema = new Schema({
-    id: { type: String, required: true, unique: true },
-    name: { type: String, required: true },
-    slug: { type: String, required: true, unique: true },
-    domain: { type: String, sparse: true },
-
-    // Branding
-    logo: { type: String },
-    primaryColor: { type: String },
-    secondaryColor: { type: String },
-
-    // Status & Plan
-    status: {
-        type: String,
-        enum: ['active', 'suspended', 'trial', 'cancelled'],
-        required: true,
-        default: 'trial'
-    },
-    plan: {
-        type: String,
-        enum: ['free', 'starter', 'pro', 'enterprise'],
-        required: true,
-        default: 'free'
-    },
-    planDuration: {
-        type: String,
-        enum: ['monthly', '3months', '6months', 'yearly', 'lifetime']
-    },
-    planExpiresAt: { type: String },
-    trialEndsAt: { type: String },
-
-    // Limits & Usage
-    limits: { type: AgencyLimitsSchema, required: true },
-    usage: { type: AgencyUsageSchema, required: true },
-
-    // Billing
-    billing: {
-        subscriptionId: { type: String },
-        stripeCustomerId: { type: String },
-        subscriptionStatus: {
-            type: String,
-            enum: ['active', 'past_due', 'canceled', 'unpaid', 'trialing', 'incomplete', 'incomplete_expired', 'paused']
-        },
-        currentPeriodEnd: { type: String },
-        cancelAtPeriodEnd: { type: Boolean },
-        billingEmail: { type: String, required: true },
-        billingAddress: { type: String },
-        taxId: { type: String }
-    },
-
-    // Settings
-    settings: { type: AgencySettingsSchema, required: true },
-
-    // Metadata
-    createdAt: { type: String, required: true },
-    createdBy: { type: String, required: true },
-    updatedAt: { type: String },
-    lastActivityAt: { type: String },
-
-    // Features
-    features: { type: AgencyFeaturesSchema, required: true },
-
-    // AI Configuration (Singularity)
-    aiConfig: { type: AIConfigSchema },
-    aiPermissions: { type: AIPermissionsSchema },
-}, { timestamps: true });
-
-// Indexes for Agency
-// AgencySchema.index({ slug: 1 }); // Already unique
-AgencySchema.index({ status: 1 });
-AgencySchema.index({ plan: 1 });
-AgencySchema.index({ createdBy: 1 });
-
-// SuperAdmin Permissions Schema (Embedded)
-const SuperAdminPermissionsSchema = new Schema({
-    canCreateAgency: { type: Boolean, default: true },
-    canDeleteAgency: { type: Boolean, default: true },
-    canSuspendAgency: { type: Boolean, default: true },
-    canViewBilling: { type: Boolean, default: true },
-    canManagePlans: { type: Boolean, default: true }
-}, { _id: false });
-
-// SuperAdmin Schema
-const SuperAdminSchema = new Schema({
-    id: { type: String, required: true, unique: true },
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    role: { type: String, default: 'superadmin' },
-    avatar: { type: String },
-    phone: { type: String },
-    timezone: { type: String },
-    twoFactorEnabled: { type: Boolean, default: false },
-    twoFactorSecret: { type: String },
-    createdAt: { type: String, required: true },
-    lastLoginAt: { type: String },
-    permissions: { type: SuperAdminPermissionsSchema, required: true }
-}, { timestamps: true });
-
-// Indexes for SuperAdmin
-// SuperAdminSchema.index({ email: 1 }); // Already unique
 
 // ============================================================================
 // EXISTING SCHEMAS (Updated with agencyId)
@@ -429,7 +171,7 @@ const TaskSchema = new Schema<Task>({
     description: { type: String },
     status: { type: String, enum: ['Todo', 'In Progress', 'Review', 'Done'], required: true },
     priority: { type: String, enum: ['Low', 'Medium', 'High'] },
-    assigneeId: { type: String, required: true },
+    assigneeId: { type: String, default: "" },
     dueDate: { type: String },
     startDate: { type: String },
     category: { type: String },
@@ -593,74 +335,15 @@ const SettingsSchema = new Schema<Settings>({
 SettingsSchema.index({ agencyId: 1 }, { unique: true });
 
 // ============================================================================
-// SINGULARITY CHAT & CHECKPOINT SCHEMAS
+// SINGULARITY CHAT & CHECKPOINT MODELS
+// Extracted to mongodb-singularity-models.ts and re-exported above.
 // ============================================================================
-
-// Chat Message Schema (Embedded in SingularityChatSession)
-const SingularityChatMessageSchema = new Schema({
-    role: { type: String, enum: ['user', 'model'], required: true },
-    content: { type: String, default: '' },
-    thinking: { type: String },
-    images: [{ type: String }],
-    toolActions: [{
-        name: { type: String },
-        displayName: { type: String },
-        status: { type: String, enum: ['calling', 'done', 'error'] },
-        summary: { type: String },
-        success: { type: Boolean },
-        _id: false,
-    }],
-    timestamp: { type: String, required: true },
-}, { _id: false });
-
-// Chat Session Schema — stores entire conversation
-const SingularityChatSessionSchema = new Schema({
-    id: { type: String, required: true, unique: true },
-    agencyId: { type: String, required: true, index: true },
-    userId: { type: String, required: true, index: true },
-    title: { type: String, default: 'New Chat' },
-    mode: { type: String, enum: ['chat', 'agent'], required: true, default: 'chat' },
-    messages: [SingularityChatMessageSchema],
-    createdAt: { type: String, required: true },
-    updatedAt: { type: String, required: true },
-}, { timestamps: false }); // We manage our own timestamps
-
-SingularityChatSessionSchema.index({ userId: 1, updatedAt: -1 });
-
-// Checkpoint Action Schema (Embedded in SingularityCheckpoint)
-const CheckpointActionSchema = new Schema({
-    toolName: { type: String, required: true },
-    actionType: { type: String, enum: ['create', 'update', 'delete'], required: true },
-    entityType: { type: String, enum: ['task', 'project', 'client', 'invoice', 'transaction', 'service', 'leaveRequest', 'comment'], required: true },
-    entityId: { type: String, required: true },
-    beforeSnapshot: { type: Schema.Types.Mixed }, // Full entity state before change (for update/delete rollback)
-    createdEntityIds: [{ type: String }], // For bulk operations — all created IDs
-    executedAt: { type: String, required: true },
-}, { _id: false });
-
-// Checkpoint Schema — stores rollback data for agent actions
-const SingularityCheckpointSchema = new Schema({
-    id: { type: String, required: true, unique: true },
-    sessionId: { type: String, required: true, index: true },
-    agencyId: { type: String, required: true, index: true },
-    messageIndex: { type: Number, required: true }, // Position in messages array when checkpoint was created
-    actions: [CheckpointActionSchema],
-    label: { type: String, default: 'Checkpoint' },
-    status: { type: String, enum: ['active', 'rolled_back'], default: 'active' },
-    createdAt: { type: String, required: true },
-}, { timestamps: false });
-
-SingularityCheckpointSchema.index({ sessionId: 1, createdAt: -1 });
 
 // ============================================================================
 // MODEL EXPORTS
 // ============================================================================
 
-// Multi-tenancy models
-export const AgencyModel = (mongoose.models.Agency as Model<Agency>) || mongoose.model<Agency>('Agency', AgencySchema);
-export const SuperAdminModel = (mongoose.models.SuperAdmin as Model<SuperAdmin>) || mongoose.model<SuperAdmin>('SuperAdmin', SuperAdminSchema);
-
-// Existing models
+// Existing business models
 export const UserModel = (mongoose.models.User as Model<User>) || mongoose.model<User>('User', UserSchema);
 export const ClientModel = (mongoose.models.Client as Model<Client>) || mongoose.model<Client>('Client', ClientSchema);
 export const ProjectModel = (mongoose.models.Project as Model<Project>) || mongoose.model<Project>('Project', ProjectSchema);
@@ -676,131 +359,3 @@ export const MessageModel = (mongoose.models.Message as Model<Message>) || mongo
 export const LeaveRequestModel = (mongoose.models.LeaveRequest as Model<LeaveRequest>) || mongoose.model<LeaveRequest>('LeaveRequest', LeaveRequestSchema);
 
 export const SettingsModel = (mongoose.models.Settings as Model<Settings>) || mongoose.model<Settings>('Settings', SettingsSchema);
-
-// Singularity AI Chat models
-export const SingularityChatSessionModel = (mongoose.models.SingularityChatSession as Model<any>) || mongoose.model('SingularityChatSession', SingularityChatSessionSchema);
-export const SingularityCheckpointModel = (mongoose.models.SingularityCheckpoint as Model<any>) || mongoose.model('SingularityCheckpoint', SingularityCheckpointSchema);
-
-// OTP Schema with TTL auto-expiry
-const OtpSchema = new Schema({
-    email: { type: String, required: true },
-    otp: { type: String, required: true },
-    attempts: { type: Number, default: 0 },
-    purpose: { type: String, enum: ['signup', 'password-reset'], default: 'signup' },
-    expiresAt: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
-});
-OtpSchema.index({ email: 1, purpose: 1 });
-export const OtpModel = (mongoose.models.Otp as Model<any>) || mongoose.model('Otp', OtpSchema);
-
-// Rate Limit Schema with TTL auto-expiry
-const RateLimitSchema = new Schema({
-    key: { type: String, required: true, unique: true },
-    count: { type: Number, default: 1 },
-    expiresAt: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
-});
-export const RateLimitModel = (mongoose.models.RateLimit as Model<any>) || mongoose.model('RateLimit', RateLimitSchema);
-
-// ============================================================================
-// SYSTEM SETTINGS (Global platform-wide settings for super-admin)
-// ============================================================================
-const SystemSettingsSchema = new Schema({
-    key: { type: String, default: 'global', unique: true },
-    platform: {
-        name: { type: String, default: 'AgencyOS' },
-        supportEmail: { type: String, default: 'support@agencyos.com' },
-        defaultTimezone: { type: String, default: 'UTC' },
-        defaultCurrency: { type: String, default: 'USD' },
-    },
-    security: {
-        requireEmailVerification: { type: Boolean, default: false },
-        enableTwoFactor: { type: Boolean, default: false },
-        allowSelfRegistration: { type: Boolean, default: false },
-        enforceStrongPasswords: { type: Boolean, default: true },
-    },
-    notifications: {
-        emailOnAgencyCreated: { type: Boolean, default: true },
-        emailOnAgencySuspended: { type: Boolean, default: true },
-        weeklySummary: { type: Boolean, default: false },
-    },
-    notificationDefaults: {
-        welcome: { type: Boolean, default: true },
-        project: { type: Boolean, default: true },
-        task: { type: Boolean, default: true },
-        invoice: { type: Boolean, default: true },
-        salary: { type: Boolean, default: true },
-        leave: { type: Boolean, default: true },
-        refund: { type: Boolean, default: true },
-        document: { type: Boolean, default: true },
-        security: { type: Boolean, default: true },
-    },
-    emailDefaults: {
-        globalEnabled: { type: Boolean, default: true },
-        accountCreation: { type: Boolean, default: true },
-        invoicePayment: { type: Boolean, default: true },
-        salaryPayroll: { type: Boolean, default: true },
-        refund: { type: Boolean, default: true },
-        projectUpdates: { type: Boolean, default: false },
-        taskUpdates: { type: Boolean, default: false },
-        leaveManagement: { type: Boolean, default: false },
-        documentApproval: { type: Boolean, default: false },
-        taskEmailEvents: {
-            taskCreated: {
-                enabled: { type: Boolean, default: true },
-                notifyAssignee: { type: Boolean, default: true },
-                notifyClient: { type: Boolean, default: false },
-            },
-            taskInProgress: {
-                enabled: { type: Boolean, default: false },
-                notifyAssignee: { type: Boolean, default: true },
-                notifyClient: { type: Boolean, default: false },
-            },
-            taskDone: {
-                enabled: { type: Boolean, default: false },
-                notifyAssignee: { type: Boolean, default: true },
-                notifyClient: { type: Boolean, default: true },
-            },
-        },
-    },
-}, { timestamps: true });
-export const SystemSettingsModel = (mongoose.models.SystemSettings as Model<any>) || mongoose.model('SystemSettings', SystemSettingsSchema);
-
-// ============================================================================
-// SYSTEM LOG (Real event log for super-admin — replaces fabricated logs)
-// ============================================================================
-const SystemLogSchema = new Schema({
-    event: { type: String, required: true, index: true },
-    type: { type: String, required: true, enum: ['agency', 'user', 'system', 'security', 'error'] },
-    detail: { type: String, required: true },
-    status: { type: String, required: true, enum: ['success', 'error', 'warning', 'info'], default: 'info' },
-    agencyId: { type: String, index: true },
-    userId: { type: String },
-    meta: { type: Schema.Types.Mixed },
-}, { timestamps: true });
-SystemLogSchema.index({ createdAt: -1 });
-export const SystemLogModel = (mongoose.models.SystemLog as Model<any>) || mongoose.model('SystemLog', SystemLogSchema);
-
-// ============================================================================
-// AI USAGE LOG — Tracks every AI API call for monitoring and billing
-// ============================================================================
-const AIUsageLogSchema = new Schema({
-    agencyId: { type: String, required: true, index: true },
-    userId: { type: String, required: true, index: true },
-    feature: {
-        type: String,
-        required: true,
-        enum: ['singularity-agent', 'singularity-chat', 'ai-explain', 'ai-enhance', 'ai-task-chat', 'ai-chatbot', 'ai-hour-estimate'],
-        index: true,
-    },
-    model: { type: String, required: true },
-    provider: { type: String, required: true },
-    inputTokens: { type: Number, default: 0 },
-    outputTokens: { type: Number, default: 0 },
-    totalTokens: { type: Number, default: 0 },
-    durationMs: { type: Number, default: 0 },
-    success: { type: Boolean, default: true },
-    error: { type: String },
-}, { timestamps: true });
-AIUsageLogSchema.index({ createdAt: -1 });
-AIUsageLogSchema.index({ agencyId: 1, createdAt: -1 });
-AIUsageLogSchema.index({ agencyId: 1, feature: 1, createdAt: -1 });
-export const AIUsageLogModel = (mongoose.models.AIUsageLog as Model<any>) || mongoose.model('AIUsageLog', AIUsageLogSchema);

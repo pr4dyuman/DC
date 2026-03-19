@@ -1,6 +1,7 @@
-import { LeaveRequest, Project, Task, User } from "@/lib/types";
+import { LeaveRequest, Project, Task } from "@/lib/types";
 import { dateKeyTz, fmtDateShort, getLocaleForTimezone, toLocalCalendarDay } from "@/lib/date-utils";
 import { getDashboardMetrics, getRevenueData, getProjectDistribution, getRecentActivity, getUrgentTasks, getClientDashboardData, getEmployeeDashboardData } from "@/lib/actions";
+import type { CurrentUserResult } from "@/lib/actions";
 
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { RevenueChart, ProjectDistributionChart } from "@/components/dashboard/Charts";
@@ -18,7 +19,7 @@ type DashboardLeaveRequest = LeaveRequest & {
     leaveType?: string;
 };
 
-export async function DashboardContent({ currentUser }: { currentUser: User }) {
+export async function DashboardContent({ currentUser }: { currentUser: CurrentUserResult }) {
     // Client Dashboard View
     if (currentUser.role === 'client') {
         const data = await getClientDashboardData(currentUser.id);

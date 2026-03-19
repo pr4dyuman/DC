@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import dbConnect from '@/lib/marketing-db';
 import Testimonial from '@/models/marketing/Testimonial';
 import { checkAuth } from '@/lib/authMiddleware';
@@ -8,6 +9,8 @@ import { sanitizeName, sanitizeString, validateCsrfOrigin } from '@/lib/validati
 export async function GET(request) {
   try {
     await dbConnect();
+    const authResult = await checkAuth();
+    const isAdmin = authResult.authorized === true;
     
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
@@ -15,7 +18,14 @@ export async function GET(request) {
 
     // If ID is provided, fetch single testimonial
     if (id) {
-      const testimonial = await Testimonial.findById(id).lean();
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid testimonial ID' },
+          { status: 400 }
+        );
+      }
+      const testimonialQuery = isAdmin ? { _id: id } : { _id: id, status: 'active' };
+      const testimonial = await Testimonial.findOne(testimonialQuery).lean();
       if (!testimonial) {
         return NextResponse.json(
           { success: false, error: 'Testimonial not found' },
@@ -27,10 +37,11 @@ export async function GET(request) {
 
     // Build query — public requests only see active testimonials
     const query = {};
-    if (status) {
-      query.status = status;
+    if (isAdmin) {
+      if (status === 'active' || status === 'inactive') {
+        query.status = status;
+      }
     } else {
-      // Default to active for public access
       query.status = 'active';
     }
 
@@ -119,6 +130,12 @@ export async function PUT(request) {
         { status: 400 }
       );
     }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid testimonial ID' },
+        { status: 400 }
+      );
+    }
 
     // Find and update testimonial
     const updateData = {};
@@ -172,6 +189,12 @@ export async function DELETE(request) {
     if (!id) {
       return NextResponse.json(
         { success: false, error: 'Testimonial ID is required' },
+        { status: 400 }
+      );
+    }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid testimonial ID' },
         { status: 400 }
       );
     }

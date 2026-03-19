@@ -1,0 +1,247 @@
+Auth / Authorization Security Audit
+Date: 2026-03-19
+Scope: role boundaries, server actions, dashboard routes, API routes, cross-account data exposure, unauthorized mutations
+Method: static code review only (no authenticated browser automation in this pass)
+
+Coverage Summary
+
+- Reviewed app routes/pages/layouts: 50
+- Reviewed API routes: 15
+- Reviewed action modules under lib/actions: 42
+- Reviewed central authenticated app shells, dashboard wrappers, major client components, shared chat/messaging surfaces, and the main auth/session utilities
+
+Resolution Update (workspace)
+
+- AUTH-002 fixed: employee-facing team profiles still allow profile visibility, but client project/task loading is now blocked unless the viewer is admin/manager or the client themself.
+- AUTH-005 fixed: Singularity context now avoids broad operational finance/workload exposure for non-privileged roles while preserving intended profile-level visibility.
+- AUTH-006 fixed with backward-compatible enforcement: explicit per-user AI denies are now enforced at Singularity page, API route, and task-AI action entry points; legacy accounts without an explicit AI permission record keep existing access.
+- AUTH-007 fixed: getUserPermissions() is now restricted to self or admin/manager.
+- AUTH-008 fixed: global search now keeps profile-directory results, but project/task results are scoped to the caller's authorized project set.
+
+Confirmed Findings
+
+AUTH-002 [HIGH]
+Title: Employees can load client project lists and created-task data through the team profile route
+
+Evidence:
+- app/dashboard/team/[username]/page.tsx:18
+- app/dashboard/team/[username]/EmployeeProfilePageClient.tsx:120
+- app/dashboard/team/[username]/EmployeeProfilePageClient.tsx:122
+- lib/actions/client-queries.ts:39
+- lib/actions.ts:495
+- lib/actions/project-queries.ts:176
+
+What happens:
+- /dashboard/team/[username] only blocks clients from viewing other profiles; it does not block employees from loading a client's deeper account data.
+- When the resolved subject is a client, the client-side page loads getClientProjects() and getClientCreatedTasks().
+- getClientProjectsImpl() blocks only cross-client access, not employee access.
+- getClientCreatedTasks() has no actor-level authorization check beyond "logged in".
+
+Impact:
+- Under your stated policy, profile visibility inside the same agency is allowed.
+- The remaining issue is that an employee can inspect a client's project list and the tasks that client created, which goes beyond simple profile visibility.
+
+Recommended fix:
+- Keep the client profile visible if that is the intended product rule.
+- Block non-admin/non-manager access to client project/task data on the team route.
+- Add actor checks to getClientCreatedTasks() so only the client themself or admin/manager can read it.
+
+AUTH-005 [HIGH]
+Title: Singularity exposes full agency operational data across account types, not just profile/directory information
+
+Evidence:
+- app/dashboard/singularity/page.tsx:8
+- app/api/singularity/route.ts:38
+- app/api/singularity/route.ts:89
+- lib/singularity-context.ts:33
+- lib/singularity-context.ts:35
+- lib/singularity-context.ts:36
+- lib/singularity-context.ts:79
+- lib/singularity-context.ts:138
+- app/dashboard/clients/layout.tsx:12
+
+What happens:
+- The Singularity page is available to any authenticated non-superadmin user.
+- Agent mode builds a live context by calling getProjects(), getFinanceStats(), getRecentActivity(), getTasks(), getServices(), and getUserTasks() for every request.
+- It also loads user and client directory data, but that part alone is no longer treated as a bug under your stated profile-visibility rule.
+- The core problem is that non-privileged roles receive full project, task, finance, service, workload, and recent-activity context for the whole agency.
+
+Impact:
+- Employees and clients can bypass normal page-level role boundaries and access agency-wide operational data through Singularity.
+- This goes well beyond simple profile visibility and includes project/task/finance intelligence that should remain role-scoped.
+
+Recommended fix:
+- Scope Singularity context by actor role.
+- For employee/client callers, only include data they can already access through the normal app.
+- Keep directory/profile context only if it matches product policy, but do not load global projects/tasks/finance/activity for all roles.
+
+
+AUTH-006 [HIGH]
+Title: Per-user AI access permission exists in settings but is never enforced
+
+Evidence:
+- lib/actions/task-queries.ts:13
+- lib/actions/task-queries.ts:18
+- components/settings/PermissionSettings.tsx:221
+- components/settings/PermissionSettings.tsx:231
+- app/dashboard/singularity/page.tsx:8
+- app/api/singularity/route.ts:38
+- lib/actions/ai-runtime.ts:31
+- lib/actions/ai-runtime.ts:38
+- lib/actions/ai-runtime.ts:63
+- lib/actions/ai-runtime.ts:80
+- lib/actions/ai-runtime.ts:128
+
+What happens:
+- The system stores canUseAI in per-user permissions and exposes an "AI Access" control in settings.
+- The Singularity page, Singularity API route, and task-AI actions only require authentication.
+- None of those entry points enforce canUseAI for the current actor.
+
+Impact:
+- Users explicitly denied AI access can still use Singularity and task-AI features.
+- This is a direct authorization bypass of a configured permission.
+
+Recommended fix:
+- Enforce canUseAI in one central helper and call it from all AI entry points.
+- Ideally block at both page-load level and route/action level.
+
+
+AUTH-007 [MEDIUM]
+Title: getUserPermissions is over-exposed as a client-callable server action
+
+Evidence:
+- lib/actions.ts:735
+- components/settings/PermissionSettings.tsx:6
+- components/settings/PermissionSettings.tsx:45
+
+What happens:
+- getUserPermissions() only requires authentication and accepts any target user ID.
+- The action is imported into a client component, so it is not purely an internal server helper.
+
+Impact:
+- Any authenticated actor who can invoke the action endpoint can query arbitrary permission records for other accounts.
+- This leaks internal authorization configuration and expands the attack surface for targeted privilege abuse.
+
+Recommended fix:
+- Restrict getUserPermissions() to self or admin/manager.
+- If admin bulk-loading is needed, keep a separate privileged action for that screen.
+
+
+AUTH-008 [HIGH]
+Title: Global search exposes agency-wide projects and tasks to any authenticated role without role scoping
+
+Evidence:
+- lib/actions.ts:1074
+- lib/actions.ts:1077
+- lib/actions/search.ts:16
+- lib/actions/search.ts:28
+- lib/actions/search.ts:42
+- lib/actions/search.ts:56
+- lib/actions/search.ts:70
+- lib/actions/search.ts:106
+- lib/actions/search.ts:121
+- lib/actions/search.ts:138
+- components/layout/AuthenticatedLayout.tsx:78
+- components/layout/Topbar.tsx:10
+- components/layout/Topbar.tsx:86
+
+What happens:
+- globalSearch() only requires authentication and passes the caller straight into an agency-wide search implementation.
+- The search implementation does not apply role scoping or project scoping.
+- It returns users, clients, tasks, and projects for the entire agency as long as they match the query.
+- The shared Topbar calls this action for every authenticated dashboard user.
+
+Impact:
+- Under your stated policy, the user/client profile directory part is not the main issue.
+- The confirmed problem is that clients and employees can discover agency-wide projects and tasks outside their authorized scope through the shared search box.
+- This is still a broad cross-role operational data disclosure surface.
+
+Recommended fix:
+- Scope search results by actor role.
+- Clients should only see their own projects/tasks/profile.
+- Employees should only see projects/tasks already reachable through their authorized project scope.
+- Consider separate search providers per role instead of a single shared action.
+
+
+Policy / Product-Scope Note
+
+PROFILE-001
+Title: Agency-wide profile visibility appears to be an intentional product rule, so profile-directory findings were narrowed out of the confirmed bug list
+
+Evidence:
+- lib/actions.ts:428
+- lib/actions.ts:443
+- lib/actions/user-queries.ts:56
+- lib/actions/user-queries.ts:67
+- app/dashboard/team/[username]/EmployeeProfilePageClient.tsx:13
+- app/dashboard/team/[username]/EmployeeProfilePageClient.tsx:112
+- components/finance/FinanceContent.tsx:31
+- components/finance/FinanceContent.tsx:33
+- components/projects/ProjectView.tsx:77
+
+Assessment:
+- You clarified that members inside the same agency are allowed to see each other's profiles.
+- Under that rule, the earlier profile/directory-only concerns are not treated as confirmed security bugs.
+- This specifically retires the old profile-only reading of AUTH-001 and removes the profile-directory part of the older AUTH-003/AUTH-004 concerns.
+
+Recommended handling:
+- Keep profile visibility as an explicit product rule.
+- Treat future findings as bugs only when they expose deeper data such as projects, tasks, finance, permissions, or role-restricted actions beyond simple profile information.
+
+CHAT-001
+Title: Agency-wide contact visibility in messages appears to be an intentional product decision, not a confirmed auth bug
+
+Evidence:
+- app/dashboard/messages/page.tsx:12
+- components/providers/DashboardChatProvider.tsx:19
+- components/chat/useChatPanelState.ts:88
+- lib/chat.ts:124
+- lib/chat.ts:138
+- lib/chat.ts:139
+- lib/chat.ts:158
+- lib/chat.ts:174
+
+What the code does:
+- The messages page is available to any logged-in account type.
+- The dashboard chat overlay is mounted for authenticated dashboard users.
+- getContacts() loads all agency users for every authenticated caller.
+- For non-client callers it also loads all clients in the agency.
+- For client callers it omits other clients but still returns the agency employee directory.
+
+Assessment:
+- If the intended workflow is "authenticated members of the same agency can message each other," this is expected behavior and should not be treated as a security bug.
+- Because messaging inherently requires a contact directory, this item is policy-dependent.
+- The only remaining product decision to clarify is whether clients should see all agency employees or only assigned/support contacts. The current code allows clients to see all agency employees, but not other clients.
+
+Recommended handling:
+- Do not treat this as a confirmed vulnerability unless the product rule is stricter than the current behavior.
+- If later you decide clients should only contact assigned/support users, re-open this item as a product-scope hardening task rather than a general auth bug.
+
+
+Residual Architecture Risk
+
+RISK-001
+Title: Authorization is still fragmented across many pages/actions instead of being centrally enforced
+
+Evidence:
+- No confirmed root middleware/proxy guard was found for role-aware dashboard segmentation in this pass.
+- Access control is currently spread across page files, server actions, query helpers, and API routes.
+
+Why this matters:
+- The bugs above largely came from individual routes/actions forgetting one role check or performing it too late.
+- This architecture makes auth regressions likely whenever a new route or server action is added.
+
+Recommended direction:
+- Keep server-side authorization in one small set of shared guard helpers and make every high-risk read/mutation go through them.
+- Add regression tests for client/employee/admin/superadmin access boundaries on sensitive pages and actions.
+
+
+Notes
+
+- This audit focused on authorization, cross-role visibility, and account-boundary enforcement.
+- This was a repo-wide static sweep of route files, API routes, and action modules, but it is still not a mathematical proof that every reachable runtime path is safe.
+- I specifically rechecked cross-agency scoping on the main tenant data layer while doing this pass. The reviewed app surfaces consistently used agencyId filters, and I did not confirm an agency-A to agency-B leak in the reviewed set.
+- The most important missed surface from the first draft was global search, which is now included above as AUTH-008.
+- The most important missed surface from this exhaustive pass was global search. The messages/contact directory was reviewed too, but it looks policy-dependent rather than a confirmed auth bug.
+- Public marketing endpoints for blog/testimonial/category were rechecked in this pass and did not show a confirmed auth regression.
+- Build/lint cleanliness is separate from this document; this file only lists confirmed security issues from the auth/role audit.

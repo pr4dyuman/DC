@@ -68,6 +68,12 @@ export async function POST(request) {
         { status: 400 }
       );
     }
+    if (!phone) {
+      return NextResponse.json(
+        { error: 'A valid phone number is required' },
+        { status: 400 }
+      );
+    }
 
     // Connect to database
     await dbConnect();

@@ -5,6 +5,7 @@ import { ArrowLeft, Calendar, User, Clock } from "lucide-react";
 import DOMPurify from "isomorphic-dompurify";
 import dbConnect from '@/lib/marketing-db';
 import Blog from '@/models/marketing/Blog';
+import { checkAuth } from '@/lib/authMiddleware';
 import { notFound } from 'next/navigation';
 
 // Cache for 60 seconds
@@ -12,12 +13,14 @@ export const revalidate = 60;
 
 async function getBlog(slug) {
   await dbConnect();
+  const auth = await checkAuth();
+  const isAdmin = auth.authorized === true;
 
   // Try finding by slug first, then ID
-  let blog = await Blog.findOne({ slug }).lean();
+  let blog = await Blog.findOne(isAdmin ? { slug } : { slug, status: 'published' }).lean();
 
   if (!blog && /^[0-9a-fA-F]{24}$/.test(slug)) {
-    blog = await Blog.findById(slug).lean();
+    blog = await Blog.findOne(isAdmin ? { _id: slug } : { _id: slug, status: 'published' }).lean();
   }
 
   if (!blog) return null;

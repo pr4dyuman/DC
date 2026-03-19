@@ -125,7 +125,7 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
             }
         });
         return monthLabels;
-    }, [weeks, year]);
+    }, [weeks, year, fmt]);
 
 
     return (

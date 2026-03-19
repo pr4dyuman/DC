@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useInView } from "react-intersection-observer";
@@ -20,6 +20,7 @@ export function ClientProjectsList({ initialProjects }: ClientProjectsListProps)
     const [hasMore, setHasMore] = useState(initialProjects.length >= 5);
     const [loading, setLoading] = useState(false);
     const { ref, inView } = useInView();
+    const loadMoreRef = useRef<() => Promise<void>>(async () => { });
 
     const loadMore = async () => {
         if (loading || !hasMore) return;
@@ -42,9 +43,11 @@ export function ClientProjectsList({ initialProjects }: ClientProjectsListProps)
         }
     };
 
+    loadMoreRef.current = loadMore;
+
     useEffect(() => {
         if (inView) {
-            loadMore();
+            void loadMoreRef.current();
         }
     }, [inView]);
 

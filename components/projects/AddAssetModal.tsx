@@ -1,23 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { PlusIcon, AlertTriangle, FileIcon, Loader2, ShieldCheck } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { upload } from "@vercel/blob/client";
+import { AlertTriangle, PlusIcon } from "lucide-react";
+
 import { addProjectAsset } from "@/lib/actions";
 import { AssetType } from "@/lib/types";
-import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
-import { upload } from "@vercel/blob/client";
 
+import { AddAssetDetailsFields } from "./AddAssetDetailsFields";
+import { AddAssetSecureUploadPanel } from "./AddAssetSecureUploadPanel";
 
 interface AddAssetModalProps {
     projectId: string;
+}
+
+const DIRECT_UPLOAD_LIMIT = 4 * 1024 * 1024;
+const MAX_EXTRACTABLE_TEXT_BYTES = 1024 * 1024;
+const MAX_ASSET_CONTENT_CHARS = 200_000;
+const TEXT_CONTENT_EXTENSIONS = [".txt", ".md", ".json", ".html", ".css", ".js", ".ts", ".tsx", ".jsx", ".py", ".csv"];
+
+function shouldExtractTextContent(type: AssetType, fileName: string) {
+    return type === "code" || TEXT_CONTENT_EXTENSIONS.some((ext) => fileName.endsWith(ext));
+}
+
+function truncateAssetContent(content: string) {
+    return content.length > MAX_ASSET_CONTENT_CHARS
+        ? content.slice(0, MAX_ASSET_CONTENT_CHARS)
+        : content;
 }
 
 export function AddAssetModal({ projectId }: AddAssetModalProps) {
@@ -26,24 +39,29 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
     const router = useRouter();
 
     const [inputMode, setInputMode] = useState<"link" | "file">("link");
-
-    // Upload & Security State
     const [uploadProgress, setUploadProgress] = useState(0);
     const [uploadSpeed, setUploadSpeed] = useState("");
     const [remainingTime, setRemainingTime] = useState("");
     const [isScanning, setIsScanning] = useState(false);
     const [scanResult, setScanResult] = useState<"clean" | "infected" | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [formData, setFormData] = useState({
+        name: "",
+        type: "link" as AssetType,
+        url: "",
+        description: "",
+        content: "" as string | undefined,
+    });
+    const [file, setFile] = useState<File | null>(null);
 
-    // Reset type when switching modes
     const handleModeChange = (mode: "link" | "file") => {
         setInputMode(mode);
         resetState();
         if (mode === "link") {
-            setFormData(prev => ({ ...prev, type: "link", url: "" }));
+            setFormData((prev) => ({ ...prev, type: "link", url: "" }));
             setFile(null);
         } else {
-            setFormData(prev => ({ ...prev, type: "file", url: "" }));
+            setFormData((prev) => ({ ...prev, type: "file", url: "" }));
         }
     };
 
@@ -56,51 +74,75 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
         setError(null);
         setLoading(false);
         setFile(null);
-        setBase64Data(null);
     };
 
-    const [formData, setFormData] = useState({
-        name: "",
-        type: "link" as AssetType,
-        url: "",
-        description: "",
-        content: "" as string | undefined
-    });
-
-    const [file, setFile] = useState<File | null>(null);
-    const [, setBase64Data] = useState<string | null>(null);
-
-    // Helper to format file size
     const formatBytes = (bytes: number, decimals = 2) => {
-        if (!+bytes) return '0 Bytes';
+        if (!+bytes) return "0 Bytes";
         const k = 1024;
         const dm = decimals < 0 ? 0 : decimals;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
     };
 
-    // Security: Validate File
-    const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv', '.txt'];
-    const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+    const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt"];
+    const MAX_SIZE = 50 * 1024 * 1024;
 
-    const validateFile = (file: File): { valid: boolean; error?: string } => {
-        const fileName = file.name.toLowerCase();
-        const ext = '.' + fileName.split('.').pop();
+    const validateFile = (selectedFile: File): { valid: boolean; error?: string } => {
+        const fileName = selectedFile.name.toLowerCase();
+        const ext = "." + fileName.split(".").pop();
 
-        // 1. File type check — allowlist only
         if (!ALLOWED_EXTENSIONS.includes(ext)) {
-            const allowed = ALLOWED_EXTENSIONS.map(e => e.replace('.', '').toUpperCase()).join(', ');
+            const allowed = ALLOWED_EXTENSIONS.map((entry) => entry.replace(".", "").toUpperCase()).join(", ");
             return { valid: false, error: `Unsupported file type (${ext}). Allowed types: ${allowed}` };
         }
 
-        // 2. Size Limit — 50MB
-        if (file.size > MAX_SIZE) {
-            const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+        if (selectedFile.size > MAX_SIZE) {
+            const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(1);
             return { valid: false, error: `File too large (${sizeMB}MB). Maximum size is 50MB.` };
         }
 
         return { valid: true };
+    };
+
+    const handleFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (!event.target.files?.[0]) return;
+
+        const nextFile = event.target.files[0];
+        const validation = validateFile(nextFile);
+        if (!validation.valid) {
+            setError(validation.error || "Invalid file");
+            event.target.value = "";
+            return;
+        }
+
+        setError(null);
+        setFile(nextFile);
+        setFormData((prev) => ({ ...prev, content: "" }));
+
+        let nextType: AssetType = "file";
+        const lowerName = nextFile.name.toLowerCase();
+        if (nextFile.type.startsWith("image/")) nextType = "image";
+        else if (lowerName.endsWith(".zip") || lowerName.endsWith(".rar")) nextType = "zip";
+        else if ([".js", ".ts", ".tsx", ".jsx", ".md", ".json", ".html", ".css", ".py"].some((ext) => lowerName.endsWith(ext))) nextType = "code";
+
+        if (shouldExtractTextContent(nextType, lowerName) && nextFile.size <= MAX_EXTRACTABLE_TEXT_BYTES) {
+            const reader = new FileReader();
+            reader.onload = (loadEvent) => {
+                const text = loadEvent.target?.result;
+                if (typeof text === "string") {
+                    setFormData((prev) => ({ ...prev, content: truncateAssetContent(text) }));
+                }
+            };
+            reader.readAsText(nextFile);
+        }
+
+        setFormData((prev) => ({ ...prev, type: nextType, name: prev.name || nextFile.name }));
+    };
+
+    const handleOpenChange = (nextOpen: boolean) => {
+        if (!nextOpen) resetState();
+        setOpen(nextOpen);
     };
 
     async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -108,7 +150,6 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
         setError(null);
 
         if (inputMode === "file" && file) {
-            // Security Check Step 1
             const validation = validateFile(file);
             if (!validation.valid) {
                 setError(validation.error || "Invalid file");
@@ -118,73 +159,68 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
             setLoading(true);
 
             try {
-                // Real upload via /api/upload-dc
-                const uploadFormData = new FormData();
-                uploadFormData.append('file', file);
-
                 const startTime = Date.now();
-                const VERCEL_BODY_LIMIT = 4 * 1024 * 1024; // 4MB — Vercel serverless limit
-
                 let uploadUrl: string;
 
-                if (file.size > VERCEL_BODY_LIMIT) {
-                    // Large file: upload directly to Vercel Blob from browser
-                    // This bypasses the 4.5MB serverless function body limit
+                if (file.size > DIRECT_UPLOAD_LIMIT) {
                     setUploadProgress(10);
                     try {
                         const blob = await upload(file.name, file, {
-                            access: 'public',
-                            handleUploadUrl: '/api/upload-blob',
+                            access: "public",
+                            clientPayload: JSON.stringify({
+                                contentType: file.type || undefined,
+                                fileSize: file.size,
+                                projectId,
+                            }),
+                            handleUploadUrl: "/api/upload-blob",
                         });
                         uploadUrl = blob.url;
                         setUploadProgress(100);
-                    } catch (error) {
-                        // If Vercel Blob fails (e.g. storage full), fall back to server upload
-                        throw new Error(error instanceof Error ? error.message : 'Large file upload failed. Storage may be full.');
+                    } catch (uploadError) {
+                        throw new Error(uploadError instanceof Error ? uploadError.message : "Large file upload failed. Storage may be full.");
                     }
                 } else {
-                    // Small file: use server route (includes image validation)
                     const uploadFormData = new FormData();
-                    uploadFormData.append('file', file);
+                    uploadFormData.append("file", file);
 
                     uploadUrl = await new Promise<string>((resolve, reject) => {
                         const xhr = new XMLHttpRequest();
 
-                        xhr.upload.addEventListener('progress', (e) => {
-                            if (e.lengthComputable) {
-                                const progress = Math.round((e.loaded / e.total) * 100);
+                        xhr.upload.addEventListener("progress", (progressEvent) => {
+                            if (progressEvent.lengthComputable) {
+                                const progress = Math.round((progressEvent.loaded / progressEvent.total) * 100);
                                 setUploadProgress(progress);
 
                                 const elapsedSeconds = (Date.now() - startTime) / 1000;
                                 if (elapsedSeconds > 0) {
-                                    const speed = e.loaded / elapsedSeconds;
+                                    const speed = progressEvent.loaded / elapsedSeconds;
                                     setUploadSpeed(`${formatBytes(speed)}/s`);
-                                    const remainingBytes = e.total - e.loaded;
+                                    const remainingBytes = progressEvent.total - progressEvent.loaded;
                                     const secondsLeft = Math.ceil(remainingBytes / speed);
                                     setRemainingTime(`${secondsLeft}s`);
                                 }
                             }
                         });
 
-                        xhr.addEventListener('load', () => {
+                        xhr.addEventListener("load", () => {
                             try {
                                 const data = JSON.parse(xhr.responseText);
                                 if (xhr.status >= 200 && xhr.status < 300 && data.success) {
                                     resolve(data.url);
                                 } else {
-                                    reject(new Error(data.error || 'Upload failed'));
+                                    reject(new Error(data.error || "Upload failed"));
                                 }
                             } catch {
-                                reject(new Error('Upload failed'));
+                                reject(new Error("Upload failed"));
                             }
                         });
 
-                        xhr.addEventListener('error', () => reject(new Error('Network error. Check your connection and try again.')));
-                        xhr.addEventListener('abort', () => reject(new Error('Upload was cancelled.')));
-                        xhr.addEventListener('timeout', () => reject(new Error('Upload timed out. The file may be too large for your connection speed.')));
+                        xhr.addEventListener("error", () => reject(new Error("Network error. Check your connection and try again.")));
+                        xhr.addEventListener("abort", () => reject(new Error("Upload was cancelled.")));
+                        xhr.addEventListener("timeout", () => reject(new Error("Upload timed out. The file may be too large for your connection speed.")));
 
-                        xhr.open('POST', '/api/upload-dc');
-                        xhr.timeout = 120000; // 2 minute timeout
+                        xhr.open("POST", "/api/upload-dc");
+                        xhr.timeout = 120000;
                         xhr.send(uploadFormData);
                     });
                 }
@@ -193,7 +229,6 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                 setIsScanning(false);
                 setScanResult("clean");
 
-                // Save asset record with real uploaded URL
                 const finalName = formData.name || file.name;
                 const finalSize = formatBytes(file.size);
 
@@ -204,7 +239,6 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                     url: uploadUrl,
                     description: formData.description,
                     size: finalSize,
-                    uploadedBy: "Admin",
                     content: formData.content,
                 });
 
@@ -213,14 +247,13 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                 setInputMode("link");
                 resetState();
                 router.refresh();
-            } catch (error) {
-                const msg = error instanceof Error ? error.message : "Upload failed.";
-                // Make messages more user-friendly
-                if (msg.includes('413') || msg.toLowerCase().includes('too large') || msg.toLowerCase().includes('body exceeded')) {
+            } catch (submitError) {
+                const msg = submitError instanceof Error ? submitError.message : "Upload failed.";
+                if (msg.includes("413") || msg.toLowerCase().includes("too large") || msg.toLowerCase().includes("body exceeded")) {
                     setError("File is too large. Maximum upload size is 50MB.");
-                } else if (msg.includes('403') || msg.toLowerCase().includes('storage limit')) {
+                } else if (msg.includes("403") || msg.toLowerCase().includes("storage limit")) {
                     setError("Storage limit reached. Contact your admin to upgrade.");
-                } else if (msg.includes('401') || msg.toLowerCase().includes('unauthorized')) {
+                } else if (msg.includes("401") || msg.toLowerCase().includes("unauthorized")) {
                     setError("Session expired. Please refresh the page and try again.");
                 } else {
                     setError(msg);
@@ -228,9 +261,7 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
             } finally {
                 setLoading(false);
             }
-
         } else {
-            // Link mode - instant
             await finalizeSubmission();
         }
     }
@@ -240,8 +271,8 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
             const finalUrl = formData.url;
             let finalName = formData.name;
 
-            if (inputMode === "link") {
-                if (!finalName) finalName = "New Link";
+            if (inputMode === "link" && !finalName) {
+                finalName = "New Link";
             }
 
             await addProjectAsset({
@@ -251,7 +282,6 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                 url: finalUrl,
                 description: formData.description,
                 size: "0KB",
-                uploadedBy: "Admin",
                 content: formData.content,
             });
 
@@ -261,13 +291,13 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                 type: "link",
                 url: "",
                 description: "",
-                content: ""
+                content: "",
             });
             setInputMode("link");
             resetState();
             router.refresh();
-        } catch (error) {
-            console.error("Failed to add asset", error);
+        } catch (saveError) {
+            console.error("Failed to add asset", saveError);
             setError("Failed to save asset to database.");
         } finally {
             setLoading(false);
@@ -275,10 +305,7 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
     };
 
     return (
-        <Dialog open={open} onOpenChange={(val) => {
-            if (!val) resetState();
-            setOpen(val);
-        }}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
                 <Button>
                     <PlusIcon className="mr-2 h-4 w-4" />
@@ -290,7 +317,7 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                     <DialogTitle>Add Project Asset</DialogTitle>
                 </DialogHeader>
 
-                <Tabs defaultValue="link" value={inputMode} onValueChange={(v) => handleModeChange(v as "link" | "file")} className="w-full flex-1 flex flex-col overflow-hidden min-h-0">
+                <Tabs defaultValue="link" value={inputMode} onValueChange={(value) => handleModeChange(value as "link" | "file")} className="w-full flex-1 flex flex-col overflow-hidden min-h-0">
                     <TabsList className="grid w-full grid-cols-2 shrink-0">
                         <TabsTrigger value="link">External Link</TabsTrigger>
                         <TabsTrigger value="file">Secure Upload</TabsTrigger>
@@ -307,182 +334,32 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                             </div>
                         )}
 
-                        <div className={inputMode === "file" ? "hidden" : "block"}>
-                            <div className="space-y-2">
-                                <Label htmlFor="url">URL / Link</Label>
-                                <Input
-                                    id="url"
-                                    value={formData.url}
-                                    onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                                    placeholder="https://github.com/..."
-                                    required={inputMode === "link"}
-                                />
-                            </div>
-                        </div>
+                        <AddAssetSecureUploadPanel
+                            inputMode={inputMode}
+                            loading={loading}
+                            isScanning={isScanning}
+                            scanResult={scanResult}
+                            uploadProgress={uploadProgress}
+                            uploadSpeed={uploadSpeed}
+                            remainingTime={remainingTime}
+                            fileName={file?.name || null}
+                            onFileChange={handleFileSelection}
+                        />
 
-                        <div className={inputMode === "file" ? "block space-y-4" : "hidden"}>
-                            {!loading && !scanResult && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="file">Select File</Label>
-                                    <div className="border-2 border-dashed rounded-lg p-6 text-center hover:bg-muted/50 transition-colors cursor-pointer relative">
-                                        <Input
-                                            id="file"
-                                            type="file"
-                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                            accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
-                                            onChange={(e) => {
-                                                if (e.target.files && e.target.files[0]) {
-                                                    const f = e.target.files[0];
-                                                    // Immediate Validation Check
-                                                    const val = validateFile(f);
-                                                    if (!val.valid) {
-                                                        setError(val.error!);
-                                                        e.target.value = ""; // clear input
-                                                        return;
-                                                    }
-                                                    setError(null);
-                                                    setFile(f);
-                                                    setBase64Data(null);
-                                                    setFormData(prev => ({ ...prev, content: "" }));
-
-                                                    // Auto-detect & Read logic (same as before)
-                                                    let type: AssetType = 'file';
-                                                    const lowerName = f.name.toLowerCase();
-                                                    if (f.type.startsWith('image/')) type = 'image';
-                                                    else if (lowerName.endsWith('.zip') || lowerName.endsWith('.rar')) type = 'zip';
-                                                    else if (['.js', '.ts', '.tsx', '.jsx', '.md', '.json', '.html', '.css', '.py'].some(ext => lowerName.endsWith(ext))) type = 'code';
-                                                    else type = 'file';
-
-                                                    if (type === 'file' || type === 'code') {
-                                                        const reader = new FileReader();
-                                                        reader.onload = (e) => {
-                                                            const text = e.target?.result;
-                                                            if (typeof text === 'string') setFormData(prev => ({ ...prev, content: text }));
-                                                        };
-                                                        reader.readAsText(f);
-                                                    } else if (type === 'image') {
-                                                        const reader = new FileReader();
-                                                        reader.onload = (e) => {
-                                                            const result = e.target?.result;
-                                                            if (typeof result === 'string') setBase64Data(result);
-                                                        };
-                                                        reader.readAsDataURL(f);
-                                                    }
-                                                    setFormData(prev => ({ ...prev, type: type, name: prev.name || f.name }));
-                                                }
-                                            }}
-                                            required={inputMode === "file"}
-                                        />
-                                        <div className="flex flex-col items-center gap-2">
-                                            <FileIcon className="h-8 w-8 text-muted-foreground" />
-                                            {file ? (
-                                                <div className="text-sm font-medium text-primary break-all">{file.name}</div>
-                                            ) : (
-                                                <>
-                                                    <span className="text-sm font-medium">Click to upload or drag and drop</span>
-                                                    <span className="text-xs text-muted-foreground">Images, PDF, DOC, XLS, CSV, TXT · Max 50MB</span>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* PROGRESS & SCANNING UI */}
-                            {(loading || isScanning || scanResult === 'clean') && (
-                                <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
-                                    <div className="flex justify-between text-sm mb-2">
-                                        <span className="font-medium">
-                                            {isScanning ? "Running Virus Scan..." :
-                                                scanResult === 'clean' ? "Scan Passed. Finalizing..." :
-                                                    "Uploading..."}
-                                        </span>
-                                        <span className="text-muted-foreground">
-                                            {isScanning ? <ShieldCheck className="h-4 w-4 animate-pulse text-indigo-500 inline mr-1" /> : null}
-                                            {uploadProgress}%
-                                        </span>
-                                    </div>
-
-                                    <Progress value={isScanning ? 100 : uploadProgress} className={isScanning ? "h-2 bg-indigo-100" : "h-2"} />
-
-                                    {!isScanning && !scanResult && (
-                                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                            <span>Speed: {uploadSpeed}</span>
-                                            <span>Remaining: {remainingTime}</span>
-                                        </div>
-                                    )}
-
-                                    {isScanning && (
-                                        <div className="flex items-center gap-2 text-xs text-indigo-400 mt-2">
-                                            <Loader2 className="h-3 w-3 animate-spin" />
-                                            Checking file integrity and signatures...
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Common Fields */}
-                        <div className="space-y-2">
-                            <Label htmlFor="type">Type</Label>
-                            <Select
-                                value={formData.type}
-                                onValueChange={(value: AssetType) => setFormData({ ...formData, type: value })}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {inputMode === 'link' ? (
-                                        <>
-                                            <SelectItem value="link">Link</SelectItem>
-                                            <SelectItem value="code">Code (Repository)</SelectItem>
-                                            <SelectItem value="image">Image (URL)</SelectItem>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <SelectItem value="file">File</SelectItem>
-                                            <SelectItem value="image">Image</SelectItem>
-                                            <SelectItem value="code">Code</SelectItem>
-                                            <SelectItem value="folder">Folder</SelectItem>
-                                            <SelectItem value="zip">Zip Archive</SelectItem>
-                                        </>
-                                    )}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Name</Label>
-                            <Input
-                                id="name"
-                                value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                placeholder="e.g. Project Specs"
-                                required
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="description">Description (Optional)</Label>
-                            <Textarea
-                                id="description"
-                                value={formData.description}
-                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                placeholder="Brief description..."
-                            />
-                        </div>
-
-                        <div className="flex justify-end pt-4">
-                            <Button type="submit" disabled={loading || isScanning || (inputMode === 'file' && !file)}>
-                                {loading || isScanning ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Processing...
-                                    </>
-                                ) : "Add Asset"}
-                            </Button>
-                        </div>
+                        <AddAssetDetailsFields
+                            inputMode={inputMode}
+                            type={formData.type}
+                            name={formData.name}
+                            url={formData.url}
+                            description={formData.description}
+                            loading={loading}
+                            isScanning={isScanning}
+                            hasFile={!!file}
+                            onTypeChange={(value) => setFormData((prev) => ({ ...prev, type: value }))}
+                            onNameChange={(value) => setFormData((prev) => ({ ...prev, name: value }))}
+                            onUrlChange={(value) => setFormData((prev) => ({ ...prev, url: value }))}
+                            onDescriptionChange={(value) => setFormData((prev) => ({ ...prev, description: value }))}
+                        />
                     </form>
                 </Tabs>
             </DialogContent>

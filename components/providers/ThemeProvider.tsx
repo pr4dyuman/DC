@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useSyncExternalStore } from "react";
 
 type Theme = "dark" | "light";
 
@@ -14,21 +14,21 @@ const ThemeContext = createContext<ThemeContextType>({
     setTheme: () => { },
 });
 
+const subscribe = () => () => { };
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-    const [theme, setTheme] = useState<Theme>("dark");
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        // Read from localStorage on mount
-        const stored = localStorage.getItem("agency-os-theme") as Theme | null;
-        if (stored === "light" || stored === "dark") {
-            setTheme(stored);
+    const isHydrated = useSyncExternalStore(subscribe, () => true, () => false);
+    const [theme, setTheme] = useState<Theme>(() => {
+        if (typeof window === "undefined") {
+            return "dark";
         }
-        setMounted(true);
-    }, []);
+
+        const stored = localStorage.getItem("agency-os-theme");
+        return stored === "light" || stored === "dark" ? stored : "dark";
+    });
 
     useEffect(() => {
-        if (!mounted) return;
+        if (!isHydrated) return;
 
         const root = document.documentElement;
         // Toggle dark class on <html> element
@@ -52,10 +52,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         }
 
         localStorage.setItem("agency-os-theme", theme);
-    }, [theme, mounted]);
+    }, [theme, isHydrated]);
 
     // Prevent flash of wrong theme
-    if (!mounted) {
+    if (!isHydrated) {
         return <>{children}</>;
     }
 

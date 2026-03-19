@@ -85,7 +85,7 @@ export function AgencySettings({ initialSettings, loading: parentLoading, onSave
                     </div>
                     <div>
                         <CardTitle>Agency Branding</CardTitle>
-                        <CardDescription>Update your agency's identity and logo.</CardDescription>
+                        <CardDescription>Update your agency&apos;s identity and logo.</CardDescription>
                     </div>
                 </div>
             </CardHeader>

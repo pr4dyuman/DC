@@ -27,6 +27,12 @@ export function AIChatBox({ projectId, taskState, userId, availableCategories = 
     const [applyingIdx, setApplyingIdx] = useState<number | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const sessionRef = useRef<string | null>(null);
+    const initialContextRef = useRef({
+        projectId,
+        title: taskState.title,
+        description: taskState.description,
+        userId,
+    });
 
     // Keep ref in sync with state
     useEffect(() => {
@@ -44,13 +50,14 @@ export function AIChatBox({ projectId, taskState, userId, availableCategories = 
     useEffect(() => {
         let mounted = true;
         const initSession = async () => {
+            const initialContext = initialContextRef.current;
             try {
                 setIsConnecting(true);
                 const id = await createAISession(
-                    projectId,
-                    taskState.title,
-                    taskState.description,
-                    userId
+                    initialContext.projectId,
+                    initialContext.title,
+                    initialContext.description,
+                    initialContext.userId
                 );
                 if (mounted) {
                     setSessionId(id);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { UserPermissions, DEFAULT_USER_PERMISSIONS } from '@/lib/types';
+import { UserPermissions, DEFAULT_USER_PERMISSIONS, getDefaultUserPermissionsForRole } from '@/lib/types';
 import type { User, Client } from '@/lib/types';
 import { getUsers, getUserPermissions, updateUserPermissions, getClients } from '@/lib/actions';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,6 +9,18 @@ import { toast } from 'sonner';
 import { Search, User as UserIcon, Building2, Trash2, Sparkles, FolderPlus, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { Switch } from '@/components/ui/switch';
+
+type PermissionSubject = User | Client;
+
+function getSubjectImage(user: PermissionSubject): string | null {
+    if ("avatar" in user && user.avatar) {
+        return user.avatar;
+    }
+    if ("logo" in user && user.logo) {
+        return user.logo;
+    }
+    return null;
+}
 
 export default function PermissionSettings() {
     const [users, setUsers] = useState<User[]>([]);
@@ -33,7 +45,8 @@ export default function PermissionSettings() {
                         const perm = await getUserPermissions(id);
                         return [id, perm] as [string, UserPermissions];
                     } catch {
-                        return [id, { ...DEFAULT_USER_PERMISSIONS }] as [string, UserPermissions];
+                        const subject = employees.find((user) => user.id === id) || clientsData.find((client) => client.id === id);
+                        return [id, getDefaultUserPermissionsForRole(subject?.role)] as [string, UserPermissions];
                     }
                 })
             );
@@ -59,7 +72,8 @@ export default function PermissionSettings() {
         key: keyof UserPermissions,
         value: boolean | string
     ) => {
-        const currentPerms = permissionsMap[userId] || { ...DEFAULT_USER_PERMISSIONS };
+        const subject = users.find((user) => user.id === userId) || clients.find((client) => client.id === userId);
+        const currentPerms = permissionsMap[userId] || getDefaultUserPermissionsForRole(subject?.role);
         const newPerms = { ...currentPerms, [key]: value };
 
         // Optimistic UI
@@ -131,7 +145,8 @@ export default function PermissionSettings() {
             <div className="grid gap-4">
                 <AnimatePresence>
                     {filteredList.map((user) => {
-                        const perms = permissionsMap[user.id] || { ...DEFAULT_USER_PERMISSIONS };
+                        const perms = permissionsMap[user.id] || getDefaultUserPermissionsForRole(user.role);
+                        const imageSrc = getSubjectImage(user);
 
                         return (
                             <motion.div
@@ -144,9 +159,9 @@ export default function PermissionSettings() {
                                 {/* User Info */}
                                 <div className="flex items-center gap-4 min-w-[200px]">
                                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden border border-border group-hover:border-primary/50 transition-colors">
-                                        {('avatar' in user && (user as any).avatar) || ('logo' in user && (user as any).logo) ? (
+                                        {imageSrc ? (
                                             <Image
-                                                src={('avatar' in user && (user as any).avatar) ? (user as any).avatar : ('logo' in user ? (user as any).logo : '')}
+                                                src={imageSrc}
                                                 alt={user.name}
                                                 width={40}
                                                 height={40}
@@ -200,7 +215,7 @@ export default function PermissionSettings() {
                                             <span className="text-[10px] text-muted-foreground">Move tasks to &quot;Done&quot;</span>
                                         </div>
                                         <Switch
-                                            checked={perms.canMarkDone ?? true}
+                                            checked={perms.canMarkDone ?? DEFAULT_USER_PERMISSIONS.canMarkDone}
                                             onCheckedChange={(val) => handleUpdatePermission(user.id, 'canMarkDone', val)}
                                         />
                                     </div>

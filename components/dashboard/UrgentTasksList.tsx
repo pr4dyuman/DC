@@ -14,7 +14,7 @@ import { toast } from "sonner";
 interface Task {
     id: string;
     title: string;
-    dueDate: string;
+    dueDate?: string;
     status: string;
     projectId: string;
     projectName: string;
@@ -32,6 +32,7 @@ export function UrgentTasksList({ initialTasks }: UrgentTasksListProps) {
     const [loading, setLoading] = useState(false);
     const { ref, inView } = useInView();
     const loadingRef = useRef(false);
+    const loadMoreRef = useRef<() => Promise<void>>(async () => { });
 
     const loadMore = async () => {
         if (loading || !hasMore || loadingRef.current) return;
@@ -54,8 +55,10 @@ export function UrgentTasksList({ initialTasks }: UrgentTasksListProps) {
         }
     };
 
+    loadMoreRef.current = loadMore;
+
     useEffect(() => {
-        if (inView) loadMore();
+        if (inView) void loadMoreRef.current();
     }, [inView]);
 
     const today = toLocalCalendarDay(new Date());

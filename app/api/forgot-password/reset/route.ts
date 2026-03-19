@@ -42,13 +42,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: getErrorMessage(error, 'Invalid email address') }, { status: 400 });
         }
 
-        // --- Verify OTP ---
-        try {
-            await verifyOtp(validatedEmail, otp.toString().trim(), 'password-reset');
-        } catch (error: unknown) {
-            return NextResponse.json({ error: getErrorMessage(error, 'Invalid verification code') }, { status: 400 });
-        }
-
         await connectDB();
 
         // --- Validate new password against system policy ---
@@ -65,6 +58,13 @@ export async function POST(request: Request) {
             }
         } catch (error: unknown) {
             return NextResponse.json({ error: getErrorMessage(error, 'Invalid password') }, { status: 400 });
+        }
+
+        // --- Verify OTP only after password passes validation ---
+        try {
+            await verifyOtp(validatedEmail, otp.toString().trim(), 'password-reset');
+        } catch (error: unknown) {
+            return NextResponse.json({ error: getErrorMessage(error, 'Invalid verification code') }, { status: 400 });
         }
 
         // --- Find user and update password ---

@@ -81,20 +81,22 @@ interface MessagesListProps {
 
 export function MessagesList({ messages, currentUserId }: MessagesListProps) {
     const fmt = useDateFormat();
-    let lastDate: string | null = null;
+    const groupedMessages = messages.map((msg, idx) => {
+        const msgDate = new Date(msg.timestamp);
+        const dateKey = fmt.dateKey(msgDate);
+        const previousDateKey = idx > 0 ? fmt.dateKey(new Date(messages[idx - 1].timestamp)) : null;
+
+        return {
+            msg,
+            idx,
+            msgDate,
+            showSeparator: idx === 0 || dateKey !== previousDateKey,
+        };
+    });
 
     return (
         <>
-            {messages.map((msg, idx) => {
-                const msgDate = new Date(msg.timestamp);
-                const dateKey = fmt.dateKey(msgDate);
-                let showSeparator = false;
-
-                if (dateKey !== lastDate) {
-                    showSeparator = true;
-                    lastDate = dateKey;
-                }
-
+            {groupedMessages.map(({ msg, idx, msgDate, showSeparator }) => {
                 return (
                     <div key={msg.id || idx}>
                         {showSeparator && <DateSeparator date={msgDate} />}

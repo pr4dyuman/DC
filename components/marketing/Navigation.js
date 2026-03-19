@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { getCurrentUser } from "@/lib/actions";
 import { X, Menu } from "lucide-react";
 
 export default function Navigation() {
@@ -10,6 +11,9 @@ export default function Navigation() {
   const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const pathname = usePathname();
+  const clearLoggedInCookie = () => {
+    document.cookie = "logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  };
 
   const servicesList = [
     { name: "Web Development", href: "/services/web-development" },
@@ -21,10 +25,35 @@ export default function Navigation() {
     { name: "Manage Company", href: "/services/manage-company" },
   ];
 
-  // Check if user is logged in by looking for logged_in cookie (set on login/signup)
+  // Keep marketing navigation aligned with the real authenticated session.
   useEffect(() => {
-    const hasToken = document.cookie.split(";").some((c) => c.trim().startsWith("logged_in="));
-    setIsLoggedIn(hasToken);
+    let cancelled = false;
+
+    const syncSessionState = async () => {
+      try {
+        const currentUser = await getCurrentUser();
+        if (cancelled) return;
+
+        if (currentUser) {
+          setIsLoggedIn(true);
+          return;
+        }
+
+        clearLoggedInCookie();
+        setIsLoggedIn(false);
+      } catch {
+        if (!cancelled) {
+          clearLoggedInCookie();
+          setIsLoggedIn(false);
+        }
+      }
+    };
+
+    void syncSessionState();
+
+    return () => {
+      cancelled = true;
+    };
   }, [pathname]);
 
   useEffect(() => {

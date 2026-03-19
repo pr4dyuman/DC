@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 // Export all MongoDB collections to JSON files
 const mongoose = require('mongoose');
 const fs = require('fs');

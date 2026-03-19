@@ -5,7 +5,7 @@ import { updateTask, getUsers, getProjectServices, deleteTask, aiEstimateTaskHou
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, Trash2, AlertTriangle, Clock, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Task, User, UserPermissions } from "@/lib/types";
+import { Task, User, UserPermissions, getDefaultUserPermissionsForRole } from "@/lib/types";
 import { toast } from "sonner";
 import { DateTimeInput } from "@/components/ui/DateTimeInput";
 
@@ -18,11 +18,12 @@ interface EditTaskModalProps {
     setOpen: (open: boolean) => void;
     permissions?: UserPermissions;
     currentUserId?: string;
+    currentUserRole?: string;
 }
 
 const PRIORITY_OPTIONS = ["Low", "Medium", "High"] as const;
 
-export function EditTaskModal({ task, open, setOpen, permissions, currentUserId }: EditTaskModalProps) {
+export function EditTaskModal({ task, open, setOpen, permissions, currentUserId, currentUserRole }: EditTaskModalProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
@@ -89,10 +90,11 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
         }
     };
 
-    const canEdit = permissions?.canManageTasks ?? true;
-    const canDelete = !permissions ||
-        permissions.deleteAccess === 'any' ||
-        (permissions.deleteAccess === 'own' && task.createdBy === currentUserId);
+    const effectivePermissions = permissions ?? getDefaultUserPermissionsForRole(currentUserRole);
+    const canEdit = effectivePermissions.canManageTasks;
+    const canReassignTask = currentUserRole === 'admin' || currentUserRole === 'manager';
+    const canDelete = effectivePermissions.deleteAccess === 'any' ||
+        (effectivePermissions.deleteAccess === 'own' && task.createdBy === currentUserId);
 
     const inputCls = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-ring";
     const labelCls = "text-sm font-medium text-foreground";
@@ -128,7 +130,7 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId 
                         </div>
                         <div className="space-y-1.5">
                             <label className={labelCls}>Assign To</label>
-                            <select disabled={!canEdit} value={assigneeId} onChange={e => setAssigneeId(e.target.value)} className={inputCls}>
+                            <select disabled={!canEdit || !canReassignTask} value={assigneeId} onChange={e => setAssigneeId(e.target.value)} className={inputCls}>
                                 <option value="">Unassigned</option>
                                 {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.jobTitle || u.role})</option>)}
                             </select>

@@ -2,7 +2,7 @@
 // NOT a server action itself — holds in-memory state (sessions Map)
 
 import { GoogleGenAI, Modality } from "@google/genai";
-import type { LiveServerMessage, Session } from "@google/genai";
+import type { LiveConnectConfig, LiveServerMessage, Session } from "@google/genai";
 
 // =============================================================================
 // PERSISTENT LIVE API SESSION MANAGER
@@ -17,7 +17,7 @@ import type { LiveServerMessage, Session } from "@google/genai";
 // =============================================================================
 
 interface LiveSession {
-    session: Session;
+    session: Session | null;
     messageQueue: LiveServerMessage[];
     apiKey: string;
     modelId: string;
@@ -79,8 +79,9 @@ async function collectResponse(liveSession: LiveSession): Promise<string> {
         const message = await waitMessage(liveSession);
 
         // Collect audio transcript (the ACTUAL spoken response)
-        if ((message.serverContent as any)?.outputTranscription?.text) {
-            transcriptText += (message.serverContent as any).outputTranscription.text;
+        const transcriptChunk = message.serverContent?.outputTranscription?.text;
+        if (transcriptChunk) {
+            transcriptText += transcriptChunk;
         }
 
         // Collect thought text as fallback
@@ -107,8 +108,9 @@ async function collectResponse(liveSession: LiveSession): Promise<string> {
             await new Promise(r => setTimeout(r, 100));
             continue;
         }
-        if ((remaining.serverContent as any)?.outputTranscription?.text) {
-            transcriptText += (remaining.serverContent as any).outputTranscription.text;
+        const transcriptChunk = remaining.serverContent?.outputTranscription?.text;
+        if (transcriptChunk) {
+            transcriptText += transcriptChunk;
         }
     }
 
@@ -164,30 +166,31 @@ async function connectSession(sessionId: string): Promise<void> {
     s.messageQueue = []; // Clear stale messages
 
     console.log(`[Live Session] ${sessionId} connecting...`);
+    const liveConfig: LiveConnectConfig = {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+            voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: 'Zephyr' }
+            }
+        },
+        // CRITICAL: captures what the model SPEAKS (the actual response)
+        outputAudioTranscription: {},
+    };
     const session = await ai.live.connect({
         model: `models/${s.modelId}`,
-        config: {
-            responseModalities: [Modality.AUDIO],
-            speechConfig: {
-                voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: 'Zephyr' }
-                }
-            },
-            // CRITICAL: captures what the model SPEAKS (the actual response)
-            outputAudioTranscription: {},
-        } as any,
+        config: liveConfig,
         callbacks: {
             onopen: () => {
                 console.log(`[Live Session] ${sessionId} connected`);
                 s.connected = true;
             },
             onmessage: (message: LiveServerMessage) => s.messageQueue.push(message),
-            onerror: (e: any) => {
-                console.error(`[Live Session] ${sessionId} error:`, e?.message || e);
+            onerror: (event) => {
+                console.error(`[Live Session] ${sessionId} error:`, event?.message || event);
                 s.connected = false;
             },
-            onclose: (e: any) => {
-                console.log(`[Live Session] ${sessionId} closed:`, e?.reason || '');
+            onclose: (event) => {
+                console.log(`[Live Session] ${sessionId} closed:`, event?.reason || '');
                 s.connected = false;
             },
         },
@@ -239,7 +242,7 @@ export async function createSession(
     const sessionId = generateSessionId();
 
     const liveSession: LiveSession = {
-        session: null as any,
+        session: null,
         messageQueue: [],
         apiKey,
         modelId,
@@ -287,6 +290,7 @@ export async function sendMessage(
     resetIdleTimer(sessionId);
 
     console.log(`[Live Session] ${sessionId} sending message (${userMessage.length} chars)`);
+    if (!s.session) throw new Error('Session not initialized. Create a new session.');
     s.session.sendClientContent({ turns: [userMessage] });
 
     // Collect response — prioritizes transcript over thought

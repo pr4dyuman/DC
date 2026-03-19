@@ -15,6 +15,7 @@ export type Contact = {
     username?: string;
     name: string;
     email: string;
+    companyName?: string;
     avatar?: string;
     role: string;
     jobTitle?: string;
@@ -28,10 +29,50 @@ export type Contact = {
 // Threshold for "Online" status (1 minute)
 const ONLINE_THRESHOLD_MS = 60 * 1000;
 
+type MessageRecord = Pick<Message, 'agencyId' | 'senderId' | 'receiverId' | 'content' | 'timestamp'> &
+    Partial<Pick<Message, 'id' | 'read' | 'type'>> & {
+        _id?: string | { toString(): string };
+    };
+
+type ContactMessageAggregateRow = {
+    _id: string;
+    lastMsg: MessageRecord;
+};
+
+type UnreadCountAggregateRow = {
+    _id: string;
+    count: number;
+};
+
+type UserContactRecord = {
+    id: string;
+    username?: string;
+    name: string;
+    email: string;
+    avatar?: string;
+    role: string;
+    jobTitle?: string;
+    lastActiveAt?: string;
+};
+
+type ClientContactRecord = {
+    id: string;
+    username?: string;
+    name: string;
+    email: string;
+    logo?: string;
+    companyName?: string;
+    lastActiveAt?: string;
+};
+
+type AgencyIdRecord = {
+    agencyId?: string;
+};
+
 /** Converts a raw Mongoose lean Message doc into a plain serializable object */
-function serializeMessage(m: any): Message {
+function serializeMessage(m: MessageRecord): Message {
     return {
-        id: m.id ?? String(m._id),
+        id: m.id ?? String(m._id ?? ''),
         agencyId: m.agencyId,
         senderId: m.senderId,
         receiverId: m.receiverId,
@@ -42,28 +83,30 @@ function serializeMessage(m: any): Message {
     };
 }
 
+async function touchCurrentUserPresence(userId: string, agencyId?: string) {
+    await connectDB();
+
+    const now = new Date().toISOString();
+    const scopedFilter = agencyId ? { id: userId, agencyId } : { id: userId };
+    const userResult = await UserModel.updateOne(
+        scopedFilter,
+        { $set: { lastActiveAt: now } }
+    );
+
+    if (userResult.matchedCount === 0) {
+        await ClientModel.updateOne(
+            scopedFilter,
+            { $set: { lastActiveAt: now } }
+        );
+    }
+}
+
 export async function heartbeat(_userId?: string) {
     void _userId;
     const session = await getSessionUser();
     if (!session) return;
-    const authedUserId = session.userId;
 
-    await connectDB();
-    const now = new Date().toISOString();
-
-    // Direct targeted update — avoids loading all collections just to update one field
-    const userResult = await UserModel.updateOne(
-        { id: authedUserId },
-        { $set: { lastActiveAt: now } }
-    );
-
-    // If no user was found, try clients
-    if (userResult.matchedCount === 0) {
-        await ClientModel.updateOne(
-            { id: authedUserId },
-            { $set: { lastActiveAt: now } }
-        );
-    }
+    await touchCurrentUserPresence(session.userId);
 }
 
 export async function getTotalUnreadCount(_currentUserId?: string): Promise<number> {
@@ -76,8 +119,9 @@ export async function getTotalUnreadCount(_currentUserId?: string): Promise<numb
     const agency = await getCurrentAgency();
     if (!agency?.id) return 0;
     return MessageModel.countDocuments({
-        receiverId: authedUserId, read: false,
-        agencyId: agency.id
+        receiverId: authedUserId,
+        read: false,
+        agencyId: agency.id,
     });
 }
 
@@ -93,58 +137,67 @@ export async function getContacts(_currentUserId?: string): Promise<Contact[]> {
     const agencyFilter = { agencyId: agency.id };
     const now = new Date().getTime();
 
-    // Fetch users/clients, and use aggregation for message stats instead of loading ALL messages
+    // Fetch users/clients, and use aggregation for message stats instead of loading all messages.
     const [users, clients, lastMessages, unreadCounts] = await Promise.all([
-        UserModel.find({ id: { $ne: currentUserId }, ...agencyFilter }).select('-password').lean(),
-        ClientModel.find({ ...agencyFilter }).select('-password').lean(),
-        // Aggregation: get last message per contact (sent or received)
+        UserModel.find({ id: { $ne: currentUserId }, ...agencyFilter }).select('-password').lean() as Promise<UserContactRecord[]>,
+        ClientModel.find({ ...agencyFilter }).select('-password').lean() as Promise<ClientContactRecord[]>,
         MessageModel.aggregate([
             { $match: { $or: [{ senderId: currentUserId }, { receiverId: currentUserId }], ...agencyFilter } },
             { $addFields: { contactId: { $cond: [{ $eq: ['$senderId', currentUserId] }, '$receiverId', '$senderId'] } } },
             { $sort: { timestamp: -1 } },
             { $group: { _id: '$contactId', lastMsg: { $first: '$$ROOT' } } },
-        ]),
-        // Aggregation: count unread messages per sender
+        ]) as Promise<ContactMessageAggregateRow[]>,
         MessageModel.aggregate([
             { $match: { receiverId: currentUserId, read: false, ...agencyFilter } },
             { $group: { _id: '$senderId', count: { $sum: 1 } } },
-        ]),
+        ]) as Promise<UnreadCountAggregateRow[]>,
     ]);
 
-    // Build lookup maps
-    const lastMsgMap = new Map<string, any>(lastMessages.map((r: any) => [r._id, r.lastMsg]));
-    const unreadMap = new Map<string, number>(unreadCounts.map((r: any) => [r._id, r.count]));
+    const lastMsgMap = new Map(lastMessages.map((row) => [row._id, row.lastMsg] as const));
+    const unreadMap = new Map(unreadCounts.map((row) => [row._id, row.count] as const));
 
-    const isClient = clients.some((c: any) => c.id === currentUserId);
+    const isClient = clients.some((client) => client.id === currentUserId);
     const contacts: Contact[] = [];
 
     for (const user of users) {
-        const u = user as any;
-        const lastActive = u.lastActiveAt ? new Date(u.lastActiveAt).getTime() : 0;
-        const lastMsg = lastMsgMap.get(u.id);
+        const lastActive = user.lastActiveAt ? new Date(user.lastActiveAt).getTime() : 0;
+        const lastMsg = lastMsgMap.get(user.id);
+
         contacts.push({
-            id: u.id, username: u.username, name: u.name, email: u.email,
-            avatar: u.avatar, role: u.role, jobTitle: u.jobTitle, type: 'user',
-            unreadCount: unreadMap.get(u.id) || 0,
+            id: user.id,
+            username: user.username,
+            name: user.name,
+            email: user.email,
+            avatar: user.avatar,
+            role: user.role,
+            jobTitle: user.jobTitle,
+            type: 'user',
+            unreadCount: unreadMap.get(user.id) || 0,
             isOnline: (now - lastActive) < ONLINE_THRESHOLD_MS,
-            lastActiveAt: u.lastActiveAt,
+            lastActiveAt: user.lastActiveAt,
             lastMessage: lastMsg ? serializeMessage(lastMsg) : undefined,
         });
     }
 
     if (!isClient) {
         for (const client of clients) {
-            const c = client as any;
-            const lastActive = c.lastActiveAt ? new Date(c.lastActiveAt).getTime() : 0;
-            const lastMsg = lastMsgMap.get(c.id);
+            const lastActive = client.lastActiveAt ? new Date(client.lastActiveAt).getTime() : 0;
+            const lastMsg = lastMsgMap.get(client.id);
+
             contacts.push({
-                id: c.id, username: c.username, name: c.name, email: c.email,
-                companyName: c.companyName, avatar: c.logo, role: 'Client', type: 'client',
-                unreadCount: unreadMap.get(c.id) || 0,
+                id: client.id,
+                username: client.username,
+                name: client.name,
+                email: client.email,
+                companyName: client.companyName,
+                avatar: client.logo,
+                role: 'Client',
+                type: 'client',
+                unreadCount: unreadMap.get(client.id) || 0,
                 isOnline: (now - lastActive) < ONLINE_THRESHOLD_MS,
-                lastActiveAt: c.lastActiveAt,
+                lastActiveAt: client.lastActiveAt,
                 lastMessage: lastMsg ? serializeMessage(lastMsg) : undefined,
-            } as any);
+            });
         }
     }
 
@@ -164,15 +217,17 @@ export async function getMessages(_currentUserId: string, otherUserId: string): 
     await connectDB();
     const agency = await getCurrentAgency();
     if (!agency?.id) throw new Error('Agency context required');
+
     const msgs = await MessageModel.find({
         $or: [
             { senderId: currentUserId, receiverId: otherUserId },
-            { senderId: otherUserId, receiverId: currentUserId }
+            { senderId: otherUserId, receiverId: currentUserId },
         ],
-        agencyId: agency.id
-    }).lean();
+        agencyId: agency.id,
+    }).lean() as unknown as MessageRecord[];
+
     return msgs
-        .map((m: any) => serializeMessage(m))
+        .map((message) => serializeMessage(message))
         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) as Message[];
 }
 
@@ -182,22 +237,23 @@ export async function sendMessage(_senderId: string, receiverId: string, content
     const senderId = session.userId;
 
     await connectDB();
-    // Input sanitization — prevent XSS in chat messages
+
+    // Input sanitization - prevent XSS in chat messages.
     content = sanitizeString(content, 10000);
     if (!content) throw new Error('Message content is required');
 
-    // Resolve agencyId — require it for data isolation
+    // Resolve agencyId - require it for data isolation.
     let agencyId: string | undefined;
     const agency = await getCurrentAgency();
     if (agency) {
         agencyId = agency.id;
     } else {
-        // Fallback: look up user directly from DB
-        const userData = await UserModel.findOne({ id: senderId }).select('agencyId').lean();
-        if (userData && (userData as any).agencyId) {
-            agencyId = (userData as any).agencyId;
+        const userData = await UserModel.findOne({ id: senderId }).select('agencyId').lean() as AgencyIdRecord | null;
+        if (userData?.agencyId) {
+            agencyId = userData.agencyId;
         }
     }
+
     if (!agencyId) throw new Error('Agency context required');
 
     const newMessage: Message = {
@@ -208,15 +264,13 @@ export async function sendMessage(_senderId: string, receiverId: string, content
         timestamp: new Date().toISOString(),
         read: false,
         type,
-        agencyId
+        agencyId,
     };
 
-    // Direct MongoDB insert — bypasses the heavy db.update read-modify-write cycle
-    // which could lose the message due to React cache() stale reads
+    // Direct MongoDB insert - bypasses the heavier read-modify-write helper path.
     await MessageModel.create(newMessage);
 
-    // Also update sender's presence
-    await heartbeat();
+    await touchCurrentUserPresence(senderId, agencyId);
 
     revalidatePath('/dashboard');
 
@@ -232,14 +286,13 @@ export async function markAsRead(_currentUserId: string, senderId: string) {
     await connectDB();
     const agency = await getCurrentAgency();
     if (!agency?.id) return;
+
     await MessageModel.updateMany(
         { senderId, receiverId: currentUserId, agencyId: agency.id, read: false },
         { $set: { read: true } }
     );
-    await UserModel.updateOne(
-        { id: currentUserId, agencyId: agency.id },
-        { $set: { lastActiveAt: new Date().toISOString() } }
-    );
+
+    await touchCurrentUserPresence(currentUserId, agency.id);
 }
 
 export async function deleteConversation(_currentUserId: string, otherUserId: string) {
@@ -250,13 +303,15 @@ export async function deleteConversation(_currentUserId: string, otherUserId: st
 
     await connectDB();
     const agency = await getCurrentAgency();
-    if (!agency) throw new Error('No agency context — cannot delete conversation');
+    if (!agency) throw new Error('No agency context - cannot delete conversation');
+
     await MessageModel.deleteMany({
         agencyId: agency.id,
         $or: [
             { senderId: currentUserId, receiverId: otherUserId },
-            { senderId: otherUserId, receiverId: currentUserId }
-        ]
+            { senderId: otherUserId, receiverId: currentUserId },
+        ],
     });
+
     revalidatePath('/dashboard');
 }

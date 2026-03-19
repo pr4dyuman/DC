@@ -10,6 +10,10 @@ import {
 import { getSessionUser } from "@/lib/auth";
 import { validateCsrfOrigin } from "@/lib/validation";
 
+function getErrorMessage(error: unknown) {
+    return error instanceof Error ? error.message : "Unknown error";
+}
+
 // Helper: verify session ownership (scoped inside getSingularitySession)
 async function verifySessionOwnership(sessionId: string): Promise<boolean> {
     const chatSession = await getSingularitySession(sessionId);
@@ -38,8 +42,8 @@ export async function GET(req: NextRequest) {
 
         const checkpoints = await getCheckpoints(sessionId);
         return NextResponse.json(checkpoints);
-    } catch (error: any) {
-        console.error("[Checkpoint API] GET error:", error.message);
+    } catch (error: unknown) {
+        console.error("[Checkpoint API] GET error:", getErrorMessage(error));
         return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 }
@@ -85,8 +89,8 @@ export async function POST(req: NextRequest) {
 
         const checkpointId = await createCheckpoint(sessionId, messageIndex, actions, label || "Checkpoint");
         return NextResponse.json({ checkpointId });
-    } catch (error: any) {
-        console.error("[Checkpoint API] POST error:", error.message);
+    } catch (error: unknown) {
+        console.error("[Checkpoint API] POST error:", getErrorMessage(error));
         return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 }
@@ -117,8 +121,8 @@ export async function PUT(req: NextRequest) {
 
         const result = await executeRollback(checkpointId, scope);
         return NextResponse.json(result);
-    } catch (error: any) {
-        console.error("[Checkpoint API] PUT error:", error.message);
+    } catch (error: unknown) {
+        console.error("[Checkpoint API] PUT error:", getErrorMessage(error));
         return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 }

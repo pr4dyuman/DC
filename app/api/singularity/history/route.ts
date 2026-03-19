@@ -10,6 +10,10 @@ import {
 import { getSessionUser } from "@/lib/auth";
 import { validateCsrfOrigin } from "@/lib/validation";
 
+function getErrorMessage(error: unknown) {
+    return error instanceof Error ? error.message : "Unknown error";
+}
+
 // GET /api/singularity/history?sessionId=xxx — Load single session
 // GET /api/singularity/history — List current user's sessions
 export async function GET(req: NextRequest) {
@@ -34,8 +38,8 @@ export async function GET(req: NextRequest) {
         // Only return sessions for the authenticated user (Fix IDOR)
         const sessions = await getSingularitySessions(session.userId);
         return NextResponse.json(sessions);
-    } catch (error: any) {
-        console.error("[History API] GET error:", error.message);
+    } catch (error: unknown) {
+        console.error("[History API] GET error:", getErrorMessage(error));
         return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 }
@@ -71,8 +75,8 @@ export async function POST(req: NextRequest) {
         // Otherwise — create a new session for the authenticated user
         const newSessionId = await createSingularitySession(session.userId, mode || "chat");
         return NextResponse.json({ sessionId: newSessionId });
-    } catch (error: any) {
-        console.error("[History API] POST error:", error.message);
+    } catch (error: unknown) {
+        console.error("[History API] POST error:", getErrorMessage(error));
         return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 }
@@ -111,8 +115,8 @@ export async function PUT(req: NextRequest) {
         }
 
         return NextResponse.json({ success: true });
-    } catch (error: any) {
-        console.error("[History API] PUT error:", error.message);
+    } catch (error: unknown) {
+        console.error("[History API] PUT error:", getErrorMessage(error));
         return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 }
@@ -144,8 +148,8 @@ export async function DELETE(req: NextRequest) {
 
         await deleteSingularitySession(id);
         return NextResponse.json({ success: true });
-    } catch (error: any) {
-        console.error("[History API] DELETE error:", error.message);
+    } catch (error: unknown) {
+        console.error("[History API] DELETE error:", getErrorMessage(error));
         return NextResponse.json({ error: "An internal error occurred" }, { status: 500 });
     }
 }

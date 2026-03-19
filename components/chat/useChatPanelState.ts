@@ -34,10 +34,12 @@ export function useChatPanelState({
     const [showEmoji, setShowEmoji] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const loadContactsRef = useRef<(silent?: boolean) => Promise<void>>(async () => { });
+    const loadMessagesRef = useRef<(silent?: boolean) => Promise<void>>(async () => { });
 
     useEffect(() => {
         if (enabled && currentUserId) {
-            void loadContacts();
+            void loadContactsRef.current();
         }
     }, [enabled, currentUserId]);
 
@@ -54,18 +56,18 @@ export function useChatPanelState({
     }, [activeContactId]);
 
     useActivePolling(() => {
-        void loadContacts(true);
+        void loadContactsRef.current(true);
     }, 120000, enabled && !!currentUserId);
 
     useEffect(() => {
         if (enabled && currentUserId && activeContactId) {
-            void loadMessages();
+            void loadMessagesRef.current();
             void markAsRead(currentUserId, activeContactId);
         }
     }, [enabled, currentUserId, activeContactId]);
 
     useActivePolling(() => {
-        void loadMessages(true);
+        void loadMessagesRef.current(true);
     }, 10000, enabled && !!currentUserId && !!activeContactId);
 
     useEffect(() => {
@@ -105,6 +107,9 @@ export function useChatPanelState({
         }
     }
 
+    loadContactsRef.current = loadContacts;
+    loadMessagesRef.current = loadMessages;
+
     async function handleSend() {
         if (!currentUserId || !activeContactId || !newMessage.trim() || isSending) return;
         const content = newMessage.trim();
@@ -130,6 +135,8 @@ export function useChatPanelState({
             await loadMessages(true);
             await loadContacts(true);
         } catch (error) {
+            setMessages((prev) => prev.filter((message) => message.id !== optimisticMessage.id));
+            setNewMessage(content);
             console.error("Failed to send", error);
             toast.error("Failed to send message");
         } finally {

@@ -93,7 +93,7 @@ export default function AboutAgency() {
             {/* Description */}
             <div className="max-w-md space-y-3 sm:space-y-4">
               <p className="text-gray-400 text-xs sm:text-sm leading-relaxed">
-                At Digital Corvids, we don't just deliver solutions –
+                At Digital Corvids, we don&apos;t just deliver solutions –
                 we innovate, adapt, and evolve to meet the ever-shifting
                 demands of the digital world. We are agile and strategic,
                 always finding the most effective path forward to unlock new

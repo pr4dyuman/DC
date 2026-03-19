@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 // Fix database: normalize agencyId + create new admin account
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');

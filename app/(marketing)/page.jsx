@@ -44,7 +44,7 @@ const HeroSection = () => {
     }, 3500);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [words.length]);
 
   return (
     <div className="font-glacial text-white bg-black">

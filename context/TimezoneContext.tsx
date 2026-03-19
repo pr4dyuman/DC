@@ -40,6 +40,7 @@ export function TimezoneProvider({
     const locale = useMemo(() => getLocaleForTimezone(timezone), [timezone]);
 
     // Auto-detect browser timezone if user hasn't set one
+    /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
         if (!userTimezone) {
             try {
@@ -51,6 +52,7 @@ export function TimezoneProvider({
             } catch { /* noop */ }
         }
     }, [userTimezone, onDetected]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     const value = useMemo(() => ({ timezone, locale }), [timezone, locale]);
 

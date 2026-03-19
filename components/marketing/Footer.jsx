@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Instagram, Linkedin } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { subscribeNewsletter } from "@/lib/actions/super-admin";
 
 function NewsletterForm() {
@@ -99,9 +100,9 @@ export default function Footer() {
 
           {/* Center: Navigation Links */}
           <div className="flex gap-8 md:gap-12 mt-4 lg:mt-12 font-bold text-sm tracking-widest font-glacial">
-            <a href="/about" className="hover:text-gray-300 transition-colors uppercase">ABOUT US</a>
-            <a href="/contact" className="hover:text-gray-300 transition-colors uppercase">CONTACT US</a>
-            <a href="/blog" className="hover:text-gray-300 transition-colors uppercase">BLOG</a>
+            <Link href="/about" className="hover:text-gray-300 transition-colors uppercase">ABOUT US</Link>
+            <Link href="/contact" className="hover:text-gray-300 transition-colors uppercase">CONTACT US</Link>
+            <Link href="/blog" className="hover:text-gray-300 transition-colors uppercase">BLOG</Link>
           </div>
 
           {/* Right: Newsletter & Contact */}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Project, Task, User, Transaction, Asset, Service, UserPermissions } from "@/lib/types";
+import { Project, Task, User, Transaction, Asset, Service, UserPermissions, getDefaultUserPermissionsForRole } from "@/lib/types";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { KanbanBoard } from "@/components/projects/KanbanBoard";
@@ -17,6 +17,7 @@ import { AddAssetModal } from "@/components/projects/AddAssetModal";
 import { PaymentSettingsCard } from "@/components/projects/PaymentSettingsCard";
 import { ProjectServices } from "@/components/projects/ProjectServices";
 import { toLocalCalendarDay } from "@/lib/date-utils";
+import type { CurrentUserResult } from "@/lib/actions";
 
 type ProjectViewProps = {
     project: Project;
@@ -28,7 +29,7 @@ type ProjectViewProps = {
     permissions?: UserPermissions;
 };
 
-export function ProjectView({ project, tasks, users, transactions, assets, categories, currentUser, permissions }: ProjectViewProps & { currentUser?: User }) {
+export function ProjectView({ project, tasks, users, transactions, assets, categories, currentUser, permissions }: ProjectViewProps & { currentUser?: CurrentUserResult }) {
     const fmt = useDateFormat();
     const { format: formatMoney } = useCurrency();
     const projectServices = project.services || [];
@@ -37,6 +38,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
     );
     const [selectedCategory, setSelectedCategory] = useState<string>("All");
     const [showTeamHours, setShowTeamHours] = useState(false);
+    const effectivePermissions = permissions ?? getDefaultUserPermissionsForRole(currentUser?.role);
 
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager'; // Helper
 
@@ -73,7 +75,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                         <div className="flex items-center gap-2">
                             <TabsContent value="board" className="mt-0">
                                 <div className="flex items-center gap-2">
-                                    {(permissions?.canManageTasks ?? true) && <CreateTaskModal projectId={project.id} />}
+                                    {effectivePermissions.canManageTasks && <CreateTaskModal projectId={project.id} />}
                                     {/* Settings gear (desktop only, in header row) */}
                                     <div className="hidden md:flex">
                                         {isAdmin && (
@@ -235,6 +237,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                             users={users}
                             categories={filteredCategories}
                             currentUserId={currentUser?.id}
+                            currentUserRole={currentUser?.role}
                             selectedCategory={selectedCategory}
                             readOnly={false}
                             permissions={permissions}

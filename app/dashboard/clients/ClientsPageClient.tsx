@@ -41,7 +41,7 @@ export default function ClientsPage() {
         } finally {
             setLoading(false);
         }
-    }, [showArchived]);
+    }, [showArchived, router]);
 
     useEffect(() => {
         loadData();

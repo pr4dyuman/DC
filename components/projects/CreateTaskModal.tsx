@@ -11,6 +11,16 @@ import { toast } from "sonner";
 import { DateTimeInput } from "@/components/ui/DateTimeInput";
 
 type TaskPriority = 'Low' | 'Medium' | 'High';
+type TaskAssignee = {
+    id: string;
+    name: string;
+    jobTitle?: string;
+    role?: string;
+};
+type ServiceOption = {
+    id: string;
+    name: string;
+};
 
 interface CreateTaskModalProps {
     projectId: string;
@@ -36,21 +46,35 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
     const [priority, setPriority] = useState<TaskPriority>("Medium");
     const [estimatedHours, setEstimatedHours] = useState<number>(0);
 
-    const [users, setUsers] = useState<any[]>([]);
-    const [services, setServices] = useState<any[]>([]);
+    const [users, setUsers] = useState<TaskAssignee[]>([]);
+    const [services, setServices] = useState<ServiceOption[]>([]);
 
     useEffect(() => {
-        if (open) {
-            Promise.all([getUsers(), getProjectServices(projectId), getCurrentUser()]).then(([u, s, currentUser]) => {
-                setUsers(u);
-                setServices(s);
+        if (!open) return;
+
+        let cancelled = false;
+        Promise.all([getUsers(), getProjectServices(projectId), getCurrentUser()])
+            .then(([loadedUsers, loadedServices, currentUser]) => {
+                if (cancelled) return;
+                setUsers(loadedUsers);
+                setServices((loadedServices || []).map((service) => ({
+                    id: service.id,
+                    name: service.name,
+                })));
                 if (currentUser) setCurrentUserId(currentUser.id);
-                // Set defaults only if not already set
-                if (s.length > 0 && !category) setCategory(s[0].name);
-                if (u.length > 0 && !assigneeId) setAssigneeId(u[0].id);
+                setCategory((prev) => prev || loadedServices[0]?.name || "");
+                setAssigneeId((prev) => prev || loadedUsers[0]?.id || "");
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    toast.error("Failed to load task form data");
+                }
             });
-        }
-    }, [open]);
+
+        return () => {
+            cancelled = true;
+        };
+    }, [open, projectId]);
 
     const resetForm = () => {
         setTitle("");
@@ -183,8 +207,8 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                                                 const hours = await aiEstimateTaskHours(projectId, title, description, priority);
                                                 setEstimatedHours(hours);
                                                 toast.success(`Estimated: ${hours}h`);
-                                            } catch (e: any) {
-                                                toast.error(e.message || 'Failed to estimate');
+                                            } catch (error: unknown) {
+                                                toast.error(error instanceof Error ? error.message : 'Failed to estimate');
                                             } finally {
                                                 setEstimating(false);
                                             }

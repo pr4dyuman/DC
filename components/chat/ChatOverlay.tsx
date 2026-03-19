@@ -147,6 +147,7 @@ export function ChatOverlay({ isOpen, onClose, currentUserId, initialActiveId }:
                                         <ArrowLeft className="w-4 h-4" />
                                     </button>
                                     <div className="relative">
+                                        {/* eslint-disable-next-line @next/next/no-img-element -- dynamic remote avatars are kept raw to avoid tenant image-loader/domain regressions */}
                                         <img
                                             src={activeContact.avatar || "/placeholder-avatar.jpg"}
                                             alt={activeContact.name}

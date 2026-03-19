@@ -45,9 +45,10 @@ export async function sendEmail({ to, toName, subject, htmlContent }: SendEmailO
         }
 
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Brevo send error:", error);
-        return { success: false, error: error.message || "Email send failed" };
+        const message = error instanceof Error ? error.message : "Email send failed";
+        return { success: false, error: message };
     }
 }
 

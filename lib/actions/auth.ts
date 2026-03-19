@@ -30,7 +30,7 @@ export async function login(email: string, password: string) {
     const rateKey = `login:${email.toLowerCase().trim()}`;
     const now = new Date();
     const rateRecord = await RateLimitModel.findOne({ key: rateKey, expiresAt: { $gt: now } }).lean();
-    if (rateRecord && (rateRecord as any).count >= MAX_LOGIN_ATTEMPTS) {
+    if (rateRecord && rateRecord.count >= MAX_LOGIN_ATTEMPTS) {
         return { success: false, error: 'Too many login attempts. Please try again later.' };
     }
     if (rateRecord) {
@@ -60,7 +60,7 @@ export async function login(email: string, password: string) {
     }
     const user = matchedUsers[0];
     if (user) {
-        if ((user as any).archived) {
+        if (user.archived) {
             return { success: false, error: 'This account has been deactivated. Please contact your agency.' };
         }
         if (user.password && await comparePassword(password, user.password)) {
@@ -78,7 +78,7 @@ export async function login(email: string, password: string) {
     }
     const client = matchedClients[0];
     if (client) {
-        if ((client as any).archived) {
+        if (client.archived) {
             return { success: false, error: 'This account has been deactivated. Please contact your agency.' };
         }
         if (client.password && await comparePassword(password, client.password)) {

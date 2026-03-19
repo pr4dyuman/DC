@@ -89,7 +89,7 @@ const ServicesSection = () => {
           <div className="lg:w-1/3">
             <p className="text-gray-300 text-sm lg:text-base leading-relaxed">
               A brief overview of all the services we provide as a digital marketing agency. Clicking the learn more
-              button will lead to each service's individual page.
+              button will lead to each service&apos;s individual page.
             </p>
           </div>
         </div>

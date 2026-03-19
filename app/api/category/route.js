@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import dbConnect from '@/lib/marketing-db';
 import Category from '@/models/marketing/Category';
 import { checkAuth } from '@/lib/authMiddleware';
@@ -80,6 +81,9 @@ export async function DELETE(req) {
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'ID required' }, { status: 400 });
+    }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ success: false, error: 'Invalid category ID' }, { status: 400 });
     }
 
     const category = await Category.findByIdAndDelete(id).lean();

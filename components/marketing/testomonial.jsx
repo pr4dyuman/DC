@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Pagination, Autoplay } from 'swiper/modules';
 import 'swiper/css';
@@ -97,16 +98,19 @@ export default function TestimonialSection() {
               <div className="bg-black p-8 rounded-lg h-full flex flex-col">
                 {/* Icon */}
                 <div className="mb-6">
-                  <img
+                  <Image
                     src="/Frame.svg"
                     alt="Quote"
+                    width={48}
+                    height={48}
                     className="w-12 h-12"
+                    unoptimized
                   />
                 </div>
 
                 {/* Testimonial Text */}
                 <p className="text-gray-300 text-sm leading-relaxed mb-8 flex-grow">
-                  "{testimonial.text}"
+                  &quot;{testimonial.text}&quot;
                 </p>
 
                 {/* Author Info */}

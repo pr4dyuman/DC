@@ -154,6 +154,7 @@ export default function CreateAgencyForm() {
                 <label className="block text-sm font-medium text-foreground mb-2">Agency Logo</label>
                 {logoPreview ? (
                     <div className="flex items-center gap-4">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- local data URL previews are kept raw to avoid preview regressions in admin upload flow */}
                         <img src={logoPreview} alt="Logo preview" className="w-16 h-16 rounded-lg object-contain border border-border bg-muted/30" />
                         <button
                             type="button"

@@ -4,7 +4,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { Sidebar } from "./Sidebar";
 import { Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 interface MobileSidebarProps {
     currentUserId?: string;
@@ -15,21 +15,21 @@ interface MobileSidebarProps {
     agencyPlan?: string;
 }
 
+const subscribe = () => () => { };
+
 export function MobileSidebar({ currentUserId, currentUserUsername, currentUserRole, agencyName, agencyLogo, agencyPlan }: MobileSidebarProps) {
     const [open, setOpen] = useState(false);
     const pathname = usePathname();
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
+    const isHydrated = useSyncExternalStore(subscribe, () => true, () => false);
 
     // Close sidebar when route changes
+    /* eslint-disable react-hooks/set-state-in-effect */
     useEffect(() => {
         setOpen(false);
     }, [pathname]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
-    if (!mounted) return null; // Avoid hydration mismatch
+    if (!isHydrated) return null; // Avoid hydration mismatch
 
     return (
         <Sheet open={open} onOpenChange={setOpen}>

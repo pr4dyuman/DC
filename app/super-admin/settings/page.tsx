@@ -1,17 +1,24 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { Shield, Bell, Database, Globe, Check, Mail, AlertTriangle, Loader2, Brain, ChevronRight, ChevronDown, Zap, Sparkles } from "lucide-react";
+import { Shield, Bell, Database, Globe, Mail, Loader2, Brain } from "lucide-react";
 import { useDateFormat } from "@/context/TimezoneContext";
-import { CURRENCIES } from "@/lib/currency";
 import { getSystemSettings, updateSystemSettings, getAllAgenciesWithStats, getDefaultAiConfig, saveDefaultAiConfig } from "@/lib/actions/super-admin";
 import { AI_MODELS } from "@/lib/ai-models";
 import { AIConfig, Agency, AIProvider } from "@/lib/types";
-import { Switch } from "@/components/ui/switch";
-import { EMAIL_CATEGORY_INFO, DEFAULT_EMAIL_CATEGORIES, TASK_EMAIL_EVENTS, DEFAULT_TASK_EMAIL_EVENTS } from "@/lib/email-constants";
+import { DEFAULT_EMAIL_CATEGORIES, DEFAULT_TASK_EMAIL_EVENTS } from "@/lib/email-constants";
 import type { EmailCategory, TaskEmailEventKey, TaskEmailEventConfig } from "@/lib/email-constants";
 import { toast } from "sonner";
+import { SystemSettingsAiAgencyList } from "./_components/SystemSettingsAiAgencyList";
+import { SystemSettingsDefaultAiSection } from "./_components/SystemSettingsDefaultAiSection";
+import { SystemSettingsEmailAdminSection } from "./_components/SystemSettingsEmailAdminSection";
+import { SystemSettingsEmailCategorySection } from "./_components/SystemSettingsEmailCategorySection";
+import { SystemSettingsEmailGlobalControls } from "./_components/SystemSettingsEmailGlobalControls";
+import { SystemSettingsInfoSection } from "./_components/SystemSettingsInfoSection";
+import { SystemSettingsNotificationsSection } from "./_components/SystemSettingsNotificationsSection";
+import { SystemSettingsPlatformSection } from "./_components/SystemSettingsPlatformSection";
+import { SystemSettingsSectionAccordion } from "./_components/SystemSettingsSectionAccordion";
+import { SystemSettingsSecuritySection } from "./_components/SystemSettingsSecuritySection";
 
 type AgencyWithStats = Agency & {
     stats: {
@@ -102,18 +109,24 @@ export default function SystemSettingsPage() {
                 if (settings?.notifications) setNotifications(prev => ({ ...prev, ...settings.notifications }));
                 if (settings?.notificationDefaults) setNotificationDefaults(prev => ({ ...prev, ...settings.notificationDefaults }));
                 if (settings?.emailDefaults) {
-                    if (typeof settings.emailDefaults.globalEnabled === 'boolean') setEmailGlobalEnabled(settings.emailDefaults.globalEnabled);
+                    const emailDefaults = settings.emailDefaults;
+                    if (typeof emailDefaults.globalEnabled === 'boolean') setEmailGlobalEnabled(emailDefaults.globalEnabled);
                     const cats: Record<string, boolean> = { ...DEFAULT_EMAIL_CATEGORIES };
-                    for (const key of Object.keys(DEFAULT_EMAIL_CATEGORIES)) {
-                        if (typeof settings.emailDefaults[key] === 'boolean') cats[key] = settings.emailDefaults[key];
+                    for (const key of Object.keys(DEFAULT_EMAIL_CATEGORIES) as EmailCategory[]) {
+                        const categoryValue = emailDefaults[key];
+                        if (typeof categoryValue === 'boolean') {
+                            cats[key] = categoryValue;
+                        }
                     }
                     setEmailCategories(cats);
-                    if (settings.emailDefaults.taskEmailEvents) {
+                    const taskEmailEventDefaults = emailDefaults.taskEmailEvents;
+                    if (taskEmailEventDefaults) {
                         setTaskEmailEvents(prev => {
                             const merged = { ...prev };
                             for (const eventKey of Object.keys(prev) as TaskEmailEventKey[]) {
-                                if (settings.emailDefaults.taskEmailEvents[eventKey]) {
-                                    merged[eventKey] = { ...prev[eventKey], ...settings.emailDefaults.taskEmailEvents[eventKey] };
+                                const eventConfig = taskEmailEventDefaults[eventKey];
+                                if (eventConfig) {
+                                    merged[eventKey] = { ...prev[eventKey], ...eventConfig };
                                 }
                             }
                             return merged;
@@ -219,6 +232,74 @@ export default function SystemSettingsPage() {
         }
     }, []);
 
+    const handleDefaultAiProviderChange = useCallback((provider: AIProvider) => {
+        setDefaultAi((prev) => ({
+            ...prev,
+            provider,
+            model: AI_MODELS[provider]?.[0]?.id || "",
+            customModelId: "",
+        }));
+    }, []);
+
+    const handleDefaultAiApiKeyChange = useCallback((apiKey: string) => {
+        setDefaultAi((prev) => ({ ...prev, apiKey }));
+    }, []);
+
+    const handleDefaultAiModelChange = useCallback((model: string) => {
+        setDefaultAi((prev) => ({
+            ...prev,
+            model,
+            customModelId: model !== "custom" ? "" : prev.customModelId,
+        }));
+    }, []);
+
+    const handleDefaultAiCustomModelIdChange = useCallback((customModelId: string) => {
+        setDefaultAi((prev) => ({ ...prev, customModelId }));
+    }, []);
+
+    const handleDefaultAiSave = useCallback(async () => {
+        if (!defaultAi.apiKey && !defaultAiConfigured) return;
+        if (!defaultAi.model) return;
+
+        setSavingDefaultAi(true);
+        try {
+            const configToSave: AIConfig = {
+                provider: defaultAi.provider,
+                apiKey: defaultAi.apiKey || "",
+                model: defaultAi.model,
+            };
+            if (defaultAi.customModelId) configToSave.customModelId = defaultAi.customModelId;
+
+            await saveDefaultAiConfig(configToSave);
+            setDefaultAiConfigured(true);
+            setDefaultAi((prev) => ({ ...prev, apiKey: "" }));
+            setSavedDefaultAi("Saved!");
+            setTimeout(() => setSavedDefaultAi(""), 3000);
+        } catch (err) {
+            const message = getErrorMessage(err, "Failed to save default AI config");
+            toast.error(message);
+            setSavedDefaultAi(message);
+            setTimeout(() => setSavedDefaultAi(""), 3000);
+        } finally {
+            setSavingDefaultAi(false);
+        }
+    }, [defaultAi, defaultAiConfigured]);
+
+    const handleDefaultAiRemove = useCallback(async () => {
+        setSavingDefaultAi(true);
+        try {
+            await saveDefaultAiConfig(null);
+            setDefaultAi({ provider: "gemini", apiKey: "", model: "", customModelId: "" });
+            setDefaultAiConfigured(false);
+            setSavedDefaultAi("Removed");
+            setTimeout(() => setSavedDefaultAi(""), 3000);
+        } catch {
+            toast.error("Failed to remove default AI config");
+        } finally {
+            setSavingDefaultAi(false);
+        }
+    }, []);
+
     const handleSuperAdminAlertToggle = useCallback(async (key: string, checked: boolean) => {
         setNotifications(prev => ({ ...prev, [key]: checked }));
         setUpdatingEmail(`sa-${key}`);
@@ -249,7 +330,7 @@ export default function SystemSettingsPage() {
             </div>
 
             {/* Platform Info */}
-            <SectionAccordion
+            <SystemSettingsSectionAccordion
                 title="Platform Information"
                 description="Platform name, support email, and defaults for new agencies."
                 icon={<Globe className="h-6 w-6 text-blue-500" />}
@@ -257,55 +338,17 @@ export default function SystemSettingsPage() {
                 isOpen={!!openSections.platform}
                 onToggle={() => toggleSection('platform')}
             >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">Platform Name</label>
-                        <input
-                            type="text"
-                            value={platform.name}
-                            onChange={e => setPlatform(p => ({ ...p, name: e.target.value }))}
-                            className="w-full h-10 rounded-lg border border-border bg-background px-4 text-sm text-foreground focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">Support Email</label>
-                        <input
-                            type="email"
-                            value={platform.supportEmail}
-                            onChange={e => setPlatform(p => ({ ...p, supportEmail: e.target.value }))}
-                            className="w-full h-10 rounded-lg border border-border bg-background px-4 text-sm text-foreground focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                        />
-                    </div>
-                    <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">Default Currency</label>
-                        <select
-                            value={platform.defaultCurrency}
-                            onChange={e => setPlatform(p => ({ ...p, defaultCurrency: e.target.value }))}
-                            className="w-full h-10 rounded-lg border border-border bg-background px-4 text-sm text-foreground focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                        >
-                            {CURRENCIES.map(c => (
-                                <option key={c.code} value={c.code}>{c.code} ({c.symbol}) — {c.name}</option>
-                            ))}
-                        </select>
-                        <p className="text-xs text-muted-foreground mt-1">This currency is used across all dashboards, invoices, and reports</p>
-                    </div>
-                </div>
-                <div className="flex items-center justify-between pt-2">
-                    <p className="text-xs text-muted-foreground">These are the defaults for new agencies</p>
-                    <button
-                        onClick={() => handleSave("platform")}
-                        disabled={!!saving}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition"
-                    >
-                        {saving === "platform" ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
-                            : saved === "platform" ? <><Check className="w-4 h-4" /> Saved!</>
-                                : "Save Changes"}
-                    </button>
-                </div>
-            </SectionAccordion>
+                <SystemSettingsPlatformSection
+                    platform={platform}
+                    onChange={(updates) => setPlatform((prev) => ({ ...prev, ...updates }))}
+                    onSave={() => handleSave("platform")}
+                    saving={saving === "platform"}
+                    saved={saved === "platform"}
+                />
+            </SystemSettingsSectionAccordion>
 
             {/* Email Services */}
-            <SectionAccordion
+            <SystemSettingsSectionAccordion
                 title="Email Services"
                 description="Default email settings for all agencies. Each agency can override from their Settings page."
                 icon={<Mail className="h-6 w-6 text-emerald-500" />}
@@ -313,182 +356,29 @@ export default function SystemSettingsPage() {
                 isOpen={!!openSections.email}
                 onToggle={() => toggleSection('email')}
             >
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground">Global Email Service</span>
-                        {updatingEmail === 'global' && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
-                    </div>
-                    <Switch
-                        checked={emailGlobalEnabled}
-                        onCheckedChange={handleEmailGlobalToggle}
-                        disabled={updatingEmail === 'global'}
-                    />
-                </div>
+                <SystemSettingsEmailGlobalControls
+                    emailGlobalEnabled={emailGlobalEnabled}
+                    updatingEmail={updatingEmail}
+                    onToggle={handleEmailGlobalToggle}
+                />
+                <SystemSettingsEmailCategorySection
+                    emailGlobalEnabled={emailGlobalEnabled}
+                    emailCategories={emailCategories}
+                    taskEmailEvents={taskEmailEvents}
+                    updatingEmail={updatingEmail}
+                    onCategoryToggle={handleEmailCategoryToggle}
+                    onTaskEventToggle={handleTaskEventToggle}
+                />
+                <SystemSettingsEmailAdminSection
+                    notifications={notifications}
+                    updatingEmail={updatingEmail}
+                    onToggle={handleSuperAdminAlertToggle}
+                />
 
-                {!emailGlobalEnabled && (
-                    <div className="border border-red-500/20 bg-red-500/5 rounded-lg p-3 flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                        <div className="text-xs text-red-400">
-                            <strong>All emails disabled.</strong> No emails will be sent across the platform.
-                        </div>
-                    </div>
-                )}
-
-                {emailGlobalEnabled && (
-                    <div className="border border-amber-500/20 bg-amber-500/5 rounded-lg p-3 flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                        <div className="text-xs text-amber-200/80">
-                            <strong>Brevo Free Tier:</strong> 300 emails/day. Critical categories (credentials, payments) are recommended to stay ON.
-                        </div>
-                    </div>
-                )}
-
-                {emailGlobalEnabled && (
-                    <div className="space-y-1">
-                        {(Object.entries(EMAIL_CATEGORY_INFO) as [EmailCategory, typeof EMAIL_CATEGORY_INFO[EmailCategory]][]).map(([key, info]) => {
-                            const isOn = emailCategories[key] ?? DEFAULT_EMAIL_CATEGORIES[key];
-                            const isUpdating = updatingEmail === key;
-                            return (
-                                <div key={key}>
-                                    <div className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-muted/30 transition-colors">
-                                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                                            <div className={`p-1.5 rounded-md ${info.priority === 'critical' ? 'bg-amber-500/10' : 'bg-blue-500/10'}`}>
-                                                {info.priority === 'critical'
-                                                    ? <Shield className="h-4 w-4 text-amber-500" />
-                                                    : <Zap className="h-4 w-4 text-blue-500" />
-                                                }
-                                            </div>
-                                            <div className="min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-medium text-foreground">{info.label}</span>
-                                                    <span className={`text-[10px] px-1.5 py-0 rounded-full border ${
-                                                        info.priority === 'critical'
-                                                            ? 'border-amber-500/30 text-amber-500 bg-amber-500/10'
-                                                            : 'border-blue-500/30 text-blue-500 bg-blue-500/10'
-                                                    }`}>
-                                                        {info.priority}
-                                                    </span>
-                                                </div>
-                                                <p className="text-xs text-muted-foreground truncate">{info.description}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2 ml-2">
-                                            {isUpdating && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-                                            <Switch
-                                                checked={isOn}
-                                                onCheckedChange={(checked) => handleEmailCategoryToggle(key, checked)}
-                                                disabled={!!updatingEmail}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Task Email Event Sub-toggles */}
-                                    {key === 'taskUpdates' && isOn && (
-                                        <div className="ml-12 pl-3 border-l-2 border-blue-500/20 space-y-2 py-1 mb-1">
-                                            <p className="text-xs text-muted-foreground mb-1">Configure task email events and recipients:</p>
-                                            {(Object.entries(TASK_EMAIL_EVENTS) as [TaskEmailEventKey, typeof TASK_EMAIL_EVENTS[TaskEmailEventKey]][]).map(([eventKey, eventInfo]) => {
-                                                const eventConfig = taskEmailEvents[eventKey] || DEFAULT_TASK_EMAIL_EVENTS[eventKey];
-                                                return (
-                                                    <div key={eventKey} className="rounded-lg bg-muted/20 p-2">
-                                                        <div className="flex items-center justify-between py-1">
-                                                            <div>
-                                                                <span className="text-xs font-medium text-foreground">{eventInfo.label}</span>
-                                                                <p className="text-[10px] text-muted-foreground">{eventInfo.description}</p>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                {updatingEmail === `event-${eventKey}-enabled` && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-                                                                <Switch
-                                                                    checked={eventConfig.enabled}
-                                                                    onCheckedChange={(checked) => handleTaskEventToggle(eventKey, 'enabled', checked)}
-                                                                    disabled={!!updatingEmail}
-                                                                    className="scale-[0.8]"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        {eventConfig.enabled && (
-                                                            <div className="ml-4 mt-1 space-y-1 border-l border-border pl-3">
-                                                                <div className="flex items-center justify-between py-1">
-                                                                    <span className="text-[11px] text-muted-foreground">Notify Assignee</span>
-                                                                    <div className="flex items-center gap-2">
-                                                                        {updatingEmail === `event-${eventKey}-notifyAssignee` && <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />}
-                                                                        <Switch
-                                                                            checked={eventConfig.notifyAssignee}
-                                                                            onCheckedChange={(checked) => handleTaskEventToggle(eventKey, 'notifyAssignee', checked)}
-                                                                            disabled={!!updatingEmail}
-                                                                            className="scale-[0.7]"
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex items-center justify-between py-1">
-                                                                    <span className="text-[11px] text-muted-foreground">Notify Project Client</span>
-                                                                    <div className="flex items-center gap-2">
-                                                                        {updatingEmail === `event-${eventKey}-notifyClient` && <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />}
-                                                                        <Switch
-                                                                            checked={eventConfig.notifyClient}
-                                                                            onCheckedChange={(checked) => handleTaskEventToggle(eventKey, 'notifyClient', checked)}
-                                                                            disabled={!!updatingEmail}
-                                                                            className="scale-[0.7]"
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-
-                <div className="border-t border-border pt-3 space-y-2">
-                    <p className="text-xs font-medium text-foreground">Super-Admin Email Alerts</p>
-                    <p className="text-xs text-muted-foreground mb-2">Receive email notifications for important platform events.</p>
-                    <div className="space-y-1">
-                        {([
-                            { key: "emailOnAgencyCreated", label: "New agency created", desc: "Get notified when a new agency registers on the platform" },
-                            { key: "emailOnAgencySuspended", label: "Agency suspended", desc: "Get notified when an agency is suspended" },
-                            { key: "weeklySummary", label: "Weekly summary report", desc: "Receive a weekly summary of platform activity (coming soon)", disabled: true },
-                        ] as const).map((item) => (
-                            <div key={item.key} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-muted/30 transition-colors">
-                                <div className="min-w-0">
-                                    <span className="text-sm font-medium text-foreground">{item.label}</span>
-                                    <p className="text-xs text-muted-foreground">{item.desc}</p>
-                                </div>
-                                <div className="flex items-center gap-2 ml-2">
-                                    {updatingEmail === `sa-${item.key}` && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-                                    <Switch
-                                        checked={notifications[item.key]}
-                                        onCheckedChange={(checked) => handleSuperAdminAlertToggle(item.key, checked)}
-                                        disabled={!!updatingEmail || ('disabled' in item && item.disabled)}
-                                    />
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="border-t border-border pt-3 space-y-2">
-                    <p className="text-xs font-medium text-foreground">Anti-Spam Setup (DNS)</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        {["SPF Record", "DKIM Signing", "DMARC Policy"].map((dns) => (
-                            <div key={dns} className="flex items-center gap-2 px-3 py-2 bg-muted/30 rounded-lg">
-                                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-                                <span className="text-xs text-muted-foreground">{dns}</span>
-                            </div>
-                        ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        Configure these in your Brevo dashboard → Settings → Senders & Domains → Authenticate domain
-                    </p>
-                </div>
-            </SectionAccordion>
+            </SystemSettingsSectionAccordion>
 
             {/* Security */}
-            <SectionAccordion
+            <SystemSettingsSectionAccordion
                 title="Security"
                 description="Authentication, registration, and password policies."
                 icon={<Shield className="h-6 w-6 text-green-500" />}
@@ -496,45 +386,17 @@ export default function SystemSettingsPage() {
                 isOpen={!!openSections.security}
                 onToggle={() => toggleSection('security')}
             >
-                <div className="space-y-4">
-                    {([
-                        { key: "requireEmailVerification", label: "Require email verification for new users", hint: "Always enforced — OTP required at signup", disabled: true },
-                        { key: "enableTwoFactor", label: "Enable two-factor authentication globally", hint: "Coming soon", disabled: true },
-                        { key: "allowSelfRegistration", label: "Allow agencies to register themselves", hint: "Controls whether the Get Started signup page accepts new registrations", disabled: false },
-                        { key: "enforceStrongPasswords", label: "Enforce strong passwords", hint: "Requires 10+ chars, uppercase, lowercase, number, and special character", disabled: false },
-                    ] as const).map((item) => (
-                        <div key={item.key} className="flex items-start gap-3 group">
-                            <input
-                                type="checkbox"
-                                checked={security[item.key]}
-                                onChange={e => !item.disabled && setSecurity(s => ({ ...s, [item.key]: e.target.checked }))}
-                                disabled={item.disabled}
-                                className="w-4 h-4 mt-0.5 rounded border-border text-blue-600 focus:ring-blue-500 disabled:opacity-50"
-                            />
-                            <div>
-                                <span className={`text-sm text-foreground ${item.disabled ? 'opacity-60' : 'group-hover:text-foreground'}`}>{item.label}</span>
-                                {item.hint && (
-                                    <p className="text-xs text-muted-foreground mt-0.5">{item.hint}</p>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                <div className="flex justify-end pt-2">
-                    <button
-                        onClick={() => handleSave("security")}
-                        disabled={!!saving}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition"
-                    >
-                        {saving === "security" ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
-                            : saved === "security" ? <><Check className="w-4 h-4" /> Saved!</>
-                                : "Save Security Settings"}
-                    </button>
-                </div>
-            </SectionAccordion>
+                <SystemSettingsSecuritySection
+                    security={security}
+                    onChange={(key, checked) => setSecurity((prev) => ({ ...prev, [key]: checked }))}
+                    onSave={() => handleSave("security")}
+                    saving={saving === "security"}
+                    saved={saved === "security"}
+                />
+            </SystemSettingsSectionAccordion>
 
             {/* AI Configuration */}
-            <SectionAccordion
+            <SystemSettingsSectionAccordion
                 title="Singularity AI"
                 description="Manage AI provider configuration per agency."
                 icon={<Brain className="h-6 w-6 text-purple-500" />}
@@ -542,171 +404,24 @@ export default function SystemSettingsPage() {
                 isOpen={!!openSections.ai}
                 onToggle={() => toggleSection('ai')}
             >
-                {/* Default AI for Signups */}
-                <div className="border border-purple-500/20 rounded-lg p-4 mb-4 bg-purple-500/5">
-                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-1">
-                        <Sparkles className="w-4 h-4 text-purple-400" />
-                        Default AI for New Signups
-                    </h3>
-                    <p className="text-xs text-muted-foreground mb-3">
-                        This config is automatically applied when a new agency registers via signup.
-                        All trial agencies will share this API key.
-                    </p>
-
-                    <div className="space-y-3">
-                        {/* Provider */}
-                        <div>
-                            <label className="block text-xs font-medium text-muted-foreground mb-1">Provider</label>
-                            <select
-                                value={defaultAi.provider}
-                                onChange={e => {
-                                    const p = e.target.value as AIProvider;
-                                    setDefaultAi(prev => ({ ...prev, provider: p, model: AI_MODELS[p]?.[0]?.id || '', customModelId: '' }));
-                                }}
-                                className="w-full h-9 rounded-lg border border-border bg-background px-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
-                            >
-                                <option value="gemini">Google Gemini</option>
-                                <option value="openai">OpenAI</option>
-                                <option value="nvidia">NVIDIA NIM</option>
-                                <option value="github">GitHub Models</option>
-                            </select>
-                        </div>
-
-                        {/* API Key */}
-                        <div>
-                            <label className="block text-xs font-medium text-muted-foreground mb-1">API Key</label>
-                            <input
-                                type="password"
-                                value={defaultAi.apiKey}
-                                onChange={e => setDefaultAi(prev => ({ ...prev, apiKey: e.target.value }))}
-                                placeholder={defaultAiConfigured ? "Key configured — enter new key to change" : "Enter API key..."}
-                                className="w-full h-9 rounded-lg border border-border bg-background px-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
-                            />
-                            {defaultAiConfigured && (
-                                <p className="text-[10px] text-muted-foreground mt-0.5">Leave empty to keep existing key</p>
-                            )}
-                        </div>
-
-                        {/* Model */}
-                        <div>
-                            <label className="block text-xs font-medium text-muted-foreground mb-1">Model</label>
-                            <select
-                                value={defaultAi.model}
-                                onChange={e => setDefaultAi(prev => ({ ...prev, model: e.target.value, customModelId: e.target.value !== 'custom' ? '' : prev.customModelId }))}
-                                className="w-full h-9 rounded-lg border border-border bg-background px-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
-                            >
-                                <option value="">Select a model...</option>
-                                {(AI_MODELS[defaultAi.provider] || []).map((m) => (
-                                    <option key={m.id} value={m.id}>{m.name}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {defaultAi.model === 'custom' && (
-                            <div>
-                                <label className="block text-xs font-medium text-muted-foreground mb-1">Custom Model ID</label>
-                                <input
-                                    type="text"
-                                    value={defaultAi.customModelId}
-                                    onChange={e => setDefaultAi(prev => ({ ...prev, customModelId: e.target.value }))}
-                                    placeholder="e.g. ft:gpt-4o:custom-model"
-                                    className="w-full h-9 rounded-lg border border-border bg-background px-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
-                                />
-                            </div>
-                        )}
-
-                        <div className="flex items-center gap-2 pt-1">
-                            <button
-                                onClick={async () => {
-                                    if (!defaultAi.apiKey && !defaultAiConfigured) return;
-                                    if (!defaultAi.model) return;
-                                    setSavingDefaultAi(true);
-                                    try {
-                                        const configToSave: AIConfig = {
-                                            provider: defaultAi.provider,
-                                            apiKey: defaultAi.apiKey || '', // Empty = keep existing (server handles it)
-                                            model: defaultAi.model,
-                                        };
-                                        if (defaultAi.customModelId) configToSave.customModelId = defaultAi.customModelId;
-                                        await saveDefaultAiConfig(configToSave);
-                                        setDefaultAiConfigured(true);
-                                        setDefaultAi(prev => ({ ...prev, apiKey: '' })); // Clear after save
-                                        setSavedDefaultAi('Saved!');
-                                        setTimeout(() => setSavedDefaultAi(''), 3000);
-                                    } catch (err) {
-                                        const message = getErrorMessage(err, 'Failed to save default AI config');
-                                        toast.error(message);
-                                        setSavedDefaultAi(message);
-                                        setTimeout(() => setSavedDefaultAi(''), 3000);
-                                    } finally {
-                                        setSavingDefaultAi(false);
-                                    }
-                                }}
-                                disabled={savingDefaultAi || !defaultAi.model || (!defaultAi.apiKey && !defaultAiConfigured)}
-                                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition"
-                            >
-                                {savingDefaultAi ? 'Saving...' : defaultAiConfigured ? 'Update Default' : 'Set Default'}
-                            </button>
-                            {defaultAiConfigured && (
-                                <button
-                                    onClick={async () => {
-                                        setSavingDefaultAi(true);
-                                        try {
-                                            await saveDefaultAiConfig(null);
-                                            setDefaultAi({ provider: 'gemini', apiKey: '', model: '', customModelId: '' });
-                                            setDefaultAiConfigured(false);
-                                            setSavedDefaultAi('Removed');
-                                            setTimeout(() => setSavedDefaultAi(''), 3000);
-                                        } catch {
-                                            toast.error('Failed to remove default AI config');
-                                        } finally { setSavingDefaultAi(false); }
-                                    }}
-                                    className="px-3 py-1.5 text-red-500 hover:bg-red-500/10 rounded-lg text-xs font-medium transition"
-                                >
-                                    Remove Default
-                                </button>
-                            )}
-                            {savedDefaultAi && <span className="text-xs text-green-500">{savedDefaultAi}</span>}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Per-Agency AI Config List */}
-                {agencies.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No agencies found.</p>
-                ) : (
-                    <div className="divide-y divide-border">
-                        {agencies.map((agency) => (
-                            <Link
-                                key={agency.id}
-                                href={`/super-admin/settings/ai/${agency.id}`}
-                                className="flex items-center justify-between py-3 px-2 rounded-lg hover:bg-muted/40 transition-colors group"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-2 h-2 rounded-full ${agency.aiConfig ? "bg-green-500" : "bg-muted-foreground/40"}`} />
-                                    <div>
-                                        <span className="text-sm font-medium text-foreground">{agency.name}</span>
-                                        <p className="text-xs text-muted-foreground">
-                                            {agency.aiConfig
-                                                ? `${agency.aiConfig.provider?.charAt(0).toUpperCase()}${agency.aiConfig.provider?.slice(1)} · ${agency.aiConfig.model || "configured"}`
-                                                : "Not configured"}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${agency.aiConfig ? "bg-green-500/10 text-green-500" : "bg-muted text-muted-foreground"}`}>
-                                        {agency.aiConfig ? "Active" : "Off"}
-                                    </span>
-                                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition" />
-                                </div>
-                            </Link>
-                        ))}
-                    </div>
-                )}
-            </SectionAccordion>
+                <SystemSettingsDefaultAiSection
+                    defaultAi={defaultAi}
+                    availableModels={AI_MODELS[defaultAi.provider] || []}
+                    defaultAiConfigured={defaultAiConfigured}
+                    savingDefaultAi={savingDefaultAi}
+                    savedDefaultAi={savedDefaultAi}
+                    onProviderChange={handleDefaultAiProviderChange}
+                    onApiKeyChange={handleDefaultAiApiKeyChange}
+                    onModelChange={handleDefaultAiModelChange}
+                    onCustomModelIdChange={handleDefaultAiCustomModelIdChange}
+                    onSave={() => { void handleDefaultAiSave(); }}
+                    onRemove={() => { void handleDefaultAiRemove(); }}
+                />
+                <SystemSettingsAiAgencyList agencies={agencies} />
+            </SystemSettingsSectionAccordion>
 
             {/* Notifications */}
-            <SectionAccordion
+            <SystemSettingsSectionAccordion
                 title="Notifications"
                 description="Control which in-app notification types are enabled across all agencies."
                 icon={<Bell className="h-6 w-6 text-yellow-500" />}
@@ -714,45 +429,15 @@ export default function SystemSettingsPage() {
                 isOpen={!!openSections.notifications}
                 onToggle={() => toggleSection('notifications')}
             >
-                <p className="text-xs text-muted-foreground mb-3">
-                    Toggle notification types on or off. When disabled, no in-app notifications of that type will
-                    be created for any user across all agencies.
-                </p>
-                <div className="space-y-1">
-                    {([
-                        { key: "welcome", label: "Welcome & Onboarding", desc: "Welcome messages when new employees or clients are added", icon: "👋" },
-                        { key: "project", label: "Project Updates", desc: "Project status changes, completions, and auto-completion alerts", icon: "📁" },
-                        { key: "task", label: "Task Notifications", desc: "Task assignments, status updates, and comments", icon: "✅" },
-                        { key: "invoice", label: "Invoice & Billing", desc: "Invoice generation, payment pending, approved, and rejected", icon: "🧾" },
-                        { key: "salary", label: "Salary & Payroll", desc: "Salary payment confirmations sent to employees", icon: "💰" },
-                        { key: "leave", label: "Leave Management", desc: "Leave requests, approvals, rejections, and cancellations", icon: "🏖️" },
-                        { key: "refund", label: "Refunds", desc: "Refund issued notifications sent to clients", icon: "↩️" },
-                        { key: "document", label: "Document Approvals", desc: "Document update requests and admin approvals/rejections", icon: "📄" },
-                        { key: "security", label: "Security Alerts", desc: "Password reset notifications and security warnings", icon: "🔒" },
-                    ] as const).map((item) => (
-                        <div key={item.key} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-muted/30 transition-colors">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <span className="text-lg">{item.icon}</span>
-                                <div className="min-w-0">
-                                    <span className="text-sm font-medium text-foreground">{item.label}</span>
-                                    <p className="text-xs text-muted-foreground truncate">{item.desc}</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2 ml-2">
-                                {updatingNotif === item.key && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-                                <Switch
-                                    checked={notificationDefaults[item.key] ?? true}
-                                    onCheckedChange={(checked) => handleNotifToggle(item.key, checked)}
-                                    disabled={!!updatingNotif}
-                                />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </SectionAccordion>
+                                <SystemSettingsNotificationsSection
+                    notificationDefaults={notificationDefaults}
+                    updatingNotif={updatingNotif}
+                    onToggle={handleNotifToggle}
+                />
+            </SystemSettingsSectionAccordion>
 
             {/* System Info */}
-            <SectionAccordion
+            <SystemSettingsSectionAccordion
                 title="System Information"
                 description="Platform version and environment details."
                 icon={<Database className="h-6 w-6 text-indigo-500" />}
@@ -760,65 +445,11 @@ export default function SystemSettingsPage() {
                 isOpen={!!openSections.system}
                 onToggle={() => toggleSection('system')}
             >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {[
-                        { label: "Platform", value: platform.name },
-                        { label: "Version", value: "1.0.0" },
-                        { label: "Framework", value: "Next.js 16" },
-                        { label: "Database", value: "MongoDB" },
-                        { label: "Environment", value: "Production" },
-                        { label: "Last Restart", value: fmt.date(new Date()) },
-                    ].map((item) => (
-                        <div key={item.label} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                            <span className="text-sm text-muted-foreground">{item.label}</span>
-                            <span className="text-sm font-medium text-foreground">{item.value}</span>
-                        </div>
-                    ))}
-                </div>
-            </SectionAccordion>
-        </div>
-    );
-}
-
-// Reusable collapsible section component (matches admin settings pattern)
-function SectionAccordion({
-    title, description, icon, iconBg, isOpen, onToggle, children
-}: {
-    title: string;
-    description: string;
-    icon: React.ReactNode;
-    iconBg: string;
-    isOpen: boolean;
-    onToggle: () => void;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="border rounded-lg bg-card text-card-foreground shadow-sm">
-            <button
-                type="button"
-                onClick={onToggle}
-                aria-expanded={isOpen}
-                className="w-full text-left flex flex-row items-center justify-between p-6 hover:bg-accent/50 transition-colors"
-            >
-                <span className="flex items-center gap-4">
-                    <span className={`p-2 ${iconBg} rounded-full inline-flex`}>
-                        {icon}
-                    </span>
-                    <span>
-                        <span className="block text-lg font-semibold">{title}</span>
-                        <span className="block text-sm text-muted-foreground">{description}</span>
-                    </span>
-                </span>
-                {isOpen ? <ChevronDown className="h-5 w-5 text-muted-foreground" /> : <ChevronRight className="h-5 w-5 text-muted-foreground" />}
-            </button>
-
-            <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-                <div className="overflow-hidden">
-                    <div className="p-6 pt-0">
-                        {children}
-                    </div>
-                </div>
-            </div>
+                <SystemSettingsInfoSection
+                    platformName={platform.name}
+                    lastRestartText={fmt.date(new Date())}
+                />
+            </SystemSettingsSectionAccordion>
         </div>
     );
 }

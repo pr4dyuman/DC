@@ -1,41 +1,56 @@
 "use client";
 
 import { useState, useEffect, useRef, useTransition } from "react";
-import { createPortal } from "react-dom";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { useDraggable } from "@dnd-kit/core";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Task, UserPermissions } from "@/lib/types";
+import { Task, UserPermissions, getDefaultUserPermissionsForRole } from "@/lib/types";
 import { Sparkles, Calendar, ArrowRightLeft } from "lucide-react";
 import { toLocalCalendarDay } from "@/lib/date-utils";
-
-const STATUS_ORDER = ['Todo', 'In Progress', 'Review', 'Done'] as const;
 import { AIExplanationModal } from "./AIExplanationModal";
+import { TaskCardAssigneeMenu } from "./TaskCardAssigneeMenu";
+import { TaskCardStatusSheet } from "./TaskCardStatusSheet";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { updateTask, getUsers } from "@/lib/actions";
-
-type TaskPriority = 'Low' | 'Medium' | 'High';
-const PRIORITY_CYCLE: TaskPriority[] = ['Low', 'Medium', 'High'];
-const PRIORITY_STYLES: Record<TaskPriority, string> = {
-    High: 'bg-red-500/15 text-red-500 hover:bg-red-500/25',
-    Medium: 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/25',
-    Low: 'bg-blue-500/15 text-blue-500 hover:bg-blue-500/25',
-};
+import {
+    PRIORITY_CYCLE,
+    PRIORITY_STYLES,
+    type TaskAssignee,
+    type TaskPriority,
+} from "./task-card-shared";
 
 interface TaskCardProps {
     task: Task;
-    users?: { id: string; name: string; avatar?: string; jobTitle?: string; role?: string }[];
+    users?: TaskAssignee[];
     readOnly?: boolean;
     permissions?: UserPermissions;
+    currentUserRole?: string;
     onQuickEdit?: (taskId: string, patch: Partial<Task>) => void;
     dragOverlay?: boolean;
     disableDrag?: boolean;
-    onStatusChange?: (taskId: string, newStatus: Task['status']) => void;
+    onStatusChange?: (taskId: string, newStatus: Task["status"]) => void;
 }
 
-export function TaskCard({ task, users = [], onView, onEdit, currentUserId, readOnly, permissions, onQuickEdit, dragOverlay = false, disableDrag = false, onStatusChange }: TaskCardProps & { onView: (task: Task) => void; onEdit: (task: Task) => void; currentUserId?: string }) {
+export function TaskCard({
+    task,
+    users = [],
+    onView,
+    onEdit,
+    currentUserId,
+    currentUserRole,
+    readOnly,
+    permissions,
+    onQuickEdit,
+    dragOverlay = false,
+    disableDrag = false,
+    onStatusChange,
+}: TaskCardProps & {
+    onView: (task: Task) => void;
+    onEdit: (task: Task) => void;
+    currentUserId?: string;
+}) {
     const fmt = useDateFormat();
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id: task.id,
@@ -52,45 +67,49 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, read
     const [showStatusMenu, setShowStatusMenu] = useState(false);
     const assigneeMenuRef = useRef<HTMLDivElement>(null);
     const [isPending, startTransition] = useTransition();
-    const [mounted, setMounted] = useState(false);
-    const [assigneeOptions, setAssigneeOptions] = useState(users.filter(u => u.role?.toLowerCase() !== 'client'));
-
-    useEffect(() => { setMounted(true); }, []);
-
-    useEffect(() => {
-        setAssigneeOptions(users.filter(u => u.role?.toLowerCase() !== 'client'));
-    }, [users]);
+    const [loadedAssigneeOptions, setLoadedAssigneeOptions] = useState<TaskAssignee[] | null>(null);
+    const defaultAssigneeOptions = users.filter((user) => user.role?.toLowerCase() !== "client");
+    const effectivePermissions = permissions ?? getDefaultUserPermissionsForRole(currentUserRole);
 
     useEffect(() => {
         if (shouldHighlight) {
-            setIsHighlighted(true);
-            cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-            const t = setTimeout(() => setIsHighlighted(false), 2000);
-            return () => clearTimeout(t);
+            const frameId = window.requestAnimationFrame(() => {
+                cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                setIsHighlighted(true);
+            });
+            const timeoutId = window.setTimeout(() => setIsHighlighted(false), 2000);
+            return () => {
+                window.cancelAnimationFrame(frameId);
+                window.clearTimeout(timeoutId);
+            };
         }
     }, [shouldHighlight]);
 
-    // Close assignee menu on outside click
     useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (assigneeMenuRef.current && !assigneeMenuRef.current.contains(e.target as Node)) {
+        const handler = (event: MouseEvent) => {
+            if (assigneeMenuRef.current && !assigneeMenuRef.current.contains(event.target as Node)) {
                 setShowAssigneeMenu(false);
             }
         };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
     }, []);
 
-    const canEdit = !readOnly && ((permissions?.canManageTasks ?? true) || permissions?.deleteAccess === 'any' || (permissions?.deleteAccess === 'own' && task.createdBy === currentUserId));
+    const canEdit = !readOnly && (
+        effectivePermissions.canManageTasks ||
+        effectivePermissions.deleteAccess === "any" ||
+        (effectivePermissions.deleteAccess === "own" && task.createdBy === currentUserId)
+    );
+    const canReassignTask = !readOnly && (currentUserRole === "admin" || currentUserRole === "manager");
 
     useEffect(() => {
-        if (!showAssigneeMenu || !canEdit) return;
+        if (!showAssigneeMenu || !canReassignTask) return;
 
         let cancelled = false;
         getUsers()
             .then((loadedUsers) => {
                 if (!cancelled) {
-                    setAssigneeOptions(loadedUsers.filter((user) => user.role !== 'client'));
+                    setLoadedAssigneeOptions(loadedUsers.filter((user) => user.role !== "client"));
                 }
             })
             .catch((error) => {
@@ -100,64 +119,63 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, read
         return () => {
             cancelled = true;
         };
-    }, [showAssigneeMenu, canEdit]);
+    }, [showAssigneeMenu, canReassignTask]);
 
     const style: React.CSSProperties = dragOverlay
-        ? { cursor: 'grabbing' }
+        ? { cursor: "grabbing" }
         : disableDrag
             ? { opacity: 1 }
-            : { opacity: isDragging ? 0.4 : 1, cursor: 'grab' };
+            : { opacity: isDragging ? 0.4 : 1, cursor: "grab" };
 
+    const assigneeOptions = loadedAssigneeOptions ?? defaultAssigneeOptions;
     const assigneeLookup = assigneeOptions.length > 0 ? assigneeOptions : users;
-    const assignee = assigneeLookup.find(u => u.id === task.assigneeId);
+    const assignee = assigneeLookup.find((user) => user.id === task.assigneeId);
 
-
-    // ── Quick: cycle priority ─────────────────────────────────────────────────
-    const handlePriorityClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
+    const handlePriorityClick = (event: React.MouseEvent) => {
+        event.stopPropagation();
         if (!canEdit) return;
-        const current = (task.priority as TaskPriority) || 'Medium';
+        const current = (task.priority as TaskPriority) || "Medium";
         const next = PRIORITY_CYCLE[(PRIORITY_CYCLE.indexOf(current) + 1) % PRIORITY_CYCLE.length];
         onQuickEdit?.(task.id, { priority: next });
         startTransition(async () => {
             try {
                 await updateTask(task.id, { priority: next });
             } catch {
-                onQuickEdit?.(task.id, { priority: current }); // revert
+                onQuickEdit?.(task.id, { priority: current });
                 toast.error("Failed to update priority");
             }
         });
     };
 
-    // ── Quick: change assignee ────────────────────────────────────────────────
-    const handleAssigneeChange = (e: React.MouseEvent, userId: string) => {
-        e.stopPropagation();
+    const handleAssigneeChange = (userId: string) => {
         setShowAssigneeMenu(false);
-        if (!canEdit) return;
-        const prev = task.assigneeId;
+        if (!canReassignTask) return;
+        const previousAssignee = task.assigneeId;
         onQuickEdit?.(task.id, { assigneeId: userId });
         startTransition(async () => {
             try {
                 await updateTask(task.id, { assigneeId: userId });
             } catch {
-                onQuickEdit?.(task.id, { assigneeId: prev }); // revert
+                onQuickEdit?.(task.id, { assigneeId: previousAssignee });
                 toast.error("Failed to update assignee");
             }
         });
     };
 
-    // ── Quick: change status (mobile) ──────────────────────────────────────────
-    const handleStatusChange = (e: React.MouseEvent, newStatus: string) => {
-        e.stopPropagation();
+    const handleStatusChange = (newStatus: Task["status"]) => {
         setShowStatusMenu(false);
         if (!canEdit || newStatus === task.status) return;
-        onQuickEdit?.(task.id, { status: newStatus as Task['status'] });
-        onStatusChange?.(task.id, newStatus as Task['status']);
+        onQuickEdit?.(task.id, { status: newStatus });
+        onStatusChange?.(task.id, newStatus);
     };
 
-    const handleEditClick = (e: React.MouseEvent) => { e.stopPropagation(); onEdit(task); };
-    const handleExplainClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
+    const handleEditClick = (event: React.MouseEvent) => {
+        event.stopPropagation();
+        onEdit(task);
+    };
+
+    const handleExplainClick = (event: React.MouseEvent) => {
+        event.stopPropagation();
         setShowAIModal(true);
     };
 
@@ -165,29 +183,31 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, read
     const today = toLocalCalendarDay(fmt.dateKey(new Date()));
 
     return (
-        <div ref={dragOverlay ? undefined : setNodeRef} style={style} {...(dragOverlay ? {} : attributes)} {...(dragOverlay || disableDrag ? {} : listeners)} className={`mb-3 ${disableDrag ? '' : 'touch-none'}`}>
+        <div
+            ref={dragOverlay ? undefined : setNodeRef}
+            style={style}
+            {...(dragOverlay ? {} : attributes)}
+            {...(dragOverlay || disableDrag ? {} : listeners)}
+            className={`mb-3 ${disableDrag ? "" : "touch-none"}`}
+        >
             <div ref={cardRef}>
                 <Card
                     onClick={() => onView(task)}
-                    className={`cursor-pointer bg-card border-border hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-md group relative ${isHighlighted ? 'ring-2 ring-yellow-500 border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)]' : ''} ${isPending ? 'opacity-70' : ''}`}
+                    className={`cursor-pointer bg-card border-border hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-md group relative ${isHighlighted ? "ring-2 ring-yellow-500 border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)]" : ""} ${isPending ? "opacity-70" : ""}`}
                 >
-                    {/* Header */}
                     <div className="p-4 flex items-start justify-between gap-3">
                         <div className="flex-1 space-y-2 min-w-0">
                             <div className="flex items-start justify-between gap-2">
                                 <h4 className="font-medium text-sm text-foreground leading-tight break-words">{task.title}</h4>
                                 <div className="flex items-center gap-1 shrink-0">
-                                    {/* Quick priority toggle */}
                                     <button
                                         onClick={handlePriorityClick}
-                                        title={canEdit ? `Priority: ${priority || 'None'} — click to change` : `Priority: ${priority || 'None'}`}
-                                        className={`text-[10px] sm:text-[9px] font-bold px-2 py-1 sm:px-1.5 sm:py-0.5 rounded-full transition-colors ${priority ? PRIORITY_STYLES[priority] : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                                            } ${canEdit ? 'cursor-pointer' : 'cursor-default'}`}
+                                        title={canEdit ? `Priority: ${priority || "None"} - click to change` : `Priority: ${priority || "None"}`}
+                                        className={`text-[10px] sm:text-[9px] font-bold px-2 py-1 sm:px-1.5 sm:py-0.5 rounded-full transition-colors ${priority ? PRIORITY_STYLES[priority] : "bg-muted text-muted-foreground hover:bg-muted/80"} ${canEdit ? "cursor-pointer" : "cursor-default"}`}
                                     >
-                                        {priority || '—'}
+                                        {priority || "—"}
                                     </button>
 
-                                    {/* Edit pencil */}
                                     {canEdit && (
                                         <button
                                             onClick={handleEditClick}
@@ -200,17 +220,16 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, read
                                 </div>
                             </div>
 
-                            {/* Quick assignee change */}
                             <div className="relative flex items-center gap-2" ref={assigneeMenuRef}>
                                 <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (canEdit && users.length > 0) setShowAssigneeMenu(v => !v);
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        if (canReassignTask && users.length > 0) setShowAssigneeMenu((previous) => !previous);
                                     }}
-                                    className={`flex items-center gap-2 min-w-0 ${canEdit ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
-                                    title={canEdit ? "Click to change assignee" : assignee?.name || "Unassigned"}
+                                    className={`flex items-center gap-2 min-w-0 ${canReassignTask ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}
+                                    title={canReassignTask ? "Click to change assignee" : assignee?.name || "Unassigned"}
                                 >
-                                    <Avatar className={`h-5 w-5 border border-border transition-all ${canEdit ? 'group-hover:ring-1 group-hover:ring-primary' : ''}`}>
+                                    <Avatar className={`h-5 w-5 border border-border transition-all ${canReassignTask ? "group-hover:ring-1 group-hover:ring-primary" : ""}`}>
                                         <AvatarImage src={assignee?.avatar} />
                                         <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-medium">
                                             {assignee ? assignee.name.substring(0, 2).toUpperCase() : "?"}
@@ -220,9 +239,9 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, read
                                         {assignee ? (
                                             <>
                                                 {assignee.name}
-                                                {(assignee.jobTitle || (assignee.role && ['admin', 'manager', 'client'].includes(assignee.role.toLowerCase()))) && (
+                                                {(assignee.jobTitle || (assignee.role && ["admin", "manager", "client"].includes(assignee.role.toLowerCase()))) && (
                                                     <span className="text-yellow-600 dark:text-yellow-500 ml-1">
-                                                        ({assignee.jobTitle || (assignee.role ? assignee.role.charAt(0).toUpperCase() + assignee.role.slice(1) : '')})
+                                                        ({assignee.jobTitle || (assignee.role ? assignee.role.charAt(0).toUpperCase() + assignee.role.slice(1) : "")})
                                                     </span>
                                                 )}
                                             </>
@@ -230,36 +249,12 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, read
                                     </span>
                                 </button>
 
-                                {/* Assignee dropdown */}
-                                {showAssigneeMenu && (
-                                    <div
-                                        className="absolute top-7 left-0 z-50 w-52 rounded-lg border border-border bg-popover shadow-lg py-1"
-                                        onClick={e => e.stopPropagation()}
-                                    >
-                                        <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-border mb-1">
-                                            Assign to
-                                        </div>
-                                        <div className="max-h-48 overflow-y-auto no-scrollbar">
-                                        {assigneeOptions.map(u => (
-                                                <button
-                                                    key={u.id}
-                                                    onClick={(e) => handleAssigneeChange(e, u.id)}
-                                                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent transition-colors ${u.id === task.assigneeId ? 'bg-primary/5 text-primary font-medium' : 'text-foreground'}`}
-                                                >
-                                                    <Avatar className="h-6 w-6 border border-border shrink-0">
-                                                        <AvatarImage src={u.avatar} />
-                                                        <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-bold">{u.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
-                                                    </Avatar>
-                                                    <div className="flex-1 min-w-0 text-left">
-                                                        <div className="truncate font-medium text-xs">{u.name}</div>
-                                                        <div className="truncate text-[10px] text-muted-foreground">{u.jobTitle || u.role}</div>
-                                                    </div>
-                                                    {u.id === task.assigneeId && <span className="text-xs text-primary shrink-0">✓</span>}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                                <TaskCardAssigneeMenu
+                                    open={showAssigneeMenu}
+                                    assigneeOptions={assigneeOptions}
+                                    currentAssigneeId={task.assigneeId}
+                                    onSelect={handleAssigneeChange}
+                                />
                             </div>
 
                             {task.description && (
@@ -272,16 +267,15 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, read
                         </div>
                     </div>
 
-                    {/* Footer */}
                     <div className="px-4 pb-3 pt-0">
                         <div className="flex items-center gap-2 text-[11px] sm:text-[10px] text-muted-foreground font-medium min-w-0 flex-wrap pt-2.5 border-t border-border/40">
                             {task.dueDate && (() => {
                                 const due = toLocalCalendarDay(fmt.dateKey(task.dueDate));
-                                const isOverdue = !!due && !!today && due < today && task.status !== 'Done';
+                                const isOverdue = !!due && !!today && due < today && task.status !== "Done";
                                 return (
-                                    <div className={`flex items-center gap-1.5 shrink-0 ${isOverdue ? 'text-red-500' : ''}`}>
-                                        <Calendar className={`w-3 h-3 shrink-0 ${isOverdue ? 'text-red-500' : 'text-yellow-500'}`} />
-                                        <span className={isOverdue ? 'font-semibold' : ''}>{fmt.dateShort(task.dueDate)}{isOverdue ? ' ⚠' : ''}</span>
+                                    <div className={`flex items-center gap-1.5 shrink-0 ${isOverdue ? "text-red-500" : ""}`}>
+                                        <Calendar className={`w-3 h-3 shrink-0 ${isOverdue ? "text-red-500" : "text-yellow-500"}`} />
+                                        <span className={isOverdue ? "font-semibold" : ""}>{fmt.dateShort(task.dueDate)}{isOverdue ? " ⚠" : ""}</span>
                                     </div>
                                 );
                             })()}
@@ -294,8 +288,8 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, read
                             )}
 
                             {task.estimatedHours && task.estimatedHours > 0 && (
-                                <div className={`flex items-center gap-1 shrink-0 px-1.5 py-0.5 rounded-md font-semibold ${task.status === 'Done' ? 'bg-emerald-500/15 text-emerald-500' : 'bg-cyan-500/15 text-cyan-500 dark:text-cyan-400'}`}>
-                                    {task.status === 'Done' ? (
+                                <div className={`flex items-center gap-1 shrink-0 px-1.5 py-0.5 rounded-md font-semibold ${task.status === "Done" ? "bg-emerald-500/15 text-emerald-500" : "bg-cyan-500/15 text-cyan-500 dark:text-cyan-400"}`}>
+                                    {task.status === "Done" ? (
                                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
                                     ) : (
                                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
@@ -305,10 +299,12 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, read
                             )}
 
                             <div className="flex items-center shrink-0 ml-auto gap-1.5">
-                                {/* Mobile: quick status change */}
                                 {disableDrag && canEdit && (
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); setShowStatusMenu(v => !v); }}
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            setShowStatusMenu((previous) => !previous);
+                                        }}
                                         className="flex items-center gap-1 transition-colors px-2 py-1 rounded-md text-muted-foreground/70 hover:text-foreground hover:bg-accent active:bg-accent"
                                         title="Move to..."
                                     >
@@ -337,44 +333,13 @@ export function TaskCard({ task, users = [], onView, onEdit, currentUserId, read
                 />
             </div>
 
-            {/* Portal: Status change bottom sheet (renders outside all overflow containers) */}
-            {mounted && showStatusMenu && createPortal(
-                <div
-                    className="fixed inset-0 z-[99999] flex items-end justify-center bg-black/40 backdrop-blur-[2px]"
-                    onClick={(e) => { e.stopPropagation(); setShowStatusMenu(false); }}
-                >
-                    <div
-                        className="w-full max-w-sm mx-4 mb-6 rounded-xl border border-border bg-popover shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-200"
-                        onClick={e => e.stopPropagation()}
-                    >
-                        <div className="px-4 py-3 text-xs font-bold uppercase tracking-widest text-muted-foreground border-b border-border bg-muted/30">
-                            Move &ldquo;{task.title.length > 30 ? task.title.slice(0, 30) + '…' : task.title}&rdquo;
-                        </div>
-                        {STATUS_ORDER.map(s => (
-                            <button
-                                key={s}
-                                onClick={(e) => handleStatusChange(e, s)}
-                                className={`w-full text-left px-4 py-3.5 text-sm flex items-center gap-3 transition-colors active:bg-accent/80 ${s === task.status ? 'bg-primary/5 text-primary font-semibold' : 'text-foreground hover:bg-accent'}`}
-                            >
-                                <span className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${s === 'Done' ? 'bg-emerald-500' :
-                                    s === 'In Progress' ? 'bg-blue-500' :
-                                        s === 'Review' ? 'bg-yellow-500' :
-                                            'bg-muted-foreground/40'
-                                    }`} />
-                                <span className="flex-1">{s}</span>
-                                {s === task.status && <span className="text-primary text-base">✓</span>}
-                            </button>
-                        ))}
-                        <button
-                            onClick={(e) => { e.stopPropagation(); setShowStatusMenu(false); }}
-                            className="w-full text-center px-4 py-3 text-sm font-medium text-muted-foreground border-t border-border hover:bg-accent transition-colors"
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                </div>,
-                document.body
-            )}
+            <TaskCardStatusSheet
+                open={showStatusMenu}
+                taskTitle={task.title}
+                currentStatus={task.status}
+                onSelectStatus={handleStatusChange}
+                onClose={() => setShowStatusMenu(false)}
+            />
         </div>
     );
 }

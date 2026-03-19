@@ -11,14 +11,30 @@ export const revalidate = 60;
 export async function GET(request) {
   try {
     await dbConnect();
+    const auth = await checkAuth();
+    const isAdmin = auth.authorized === true;
     
     const { searchParams } = new URL(request.url);
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit')) || 50, 1), 100);
     const offset = Math.max(parseInt(searchParams.get('offset')) || 0, 0);
+    const requestedStatus = searchParams.get('status');
+    const query = {};
+
+    if (isAdmin) {
+      if (requestedStatus === 'published' || requestedStatus === 'draft') {
+        query.status = requestedStatus;
+      }
+    } else {
+      query.status = 'published';
+    }
+
+    const selectFields = isAdmin
+      ? 'title shortDescription category status image slug createdAt'
+      : 'title shortDescription category image slug createdAt';
 
     // Use lean() for faster queries and select only needed fields
-    const blogs = await Blog.find({})
-      .select('title shortDescription category status image slug createdAt')
+    const blogs = await Blog.find(query)
+      .select(selectFields)
       .sort({ createdAt: -1 })
       .skip(offset)
       .limit(limit)

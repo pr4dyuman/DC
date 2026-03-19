@@ -7,36 +7,21 @@ import {
     Dialog,
     DialogContent,
     DialogHeader,
-    DialogTitle,
 } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Task, Comment } from "@/lib/types";
+import { Task, Comment, UserPermissions, getDefaultUserPermissionsForRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { MentionTextarea } from "@/components/ui/mention-textarea";
-import { renderCommentText } from "@/lib/mention-utils";
 import { addComment } from "@/lib/actions";
-import { hasExplicitTime, toLocalCalendarDay } from "@/lib/date-utils";
+import { toLocalCalendarDay } from "@/lib/date-utils";
+import { Pencil } from "lucide-react";
+import { ViewTaskModalComments } from "./ViewTaskModalComments";
+import { ViewTaskModalDescription } from "./ViewTaskModalDescription";
+import { ViewTaskModalHeader } from "./ViewTaskModalHeader";
+import { ViewTaskModalMetadataGrid } from "./ViewTaskModalMetadataGrid";
 import {
-    Calendar,
-    Clock,
-    Pencil,
-    User,
-    Tag,
-    AlignLeft,
-    CheckCircle2,
-    Circle,
-    Timer,
-    AlertCircle,
-    MessageSquare,
-    Send,
-    Flag,
-    type LucideIcon,
-} from "lucide-react";
-import { UserPermissions, User as AppUser } from "@/lib/types";
-
-type TaskAssignee = Pick<AppUser, "id" | "name" | "avatar" | "jobTitle" | "role"> & {
-    email?: string;
-};
+    STATUS_CONFIGS,
+    type TaskAssignee,
+    type ViewTaskCurrentUser,
+} from "./view-task-modal-shared";
 
 interface ViewTaskModalProps {
     task: Task;
@@ -47,26 +32,27 @@ interface ViewTaskModalProps {
     readOnly?: boolean;
     permissions?: UserPermissions;
     currentUserId?: string;
+    currentUserRole?: string;
 }
 
-const PRIORITY_STYLES: Record<string, string> = {
-    High: "bg-red-500/15 text-red-500 border-red-500/30",
-    Medium: "bg-amber-500/15 text-amber-600 border-amber-500/30",
-    Low: "bg-blue-500/15 text-blue-500 border-blue-500/30",
-};
-
-const STATUS_CONFIGS: Record<string, { color: string; icon: LucideIcon }> = {
-    Done: { color: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30", icon: CheckCircle2 },
-    "In Progress": { color: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30", icon: Timer },
-    Review: { color: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30", icon: AlertCircle },
-    Todo: { color: "bg-muted text-muted-foreground border-border", icon: Circle },
-};
-
-export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnly, permissions, currentUserId }: ViewTaskModalProps) {
+export function ViewTaskModal({
+    task,
+    open,
+    setOpen,
+    onEdit,
+    users = [],
+    readOnly,
+    permissions,
+    currentUserId,
+    currentUserRole,
+}: ViewTaskModalProps) {
     const fmt = useDateFormat();
-    const assignee = users.find(u => u.id === task.assigneeId);
-    // Fix: use actual logged-in user, not first user in array
-    const currentUser = users.find(u => u.id === currentUserId) || { id: currentUserId || "", name: "You", avatar: "" };
+    const assignee = users.find((user) => user.id === task.assigneeId);
+    const currentUser: ViewTaskCurrentUser = users.find((user) => user.id === currentUserId) || {
+        id: currentUserId || "",
+        name: "You",
+        avatar: "",
+    };
 
     const [commentText, setCommentText] = useState("");
     const [isPending, startTransition] = useTransition();
@@ -78,12 +64,14 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
 
     const handleAddComment = () => {
         if (!commentText.trim() || !currentUserId) return;
+
         const tempComment: Comment = {
             id: Math.random().toString(),
             userId: currentUserId,
             text: commentText,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
         };
+
         startTransition(async () => {
             addOptimisticComment(tempComment);
             setCommentText("");
@@ -91,297 +79,70 @@ export function ViewTaskModal({ task, open, setOpen, onEdit, users = [], readOnl
         });
     };
 
-    // Overdue/days calculation
     const today = toLocalCalendarDay(fmt.dateKey(new Date()));
     const dueDate = task.dueDate ? toLocalCalendarDay(fmt.dateKey(task.dueDate)) : null;
     const dueDiff = dueDate && today ? differenceInCalendarDays(dueDate, today) : null;
-    const isOverdue = dueDiff !== null && dueDiff < 0 && task.status !== 'Done';
-    const showDueTime = hasExplicitTime(task.dueDate);
+    const isOverdue = dueDiff !== null && dueDiff < 0 && task.status !== "Done";
 
     const statusConfig = STATUS_CONFIGS[task.status] || STATUS_CONFIGS.Todo;
-    const StatusIcon = statusConfig.icon;
+    const effectivePermissions = permissions ?? getDefaultUserPermissionsForRole(currentUserRole);
 
-    const comments = [...optimisticComments].sort((a, b) =>
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    const comments = [...optimisticComments].sort(
+        (first, second) =>
+            new Date(first.timestamp).getTime() - new Date(second.timestamp).getTime()
     );
 
     const canEdit = !readOnly && (
-        (permissions?.canManageTasks ?? true) ||
-        permissions?.deleteAccess === 'any' ||
-        (permissions?.deleteAccess === 'own' && task.createdBy === currentUserId)
+        effectivePermissions.canManageTasks ||
+        effectivePermissions.deleteAccess === "any" ||
+        (effectivePermissions.deleteAccess === "own" && task.createdBy === currentUserId)
     );
+
+    const createdByName = task.createdBy
+        ? users.find((user) => user.id === task.createdBy)?.name || "Unknown"
+        : undefined;
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogContent className="max-w-[95vw] sm:max-w-3xl p-0 gap-0 overflow-hidden border-none shadow-2xl bg-background max-h-[90dvh] flex flex-col">
 
-                {/* Fixed Header */}
                 <DialogHeader className="p-6 pb-4 border-b border-border bg-background shrink-0">
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${statusConfig.color} transition-colors`}>
-                                <StatusIcon className="w-3.5 h-3.5" />
-                                {task.status}
-                            </span>
-                            {task.priority && (
-                                <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${PRIORITY_STYLES[task.priority]}`}>
-                                    <Flag className="w-3 h-3" />
-                                    {task.priority} Priority
-                                </span>
-                            )}
-                            {task.category && (
-                                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                                    <Tag className="w-3 h-3" />
-                                    {task.category}
-                                </span>
-                            )}
-                            {task.estimatedHours && task.estimatedHours > 0 && (
-                                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
-                                    <Clock className="w-3 h-3" />
-                                    {task.estimatedHours}h
-                                </span>
-                            )}
-                            {isOverdue && (
-                                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500/10 text-red-500 border border-red-500/20">
-                                    <AlertCircle className="w-3 h-3" />
-                                    {Math.abs(dueDiff!)}d overdue
-                                </span>
-                            )}
-                            {!isOverdue && dueDiff !== null && dueDiff <= 3 && task.status !== 'Done' && (
-                                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 border border-amber-500/20">
-                                    <Clock className="w-3 h-3" />
-                                    {dueDiff === 0 ? 'Due today' : `${dueDiff}d left`}
-                                </span>
-                            )}
-                        </div>
-                        <DialogTitle className="text-2xl font-bold text-foreground leading-tight break-words">
-                            {task.title}
-                        </DialogTitle>
-                    </div>
+                    <ViewTaskModalHeader
+                        task={task}
+                        statusConfig={statusConfig}
+                        isOverdue={isOverdue}
+                        dueDiff={dueDiff}
+                    />
                 </DialogHeader>
 
-                {/* Scrollable Body */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar">
+                    <ViewTaskModalMetadataGrid
+                        task={task}
+                        assignee={assignee}
+                        createdByName={createdByName}
+                    />
 
-                    {/* Metadata Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bg-muted/30 p-5 rounded-xl border border-border/50">
-                        {/* Assignee */}
-                        <div className="flex flex-col space-y-3">
-                            <div className="flex items-center gap-2 mb-1">
-                                <div className="p-1.5 bg-background rounded-md border border-border shadow-sm">
-                                    <User className="w-3.5 h-3.5 text-muted-foreground" />
-                                </div>
-                                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Assignee</label>
-                            </div>
-                            <div className="flex items-center gap-3 pl-1">
-                                <Avatar className="h-9 w-9 border-2 border-background shadow-sm">
-                                    <AvatarImage src={assignee?.avatar} />
-                                    <AvatarFallback className="bg-indigo-500/10 text-indigo-600 text-xs font-bold">
-                                        {assignee?.name?.substring(0, 2).toUpperCase() || "?"}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-semibold text-foreground leading-none mb-1">
-                                        {assignee ? assignee.name : "Unassigned"}
-                                    </span>
-                                    <span className="text-[11px] text-muted-foreground truncate max-w-[120px]">
-                                        {assignee?.jobTitle || assignee?.email || ""}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
+                    <ViewTaskModalDescription description={task.description} />
 
-                        {/* Due Date */}
-                        <div className="flex flex-col space-y-3 md:border-l md:border-border/50 md:pl-6">
-                            <div className="flex items-center gap-2 mb-1">
-                                <div className="p-1.5 bg-background rounded-md border border-border shadow-sm">
-                                    <Calendar className={`w-3.5 h-3.5 ${isOverdue ? 'text-red-500' : 'text-yellow-500'}`} />
-                                </div>
-                                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Due Date</label>
-                            </div>
-                            <div className="flex flex-col pl-1">
-                                {task.dueDate ? (
-                                    <>
-                                        <span className={`text-sm font-semibold leading-none mb-1 ${isOverdue ? 'text-red-500' : 'text-foreground'}`}>
-                                            {fmt.dateLong(task.dueDate)}
-                                        </span>
-                                        <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-                                            {showDueTime && (
-                                                <>
-                                                    <Clock className="w-3 h-3" />
-                                                    {fmt.time12(task.dueDate)}
-                                                </>
-                                            )}
-                                            {dueDiff !== null && (
-                                                <span className={isOverdue ? 'text-red-500 font-semibold' : dueDiff <= 3 ? 'text-amber-500 font-semibold' : ''}>
-                                                    {isOverdue ? ` • ${Math.abs(dueDiff)}d overdue` : dueDiff === 0 ? ' • Due today' : ` • ${dueDiff}d left`}
-                                                </span>
-                                            )}
-                                        </span>
-                                    </>
-                                ) : (
-                                    <span className="text-sm text-muted-foreground italic">No due date set</span>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Created On */}
-                        <div className="flex flex-col space-y-3 md:border-l md:border-border/50 md:pl-6">
-                            <div className="flex items-center gap-2 mb-1">
-                                <div className="p-1.5 bg-background rounded-md border border-border shadow-sm">
-                                    <Timer className="w-3.5 h-3.5 text-muted-foreground" />
-                                </div>
-                                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Created On</label>
-                            </div>
-                            {task.createdAt ? (
-                                <div className="flex flex-col pl-1">
-                                    <span className="text-sm font-semibold text-foreground leading-none mb-1">
-                                        {fmt.dateLong(task.createdAt)}
-                                    </span>
-                                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                                        <span>{fmt.time12(task.createdAt)}</span>
-                                        {task.createdBy && (
-                                            <>
-                                                <span className="w-1 h-1 rounded-full bg-border" />
-                                                <span>by <span className="text-foreground font-medium">{users.find(u => u.id === task.createdBy)?.name || "Unknown"}</span></span>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : (
-                                <span className="text-sm text-muted-foreground italic pl-1">Unknown</span>
-                            )}
-                        </div>
-
-                        {/* Estimated Hours */}
-                        <div className="flex flex-col space-y-3 md:border-l md:border-border/50 md:pl-6">
-                            <div className="flex items-center gap-2 mb-1">
-                                <div className="p-1.5 bg-background rounded-md border border-border shadow-sm">
-                                    <Clock className="w-3.5 h-3.5 text-cyan-500" />
-                                </div>
-                                <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Est. Hours</label>
-                            </div>
-                            <div className="flex flex-col pl-1">
-                                {task.estimatedHours && task.estimatedHours > 0 ? (
-                                    <>
-                                        <span className="text-2xl font-bold text-cyan-500 dark:text-cyan-400 leading-none mb-1">
-                                            {task.estimatedHours}h
-                                        </span>
-                                        <span className="text-[11px] text-muted-foreground">
-                                            {task.status === 'Done' ? (
-                                                <span className="text-emerald-500 font-semibold flex items-center gap-1">
-                                                    <CheckCircle2 className="w-3 h-3" /> Completed
-                                                </span>
-                                            ) : 'Estimated'}
-                                        </span>
-                                    </>
-                                ) : (
-                                    <span className="text-sm text-muted-foreground italic">Not set</span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Description */}
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-2 pb-2 border-b border-border">
-                            <AlignLeft className="w-5 h-5 text-indigo-500" />
-                            <h3 className="text-lg font-semibold text-foreground">Description</h3>
-                        </div>
-                        {task.description ? (
-                            <div className="text-sm leading-7 text-foreground break-words whitespace-pre-wrap">
-                                {task.description}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center py-10 text-muted-foreground bg-muted/30 rounded-lg border border-dashed border-border">
-                                <AlignLeft className="w-8 h-8 mb-2 opacity-40" />
-                                <p className="text-sm">No description provided for this task.</p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Comments */}
-                    <div className="space-y-6 pt-2">
-                        <div className="flex items-center gap-2 pb-2 border-b border-border">
-                            <MessageSquare className="w-5 h-5 text-indigo-500" />
-                            <h3 className="text-lg font-semibold text-foreground">
-                                Comments <span className="text-muted-foreground text-sm font-normal ml-1">({comments.length})</span>
-                            </h3>
-                        </div>
-
-                        <div className="space-y-4">
-                            {comments.length === 0 ? (
-                                <p className="text-sm text-muted-foreground italic">No comments yet. Be the first to start a discussion.</p>
-                            ) : comments.map((comment) => {
-                                const commentUser = users.find(u => u.id === comment.userId);
-                                const isMe = comment.userId === currentUserId;
-                                return (
-                                    <div key={comment.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
-                                        <Avatar className="h-8 w-8 border border-border mt-1 shrink-0">
-                                            <AvatarImage src={commentUser?.avatar} />
-                                            <AvatarFallback className="bg-muted text-muted-foreground text-xs">
-                                                {commentUser?.name?.substring(0, 2).toUpperCase() || "?"}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <div className={`flex-1 space-y-1 ${isMe ? 'items-end' : ''}`}>
-                                            <div className={`flex items-center gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
-                                                <span className="text-sm font-semibold text-foreground">
-                                                    {isMe ? 'You' : (commentUser?.name || "Unknown")}
-                                                </span>
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    {fmt.dateTimeShort(comment.timestamp)}
-                                                </span>
-                                            </div>
-                                            <div className={`text-sm text-foreground p-3 rounded-lg border border-border whitespace-pre-wrap ${isMe ? 'bg-indigo-500/10 rounded-tr-none ml-8' : 'bg-muted/50 rounded-tl-none mr-8'}`}>
-                                                {renderCommentText(comment.text)}
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {/* Add Comment */}
-                        {currentUserId && (
-                            <div className="flex gap-3 pt-2">
-                                <Avatar className="h-8 w-8 border border-border mt-1 shrink-0">
-                                    <AvatarImage src={currentUser?.avatar} />
-                                    <AvatarFallback className="bg-indigo-500/10 text-indigo-600 text-xs">
-                                        {currentUser?.name?.substring(0, 2).toUpperCase() || "ME"}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 space-y-2">
-                                    <MentionTextarea
-                                        placeholder="Ask a question or post an update... Use @ to mention someone"
-                                        value={commentText}
-                                        onChange={setCommentText}
-                                        users={users}
-                                        onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddComment(); }}
-                                        className="min-h-[72px] text-sm resize-none"
-                                    />
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[10px] text-muted-foreground">Ctrl+Enter to post</span>
-                                        <Button
-                                            size="sm"
-                                            onClick={handleAddComment}
-                                            disabled={!commentText.trim() || isPending}
-                                            className="gap-2"
-                                        >
-                                            <Send className="w-3.5 h-3.5" />
-                                            {isPending ? "Posting..." : "Post"}
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    <ViewTaskModalComments
+                        comments={comments}
+                        users={users}
+                        currentUserId={currentUserId}
+                        currentUser={currentUser}
+                        commentText={commentText}
+                        setCommentText={setCommentText}
+                        handleAddComment={handleAddComment}
+                        isPending={isPending}
+                    />
                 </div>
 
-                {/* Fixed Footer */}
                 {canEdit && (
                     <div className="p-4 border-t border-border bg-muted/20 flex justify-end shrink-0">
                         <Button
-                            onClick={() => { setOpen(false); onEdit(); }}
+                            onClick={() => {
+                                setOpen(false);
+                                onEdit();
+                            }}
                             className="gap-2"
                         >
                             <Pencil className="h-4 w-4" />

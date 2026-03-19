@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 // Check MongoDB database structure and data integrity
 const mongoose = require('mongoose');
 require('dotenv').config();

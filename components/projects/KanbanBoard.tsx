@@ -16,7 +16,7 @@ import {
     rectIntersection,
     CollisionDetection,
 } from "@dnd-kit/core";
-import { Task, User, UserPermissions } from "@/lib/types";
+import { Task, User, UserPermissions, getDefaultUserPermissionsForRole } from "@/lib/types";
 import { updateTaskStatus } from "@/lib/actions";
 import { TaskCard } from "./TaskCard";
 import { toast } from "sonner";
@@ -41,6 +41,7 @@ interface KanbanBoardProps {
     categories?: { id: string; name: string }[];
     users?: TaskAssignee[];
     currentUserId?: string;
+    currentUserRole?: string;
     selectedCategory?: string;
     readOnly?: boolean;
     permissions?: UserPermissions;
@@ -77,12 +78,13 @@ const kanbanCollision: CollisionDetection = (args) => {
     return collisions;
 };
 
-export function KanbanBoard({ initialTasks, users, currentUserId, selectedCategory = "All", readOnly = false, permissions }: KanbanBoardProps) {
+export function KanbanBoard({ initialTasks, users, currentUserId, currentUserRole, selectedCategory = "All", readOnly = false, permissions }: KanbanBoardProps) {
     const [mounted, setMounted] = useState(false);
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [activeTask, setActiveTask] = useState<Task | null>(null);
     const [activeColumn, setActiveColumn] = useState(0);
     const overlayRef = useRef<HTMLDivElement>(null);
+    const effectivePermissions = permissions ?? getDefaultUserPermissionsForRole(currentUserRole);
 
     const [viewTaskId, setViewTaskId] = useState<string | null>(null);
     const [editTaskId, setEditTaskId] = useState<string | null>(null);
@@ -128,7 +130,7 @@ export function KanbanBoard({ initialTasks, users, currentUserId, selectedCatego
 
     const handleDragStart = (event: DragStartEvent) => {
         if (readOnly) return;
-        if (permissions && !permissions.canManageTasks && !permissions.canMarkDone) return;
+        if (!effectivePermissions.canManageTasks && !effectivePermissions.canMarkDone) return;
         const pointerEvent = event.activatorEvent as MouseEvent;
         if (pointerEvent && overlayRef.current) {
             overlayRef.current.style.transform = `translate3d(${pointerEvent.clientX - 140}px, ${pointerEvent.clientY - 20}px, 0)`;
@@ -158,15 +160,13 @@ export function KanbanBoard({ initialTasks, users, currentUserId, selectedCatego
         if (!newStatus || newStatus === draggedTask.status) return;
 
         // Permission check
-        if (permissions) {
-            if (newStatus === 'Done' && !permissions.canMarkDone) {
-                toast.error("You don't have permission to mark tasks as Done.");
-                return;
-            }
-            if (newStatus !== 'Done' && !permissions.canManageTasks) {
-                toast.error("You don't have permission to manage task status.");
-                return;
-            }
+        if (newStatus === 'Done' && !effectivePermissions.canMarkDone) {
+            toast.error("You don't have permission to mark tasks as Done.");
+            return;
+        }
+        if (newStatus !== 'Done' && !effectivePermissions.canManageTasks) {
+            toast.error("You don't have permission to manage task status.");
+            return;
         }
 
         // Optimistic update
@@ -191,15 +191,13 @@ export function KanbanBoard({ initialTasks, users, currentUserId, selectedCatego
         if (!task || task.status === newStatus) return;
 
         // Permission check
-        if (permissions) {
-            if (newStatus === 'Done' && !permissions.canMarkDone) {
-                toast.error("You don't have permission to mark tasks as Done.");
-                return;
-            }
-            if (newStatus !== 'Done' && !permissions.canManageTasks) {
-                toast.error("You don't have permission to manage task status.");
-                return;
-            }
+        if (newStatus === 'Done' && !effectivePermissions.canMarkDone) {
+            toast.error("You don't have permission to mark tasks as Done.");
+            return;
+        }
+        if (newStatus !== 'Done' && !effectivePermissions.canManageTasks) {
+            toast.error("You don't have permission to manage task status.");
+            return;
         }
 
         const oldStatus = task.status;
@@ -277,8 +275,9 @@ export function KanbanBoard({ initialTasks, users, currentUserId, selectedCatego
                             onViewTask={(task) => setViewTaskId(task.id)}
                             onEditTask={(task) => !readOnly && setEditTaskId(task.id)}
                             currentUserId={currentUserId}
+                            currentUserRole={currentUserRole}
                             readOnly={readOnly}
-                            permissions={permissions}
+                            permissions={effectivePermissions}
                             onQuickEdit={handleQuickEdit}
                         />
                     ))}
@@ -295,8 +294,9 @@ export function KanbanBoard({ initialTasks, users, currentUserId, selectedCatego
                         onViewTask={(task) => setViewTaskId(task.id)}
                         onEditTask={(task) => !readOnly && setEditTaskId(task.id)}
                         currentUserId={currentUserId}
+                        currentUserRole={currentUserRole}
                         readOnly={readOnly}
-                        permissions={permissions}
+                        permissions={effectivePermissions}
                         onQuickEdit={handleQuickEdit}
                         disableDrag={true}
                         onStatusChange={handleMobileStatusChange}
@@ -328,7 +328,8 @@ export function KanbanBoard({ initialTasks, users, currentUserId, selectedCatego
                             onView={() => { }}
                             onEdit={() => { }}
                             currentUserId={currentUserId}
-                            permissions={permissions}
+                            currentUserRole={currentUserRole}
+                            permissions={effectivePermissions}
                             onQuickEdit={() => { }}
                             dragOverlay={true}
                         />
@@ -348,8 +349,9 @@ export function KanbanBoard({ initialTasks, users, currentUserId, selectedCatego
                     }}
                     users={users}
                     readOnly={readOnly}
-                    permissions={permissions}
+                    permissions={effectivePermissions}
                     currentUserId={currentUserId}
+                    currentUserRole={currentUserRole}
                 />
             )}
 
@@ -358,8 +360,9 @@ export function KanbanBoard({ initialTasks, users, currentUserId, selectedCatego
                     task={editingTask}
                     open={!!editingTask}
                     setOpen={(open) => !open && setEditTaskId(null)}
-                    permissions={permissions}
+                    permissions={effectivePermissions}
                     currentUserId={currentUserId}
+                    currentUserRole={currentUserRole}
                 />
             )}
         </div>

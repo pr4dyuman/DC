@@ -1,60 +1,123 @@
 import { NextResponse } from 'next/server';
 import { handleUpload } from '@vercel/blob/client';
+
 import { getSessionUser } from '@/lib/auth';
+import { getCurrentAgency, checkTrialExpired } from '@/lib/agency-context';
+import { canCurrentUserAccessProject } from '@/lib/actions/access';
+import { deleteFile } from '@/lib/storage';
+import {
+  assertAgencyCanUpload,
+  assertAllowedUploadExtension,
+  getAllowedContentTypesForExtension,
+  parseDirectUploadClientPayload,
+  reserveAgencyStorageAfterUpload,
+  validateUploadedBlobFromUrl,
+} from '@/lib/upload-security';
+import { validateCsrfOrigin } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Client Upload Handler for Vercel Blob
- * 
- * This enables direct browser-to-Vercel-Blob uploads, bypassing the
- * 4.5MB serverless function body limit. The browser sends the file
- * directly to Vercel Blob storage after getting a secure token.
- * 
- * Flow:
- * 1. Client calls POST /api/upload-blob with upload metadata
- * 2. This handler validates auth and returns a secure upload token
- * 3. Client uploads directly to Vercel Blob using the token
- * 4. Vercel Blob calls back to confirm the upload
- */
+function parseUploadTokenPayload(tokenPayload) {
+  if (!tokenPayload) return {};
+
+  try {
+    const parsed = JSON.parse(tokenPayload);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    throw new Error('Invalid upload context.');
+  }
+}
+
 export async function POST(req) {
   try {
-    // Auth check
-    const session = await getSessionUser();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await req.json();
+    const isTokenRequest = body?.type === 'blob.generate-client-token';
+
+    let session = null;
+    let agency = null;
+
+    if (isTokenRequest) {
+      const csrf = validateCsrfOrigin(req);
+      if (!csrf.valid) return csrf.response;
+
+      session = await getSessionUser();
+      if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      agency = await getCurrentAgency();
+      if (await checkTrialExpired(agency)) {
+        return NextResponse.json({ error: 'Trial expired. Please upgrade your plan.' }, { status: 403 });
+      }
+    }
 
     const jsonResponse = await handleUpload({
       body,
       request: req,
-      onBeforeGenerateToken: async (pathname) => {
-        // Validate file type
-        const ext = pathname.split('.').pop()?.toLowerCase();
-        const ALLOWED = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt'];
-        
-        if (!ext || !ALLOWED.includes(ext)) {
-          throw new Error('File type not allowed.');
+      onBeforeGenerateToken: async (pathname, clientPayload) => {
+        if (!session) {
+          throw new Error('Unauthorized');
+        }
+
+        const uploadMeta = parseDirectUploadClientPayload(clientPayload);
+        const projectId = typeof uploadMeta.projectId === 'string' ? uploadMeta.projectId.trim() : '';
+        const fileSize = Number(uploadMeta.fileSize);
+        const ext = assertAllowedUploadExtension(pathname);
+
+        if (!projectId) {
+          throw new Error('Project context is required for uploads.');
+        }
+
+        assertAgencyCanUpload(agency, fileSize);
+
+        const canAccess = await canCurrentUserAccessProject(projectId, agency.id);
+        if (!canAccess) {
+          throw new Error('Unauthorized: You cannot upload files to this project.');
         }
 
         return {
-          allowedContentTypes: [
-            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-            'application/pdf',
-            'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.document',
-            'text/csv', 'text/plain'
-          ],
-          maximumSizeInBytes: 50 * 1024 * 1024, // 50MB
+          allowedContentTypes: getAllowedContentTypesForExtension(ext),
+          maximumSizeInBytes: 50 * 1024 * 1024,
           tokenPayload: JSON.stringify({
+            agencyId: agency.id,
+            extension: ext,
+            fileSize,
+            projectId,
             userId: session.userId,
           }),
         };
       },
-      onUploadCompleted: async ({ blob }) => {
-        // Called after successful upload
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
+        const uploadContext = parseUploadTokenPayload(tokenPayload);
+        const agencyId = typeof uploadContext.agencyId === 'string' ? uploadContext.agencyId : '';
+        const expectedExtension = typeof uploadContext.extension === 'string' ? uploadContext.extension : '';
+        const expectedSize = Number(uploadContext.fileSize);
+        const actualExtension = assertAllowedUploadExtension(blob.pathname);
+
+        if (!agencyId) {
+          await deleteFile(blob.url);
+          throw new Error('Missing upload agency context.');
+        }
+
+        if (expectedExtension && expectedExtension !== actualExtension) {
+          await deleteFile(blob.url);
+          throw new Error('Upload extension mismatch.');
+        }
+
+        if (Number.isFinite(expectedSize) && expectedSize > 0 && blob.size !== expectedSize) {
+          await deleteFile(blob.url);
+          throw new Error('Upload metadata mismatch.');
+        }
+
+        try {
+          await validateUploadedBlobFromUrl(blob.url, actualExtension);
+        } catch (error) {
+          await deleteFile(blob.url);
+          throw error;
+        }
+
+        await reserveAgencyStorageAfterUpload(agencyId, blob.size, blob.url);
+
         console.log(`[Blob Client Upload] Completed: ${blob.pathname} (${blob.size} bytes)`);
       },
     });

@@ -16,7 +16,7 @@ export function useActivePolling(
     isEnabled: boolean = true
 ) {
     const savedCallback = useRef(callback);
-    const lastRunTime = useRef<number>(Date.now());
+    const lastRunTime = useRef<number>(0);
 
     // Remember the latest callback
     useEffect(() => {
@@ -25,6 +25,8 @@ export function useActivePolling(
 
     useEffect(() => {
         if (!isEnabled) return;
+
+        lastRunTime.current = Date.now();
 
         const tick = () => {
             if (!document.hidden) {

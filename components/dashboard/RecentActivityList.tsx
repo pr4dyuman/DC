@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -55,6 +55,7 @@ export function RecentActivityList({ initialActivities }: RecentActivityListProp
     const [hasMore, setHasMore] = useState(initialActivities.length >= 5);
     const [loading, setLoading] = useState(false);
     const { ref, inView } = useInView();
+    const loadMoreRef = useRef<() => Promise<void>>(async () => { });
 
     const loadMore = async () => {
         if (loading || !hasMore) return;
@@ -74,9 +75,11 @@ export function RecentActivityList({ initialActivities }: RecentActivityListProp
         }
     };
 
+    loadMoreRef.current = loadMore;
+
     useEffect(() => {
         if (inView) {
-            loadMore();
+            void loadMoreRef.current();
         }
     }, [inView]);
 

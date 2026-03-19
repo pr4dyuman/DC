@@ -1,11 +1,18 @@
 import { getAllAgenciesWithStats } from "@/lib/actions/super-admin";
 import Link from "next/link";
 import { Users, Building2, Shield, User } from "lucide-react";
+import type { Agency } from "@/lib/types";
+
+type AgencyWithStats = Agency & {
+    stats?: {
+        users?: number;
+    };
+};
 
 export default async function SystemUsersPage() {
-    const agencies = await getAllAgenciesWithStats();
+    const agencies = await getAllAgenciesWithStats() as AgencyWithStats[];
 
-    const totalUsers = agencies.reduce((sum: number, a: any) => sum + (a.stats?.users || 0), 0);
+    const totalUsers = agencies.reduce((sum, agency) => sum + (agency.stats?.users || 0), 0);
     const totalAdmins = agencies.length; // Each agency has at least one admin (owner)
 
     return (
@@ -71,8 +78,8 @@ export default async function SystemUsersPage() {
                         </thead>
                         <tbody className="divide-y divide-border">
                             {agencies
-                                .sort((a: any, b: any) => (b.stats?.users || 0) - (a.stats?.users || 0))
-                                .map((agency: any) => {
+                                .sort((a, b) => (b.stats?.users || 0) - (a.stats?.users || 0))
+                                .map((agency) => {
                                     const userCount = agency.stats?.users || 0;
                                     const userLimit = agency.limits?.maxUsers === -1 ? null : agency.limits?.maxUsers;
                                     const usagePct = userLimit ? Math.min((userCount / userLimit) * 100, 100) : null;

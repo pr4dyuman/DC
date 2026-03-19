@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * One-time migration: hash all plain text passwords in the database.
  * 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 // Import backed-up JSON files into MongoDB
 const mongoose = require('mongoose');
 const fs = require('fs');

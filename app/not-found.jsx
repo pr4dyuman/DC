@@ -1,16 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import Navigation from "@/components/marketing/Navigation";
 import Footer from "@/components/marketing/Footer";
 
-export default function NotFound() {
-    const [mounted, setMounted] = useState(false);
+const subscribe = () => () => {};
 
-    useEffect(() => {
-        setMounted(true);
-    }, []);
+export default function NotFound() {
+    const mounted = useSyncExternalStore(subscribe, () => true, () => false);
 
     return (
         <div className="min-h-screen bg-black text-white flex flex-col">
