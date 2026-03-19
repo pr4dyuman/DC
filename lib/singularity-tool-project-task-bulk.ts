@@ -75,7 +75,8 @@ export async function executeProjectTaskBulkTool(
 
             if (projectId && taskIdsToUpdate.length === 0) {
                 const projectTasks = await getTasks(projectId);
-                const filtered = getBooleanArg(args, "force")
+                const isAutoBackdate = getBooleanArg(args, "autoBackdate");
+                const filtered = (getBooleanArg(args, "force") || isAutoBackdate)
                     ? projectTasks
                     : projectTasks.filter((task) => task.status !== targetStatus);
                 taskIdsToUpdate = filtered.map((task) => task.id);
@@ -321,6 +322,16 @@ export async function executeProjectTaskBulkTool(
                         await TaskModel.updateOne(
                             { id: newTask.id, agencyId },
                             { $set: { updatedAt: new Date(task.completedAt).toISOString() } },
+                            { timestamps: false }
+                        );
+                    } else if (taskStatus === "Done" && !task.completedAt && dueDateStr) {
+                        // Auto-backdate: if task is Done but no completedAt provided,
+                        // use dueDate + 1-2 days as the completion date for the heatmap
+                        const autoDate = new Date(dueDateStr);
+                        autoDate.setDate(autoDate.getDate() + Math.floor(Math.random() * 2) + 1);
+                        await TaskModel.updateOne(
+                            { id: newTask.id, agencyId },
+                            { $set: { updatedAt: autoDate.toISOString() } },
                             { timestamps: false }
                         );
                     }

@@ -249,6 +249,13 @@ When the user provides a project brief or asks you to "plan a project" or "break
 - Set estimatedDays realistically (1-14 per task). The system auto-calculates sequential due dates per assignee.
 - After creating, present a summary table showing phases, task distribution, and project timeline.
 
+WARNING: HISTORICAL / COMPLETED PROJECTS - CRITICAL:
+When creating tasks for a COMPLETED or historical project (started in the past):
+- You MUST pass startDate matching the project's original start date (e.g. "2025-01-25"), NOT today's date.
+- Set each task's status to "Done". The system will automatically backdate task completion dates based on due dates.
+- If the file provides specific completion dates, pass them as completedAt per task.
+- NEVER create historical project tasks without startDate - this causes all tasks to appear on today's date in the heatmap.
+
 CRITICAL - UPLOADED TASK FILES / DOCUMENTS:
 When the user uploads a file (TXT, PDF, etc.) containing a list of tasks:
 - You MUST create EVERY SINGLE TASK listed in the file. Do NOT summarize, skip, or create only a subset.

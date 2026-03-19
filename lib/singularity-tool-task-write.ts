@@ -102,6 +102,16 @@ export async function executeTaskWriteTool(
                     { $set: { updatedAt: new Date(completedAt).toISOString() } },
                     { timestamps: false }
                 );
+            } else if (taskStatus === "Done" && !completedAt && dueDate) {
+                // Auto-backdate: use dueDate + 1-2 days as completion date for heatmap
+                const agId = agencyId || await getRequiredAgencyId();
+                const autoDate = new Date(dueDate);
+                autoDate.setDate(autoDate.getDate() + Math.floor(Math.random() * 2) + 1);
+                await TaskModel.updateOne(
+                    { id: newTask.id, agencyId: agId },
+                    { $set: { updatedAt: autoDate.toISOString() } },
+                    { timestamps: false }
+                );
             }
 
             const assignInfo = autoAssigned
