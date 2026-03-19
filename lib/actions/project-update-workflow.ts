@@ -14,10 +14,13 @@ import {
 } from "../mongodb";
 import { isNotifEnabled } from "./shared";
 import {
+    buildProjectServiceLookupQuery,
     buildNormalizedProjectServiceConfigs,
+    mapProjectServicesByProjectId,
     resolveProjectClientFields,
     type ProjectLike,
     type ProjectServiceConfigSnapshot,
+    type ProjectServiceOwnerSnapshot,
     type ProjectServiceSnapshot,
 } from "./projects-shared";
 import type { Project } from "../db";
@@ -27,17 +30,19 @@ async function syncProjectServicesImpl(
     agencyId: string,
     rawServiceRefs: unknown[]
 ): Promise<{ services: string[]; serviceConfigs: ProjectServiceConfigSnapshot[] }> {
-    const [projectDoc, existingServices] = await Promise.all([
-        ProjectModel.findOne({ id: projectId, agencyId })
-            .select("serviceConfigs")
-            .lean() as Promise<{ serviceConfigs?: ProjectServiceConfigSnapshot[] } | null>,
-        ServiceModel.find({ agencyId, projectId })
-            .select("id name projectId employees agencyId")
-            .lean() as Promise<ProjectServiceSnapshot[]>,
-    ]);
+    const projectDoc = await ProjectModel.findOne({ id: projectId, agencyId })
+        .select("id services serviceConfigs")
+        .lean() as ProjectServiceOwnerSnapshot | null;
 
     if (!projectDoc) throw new Error("Project not found");
 
+    const serviceLookupQuery = buildProjectServiceLookupQuery([projectDoc]);
+    const serviceCandidates = serviceLookupQuery
+        ? await ServiceModel.find({ agencyId, ...serviceLookupQuery })
+            .select("id name projectId employees agencyId")
+            .lean() as ProjectServiceSnapshot[]
+        : [];
+    const existingServices = mapProjectServicesByProjectId([projectDoc], serviceCandidates).get(projectId) || [];
     const serviceById = new Map(existingServices.map((service) => [String(service.id), service] as const));
     const serviceByName = new Map(existingServices.map((service) => [String(service.name).toLowerCase(), service] as const));
     const desiredServiceNames: string[] = [];
@@ -91,7 +96,6 @@ async function syncProjectServicesImpl(
     if (removedServices.length > 0) {
         await ServiceModel.deleteMany({
             agencyId,
-            projectId,
             id: { $in: removedServices.map((service) => service.id) },
         });
     }

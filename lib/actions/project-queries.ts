@@ -4,7 +4,9 @@ import type { Task, User } from "../db";
 import { ClientModel, ProjectModel, ServiceModel, TaskModel, UserModel, connectDB } from "../mongodb";
 import { sanitizeDoc, withAgencyIdFallback } from "./shared";
 import {
+    buildProjectServiceLookupQuery,
     hydrateProjectsWithCurrentClients,
+    mapProjectServicesByProjectId,
     normalizeProjectServiceRefs,
     type ProjectLike,
     type ProjectServiceSnapshot,
@@ -55,14 +57,7 @@ type ProjectDirectoryClient = {
 function normalizeProjectsWithCurrentServices<T extends ProjectLike>(projects: T[], services: ProjectServiceSnapshot[]): T[] {
     if (!Array.isArray(projects) || projects.length === 0) return projects;
 
-    const servicesByProjectId = new Map<string, ProjectServiceSnapshot[]>();
-    services.forEach((service) => {
-        const projectId = String(service.projectId || "").trim();
-        if (!projectId) return;
-        const existingServices = servicesByProjectId.get(projectId) || [];
-        existingServices.push(service);
-        servicesByProjectId.set(projectId, existingServices);
-    });
+    const servicesByProjectId = mapProjectServicesByProjectId(projects, services);
 
     return projects.map((project) => {
         const normalizedServices = normalizeProjectServiceRefs(
@@ -100,9 +95,9 @@ export async function getProjectsImpl(
 
     const projects = await ProjectModel.find(query).skip(offset).limit(limit).lean() as ProjectLike[];
     const hydratedProjects = await hydrateProjectsWithCurrentClients(projects, agencyId);
-    const projectIds = hydratedProjects.map((project) => project.id);
-    const services = projectIds.length > 0
-        ? await ServiceModel.find({ agencyId, projectId: { $in: projectIds } })
+    const serviceLookupQuery = buildProjectServiceLookupQuery(hydratedProjects);
+    const services = serviceLookupQuery
+        ? await ServiceModel.find({ agencyId, ...serviceLookupQuery })
             .select("id name projectId employees agencyId")
             .lean() as ProjectServiceSnapshot[]
         : [];
@@ -117,9 +112,9 @@ export async function getUserProjectsImpl(agencyId: string, userId: string) {
     if (isClient) {
         const projects = await ProjectModel.find({ clientId: userId, agencyId }).lean() as ProjectLike[];
         const hydratedProjects = await hydrateProjectsWithCurrentClients(projects, agencyId);
-        const projectIds = hydratedProjects.map((project) => project.id);
-        const services = projectIds.length > 0
-            ? await ServiceModel.find({ agencyId, projectId: { $in: projectIds } })
+        const serviceLookupQuery = buildProjectServiceLookupQuery(hydratedProjects);
+        const services = serviceLookupQuery
+            ? await ServiceModel.find({ agencyId, ...serviceLookupQuery })
                 .select("id name projectId employees agencyId")
                 .lean() as ProjectServiceSnapshot[]
             : [];
@@ -130,8 +125,9 @@ export async function getUserProjectsImpl(agencyId: string, userId: string) {
     const taskProjectIds = await TaskModel.distinct("projectId", { assigneeId: userId, agencyId });
     const projects = await ProjectModel.find({ id: { $in: taskProjectIds }, agencyId }).lean() as ProjectLike[];
     const hydratedProjects = await hydrateProjectsWithCurrentClients(projects, agencyId);
-    const services = taskProjectIds.length > 0
-        ? await ServiceModel.find({ agencyId, projectId: { $in: taskProjectIds } })
+    const serviceLookupQuery = buildProjectServiceLookupQuery(hydratedProjects);
+    const services = serviceLookupQuery
+        ? await ServiceModel.find({ agencyId, ...serviceLookupQuery })
             .select("id name projectId employees agencyId")
             .lean() as ProjectServiceSnapshot[]
         : [];
@@ -144,9 +140,12 @@ export async function getProjectImpl(agencyId: string, id: string) {
     const project = await ProjectModel.findOne({ id, agencyId }).lean() as ProjectLike | null;
     if (!project) return undefined;
     const [hydratedProject] = await hydrateProjectsWithCurrentClients([project], agencyId);
-    const services = await ServiceModel.find({ agencyId, projectId: id })
-        .select("id name projectId employees agencyId")
-        .lean() as ProjectServiceSnapshot[];
+    const serviceLookupQuery = buildProjectServiceLookupQuery([hydratedProject]);
+    const services = serviceLookupQuery
+        ? await ServiceModel.find({ agencyId, ...serviceLookupQuery })
+            .select("id name projectId employees agencyId")
+            .lean() as ProjectServiceSnapshot[]
+        : [];
     const [normalizedProject] = normalizeProjectsWithCurrentServices([hydratedProject], services);
     return withAgencyIdFallback(sanitizeDoc(normalizedProject) as ProjectLike & { agencyId?: string }, agencyId);
 }
@@ -156,9 +155,12 @@ export async function getProjectBySlugImpl(agencyId: string, slug: string) {
     const project = await ProjectModel.findOne({ $or: [{ slug }, { id: slug }], agencyId }).lean() as ProjectLike | null;
     if (!project) return undefined;
     const [hydratedProject] = await hydrateProjectsWithCurrentClients([project], agencyId);
-    const services = await ServiceModel.find({ agencyId, projectId: hydratedProject.id })
-        .select("id name projectId employees agencyId")
-        .lean() as ProjectServiceSnapshot[];
+    const serviceLookupQuery = buildProjectServiceLookupQuery([hydratedProject]);
+    const services = serviceLookupQuery
+        ? await ServiceModel.find({ agencyId, ...serviceLookupQuery })
+            .select("id name projectId employees agencyId")
+            .lean() as ProjectServiceSnapshot[]
+        : [];
     const [normalizedProject] = normalizeProjectsWithCurrentServices([hydratedProject], services);
     return withAgencyIdFallback(sanitizeDoc(normalizedProject) as ProjectLike & { agencyId?: string }, agencyId);
 }

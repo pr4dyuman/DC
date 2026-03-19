@@ -2,7 +2,13 @@ import "server-only";
 
 import { ProjectModel, ServiceModel, TaskModel, connectDB } from "../mongodb";
 import { sanitizeDoc } from "./shared";
-import { getActiveProjectServiceDocs, type ProjectServiceSnapshot } from "./projects-shared";
+import {
+    buildProjectServiceLookupQuery,
+    getActiveProjectServiceDocs,
+    mapProjectServicesByProjectId,
+    type ProjectServiceOwnerSnapshot,
+    type ProjectServiceSnapshot,
+} from "./projects-shared";
 
 export async function getServicesImpl(agencyId: string, scopedProjectIds: string[] | null) {
     await connectDB();
@@ -18,15 +24,18 @@ export async function getServicesImpl(agencyId: string, scopedProjectIds: string
 export async function getProjectServicesImpl(agencyId: string, projectId: string) {
     await connectDB();
 
-    const [project, services] = await Promise.all([
-        ProjectModel.findOne({ id: projectId, agencyId }).select("services").lean() as Promise<{ services?: string[] } | null>,
-        ServiceModel.find({ agencyId, projectId }).lean() as Promise<ProjectServiceSnapshot[]>,
-    ]);
+    const project = await ProjectModel.findOne({ id: projectId, agencyId })
+        .select("id services serviceConfigs")
+        .lean() as ProjectServiceOwnerSnapshot | null;
 
     if (!project) return [];
 
-    const activeServices = getActiveProjectServiceDocs(project.services, services);
-    return activeServices.map(sanitizeDoc);
+    const serviceLookupQuery = buildProjectServiceLookupQuery([project]);
+    const services = serviceLookupQuery
+        ? await ServiceModel.find({ agencyId, ...serviceLookupQuery }).lean() as ProjectServiceSnapshot[]
+        : [];
+    const servicesByProjectId = mapProjectServicesByProjectId([project], services);
+    return getActiveProjectServiceDocs(project.services, servicesByProjectId.get(projectId) || []).map(sanitizeDoc);
 }
 
 export async function getServiceTaskCountImpl(agencyId: string, projectId: string, serviceName: string) {

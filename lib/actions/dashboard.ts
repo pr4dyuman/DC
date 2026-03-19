@@ -21,8 +21,10 @@ import { sanitizeName, sanitizeUrl } from "../validation";
 import { sanitizeDoc, sortByDateDesc, withAgencyIdFallback } from "./shared";
 import { buildClientFinanceSummary } from "./finance-shared";
 import {
+    buildProjectServiceLookupQuery,
     getActiveProjectServiceDocs,
     hydrateProjectsWithCurrentServiceNames,
+    mapProjectServicesByProjectId,
     type ProjectServiceSnapshot,
 } from "./projects-shared";
 
@@ -46,7 +48,7 @@ type RevenueHistoryPoint = {
     year: number;
 };
 
-type DistributionProject = Pick<Project, "id" | "services">;
+type DistributionProject = Pick<Project, "id" | "services" | "status" | "serviceConfigs">;
 type DistributionService = Pick<Service, "id" | "name" | "projectId">;
 
 function isInvoiceOverdueForMetrics(invoice: Partial<Invoice> | null | undefined, now = new Date(), timezone?: string): boolean {
@@ -208,21 +210,19 @@ export async function getRevenueDataImpl(agencyId: string) {
 export async function getProjectDistributionImpl(agencyId: string) {
     await connectDB();
 
-    const [projects, services] = await Promise.all([
-        ProjectModel.find({ agencyId }).lean() as Promise<DistributionProject[]>,
-        ServiceModel.find({ agencyId }).lean() as Promise<DistributionService[]>,
-    ]);
+    const projects = await ProjectModel.find({ agencyId, status: "Active" })
+        .select("id services serviceConfigs status")
+        .lean() as DistributionProject[];
+
+    const serviceLookupQuery = buildProjectServiceLookupQuery(projects);
+    const services = serviceLookupQuery
+        ? await ServiceModel.find({ agencyId, ...serviceLookupQuery })
+            .select("id name projectId")
+            .lean() as DistributionService[]
+        : [];
 
     const distribution: Record<string, number> = {};
-    const servicesByProjectId = new Map<string, ProjectServiceSnapshot[]>();
-
-    services.forEach((service) => {
-        const projectId = String(service.projectId || "").trim();
-        if (!projectId) return;
-        const projectServices = servicesByProjectId.get(projectId) || [];
-        projectServices.push(service);
-        servicesByProjectId.set(projectId, projectServices);
-    });
+    const servicesByProjectId = mapProjectServicesByProjectId(projects, services);
 
     projects.forEach((project) => {
         const activeServices = getActiveProjectServiceDocs(
@@ -230,23 +230,8 @@ export async function getProjectDistributionImpl(agencyId: string) {
             servicesByProjectId.get(project.id) || []
         );
 
-        if (activeServices.length > 0) {
-            activeServices.forEach((service) => {
-                distribution[service.name] = (distribution[service.name] || 0) + 1;
-            });
-            return;
-        }
-
-        const seenFallbackRefs = new Set<string>();
-        (project.services || []).forEach((serviceRef) => {
-            const normalizedRef = String(serviceRef || "").trim();
-            if (!normalizedRef) return;
-
-            const refKey = normalizedRef.toLowerCase();
-            if (seenFallbackRefs.has(refKey)) return;
-            seenFallbackRefs.add(refKey);
-
-            distribution[normalizedRef] = (distribution[normalizedRef] || 0) + 1;
+        activeServices.forEach((service) => {
+            distribution[service.name] = (distribution[service.name] || 0) + 1;
         });
     });
 
@@ -302,6 +287,7 @@ export async function getClientDashboardDataImpl(actor: DashboardActor, clientId
 
     const clientProjects = await ProjectModel.find({ clientId, agencyId }).lean() as Project[];
     const projectIds = clientProjects.map((project) => project.id);
+    const serviceLookupQuery = buildProjectServiceLookupQuery(clientProjects);
 
     const [invoices, transactions, tasks, assets, notifications, projectServices] = await Promise.all([
         InvoiceModel.find({ projectId: { $in: projectIds }, agencyId }).lean() as Promise<Invoice[]>,
@@ -309,8 +295,8 @@ export async function getClientDashboardDataImpl(actor: DashboardActor, clientId
         TaskModel.find({ projectId: { $in: projectIds }, agencyId }).lean() as Promise<Task[]>,
         AssetModel.find({ projectId: { $in: projectIds }, agencyId }).lean() as Promise<Asset[]>,
         NotificationModel.find({ userId: clientId, agencyId }).sort({ timestamp: -1 }).limit(5).lean() as Promise<Notification[]>,
-        projectIds.length > 0
-            ? ServiceModel.find({ agencyId, projectId: { $in: projectIds } })
+        serviceLookupQuery
+            ? ServiceModel.find({ agencyId, ...serviceLookupQuery })
                 .select("id name projectId employees agencyId")
                 .lean() as Promise<ProjectServiceSnapshot[]>
             : Promise.resolve([] as ProjectServiceSnapshot[]),

@@ -19,6 +19,12 @@ export type ProjectServiceConfigSnapshot = {
     paymentConfig?: PaymentConfig;
 };
 
+export type ProjectServiceOwnerSnapshot = {
+    id: string;
+    services?: string[];
+    serviceConfigs?: ProjectServiceConfigSnapshot[];
+};
+
 export function createDefaultProjectPaymentConfig(): PaymentConfig {
     return {
         type: "installment",
@@ -103,6 +109,124 @@ export function getActiveProjectServiceDocs<T extends ProjectServiceSnapshot>(
     return activeServices.length > 0 ? activeServices : [...serviceDocs];
 }
 
+function getNormalizedProjectServiceReferenceValues(project: ProjectServiceOwnerSnapshot): string[] {
+    const values: string[] = [];
+    const seen = new Set<string>();
+
+    const pushValue = (rawValue: unknown) => {
+        const normalizedValue = String(rawValue || "").trim();
+        if (!normalizedValue) return;
+
+        const valueKey = normalizedValue.toLowerCase();
+        if (seen.has(valueKey)) return;
+
+        seen.add(valueKey);
+        values.push(normalizedValue);
+    };
+
+    (project.services || []).forEach(pushValue);
+    (project.serviceConfigs || []).forEach((config) => {
+        pushValue(config?.serviceId);
+        pushValue(config?.name);
+    });
+
+    return values;
+}
+
+export function buildProjectServiceLookupQuery(projects: ProjectServiceOwnerSnapshot[]): Record<string, unknown> | null {
+    if (!Array.isArray(projects) || projects.length === 0) return null;
+
+    const projectIds = Array.from(new Set(
+        projects
+            .map((project) => String(project?.id || "").trim())
+            .filter(Boolean)
+    ));
+
+    const referenceValues = Array.from(new Set(
+        projects.flatMap((project) => getNormalizedProjectServiceReferenceValues(project))
+    ));
+
+    const orClauses: Array<Record<string, unknown>> = [];
+
+    if (projectIds.length > 0) {
+        orClauses.push({ projectId: { $in: projectIds } });
+    }
+
+    if (referenceValues.length > 0) {
+        orClauses.push({ id: { $in: referenceValues } });
+        orClauses.push({ name: { $in: referenceValues } });
+    }
+
+    if (orClauses.length === 0) return null;
+    return orClauses.length === 1 ? orClauses[0] : { $or: orClauses };
+}
+
+export function mapProjectServicesByProjectId<T extends ProjectServiceOwnerSnapshot, U extends ProjectServiceSnapshot>(
+    projects: T[],
+    serviceDocs: U[]
+): Map<string, U[]> {
+    const directServicesByProjectId = new Map<string, U[]>();
+    const servicesById = new Map<string, U>();
+    const servicesByName = new Map<string, U[]>();
+
+    serviceDocs.forEach((service) => {
+        const serviceId = String(service.id || "").trim();
+        if (serviceId) {
+            servicesById.set(serviceId, service);
+        }
+
+        const serviceNameKey = String(service.name || "").trim().toLowerCase();
+        if (serviceNameKey) {
+            const namedServices = servicesByName.get(serviceNameKey) || [];
+            namedServices.push(service);
+            servicesByName.set(serviceNameKey, namedServices);
+        }
+
+        const projectId = String(service.projectId || "").trim();
+        if (!projectId) return;
+
+        const projectServices = directServicesByProjectId.get(projectId) || [];
+        projectServices.push(service);
+        directServicesByProjectId.set(projectId, projectServices);
+    });
+
+    return new Map(
+        projects.map((project) => {
+            const projectId = String(project?.id || "").trim();
+            const matchedServices: U[] = [];
+            const seenServiceIds = new Set<string>();
+
+            const addService = (service: U | undefined) => {
+                if (!service) return;
+                const serviceId = String(service.id || "").trim();
+                if (!serviceId || seenServiceIds.has(serviceId)) return;
+                seenServiceIds.add(serviceId);
+                matchedServices.push(service);
+            };
+
+            (directServicesByProjectId.get(projectId) || []).forEach(addService);
+
+            getNormalizedProjectServiceReferenceValues(project).forEach((referenceValue) => {
+                const exactService = servicesById.get(referenceValue);
+                if (exactService) {
+                    const exactServiceProjectId = String(exactService.projectId || "").trim();
+                    if (!exactServiceProjectId || exactServiceProjectId === projectId) {
+                        addService(exactService);
+                    }
+                }
+
+                (servicesByName.get(referenceValue.toLowerCase()) || []).forEach((service) => {
+                    const serviceProjectId = String(service.projectId || "").trim();
+                    if (serviceProjectId && serviceProjectId !== projectId) return;
+                    addService(service);
+                });
+            });
+
+            return [projectId, matchedServices] as const;
+        })
+    );
+}
+
 export function normalizeProjectServiceRefs(
     projectServiceRefs: string[] | undefined,
     serviceDocs: ProjectServiceSnapshot[]
@@ -150,14 +274,10 @@ export function hydrateProjectsWithCurrentServiceNames<T extends { id: string; s
 ): T[] {
     if (!Array.isArray(projects) || projects.length === 0) return projects;
 
-    const servicesByProjectId = new Map<string, ProjectServiceSnapshot[]>();
-    services.forEach((service) => {
-        const projectId = String(service.projectId || "").trim();
-        if (!projectId) return;
-        const projectServices = servicesByProjectId.get(projectId) || [];
-        projectServices.push(service);
-        servicesByProjectId.set(projectId, projectServices);
-    });
+    const servicesByProjectId = mapProjectServicesByProjectId(
+        projects as Array<T & ProjectServiceOwnerSnapshot>,
+        services
+    );
 
     return projects.map((project) => {
         const serviceNames = getProjectServiceDisplayNames(

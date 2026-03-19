@@ -4,6 +4,7 @@ import type { Client } from "../db";
 import { ClientModel, ProjectModel, ServiceModel, connectDB } from "../mongodb";
 import { sanitizeDoc, withAgencyIdFallback } from "./shared";
 import {
+    buildProjectServiceLookupQuery,
     hydrateProjectsWithCurrentClients,
     hydrateProjectsWithCurrentServiceNames,
     type ProjectLike,
@@ -58,9 +59,9 @@ export async function getClientProjectsImpl(
     await connectDB();
     const projects = await ProjectModel.find({ clientId, agencyId }).skip(offset).limit(limit).lean() as ProjectLike[];
     const hydratedProjects = await hydrateProjectsWithCurrentClients(projects, agencyId);
-    const projectIds = hydratedProjects.map((project) => project.id);
-    const services = projectIds.length > 0
-        ? await ServiceModel.find({ agencyId, projectId: { $in: projectIds } })
+    const serviceLookupQuery = buildProjectServiceLookupQuery(hydratedProjects);
+    const services = serviceLookupQuery
+        ? await ServiceModel.find({ agencyId, ...serviceLookupQuery })
             .select("id name projectId employees agencyId")
             .lean() as ProjectServiceSnapshot[]
         : [];

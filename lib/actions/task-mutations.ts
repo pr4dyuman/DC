@@ -20,9 +20,11 @@ import {
 } from "../mongodb";
 import { isNotifEnabled, sanitizeDoc } from "./shared";
 import {
+    buildProjectServiceLookupQuery,
     buildNormalizedProjectServiceConfigs,
     getActiveProjectServiceDocs,
-    type ProjectServiceConfigSnapshot,
+    mapProjectServicesByProjectId,
+    type ProjectServiceOwnerSnapshot,
     type ProjectServiceSnapshot,
 } from "./projects-shared";
 import {
@@ -49,17 +51,19 @@ async function ensureProjectServiceReferenceForTask(
     const normalizedServiceRef = sanitizeName(String(rawServiceRef || ""), 200);
     if (!normalizedServiceRef) return null;
 
-    const [projectDoc, existingServices] = await Promise.all([
-        ProjectModel.findOne({ id: projectId, agencyId })
-            .select("services serviceConfigs")
-            .lean() as Promise<{ services?: string[]; serviceConfigs?: ProjectServiceConfigSnapshot[] } | null>,
-        ServiceModel.find({ agencyId, projectId })
-            .select("id name projectId employees agencyId")
-            .lean() as Promise<ProjectServiceSnapshot[]>,
-    ]);
+    const projectDoc = await ProjectModel.findOne({ id: projectId, agencyId })
+        .select("id services serviceConfigs")
+        .lean() as ProjectServiceOwnerSnapshot | null;
 
     if (!projectDoc) throw new Error("Project not found");
 
+    const serviceLookupQuery = buildProjectServiceLookupQuery([projectDoc]);
+    const serviceCandidates = serviceLookupQuery
+        ? await ServiceModel.find({ agencyId, ...serviceLookupQuery })
+            .select("id name projectId employees agencyId")
+            .lean() as ProjectServiceSnapshot[]
+        : [];
+    const existingServices = mapProjectServicesByProjectId([projectDoc], serviceCandidates).get(projectId) || [];
     const serviceById = new Map(existingServices.map((service) => [String(service.id), service] as const));
     const serviceByName = new Map(existingServices.map((service) => [String(service.name).toLowerCase(), service] as const));
     let resolvedService = serviceById.get(normalizedServiceRef) || serviceByName.get(normalizedServiceRef.toLowerCase());

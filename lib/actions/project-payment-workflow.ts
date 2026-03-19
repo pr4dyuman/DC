@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 import type { PaymentConfig } from "../db";
 import { sanitizeMongoInput } from "../validation";
 import { ProjectModel, ServiceModel, connectDB } from "../mongodb";
+import {
+    buildProjectServiceLookupQuery,
+    mapProjectServicesByProjectId,
+    type ProjectServiceOwnerSnapshot,
+    type ProjectServiceSnapshot,
+} from "./projects-shared";
 
 export async function updateProjectPaymentImpl(
     projectId: string,
@@ -15,18 +21,23 @@ export async function updateProjectPaymentImpl(
 
     paymentConfig = sanitizeMongoInput(paymentConfig);
 
-    const projectServices = await ServiceModel.find({ agencyId, projectId }).select("id name").lean() as Array<{ id: string; name: string }>;
-    const idMap = new Map(projectServices.map((svc) => [String(svc.id), svc] as const));
-    const nameMap = new Map(projectServices.map((svc) => [String(svc.name).toLowerCase(), svc] as const));
+    const projectDoc = await ProjectModel.findOne({ id: projectId, agencyId })
+        .select("id services serviceConfigs")
+        .lean() as ProjectServiceOwnerSnapshot | null;
+    if (!projectDoc) throw new Error("Project not found");
+
+    const serviceLookupQuery = buildProjectServiceLookupQuery([projectDoc]);
+    const projectServices = serviceLookupQuery
+        ? await ServiceModel.find({ agencyId, ...serviceLookupQuery })
+            .select("id name projectId employees agencyId")
+            .lean() as ProjectServiceSnapshot[]
+        : [];
+    const projectServiceMap = mapProjectServicesByProjectId([projectDoc], projectServices);
+    const resolvedProjectServices = projectServiceMap.get(projectId) || [];
+    const idMap = new Map(resolvedProjectServices.map((svc) => [String(svc.id), svc] as const));
+    const nameMap = new Map(resolvedProjectServices.map((svc) => [String(svc.name).toLowerCase(), svc] as const));
     const canonicalService = idMap.get(String(serviceId)) || nameMap.get(String(serviceId).toLowerCase());
     if (!canonicalService) throw new Error("Service not found for this project");
-
-    const projectDoc = await ProjectModel.findOne({ id: projectId, agencyId })
-        .select("services serviceConfigs")
-        .lean() as {
-            services?: string[];
-            serviceConfigs?: Array<{ serviceId?: string; name?: string; paymentConfig?: PaymentConfig }>;
-        } | null;
 
     const normalizedServices = Array.isArray(projectDoc?.services)
         ? Array.from(new Set(projectDoc.services.map((rawSvc) => {

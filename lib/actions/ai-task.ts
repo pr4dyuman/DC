@@ -7,7 +7,9 @@ import { logAIUsage } from "../ai-usage";
 import { AssetModel, ProjectModel, ServiceModel, TaskModel, UserModel, connectDB } from "../mongodb";
 import { getErrorMessage } from "./shared";
 import {
+    buildProjectServiceLookupQuery,
     getProjectServiceDisplayNames,
+    mapProjectServicesByProjectId,
     type ProjectLike,
     type ProjectServiceSnapshot,
 } from "./projects-shared";
@@ -135,17 +137,24 @@ export async function explainTaskImpl(
     const task = await TaskModel.findOne({ id: taskId, agencyId }).lean() as Task | null;
     if (!task) throw new Error("Task not found");
 
-    const [project, assignee, allProjectTasks, projectAssetsRaw, projectServices] = await Promise.all([
+    const [project, assignee, allProjectTasks, projectAssetsRaw] = await Promise.all([
         ProjectModel.findOne({ id: task.projectId, agencyId }).lean() as Promise<ProjectLike | null>,
         task.assigneeId
             ? UserModel.findOne({ id: task.assigneeId, agencyId }).select("-password").lean() as Promise<Pick<User, "name"> | null>
             : Promise.resolve(null),
         TaskModel.find({ projectId: task.projectId, agencyId }).lean() as Promise<Task[]>,
         AssetModel.find({ projectId: task.projectId, aiEnabled: true, agencyId }).lean() as Promise<Asset[]>,
-        ServiceModel.find({ projectId: task.projectId, agencyId })
-            .select("id name projectId employees agencyId")
-            .lean() as Promise<ProjectServiceSnapshot[]>,
     ]);
+
+    const serviceLookupQuery = project ? buildProjectServiceLookupQuery([project]) : null;
+    const projectServices = serviceLookupQuery
+        ? await ServiceModel.find({ agencyId, ...serviceLookupQuery })
+            .select("id name projectId employees agencyId")
+            .lean() as ProjectServiceSnapshot[]
+        : [];
+    const resolvedProjectServices = project
+        ? mapProjectServicesByProjectId([project], projectServices).get(project.id) || []
+        : [];
 
     const userIds = [...new Set(allProjectTasks.map((projectTask) => projectTask.assigneeId).filter((id): id is string => Boolean(id)))];
     const users = await UserModel.find({ id: { $in: userIds }, agencyId }).select("-password").lean() as Array<Pick<User, "id" | "name">>;
@@ -184,7 +193,7 @@ export async function explainTaskImpl(
         },
         project: project ? {
             name: project.client || "Unknown Client",
-            departments: getProjectServiceDisplayNames(project.services, projectServices).join(", ") || "General",
+            departments: getProjectServiceDisplayNames(project.services, resolvedProjectServices).join(", ") || "General",
         } : null,
         comments: task.comments || [],
     };
