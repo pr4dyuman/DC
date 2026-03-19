@@ -21,6 +21,9 @@ export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 export function resolveModel(config: AIConfig): string {
+    if (config.model === "custom" && config.customModelId) {
+        return config.customModelId;
+    }
     return config.model || "gemini-2.5-flash-lite";
 }
 

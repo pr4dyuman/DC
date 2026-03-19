@@ -3,6 +3,7 @@ import "server-only";
 import type { Asset, Task, User } from "../db";
 import type { AIConfig } from "../types";
 import { generateContentWithChat } from "../ai-provider";
+import { resolveModel } from "../ai-provider-shared";
 import { logAIUsage } from "../ai-usage";
 import { createSession } from "../live-session";
 import { AssetModel, TaskModel, UserModel, connectDB } from "../mongodb";
@@ -67,7 +68,7 @@ export async function createAISessionImpl(
     currentTitle: string,
     currentDescription: string
 ): Promise<string> {
-    const modelId = aiConfig.model || "gemini-2.5-flash-lite";
+    const modelId = resolveModel(aiConfig);
     if (!modelId.includes("native-audio")) {
         return "legacy";
     }

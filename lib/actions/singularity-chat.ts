@@ -2,6 +2,7 @@ import "server-only";
 
 import type { AIConfig } from "../types";
 import { generateContent } from "../ai-provider";
+import { resolveModel } from "../ai-provider-shared";
 import { logAIUsage } from "../ai-usage";
 import { getErrorMessage } from "./shared";
 
@@ -33,7 +34,7 @@ export async function singularityChatImpl(
     }
     fullPrompt += `User: ${userMessage}`;
 
-    const modelId = aiConfig.model || "gemini-2.5-flash-lite";
+    const modelId = resolveModel(aiConfig);
     const isLive = modelId.includes("native-audio");
 
     if (isLive) {

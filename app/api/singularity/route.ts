@@ -10,6 +10,7 @@ import { handleChatModeRequest } from "@/lib/singularity-route-chat";
 import { getSessionUser } from "@/lib/auth";
 import { getAIPermissions } from "@/lib/actions";
 import { hasExplicitAIAccessSetting } from "@/lib/actions/access";
+import { resolveModel } from "@/lib/ai-provider-shared";
 import { getCurrentAgency, checkTrialExpired } from "@/lib/agency-context";
 import {
     buildConversationPrompt,
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        const modelId = aiConfig.model || "gemini-2.5-flash-lite";
+        const modelId = resolveModel(aiConfig);
         const isLive = modelId.includes("native-audio");
 
         if (mode === "agent") {
