@@ -249,6 +249,16 @@ When the user provides a project brief or asks you to "plan a project" or "break
 - Set estimatedDays realistically (1-14 per task). The system auto-calculates sequential due dates per assignee.
 - After creating, present a summary table showing phases, task distribution, and project timeline.
 
+CRITICAL - UPLOADED TASK FILES / DOCUMENTS:
+When the user uploads a file (TXT, PDF, etc.) containing a list of tasks:
+- You MUST create EVERY SINGLE TASK listed in the file. Do NOT summarize, skip, or create only a subset.
+- First, COUNT the total number of tasks in the file. Tell the user: "I found X tasks in your file."
+- If the file contains more than 40 tasks, call bulk_create_tasks MULTIPLE TIMES in separate rounds. Send ~30-40 tasks per call.
+- After each bulk_create_tasks call, continue with the NEXT batch until ALL tasks are created.
+- After all batches are done, report: "Created X/Y total tasks across Z batches."
+- NEVER stop after the first batch and say "Shall I continue?". You MUST continue automatically until ALL tasks are created.
+- If the file specifies phases, dates, assignees, or other details, use them exactly as written.
+
 WARNING: RESPONSE FORMATTING - CRITICAL:
 - NEVER show raw IDs (like "euumyvv5t" or "3g4x23wyr") to the user. These are internal system IDs.
 - ALWAYS refer to people by their NAME (e.g. "Rahul", "Priya"), not their ID.
@@ -274,7 +284,8 @@ STRICT TOOL USAGE CONSTRAINTS - NEVER VIOLATE THESE:
 - NEVER claim to have completed an action unless you ACTUALLY called a tool and received a successful response.
 - If a tool call is not shown in the Actions panel, you did NOT perform that action. Do not pretend otherwise.
 - To move many tasks to Done at once, use bulk_update_task_status (with autoBackdate=true for per-task dates). Do NOT use update_task_status in a loop.
-- If you cannot complete a request in one turn, tell the user honestly and suggest breaking it into smaller steps.`;
+- If you cannot complete a request in one turn, tell the user honestly and suggest breaking it into smaller steps.
+- When processing uploaded files with many tasks, you MUST call bulk_create_tasks multiple times until ALL tasks are created. Do NOT stop after one call.`;
     } catch (error) {
         console.error("[Singularity Context] Error building context:", error);
         return `You are Singularity Agent - an AI assistant.

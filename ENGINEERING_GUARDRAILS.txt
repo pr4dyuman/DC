@@ -1,71 +1,81 @@
 AGENCY-OS ENGINEERING GUARDRAILS
-Version: 1.0
+Version: 2.0
 Scope: Mandatory rules for all future code changes in this repository.
 
-PRE-EDIT GATE (REQUIRED BEFORE ANY CODE CHANGE)
-1) Trace authentication and token flow touched by the change.
-2) Identify security impact, data impact, UI impact, and workflow impact.
-3) Define production-ready approach only; reject temporary workarounds.
-4) Confirm compatibility with current architecture, conventions, and runtime.
+CORE RULE
+- Always write structured code. Preserve the organized architecture already built in this repo.
+- Most files should stay under about 400-500 lines. If a change pushes a file much beyond that, extract a focused helper/hook/component/module first.
+- Keep public entry files stable when possible (`lib/actions.ts`, route files, main page shells), and move heavy logic into domain modules.
 
-RULE 1: AUTH AND TOKEN SAFETY
-- Preserve existing auth boundaries, session rules, and token lifecycle.
-- Never weaken validation, authorization, expiry, rotation, or revocation behavior.
-- Avoid exposing tokens, secrets, user-sensitive payloads, or internal errors.
-- Any auth-related update must include threat-focused review of affected endpoints and flows.
+PRE-CHANGE GATE
+- Before editing, trace auth/role scope, tenant scope, data flow, UI flow, and workflow impact.
+- Review read paths, write paths, AI paths, API routes, uploads, rollback behavior, and downstream screens touched by the change.
+- Reject temporary hacks, silent behavior changes, dead fallback code, and commented-out "backup logic".
 
-RULE 2: PRODUCTION-LEVEL QUALITY ONLY
-- No temporary patches, bypasses, hidden flags, or fragile shortcuts.
-- Implement durable fixes with clear failure handling and stable behavior.
-- Keep edge cases and rollback behavior in mind for real traffic conditions.
+AUTH / TENANT / PERMISSION RULES
+- Fail closed. Missing permission/config/record must reduce access, never grant it.
+- Enforce auth, role, ownership, and agency scope on every read and write.
+- Scope every query/mutation by `agencyId`, plus narrower scope such as `projectId`, `userId`, `clientId`, or `sessionUserId` when applicable.
+- The same restrictions must hold across UI, server actions, API routes, search, chat, exports, and AI tools.
 
-RULE 3: MONGODB ORGANIZATION AND DATA INTEGRITY
-- Keep schema usage consistent, normalized where appropriate, and predictable.
-- Preserve indexes, constraints, references, and migration safety.
-- Prevent orphaned records, duplicate writes, and inconsistent document structure.
-- Database-related changes must not degrade query health or operational maintainability.
+IDENTIFIER RULES
+- Use stable IDs as canonical references. Names, usernames, slugs, descriptions, and labels are display fields only.
+- Never join, filter, update, delete, attribute, or restore records by mutable names when an ID exists.
+- Never persist mixed "id or name" fields.
+- If legacy mixed data is encountered, normalize to canonical IDs before continuing.
 
-RULE 4: CODE ORGANIZATION AND MAINTAINABILITY
-- Follow current project patterns for naming, structure, and layering.
-- Keep modules cohesive and avoid unnecessary coupling.
-- Maintain readability, typed safety where applicable, and clear control flow.
+DATA INTEGRITY RULES
+- Prevent orphaned foreign keys, stale denormalized labels, duplicate per-scope records, and ghost fallback values.
+- Validate referenced entities before write.
+- Keep schema meaning consistent across UI, server, AI, imports, and scripts.
+- Rollback/restore logic must match the real snapshot shape, especially for composite actions.
 
-RULE 5: WORKFLOW COMPATIBILITY
-- Changes must not break existing product workflows, role-based behavior, or integrations.
-- Preserve current API contracts unless an explicit migration path is included.
-- Validate backward compatibility for dependent screens, actions, and services.
+CONSISTENCY RULES
+- Use one source of truth for each metric, total, status definition, and business rule.
+- Do not keep parallel formulas for dashboard/finance/project/client versions of the same number.
+- Keep all input paths under the same validation and permission rules: UI, API, AI, bulk actions, direct uploads, and background flows.
 
-RULE 6: CONSEQUENCE ANALYSIS BEFORE MERGE
-- Check direct and indirect impacts across API routes, UI states, jobs, and data lifecycle.
-- Review failure modes, race conditions, and permission boundaries.
-- Ensure no existing feature regression is introduced.
+QUERY / MUTATION SAFETY
+- Avoid broad `updateMany` / `deleteMany` unless the scope is explicitly bounded and reviewed.
+- Never let project/service/task/client changes spill into unrelated records because of shared names.
+- Search may match display text, but authorization and ownership must still be enforced with IDs and scope checks.
 
-RULE 7: THEME CONSISTENCY (BLACK AND WHITE)
-- UI updates must work correctly in both dark and light themes.
-- Maintain contrast, readability, semantic states, and visual consistency.
+VALIDATION / SANITIZATION
+- Validate after sanitization, not only before.
+- Keep required/optional field rules aligned across schema, UI, and server actions.
+- Do not trust client-sent audit or ownership fields such as uploader, performer, creator, or assignee authority; derive them from authenticated server context.
+- Large/direct uploads must enforce the same server-side limits, validation, accounting, and security checks as small uploads.
 
-RULE 8: RESPONSIVE UI QUALITY
-- UI changes must be responsive across mobile, tablet, laptop, and desktop breakpoints.
-- Preserve current layout behavior and avoid overflow, clipping, and interaction issues.
+UI / WORKFLOW RULES
+- Preserve current behavior and workflows unless an explicit migration path is included.
+- Keep responsive behavior and light/dark theme support intact.
+- Show failures clearly; no silent partial-success states.
 
-RULE 9: BUG REPORTING DUTY
-- If any existing bug is discovered during work, report:
-  a) where it exists,
-  b) expected vs current behavior,
-  c) user/business impact,
-  d) severity and risk.
+MANDATORY VERIFICATION
+- Run `npm run lint` and do not introduce new lint errors.
+- Run `.\node_modules\.bin\tsc.cmd --noEmit --pretty false` or the repo typecheck equivalent.
+- Run `npm run build` before finalizing meaningful changes.
+- Recheck the exact user flow changed plus nearby regression-prone flows.
+- For auth, AI, uploads, finance, task, or cross-scope data changes, do an extra role/scope regression review.
 
-RULE 10: RE-VERIFICATION REQUIREMENT
-- Re-verify every edit before completion.
-- Minimum verification includes:
-  1) target behavior check,
-  2) regression check for related flows,
-  3) lint and typecheck execution where available,
-  4) test execution relevant to impacted areas.
+BUG TYPES TO ACTIVELY AVOID
+- ID/name reference mixing
+- Cross-project or cross-tenant mutation by shared names
+- Mutable-name fallback queries for client/user/service/activity/finance joins
+- Stale denormalized labels overriding canonical IDs
+- Missing permission checks or permissive fallback defaults
+- Unauthorized exposure through alternate surfaces such as AI, search, chat, exports, or API routes
+- Inconsistent formulas or status scopes across pages/modules
+- Orphaned references or invalid foreign keys
+- Direct-upload vs normal-upload validation drift
+- Ghost/default scope fallbacks (for example fake default tenant/agency values)
+- Runtime/tool contract mismatch between schema, handler, and persisted data
+- Rollback snapshot mismatch with restore logic
 
-MANDATORY EXECUTION ORDER FOR ALL FUTURE CHANGES
-Step A: Run Pre-Edit Gate.
-Step B: Implement production-grade change.
-Step C: Perform consequence analysis.
-Step D: Re-verify via lint, typecheck, tests, and impacted flow checks.
-Step E: Report discovered bugs and final validation status.
+GIT / DELIVERY RULES
+- Review the real staged diff before push.
+- Stage extracted/new files intentionally so workspace structure and git history match.
+- Do not push unrelated local files, scratch notes, or partial refactors.
+
+BUG REPORTING DUTY
+- If a bug is found during work, record: file/path, bug type, current vs expected behavior, impact, severity, and safest fix path.

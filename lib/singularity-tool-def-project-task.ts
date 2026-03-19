@@ -126,7 +126,7 @@ export const SINGULARITY_TOOL_DECLARATIONS_PROJECT_TASK = [
     },
     {
         name: "bulk_create_tasks",
-        description: "Create multiple tasks at once from a project plan/breakdown. For HISTORICAL/completed projects, set each task's status to 'Done' and provide a completedAt date so the contribution heatmap shows correct dates. For new projects, leave status as default (Todo) and provide estimatedDays for auto-scheduling.",
+        description: "Create multiple tasks at once from a project plan/breakdown. For HISTORICAL/completed projects, set each task's status to 'Done' and provide a completedAt date so the contribution heatmap shows correct dates. For new projects, leave status as default (Todo) and provide estimatedDays for auto-scheduling. IMPORTANT: If the user uploaded a file with many tasks, you MUST call this tool MULTIPLE TIMES (once per batch of ~30-40 tasks) until EVERY task from the file is created. Never stop at a subset.",
         parameters: {
             type: "OBJECT",
             properties: {
@@ -134,7 +134,7 @@ export const SINGULARITY_TOOL_DECLARATIONS_PROJECT_TASK = [
                 startDate: { type: "STRING", description: "Project start date in YYYY-MM-DD format. Tasks will be scheduled sequentially from this date." },
                 tasks: {
                     type: "ARRAY",
-                    description: "Array of tasks to create. Generate as many as needed (10-100+) to cover the full project scope.",
+                    description: "Array of tasks to create. Include ALL tasks - if there are more than 40, split across multiple calls to this tool.",
                     items: {
                         type: "OBJECT",
                         properties: {

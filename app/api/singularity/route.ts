@@ -118,6 +118,8 @@ export async function POST(req: NextRequest) {
 - When moving tasks to Done with realistic dates, use bulk_update_task_status with autoBackdate=true.
 - You MUST call a tool to perform an action. Reading data (get_project_tasks) does NOT modify anything.
 - If you only see "Fetching tasks" in the Actions, you have NOT updated any tasks.
+- When an uploaded file contains many tasks, you MUST call bulk_create_tasks MULTIPLE TIMES until ALL tasks from the file are created. Never stop at a subset.
+- Include ~30-40 tasks per bulk_create_tasks call to avoid truncation.
 - Keep responses concise. Do not over-explain or repeat yourself.`;
             }
 

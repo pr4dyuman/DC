@@ -12,6 +12,23 @@ import { ClientModel, NotificationModel, ProjectModel, UserModel, connectDB } fr
 
 type AgencyContext = Pick<Agency, "id" | "name"> | null;
 
+const LEGACY_CLIENT_ARCHIVE_RECOVERY_WINDOW_MS = 5 * 60 * 1000;
+
+function buildLegacyClientArchiveRecoveryClause(archivedAt?: string): Record<string, unknown> | null {
+    if (!archivedAt) return null;
+
+    const archivedAtDate = new Date(archivedAt);
+    if (Number.isNaN(archivedAtDate.getTime())) return null;
+
+    return {
+        clientArchiveHold: { $exists: false },
+        updatedAt: {
+            $gte: archivedAtDate.toISOString(),
+            $lte: new Date(archivedAtDate.getTime() + LEGACY_CLIENT_ARCHIVE_RECOVERY_WINDOW_MS).toISOString(),
+        },
+    };
+}
+
 export async function createClientImpl(client: Omit<Client, "id" | "agencyId">, agency: AgencyContext) {
     client = sanitizeMongoInput(client);
     client.name = sanitizeName(client.name);
@@ -160,13 +177,21 @@ export async function deleteClientImpl(id: string, agencyId?: string) {
     const client = await ClientModel.findOne({ id, agencyId }).select("-password").lean();
     if (!client) throw new Error("Client not found");
 
+    const archiveTimestamp = new Date().toISOString();
+
     await ClientModel.updateOne(
         { id, agencyId },
-        { $set: { archived: true, archivedAt: new Date().toISOString() } }
+        { $set: { archived: true, archivedAt: archiveTimestamp } }
     );
     await ProjectModel.updateMany(
         { clientId: id, agencyId, status: "Active" },
-        { $set: { status: "On Hold" } }
+        {
+            $set: {
+                status: "On Hold",
+                clientArchiveHold: true,
+                clientArchiveHoldAt: archiveTimestamp,
+            },
+        }
     );
     await NotificationModel.deleteMany({ userId: id, agencyId });
     if (agencyId) await decrementAgencyUsage(agencyId, "clients");
@@ -189,11 +214,32 @@ export async function unarchiveClientImpl(id: string, agencyId?: string) {
     if (!client) throw new Error("Client not found");
     if (!client.archived) throw new Error("Client is not archived");
 
+    const recoveryClauses: Record<string, unknown>[] = [{ clientArchiveHold: true }];
+    const legacyRecoveryClause = buildLegacyClientArchiveRecoveryClause(client.archivedAt);
+    if (legacyRecoveryClause) {
+        recoveryClauses.push(legacyRecoveryClause);
+    }
+
     await ClientModel.updateOne(
         { id, agencyId },
         { $set: { archived: false }, $unset: { archivedAt: "" } }
     );
+    await ProjectModel.updateMany(
+        {
+            clientId: id,
+            agencyId,
+            status: "On Hold",
+            $or: recoveryClauses,
+        },
+        {
+            $set: { status: "Active" },
+            $unset: { clientArchiveHold: "", clientArchiveHoldAt: "" },
+        }
+    );
     if (agencyId) await incrementAgencyUsage(agencyId, "clients");
 
     revalidatePath("/dashboard/clients");
+    revalidatePath("/dashboard/projects");
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/clients/[slug]", "page");
 }

@@ -3,9 +3,9 @@ Project Duration: January 2025 - July 2025
 Framework: Next.js
 
 Team Allocations:
-- Nagendra Indoria: Graphic Designer (UI/UX, Branding, Assets)
-- Nitin Maharishi: Lead Developer (80% dev capacity - Architecture, Backend, Logic)
-- Ankit Maharishi: Developer (20% dev capacity - Components, UI polish, Templates)
+- Nagendra Indoria: Graphic Designer (100% of Design work)
+- Nitin Maharishi: Lead Developer (80% of Dev work)
+- Ankit Maharishi: Developer (20% of Dev work)
 
 =======================================================
 PHASE 1: Project Setup & Branding (January 2025)

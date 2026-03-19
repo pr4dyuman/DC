@@ -176,13 +176,26 @@ export async function createProjectImpl(
         }
     }
 
-    await ProjectModel.create(newProject);
     if (serviceDocs.length > 0) {
         try {
-            await ServiceModel.insertMany(serviceDocs, { ordered: false });
+            await ServiceModel.insertMany(serviceDocs, { ordered: true });
         } catch (serviceSyncError) {
-            console.error("[createProject] Service sync failed:", serviceSyncError);
+            console.error("[createProject] Service sync failed before project creation:", serviceSyncError);
+            throw new Error("Project creation failed while creating services. No changes were saved.");
         }
+    }
+
+    try {
+        await ProjectModel.create(newProject);
+    } catch (projectCreationError) {
+        if (serviceDocs.length > 0) {
+            try {
+                await ServiceModel.deleteMany({ agencyId, projectId: newProject.id });
+            } catch (serviceRollbackError) {
+                console.error("[createProject] Failed to roll back services after project creation error:", serviceRollbackError);
+            }
+        }
+        throw projectCreationError;
     }
 
     await incrementAgencyUsage(agencyId, "projects");

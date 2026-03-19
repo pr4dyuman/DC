@@ -85,6 +85,8 @@ export type Project = {
     services: string[];
     serviceConfigs?: ProjectServiceConfig[];
     status: "Active" | "Completed" | "On Hold" | "Cancelled";
+    clientArchiveHold?: boolean;
+    clientArchiveHoldAt?: string;
     budget: number;
     dueDate: string;
     createdAt?: string;

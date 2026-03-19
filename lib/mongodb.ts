@@ -151,6 +151,8 @@ const ProjectSchema = new Schema<Project>({
     services: [{ type: String }],
     serviceConfigs: [ProjectServiceConfigSchema],
     status: { type: String, enum: ['Active', 'Completed', 'On Hold', 'Cancelled'], required: true },
+    clientArchiveHold: { type: Boolean, default: false },
+    clientArchiveHoldAt: { type: String },
     budget: { type: Number, required: true },
     dueDate: { type: String, required: true },
     aiEnabled: { type: Boolean, default: false }

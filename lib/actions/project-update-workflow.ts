@@ -154,6 +154,11 @@ export async function updateProjectImpl(
         setUpdates.serviceConfigs = normalizedServices.serviceConfigs;
     }
 
+    if (Object.prototype.hasOwnProperty.call(setUpdates, "status")) {
+        unsetUpdates.clientArchiveHold = "";
+        unsetUpdates.clientArchiveHoldAt = "";
+    }
+
     if (Object.keys(setUpdates).length > 0 || Object.keys(unsetUpdates).length > 0) {
         await ProjectModel.updateOne(
             { id, agencyId },

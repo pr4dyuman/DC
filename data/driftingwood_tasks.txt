@@ -1,0 +1,643 @@
+Project Name: Driftingwood.in
+Project Duration: January 25, 2025 - May 15, 2025
+Framework: Next.js (App Router)
+
+Team Allocations:
+- Nagendra Indoria: Graphic Designer (100% of Design work)
+- Nitin Maharishi: Lead Developer (80% of Dev work)
+- Ankit Maharishi: Developer (20% of Dev work)
+
+=======================================================
+PHASE 1: Project Setup & Branding (Jan 25 - Feb 5, 2025)
+=======================================================
+
+Task: Requirements gathering & feature spec
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Meet with stakeholders to define essential scope, features, and MVP requirements for Driftingwood.in.
+
+Task: Define brand guidelines
+Assignee: Nagendra Indoria
+Hours: 6h
+Description: Establish core color palettes, moods, and visual aesthetic tailored for wooden furniture.
+
+Task: Logo design concepts
+Assignee: Nagendra Indoria
+Hours: 8h
+Description: Create 3 distinct initial concepts for the driftingwood logo.
+
+Task: Logo finalization & export
+Assignee: Nagendra Indoria
+Hours: 4h
+Description: Revise the chosen logo based on feedback and export in all necessary web formats (SVG/PNG/Favicon).
+
+Task: Typography selection
+Assignee: Nagendra Indoria
+Hours: 2h
+Description: Choose elegant, highly readable web fonts suitable for a premium wooden furniture catalog.
+
+Task: Initialize Next.js project
+Assignee: Nitin Maharishi
+Hours: 2h
+Description: Bootstrap the Next.js App Router codebase and clean up default boilerplate.
+
+Task: Setup Tailwind CSS & tokens
+Assignee: Nitin Maharishi
+Hours: 2h
+Description: Configure tailwind.config.ts with the brand colors and typography variables defined by UI.
+
+Task: Setup Git repository & environments
+Assignee: Ankit Maharishi
+Hours: 2h
+Description: Initialize GitHub repository, set up branch protection, and connect to Vercel/staging.
+
+Task: Setup Code Quality Tools (ESLint/Prettier)
+Assignee: Ankit Maharishi
+Hours: 2h
+Description: Configure ESLint, Prettier, and Husky pre-commit hooks to ensure code consistency.
+
+Task: Database Schema (Users, Products)
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Model the core relational tables for Users, Sessions, Products, and Variants.
+
+Task: Database Schema (Orders, Categories)
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Model the tables for Categories, Cart Items, Orders, and Order Items.
+
+Task: Setup ORM & Initial Migrations
+Assignee: Nitin Maharishi
+Hours: 3h
+Description: Initialize Prisma or Drizzle ORM, connect to the database URL, and push the first schema migration.
+
+Task: CI/CD Pipeline Setup
+Assignee: Nitin Maharishi
+Hours: 3h
+Description: Set up GitHub Actions or Vercel deployments for automated build checks on PRs.
+
+=======================================================
+PHASE 2: UI Design & Wireframing (Feb 6 - Feb 20, 2025)
+=======================================================
+
+Task: Low-fi wireframes: Homepage
+Assignee: Nagendra Indoria
+Hours: 4h
+Description: Sketch structural layout of the landing page, hero banner, and featured sections.
+
+Task: Low-fi wireframes: Category Listing (PLP)
+Assignee: Nagendra Indoria
+Hours: 4h
+Description: Outline the layout for product grids, sidebar filters, and pagination.
+
+Task: Low-fi wireframes: Product Detail (PDP)
+Assignee: Nagendra Indoria
+Hours: 4h
+Description: Structure the image gallery, product details, and add-to-cart layout.
+
+Task: Low-fi wireframes: Checkout Flow
+Assignee: Nagendra Indoria
+Hours: 6h
+Description: Outline the multi-step checkout process (cart, shipping, payment, review).
+
+Task: High-fi UI: Homepage
+Assignee: Nagendra Indoria
+Hours: 8h
+Description: Create the final pixel-perfect visual design for the homepage in Figma.
+
+Task: High-fi UI: Category Listing (PLP)
+Assignee: Nagendra Indoria
+Hours: 6h
+Description: Design the final UI for category pages, including active hover states for products.
+
+Task: High-fi UI: Product Detail (PDP)
+Assignee: Nagendra Indoria
+Hours: 8h
+Description: Design the final PDP, accounting for wood finish variants and image zoom states.
+
+Task: High-fi UI: Cart & Checkout
+Assignee: Nagendra Indoria
+Hours: 8h
+Description: Design the slide-out cart drawer and the dedicated secure checkout screen.
+
+Task: High-fi UI: User Profile & Orders
+Assignee: Nagendra Indoria
+Hours: 6h
+Description: Design the customer portal for managing addresses and tracking past orders.
+
+Task: Finalize Design System in Figma
+Assignee: Nagendra Indoria
+Hours: 8h
+Description: Consolidate all reusable components (buttons, headers, inputs) into a master Figma file for devs.
+
+=======================================================
+PHASE 3: Core UI Components (Feb 21 - Mar 5, 2025)
+=======================================================
+
+Task: Setup Component library architecture
+Assignee: Nitin Maharishi
+Hours: 2h
+Description: Create the directory structure for generic UI components vs feature-specific components.
+
+Task: Build generic Button properties
+Assignee: Ankit Maharishi
+Hours: 3h
+Description: Build a flexible Button component with primary, secondary, outline, and ghost variants.
+
+Task: Build Input & Form text fields
+Assignee: Ankit Maharishi
+Hours: 3h
+Description: Create reusable accessible form controls with error state indicators.
+
+Task: Build Typography components
+Assignee: Ankit Maharishi
+Hours: 2h
+Description: Implement standard H1-H6, paragraph, and label components mirroring Figma.
+
+Task: Build layout Card wrappers
+Assignee: Ankit Maharishi
+Hours: 3h
+Description: Create standard aesthetic cards for displaying products or categories.
+
+Task: Build Modal & Drawer shell components
+Assignee: Ankit Maharishi
+Hours: 4h
+Description: Construct reusable accessible overlays for popups and the cart drawer.
+
+Task: Desktop Navbar structure
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Build the main header with logo, mega-menu links, search icon, and cart icon.
+
+Task: Mobile Hamburger Navigation
+Assignee: Ankit Maharishi
+Hours: 4h
+Description: Implement a responsive side-drawer menu for mobile shoppers.
+
+Task: Global Footer construction
+Assignee: Ankit Maharishi
+Hours: 2h
+Description: Build out the footer with important links, newsletter signup, and social icons.
+
+Task: Image Carousel component
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Integrate a lightweight slider library (Embla/Swiper) for product galleries.
+
+Task: Toast Notification system
+Assignee: Ankit Maharishi
+Hours: 2h
+Description: Add a global toast provider to notify users when items are added to cart or errors occur.
+
+=======================================================
+PHASE 4: Auth & Customer Portal (Mar 6 - Mar 15, 2025)
+=======================================================
+
+Task: Setup NextAuth/Auth.js internals
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Configure the core authentication wrapper and session providers.
+
+Task: Email/Password Login UI
+Assignee: Ankit Maharishi
+Hours: 3h
+Description: Build the standard sign-in form matching Figma designs.
+
+Task: Email/Password Auth Logic
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Connect the login form to the DB to verify hashed passwords securely.
+
+Task: Google OAuth Integration
+Assignee: Nitin Maharishi
+Hours: 3h
+Description: Setup Google Cloud console apps and enable 1-click social login.
+
+Task: Registration Page UI
+Assignee: Ankit Maharishi
+Hours: 3h
+Description: Build the sign-up form with password strength indicators.
+
+Task: Registration API endpoint
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Create the user in the database and automatically sign them in securely.
+
+Task: Password Reset 'Forgot' UI
+Assignee: Ankit Maharishi
+Hours: 2h
+Description: Interface for requesting a password reset email link.
+
+Task: Password Reset DB Tokens Logic
+Assignee: Nitin Maharishi
+Hours: 5h
+Description: Generate secure, expiring OTPs or tokens to allow users to reset forgotten passwords safely.
+
+Task: User Profile Dashboard Layout
+Assignee: Ankit Maharishi
+Hours: 3h
+Description: Build the structural layout for the logged-in customer portal.
+
+Task: Update Details Interface & API
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Allow users to change their name, email, or phone number in their dashboard.
+
+Task: Change Password functionality
+Assignee: Nitin Maharishi
+Hours: 3h
+Description: Form and backend logic to allow authenticated users to change their active password.
+
+Task: Address Book UI List
+Assignee: Ankit Maharishi
+Hours: 4h
+Description: View displaying saved shipping and billing addresses for quick checkout.
+
+Task: Address CRUD API routes
+Assignee: Nitin Maharishi
+Hours: 5h
+Description: Create, Read, Update, and Delete endpoints for user addresses.
+
+=======================================================
+PHASE 5: Product Backend & Admin (Mar 16 - Mar 25, 2025)
+=======================================================
+
+Task: Admin Dashboard Layout Structure
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Set up a secure admin-only shell route and layout component for the CMS.
+
+Task: Admin Layout UI polish
+Assignee: Nagendra Indoria
+Hours: 6h
+Description: Provide quick wireframes for how the admin panel should structurally look.
+
+Task: Category CRUD API
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Backend logic to create and manage furniture categories natively.
+
+Task: Category Management UI
+Assignee: Ankit Maharishi
+Hours: 5h
+Description: Admin screen to view, add, or rename furniture categories.
+
+Task: Product Core Config API
+Assignee: Nitin Maharishi
+Hours: 5h
+Description: Endpoints to save basic product data like name, description, price, and category relation.
+
+Task: Image Upload Infrastructure
+Assignee: Nitin Maharishi
+Hours: 5h
+Description: Integrate an S3 bucket or Cloudinary API for secure admin image uploads.
+
+Task: Product Variants backend logic
+Assignee: Nitin Maharishi
+Hours: 8h
+Description: Implement complex database relations allowing items to have wood types, sizes, or colors.
+
+Task: Inventory tracking system
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Database constraints to track stock quantities per variant dynamically.
+
+Task: Product Admin Editor UI
+Assignee: Nitin Maharishi
+Hours: 8h
+Description: Build the large, complex form admins use to enter new wood furniture data and images.
+
+Task: Admin Products List UI
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: A data table screen enabling admins to search and edit existing products.
+
+Task: Admin Drag & Drop Image UI
+Assignee: Ankit Maharishi
+Hours: 4h
+Description: Build an intuitive dropzone component for admins to easily upload product galleries.
+
+Task: Seed Test Products
+Assignee: Nitin Maharishi
+Hours: 2h
+Description: Write a script to quickly populate the local database with 20 dummy wooden items for UI testing.
+
+=======================================================
+PHASE 6: Shop Frontend (Mar 26 - Apr 10, 2025)
+=======================================================
+
+Task: Homepage Layout construction
+Assignee: Ankit Maharishi
+Hours: 4h
+Description: Build the primary hero banner and promotional blocks natively.
+
+Task: Homepage Featured Carousel
+Assignee: Ankit Maharishi
+Hours: 3h
+Description: Implement a swipeable carousel showing 'Best Selling' furniture items.
+
+Task: Dynamic Category grids
+Assignee: Ankit Maharishi
+Hours: 3h
+Description: Present interactive masonry grids linking to specific furniture collections.
+
+Task: Category Page dynamic routes
+Assignee: Nitin Maharishi
+Hours: 2h
+Description: Setup the Next.js [slug] routing infrastructure for shop segments.
+
+Task: Product Listing Page (PLP) search API
+Assignee: Nitin Maharishi
+Hours: 8h
+Description: Implement the core database query capable of filtering by category, price, and handling pagination over hundreds of items.
+
+Task: PLP Furniture Grid UI
+Assignee: Ankit Maharishi
+Hours: 5h
+Description: Create the responsive grid rendering the actual product cards.
+
+Task: Sidebar Filter UI component
+Assignee: Ankit Maharishi
+Hours: 5h
+Description: Build accordion-style filters allowing users to narrow down by wood type, price, etc.
+
+Task: PLP Sorting Logic
+Assignee: Nitin Maharishi
+Hours: 3h
+Description: Connect the frontend sort dropdown (Price Low/High) to the backend database query.
+
+Task: Product Detail Page (PDP) routing
+Assignee: Nitin Maharishi
+Hours: 2h
+Description: Configure wildcard routes /products/[slug] that fetch comprehensive single-item data.
+
+Task: PDP Gallery logic
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Complete the interactive logic linking thumbnails to the main display image.
+
+Task: PDP Variant Selector implementation
+Assignee: Nitin Maharishi
+Hours: 6h
+Description: State machine determining which variant is selected, updating the price dynamically, and handling out-of-stock edges.
+
+Task: PDP Info Tabs/Accordions
+Assignee: Ankit Maharishi
+Hours: 3h
+Description: Build fold-out sections displaying dimensions, wood care instructions, and shipping policies.
+
+Task: Header Navigation Search Backend
+Assignee: Nitin Maharishi
+Hours: 5h
+Description: Create a fast, indexed search API to quickly find products by name or SKU.
+
+Task: Header Search Autocomplete UI
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Build the frontend dropdown that suggests products as the user types them.
+
+=======================================================
+PHASE 7: Cart & Checkout (Apr 11 - Apr 25, 2025)
+=======================================================
+
+Task: Global Cart Zustand Store
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Setup the client-side state manager to persist cart data smoothly across route transitions.
+
+Task: Add-to-cart dispatch integration
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Wire the PDP buttons to insert the specific selected variant into the global cart.
+
+Task: Update/Delete Cart items
+Assignee: Nitin Maharishi
+Hours: 3h
+Description: Allow users to change item quantities or delete items in the cart UI seamlessly.
+
+Task: Cart Slide-out Drawer UI
+Assignee: Ankit Maharishi
+Hours: 6h
+Description: Build the animated overlay showing order summary and subtotal calculations.
+
+Task: Persist Cart via Database
+Assignee: Nitin Maharishi
+Hours: 6h
+Description: Ensure that if a user logs in, their local cart syncs to the database so it isn't lost.
+
+Task: Checkout Multi-step Layout
+Assignee: Ankit Maharishi
+Hours: 5h
+Description: Structure the wrapper handling the transition between Shipping -> Billing -> Payment.
+
+Task: Server Pricing and Tax calculations
+Assignee: Nitin Maharishi
+Hours: 6h
+Description: Secure backend endpoints verifying the real pricing and adding tax/shipping rules.
+
+Task: Shipping form UI logic
+Assignee: Ankit Maharishi
+Hours: 4h
+Description: Build the address capturing form, utilizing React Hook Form with strict validation.
+
+Task: Stripe SDK Intitialization
+Assignee: Nitin Maharishi
+Hours: 3h
+Description: Install Stripe server libraries, configure API keys, and set up the intent infrastructure.
+
+Task: Stripe Elements frontend integration
+Assignee: Nitin Maharishi
+Hours: 8h
+Description: Add the secure, embedded credit card/Apple Pay form into the checkout page natively.
+
+Task: Create Pending Order Transaction
+Assignee: Nitin Maharishi
+Hours: 5h
+Description: Save the cart to the `orders` table as 'Pending' immediately prior to finalizing the payment intent natively.
+
+Task: Stripe Webhook processor
+Assignee: Nitin Maharishi
+Hours: 8h
+Description: Expose an API endpoint for Stripe to securely ping upon successful charge, automatically migrating the order to 'Processing' status.
+
+Task: Order Success UI Screen
+Assignee: Ankit Maharishi
+Hours: 3h
+Description: Build the "Thank you for your order" confirmation page displaying the order ID statically.
+
+=======================================================
+PHASE 8: Order Management & CMS (Apr 26 - May 5, 2025)
+=======================================================
+
+Task: Order Admin dashboard UI logic
+Assignee: Nagendra Indoria
+Hours: 6h
+Description: Wireframe clean layouts for administrators tracking customer fulfillments in a clean table format.
+
+Task: View Orders API route
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Backend logic sorting and paginating all global orders securely.
+
+Task: Order Dashboard Table UI
+Assignee: Nitin Maharishi
+Hours: 5h
+Description: Render the data grid displaying customer name, total, and fulfillment badge natively.
+
+Task: Process Status Update API
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Backend endpoint to flag orders as 'Shipped', 'Delivered', or 'Refunded'.
+
+Task: Single Order Admin view
+Assignee: Ankit Maharishi
+Hours: 4h
+Description: A distinct view for staff to look at all line-items and shipping addresses natively.
+
+Task: Customer "Order History" Logic
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Secure logic returning only orders tied to the currently logged in user ID dynamically.
+
+Task: Customer Order History List UI
+Assignee: Ankit Maharishi
+Hours: 4h
+Description: Build user-facing cards listing tracking numbers and past purchases gracefully.
+
+Task: Customer Order Receipt UI
+Assignee: Ankit Maharishi
+Hours: 3h
+Description: Page allowing the customer to see an invoice view of their historic purchase.
+
+Task: Implement Static Informational Pages (About, Contact)
+Assignee: Ankit Maharishi
+Hours: 5h
+Description: Hardcode or wire up basic markdown to render company footprint data gracefully.
+
+Task: Implement Legal Pages (Terms, Privacy)
+Assignee: Ankit Maharishi
+Hours: 4h
+Description: Scaffold standard legal protections efficiently and statically render them.
+
+=======================================================
+PHASE 9: Email & SEO Optimization (May 6 - May 10, 2025)
+=======================================================
+
+Task: Design Transactional Emails
+Assignee: Nagendra Indoria
+Hours: 8h
+Description: Provide elegant static mockups for standard confirmation dispatches mirroring the site brand.
+
+Task: Configure React Email library
+Assignee: Nitin Maharishi
+Hours: 3h
+Description: Install and configure Resend/React dependencies.
+
+Task: Welcome Series Template
+Assignee: Ankit Maharishi
+Hours: 3h
+Description: Code the layout dispatched dynamically upon new signups.
+
+Task: Password Reset Template
+Assignee: Ankit Maharishi
+Hours: 3h
+Description: Code the layout housing the secure authentication reset url dynamically.
+
+Task: Order Confirmation Template
+Assignee: Ankit Maharishi
+Hours: 4h
+Description: Code the comprehensive layout containing dynamically injected line-items for receipts.
+
+Task: Server-side dispatch logic
+Assignee: Nitin Maharishi
+Hours: 5h
+Description: Hardwire the firing mechanisms within auth components and Stripe webhooks securely natively.
+
+Task: SEO Next.js Metadata wrapper
+Assignee: Nitin Maharishi
+Hours: 2h
+Description: Export a globally shared constant defining base page titles dynamically.
+
+Task: Advanced Product SEO (OpenGraph)
+Assignee: Nitin Maharishi
+Hours: 4h
+Description: Override metadata natively in the PDP route to display product images on Twitter/Slack automatically.
+
+Task: Dynamic XML Sitemap
+Assignee: Nitin Maharishi
+Hours: 3h
+Description: Provide an auto-updating sitemap for Google crawlers pulling live categorizations natively.
+
+=======================================================
+PHASE 10: Testing, QA & Deployment (May 11 - May 15, 2025)
+=======================================================
+
+Task: Setup Light Playwright infrastructure
+Assignee: Nitin Maharishi
+Hours: 3h
+Description: Initialize barebones test runner to guarantee primary checkout flow function dynamically.
+
+Task: E2E Checkout Flow Scripting
+Assignee: Nitin Maharishi
+Hours: 6h
+Description: Create an automated run guaranteeing Add-to-cart -> Login -> Stripe Sandbox completion functionally.
+
+Task: Cross Browser Manual Checks
+Assignee: Ankit Maharishi
+Hours: 6h
+Description: Navigate the experience on iOS Safari, Chrome, and Firefox to identify CSS deviations natively.
+
+Task: Mobile UI Polish & Fixes
+Assignee: Ankit Maharishi
+Hours: 8h
+Description: Aggressively identify and resolve mobile padding/viewport scaling issues functionally.
+
+Task: Lighthouse Audit Check
+Assignee: Nitin Maharishi
+Hours: 3h
+Description: Run performance tests measuring Largest Contentful Paint metrics natively.
+
+Task: Image pipeline Optimization
+Assignee: Nitin Maharishi
+Hours: 5h
+Description: Adjust Next.js image configurations ensuring webp optimization across galleries dynamically.
+
+Task: Visual adherence review
+Assignee: Nagendra Indoria
+Hours: 6h
+Description: Scrutinize the staging branch against Figma designs and flag padding/font misalignments logically.
+
+Task: Visual Feedback Application
+Assignee: Ankit Maharishi
+Hours: 6h
+Description: Action all stylistic bug tickets issued smoothly functionally.
+
+Task: Setup Production DB
+Assignee: Nitin Maharishi
+Hours: 3h
+Description: Provision a dedicated, backed-up Postgres production tier correctly.
+
+Task: Manage Production Environment variables
+Assignee: Nitin Maharishi
+Hours: 2h
+Description: Distribute secure live Stripe keys and DB urls cleanly seamlessly.
+
+Task: Vercel Production Deployment
+Assignee: Nitin Maharishi
+Hours: 3h
+Description: Merge branch to main and cut the final production release structurally.
+
+Task: Domain configuration & Cutover
+Assignee: Nitin Maharishi
+Hours: 2h
+Description: Point driftingwood.in DNS registers to the Vercel namespace robustly securely.
+
+Task: Post-Launch 'War Room' Monitoring
+Assignee: Nitin Maharishi
+Hours: 8h
+Description: Monitor infrastructure dashboards handling day-1 real world traffic and resolving immediate hotfixes seamlessly.
+
+Task: Create project handover documentation
+Assignee: Ankit Maharishi
+Hours: 4h
+Description: Provide simple markdown files denoting necessary commands or third-party logins cleanly.

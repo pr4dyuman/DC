@@ -145,7 +145,13 @@ export async function handleTaskStatusChangeEffectsImpl({
     const allDone = projectTasks.length > 0 && projectTasks.every((task) => task.status === "Done");
 
     if (project && allDone && ["Active", "On Hold"].includes(project.status || "")) {
-        await ProjectModel.updateOne({ id: currentTask.projectId, agencyId: agency.id }, { $set: { status: "Completed" } });
+        await ProjectModel.updateOne(
+            { id: currentTask.projectId, agencyId: agency.id },
+            {
+                $set: { status: "Completed" },
+                $unset: { clientArchiveHold: "", clientArchiveHoldAt: "" },
+            }
+        );
 
         if (project.clientId && await isNotifEnabled("project")) {
             await NotificationModel.create({
@@ -196,7 +202,10 @@ export async function handleTaskStatusChangeEffectsImpl({
     } else if (project && project.status === "Completed" && previousTask.status === "Done" && currentTask.status !== "Done") {
         await ProjectModel.updateOne(
             { id: currentTask.projectId, agencyId: agency.id },
-            { $set: { status: "Active" } }
+            {
+                $set: { status: "Active" },
+                $unset: { clientArchiveHold: "", clientArchiveHoldAt: "" },
+            }
         );
     }
 }
