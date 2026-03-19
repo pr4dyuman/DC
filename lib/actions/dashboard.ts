@@ -20,6 +20,7 @@ import { dateKeyTz, isDateOnlyString, toLocalCalendarDay } from "@/lib/date-util
 import { sanitizeName, sanitizeUrl } from "../validation";
 import { sanitizeDoc, sortByDateDesc, withAgencyIdFallback } from "./shared";
 import { buildClientFinanceSummary } from "./finance-shared";
+import { getActiveProjectServiceDocs, type ProjectServiceSnapshot } from "./projects-shared";
 
 type DashboardActor = {
     id: string;
@@ -209,21 +210,39 @@ export async function getProjectDistributionImpl(agencyId: string) {
     ]);
 
     const distribution: Record<string, number> = {};
-    const serviceNameByScopedKey = new Map<string, string>();
+    const servicesByProjectId = new Map<string, ProjectServiceSnapshot[]>();
 
     services.forEach((service) => {
-        if (!service.projectId) return;
-        serviceNameByScopedKey.set(`${service.projectId}:id:${service.id}`, service.name);
-        serviceNameByScopedKey.set(`${service.projectId}:name:${String(service.name).toLowerCase()}`, service.name);
+        const projectId = String(service.projectId || "").trim();
+        if (!projectId) return;
+        const projectServices = servicesByProjectId.get(projectId) || [];
+        projectServices.push(service);
+        servicesByProjectId.set(projectId, projectServices);
     });
 
     projects.forEach((project) => {
+        const activeServices = getActiveProjectServiceDocs(
+            project.services,
+            servicesByProjectId.get(project.id) || []
+        );
+
+        if (activeServices.length > 0) {
+            activeServices.forEach((service) => {
+                distribution[service.name] = (distribution[service.name] || 0) + 1;
+            });
+            return;
+        }
+
+        const seenFallbackRefs = new Set<string>();
         (project.services || []).forEach((serviceRef) => {
-            const resolvedName =
-                serviceNameByScopedKey.get(`${project.id}:id:${serviceRef}`) ||
-                serviceNameByScopedKey.get(`${project.id}:name:${String(serviceRef).toLowerCase()}`) ||
-                serviceRef;
-            distribution[resolvedName] = (distribution[resolvedName] || 0) + 1;
+            const normalizedRef = String(serviceRef || "").trim();
+            if (!normalizedRef) return;
+
+            const refKey = normalizedRef.toLowerCase();
+            if (seenFallbackRefs.has(refKey)) return;
+            seenFallbackRefs.add(refKey);
+
+            distribution[normalizedRef] = (distribution[normalizedRef] || 0) + 1;
         });
     });
 

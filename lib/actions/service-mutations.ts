@@ -5,7 +5,14 @@ import type { Service } from "../db";
 import { generateId } from "../utils-server";
 import { sanitizeName } from "../validation";
 import { ProjectModel, ServiceModel, TaskModel, connectDB } from "../mongodb";
-import { createDefaultProjectPaymentConfig, type ProjectLike } from "./projects-shared";
+import {
+    buildNormalizedProjectServiceConfigs,
+    createDefaultProjectPaymentConfig,
+    getActiveProjectServiceDocs,
+    type ProjectLike,
+    type ProjectServiceConfigSnapshot,
+    type ProjectServiceSnapshot,
+} from "./projects-shared";
 
 type ServiceDoc = Service;
 
@@ -61,6 +68,7 @@ export async function addServiceImpl(name: string, projectId: string, employees:
 
     revalidatePath("/dashboard/projects");
     revalidatePath("/dashboard/projects/[slug]", "page");
+    revalidatePath("/dashboard");
     revalidatePath("/dashboard/finance");
     revalidatePath("/dashboard/settings");
     return newService;
@@ -88,12 +96,22 @@ export async function deleteServiceImpl(id: string, agencyId?: string) {
 
     await ServiceModel.deleteOne({ id, agencyId });
     if (serviceProjectId) {
+        const [projectDoc, remainingServices] = await Promise.all([
+            ProjectModel.findOne({ agencyId, id: serviceProjectId })
+                .select("services serviceConfigs")
+                .lean() as Promise<{ services?: string[]; serviceConfigs?: ProjectServiceConfigSnapshot[] } | null>,
+            ServiceModel.find({ agencyId, projectId: serviceProjectId })
+                .select("id name projectId employees agencyId")
+                .lean() as Promise<ProjectServiceSnapshot[]>,
+        ]);
+
+        const activeServices = getActiveProjectServiceDocs(projectDoc?.services, remainingServices);
         await ProjectModel.updateOne(
             { agencyId, id: serviceProjectId },
             {
-                $pull: {
-                    services: { $in: [id, serviceName] },
-                    serviceConfigs: { $or: [{ serviceId: { $in: [id, serviceName] } }, { name: serviceName }] },
+                $set: {
+                    services: activeServices.map((service) => service.id),
+                    serviceConfigs: buildNormalizedProjectServiceConfigs(activeServices, projectDoc?.serviceConfigs),
                 },
             }
         );
@@ -111,6 +129,7 @@ export async function deleteServiceImpl(id: string, agencyId?: string) {
     revalidatePath("/dashboard/settings");
     revalidatePath("/dashboard/projects");
     revalidatePath("/dashboard/projects/[slug]", "page");
+    revalidatePath("/dashboard");
     revalidatePath("/dashboard/finance");
 }
 
@@ -207,5 +226,6 @@ export async function updateServiceImpl(id: string, name: string, projectId: str
     revalidatePath("/dashboard/settings");
     revalidatePath("/dashboard/projects");
     revalidatePath("/dashboard/projects/[slug]", "page");
+    revalidatePath("/dashboard");
     revalidatePath("/dashboard/finance");
 }

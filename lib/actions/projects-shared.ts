@@ -103,6 +103,33 @@ export function getActiveProjectServiceDocs<T extends ProjectServiceSnapshot>(
     return activeServices.length > 0 ? activeServices : [...serviceDocs];
 }
 
+export function normalizeProjectServiceRefs(
+    projectServiceRefs: string[] | undefined,
+    serviceDocs: ProjectServiceSnapshot[]
+): string[] {
+    if (!Array.isArray(serviceDocs) || serviceDocs.length === 0) {
+        if (!Array.isArray(projectServiceRefs) || projectServiceRefs.length === 0) return [];
+
+        const seen = new Set<string>();
+        const normalizedRefs: string[] = [];
+
+        for (const rawRef of projectServiceRefs) {
+            const ref = String(rawRef || "").trim();
+            if (!ref) continue;
+
+            const refKey = ref.toLowerCase();
+            if (seen.has(refKey)) continue;
+
+            seen.add(refKey);
+            normalizedRefs.push(ref);
+        }
+
+        return normalizedRefs;
+    }
+
+    return getActiveProjectServiceDocs(projectServiceRefs, serviceDocs).map((service) => service.id);
+}
+
 function findMatchingProjectServiceConfig(
     configs: ProjectServiceConfigSnapshot[] | undefined,
     service: ProjectServiceSnapshot
