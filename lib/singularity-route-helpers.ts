@@ -47,6 +47,7 @@ export type SingularityRequestBody = {
     images?: UploadedImage[];
     documents?: UploadedDocument[];
     mode?: string;
+    isHeavyTask?: boolean;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -64,6 +65,7 @@ export function normalizeSingularityRequestBody(requestBody: Partial<Singularity
         images: Array.isArray(requestBody.images) ? requestBody.images : [],
         documents: Array.isArray(requestBody.documents) ? requestBody.documents : [],
         mode: requestBody.mode,
+        isHeavyTask: requestBody.isHeavyTask === true,
     };
 }
 

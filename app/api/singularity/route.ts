@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
         }
 
         const requestBody = (await req.json()) as Partial<SingularityRequestBody>;
-        const { history, message, images, documents, mode } =
+        const { history, message, images, documents, mode, isHeavyTask } =
             normalizeSingularityRequestBody(requestBody);
         const authenticatedUserId = session.userId;
 
@@ -96,8 +96,16 @@ export async function POST(req: NextRequest) {
         const agentConfig = getResolvedFeatureConfig(aiConfig, "agent");
         const chatConfig  = getResolvedFeatureConfig(aiConfig, "chat");
 
-        const agentModelId = resolveModel(agentConfig);
-        const chatModelId  = resolveModel(chatConfig);
+        // If admin toggled Heavy Tasks mode, override with the heavy model config
+        const isAdminHeavy = isHeavyTask && session.role === "admin";
+        const heavyConfig = isAdminHeavy ? getResolvedFeatureConfig(aiConfig, "heavyTasks") : null;
+
+        const agentModelId = resolveModel(heavyConfig ?? agentConfig);
+        const chatModelId  = resolveModel(heavyConfig ?? chatConfig);
+
+        if (isAdminHeavy) {
+            console.log("[Singularity] Heavy Tasks mode active, model:", agentModelId);
+        }
 
         // isLive is checked per mode
         const isLive = mode === "agent"
@@ -154,7 +162,7 @@ export async function POST(req: NextRequest) {
 
             if (!isLive) {
                 return handleNonLiveAgentMode({
-                    aiConfig: agentConfig,
+                    aiConfig: heavyConfig ?? agentConfig,
                     modelId: agentModelId,
                     systemInstruction,
                     fullPrompt,
@@ -165,7 +173,7 @@ export async function POST(req: NextRequest) {
             }
 
             return handleLiveAgentMode({
-                aiConfig: agentConfig,
+                aiConfig: heavyConfig ?? agentConfig,
                 agencyId: agency!.id,
                 authenticatedUserId,
                 modelId: agentModelId,
@@ -179,7 +187,7 @@ export async function POST(req: NextRequest) {
         }
 
         return handleChatModeRequest({
-            aiConfig: chatConfig,
+            aiConfig: heavyConfig ?? chatConfig,
             fullPrompt,
             images,
             agencyId: agency!.id,

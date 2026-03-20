@@ -7,7 +7,7 @@ import { FeatureConfigEditor, AIFeatureConfigState } from "./FeatureConfigEditor
 
 type AiModelOption = { id: string; name: string; };
 
-type FeatureModelKey = "chatConfig" | "agentConfig" | "taskExplainConfig" | "hourEstimateConfig" | "taskChatbotConfig";
+type FeatureModelKey = "chatConfig" | "agentConfig" | "taskExplainConfig" | "hourEstimateConfig" | "taskChatbotConfig" | "heavyTasksConfig";
 export type FeatureConfigs = Partial<Record<FeatureModelKey, AIFeatureConfigState>>;
 
 const FEATURE_LABELS: { key: FeatureModelKey; label: string; desc: string }[] = [
@@ -16,6 +16,7 @@ const FEATURE_LABELS: { key: FeatureModelKey; label: string; desc: string }[] = 
     { key: "taskExplainConfig",  label: "Task Explain/Enhance", desc: "AI task analysis & description enhancement" },
     { key: "hourEstimateConfig", label: "Hour Estimation",      desc: "AI-powered task hour estimation" },
     { key: "taskChatbotConfig",  label: "Task Chatbot",         desc: "In-task AI assistant chat" },
+    { key: "heavyTasksConfig",   label: "Heavy Tasks (Singularity)", desc: "Powerful model for complex admin tasks — activated via the ⚡ toggle" },
 ];
 
 interface DefaultAiState {

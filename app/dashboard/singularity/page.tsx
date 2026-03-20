@@ -27,7 +27,7 @@ async function SingularityData() {
     const agencyName = agencySettings?.name || "Agency OS";
 
     return (
-        <SingularityChat userId={currentUser.id} agencyName={agencyName} />
+        <SingularityChat userId={currentUser.id} agencyName={agencyName} role={currentUser.role} />
     );
 }
 

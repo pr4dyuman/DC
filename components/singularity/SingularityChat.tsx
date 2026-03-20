@@ -54,7 +54,7 @@ function renderMarkdown(text: string): string {
     return DOMPurify.sanitize(html);
 }
 
-export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?: string; agencyName?: string }) {
+export function SingularityChat({ userId, agencyName = 'Agency OS', role }: { userId?: string; agencyName?: string; role?: string }) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -62,6 +62,20 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [streamingPhase, setStreamingPhase] = useState<'idle' | 'thinking' | 'responding' | 'rechecking'>('idle');
     const [mode, setMode] = useState<'chat' | 'agent'>('agent');
+    const isAdmin = role === 'admin';
+    const [isHeavyTask, setIsHeavyTask] = useState<boolean>(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('singularity_heavy_tasks') === 'true';
+        }
+        return false;
+    });
+    const handleToggleHeavyTask = () => {
+        setIsHeavyTask(prev => {
+            const next = !prev;
+            localStorage.setItem('singularity_heavy_tasks', String(next));
+            return next;
+        });
+    };
 
     const [checkpoints, setCheckpoints] = useState<CheckpointInfo[]>([]);
     const [showNavMenu, setShowNavMenu] = useState(false);
@@ -291,6 +305,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
             }
 
             const body: SingularityRequestBody = { history, message: msg, mode };
+            if (isAdmin && isHeavyTask) body.isHeavyTask = true;
             if (userId) body.userId = userId;
 
             // Separate images and documents
@@ -545,6 +560,9 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                     setShowNavMenu(false);
                     void fetchSessions();
                 }}
+                isAdmin={isAdmin}
+                isHeavyTask={isHeavyTask}
+                onToggleHeavyTask={handleToggleHeavyTask}
             />
 
 

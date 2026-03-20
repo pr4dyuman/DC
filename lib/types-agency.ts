@@ -40,6 +40,7 @@ export type AIConfig = {
     taskExplainConfig?: AIFeatureConfig;
     hourEstimateConfig?: AIFeatureConfig;
     taskChatbotConfig?: AIFeatureConfig;
+    heavyTasksConfig?: AIFeatureConfig; // Admin-only heavy tasks model override
 };
 
 export type AIPermissions = {

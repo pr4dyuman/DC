@@ -106,6 +106,7 @@ export interface SingularityRequestBody {
     userId?: string;
     images?: Array<{ base64: string; mimeType: string }>;
     documents?: Array<{ fileName?: string; mimeType: string; textContent?: string; base64?: string }>;
+    isHeavyTask?: boolean;
 }
 
 export const CHAT_SUGGESTIONS = [

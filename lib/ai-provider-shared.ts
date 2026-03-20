@@ -27,7 +27,7 @@ export function resolveModel(config: AIConfig): string {
     return config.model || "gemini-2.5-flash-lite";
 }
 
-export type AIFeature = "chat" | "agent" | "taskExplain" | "hourEstimate" | "taskChatbot";
+export type AIFeature = "chat" | "agent" | "taskExplain" | "hourEstimate" | "taskChatbot" | "heavyTasks";
 
 /**
  * Resolves the full configuration (provider, key, model) for a specific AI feature.
@@ -42,6 +42,7 @@ export function getResolvedFeatureConfig(config: AIConfig, feature: AIFeature): 
         case "taskExplain": override = config.taskExplainConfig; break;
         case "hourEstimate": override = config.hourEstimateConfig; break;
         case "taskChatbot": override = config.taskChatbotConfig; break;
+        case "heavyTasks": override = config.heavyTasksConfig; break;
     }
 
     if (!override) {
