@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, Users, FolderKanban, UserCircle, Brain, AlertTriangle, Shield } from "lucide-react";
 import AgencyActions from "@/components/super-admin/AgencyActions";
 import type { Agency } from "@/lib/types";
+import { getCurrencyInfo } from "@/lib/currency";
 
 type AgencyDetailsAgency = Agency & {
     suspendedAt?: string;
@@ -61,6 +62,7 @@ export default async function AgencyDetailsPage({ params }: { params: Promise<{ 
     const { id } = await params;
     const { agency, stats, users } = JSON.parse(JSON.stringify(await getAgencyDetails(id))) as AgencyDetailsPayload;
     const aiConfig = agency.aiConfig;
+    const currencyInfo = getCurrencyInfo(agency.settings?.currency || 'USD');
 
     return (
         <div className="space-y-6">
@@ -101,15 +103,20 @@ export default async function AgencyDetailsPage({ params }: { params: Promise<{ 
 
             {/* Status Badges */}
             <div className="flex items-center gap-3 flex-wrap">
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${agency.plan === 'enterprise' ? 'bg-purple-500/10 text-purple-500' :
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    agency.plan === 'enterprise' ? 'bg-purple-500/10 text-purple-500' :
                     agency.plan === 'pro' ? 'bg-blue-500/10 text-blue-500' :
-                        agency.plan === 'starter' ? 'bg-emerald-500/10 text-emerald-500' :
-                            'bg-muted text-muted-foreground'
-                    }`}>
+                    agency.plan === 'starter' ? 'bg-emerald-500/10 text-emerald-500' :
+                    'bg-muted text-muted-foreground'
+                }`}>
                     {agency.plan.toUpperCase()} Plan
                 </span>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusBadge(agency.status)}`}>
                     {agency.status}
+                </span>
+                {/* Currency Badge */}
+                <span className="px-3 py-1 rounded-full text-sm font-medium bg-emerald-500/10 text-emerald-500">
+                    {currencyInfo.symbol} {currencyInfo.code}
                 </span>
                 {agency.planDuration && (
                     <span className="px-3 py-1 rounded-full text-sm font-medium bg-cyan-500/10 text-cyan-500">

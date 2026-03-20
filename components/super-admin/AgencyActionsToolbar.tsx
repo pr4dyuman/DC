@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, CheckCircle, Clock, Edit, Trash2 } from "lucide-react";
+import { Ban, CheckCircle, Clock, DollarSign, Edit, Trash2 } from "lucide-react";
 import type { Agency } from "@/lib/types";
 import { AgencyActionAgency, AgencyPlanDuration, ModalType } from "./agency-actions-shared";
 
@@ -10,6 +10,7 @@ type AgencyActionsToolbarProps = {
     setModal: (modal: ModalType) => void;
     setSelectedPlan: (plan: Agency["plan"]) => void;
     setSelectedDuration: (duration: AgencyPlanDuration) => void;
+    setSelectedCurrency: (currency: string) => void;
     handleActivate: () => void;
 };
 
@@ -19,6 +20,7 @@ export function AgencyActionsToolbar({
     setModal,
     setSelectedPlan,
     setSelectedDuration,
+    setSelectedCurrency,
     handleActivate,
 }: AgencyActionsToolbarProps) {
     return (
@@ -33,6 +35,17 @@ export function AgencyActionsToolbar({
             >
                 <Edit className="w-4 h-4" />
                 <span>Change Plan</span>
+            </button>
+
+            <button
+                onClick={() => {
+                    setSelectedCurrency(agency.settings?.currency || "USD");
+                    setModal("currency");
+                }}
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm"
+            >
+                <DollarSign className="w-4 h-4" />
+                <span>Change Currency</span>
             </button>
 
             {agency.status === "trial" && (

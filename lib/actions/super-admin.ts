@@ -35,6 +35,7 @@ import {
     extendTrialImpl,
     suspendAgencyImpl,
     updateAgencyImpl,
+    updateAgencyCurrencyImpl,
     updateAgencyPlanImpl,
 } from "./super-admin-agency-lifecycle";
 import {
@@ -258,6 +259,13 @@ export async function createAgency(data: {
  */
 export async function updateAgency(agencyId: string, updates: Partial<Agency>) {
     return updateAgencyImpl(agencyId, updates);
+}
+
+/**
+ * Update agency currency (super-admin only)
+ */
+export async function updateAgencyCurrency(agencyId: string, currency: string) {
+    return updateAgencyCurrencyImpl(agencyId, currency);
 }
 
 /**

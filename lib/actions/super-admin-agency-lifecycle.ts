@@ -339,3 +339,32 @@ export async function extendTrialImpl(agencyId: string, days: number) {
 
     return true;
 }
+
+export async function updateAgencyCurrencyImpl(agencyId: string, currency: string) {
+    await verifySuperAdmin();
+    await connectDB();
+
+    // Basic ISO 4217 validation (3 uppercase letters)
+    if (!/^[A-Z]{3}$/.test(currency)) {
+        throw new Error("Invalid currency code. Must be a 3-letter ISO 4217 code (e.g. USD, INR).");
+    }
+
+    const result = await AgencyModel.updateOne(
+        { id: agencyId },
+        {
+            $set: {
+                "settings.currency": currency,
+                updatedAt: new Date().toISOString(),
+            },
+        },
+    );
+
+    if (result.matchedCount === 0) {
+        throw new Error("Agency not found");
+    }
+
+    revalidatePath("/super-admin/agencies");
+    revalidatePath(`/super-admin/agencies/${agencyId}`);
+
+    return true;
+}

@@ -8,6 +8,7 @@ import {
     deleteAgency,
     extendTrial,
     suspendAgency,
+    updateAgencyCurrency,
     updateAgencyPlan,
 } from "@/lib/actions/super-admin";
 import { AgencyActionsToolbar } from "./AgencyActionsToolbar";
@@ -15,6 +16,7 @@ import { AgencyActionAgency, AgencyPlanDuration, ModalType } from "./agency-acti
 import { DeleteAgencyModal } from "./DeleteAgencyModal";
 import { ExtendTrialModal } from "./ExtendTrialModal";
 import { SuspendAgencyModal } from "./SuspendAgencyModal";
+import { UpdateCurrencyModal } from "./UpdateCurrencyModal";
 import { UpdatePlanModal } from "./UpdatePlanModal";
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -30,6 +32,7 @@ export default function AgencyActions({ agency }: { agency: AgencyActionAgency }
     const [deleteConfirmText, setDeleteConfirmText] = useState("");
     const [selectedPlan, setSelectedPlan] = useState<Agency["plan"]>(agency.plan);
     const [selectedDuration, setSelectedDuration] = useState<AgencyPlanDuration>(agency.planDuration || "lifetime");
+    const [selectedCurrency, setSelectedCurrency] = useState<string>(agency.settings?.currency || "USD");
     const [trialDays, setTrialDays] = useState(7);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -130,6 +133,20 @@ export default function AgencyActions({ agency }: { agency: AgencyActionAgency }
         }
     };
 
+    const handleUpdateCurrency = async () => {
+        setLoading(true);
+        setError("");
+        try {
+            await updateAgencyCurrency(agency.id, selectedCurrency);
+            router.refresh();
+            resetModal();
+        } catch (err: unknown) {
+            setError(getErrorMessage(err, "Failed to update currency"));
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <>
             <AgencyActionsToolbar
@@ -138,6 +155,7 @@ export default function AgencyActions({ agency }: { agency: AgencyActionAgency }
                 setModal={setModal}
                 setSelectedPlan={setSelectedPlan}
                 setSelectedDuration={setSelectedDuration}
+                setSelectedCurrency={setSelectedCurrency}
                 handleActivate={handleActivate}
             />
 
@@ -201,6 +219,18 @@ export default function AgencyActions({ agency }: { agency: AgencyActionAgency }
                                 setTrialDays={setTrialDays}
                                 resetModal={resetModal}
                                 handleExtendTrial={handleExtendTrial}
+                            />
+                        )}
+
+                        {modal === "currency" && (
+                            <UpdateCurrencyModal
+                                agency={agency}
+                                selectedCurrency={selectedCurrency}
+                                loading={loading}
+                                error={error}
+                                setSelectedCurrency={setSelectedCurrency}
+                                resetModal={resetModal}
+                                handleUpdateCurrency={handleUpdateCurrency}
                             />
                         )}
                     </div>
