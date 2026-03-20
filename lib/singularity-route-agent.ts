@@ -153,13 +153,39 @@ async function handleOpenAICompatAgentMode({
 
     const encoder = new TextEncoder();
 
+    /**
+     * Groq / OpenAI require lowercase JSON Schema types ("object", "string", etc.)
+     * but our tool declarations were written for Gemini which uses uppercase ("OBJECT", "STRING").
+     * This normalizer recursively lowercases all `type` fields so the schema is valid.
+     */
+    function normalizeSchema(schema: Record<string, unknown>): Record<string, unknown> {
+        const result: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(schema)) {
+            if (k === "type" && typeof v === "string") {
+                result[k] = v.toLowerCase();
+            } else if (k === "properties" && v && typeof v === "object") {
+                const props: Record<string, unknown> = {};
+                for (const [pk, pv] of Object.entries(v as Record<string, unknown>)) {
+                    props[pk] = normalizeSchema(pv as Record<string, unknown>);
+                }
+                result[k] = props;
+            } else if (k === "items" && v && typeof v === "object") {
+                result[k] = normalizeSchema(v as Record<string, unknown>);
+            } else {
+                result[k] = v;
+            }
+        }
+        return result;
+    }
+
     // Convert Singularity tool declarations to OpenAI function-calling format
+    // with normalized (lowercase) JSON Schema types
     const openAITools = filteredTools.map((tool) => ({
         type: "function" as const,
         function: {
             name: tool.name,
             description: tool.description,
-            parameters: tool.parameters as Record<string, unknown>,
+            parameters: normalizeSchema(tool.parameters as Record<string, unknown>),
         },
     }));
 
