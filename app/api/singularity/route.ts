@@ -10,7 +10,7 @@ import { handleChatModeRequest } from "@/lib/singularity-route-chat";
 import { getSessionUser } from "@/lib/auth";
 import { getAIPermissions } from "@/lib/actions";
 import { hasExplicitAIAccessSetting } from "@/lib/actions/access";
-import { resolveModel } from "@/lib/ai-provider-shared";
+import { resolveModel, resolveFeatureModel } from "@/lib/ai-provider-shared";
 import { getCurrentAgency, checkTrialExpired } from "@/lib/agency-context";
 import {
     buildConversationPrompt,
@@ -92,8 +92,14 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        const modelId = resolveModel(aiConfig);
-        const isLive = modelId.includes("native-audio");
+        // Resolve model per feature — falls back to main model if override not set
+        const agentModelId = resolveFeatureModel(aiConfig, "agent");
+        const chatModelId  = resolveFeatureModel(aiConfig, "chat");
+
+        // isLive is checked per mode
+        const isLive = mode === "agent"
+            ? agentModelId.includes("native-audio")
+            : chatModelId.includes("native-audio");
 
         if (mode === "agent") {
             console.log("[Singularity Agent] Starting agent mode for userId:", authenticatedUserId);
@@ -112,7 +118,7 @@ export async function POST(req: NextRequest) {
             }
 
             const isLiteModel =
-                modelId.includes("lite") || modelId.includes("flash-lite");
+                agentModelId.includes("lite") || agentModelId.includes("flash-lite");
             if (isLiteModel) {
                 systemInstruction += `\n\nMODEL-SPECIFIC RULES (you are a lightweight model):
 - ALWAYS use bulk tools (bulk_create_tasks, bulk_update_task_status) instead of individual calls for batch operations.
@@ -146,7 +152,7 @@ export async function POST(req: NextRequest) {
             if (!isLive) {
                 return handleNonLiveAgentMode({
                     aiConfig,
-                    modelId,
+                    modelId: agentModelId,
                     systemInstruction,
                     fullPrompt,
                     filteredTools,
@@ -158,7 +164,7 @@ export async function POST(req: NextRequest) {
                 aiConfig,
                 agencyId: agency!.id,
                 authenticatedUserId,
-                modelId,
+                modelId: agentModelId,
                 systemInstruction,
                 fullPrompt,
                 agentPrompt,
@@ -174,7 +180,7 @@ export async function POST(req: NextRequest) {
             images,
             agencyId: agency!.id,
             authenticatedUserId,
-            modelId,
+            modelId: chatModelId,
         });
     } catch (error: unknown) {
         console.error("[Singularity API] Error:", error);

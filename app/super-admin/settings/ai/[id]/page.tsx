@@ -2,48 +2,51 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Sparkles, Eye, EyeOff, Check, AlertCircle, Trash2, Brain } from "lucide-react";
+import { ArrowLeft, Sparkles, Eye, EyeOff, Check, AlertCircle, Trash2, Brain, ChevronDown, ChevronUp } from "lucide-react";
 import { getAgencyDetails, getAgencyAIConfigSuperAdmin, updateAgencyAIConfigSuperAdmin, removeAgencyAIConfig } from "@/lib/actions/super-admin";
 import { AI_MODELS } from "@/lib/ai-models";
 import { AIProvider, AIConfig } from "@/lib/types";
 
 const PROVIDER_INFO: Record<AIProvider, { name: string; label: string; keyLabel: string; keyPlaceholder: string; description: string }> = {
-    gemini: {
-        name: "Google Gemini",
-        label: "Gemini",
-        keyLabel: "API Key",
-        keyPlaceholder: "AIzaSy...",
-        description: "Google's multimodal AI. Best for vision tasks and code generation."
-    },
-    openai: {
-        name: "OpenAI",
-        label: "OpenAI",
-        keyLabel: "API Key",
-        keyPlaceholder: "sk-...",
-        description: "GPT models. Excellent for complex reasoning and chat."
-    },
-    nvidia: {
-        name: "NVIDIA NIM",
-        label: "NVIDIA",
-        keyLabel: "API Key",
-        keyPlaceholder: "nvapi-...",
-        description: "Open-source models on NVIDIA infrastructure. Great for speed."
-    },
-    github: {
-        name: "GitHub Models",
-        label: "GitHub",
-        keyLabel: "Personal Access Token",
-        keyPlaceholder: "ghp_... or github_pat_...",
-        description: "AI models via GitHub. Uses your PAT with models:read scope."
-    },
-    groq: {
-        name: "Groq",
-        label: "Groq",
-        keyLabel: "API Key",
-        keyPlaceholder: "gsk_...",
-        description: "Ultra-fast LPU inference. Best for speed-critical workloads."
-    },
+    gemini: { name: "Google Gemini", label: "Gemini", keyLabel: "API Key", keyPlaceholder: "AIzaSy...", description: "Google's multimodal AI. Best for vision tasks and code generation." },
+    openai: { name: "OpenAI", label: "OpenAI", keyLabel: "API Key", keyPlaceholder: "sk-...", description: "GPT models. Excellent for complex reasoning and chat." },
+    nvidia: { name: "NVIDIA NIM", label: "NVIDIA", keyLabel: "API Key", keyPlaceholder: "nvapi-...", description: "Open-source models on NVIDIA infrastructure. Great for speed." },
+    github: { name: "GitHub Models", label: "GitHub", keyLabel: "Personal Access Token", keyPlaceholder: "ghp_... or github_pat_...", description: "AI models via GitHub. Uses your PAT with models:read scope." },
+    groq: { name: "Groq", label: "Groq", keyLabel: "API Key", keyPlaceholder: "gsk_...", description: "Ultra-fast LPU inference. Best for speed-critical workloads." },
 };
+
+const FEATURE_LABELS = [
+    { key: "modelChat" as const,         label: "Singularity Chat",    desc: "Conversational AI chat mode" },
+    { key: "modelAgent" as const,        label: "Singularity Agent",   desc: "Tool-calling agent mode" },
+    { key: "modelTaskExplain" as const,  label: "Task Explain/Enhance", desc: "AI task analysis & description enhancement" },
+    { key: "modelHourEstimate" as const, label: "Hour Estimation",     desc: "AI-powered task hour estimation" },
+    { key: "modelTaskChatbot" as const,  label: "Task Chatbot",        desc: "In-task AI assistant chat" },
+];
+
+type FeatureModelKey = typeof FEATURE_LABELS[number]["key"];
+type FeatureModels = Partial<Record<FeatureModelKey, string>>;
+
+function FeatureModelSelect({ label, desc, value, onChange, models }: {
+    label: string; desc: string; value: string;
+    onChange: (v: string) => void; models: { id: string; name: string }[];
+}) {
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-start py-3 border-b border-border last:border-0">
+            <div>
+                <p className="text-sm font-medium text-foreground">{label}</p>
+                <p className="text-xs text-muted-foreground">{desc}</p>
+            </div>
+            <select
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
+            >
+                <option value="">Use default model</option>
+                {models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+        </div>
+    );
+}
 
 export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: string }> }) {
     const [agencyId, setAgencyId] = useState<string>("");
@@ -53,14 +56,18 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
     const [removing, setRemoving] = useState(false);
     const [success, setSuccess] = useState("");
     const [error, setError] = useState("");
+    const [showFeatureModels, setShowFeatureModels] = useState(false);
 
-    // Form state
+    // Main config state
     const [provider, setProvider] = useState<AIProvider>("gemini");
     const [apiKey, setApiKey] = useState("");
     const [model, setModel] = useState("");
     const [customModelId, setCustomModelId] = useState("");
     const [isKeyVisible, setIsKeyVisible] = useState(false);
     const [isConfigured, setIsConfigured] = useState(false);
+
+    // Per-feature model overrides
+    const [featureModels, setFeatureModels] = useState<FeatureModels>({});
 
     useEffect(() => {
         (async () => {
@@ -74,13 +81,20 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
                 setAgencyName(details.agency.name);
                 if (config) {
                     setProvider(config.provider);
-                    setApiKey(""); // Don't load masked key — keep empty, show placeholder
+                    setApiKey("");
                     setModel(config.model);
                     setCustomModelId(config.customModelId || "");
                     setIsConfigured(true);
+                    // Load per-feature overrides
+                    const fm: FeatureModels = {};
+                    for (const { key } of FEATURE_LABELS) {
+                        fm[key] = (config as Record<string, unknown>)[key] as string || "";
+                    }
+                    setFeatureModels(fm);
+                    if (Object.values(fm).some(Boolean)) setShowFeatureModels(true);
                 }
-            } catch (error) {
-                setError(error instanceof Error ? error.message : "Failed to load AI configuration");
+            } catch (e) {
+                setError(e instanceof Error ? e.message : "Failed to load AI configuration");
             } finally {
                 setLoading(false);
             }
@@ -92,40 +106,37 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
         const models = AI_MODELS[newProvider];
         setModel(models[0]?.id || "");
         setCustomModelId("");
+        // Reset feature models when provider changes — different provider has different models
+        setFeatureModels({});
     };
 
     const handleSave = async () => {
-        setError("");
-        setSuccess("");
-        // Require key for first-time setup; optional for updates
-        if (!apiKey.trim() && !isConfigured) {
-            setError("API Key / Token is required");
-            return;
-        }
-        if (!model) {
-            setError("Please select a model");
-            return;
-        }
-        if (model === "custom" && !customModelId.trim()) {
-            setError("Custom model ID is required");
-            return;
-        }
+        setError(""); setSuccess("");
+        if (!apiKey.trim() && !isConfigured) { setError("API Key / Token is required"); return; }
+        if (!model) { setError("Please select a model"); return; }
+        if (model === "custom" && !customModelId.trim()) { setError("Custom model ID is required"); return; }
 
         setSaving(true);
         try {
             const config: AIConfig = {
                 provider,
-                apiKey: apiKey.trim(), // Empty string = keep existing key (server handles it)
+                apiKey: apiKey.trim(),
                 model,
-                ...(model === "custom" ? { customModelId: customModelId.trim() } : {})
+                ...(model === "custom" ? { customModelId: customModelId.trim() } : {}),
+                // Include per-feature overrides (only non-empty ones)
+                ...(featureModels.modelChat         ? { modelChat:          featureModels.modelChat }         : {}),
+                ...(featureModels.modelAgent        ? { modelAgent:         featureModels.modelAgent }        : {}),
+                ...(featureModels.modelTaskExplain  ? { modelTaskExplain:   featureModels.modelTaskExplain }  : {}),
+                ...(featureModels.modelHourEstimate ? { modelHourEstimate:  featureModels.modelHourEstimate } : {}),
+                ...(featureModels.modelTaskChatbot  ? { modelTaskChatbot:   featureModels.modelTaskChatbot }  : {}),
             };
             await updateAgencyAIConfigSuperAdmin(agencyId, config);
             setIsConfigured(true);
-            setApiKey(""); // Clear after save
+            setApiKey("");
             setSuccess("Singularity AI configured successfully!");
             setTimeout(() => setSuccess(""), 3000);
-        } catch (error) {
-            setError(error instanceof Error ? error.message : "Failed to save");
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Failed to save");
         } finally {
             setSaving(false);
         }
@@ -136,15 +147,12 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
         setRemoving(true);
         try {
             await removeAgencyAIConfig(agencyId);
-            setProvider("gemini");
-            setApiKey("");
-            setModel("");
-            setCustomModelId("");
-            setIsConfigured(false);
+            setProvider("gemini"); setApiKey(""); setModel(""); setCustomModelId(""); setIsConfigured(false);
+            setFeatureModels({});
             setSuccess("AI configuration removed.");
             setTimeout(() => setSuccess(""), 3000);
-        } catch (error) {
-            setError(error instanceof Error ? error.message : "Failed to remove AI configuration");
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Failed to remove AI configuration");
         } finally {
             setRemoving(false);
         }
@@ -165,12 +173,8 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
         <div className="space-y-6 max-w-3xl">
             {/* Header */}
             <div>
-                <Link
-                    href="/super-admin/settings"
-                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4"
-                >
-                    <ArrowLeft className="w-4 h-4" />
-                    <span>Back to Settings</span>
+                <Link href="/super-admin/settings" className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4">
+                    <ArrowLeft className="w-4 h-4" /><span>Back to Settings</span>
                 </Link>
                 <div className="flex items-center gap-3">
                     <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg">
@@ -191,14 +195,12 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
             {/* Status Messages */}
             {error && (
                 <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-sm">
-                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                    {error}
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />{error}
                 </div>
             )}
             {success && (
                 <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-500 text-sm">
-                    <Check className="w-4 h-4 flex-shrink-0" />
-                    {success}
+                    <Check className="w-4 h-4 flex-shrink-0" />{success}
                 </div>
             )}
 
@@ -207,23 +209,11 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
                 <h2 className="text-lg font-semibold text-foreground">Provider</h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {(Object.keys(PROVIDER_INFO) as AIProvider[]).map((p) => (
-                        <button
-                            key={p}
-                            onClick={() => handleProviderChange(p)}
-                            className={`
-                                relative p-4 rounded-xl border-2 text-left transition-all duration-200
-                                ${provider === p
-                                    ? "border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30 shadow-sm"
-                                    : "border-border hover:border-muted-foreground/30 hover:bg-muted"
-                                }
-                            `}
+                        <button key={p} onClick={() => handleProviderChange(p)}
+                            className={`relative p-4 rounded-xl border-2 text-left transition-all duration-200 ${provider === p ? "border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30 shadow-sm" : "border-border hover:border-muted-foreground/30 hover:bg-muted"}`}
                         >
-                            <p className={`font-semibold text-sm ${provider === p ? "text-purple-500" : "text-foreground"}`}>
-                                {PROVIDER_INFO[p].label}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                {PROVIDER_INFO[p].description}
-                            </p>
+                            <p className={`font-semibold text-sm ${provider === p ? "text-purple-500" : "text-foreground"}`}>{PROVIDER_INFO[p].label}</p>
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{PROVIDER_INFO[p].description}</p>
                             {provider === p && (
                                 <div className="absolute top-2 right-2 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center">
                                     <Check className="w-3 h-3 text-white" />
@@ -236,13 +226,9 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
 
             {/* API Key */}
             <div className="bg-card rounded-xl shadow-sm border border-border p-6 space-y-3">
-                <label className="block text-sm font-semibold text-foreground">
-                    {currentProviderInfo.keyLabel}
-                </label>
+                <label className="block text-sm font-semibold text-foreground">{currentProviderInfo.keyLabel}</label>
                 <p className="text-xs text-muted-foreground">
-                    {provider === "github"
-                        ? "Create a fine-grained PAT with models:read scope at github.com/settings/tokens"
-                        : `Enter your ${currentProviderInfo.name} API key. This is stored securely and never sent to the client.`}
+                    {provider === "github" ? "Create a fine-grained PAT with models:read scope at github.com/settings/tokens" : `Enter your ${currentProviderInfo.name} API key. Stored securely, never sent to the client.`}
                 </p>
                 <div className="relative">
                     <input
@@ -252,43 +238,68 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
                         placeholder={isConfigured ? "Key configured — enter new key to change" : currentProviderInfo.keyPlaceholder}
                         className="w-full h-11 rounded-lg border border-border bg-background px-4 pr-10 text-sm text-foreground focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition placeholder:text-muted-foreground"
                     />
-                    <button
-                        type="button"
-                        onClick={() => setIsKeyVisible(!isKeyVisible)}
-                        className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
-                    >
+                    <button type="button" onClick={() => setIsKeyVisible(!isKeyVisible)} className="absolute right-3 top-3 text-muted-foreground hover:text-foreground">
                         {isKeyVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                 </div>
             </div>
 
-            {/* Model Selection */}
+            {/* Default Model */}
             <div className="bg-card rounded-xl shadow-sm border border-border p-6 space-y-3">
-                <label className="block text-sm font-semibold text-foreground">Model</label>
+                <div>
+                    <label className="block text-sm font-semibold text-foreground">Default Model</label>
+                    <p className="text-xs text-muted-foreground mt-0.5">Used for any feature that doesn&apos;t have a per-feature override below.</p>
+                </div>
                 <select
                     value={model}
-                    onChange={(e) => {
-                        setModel(e.target.value);
-                        if (e.target.value !== "custom") setCustomModelId("");
-                    }}
+                    onChange={(e) => { setModel(e.target.value); if (e.target.value !== "custom") setCustomModelId(""); }}
                     className="w-full h-11 rounded-lg border border-border bg-background px-4 text-sm text-foreground focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
                 >
                     <option value="">Select a model...</option>
-                    {providerModels.map((m) => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
+                    {providerModels.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
-
                 {model === "custom" && (
                     <div className="space-y-1.5 mt-2">
                         <label className="block text-xs font-medium text-muted-foreground">Custom Model ID</label>
                         <input
-                            type="text"
-                            value={customModelId}
-                            onChange={(e) => setCustomModelId(e.target.value)}
+                            type="text" value={customModelId} onChange={(e) => setCustomModelId(e.target.value)}
                             placeholder="e.g. ft:gpt-4o:my-org:custom-model:id"
                             className="w-full h-10 rounded-lg border border-border bg-background px-4 text-sm text-foreground focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition placeholder:text-muted-foreground"
                         />
+                    </div>
+                )}
+            </div>
+
+            {/* Per-Feature Model Overrides */}
+            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+                <button
+                    onClick={() => setShowFeatureModels(!showFeatureModels)}
+                    className="w-full flex items-center justify-between p-6 text-left hover:bg-muted/40 transition-colors"
+                >
+                    <div>
+                        <p className="text-sm font-semibold text-foreground">Per-Feature Model Overrides</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                            Assign a different model to each Singularity feature. Leave blank to use the default model above.
+                        </p>
+                    </div>
+                    {showFeatureModels ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
+                </button>
+
+                {showFeatureModels && (
+                    <div className="px-6 pb-6 border-t border-border">
+                        <p className="text-xs text-muted-foreground py-3">
+                            Example: use a fast lightweight model for hour estimation and a powerful model for agent mode.
+                        </p>
+                        {FEATURE_LABELS.map(({ key, label, desc }) => (
+                            <FeatureModelSelect
+                                key={key}
+                                label={label}
+                                desc={desc}
+                                value={featureModels[key] || ""}
+                                onChange={(v) => setFeatureModels((prev) => ({ ...prev, [key]: v }))}
+                                models={providerModels}
+                            />
+                        ))}
                     </div>
                 )}
             </div>
@@ -305,11 +316,7 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
                 </button>
 
                 {isConfigured && (
-                    <button
-                        onClick={handleRemove}
-                        disabled={removing}
-                        className="flex items-center gap-2 px-4 py-2.5 text-red-500 hover:bg-red-500/10 rounded-lg font-medium text-sm transition"
-                    >
+                    <button onClick={handleRemove} disabled={removing} className="flex items-center gap-2 px-4 py-2.5 text-red-500 hover:bg-red-500/10 rounded-lg font-medium text-sm transition">
                         <Trash2 className="w-4 h-4" />
                         {removing ? "Removing..." : "Remove AI"}
                     </button>

@@ -25,8 +25,14 @@ export type AIProvider = "gemini" | "openai" | "nvidia" | "github" | "groq";
 export type AIConfig = {
     provider: AIProvider;
     apiKey: string;
-    model: string;
-    customModelId?: string;
+    model: string;          // default / fallback model
+    customModelId?: string; // used when model === "custom"
+    // Per-feature model overrides (optional — falls back to `model` if absent or empty)
+    modelChat?: string;
+    modelAgent?: string;
+    modelTaskExplain?: string;
+    modelHourEstimate?: string;
+    modelTaskChatbot?: string;
 };
 
 export type AIPermissions = {

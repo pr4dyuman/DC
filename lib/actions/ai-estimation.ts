@@ -3,6 +3,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import type { AIConfig } from "../types";
 import { generateContent } from "../ai-provider";
+import { resolveFeatureModel } from "../ai-provider-shared";
 import { logAIUsage } from "../ai-usage";
 import { TaskModel, connectDB } from "../mongodb";
 import { getErrorMessage } from "./shared";
@@ -114,8 +115,9 @@ ${historyLines || "(No historical data available)"}
 - Return ONLY a single number. No text, no explanation, no units.`;
 
     try {
-        const { text, tokens } = await generateContent(aiConfig, prompt);
-        logAIUsage({ agencyId, userId, feature: "ai-hour-estimate", model: aiConfig.model || "unknown", provider: aiConfig.provider, ...tokens });
+        const featureConfig = { ...aiConfig, model: resolveFeatureModel(aiConfig, "hourEstimate") };
+        const { text, tokens } = await generateContent(featureConfig, prompt);
+        logAIUsage({ agencyId, userId, feature: "ai-hour-estimate", model: featureConfig.model, provider: aiConfig.provider, ...tokens });
         const cleaned = text.trim().replace(/[^0-9.]/g, "");
         const hours = parseFloat(cleaned);
         if (isNaN(hours) || hours <= 0) return estimateHoursFromTask({ title, description, priority });

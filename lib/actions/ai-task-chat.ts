@@ -3,7 +3,7 @@ import "server-only";
 import type { Asset, Task, User } from "../db";
 import type { AIConfig } from "../types";
 import { generateContentWithChat } from "../ai-provider";
-import { resolveModel } from "../ai-provider-shared";
+import { resolveFeatureModel } from "../ai-provider-shared";
 import { logAIUsage } from "../ai-usage";
 import { createSession } from "../live-session";
 import { AssetModel, TaskModel, UserModel, connectDB } from "../mongodb";
@@ -68,7 +68,7 @@ export async function createAISessionImpl(
     currentTitle: string,
     currentDescription: string
 ): Promise<string> {
-    const modelId = resolveModel(aiConfig);
+    const modelId = resolveFeatureModel(aiConfig, "taskChatbot");
     if (!modelId.includes("native-audio")) {
         return "legacy";
     }
@@ -107,8 +107,9 @@ export async function chatWithTaskAIImpl(
     const systemInstruction = buildChatSystemInstruction(projectId || "", currentTitle || "", currentDescription || "", data);
 
     try {
-        const { text, tokens } = await generateContentWithChat(aiConfig, history, systemInstruction, userMessage);
-        logAIUsage({ agencyId, userId, feature: "ai-task-chat", model: aiConfig.model || "unknown", provider: aiConfig.provider, ...tokens });
+        const featureConfig = { ...aiConfig, model: resolveFeatureModel(aiConfig, "taskChatbot") };
+        const { text, tokens } = await generateContentWithChat(featureConfig, history, systemInstruction, userMessage);
+        logAIUsage({ agencyId, userId, feature: "ai-task-chat", model: featureConfig.model, provider: aiConfig.provider, ...tokens });
         return text;
     } catch (error: unknown) {
         console.error("Singularity Chat Error:", error);

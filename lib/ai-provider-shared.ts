@@ -27,6 +27,29 @@ export function resolveModel(config: AIConfig): string {
     return config.model || "gemini-2.5-flash-lite";
 }
 
+export type AIFeature = "chat" | "agent" | "taskExplain" | "hourEstimate" | "taskChatbot";
+
+const FEATURE_MODEL_KEY: Record<AIFeature, keyof AIConfig> = {
+    chat:          "modelChat",
+    agent:         "modelAgent",
+    taskExplain:   "modelTaskExplain",
+    hourEstimate:  "modelHourEstimate",
+    taskChatbot:   "modelTaskChatbot",
+};
+
+/**
+ * Resolves the model for a specific AI feature.
+ * Returns the per-feature override if configured, otherwise falls back to the
+ * main model (via resolveModel). Pass the result as an override on the config:
+ *   const featureConfig = { ...aiConfig, model: resolveFeatureModel(aiConfig, 'chat') };
+ */
+export function resolveFeatureModel(config: AIConfig, feature: AIFeature): string {
+    const key = FEATURE_MODEL_KEY[feature];
+    const override = config[key] as string | undefined;
+    if (override && override.trim() !== "") return override.trim();
+    return resolveModel(config);
+}
+
 export const OPENAI_COMPAT_BASE_URLS: Record<string, string> = {
     openai: "https://api.openai.com/v1",
     nvidia: "https://integrate.api.nvidia.com/v1",

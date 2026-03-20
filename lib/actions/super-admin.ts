@@ -364,7 +364,13 @@ export async function updateAgencyAIConfigSuperAdmin(agencyId: string, config: A
                     provider: config.provider,
                     apiKey: encryptedApiKey,
                     model: config.model,
-                    ...(config.customModelId ? { customModelId: config.customModelId } : {})
+                    ...(config.customModelId ? { customModelId: config.customModelId } : {}),
+                    // Per-feature model overrides
+                    ...(config.modelChat         ? { modelChat:          sanitizeString(config.modelChat,         200) } : {}),
+                    ...(config.modelAgent        ? { modelAgent:         sanitizeString(config.modelAgent,        200) } : {}),
+                    ...(config.modelTaskExplain  ? { modelTaskExplain:   sanitizeString(config.modelTaskExplain,  200) } : {}),
+                    ...(config.modelHourEstimate ? { modelHourEstimate:  sanitizeString(config.modelHourEstimate, 200) } : {}),
+                    ...(config.modelTaskChatbot  ? { modelTaskChatbot:   sanitizeString(config.modelTaskChatbot,  200) } : {}),
                 },
                 updatedAt: new Date().toISOString()
             }
@@ -463,6 +469,12 @@ export async function saveDefaultAiConfig(config: AIConfig | null) {
                         apiKey: encryptedApiKey,
                         model: sanitizeString(config.model, 200),
                         ...(config.customModelId ? { customModelId: sanitizeString(config.customModelId, 200) } : {}),
+                        // Per-feature model overrides
+                        ...(config.modelChat         ? { modelChat:          sanitizeString(config.modelChat,         200) } : {}),
+                        ...(config.modelAgent        ? { modelAgent:         sanitizeString(config.modelAgent,        200) } : {}),
+                        ...(config.modelTaskExplain  ? { modelTaskExplain:   sanitizeString(config.modelTaskExplain,  200) } : {}),
+                        ...(config.modelHourEstimate ? { modelHourEstimate:  sanitizeString(config.modelHourEstimate, 200) } : {}),
+                        ...(config.modelTaskChatbot  ? { modelTaskChatbot:   sanitizeString(config.modelTaskChatbot,  200) } : {}),
                     }
                 }
             },

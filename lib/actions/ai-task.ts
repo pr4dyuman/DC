@@ -3,6 +3,7 @@ import "server-only";
 import type { Asset, Task, User } from "../db";
 import type { AIConfig } from "../types";
 import { generateContent, generateContentWithParts } from "../ai-provider";
+import { resolveFeatureModel } from "../ai-provider-shared";
 import { logAIUsage } from "../ai-usage";
 import { AssetModel, ProjectModel, ServiceModel, TaskModel, UserModel, connectDB } from "../mongodb";
 import { getErrorMessage } from "./shared";
@@ -117,8 +118,9 @@ ${isEnhancement ?
 Return ONLY the Markdown content.`;
 
     try {
-        const { text, tokens } = await generateContent(aiConfig, prompt);
-        logAIUsage({ agencyId, userId, feature: "ai-enhance", model: aiConfig.model || "unknown", provider: aiConfig.provider, ...tokens });
+        const featureConfig = { ...aiConfig, model: resolveFeatureModel(aiConfig, "taskExplain") };
+        const { text, tokens } = await generateContent(featureConfig, prompt);
+        logAIUsage({ agencyId, userId, feature: "ai-enhance", model: featureConfig.model, provider: aiConfig.provider, ...tokens });
         return text;
     } catch (error: unknown) {
         console.error("Enhance Task Error", error);
@@ -261,8 +263,9 @@ ${context.comments.length > 0 ? context.comments.map((comment) => `- ${comment.t
     }
 
     try {
-        const { text, tokens } = await generateContentWithParts(aiConfig, parts);
-        logAIUsage({ agencyId, userId, feature: "ai-explain", model: aiConfig.model || "unknown", provider: aiConfig.provider, ...tokens });
+        const featureConfig = { ...aiConfig, model: resolveFeatureModel(aiConfig, "taskExplain") };
+        const { text, tokens } = await generateContentWithParts(featureConfig, parts);
+        logAIUsage({ agencyId, userId, feature: "ai-explain", model: featureConfig.model, provider: aiConfig.provider, ...tokens });
         return text;
     } catch (error: unknown) {
         const message = getErrorMessage(error);
