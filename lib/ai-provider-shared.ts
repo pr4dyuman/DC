@@ -29,25 +29,34 @@ export function resolveModel(config: AIConfig): string {
 
 export type AIFeature = "chat" | "agent" | "taskExplain" | "hourEstimate" | "taskChatbot";
 
-const FEATURE_MODEL_KEY: Record<AIFeature, keyof AIConfig> = {
-    chat:          "modelChat",
-    agent:         "modelAgent",
-    taskExplain:   "modelTaskExplain",
-    hourEstimate:  "modelHourEstimate",
-    taskChatbot:   "modelTaskChatbot",
-};
-
 /**
- * Resolves the model for a specific AI feature.
- * Returns the per-feature override if configured, otherwise falls back to the
- * main model (via resolveModel). Pass the result as an override on the config:
- *   const featureConfig = { ...aiConfig, model: resolveFeatureModel(aiConfig, 'chat') };
+ * Resolves the full configuration (provider, key, model) for a specific AI feature.
+ * Features can optionally supply an override config. If the override has an empty API key,
+ * it will inherit the main config's API key but ONLY if the provider matches.
  */
-export function resolveFeatureModel(config: AIConfig, feature: AIFeature): string {
-    const key = FEATURE_MODEL_KEY[feature];
-    const override = config[key] as string | undefined;
-    if (override && override.trim() !== "") return override.trim();
-    return resolveModel(config);
+export function getResolvedFeatureConfig(config: AIConfig, feature: AIFeature): AIConfig {
+    let override;
+    switch (feature) {
+        case "chat": override = config.chatConfig; break;
+        case "agent": override = config.agentConfig; break;
+        case "taskExplain": override = config.taskExplainConfig; break;
+        case "hourEstimate": override = config.hourEstimateConfig; break;
+        case "taskChatbot": override = config.taskChatbotConfig; break;
+    }
+
+    if (!override) {
+        return config;
+    }
+
+    const resolvedApiKey = (override.apiKey?.trim() || "") || 
+        (override.provider === config.provider ? config.apiKey : "");
+
+    return {
+        provider: override.provider,
+        apiKey: resolvedApiKey,
+        model: override.model,
+        customModelId: override.customModelId
+    };
 }
 
 export const OPENAI_COMPAT_BASE_URLS: Record<string, string> = {

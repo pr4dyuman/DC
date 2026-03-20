@@ -2,7 +2,7 @@ import "server-only";
 
 import { SuperAdminModel, SystemSettingsModel, connectDB } from "../mongodb";
 import { getSessionUser } from "../auth";
-import type { Agency, AIConfig } from "../types";
+import type { Agency, AIConfig, AIFeatureConfig } from "../types";
 
 type SerializableRecord = Record<string, unknown>;
 
@@ -11,6 +11,11 @@ type StoredAIConfigRecord = {
     apiKey?: string;
     model?: string;
     customModelId?: string;
+    chatConfig?: AIFeatureConfig;
+    agentConfig?: AIFeatureConfig;
+    taskExplainConfig?: AIFeatureConfig;
+    hourEstimateConfig?: AIFeatureConfig;
+    taskChatbotConfig?: AIFeatureConfig;
 };
 
 type EmailEventSettingsRecord = {

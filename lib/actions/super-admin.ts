@@ -343,18 +343,37 @@ export async function updateAgencyAIConfigSuperAdmin(agencyId: string, config: A
     // Determine the API key to store
     let encryptedApiKey: string;
     const isNewKey = config.apiKey && !config.apiKey.startsWith('****');
+
+    // Fetch agency once — reused for both key fallback and override merging
+    const existingAgency = await AgencyModel.findOne({ id: agencyId }).lean();
+    if (!existingAgency) throw new Error("Agency not found");
+
     if (isNewKey) {
-        // User provided a new key â€” encrypt and store
+        // User provided a new key — encrypt and store
         encryptedApiKey = encryptApiKey(config.apiKey);
     } else {
-        // No new key â€” preserve existing encrypted key from DB
-        const agency = await AgencyModel.findOne({ id: agencyId }).lean();
-        if (!agency) throw new Error("Agency not found");
-        if (!agency.aiConfig?.apiKey) {
+        // No new key — preserve existing encrypted key from DB
+        if (!existingAgency.aiConfig?.apiKey) {
             throw new Error("API Key is required for initial configuration");
         }
-        encryptedApiKey = agency.aiConfig.apiKey;
+        encryptedApiKey = existingAgency.aiConfig.apiKey;
     }
+
+    const processFeatureConfig = (newConf: any, oldConf: any) => {
+        if (!newConf) return undefined;
+        let encKey = "";
+        if (newConf.apiKey && !newConf.apiKey.startsWith('****')) {
+            encKey = encryptApiKey(newConf.apiKey);
+        } else if (newConf.apiKey?.startsWith('****') && oldConf?.apiKey) {
+            encKey = oldConf.apiKey;
+        }
+        return {
+            provider: newConf.provider,
+            apiKey: encKey,
+            model: sanitizeString(newConf.model, 200),
+            ...(newConf.customModelId ? { customModelId: sanitizeString(newConf.customModelId, 200) } : {})
+        };
+    };
 
     const result = await AgencyModel.updateOne(
         { id: agencyId },
@@ -365,12 +384,12 @@ export async function updateAgencyAIConfigSuperAdmin(agencyId: string, config: A
                     apiKey: encryptedApiKey,
                     model: config.model,
                     ...(config.customModelId ? { customModelId: config.customModelId } : {}),
-                    // Per-feature model overrides
-                    ...(config.modelChat         ? { modelChat:          sanitizeString(config.modelChat,         200) } : {}),
-                    ...(config.modelAgent        ? { modelAgent:         sanitizeString(config.modelAgent,        200) } : {}),
-                    ...(config.modelTaskExplain  ? { modelTaskExplain:   sanitizeString(config.modelTaskExplain,  200) } : {}),
-                    ...(config.modelHourEstimate ? { modelHourEstimate:  sanitizeString(config.modelHourEstimate, 200) } : {}),
-                    ...(config.modelTaskChatbot  ? { modelTaskChatbot:   sanitizeString(config.modelTaskChatbot,  200) } : {}),
+                    // Per-feature object overrides
+                    ...(config.chatConfig         ? { chatConfig:         processFeatureConfig(config.chatConfig,         existingAgency?.aiConfig?.chatConfig) } : {}),
+                    ...(config.agentConfig        ? { agentConfig:        processFeatureConfig(config.agentConfig,        existingAgency?.aiConfig?.agentConfig) } : {}),
+                    ...(config.taskExplainConfig  ? { taskExplainConfig:  processFeatureConfig(config.taskExplainConfig,  existingAgency?.aiConfig?.taskExplainConfig) } : {}),
+                    ...(config.hourEstimateConfig ? { hourEstimateConfig: processFeatureConfig(config.hourEstimateConfig, existingAgency?.aiConfig?.hourEstimateConfig) } : {}),
+                    ...(config.taskChatbotConfig  ? { taskChatbotConfig:  processFeatureConfig(config.taskChatbotConfig,  existingAgency?.aiConfig?.taskChatbotConfig) } : {}),
                 },
                 updatedAt: new Date().toISOString()
             }
@@ -460,6 +479,23 @@ export async function saveDefaultAiConfig(config: AIConfig | null) {
             encryptedApiKey = existingKey;
         }
 
+        const existingGlobal = await SystemSettingsModel.findOne({ key: 'global' }).lean() as SystemSettingsRecord | null;
+        const processFeatureConfigGlobal = (newConf: any, oldConf: any) => {
+            if (!newConf) return undefined;
+            let encKey = "";
+            if (newConf.apiKey && !newConf.apiKey.startsWith('****')) {
+                encKey = encryptApiKey(newConf.apiKey);
+            } else if (newConf.apiKey?.startsWith('****') && oldConf?.apiKey) {
+                encKey = oldConf.apiKey;
+            }
+            return {
+                provider: newConf.provider,
+                apiKey: encKey,
+                model: sanitizeString(newConf.model, 200),
+                ...(newConf.customModelId ? { customModelId: sanitizeString(newConf.customModelId, 200) } : {})
+            };
+        };
+
         await SystemSettingsModel.updateOne(
             { key: 'global' },
             {
@@ -469,12 +505,12 @@ export async function saveDefaultAiConfig(config: AIConfig | null) {
                         apiKey: encryptedApiKey,
                         model: sanitizeString(config.model, 200),
                         ...(config.customModelId ? { customModelId: sanitizeString(config.customModelId, 200) } : {}),
-                        // Per-feature model overrides
-                        ...(config.modelChat         ? { modelChat:          sanitizeString(config.modelChat,         200) } : {}),
-                        ...(config.modelAgent        ? { modelAgent:         sanitizeString(config.modelAgent,        200) } : {}),
-                        ...(config.modelTaskExplain  ? { modelTaskExplain:   sanitizeString(config.modelTaskExplain,  200) } : {}),
-                        ...(config.modelHourEstimate ? { modelHourEstimate:  sanitizeString(config.modelHourEstimate, 200) } : {}),
-                        ...(config.modelTaskChatbot  ? { modelTaskChatbot:   sanitizeString(config.modelTaskChatbot,  200) } : {}),
+                        // Per-feature object overrides
+                        ...(config.chatConfig         ? { chatConfig:         processFeatureConfigGlobal(config.chatConfig,         existingGlobal?.defaultAiConfig?.chatConfig) } : {}),
+                        ...(config.agentConfig        ? { agentConfig:        processFeatureConfigGlobal(config.agentConfig,        existingGlobal?.defaultAiConfig?.agentConfig) } : {}),
+                        ...(config.taskExplainConfig  ? { taskExplainConfig:  processFeatureConfigGlobal(config.taskExplainConfig,  existingGlobal?.defaultAiConfig?.taskExplainConfig) } : {}),
+                        ...(config.hourEstimateConfig ? { hourEstimateConfig: processFeatureConfigGlobal(config.hourEstimateConfig, existingGlobal?.defaultAiConfig?.hourEstimateConfig) } : {}),
+                        ...(config.taskChatbotConfig  ? { taskChatbotConfig:  processFeatureConfigGlobal(config.taskChatbotConfig,  existingGlobal?.defaultAiConfig?.taskChatbotConfig) } : {}),
                     }
                 }
             },

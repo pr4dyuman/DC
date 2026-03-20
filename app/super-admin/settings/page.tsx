@@ -10,7 +10,8 @@ import { DEFAULT_EMAIL_CATEGORIES, DEFAULT_TASK_EMAIL_EVENTS } from "@/lib/email
 import type { EmailCategory, TaskEmailEventKey, TaskEmailEventConfig } from "@/lib/email-constants";
 import { toast } from "sonner";
 import { SystemSettingsAiAgencyList } from "./_components/SystemSettingsAiAgencyList";
-import { SystemSettingsDefaultAiSection } from "./_components/SystemSettingsDefaultAiSection";
+import { SystemSettingsDefaultAiSection, FeatureConfigs } from "./_components/SystemSettingsDefaultAiSection";
+import { AIFeatureConfigState } from "./_components/FeatureConfigEditor";
 import { SystemSettingsEmailAdminSection } from "./_components/SystemSettingsEmailAdminSection";
 import { SystemSettingsEmailCategorySection } from "./_components/SystemSettingsEmailCategorySection";
 import { SystemSettingsEmailGlobalControls } from "./_components/SystemSettingsEmailGlobalControls";
@@ -81,7 +82,7 @@ export default function SystemSettingsPage() {
     const [defaultAiConfigured, setDefaultAiConfigured] = useState(false);
     const [savingDefaultAi, setSavingDefaultAi] = useState(false);
     const [savedDefaultAi, setSavedDefaultAi] = useState('');
-    const [defaultAiFeatureModels, setDefaultAiFeatureModels] = useState<Record<string, string>>({});
+    const [defaultAiFeatureConfigs, setDefaultAiFeatureConfigs] = useState<FeatureConfigs>({});
 
     // Email defaults state
     const [emailGlobalEnabled, setEmailGlobalEnabled] = useState(true);
@@ -141,11 +142,19 @@ export default function SystemSettingsPage() {
                         setDefaultAi({ provider: daiConfig.provider, apiKey: '', model: daiConfig.model, customModelId: daiConfig.customModelId || '' });
                         setDefaultAiConfigured(true);
                         // Load per-feature model overrides
-                        const fm: Record<string, string> = {};
-                        for (const key of ["modelChat", "modelAgent", "modelTaskExplain", "modelHourEstimate", "modelTaskChatbot"] as const) {
-                            fm[key] = (daiConfig as Record<string, unknown>)[key] as string || "";
+                        const fc: FeatureConfigs = {};
+                        for (const key of ["chatConfig", "agentConfig", "taskExplainConfig", "hourEstimateConfig", "taskChatbotConfig"] as const) {
+                            const subConf = (daiConfig as Record<string, any>)[key];
+                            if (subConf && Object.keys(subConf).length > 0) {
+                                fc[key] = {
+                                    provider: subConf.provider,
+                                    apiKey: subConf.apiKey || "",
+                                    model: subConf.model,
+                                    customModelId: subConf.customModelId || ""
+                                };
+                            }
                         }
-                        setDefaultAiFeatureModels(fm);
+                        setDefaultAiFeatureConfigs(fc);
                     }
                 } catch { /* ignore if not configured */ }
             } catch (e) {
@@ -275,9 +284,9 @@ export default function SystemSettingsPage() {
                 model: defaultAi.model,
             };
             if (defaultAi.customModelId) configToSave.customModelId = defaultAi.customModelId;
-            // Include per-feature model overrides
-            for (const key of ["modelChat", "modelAgent", "modelTaskExplain", "modelHourEstimate", "modelTaskChatbot"] as const) {
-                const val = defaultAiFeatureModels[key];
+            // Include per-feature object overrides
+            for (const key of ["chatConfig", "agentConfig", "taskExplainConfig", "hourEstimateConfig", "taskChatbotConfig"] as const) {
+                const val = defaultAiFeatureConfigs[key];
                 if (val) (configToSave as Record<string, unknown>)[key] = val;
             }
 
@@ -294,14 +303,14 @@ export default function SystemSettingsPage() {
         } finally {
             setSavingDefaultAi(false);
         }
-    }, [defaultAi, defaultAiConfigured, defaultAiFeatureModels]);
+    }, [defaultAi, defaultAiConfigured, defaultAiFeatureConfigs]);
 
     const handleDefaultAiRemove = useCallback(async () => {
         setSavingDefaultAi(true);
         try {
             await saveDefaultAiConfig(null);
             setDefaultAi({ provider: "gemini", apiKey: "", model: "", customModelId: "" });
-            setDefaultAiFeatureModels({});
+            setDefaultAiFeatureConfigs({});
             setDefaultAiConfigured(false);
             setSavedDefaultAi("Removed");
             setTimeout(() => setSavedDefaultAi(""), 3000);
@@ -422,12 +431,12 @@ export default function SystemSettingsPage() {
                     defaultAiConfigured={defaultAiConfigured}
                     savingDefaultAi={savingDefaultAi}
                     savedDefaultAi={savedDefaultAi}
-                    featureModels={defaultAiFeatureModels}
+                    featureConfigs={defaultAiFeatureConfigs}
                     onProviderChange={handleDefaultAiProviderChange}
                     onApiKeyChange={handleDefaultAiApiKeyChange}
                     onModelChange={handleDefaultAiModelChange}
                     onCustomModelIdChange={handleDefaultAiCustomModelIdChange}
-                    onFeatureModelChange={(key, value) => setDefaultAiFeatureModels((prev) => ({ ...prev, [key]: value }))}
+                    onFeatureConfigChange={(key, value) => setDefaultAiFeatureConfigs((prev) => ({ ...prev, [key]: value }))}
                     onSave={() => { void handleDefaultAiSave(); }}
                     onRemove={() => { void handleDefaultAiRemove(); }}
                 />

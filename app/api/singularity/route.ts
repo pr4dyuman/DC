@@ -10,7 +10,7 @@ import { handleChatModeRequest } from "@/lib/singularity-route-chat";
 import { getSessionUser } from "@/lib/auth";
 import { getAIPermissions } from "@/lib/actions";
 import { hasExplicitAIAccessSetting } from "@/lib/actions/access";
-import { resolveModel, resolveFeatureModel } from "@/lib/ai-provider-shared";
+import { resolveModel, getResolvedFeatureConfig } from "@/lib/ai-provider-shared";
 import { getCurrentAgency, checkTrialExpired } from "@/lib/agency-context";
 import {
     buildConversationPrompt,
@@ -92,9 +92,12 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Resolve model per feature — falls back to main model if override not set
-        const agentModelId = resolveFeatureModel(aiConfig, "agent");
-        const chatModelId  = resolveFeatureModel(aiConfig, "chat");
+        // Resolve config per feature — full isolation (provider, key, model)
+        const agentConfig = getResolvedFeatureConfig(aiConfig, "agent");
+        const chatConfig  = getResolvedFeatureConfig(aiConfig, "chat");
+
+        const agentModelId = resolveModel(agentConfig);
+        const chatModelId  = resolveModel(chatConfig);
 
         // isLive is checked per mode
         const isLive = mode === "agent"
@@ -151,7 +154,7 @@ export async function POST(req: NextRequest) {
 
             if (!isLive) {
                 return handleNonLiveAgentMode({
-                    aiConfig,
+                    aiConfig: agentConfig,
                     modelId: agentModelId,
                     systemInstruction,
                     fullPrompt,
@@ -161,7 +164,7 @@ export async function POST(req: NextRequest) {
             }
 
             return handleLiveAgentMode({
-                aiConfig,
+                aiConfig: agentConfig,
                 agencyId: agency!.id,
                 authenticatedUserId,
                 modelId: agentModelId,
@@ -175,7 +178,7 @@ export async function POST(req: NextRequest) {
         }
 
         return handleChatModeRequest({
-            aiConfig,
+            aiConfig: chatConfig,
             fullPrompt,
             images,
             agencyId: agency!.id,

@@ -5,48 +5,19 @@ import Link from "next/link";
 import { ArrowLeft, Sparkles, Eye, EyeOff, Check, AlertCircle, Trash2, Brain, ChevronDown, ChevronUp } from "lucide-react";
 import { getAgencyDetails, getAgencyAIConfigSuperAdmin, updateAgencyAIConfigSuperAdmin, removeAgencyAIConfig } from "@/lib/actions/super-admin";
 import { AI_MODELS } from "@/lib/ai-models";
-import { AIProvider, AIConfig } from "@/lib/types";
-
-const PROVIDER_INFO: Record<AIProvider, { name: string; label: string; keyLabel: string; keyPlaceholder: string; description: string }> = {
-    gemini: { name: "Google Gemini", label: "Gemini", keyLabel: "API Key", keyPlaceholder: "AIzaSy...", description: "Google's multimodal AI. Best for vision tasks and code generation." },
-    openai: { name: "OpenAI", label: "OpenAI", keyLabel: "API Key", keyPlaceholder: "sk-...", description: "GPT models. Excellent for complex reasoning and chat." },
-    nvidia: { name: "NVIDIA NIM", label: "NVIDIA", keyLabel: "API Key", keyPlaceholder: "nvapi-...", description: "Open-source models on NVIDIA infrastructure. Great for speed." },
-    github: { name: "GitHub Models", label: "GitHub", keyLabel: "Personal Access Token", keyPlaceholder: "ghp_... or github_pat_...", description: "AI models via GitHub. Uses your PAT with models:read scope." },
-    groq: { name: "Groq", label: "Groq", keyLabel: "API Key", keyPlaceholder: "gsk_...", description: "Ultra-fast LPU inference. Best for speed-critical workloads." },
-};
+import { AIProvider, AIConfig, AIFeatureConfig } from "@/lib/types";
+import { FeatureConfigEditor, AIFeatureConfigState, PROVIDER_INFO } from "../../_components/FeatureConfigEditor";
 
 const FEATURE_LABELS = [
-    { key: "modelChat" as const,         label: "Singularity Chat",    desc: "Conversational AI chat mode" },
-    { key: "modelAgent" as const,        label: "Singularity Agent",   desc: "Tool-calling agent mode" },
-    { key: "modelTaskExplain" as const,  label: "Task Explain/Enhance", desc: "AI task analysis & description enhancement" },
-    { key: "modelHourEstimate" as const, label: "Hour Estimation",     desc: "AI-powered task hour estimation" },
-    { key: "modelTaskChatbot" as const,  label: "Task Chatbot",        desc: "In-task AI assistant chat" },
+    { key: "chatConfig" as const,         label: "Singularity Chat",    desc: "Conversational AI chat mode" },
+    { key: "agentConfig" as const,        label: "Singularity Agent",   desc: "Tool-calling agent mode" },
+    { key: "taskExplainConfig" as const,  label: "Task Explain/Enhance", desc: "AI task analysis & description enhancement" },
+    { key: "hourEstimateConfig" as const, label: "Hour Estimation",     desc: "AI-powered task hour estimation" },
+    { key: "taskChatbotConfig" as const,  label: "Task Chatbot",        desc: "In-task AI assistant chat" },
 ];
 
 type FeatureModelKey = typeof FEATURE_LABELS[number]["key"];
-type FeatureModels = Partial<Record<FeatureModelKey, string>>;
-
-function FeatureModelSelect({ label, desc, value, onChange, models }: {
-    label: string; desc: string; value: string;
-    onChange: (v: string) => void; models: { id: string; name: string }[];
-}) {
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-start py-3 border-b border-border last:border-0">
-            <div>
-                <p className="text-sm font-medium text-foreground">{label}</p>
-                <p className="text-xs text-muted-foreground">{desc}</p>
-            </div>
-            <select
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition"
-            >
-                <option value="">Use default model</option>
-                {models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-        </div>
-    );
-}
+type FeatureConfigs = Partial<Record<FeatureModelKey, AIFeatureConfigState>>;
 
 export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: string }> }) {
     const [agencyId, setAgencyId] = useState<string>("");
@@ -66,8 +37,8 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
     const [isKeyVisible, setIsKeyVisible] = useState(false);
     const [isConfigured, setIsConfigured] = useState(false);
 
-    // Per-feature model overrides
-    const [featureModels, setFeatureModels] = useState<FeatureModels>({});
+    // Per-feature object overrides
+    const [featureConfigs, setFeatureConfigs] = useState<FeatureConfigs>({});
 
     useEffect(() => {
         (async () => {
@@ -86,12 +57,20 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
                     setCustomModelId(config.customModelId || "");
                     setIsConfigured(true);
                     // Load per-feature overrides
-                    const fm: FeatureModels = {};
+                    const fc: FeatureConfigs = {};
                     for (const { key } of FEATURE_LABELS) {
-                        fm[key] = (config as Record<string, unknown>)[key] as string || "";
+                        const subConf = (config as Record<string, any>)[key] as AIFeatureConfig | undefined;
+                        if (subConf && Object.keys(subConf).length > 0) {
+                            fc[key] = {
+                                provider: subConf.provider,
+                                apiKey: subConf.apiKey || "",
+                                model: subConf.model,
+                                customModelId: subConf.customModelId || ""
+                            };
+                        }
                     }
-                    setFeatureModels(fm);
-                    if (Object.values(fm).some(Boolean)) setShowFeatureModels(true);
+                    setFeatureConfigs(fc);
+                    if (Object.keys(fc).length > 0) setShowFeatureModels(true);
                 }
             } catch (e) {
                 setError(e instanceof Error ? e.message : "Failed to load AI configuration");
@@ -106,8 +85,8 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
         const models = AI_MODELS[newProvider];
         setModel(models[0]?.id || "");
         setCustomModelId("");
-        // Reset feature models when provider changes — different provider has different models
-        setFeatureModels({});
+        // Reset feature configs when global provider changes
+        setFeatureConfigs({});
     };
 
     const handleSave = async () => {
@@ -123,12 +102,12 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
                 apiKey: apiKey.trim(),
                 model,
                 ...(model === "custom" ? { customModelId: customModelId.trim() } : {}),
-                // Include per-feature overrides (only non-empty ones)
-                ...(featureModels.modelChat         ? { modelChat:          featureModels.modelChat }         : {}),
-                ...(featureModels.modelAgent        ? { modelAgent:         featureModels.modelAgent }        : {}),
-                ...(featureModels.modelTaskExplain  ? { modelTaskExplain:   featureModels.modelTaskExplain }  : {}),
-                ...(featureModels.modelHourEstimate ? { modelHourEstimate:  featureModels.modelHourEstimate } : {}),
-                ...(featureModels.modelTaskChatbot  ? { modelTaskChatbot:   featureModels.modelTaskChatbot }  : {}),
+                // Include per-feature object overrides
+                ...(featureConfigs.chatConfig         ? { chatConfig:         featureConfigs.chatConfig as AIFeatureConfig }         : {}),
+                ...(featureConfigs.agentConfig        ? { agentConfig:        featureConfigs.agentConfig as AIFeatureConfig }        : {}),
+                ...(featureConfigs.taskExplainConfig  ? { taskExplainConfig:  featureConfigs.taskExplainConfig as AIFeatureConfig }  : {}),
+                ...(featureConfigs.hourEstimateConfig ? { hourEstimateConfig: featureConfigs.hourEstimateConfig as AIFeatureConfig } : {}),
+                ...(featureConfigs.taskChatbotConfig  ? { taskChatbotConfig:  featureConfigs.taskChatbotConfig as AIFeatureConfig }  : {}),
             };
             await updateAgencyAIConfigSuperAdmin(agencyId, config);
             setIsConfigured(true);
@@ -148,7 +127,7 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
         try {
             await removeAgencyAIConfig(agencyId);
             setProvider("gemini"); setApiKey(""); setModel(""); setCustomModelId(""); setIsConfigured(false);
-            setFeatureModels({});
+            setFeatureConfigs({});
             setSuccess("AI configuration removed.");
             setTimeout(() => setSuccess(""), 3000);
         } catch (e) {
@@ -291,13 +270,12 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
                             Example: use a fast lightweight model for hour estimation and a powerful model for agent mode.
                         </p>
                         {FEATURE_LABELS.map(({ key, label, desc }) => (
-                            <FeatureModelSelect
+                            <FeatureConfigEditor
                                 key={key}
                                 label={label}
                                 desc={desc}
-                                value={featureModels[key] || ""}
-                                onChange={(v) => setFeatureModels((prev) => ({ ...prev, [key]: v }))}
-                                models={providerModels}
+                                value={featureConfigs[key]}
+                                onChange={(v) => setFeatureConfigs((prev) => ({ ...prev, [key]: v }))}
                             />
                         ))}
                     </div>

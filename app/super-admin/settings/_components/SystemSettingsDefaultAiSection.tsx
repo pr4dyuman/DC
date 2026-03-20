@@ -3,18 +3,19 @@
 import { useState } from "react";
 import { Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import { AIProvider } from "@/lib/types";
+import { FeatureConfigEditor, AIFeatureConfigState } from "./FeatureConfigEditor";
 
 type AiModelOption = { id: string; name: string; };
 
-type FeatureModelKey = "modelChat" | "modelAgent" | "modelTaskExplain" | "modelHourEstimate" | "modelTaskChatbot";
-export type FeatureModels = Partial<Record<FeatureModelKey, string>>;
+type FeatureModelKey = "chatConfig" | "agentConfig" | "taskExplainConfig" | "hourEstimateConfig" | "taskChatbotConfig";
+export type FeatureConfigs = Partial<Record<FeatureModelKey, AIFeatureConfigState>>;
 
 const FEATURE_LABELS: { key: FeatureModelKey; label: string; desc: string }[] = [
-    { key: "modelChat",         label: "Singularity Chat",     desc: "Conversational AI chat mode" },
-    { key: "modelAgent",        label: "Singularity Agent",    desc: "Tool-calling agent mode" },
-    { key: "modelTaskExplain",  label: "Task Explain/Enhance", desc: "AI task analysis & description enhancement" },
-    { key: "modelHourEstimate", label: "Hour Estimation",      desc: "AI-powered task hour estimation" },
-    { key: "modelTaskChatbot",  label: "Task Chatbot",         desc: "In-task AI assistant chat" },
+    { key: "chatConfig",         label: "Singularity Chat",     desc: "Conversational AI chat mode" },
+    { key: "agentConfig",        label: "Singularity Agent",    desc: "Tool-calling agent mode" },
+    { key: "taskExplainConfig",  label: "Task Explain/Enhance", desc: "AI task analysis & description enhancement" },
+    { key: "hourEstimateConfig", label: "Hour Estimation",      desc: "AI-powered task hour estimation" },
+    { key: "taskChatbotConfig",  label: "Task Chatbot",         desc: "In-task AI assistant chat" },
 ];
 
 interface DefaultAiState {
@@ -30,23 +31,23 @@ interface SystemSettingsDefaultAiSectionProps {
     defaultAiConfigured: boolean;
     savingDefaultAi: boolean;
     savedDefaultAi: string;
-    featureModels: FeatureModels;
+    featureConfigs: FeatureConfigs;
     onProviderChange: (provider: AIProvider) => void;
     onApiKeyChange: (apiKey: string) => void;
     onModelChange: (model: string) => void;
     onCustomModelIdChange: (customModelId: string) => void;
-    onFeatureModelChange: (key: FeatureModelKey, value: string) => void;
+    onFeatureConfigChange: (key: FeatureModelKey, value: AIFeatureConfigState | undefined) => void;
     onSave: () => void;
     onRemove: () => void;
 }
 
 export function SystemSettingsDefaultAiSection({
     defaultAi, availableModels, defaultAiConfigured, savingDefaultAi, savedDefaultAi,
-    featureModels, onProviderChange, onApiKeyChange, onModelChange, onCustomModelIdChange,
-    onFeatureModelChange, onSave, onRemove,
+    featureConfigs, onProviderChange, onApiKeyChange, onModelChange, onCustomModelIdChange,
+    onFeatureConfigChange, onSave, onRemove,
 }: SystemSettingsDefaultAiSectionProps) {
     const [showFeatureModels, setShowFeatureModels] = useState(
-        Object.values(featureModels).some(Boolean)
+        Object.values(featureConfigs).some(Boolean)
     );
 
     return (
@@ -125,20 +126,15 @@ export function SystemSettingsDefaultAiSection({
                         {showFeatureModels ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
                     </button>
                     {showFeatureModels && (
-                        <div className="border-t border-border px-3 py-2 space-y-2 bg-background/50">
-                            <p className="text-[10px] text-muted-foreground">Leave blank to use the default model above.</p>
-                            {FEATURE_LABELS.map(({ key, label }) => (
-                                <div key={key} className="flex items-center gap-2">
-                                    <span className="text-xs text-foreground w-36 shrink-0">{label}</span>
-                                    <select
-                                        value={featureModels[key] || ""}
-                                        onChange={(e) => onFeatureModelChange(key, e.target.value)}
-                                        className="flex-1 h-8 rounded-md border border-border bg-background px-2 text-xs focus:ring-1 focus:ring-purple-500 outline-none"
-                                    >
-                                        <option value="">Use default</option>
-                                        {availableModels.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                                    </select>
-                                </div>
+                        <div className="border-t border-border px-3 pb-3 space-y-0 bg-background/50">
+                            {FEATURE_LABELS.map(({ key, label, desc }) => (
+                                <FeatureConfigEditor
+                                    key={key}
+                                    label={label}
+                                    desc={desc}
+                                    value={featureConfigs[key]}
+                                    onChange={(v) => onFeatureConfigChange(key, v)}
+                                />
                             ))}
                         </div>
                     )}

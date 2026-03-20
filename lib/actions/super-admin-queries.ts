@@ -125,6 +125,15 @@ export async function getAgencyAIConfigSuperAdminImpl(agencyId: string): Promise
         const decrypted = decryptApiKey(config.apiKey);
         config.apiKey = decrypted.length > 4 ? '****' + decrypted.slice(-4) : '****';
     }
+    // Mask nested feature config API keys too
+    const featureKeys = ['chatConfig', 'agentConfig', 'taskExplainConfig', 'hourEstimateConfig', 'taskChatbotConfig'] as const;
+    for (const key of featureKeys) {
+        const fc = (config as Record<string, any>)[key];
+        if (fc?.apiKey) {
+            const decrypted = decryptApiKey(fc.apiKey);
+            fc.apiKey = decrypted.length > 4 ? '****' + decrypted.slice(-4) : '****';
+        }
+    }
     return config;
 }
 
@@ -140,6 +149,15 @@ export async function getDefaultAiConfigImpl(): Promise<AIConfig | null> {
     if (maskedConfig.apiKey) {
         const decrypted = decryptApiKey(maskedConfig.apiKey);
         maskedConfig.apiKey = decrypted.length > 4 ? '****' + decrypted.slice(-4) : '****';
+    }
+    // Mask nested feature config API keys too
+    const featureKeys = ['chatConfig', 'agentConfig', 'taskExplainConfig', 'hourEstimateConfig', 'taskChatbotConfig'] as const;
+    for (const key of featureKeys) {
+        const fc = (maskedConfig as Record<string, any>)[key];
+        if (fc?.apiKey) {
+            const decrypted = decryptApiKey(fc.apiKey);
+            fc.apiKey = decrypted.length > 4 ? '****' + decrypted.slice(-4) : '****';
+        }
     }
     return maskedConfig;
 }
