@@ -36,6 +36,15 @@ export const AI_MODELS: Record<AIProvider, { id: string; name: string }[]> = {
         { id: "deepseek/deepseek-r1", name: "DeepSeek R1" },
         { id: "custom", name: "Custom Model" },
     ],
+    groq: [
+        { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B" },
+        { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B" },
+        { id: "openai/gpt-oss-20b", name: "GPT-OSS 20B" },
+        { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B Instant" },
+        { id: "meta-llama/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B" },
+        { id: "qwen/qwen3-32b", name: "Qwen3 32B" },
+        { id: "custom", name: "Custom Model" },
+    ],
 };
 
 export type ChatMessage = {

@@ -31,6 +31,7 @@ export const OPENAI_COMPAT_BASE_URLS: Record<string, string> = {
     openai: "https://api.openai.com/v1",
     nvidia: "https://integrate.api.nvidia.com/v1",
     github: "https://models.inference.ai.azure.com",
+    groq: "https://api.groq.com/openai/v1",
 };
 
 export function isLiveModel(modelId: string): boolean {

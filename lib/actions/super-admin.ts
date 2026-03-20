@@ -324,7 +324,7 @@ export async function updateAgencyAIConfigSuperAdmin(agencyId: string, config: A
     }
 
     // Validate provider
-    const validProviders = ['gemini', 'openai', 'nvidia', 'github'];
+    const validProviders = ['gemini', 'openai', 'nvidia', 'github', 'groq'];
     if (!validProviders.includes(config.provider)) {
         throw new Error(`Invalid provider: ${config.provider}`);
     }
@@ -426,7 +426,7 @@ export async function saveDefaultAiConfig(config: AIConfig | null) {
         if (!config.provider || !config.model) {
             throw new Error("Provider and Model are required");
         }
-        const validProviders = ['gemini', 'openai', 'nvidia', 'github'];
+        const validProviders = ['gemini', 'openai', 'nvidia', 'github', 'groq'];
         if (!validProviders.includes(config.provider)) {
             throw new Error(`Invalid provider: ${config.provider}`);
         }

@@ -36,6 +36,13 @@ const PROVIDER_INFO: Record<AIProvider, { name: string; label: string; keyLabel:
         keyPlaceholder: "ghp_... or github_pat_...",
         description: "AI models via GitHub. Uses your PAT with models:read scope."
     },
+    groq: {
+        name: "Groq",
+        label: "Groq",
+        keyLabel: "API Key",
+        keyPlaceholder: "gsk_...",
+        description: "Ultra-fast LPU inference. Best for speed-critical workloads."
+    },
 };
 
 export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: string }> }) {

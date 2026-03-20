@@ -20,7 +20,7 @@ export type AgencyFeatures = {
     ssoEnabled: boolean;
 };
 
-export type AIProvider = "gemini" | "openai" | "nvidia" | "github";
+export type AIProvider = "gemini" | "openai" | "nvidia" | "github" | "groq";
 
 export type AIConfig = {
     provider: AIProvider;

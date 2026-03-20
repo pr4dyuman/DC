@@ -65,6 +65,7 @@ export function SystemSettingsDefaultAiSection({
                         <option value="openai">OpenAI</option>
                         <option value="nvidia">NVIDIA NIM</option>
                         <option value="github">GitHub Models</option>
+                        <option value="groq">Groq</option>
                     </select>
                 </div>
 
