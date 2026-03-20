@@ -160,6 +160,7 @@ export async function POST(req: NextRequest) {
                     fullPrompt,
                     filteredTools,
                     authenticatedUserId,
+                    agencyId: agency!.id,
                 });
             }
 

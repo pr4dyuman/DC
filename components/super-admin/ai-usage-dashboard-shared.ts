@@ -50,6 +50,7 @@ export const PROVIDER_COLORS: Record<string, string> = {
     openai: "#22c55e",
     nvidia: "#84cc16",
     github: "#6b7280",
+    groq: "#f97316",
 };
 
 export const PLAN_STYLES: Record<string, string> = {

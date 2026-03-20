@@ -27,6 +27,7 @@ type NonLiveAgentOptions = {
     fullPrompt: string;
     filteredTools: typeof SINGULARITY_TOOL_DECLARATIONS;
     authenticatedUserId: string;
+    agencyId: string;
 };
 
 type AgentImageInput = {
@@ -59,6 +60,7 @@ export async function handleNonLiveAgentMode({
     fullPrompt,
     filteredTools,
     authenticatedUserId,
+    agencyId,
 }: NonLiveAgentOptions): Promise<Response> {
     // Non-Gemini providers (Groq, OpenAI, NVIDIA, GitHub) use the OpenAI tool-calling format
     if (aiConfig.provider !== "gemini") {
@@ -69,6 +71,7 @@ export async function handleNonLiveAgentMode({
             fullPrompt,
             filteredTools,
             authenticatedUserId,
+            agencyId,
         });
     }
 
@@ -131,6 +134,13 @@ export async function handleNonLiveAgentMode({
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", text: errorMessage })}\n\n`));
             }
 
+            // Log usage (estimate tokens from prompt length since multi-turn chat doesn't expose final usage)
+            try {
+                const { logAIUsage: logNonLiveAgent } = await import("@/lib/ai-usage");
+                const estInput = Math.ceil((systemInstruction + fullPrompt).length / 4);
+                logNonLiveAgent({ agencyId, userId: authenticatedUserId, feature: "singularity-agent", model: modelId, provider: aiConfig.provider, inputTokens: estInput, outputTokens: 0, totalTokens: estInput });
+            } catch { }
+
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
             controller.close();
         },
@@ -146,6 +156,7 @@ async function handleOpenAICompatAgentMode({
     fullPrompt,
     filteredTools,
     authenticatedUserId,
+    agencyId,
 }: NonLiveAgentOptions): Promise<Response> {
     const { OPENAI_COMPAT_BASE_URLS, AI_TIMEOUT_MS, withTimeout } = await import("@/lib/ai-provider-shared");
     const baseUrl = OPENAI_COMPAT_BASE_URLS[aiConfig.provider];
@@ -199,6 +210,7 @@ async function handleOpenAICompatAgentMode({
                     { role: "system", content: systemInstruction },
                     { role: "user", content: fullPrompt },
                 ];
+                let totalInputTokens = 0, totalOutputTokens = 0;
 
                 for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
                     const response = await withTimeout(fetch(`${baseUrl}/chat/completions`, {
@@ -221,6 +233,11 @@ async function handleOpenAICompatAgentMode({
                     }
 
                     const data = await response.json();
+                    // Accumulate real token counts from API response
+                    if (data.usage) {
+                        totalInputTokens += data.usage.prompt_tokens || 0;
+                        totalOutputTokens += data.usage.completion_tokens || 0;
+                    }
                     const choice = data.choices?.[0];
                     const assistantMessage = choice?.message;
 
@@ -281,11 +298,16 @@ async function handleOpenAICompatAgentMode({
                     // If finish_reason is not tool_calls, we're done
                     if (choice?.finish_reason && choice.finish_reason !== "tool_calls") break;
                 }
+
+                // Log real token usage (accumulated from API responses across all rounds)
+                const { logAIUsage: logOAIAgent } = await import("@/lib/ai-usage");
+                logOAIAgent({ agencyId, userId: authenticatedUserId, feature: "singularity-agent", model: modelId, provider: aiConfig.provider, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, totalTokens: totalInputTokens + totalOutputTokens });
             } catch (error: unknown) {
                 const errorMessage = getErrorMessage(error, "Agent error");
                 console.error("[Singularity Agent OpenAI-compat] Error:", errorMessage);
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", text: errorMessage })}\n\n`));
             }
+
 
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
             controller.close();
