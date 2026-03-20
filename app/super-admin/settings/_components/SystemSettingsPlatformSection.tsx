@@ -1,12 +1,10 @@
 "use client";
 
 import { Check, Loader2 } from "lucide-react";
-import { CURRENCIES } from "@/lib/currency";
 
 interface PlatformSettings {
     name: string;
     supportEmail: string;
-    defaultCurrency: string;
 }
 
 interface SystemSettingsPlatformSectionProps {
@@ -45,21 +43,6 @@ export function SystemSettingsPlatformSection({
                         className="w-full h-10 rounded-lg border border-border bg-background px-4 text-sm text-foreground focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                     />
                 </div>
-                <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-muted-foreground mb-1.5">Default Currency</label>
-                    <select
-                        value={platform.defaultCurrency}
-                        onChange={(event) => onChange({ defaultCurrency: event.target.value })}
-                        className="w-full h-10 rounded-lg border border-border bg-background px-4 text-sm text-foreground focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                    >
-                        {CURRENCIES.map((currency) => (
-                            <option key={currency.code} value={currency.code}>
-                                {currency.code} ({currency.symbol}) - {currency.name}
-                            </option>
-                        ))}
-                    </select>
-                    <p className="text-xs text-muted-foreground mt-1">This currency is used across all dashboards, invoices, and reports</p>
-                </div>
             </div>
             <div className="flex items-center justify-between pt-2">
                 <p className="text-xs text-muted-foreground">These are the defaults for new agencies</p>
@@ -84,3 +67,4 @@ export function SystemSettingsPlatformSection({
         </>
     );
 }
+

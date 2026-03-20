@@ -38,11 +38,10 @@ export default function SystemSettingsPage() {
     const [saved, setSaved] = useState("");
     const [loading, setLoading] = useState(true);
 
-    // Platform state
+    // Platform state — currency is now per-agency; removed from here
     const [platform, setPlatform] = useState({
         name: "AgencyOS",
         supportEmail: "support@agencyos.com",
-        defaultCurrency: "USD",
     });
 
     // Security state
@@ -429,7 +428,7 @@ export default function SystemSettingsPage() {
                 isOpen={!!openSections.notifications}
                 onToggle={() => toggleSection('notifications')}
             >
-                                <SystemSettingsNotificationsSection
+                <SystemSettingsNotificationsSection
                     notificationDefaults={notificationDefaults}
                     updatingNotif={updatingNotif}
                     onToggle={handleNotifToggle}

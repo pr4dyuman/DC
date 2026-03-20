@@ -25,15 +25,18 @@ type SystemCurrencySettings = {
 export async function getAgencySettingsImpl(agency: Agency | null) {
     if (!agency) return null;
 
-    let systemCurrency = "USD";
-    try {
-        const sys = await SystemSettingsModel.findOne(
-            { key: "global" },
-            { "platform.defaultCurrency": 1 }
-        ).lean() as SystemCurrencySettings | null;
-        if (sys?.platform?.defaultCurrency) systemCurrency = sys.platform.defaultCurrency;
-    } catch {
-        // Fall back to the current hard-coded default if system settings are unavailable.
+    // Agency-specific currency takes priority; fall back to system default, then USD
+    let fallbackCurrency = "USD";
+    if (!agency.settings?.currency) {
+        try {
+            const sys = await SystemSettingsModel.findOne(
+                { key: "global" },
+                { "platform.defaultCurrency": 1 }
+            ).lean() as SystemCurrencySettings | null;
+            if (sys?.platform?.defaultCurrency) fallbackCurrency = sys.platform.defaultCurrency;
+        } catch {
+            // Fall back to USD if system settings are unavailable.
+        }
     }
 
     return {
@@ -41,11 +44,12 @@ export async function getAgencySettingsImpl(agency: Agency | null) {
         logo: agency.logo || "",
         primaryColor: agency.primaryColor,
         secondaryColor: agency.secondaryColor,
-        currency: systemCurrency,
+        currency: agency.settings?.currency || fallbackCurrency,
         emailNotificationsEnabled: agency.settings?.emailNotificationsEnabled ?? true,
         emailCategories: agency.settings?.emailCategories || {},
     };
 }
+
 
 export async function getAgencyAIConfigImpl(): Promise<AIConfig | null> {
     const config = await getAgencyAIConfigServer();
