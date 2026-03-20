@@ -27,10 +27,10 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
     const [submitting, setSubmitting] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
+    // password / confirmPassword are only used for the CREATE flow
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [passwordError, setPasswordError] = useState("");
-    const [changePasswordMode, setChangePasswordMode] = useState(false);
 
     const [formData, setFormData] = useState<ClientFormData>({
         name: "",
@@ -50,7 +50,6 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
             setPassword("");
             setConfirmPassword("");
             setPasswordError("");
-            setChangePasswordMode(false);
             setShowPassword(false);
             setShowConfirm(false);
             if (client) {
@@ -87,15 +86,14 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
         e.preventDefault();
         setPasswordError("");
 
-        // --- Password validation ---
         const isCreating = !client;
-        const isChangingPassword = isCreating || (changePasswordMode && password);
 
-        if (isCreating && !password) {
-            setPasswordError("Password is required to create a client account.");
-            return;
-        }
-        if (isChangingPassword && password) {
+        if (isCreating) {
+            // CREATE: password required, must match confirm
+            if (!password) {
+                setPasswordError("Password is required to create a client account.");
+                return;
+            }
             if (password.length < 8) {
                 setPasswordError("Password must be at least 8 characters.");
                 return;
@@ -104,16 +102,18 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
                 setPasswordError("Passwords do not match.");
                 return;
             }
+        } else {
+            // EDIT (admin reset): optional, single field — no confirm needed
+            if (formData.password && (formData.password as string).length < 8) {
+                setPasswordError("Password must be at least 8 characters.");
+                return;
+            }
         }
 
         setSubmitting(true);
         try {
             if (client) {
-                const updates: Partial<Client> = { ...formData };
-                if (changePasswordMode && password) {
-                    updates.password = password;
-                }
-                await updateClient(client.id, updates);
+                await updateClient(client.id, formData);
             } else {
                 await createClient({ ...formData, password });
             }
@@ -248,61 +248,23 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
                                     {passwordError && <p className="text-xs text-red-500">{passwordError}</p>}
                                 </div>
                             ) : (
-                                // Edit mode: optional change password
+                                // EDIT mode: same single-field "Reset Password" as employee admin edit
                                 <div className="space-y-3 pt-3 border-t border-border">
-                                    <div className="flex items-center justify-between">
-                                        <h4 className="text-sm font-semibold flex items-center gap-2">
-                                            <KeyRound className="h-4 w-4 text-muted-foreground" />
-                                            Change Password
-                                        </h4>
-                                        <button
-                                            type="button"
-                                            onClick={() => { setChangePasswordMode(v => !v); setPassword(""); setConfirmPassword(""); setPasswordError(""); }}
-                                            className="text-xs text-primary hover:underline"
-                                        >
-                                            {changePasswordMode ? "Cancel" : "Change"}
-                                        </button>
-                                    </div>
-                                    {changePasswordMode && (
-                                        <div className="space-y-3 animate-in fade-in slide-in-from-top-1">
-                                            <p className="text-xs text-muted-foreground">Leave blank to keep existing password.</p>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                <div className="space-y-1">
-                                                    <label className="text-xs font-medium">New Password</label>
-                                                    <div className="relative">
-                                                        <input
-                                                            type={showPassword ? "text" : "password"}
-                                                            value={password}
-                                                            onChange={e => setPassword(e.target.value)}
-                                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 pr-10 py-2 text-sm focus:ring-2 focus:ring-primary/20"
-                                                            placeholder="Min. 8 characters"
-                                                            autoComplete="new-password"
-                                                        />
-                                                        <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground">
-                                                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <label className="text-xs font-medium">Confirm New Password</label>
-                                                    <div className="relative">
-                                                        <input
-                                                            type={showConfirm ? "text" : "password"}
-                                                            value={confirmPassword}
-                                                            onChange={e => setConfirmPassword(e.target.value)}
-                                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 pr-10 py-2 text-sm focus:ring-2 focus:ring-primary/20"
-                                                            placeholder="Repeat password"
-                                                            autoComplete="new-password"
-                                                        />
-                                                        <button type="button" onClick={() => setShowConfirm(v => !v)} className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground">
-                                                            {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {passwordError && <p className="text-xs text-red-500">{passwordError}</p>}
-                                        </div>
+                                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pt-1">Reset Password</h4>
+                                    {passwordError && (
+                                        <p className="text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded-md">{passwordError}</p>
                                     )}
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-medium text-muted-foreground">New Password</label>
+                                        <input
+                                            type="password"
+                                            placeholder="Force reset — leave blank to keep current"
+                                            value={formData.password || ""}
+                                            onChange={e => setFormData({ ...formData, password: e.target.value })}
+                                            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary"
+                                            autoComplete="new-password"
+                                        />
+                                    </div>
                                 </div>
                             )}
 
