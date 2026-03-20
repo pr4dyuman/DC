@@ -263,13 +263,34 @@ export async function executeProjectTaskBulkTool(
 
             let startDate: Date;
             const requestedStartDate = getOptionalStringArg(args, "startDate");
+            let startDateWasEstimated = false;
             if (requestedStartDate) {
                 startDate = new Date(requestedStartDate);
+                if (isNaN(startDate.getTime())) startDate = new Date();
             } else {
                 const agencyId = await getRequiredAgencyId();
                 const projectId = getStringArg(args, "projectId");
-                const projectForDate = await ProjectModel.findOne({ id: projectId, agencyId }).lean() as Pick<Project, "createdAt"> | null;
-                startDate = projectForDate?.createdAt ? new Date(projectForDate.createdAt) : new Date();
+                const projectForDate = await ProjectModel.findOne({ id: projectId, agencyId }).lean() as Pick<Project, "createdAt" | "dueDate"> | null;
+
+                // If project.createdAt is within the last 24 hours, it's a freshly created project
+                // (e.g. the AI just created a historical project today). Don't trust createdAt 
+                // as the historical start — it will push all task dates to 2026.
+                const projectCreatedAt = projectForDate?.createdAt ? new Date(projectForDate.createdAt) : null;
+                const isJustCreated = projectCreatedAt && (Date.now() - projectCreatedAt.getTime() < 24 * 60 * 60 * 1000);
+
+                if (projectCreatedAt && !isJustCreated) {
+                    // Project was created in the past — trust its createdAt as the start
+                    startDate = projectCreatedAt;
+                } else if (projectForDate?.dueDate) {
+                    // Project was just created today but has a historical dueDate —
+                    // estimate start as 60 days before the due date
+                    startDate = new Date(projectForDate.dueDate);
+                    startDate.setDate(startDate.getDate() - 60);
+                    startDateWasEstimated = true;
+                } else {
+                    startDate = new Date();
+                    startDateWasEstimated = true;
+                }
             }
 
             const assigneeSchedule = new Map<string, Date>();
@@ -373,7 +394,8 @@ export async function executeProjectTaskBulkTool(
                 (failedTasks.length > 0 ? ` (${failedTasks.length} failed)` : "") +
                 ` | Phases: ${phaseSummary}` +
                 ` | Distribution: ${distSummary}` +
-                ` | Project timeline: ${startDate.toISOString().split("T")[0]} -> ${projectEndDate}`;
+                ` | Project timeline: ${startDate.toISOString().split("T")[0]} -> ${projectEndDate}` +
+                (startDateWasEstimated ? " ⚠️ startDate was estimated — pass startDate explicitly next time for accurate dates" : "");
 
             return {
                 success: true,

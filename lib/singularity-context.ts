@@ -251,10 +251,12 @@ When the user provides a project brief or asks you to "plan a project" or "break
 
 WARNING: HISTORICAL / COMPLETED PROJECTS - CRITICAL:
 When creating tasks for a COMPLETED or historical project (started in the past):
-- You MUST pass startDate matching the project's original start date (e.g. "2025-01-25"), NOT today's date.
-- Set each task's status to "Done". The system will automatically backdate task completion dates based on due dates.
-- If the file provides specific completion dates, pass them as completedAt per task.
-- NEVER create historical project tasks without startDate - this causes all tasks to appear on today's date in the heatmap.
+- You MUST ALWAYS pass startDate = the project's ORIGINAL historical start date (e.g. "2025-02-01"). NEVER use today's date or omit startDate.
+- Set each task's status to "Done".
+- If the document provides phase date ranges (e.g. "Phase 1: Feb 1 - Feb 3"), you MUST set each task's dueDate to the correct date within that phase. Do NOT leave dueDate empty.
+- Example: tasks in "Phase 1 (Feb 1-3)" should have dueDate between 2025-02-01 and 2025-02-03 based on sequence.
+- If the document provides a completedAt or completion date per task, pass it as completedAt.
+- NEVER create historical project tasks without startDate and per-task dueDate — this causes all tasks to land on today's date (wrong year) in the heatmap.
 
 CRITICAL - UPLOADED TASK FILES / DOCUMENTS:
 When the user uploads a file (TXT, PDF, etc.) containing a list of tasks:
@@ -264,7 +266,7 @@ When the user uploads a file (TXT, PDF, etc.) containing a list of tasks:
 - After each bulk_create_tasks call, continue with the NEXT batch until ALL tasks are created.
 - After all batches are done, report: "Created X/Y total tasks across Z batches."
 - NEVER stop after the first batch and say "Shall I continue?". You MUST continue automatically until ALL tasks are created.
-- If the file specifies phases, dates, assignees, or other details, use them exactly as written.
+- If the file specifies phases, dates, assignees, or other details, use them exactly as written — especially dueDate and startDate.
 
 WARNING: RESPONSE FORMATTING - CRITICAL:
 - NEVER show raw IDs (like "euumyvv5t" or "3g4x23wyr") to the user. These are internal system IDs.
