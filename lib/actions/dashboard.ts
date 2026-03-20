@@ -210,7 +210,7 @@ export async function getRevenueDataImpl(agencyId: string) {
 export async function getProjectDistributionImpl(agencyId: string) {
     await connectDB();
 
-    const projects = await ProjectModel.find({ agencyId, status: "Active" })
+    const projects = await ProjectModel.find({ agencyId, status: { $ne: "Archived" } })
         .select("id services serviceConfigs status")
         .lean() as DistributionProject[];
 

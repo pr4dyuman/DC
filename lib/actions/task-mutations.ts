@@ -46,10 +46,15 @@ export { addCommentImpl, deleteTaskImpl } from "./task-collaboration";
 async function ensureProjectServiceReferenceForTask(
     projectId: string,
     agencyId: string,
-    rawServiceRef: string
+    rawServiceRef: string,
+    assigneeId?: string
 ): Promise<ProjectServiceSnapshot | null> {
     const normalizedServiceRef = sanitizeName(String(rawServiceRef || ""), 200);
     if (!normalizedServiceRef) return null;
+
+    // Reject UUID-like strings — the AI sometimes passes IDs as category names
+    const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (UUID_PATTERN.test(normalizedServiceRef)) return null;
 
     const projectDoc = await ProjectModel.findOne({ id: projectId, agencyId })
         .select("id services serviceConfigs")
@@ -74,10 +79,19 @@ async function ensureProjectServiceReferenceForTask(
             agencyId,
             name: normalizedServiceRef,
             projectId,
-            employees: [],
+            employees: assigneeId ? [assigneeId] : [],
         };
         await ServiceModel.create(resolvedService);
         existingServices.push(resolvedService);
+    } else if (assigneeId) {
+        // Add assignee to existing service if not already a member
+        const currentEmployees = resolvedService.employees || [];
+        if (!currentEmployees.includes(assigneeId)) {
+            await ServiceModel.updateOne(
+                { id: resolvedService.id, agencyId },
+                { $addToSet: { employees: assigneeId } }
+            );
+        }
     }
 
     const activeServices = getActiveProjectServiceDocs(projectDoc.services, existingServices);
@@ -126,7 +140,7 @@ export async function createTaskImpl(
     }
 
     if (task.category) {
-        const canonicalService = await ensureProjectServiceReferenceForTask(task.projectId, agency.id, task.category);
+        const canonicalService = await ensureProjectServiceReferenceForTask(task.projectId, agency.id, task.category, task.assigneeId);
         if (canonicalService?.name) task.category = canonicalService.name;
     }
 
@@ -333,7 +347,8 @@ export async function updateTaskImpl(
         ? updates.category
         : (updates.projectId ? task.category : undefined);
     if (targetProjectId && categoryToSync) {
-        const canonicalService = await ensureProjectServiceReferenceForTask(targetProjectId, agency.id, categoryToSync);
+        const resolvedAssigneeId = Object.prototype.hasOwnProperty.call(updates, "assigneeId") ? updates.assigneeId : task.assigneeId;
+        const canonicalService = await ensureProjectServiceReferenceForTask(targetProjectId, agency.id, categoryToSync, resolvedAssigneeId);
         if (canonicalService?.name) {
             updates.category = canonicalService.name;
         }
