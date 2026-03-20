@@ -143,7 +143,8 @@ export function buildContributionStats(
             && (action.includes("done") || action.includes("completed") || action.includes("fixed") || action.includes("finished"))
         ) {
             const currentStored = taskCompletionTimes.get(title);
-            if (!currentStored || activity.timestamp > currentStored) {
+            // Keep the EARLIEST completion date — backdated runs should always win over stale 2026 entries
+            if (!currentStored || activity.timestamp < currentStored) {
                 taskCompletionTimes.set(title, activity.timestamp);
             }
         }

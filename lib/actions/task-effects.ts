@@ -33,6 +33,19 @@ export async function handleTaskStatusChangeEffectsImpl({
     completedAt,
 }: TaskEffectArgs) {
     const activityTimestamp = completedAt ? new Date(completedAt).toISOString() : new Date().toISOString();
+
+    // When backdating a Done status: remove old "moved task to Done" activity entries
+    // for this specific task so only the backdated timestamp wins in the heatmap logic.
+    if (completedAt && currentTask.status === "Done") {
+        await ActivityModel.deleteMany({
+            agencyId: agency.id,
+            userId,
+            entityId: currentTask.id,
+            entityType: "task",
+            action: /moved task to Done/,
+        });
+    }
+
     await ActivityModel.create({
         id: generateId(),
         agencyId: agency.id,
