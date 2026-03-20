@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Settings, Sparkles } from "lucide-react";
-import { getClients, createClient, updateProject, deleteProject, getProjectAssets, toggleAssetAI, getProject, getAgencyAIConfig } from "@/lib/actions";
+import { getClients, updateProject, deleteProject, getProjectAssets, toggleAssetAI, getProject, getAgencyAIConfig } from "@/lib/actions";
 import { Client, Asset, Project } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -30,9 +30,7 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId }
     const [clients, setClients] = useState<Client[]>([]);
     const [selectedClientId, setSelectedClientId] = useState(currentClientId || "");
     const [name, setName] = useState("");
-    const [isCreatingClient, setIsCreatingClient] = useState(false);
     const [isEditingSelection, setIsEditingSelection] = useState(!currentClientId);
-    const [newClient, setNewClient] = useState({ name: "", email: "", companyName: "", password: "" });
     const [clientLoading, setClientLoading] = useState(false);
 
     // AI State
@@ -112,18 +110,6 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId }
         }
     };
 
-    const handleCreateClient = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setClientLoading(true);
-        const created = await createClient(newClient);
-        setClients([...clients, created]);
-        await handleAssignClient(created.id);
-        setIsCreatingClient(false);
-        setNewClient({ name: "", email: "", companyName: "", password: "" });
-    };
-
-
-
     const handleToggleAsset = async (assetId: string, currentState: boolean | undefined) => {
         if (!aiConfigured) return;
 
@@ -191,20 +177,14 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId }
                             name={name}
                             currentClient={currentClient}
                             isEditingSelection={isEditingSelection}
-                            isCreatingClient={isCreatingClient}
                             selectedClientId={selectedClientId}
                             clients={clients}
-                            newClient={newClient}
                             clientLoading={clientLoading}
                             onUpdateStatus={handleUpdateStatus}
                             onNameChange={setName}
                             onUpdateName={handleUpdateName}
                             onStartEditingSelection={() => setIsEditingSelection(true)}
                             onAssignClient={handleAssignClient}
-                            onStartCreatingClient={() => setIsCreatingClient(true)}
-                            onCancelCreatingClient={() => setIsCreatingClient(false)}
-                            onCreateClient={handleCreateClient}
-                            onNewClientFieldChange={(field, value) => setNewClient((prev) => ({ ...prev, [field]: value }))}
                         />
                     </TabsContent>
 

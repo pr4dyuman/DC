@@ -4,14 +4,8 @@ import type { FormEvent } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import type { Client, Project } from "@/lib/types";
-import { Check, Mail, Pencil, Plus, ShieldAlert, Users } from "lucide-react";
-
-type NewClientDraft = {
-    name: string;
-    email: string;
-    companyName: string;
-    password: string;
-};
+import { Check, ExternalLink, Mail, Pencil, Plus, ShieldAlert, Users } from "lucide-react";
+import Link from "next/link";
 
 interface ProjectSettingsGeneralTabProps {
     status: Project["status"] | "";
@@ -20,20 +14,14 @@ interface ProjectSettingsGeneralTabProps {
     name: string;
     currentClient?: Client;
     isEditingSelection: boolean;
-    isCreatingClient: boolean;
     selectedClientId: string;
     clients: Client[];
-    newClient: NewClientDraft;
     clientLoading: boolean;
     onUpdateStatus: (status: Project["status"]) => void;
     onNameChange: (value: string) => void;
     onUpdateName: () => void;
     onStartEditingSelection: () => void;
     onAssignClient: (clientId: string) => void;
-    onStartCreatingClient: () => void;
-    onCancelCreatingClient: () => void;
-    onCreateClient: (event: FormEvent<HTMLFormElement>) => void;
-    onNewClientFieldChange: (field: keyof NewClientDraft, value: string) => void;
 }
 
 export function ProjectSettingsGeneralTab({
@@ -43,20 +31,14 @@ export function ProjectSettingsGeneralTab({
     name,
     currentClient,
     isEditingSelection,
-    isCreatingClient,
     selectedClientId,
     clients,
-    newClient,
     clientLoading,
     onUpdateStatus,
     onNameChange,
     onUpdateName,
     onStartEditingSelection,
     onAssignClient,
-    onStartCreatingClient,
-    onCancelCreatingClient,
-    onCreateClient,
-    onNewClientFieldChange,
 }: ProjectSettingsGeneralTabProps) {
     return (
         <div className="flex-1 overflow-y-auto p-6 space-y-6 mt-0">
@@ -145,81 +127,43 @@ export function ProjectSettingsGeneralTab({
                     </div>
                 ) : (
                     <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                        {!isCreatingClient ? (
-                            <div className="space-y-3">
-                                <div className="grid gap-2">
-                                    <label className="text-sm font-medium">Select Existing Client</label>
-                                    <select
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                        value={selectedClientId}
-                                        onChange={(event) => onAssignClient(event.target.value)}
-                                    >
-                                        <option value="">Select a Client...</option>
-                                        {clients.map((client) => (
-                                            <option key={client.id} value={client.id}>
-                                                {client.companyName} ({client.name})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="relative">
-                                    <div className="absolute inset-0 flex items-center">
-                                        <span className="w-full border-t" />
-                                    </div>
-                                    <div className="relative flex justify-center text-xs uppercase">
-                                        <span className="bg-background px-2 text-muted-foreground">Or</span>
-                                    </div>
-                                </div>
-                                <Button variant="outline" className="w-full gap-2 border-dashed" onClick={onStartCreatingClient}>
-                                    <Plus className="h-4 w-4" />
-                                    Add New Client
-                                </Button>
+                        <div className="space-y-3">
+                            <div className="grid gap-2">
+                                <label className="text-sm font-medium">Select Existing Client</label>
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                    value={selectedClientId}
+                                    onChange={(event) => onAssignClient(event.target.value)}
+                                    disabled={clientLoading}
+                                >
+                                    <option value="">Select a Client...</option>
+                                    {clients.map((client) => (
+                                        <option key={client.id} value={client.id}>
+                                            {client.companyName} ({client.name})
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
-                        ) : (
-                            <form onSubmit={onCreateClient} className="space-y-4 bg-muted/30 p-4 rounded-lg border border-border/50">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="font-medium">New Client Details</h4>
-                                    <Button variant="ghost" size="sm" onClick={onCancelCreatingClient}>
-                                        Cancel
-                                    </Button>
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <span className="w-full border-t" />
                                 </div>
-                                <div className="grid gap-2">
-                                    <input
-                                        required
-                                        className="flex h-9 w-full rounded-md border border-input px-3 py-1"
-                                        placeholder="Company Name"
-                                        value={newClient.companyName}
-                                        onChange={(event) => onNewClientFieldChange("companyName", event.target.value)}
-                                    />
-                                    <input
-                                        required
-                                        className="flex h-9 w-full rounded-md border border-input px-3 py-1"
-                                        placeholder="Contact Name"
-                                        value={newClient.name}
-                                        onChange={(event) => onNewClientFieldChange("name", event.target.value)}
-                                    />
-                                    <input
-                                        type="email"
-                                        required
-                                        className="flex h-9 w-full rounded-md border border-input px-3 py-1"
-                                        placeholder="Email"
-                                        value={newClient.email}
-                                        onChange={(event) => onNewClientFieldChange("email", event.target.value)}
-                                    />
-                                    <input
-                                        type="password"
-                                        required
-                                        className="flex h-9 w-full rounded-md border border-input px-3 py-1"
-                                        placeholder="Password"
-                                        value={newClient.password}
-                                        onChange={(event) => onNewClientFieldChange("password", event.target.value)}
-                                    />
+                                <div className="relative flex justify-center text-xs uppercase">
+                                    <span className="bg-background px-2 text-muted-foreground">Or</span>
                                 </div>
-                                <Button type="submit" disabled={clientLoading} className="w-full">
-                                    {clientLoading ? "Creating..." : "Create & Assign"}
+                            </div>
+                            {/* Redirect to the real Clients page to create a new client */}
+                            <Link href="/dashboard/clients" target="_blank">
+                                <Button variant="outline" className="w-full gap-2 border-dashed" type="button">
+                                    <Plus className="h-4 w-4" />
+                                    Create New Client
+                                    <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
                                 </Button>
-                            </form>
-                        )}
+                            </Link>
+                            <p className="text-xs text-muted-foreground text-center">
+                                Create the client on the Clients page, then come back and select them here.
+                            </p>
+                        </div>
                     </div>
                 )}
             </div>
