@@ -40,15 +40,24 @@ export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
         if (!editingConfig || !formConfig) return;
         setLoading(true);
         try {
-            await updateProjectPayment(project.id, editingConfig.serviceId, {
-                ...formConfig,
-                paymentDetailsLater: false
-            });
+            // Build installmentDates array from firstPaymentDate + count (monthly spacing)
+            let finalConfig: PaymentConfig = { ...formConfig, paymentDetailsLater: false };
+            if (formConfig.type === 'installment' && formConfig.firstPaymentDate) {
+                const count = formConfig.installments || 1;
+                const dates: string[] = [];
+                for (let i = 0; i < count; i++) {
+                    const d = new Date(formConfig.firstPaymentDate);
+                    d.setMonth(d.getMonth() + i);
+                    dates.push(d.toISOString().split('T')[0]);
+                }
+                finalConfig = { ...finalConfig, installmentDates: dates };
+            }
+            await updateProjectPayment(project.id, editingConfig.serviceId, finalConfig);
             toast.success(`Payment settings updated for ${editingConfig.name}`);
             setEditingConfig(null);
         } catch (error) {
-            console.error("Failed to update payment", error);
-            toast.error("Failed to update payment settings");
+            console.error('Failed to update payment', error);
+            toast.error('Failed to update payment settings');
         } finally {
             setLoading(false);
         }

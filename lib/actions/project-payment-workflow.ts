@@ -127,10 +127,23 @@ export async function updateProjectPaymentImpl(
         const cfg = svcCfg.paymentConfig;
         if (!cfg) continue;
 
-        if (cfg.type === "installment" && Array.isArray(cfg.installmentDates) && cfg.installmentDates.length > 0) {
+        // Derive installmentDates from firstPaymentDate+count if not set (legacy data)
+        let installmentDates = Array.isArray(cfg.installmentDates) && cfg.installmentDates.length > 0
+            ? cfg.installmentDates
+            : [];
+        if (installmentDates.length === 0 && cfg.type === "installment" && cfg.firstPaymentDate) {
+            const count = cfg.installments || 1;
+            for (let i = 0; i < count; i++) {
+                const d = new Date(cfg.firstPaymentDate);
+                d.setMonth(d.getMonth() + i);
+                installmentDates.push(d.toISOString().split("T")[0]);
+            }
+        }
+
+        if (cfg.type === "installment" && installmentDates.length > 0) {
             const amountPerInstallment = cfg.installmentAmount
-                || Math.round(projectBudget / totalServiceCount / cfg.installmentDates.length);
-            for (const installmentDate of cfg.installmentDates) {
+                || Math.round(projectBudget / totalServiceCount / installmentDates.length);
+            for (const installmentDate of installmentDates) {
                 newInvoices.push({
                     id: generateId(),
                     projectId,
