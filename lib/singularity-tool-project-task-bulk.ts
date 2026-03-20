@@ -72,16 +72,16 @@ export async function executeProjectTaskBulkTool(
             const perTaskDates: Record<string, string> = {};
             const projectId = getOptionalStringArg(args, "projectId");
             const completedAt = getOptionalStringArg(args, "completedAt");
+            const isAutoBackdate = getBooleanArg(args, "autoBackdate");
 
             if (projectId && taskIdsToUpdate.length === 0) {
                 const projectTasks = await getTasks(projectId);
-                const isAutoBackdate = getBooleanArg(args, "autoBackdate");
                 const filtered = (getBooleanArg(args, "force") || isAutoBackdate)
                     ? projectTasks
                     : projectTasks.filter((task) => task.status !== targetStatus);
                 taskIdsToUpdate = filtered.map((task) => task.id);
 
-                if (getBooleanArg(args, "autoBackdate") && targetStatus === "Done") {
+                if (isAutoBackdate && targetStatus === "Done") {
                     for (const task of filtered) {
                         if (task.dueDate) {
                             const due = new Date(task.dueDate);
@@ -89,6 +89,24 @@ export async function executeProjectTaskBulkTool(
                             perTaskDates[task.id] = due.toISOString().split("T")[0];
                         }
                     }
+                }
+            }
+
+            // FIX: If individual taskIds were given + autoBackdate, fetch their dueDates now
+            if (isAutoBackdate && targetStatus === "Done" && taskIdsToUpdate.length > 0 && Object.keys(perTaskDates).length === 0) {
+                const agencyId = await getRequiredAgencyId();
+                const taskDocs = await Promise.all(
+                    taskIdsToUpdate.map((id) => TaskModel.findOne({ id, agencyId }, { id: 1, dueDate: 1 }).lean() as Promise<Pick<Task, "id" | "dueDate"> | null>)
+                );
+                for (const doc of taskDocs) {
+                    if (doc?.id && doc.dueDate) {
+                        const due = new Date(doc.dueDate);
+                        due.setDate(due.getDate() + Math.floor(Math.random() * 2) + 1);
+                        perTaskDates[doc.id] = due.toISOString().split("T")[0];
+                    }
+                }
+                if (Object.keys(perTaskDates).length > 0) {
+                    console.log(`[bulk_update_task_status] autoBackdate: fetched dueDates for ${Object.keys(perTaskDates).length} tasks (taskIds path)`);
                 }
             }
 
