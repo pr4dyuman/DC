@@ -97,12 +97,17 @@ export function getActiveProjectServiceDocs<T extends ProjectServiceSnapshot>(
     const serviceByName = new Map(serviceDocs.map((service) => [String(service.name).toLowerCase(), service] as const));
     const activeServices: T[] = [];
     const seen = new Set<string>();
+    const seenNames = new Set<string>();
 
     for (const rawRef of projectServiceRefs) {
         const ref = String(rawRef || "");
         const service = serviceById.get(ref) || serviceByName.get(ref.toLowerCase());
         if (!service || seen.has(service.id)) continue;
+        // Deduplicate by name (case-insensitive) — prevents duplicate "web development" entries
+        const nameKey = service.name.toLowerCase();
+        if (seenNames.has(nameKey)) continue;
         seen.add(service.id);
+        seenNames.add(nameKey);
         activeServices.push(service);
     }
 

@@ -33,9 +33,17 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
     const fmt = useDateFormat();
     const { format: formatMoney } = useCurrency();
     const projectServices = project.services || [];
-    const filteredCategories = categories.filter(c =>
+    const matchedCategories = categories.filter(c =>
         c.projectId === project.id && (projectServices.includes(c.id) || projectServices.includes(c.name))
     );
+    // Deduplicate by name (case-insensitive) — keeps first match per name
+    const seenNames = new Set<string>();
+    const filteredCategories = matchedCategories.filter(c => {
+        const key = c.name.toLowerCase();
+        if (seenNames.has(key)) return false;
+        seenNames.add(key);
+        return true;
+    });
     const [selectedCategory, setSelectedCategory] = useState<string>("All");
     const [showTeamHours, setShowTeamHours] = useState(false);
     const effectivePermissions = permissions ?? getDefaultUserPermissionsForRole(currentUser?.role);
@@ -196,15 +204,14 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                             })()}
 
                             {/* Service filter badges */}
-                            {project.services && project.services.length > 0 && (
+                            {filteredCategories.length > 0 && (
                                 <div className="flex flex-wrap gap-1.5">
-                                    {project.services.map((svc: string) => {
-                                        const serviceObj = filteredCategories.find(c => c.id === svc);
-                                        const displayName = serviceObj ? serviceObj.name : svc;
+                                    {filteredCategories.map((service) => {
+                                        const displayName = service.name;
                                         return (
                                             <button
                                                 type="button"
-                                                key={svc}
+                                                key={service.id}
                                                 aria-pressed={selectedCategory === displayName}
                                                 className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold transition-colors ${selectedCategory === displayName ? "bg-primary/15 text-primary hover:bg-primary/25 border-primary/30" : "text-muted-foreground hover:bg-muted border-border/50"}`}
                                                 onClick={() => setSelectedCategory(displayName)}
