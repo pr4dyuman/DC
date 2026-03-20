@@ -149,6 +149,10 @@ export async function updateClientImpl(id: string, updates: Partial<Client>, age
     if (updates.email) updates.email = validateEmail(updates.email);
     if (updates.phone) updates.phone = sanitizePhone(updates.phone);
     if (updates.username) updates.username = sanitizeUsername(updates.username);
+    if (updates.password) {
+        await validatePasswordWithPolicy(updates.password);
+        updates.password = await hashPassword(updates.password);
+    }
 
     if (updates.name) {
         const oldClient = await ClientModel.findOne({ id, agencyId }).select("name").lean() as Pick<Client, "name"> | null;

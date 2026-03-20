@@ -6,7 +6,7 @@ import Image from "next/image";
 import { Client } from "@/lib/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Loader2 } from "lucide-react";
 import { createClient, updateClient } from "@/lib/actions";
 import { toast } from "sonner";
 
@@ -21,15 +21,23 @@ interface EditClientDialogProps {
     onSuccess?: () => void;
 }
 
+type ClientFormData = Omit<Client, "id" | "agencyId"> & { password?: string };
+
 export function EditClientDialog({ client, open, onOpenChange, onSuccess }: EditClientDialogProps) {
     const [submitting, setSubmitting] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [passwordError, setPasswordError] = useState("");
+    const [changePasswordMode, setChangePasswordMode] = useState(false);
 
-    const [formData, setFormData] = useState<Omit<Client, "id" | "agencyId">>({
+    const [formData, setFormData] = useState<ClientFormData>({
         name: "",
         username: "",
         email: "",
         companyName: "",
-        role: "client", // Fixed role
+        role: "client",
         phone: "",
         address: "",
         logo: "",
@@ -39,6 +47,12 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
 
     useEffect(() => {
         if (open) {
+            setPassword("");
+            setConfirmPassword("");
+            setPasswordError("");
+            setChangePasswordMode(false);
+            setShowPassword(false);
+            setShowConfirm(false);
             if (client) {
                 setFormData({
                     name: client.name,
@@ -71,29 +85,56 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setPasswordError("");
+
+        // --- Password validation ---
+        const isCreating = !client;
+        const isChangingPassword = isCreating || (changePasswordMode && password);
+
+        if (isCreating && !password) {
+            setPasswordError("Password is required to create a client account.");
+            return;
+        }
+        if (isChangingPassword && password) {
+            if (password.length < 8) {
+                setPasswordError("Password must be at least 8 characters.");
+                return;
+            }
+            if (password !== confirmPassword) {
+                setPasswordError("Passwords do not match.");
+                return;
+            }
+        }
+
         setSubmitting(true);
         try {
             if (client) {
-                await updateClient(client.id, formData);
+                const updates: Partial<Client> = { ...formData };
+                if (changePasswordMode && password) {
+                    updates.password = password;
+                }
+                await updateClient(client.id, updates);
             } else {
-                await createClient(formData);
+                await createClient({ ...formData, password });
             }
             if (onSuccess) onSuccess();
             onOpenChange(false);
         } catch (error) {
-            toast.error(getErrorMessage(error, 'An error occurred'));
+            toast.error(getErrorMessage(error, "An error occurred"));
         } finally {
             setSubmitting(false);
         }
     };
 
+    const isCreating = !client;
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[600px] bg-card border-border">
+            <DialogContent className="sm:max-w-[620px] bg-card border-border max-h-[90dvh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>{client ? 'Edit Client' : 'Add New Client'}</DialogTitle>
+                    <DialogTitle>{client ? "Edit Client" : "Add New Client"}</DialogTitle>
                     <DialogDescription>
-                        {client ? 'Update client details.' : 'Add a new client to the system.'}
+                        {client ? "Update client details." : "Create a new client account. They will be able to log in using their email and password."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -119,13 +160,11 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
                                             const file = e.target.files?.[0];
                                             if (file) {
                                                 if (file.size > 2 * 1024 * 1024) {
-                                                    toast.error('Image must be under 2MB');
+                                                    toast.error("Image must be under 2MB");
                                                     return;
                                                 }
                                                 const reader = new FileReader();
-                                                reader.onloadend = () => {
-                                                    setFormData({ ...formData, logo: reader.result as string });
-                                                };
+                                                reader.onloadend = () => setFormData({ ...formData, logo: reader.result as string });
                                                 reader.readAsDataURL(file);
                                             }
                                         }}
@@ -157,13 +196,117 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
                                     <input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })}
                                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20" placeholder="+1 234 567 890" />
                                 </div>
-                                <div className="col-span-2 space-y-2">
+                                <div className="space-y-2">
                                     <label className="text-sm font-medium">Address</label>
                                     <input value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })}
                                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20" placeholder="123 Business St, City" />
                                 </div>
                             </div>
 
+                            {/* ── Password section ── */}
+                            {isCreating ? (
+                                <div className="space-y-3 pt-3 border-t border-border">
+                                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                                        <KeyRound className="h-4 w-4 text-muted-foreground" />
+                                        Login Password
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground">The client will use their email + this password to log in.</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-medium">Password <span className="text-red-500">*</span></label>
+                                            <div className="relative">
+                                                <input
+                                                    required
+                                                    type={showPassword ? "text" : "password"}
+                                                    value={password}
+                                                    onChange={e => setPassword(e.target.value)}
+                                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 pr-10 py-2 text-sm focus:ring-2 focus:ring-primary/20"
+                                                    placeholder="Min. 8 characters"
+                                                />
+                                                <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground">
+                                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-medium">Confirm Password <span className="text-red-500">*</span></label>
+                                            <div className="relative">
+                                                <input
+                                                    required
+                                                    type={showConfirm ? "text" : "password"}
+                                                    value={confirmPassword}
+                                                    onChange={e => setConfirmPassword(e.target.value)}
+                                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 pr-10 py-2 text-sm focus:ring-2 focus:ring-primary/20"
+                                                    placeholder="Repeat password"
+                                                />
+                                                <button type="button" onClick={() => setShowConfirm(v => !v)} className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground">
+                                                    {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {passwordError && <p className="text-xs text-red-500">{passwordError}</p>}
+                                </div>
+                            ) : (
+                                // Edit mode: optional change password
+                                <div className="space-y-3 pt-3 border-t border-border">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-sm font-semibold flex items-center gap-2">
+                                            <KeyRound className="h-4 w-4 text-muted-foreground" />
+                                            Change Password
+                                        </h4>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setChangePasswordMode(v => !v); setPassword(""); setConfirmPassword(""); setPasswordError(""); }}
+                                            className="text-xs text-primary hover:underline"
+                                        >
+                                            {changePasswordMode ? "Cancel" : "Change"}
+                                        </button>
+                                    </div>
+                                    {changePasswordMode && (
+                                        <div className="space-y-3 animate-in fade-in slide-in-from-top-1">
+                                            <p className="text-xs text-muted-foreground">Leave blank to keep existing password.</p>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-medium">New Password</label>
+                                                    <div className="relative">
+                                                        <input
+                                                            type={showPassword ? "text" : "password"}
+                                                            value={password}
+                                                            onChange={e => setPassword(e.target.value)}
+                                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 pr-10 py-2 text-sm focus:ring-2 focus:ring-primary/20"
+                                                            placeholder="Min. 8 characters"
+                                                            autoComplete="new-password"
+                                                        />
+                                                        <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground">
+                                                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-medium">Confirm New Password</label>
+                                                    <div className="relative">
+                                                        <input
+                                                            type={showConfirm ? "text" : "password"}
+                                                            value={confirmPassword}
+                                                            onChange={e => setConfirmPassword(e.target.value)}
+                                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 pr-10 py-2 text-sm focus:ring-2 focus:ring-primary/20"
+                                                            placeholder="Repeat password"
+                                                            autoComplete="new-password"
+                                                        />
+                                                        <button type="button" onClick={() => setShowConfirm(v => !v)} className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground">
+                                                            {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {passwordError && <p className="text-xs text-red-500">{passwordError}</p>}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Legal Details */}
                             <div className="space-y-4 pt-2 border-t border-border">
                                 <h4 className="text-sm font-semibold text-muted-foreground">Legal Details</h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -182,10 +325,7 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
                                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                                     const file = e.target.files?.[0];
                                                     if (file) {
-                                                        if (file.size > 2 * 1024 * 1024) {
-                                                            toast.error('Image must be under 2MB');
-                                                            return;
-                                                        }
+                                                        if (file.size > 2 * 1024 * 1024) { toast.error("Image must be under 2MB"); return; }
                                                         const reader = new FileReader();
                                                         reader.onloadend = () => setFormData({ ...formData, adharCardImage: reader.result as string });
                                                         reader.readAsDataURL(file);
@@ -209,10 +349,7 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
                                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                                     const file = e.target.files?.[0];
                                                     if (file) {
-                                                        if (file.size > 2 * 1024 * 1024) {
-                                                            toast.error('Image must be under 2MB');
-                                                            return;
-                                                        }
+                                                        if (file.size > 2 * 1024 * 1024) { toast.error("Image must be under 2MB"); return; }
                                                         const reader = new FileReader();
                                                         reader.onloadend = () => setFormData({ ...formData, panCardImage: reader.result as string });
                                                         reader.readAsDataURL(file);
@@ -236,6 +373,6 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
                     </div>
                 </form>
             </DialogContent>
-        </Dialog >
+        </Dialog>
     );
 }
