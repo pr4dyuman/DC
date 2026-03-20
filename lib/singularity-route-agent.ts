@@ -201,6 +201,7 @@ async function handleOpenAICompatAgentMode({
                 ];
 
                 for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+                    console.log(`[Singularity OpenAI-compat] Round ${round + 1} | provider: ${aiConfig.provider} | model: ${modelId} | tools: ${openAITools.length} | messages: ${messages.length}`);
                     const response = await withTimeout(fetch(`${baseUrl}/chat/completions`, {
                         method: "POST",
                         headers: {
@@ -217,7 +218,8 @@ async function handleOpenAICompatAgentMode({
 
                     if (!response.ok) {
                         const errorBody = await response.text().catch(() => "Unknown error");
-                        throw new Error(`AI Provider Error (${aiConfig.provider}): ${response.status} – ${errorBody}`);
+                        console.error(`[Singularity OpenAI-compat] HTTP ${response.status} from ${aiConfig.provider}:`, errorBody);
+                        throw new Error(`AI Provider Error (${aiConfig.provider} / ${modelId}): ${response.status} – ${errorBody}`);
                     }
 
                     const data = await response.json();

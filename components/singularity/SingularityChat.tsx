@@ -401,8 +401,9 @@ export function SingularityChat({ userId, agencyName = 'Agency OS' }: { userId?:
                             } else if (data.type === 'rechecking') {
                                 setStreamingPhase('rechecking');
                             } else if (data.type === 'error') {
+                                const errText = data.text || 'An error occurred. Please try again.';
                                 setMessages(prev => prev.map(m =>
-                                    m.id === msgId ? { ...m, content: 'An error occurred. Please try again.', isStreaming: false } : m
+                                    m.id === msgId ? { ...m, content: `⚠️ ${errText}`, isStreaming: false } : m
                                 ));
                             }
                         } catch { }
