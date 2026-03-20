@@ -7,6 +7,7 @@ export const AI_MODELS: Record<AIProvider, { id: string; name: string }[]> = {
         { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
         { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite (Free Tier)" },
         { id: "gemini-2.5-flash-native-audio-preview-12-2025", name: "Gemini Live (Unlimited Free)" },
+        { id: "gemini-3-flash-preview", name: "Gemini 3 Flash Preview" },
         { id: "gemini-3.1-flash-lite-preview", name: "Gemini 3.1 Flash-Lite Preview" },
         { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
         { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro" },
