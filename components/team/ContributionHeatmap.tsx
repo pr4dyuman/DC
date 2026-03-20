@@ -28,6 +28,7 @@ const COLORS = {
 
 export function ContributionHeatmap({ data, className, leaveDates = [], tooltipLabel = "completed", year = new Date().getFullYear() }: ContributionHeatmapProps & { year?: number }) {
     const fmt = useDateFormat();
+
     // 1. Generate Calendar Grid (Fixed Year)
     const calendarData = useMemo(() => {
         const dates: Date[] = [];
@@ -35,26 +36,15 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
         const endDate = new Date(year, 11, 31);
 
         // Adjust to start of the week (Sunday)
-        const dayOfWeek = startDate.getDay(); // 0 is Sun
-        const startOffset = dayOfWeek; // Days to go back to reach Sunday
+        const dayOfWeek = startDate.getDay();
         const gridStartDate = new Date(startDate);
-        gridStartDate.setDate(gridStartDate.getDate() - startOffset);
-
-        // We need enough days to cover the whole year up to the last week
-        // Loop until we reach a date > endDate AND it's the end of a week (Saturday)
+        gridStartDate.setDate(gridStartDate.getDate() - dayOfWeek);
 
         const currentDate = new Date(gridStartDate);
-
-        // Safety break
         let count = 0;
-        while (count < 400) { // 53 weeks * 7 = 371
+        while (count < 400) {
             dates.push(new Date(currentDate));
-
-            // Stop if we are past Dec 31 AND we just finished a week (current is Saturday)
-            if (currentDate > endDate && currentDate.getDay() === 6) {
-                break;
-            }
-
+            if (currentDate > endDate && currentDate.getDay() === 6) break;
             currentDate.setDate(currentDate.getDate() + 1);
             count++;
         }
@@ -65,35 +55,27 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
     // Helper: Determine Color for a Day
     const getCellProps = (date: Date) => {
         const dateStr = date.toISOString().split('T')[0];
-
-        // If date is outside the selected year, perform visual rendering but maybe dimmed or empty?
-        // Typically Github shows them as empty or invisible.
-        // Let's filter: if year matches, show data. Else empty.
-
         const isCurrentYear = date.getFullYear() === year;
-
         const stats = data[dateStr];
         const count = stats?.count || 0;
         const isLeave = leaveDates.includes(dateStr);
 
         let colorClass = COLORS.empty;
-
         if (isCurrentYear) {
             if (isLeave) colorClass = COLORS.leave;
             else if (count === 0) colorClass = COLORS.empty;
             else if (count === 1) colorClass = COLORS.level1;
             else if (count === 2) colorClass = COLORS.level2;
             else if (count === 3) colorClass = COLORS.level3;
-            else colorClass = COLORS.level4; // 4+
+            else colorClass = COLORS.level4;
         } else {
-            // Days from prev/next year used for padding
             colorClass = "bg-transparent ring-0 hover:ring-0 cursor-default";
         }
 
         return { colorClass, count, dateStr, isLeave, isCurrentYear };
     };
 
-    // Group by Weeks for Grid Layout (Columns = Weeks)
+    // Group by Weeks
     const weeks = useMemo(() => {
         const weeksArray: Date[][] = [];
         let currentWeek: Date[] = [];
@@ -106,19 +88,14 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
             }
         });
 
-        // Push remaining if any (shouldn't be based on logic above, but safety)
         if (currentWeek.length > 0) weeksArray.push(currentWeek);
-
         return weeksArray;
     }, [calendarData]);
 
     const months = useMemo(() => {
         const monthLabels: { label: string, index: number }[] = [];
         weeks.forEach((week, index) => {
-            // Logic to place month label at the start of the month
-            // If the week contains the 1st of a month, label it.
             const hasFirstOfMonth = week.some(d => d.getDate() === 1 && d.getFullYear() === year);
-
             if (hasFirstOfMonth) {
                 const d = week.find(d => d.getDate() === 1)!;
                 monthLabels.push({ label: fmt.monthShort(d), index });
@@ -127,10 +104,55 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
         return monthLabels;
     }, [weeks, year, fmt]);
 
+    // Stats computed for the selected year only
+    const yearStats = useMemo(() => {
+        const yearPrefix = `${year}-`;
+        const yearEntries = Object.entries(data).filter(([d]) => d.startsWith(yearPrefix));
+        const totalTasks = yearEntries.reduce((acc, [, v]) => acc + v.count, 0);
+        const activeDays = yearEntries.filter(([, v]) => v.count > 0).length;
+
+        // Max streak within selected year
+        let maxStreak = 0;
+        let tempStreak = 0;
+        const sortedDates = yearEntries.map(([d]) => d).sort();
+        sortedDates.forEach((dateStr) => {
+            if (data[dateStr]?.count > 0) {
+                tempStreak++;
+                maxStreak = Math.max(maxStreak, tempStreak);
+            } else {
+                tempStreak = 0;
+            }
+        });
+
+        // Current streak: only meaningful for current year
+        let currentStreak = 0;
+        const currentYear = new Date().getFullYear();
+        if (year === currentYear) {
+            const checkDate = new Date();
+            let safetyBreak = 0;
+            while (safetyBreak < 400) {
+                safetyBreak++;
+                const dStr = checkDate.toISOString().split('T')[0];
+                if (data[dStr] && data[dStr].count > 0) {
+                    currentStreak++;
+                    checkDate.setDate(checkDate.getDate() - 1);
+                } else {
+                    const isToday = dStr === new Date().toISOString().split('T')[0];
+                    if (isToday && currentStreak === 0) {
+                        checkDate.setDate(checkDate.getDate() - 1);
+                        continue;
+                    }
+                    break;
+                }
+            }
+        }
+
+        return { totalTasks, activeDays, maxStreak, currentStreak };
+    }, [data, year]);
 
     return (
-        <div className={cn("w-full overflow-hidden", className)}> {/* Hid overflow to remove scroller */}
-            <div className="flex flex-col gap-2"> {/* Removed min-w constraint */}
+        <div className={cn("w-full overflow-hidden", className)}>
+            <div className="flex flex-col gap-2">
 
                 {/* Month Labels */}
                 <div className="flex text-xs text-muted-foreground mb-1 relative h-6 w-full">
@@ -139,6 +161,7 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
                     ))}
                 </div>
 
+                {/* Grid */}
                 <div className="flex justify-between w-full h-full gap-1 sm:gap-1">
                     {weeks.map((week, wIndex) => (
                         <div key={wIndex} className="flex flex-col gap-1 sm:gap-1 flex-1 min-w-0">
@@ -147,8 +170,7 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
                                 const niceDate = fmt.dateWithDay(day);
 
                                 if (!isCurrentYear) {
-                                    // Render invisible placeholder - scale with flex
-                                    return <div key={dIndex} className="w-full aspect-square" />
+                                    return <div key={dIndex} className="w-full aspect-square" />;
                                 }
 
                                 return (
@@ -157,7 +179,7 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
                                             <TooltipTrigger asChild>
                                                 <div
                                                     className={cn(
-                                                        "w-full aspect-square rounded-[1px] sm:rounded-[2px] transition-all hover:ring-1 hover:ring-white/50 z-0 hover:z-10 cursor-pointer", // Fluid sizing
+                                                        "w-full aspect-square rounded-[1px] sm:rounded-[2px] transition-all hover:ring-1 hover:ring-white/50 z-0 hover:z-10 cursor-pointer",
                                                         colorClass
                                                     )}
                                                     aria-label={`${count} completed tasks on ${niceDate}`}
@@ -177,6 +199,7 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
                     ))}
                 </div>
 
+                {/* Legend */}
                 <div className="flex items-center justify-end text-[10px] text-muted-foreground mt-2 gap-2">
                     <span>Less</span>
                     <div className="flex gap-[2px]">
@@ -190,71 +213,26 @@ export function ContributionHeatmap({ data, className, leaveDates = [], tooltipL
                 </div>
             </div>
 
-            {/* Contribution Stats Row */}
+            {/* Stats Row — scoped to selected year */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 border-t border-border pt-6">
-                {(() => {
-                    // Calculate Stats
-                    const values = Object.values(data);
-                    const totalTasks = values.reduce((acc, curr) => acc + curr.count, 0);
-                    const activeDays = values.filter(d => d.count > 0).length;
-
-                    // Streaks
-                    let maxStreak = 0;
-                    let currentStreak = 0;
-                    let tempStreak = 0;
-
-                    // Sort dates to ensure streak calculation is correct
-                    const sortedDates = Object.keys(data).sort();
-                    sortedDates.forEach((dateStr) => {
-                        if (data[dateStr].count > 0) {
-                            tempStreak++;
-                            maxStreak = Math.max(maxStreak, tempStreak);
-                        } else {
-                            tempStreak = 0;
-                        }
-                    });
-
-                    // Check current streak (working backwards from today)
-                    // Simple check: if today has data, start count, else 0 (or check yesterday if today is empty?)
-                    // For simplicity, we check contiguous active days ending today or yesterday.
-                    const checkDate = new Date();
-                    while (true) {
-                        const dStr = checkDate.toISOString().split('T')[0];
-                        if (data[dStr] && data[dStr].count > 0) {
-                            currentStreak++;
-                            checkDate.setDate(checkDate.getDate() - 1);
-                        } else {
-                            // If today is empty, maybe they haven't worked YET today. Check yesterday.
-                            const isToday = dStr === new Date().toISOString().split('T')[0];
-                            if (isToday && currentStreak === 0) {
-                                checkDate.setDate(checkDate.getDate() - 1);
-                                continue;
-                            }
-                            break;
-                        }
-                    }
-
-                    return (
-                        <>
-                            <div className="flex flex-col">
-                                <span className="text-xs text-muted-foreground">Total Completed</span>
-                                <span className="text-base font-bold text-foreground">{totalTasks}</span>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-xs text-muted-foreground">Max Streak</span>
-                                <span className="text-base font-bold text-foreground">{maxStreak} Days</span>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-xs text-muted-foreground">Current Streak</span>
-                                <span className="text-base font-bold text-foreground">{currentStreak} Days</span>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-xs text-muted-foreground">Active Days</span>
-                                <span className="text-base font-bold text-foreground">{activeDays}</span>
-                            </div>
-                        </>
-                    );
-                })()}
+                <div className="flex flex-col">
+                    <span className="text-xs text-muted-foreground">Completed in {year}</span>
+                    <span className="text-base font-bold text-foreground">{yearStats.totalTasks}</span>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-xs text-muted-foreground">Max Streak</span>
+                    <span className="text-base font-bold text-foreground">{yearStats.maxStreak} Days</span>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-xs text-muted-foreground">Current Streak</span>
+                    <span className="text-base font-bold text-foreground">
+                        {year === new Date().getFullYear() ? `${yearStats.currentStreak} Days` : "—"}
+                    </span>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-xs text-muted-foreground">Active Days</span>
+                    <span className="text-base font-bold text-foreground">{yearStats.activeDays}</span>
+                </div>
             </div>
         </div>
     );

@@ -41,11 +41,13 @@ export async function handleTaskStatusChangeEffectsImpl({
     // IMPORTANT: Match by title + action string (NOT entityId/entityType) because old
     // activity entries may have been created before those fields were added to the schema,
     // so entityId-based queries silently match nothing on legacy data.
+    // Use case-insensitive regex for target to handle any title casing differences.
     if (completedAt && currentTask.status === "Done") {
+        const escapedTitle = currentTask.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const deleteResult = await ActivityModel.deleteMany({
             agencyId: agency.id,
             userId,
-            target: currentTask.title,
+            target: { $regex: new RegExp(`^${escapedTitle}$`, "i") },
             action: "moved task to Done",
         });
         if (deleteResult.deletedCount > 0) {
