@@ -60,6 +60,18 @@ export async function handleNonLiveAgentMode({
     filteredTools,
     authenticatedUserId,
 }: NonLiveAgentOptions): Promise<Response> {
+    // Non-Gemini providers (Groq, OpenAI, NVIDIA, GitHub) use the OpenAI tool-calling format
+    if (aiConfig.provider !== "gemini") {
+        return handleOpenAICompatAgentMode({
+            aiConfig,
+            modelId,
+            systemInstruction,
+            fullPrompt,
+            filteredTools,
+            authenticatedUserId,
+        });
+    }
+
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const genAI = new GoogleGenerativeAI(aiConfig.apiKey);
     const model = genAI.getGenerativeModel({
@@ -116,6 +128,136 @@ export async function handleNonLiveAgentMode({
             } catch (error: unknown) {
                 const errorMessage = getErrorMessage(error, "Agent error");
                 console.error("[Singularity Agent] Non-live error:", errorMessage);
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", text: errorMessage })}\n\n`));
+            }
+
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
+            controller.close();
+        },
+    });
+
+    return createEventStreamResponse(stream);
+}
+
+async function handleOpenAICompatAgentMode({
+    aiConfig,
+    modelId,
+    systemInstruction,
+    fullPrompt,
+    filteredTools,
+    authenticatedUserId,
+}: NonLiveAgentOptions): Promise<Response> {
+    const { OPENAI_COMPAT_BASE_URLS, AI_TIMEOUT_MS, withTimeout } = await import("@/lib/ai-provider-shared");
+    const baseUrl = OPENAI_COMPAT_BASE_URLS[aiConfig.provider];
+    if (!baseUrl) throw new Error(`Unknown provider: ${aiConfig.provider}`);
+
+    const encoder = new TextEncoder();
+
+    // Convert Singularity tool declarations to OpenAI function-calling format
+    const openAITools = filteredTools.map((tool) => ({
+        type: "function" as const,
+        function: {
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.parameters as Record<string, unknown>,
+        },
+    }));
+
+    const stream = new ReadableStream({
+        async start(controller) {
+            try {
+                const MAX_TOOL_ROUNDS = 25;
+
+                type OpenAIMessage = { role: string; content: string | null; tool_calls?: unknown[]; tool_call_id?: string; name?: string };
+                const messages: OpenAIMessage[] = [
+                    { role: "system", content: systemInstruction },
+                    { role: "user", content: fullPrompt },
+                ];
+
+                for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+                    const response = await withTimeout(fetch(`${baseUrl}/chat/completions`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${aiConfig.apiKey}`,
+                        },
+                        body: JSON.stringify({
+                            model: modelId,
+                            messages,
+                            tools: openAITools.length > 0 ? openAITools : undefined,
+                            tool_choice: openAITools.length > 0 ? "auto" : undefined,
+                        }),
+                    }), AI_TIMEOUT_MS);
+
+                    if (!response.ok) {
+                        const errorBody = await response.text().catch(() => "Unknown error");
+                        throw new Error(`AI Provider Error (${aiConfig.provider}): ${response.status} – ${errorBody}`);
+                    }
+
+                    const data = await response.json();
+                    const choice = data.choices?.[0];
+                    const assistantMessage = choice?.message;
+
+                    if (!assistantMessage) break;
+
+                    // Add assistant message to history
+                    messages.push(assistantMessage);
+
+                    // Stream any text content
+                    if (assistantMessage.content) {
+                        controller.enqueue(encoder.encode(
+                            `data: ${JSON.stringify({ type: "response", text: assistantMessage.content })}\n\n`
+                        ));
+                    }
+
+                    // Handle tool calls
+                    const toolCalls = assistantMessage.tool_calls as Array<{
+                        id: string;
+                        type: string;
+                        function: { name: string; arguments: string };
+                    }> | undefined;
+
+                    if (!toolCalls || toolCalls.length === 0) break;
+
+                    // Execute all tool calls and collect results
+                    for (const toolCall of toolCalls) {
+                        if (toolCall.type !== "function") continue;
+                        const fnName = toolCall.function.name;
+                        const displayName = getToolDisplayName(fnName);
+
+                        let args: Record<string, unknown> = {};
+                        try {
+                            args = JSON.parse(toolCall.function.arguments || "{}");
+                        } catch {
+                            args = {};
+                        }
+
+                        controller.enqueue(encoder.encode(
+                            `data: ${JSON.stringify({ type: "tool_call", name: fnName, displayName, args })}\n\n`
+                        ));
+
+                        const toolResult = await executeTool(fnName, args, authenticatedUserId);
+                        console.log("[Singularity Agent OpenAI-compat] Tool result:", fnName, toolResult.success, toolResult.summary);
+
+                        controller.enqueue(encoder.encode(
+                            `data: ${JSON.stringify({ type: "tool_result", name: fnName, displayName, success: toolResult.success, summary: toolResult.summary, rollbackData: toolResult.rollbackData })}\n\n`
+                        ));
+
+                        // Add tool result to messages in OpenAI format
+                        messages.push({
+                            role: "tool",
+                            content: JSON.stringify(toolResult),
+                            tool_call_id: toolCall.id,
+                            name: fnName,
+                        });
+                    }
+
+                    // If finish_reason is not tool_calls, we're done
+                    if (choice?.finish_reason && choice.finish_reason !== "tool_calls") break;
+                }
+            } catch (error: unknown) {
+                const errorMessage = getErrorMessage(error, "Agent error");
+                console.error("[Singularity Agent OpenAI-compat] Error:", errorMessage);
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", text: errorMessage })}\n\n`));
             }
 

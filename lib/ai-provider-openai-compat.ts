@@ -33,7 +33,6 @@ export async function openaiCompatGenerateContent(
         body: JSON.stringify({
             model: modelId,
             messages,
-            max_tokens: 4096,
         }),
     }), AI_TIMEOUT_MS);
 
@@ -85,7 +84,6 @@ export async function openaiCompatChat(
         body: JSON.stringify({
             model: modelId,
             messages,
-            max_tokens: 4096,
         }),
     }), AI_TIMEOUT_MS);
 
