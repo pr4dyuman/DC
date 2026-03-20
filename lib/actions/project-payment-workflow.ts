@@ -107,55 +107,48 @@ export async function updateProjectPaymentImpl(
     }
 
     // ── Regenerate invoices when payment config is updated ──────────────────
-    // Delete existing Pending invoices for this service so we don't duplicate
-    // (only remove Pending — Processing/Paid invoices represent real money, keep them)
-    const existingPendingInvoiceIds = (await InvoiceModel.find({
-        projectId,
-        agencyId,
-        serviceId: canonicalService.id,
-        status: "Pending",
-    }).select("id").lean() as Array<{ id: string }>).map((inv) => inv.id);
+    // Strategy: delete ALL Pending invoices for this project (old invoices may
+    // not have serviceId so filtering by it is unreliable), then regenerate
+    // from the updated serviceConfigs. Processing/Paid invoices are kept as-is.
+    await InvoiceModel.deleteMany({ projectId, agencyId, status: "Pending" });
 
-    // Fall back: if no serviceId field exists, match any Pending invoice for this project
-    // created from this service by matching amount (best effort for legacy data)
-    if (existingPendingInvoiceIds.length === 0 && paymentConfig.installmentDates?.length) {
-        // Just delete all Pending invoices for this project regardless of serviceId
-        // if there's only one service — safe heuristic
-        const totalServices = (projectDoc?.serviceConfigs || []).length;
-        if (totalServices <= 1) {
-            await InvoiceModel.deleteMany({ projectId, agencyId, status: "Pending" });
-        }
-    } else if (existingPendingInvoiceIds.length > 0) {
-        await InvoiceModel.deleteMany({ id: { $in: existingPendingInvoiceIds }, agencyId });
-    }
+    // Re-read the project after the serviceConfig update so we get the latest configs
+    const updatedProject = await ProjectModel.findOne({ id: projectId, agencyId })
+        .select("serviceConfigs budget dueDate")
+        .lean() as { serviceConfigs?: Array<{ serviceId: string; name?: string; paymentConfig?: PaymentConfig }>; budget?: number; dueDate?: string } | null;
 
-    // Create fresh invoices from the updated payment config
+    const allServiceConfigs = updatedProject?.serviceConfigs || [];
+    const projectBudget = updatedProject?.budget ?? 0;
+    const totalServiceCount = allServiceConfigs.length || 1;
+
     const newInvoices: Invoice[] = [];
-    const projectBudget = (await ProjectModel.findOne({ id: projectId, agencyId }).select("budget").lean() as { budget?: number } | null)?.budget ?? 0;
-    const totalServices = (projectDoc?.serviceConfigs || []).length || 1;
 
-    if (paymentConfig.type === "installment" && paymentConfig.installmentDates && paymentConfig.installmentDates.length > 0) {
-        const amountPerInstallment = paymentConfig.installmentAmount
-            || (projectBudget / totalServices / paymentConfig.installmentDates.length);
-        for (const installmentDate of paymentConfig.installmentDates) {
-            newInvoices.push({
-                id: generateId(),
-                projectId,
-                agencyId,
-                serviceId: canonicalService.id,
-                amount: Math.round(amountPerInstallment),
-                status: "Pending",
-                date: installmentDate,
-            });
-        }
-    } else if (paymentConfig.type === "monthly" && paymentConfig.monthlyAmount && paymentConfig.billingStartDate) {
-        const startDate = new Date(paymentConfig.billingStartDate);
-        const project = await ProjectModel.findOne({ id: projectId, agencyId }).select("dueDate").lean() as { dueDate?: string } | null;
-        if (project?.dueDate) {
-            const projectDueDate = new Date(project.dueDate);
+    for (const svcCfg of allServiceConfigs) {
+        const cfg = svcCfg.paymentConfig;
+        if (!cfg) continue;
+
+        if (cfg.type === "installment" && Array.isArray(cfg.installmentDates) && cfg.installmentDates.length > 0) {
+            const amountPerInstallment = cfg.installmentAmount
+                || Math.round(projectBudget / totalServiceCount / cfg.installmentDates.length);
+            for (const installmentDate of cfg.installmentDates) {
+                newInvoices.push({
+                    id: generateId(),
+                    projectId,
+                    agencyId,
+                    serviceId: svcCfg.serviceId,
+                    amount: Math.round(amountPerInstallment),
+                    status: "Pending",
+                    date: installmentDate,
+                });
+            }
+        } else if (cfg.type === "monthly" && cfg.monthlyAmount && cfg.billingStartDate && updatedProject?.dueDate) {
+            const startDate = new Date(cfg.billingStartDate);
+            const projectDueDate = new Date(updatedProject.dueDate);
             if (!isNaN(startDate.getTime()) && !isNaN(projectDueDate.getTime()) && startDate < projectDueDate) {
-                const monthsDiff = Math.ceil((projectDueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
-                const numberOfInvoices = Math.min(monthsDiff, 12);
+                const monthsDiff = Math.ceil(
+                    (projectDueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30)
+                );
+                const numberOfInvoices = Math.min(monthsDiff, 120); // cap at 10 years
                 for (let i = 0; i < numberOfInvoices; i++) {
                     const invoiceDate = new Date(startDate);
                     invoiceDate.setMonth(invoiceDate.getMonth() + i);
@@ -163,8 +156,8 @@ export async function updateProjectPaymentImpl(
                         id: generateId(),
                         projectId,
                         agencyId,
-                        serviceId: canonicalService.id,
-                        amount: paymentConfig.monthlyAmount,
+                        serviceId: svcCfg.serviceId,
+                        amount: cfg.monthlyAmount,
                         status: "Pending",
                         date: invoiceDate.toISOString().split("T")[0],
                     });
@@ -176,6 +169,8 @@ export async function updateProjectPaymentImpl(
     if (newInvoices.length > 0) {
         await InvoiceModel.insertMany(newInvoices);
     }
+
+    console.log(`[payment-workflow] project=${projectId} regenerated ${newInvoices.length} invoices from ${allServiceConfigs.length} service configs`);
     // ────────────────────────────────────────────────────────────────────────
 
     revalidatePath("/dashboard/projects/[id]", "page");
