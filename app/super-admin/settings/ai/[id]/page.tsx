@@ -14,6 +14,7 @@ const FEATURE_LABELS = [
     { key: "taskExplainConfig" as const,  label: "Task Explain/Enhance", desc: "AI task analysis & description enhancement" },
     { key: "hourEstimateConfig" as const, label: "Hour Estimation",     desc: "AI-powered task hour estimation" },
     { key: "taskChatbotConfig" as const,  label: "Task Chatbot",        desc: "In-task AI assistant chat" },
+    { key: "heavyTasksConfig" as const,  label: "Heavy Tasks (Singularity)", desc: "Powerful model for complex admin tasks — activated via the ⚡ toggle in Singularity" },
 ];
 
 type FeatureModelKey = typeof FEATURE_LABELS[number]["key"];
