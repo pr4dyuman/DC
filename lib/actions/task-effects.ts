@@ -34,16 +34,23 @@ export async function handleTaskStatusChangeEffectsImpl({
 }: TaskEffectArgs) {
     const activityTimestamp = completedAt ? new Date(completedAt).toISOString() : new Date().toISOString();
 
-    // When backdating a Done status: remove old "moved task to Done" activity entries
-    // for this specific task so only the backdated timestamp wins in the heatmap logic.
+    // When backdating a Done status: remove ALL existing "moved task to Done" activity entries
+    // for this task BEFORE inserting the new backdated one. This ensures the heatmap
+    // only ever sees one Done event per task.
+    //
+    // IMPORTANT: Match by title + action string (NOT entityId/entityType) because old
+    // activity entries may have been created before those fields were added to the schema,
+    // so entityId-based queries silently match nothing on legacy data.
     if (completedAt && currentTask.status === "Done") {
-        await ActivityModel.deleteMany({
+        const deleteResult = await ActivityModel.deleteMany({
             agencyId: agency.id,
             userId,
-            entityId: currentTask.id,
-            entityType: "task",
-            action: /moved task to Done/,
+            target: currentTask.title,
+            action: "moved task to Done",
         });
+        if (deleteResult.deletedCount > 0) {
+            console.log(`[backdate] Removed ${deleteResult.deletedCount} old "Done" activity entries for task "${currentTask.title}"`);
+        }
     }
 
     await ActivityModel.create({
