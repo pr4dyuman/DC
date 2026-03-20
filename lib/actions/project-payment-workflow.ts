@@ -1,9 +1,10 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
-import type { PaymentConfig } from "../db";
+import type { Invoice, PaymentConfig } from "../db";
 import { sanitizeMongoInput } from "../validation";
-import { ProjectModel, ServiceModel, connectDB } from "../mongodb";
+import { InvoiceModel, ProjectModel, ServiceModel, connectDB } from "../mongodb";
+import { generateId } from "../utils-server";
 import {
     buildProjectServiceLookupQuery,
     mapProjectServicesByProjectId,
@@ -105,6 +106,79 @@ export async function updateProjectPaymentImpl(
         );
     }
 
+    // ── Regenerate invoices when payment config is updated ──────────────────
+    // Delete existing Pending invoices for this service so we don't duplicate
+    // (only remove Pending — Processing/Paid invoices represent real money, keep them)
+    const existingPendingInvoiceIds = (await InvoiceModel.find({
+        projectId,
+        agencyId,
+        serviceId: canonicalService.id,
+        status: "Pending",
+    }).select("id").lean() as Array<{ id: string }>).map((inv) => inv.id);
+
+    // Fall back: if no serviceId field exists, match any Pending invoice for this project
+    // created from this service by matching amount (best effort for legacy data)
+    if (existingPendingInvoiceIds.length === 0 && paymentConfig.installmentDates?.length) {
+        // Just delete all Pending invoices for this project regardless of serviceId
+        // if there's only one service — safe heuristic
+        const totalServices = (projectDoc?.serviceConfigs || []).length;
+        if (totalServices <= 1) {
+            await InvoiceModel.deleteMany({ projectId, agencyId, status: "Pending" });
+        }
+    } else if (existingPendingInvoiceIds.length > 0) {
+        await InvoiceModel.deleteMany({ id: { $in: existingPendingInvoiceIds }, agencyId });
+    }
+
+    // Create fresh invoices from the updated payment config
+    const newInvoices: Invoice[] = [];
+    const projectBudget = (await ProjectModel.findOne({ id: projectId, agencyId }).select("budget").lean() as { budget?: number } | null)?.budget ?? 0;
+    const totalServices = (projectDoc?.serviceConfigs || []).length || 1;
+
+    if (paymentConfig.type === "installment" && paymentConfig.installmentDates && paymentConfig.installmentDates.length > 0) {
+        const amountPerInstallment = paymentConfig.installmentAmount
+            || (projectBudget / totalServices / paymentConfig.installmentDates.length);
+        for (const installmentDate of paymentConfig.installmentDates) {
+            newInvoices.push({
+                id: generateId(),
+                projectId,
+                agencyId,
+                serviceId: canonicalService.id,
+                amount: Math.round(amountPerInstallment),
+                status: "Pending",
+                date: installmentDate,
+            });
+        }
+    } else if (paymentConfig.type === "monthly" && paymentConfig.monthlyAmount && paymentConfig.billingStartDate) {
+        const startDate = new Date(paymentConfig.billingStartDate);
+        const project = await ProjectModel.findOne({ id: projectId, agencyId }).select("dueDate").lean() as { dueDate?: string } | null;
+        if (project?.dueDate) {
+            const projectDueDate = new Date(project.dueDate);
+            if (!isNaN(startDate.getTime()) && !isNaN(projectDueDate.getTime()) && startDate < projectDueDate) {
+                const monthsDiff = Math.ceil((projectDueDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
+                const numberOfInvoices = Math.min(monthsDiff, 12);
+                for (let i = 0; i < numberOfInvoices; i++) {
+                    const invoiceDate = new Date(startDate);
+                    invoiceDate.setMonth(invoiceDate.getMonth() + i);
+                    newInvoices.push({
+                        id: generateId(),
+                        projectId,
+                        agencyId,
+                        serviceId: canonicalService.id,
+                        amount: paymentConfig.monthlyAmount,
+                        status: "Pending",
+                        date: invoiceDate.toISOString().split("T")[0],
+                    });
+                }
+            }
+        }
+    }
+
+    if (newInvoices.length > 0) {
+        await InvoiceModel.insertMany(newInvoices);
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     revalidatePath("/dashboard/projects/[id]", "page");
     revalidatePath("/dashboard/projects");
+    revalidatePath("/dashboard/finance");
 }

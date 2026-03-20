@@ -59,14 +59,17 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
 
     if (currentUser?.role === 'client') {
         // Force Client View immediately - Do not execute Admin logic
-        const clientInvoices = await getInvoices(); // internally filters for client
-        const clientTransactions = await getTransactions(); // internally filters for client
+        const [clientInvoices, clientTransactions, clientProjects] = await Promise.all([
+            getInvoices(),         // internally filters for client
+            getTransactions(),      // internally filters for client
+            getProjects(),          // returns only this client's projects
+        ]);
 
         const pendingTotal = clientInvoices
             .filter(i => i.status === 'Pending' || i.status === 'Overdue')
             .reduce((acc, curr) => acc + curr.amount, 0);
 
-        return <FinanceClientView activeTab={activeTab} invoices={clientInvoices} transactions={clientTransactions} pendingTotal={pendingTotal} currency={currency} />;
+        return <FinanceClientView activeTab={activeTab} invoices={clientInvoices} transactions={clientTransactions} pendingTotal={pendingTotal} currency={currency} projects={clientProjects} />;
     }
 
     // --- ADMIN / EMPLOYEE LOGIC BELOW (Only runs if NOT client) ---

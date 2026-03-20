@@ -97,10 +97,13 @@ export type Invoice = {
     id: string;
     agencyId: string;
     projectId: string;
+    serviceId?: string;
     amount: number;
     status: "Paid" | "Pending" | "Overdue" | "Processing";
     date: string;
     performedBy?: string;
+    paymentNote?: string;
+    paymentDate?: string;
 };
 
 export type Comment = { id: string; userId: string; text: string; timestamp: string };

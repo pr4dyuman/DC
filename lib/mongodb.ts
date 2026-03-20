@@ -193,10 +193,13 @@ const InvoiceSchema = new Schema<Invoice>({
     id: { type: String, required: true, unique: true },
     agencyId: { type: String, required: true, index: true },
     projectId: { type: String, required: true },
+    serviceId: { type: String },
     amount: { type: Number, required: true },
     status: { type: String, enum: ['Paid', 'Pending', 'Overdue', 'Processing'], required: true },
     date: { type: String, required: true },
-    performedBy: { type: String }
+    performedBy: { type: String },
+    paymentDate: { type: String },
+    paymentNote: { type: String },
 }, { timestamps: true });
 
 // Note: id already has index from unique constraint

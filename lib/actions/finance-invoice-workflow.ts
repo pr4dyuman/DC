@@ -18,7 +18,13 @@ import { getDefaultCurrency } from "./super-admin";
 import { type AgencyContext, type FinanceActor, getClientDoc, getProjectDoc } from "./finance-mutation-shared";
 import { isNotifEnabled, sanitizeDoc } from "./shared";
 
-export async function clientMarkInvoiceAsPaidImpl(invoiceId: string, currentUser: FinanceActor, agencyId: string) {
+export async function clientMarkInvoiceAsPaidImpl(
+    invoiceId: string,
+    currentUser: FinanceActor,
+    agencyId: string,
+    paymentDate?: string,
+    paymentNote?: string,
+) {
     await connectDB();
 
     const invoice = await InvoiceModel.findOne({ id: invoiceId, agencyId }).lean() as Invoice | null;
@@ -32,7 +38,11 @@ export async function clientMarkInvoiceAsPaidImpl(invoiceId: string, currentUser
         throw new Error(`Cannot mark ${invoice.status} invoice as paid`);
     }
 
-    await InvoiceModel.updateOne({ id: invoiceId, agencyId }, { $set: { status: "Processing" } });
+    const updateFields: Record<string, unknown> = { status: "Processing" };
+    if (paymentDate) updateFields.paymentDate = paymentDate;
+    if (paymentNote) updateFields.paymentNote = paymentNote;
+
+    await InvoiceModel.updateOne({ id: invoiceId, agencyId }, { $set: updateFields });
 
     const admins = await UserModel.find({ agencyId, role: "admin" }).select("-password").lean() as Array<Pick<User, "id" | "email">>;
     const currency = await getDefaultCurrency();

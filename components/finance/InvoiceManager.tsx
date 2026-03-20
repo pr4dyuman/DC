@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Invoice, Project } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,8 +31,12 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
     const [loading, setLoading] = useState(false);
     const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
-    const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [statusFilter, setStatusFilter] = useState<string>("all");
     const [invoiceSearch, setInvoiceSearch] = useState("");
+    // Payment submission dialog state
+    const [payDialogInvoiceId, setPayDialogInvoiceId] = useState<string | null>(null);
+    const [payDate, setPayDate] = useState("");
+    const [payNote, setPayNote] = useState("");
     const router = useRouter();
 
     const [formData, setFormData] = useState({
@@ -43,7 +47,9 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
 
     useEffect(() => {
         setMounted(true);
-        setFormData(prev => ({ ...prev, date: new Date().toISOString().split('T')[0] }));
+        const today = new Date().toISOString().split("T")[0];
+        setFormData(prev => ({ ...prev, date: today }));
+        setPayDate(today);
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -54,11 +60,11 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
             await createInvoice({
                 projectId: formData.projectId,
                 amount: parseFloat(formData.amount),
-                date: formData.date
+                date: formData.date,
             });
             toast.success("Invoice created successfully");
             setOpen(false);
-            setFormData({ projectId: "", amount: "", date: new Date().toISOString().split('T')[0] });
+            setFormData({ projectId: "", amount: "", date: new Date().toISOString().split("T")[0] });
             router.refresh();
         } catch (error) {
             console.error(error);
@@ -68,11 +74,19 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
         }
     };
 
+    const openPayDialog = (invoiceId: string) => {
+        setPayDialogInvoiceId(invoiceId);
+        setPayDate(new Date().toISOString().split("T")[0]);
+        setPayNote("");
+    };
+
     const handleClientSubmitPayment = async (invoiceId: string) => {
         setActionLoadingId(invoiceId);
         try {
-            await clientMarkInvoiceAsPaid(invoiceId);
+            await clientMarkInvoiceAsPaid(invoiceId, payDate, payNote.trim() || undefined);
             toast.success("Payment submitted for review");
+            setPayDialogInvoiceId(null);
+            setPayNote("");
             router.refresh();
         } catch (error) {
             console.error(error);
@@ -111,11 +125,11 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
     };
 
     const getProjectName = (projectId: string) => {
-        return projects.find(p => p.id === projectId)?.name || 'Unknown Project';
+        return projects.find(p => p.id === projectId)?.name || "Unknown Project";
     };
 
     const filteredInvoices = invoices.filter(inv => {
-        const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
+        const matchesStatus = statusFilter === "all" || inv.status === statusFilter;
         const matchesSearch = !invoiceSearch || getProjectName(inv.projectId).toLowerCase().includes(invoiceSearch.toLowerCase()) || inv.amount.toString().includes(invoiceSearch);
         return matchesStatus && matchesSearch;
     });
@@ -205,20 +219,20 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
             <CardContent>
                 <div className="mb-4 flex flex-wrap items-center gap-2">
                     <div className="flex items-center gap-1 rounded-lg border p-1">
-                        {['all', 'Pending', 'Processing', 'Overdue', 'Paid'].map((status) => (
+                        {["all", "Pending", "Processing", "Overdue", "Paid"].map((status) => (
                             <button
                                 key={status}
                                 onClick={() => setStatusFilter(status)}
                                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${statusFilter === status
-                                    ? status === 'Paid' ? 'bg-emerald-500/15 text-emerald-500'
-                                        : status === 'Pending' ? 'bg-amber-500/15 text-amber-500'
-                                            : status === 'Processing' ? 'bg-blue-500/15 text-blue-500'
-                                                : status === 'Overdue' ? 'bg-red-500/15 text-red-500'
-                                                : 'bg-primary/10 text-primary'
-                                    : 'text-muted-foreground hover:text-foreground'
+                                    ? status === "Paid" ? "bg-emerald-500/15 text-emerald-500"
+                                        : status === "Pending" ? "bg-amber-500/15 text-amber-500"
+                                            : status === "Processing" ? "bg-blue-500/15 text-blue-500"
+                                                : status === "Overdue" ? "bg-red-500/15 text-red-500"
+                                                    : "bg-primary/10 text-primary"
+                                    : "text-muted-foreground hover:text-foreground"
                                     }`}
                             >
-                                {status === 'all' ? 'All' : status}
+                                {status === "all" ? "All" : status}
                             </button>
                         ))}
                     </div>
@@ -231,9 +245,9 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                             className="h-7 w-full rounded-md border bg-transparent pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                         />
                     </div>
-                    {(statusFilter !== 'all' || invoiceSearch) && (
+                    {(statusFilter !== "all" || invoiceSearch) && (
                         <span className="text-xs text-muted-foreground ml-auto">
-                            {filteredInvoices.length} result{filteredInvoices.length !== 1 ? 's' : ''}
+                            {filteredInvoices.length} result{filteredInvoices.length !== 1 ? "s" : ""}
                         </span>
                     )}
                 </div>
@@ -242,7 +256,7 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Project</TableHead>
-                                <TableHead>Date</TableHead>
+                                <TableHead>Due Date</TableHead>
                                 <TableHead>Amount</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Actions</TableHead>
@@ -260,34 +274,75 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                                         <TableCell>{fmt.date(invoice.date)}</TableCell>
                                         <TableCell>{formatMoney(invoice.amount)}</TableCell>
                                         <TableCell>
-                                            <Badge variant={invoice.status === 'Paid' ? 'secondary' : 'default'} className={
-                                                invoice.status === 'Paid' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' :
-                                                    invoice.status === 'Pending' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' :
-                                                        invoice.status === 'Processing' ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20' : 'bg-red-500/15 text-red-400 border border-red-500/20'
+                                            <Badge variant={invoice.status === "Paid" ? "secondary" : "default"} className={
+                                                invoice.status === "Paid" ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20" :
+                                                    invoice.status === "Pending" ? "bg-amber-500/15 text-amber-400 border border-amber-500/20" :
+                                                        invoice.status === "Processing" ? "bg-blue-500/15 text-blue-400 border border-blue-500/20" : "bg-red-500/15 text-red-400 border border-red-500/20"
                                             }>
                                                 {invoice.status}
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
                                             {isClient ? (
-                                                invoice.status === 'Pending' || invoice.status === 'Overdue' ? (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        disabled={actionLoadingId === invoice.id}
-                                                        onClick={() => handleClientSubmitPayment(invoice.id)}
-                                                    >
-                                                        {actionLoadingId === invoice.id ? (
-                                                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</>
-                                                        ) : "Submit Payment"}
-                                                    </Button>
-                                                ) : invoice.status === 'Paid' ? (
-                                                    <span className="text-xs text-emerald-500 font-medium">{'\u2713'} Paid</span>
-                                                ) : invoice.status === 'Processing' ? (
+                                                invoice.status === "Pending" || invoice.status === "Overdue" ? (
+                                                    <>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => openPayDialog(invoice.id)}
+                                                        >
+                                                            Submit Payment
+                                                        </Button>
+                                                        {/* Payment date + note dialog */}
+                                                        {payDialogInvoiceId === invoice.id && (
+                                                            <Dialog open={true} onOpenChange={(v) => !v && setPayDialogInvoiceId(null)}>
+                                                                <DialogContent className="max-w-sm">
+                                                                    <DialogHeader>
+                                                                        <DialogTitle>Submit Payment</DialogTitle>
+                                                                        <DialogDescription>Tell us when you paid and add an optional note for the admin.</DialogDescription>
+                                                                    </DialogHeader>
+                                                                    <div className="grid gap-4 py-2">
+                                                                        <div className="grid gap-1">
+                                                                            <Label htmlFor="pay-date">Payment Date</Label>
+                                                                            <Input
+                                                                                id="pay-date"
+                                                                                type="date"
+                                                                                value={payDate}
+                                                                                onChange={e => setPayDate(e.target.value)}
+                                                                                required
+                                                                            />
+                                                                        </div>
+                                                                        <div className="grid gap-1">
+                                                                            <Label htmlFor="pay-note">Note (optional)</Label>
+                                                                            <Input
+                                                                                id="pay-note"
+                                                                                placeholder="e.g. Paid via bank transfer"
+                                                                                value={payNote}
+                                                                                onChange={e => setPayNote(e.target.value)}
+                                                                                maxLength={200}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                    <DialogFooter>
+                                                                        <Button variant="outline" onClick={() => setPayDialogInvoiceId(null)}>Cancel</Button>
+                                                                        <Button
+                                                                            onClick={() => handleClientSubmitPayment(invoice.id)}
+                                                                            disabled={!payDate || actionLoadingId === invoice.id}
+                                                                        >
+                                                                            {actionLoadingId === invoice.id ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</> : "Confirm"}
+                                                                        </Button>
+                                                                    </DialogFooter>
+                                                                </DialogContent>
+                                                            </Dialog>
+                                                        )}
+                                                    </>
+                                                ) : invoice.status === "Paid" ? (
+                                                    <span className="text-xs text-emerald-500 font-medium">✓ Paid</span>
+                                                ) : invoice.status === "Processing" ? (
                                                     <span className="text-xs text-blue-400 font-medium">Under Review</span>
                                                 ) : null
                                             ) : (
-                                                invoice.status === 'Processing' ? (
+                                                invoice.status === "Processing" ? (
                                                     <div className="flex gap-2">
                                                         <Button
                                                             size="sm"
@@ -308,9 +363,9 @@ export function InvoiceManager({ invoices, isClient = false, projects = [] }: In
                                                             Reject
                                                         </Button>
                                                     </div>
-                                                ) : invoice.status === 'Paid' ? (
-                                                    <span className="text-xs text-emerald-500 font-medium">{'\u2713'} Confirmed</span>
-                                                ) : invoice.status === 'Pending' || invoice.status === 'Overdue' ? (
+                                                ) : invoice.status === "Paid" ? (
+                                                    <span className="text-xs text-emerald-500 font-medium">✓ Confirmed</span>
+                                                ) : invoice.status === "Pending" || invoice.status === "Overdue" ? (
                                                     <span className="text-xs text-muted-foreground">Awaiting Client</span>
                                                 ) : null
                                             )}

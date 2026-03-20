@@ -3,6 +3,7 @@ import { TransactionList } from "@/components/finance/TransactionList";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency } from "@/lib/currency";
 import { Transaction, Invoice } from "@/lib/types";
+import { Project } from "@/lib/types";
 
 interface FinanceClientViewProps {
     activeTab: string;
@@ -10,6 +11,7 @@ interface FinanceClientViewProps {
     transactions: Transaction[];
     pendingTotal: number;
     currency: string;
+    projects?: Project[];
 }
 
 export function FinanceClientView({
@@ -17,7 +19,8 @@ export function FinanceClientView({
     invoices,
     transactions,
     pendingTotal,
-    currency
+    currency,
+    projects = [],
 }: FinanceClientViewProps) {
     const defaultTab = ['invoices', 'history'].includes(activeTab) ? activeTab : 'invoices';
 
@@ -37,7 +40,7 @@ export function FinanceClientView({
                     <TabsTrigger value="history">Payment History</TabsTrigger>
                 </TabsList>
                 <TabsContent value="invoices" className="space-y-4">
-                    <InvoiceManager invoices={invoices} isClient={true} />
+                    <InvoiceManager invoices={invoices} isClient={true} projects={projects} />
                 </TabsContent>
                 <TabsContent value="history" className="space-y-4">
                     <TransactionList transactions={transactions} title="Payments Made" />

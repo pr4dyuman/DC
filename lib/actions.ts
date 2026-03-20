@@ -995,7 +995,7 @@ export async function getInvoices(projectId?: string) {
 }
 
 // Client marks invoice as paid (moves to Processing status)
-export async function clientMarkInvoiceAsPaid(invoiceId: string) {
+export async function clientMarkInvoiceAsPaid(invoiceId: string, paymentDate?: string, paymentNote?: string) {
     const currentUser = await getCurrentUser();
     if (!currentUser || currentUser.role !== 'client') throw new Error('Unauthorized: Only clients can mark invoices as paid');
     const agency = await getCurrentAgency();
@@ -1003,7 +1003,9 @@ export async function clientMarkInvoiceAsPaid(invoiceId: string) {
     return clientMarkInvoiceAsPaidImpl(
         invoiceId,
         { id: currentUser.id, name: currentUser.name, role: currentUser.role },
-        agency.id
+        agency.id,
+        paymentDate,
+        paymentNote,
     );
 }
 
