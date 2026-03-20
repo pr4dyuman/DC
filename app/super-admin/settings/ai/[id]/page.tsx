@@ -40,45 +40,52 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
     // Per-feature object overrides
     const [featureConfigs, setFeatureConfigs] = useState<FeatureConfigs>({});
 
+    // Reusable config loader — used both on mount and after a successful save
+    const loadConfig = async (id: string) => {
+        try {
+            const [details, config] = await Promise.all([
+                getAgencyDetails(id),
+                getAgencyAIConfigSuperAdmin(id)
+            ]);
+            setAgencyName(details.agency.name);
+            if (config) {
+                setProvider(config.provider);
+                setApiKey("");
+                setModel(config.model);
+                setCustomModelId(config.customModelId || "");
+                setIsConfigured(true);
+                // Load per-feature overrides — restore toggles
+                const fc: FeatureConfigs = {};
+                for (const { key } of FEATURE_LABELS) {
+                    const subConf = (config as Record<string, any>)[key] as AIFeatureConfig | undefined;
+                    if (subConf && Object.keys(subConf).length > 0) {
+                        fc[key] = {
+                            provider: subConf.provider,
+                            apiKey: subConf.apiKey || "",
+                            model: subConf.model,
+                            customModelId: subConf.customModelId || ""
+                        };
+                    }
+                }
+                setFeatureConfigs(fc);
+                if (Object.keys(fc).length > 0) setShowFeatureModels(true);
+            } else {
+                setIsConfigured(false);
+            }
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Failed to load AI configuration");
+        }
+    };
+
     useEffect(() => {
         (async () => {
             const { id } = await params;
             setAgencyId(id);
-            try {
-                const [details, config] = await Promise.all([
-                    getAgencyDetails(id),
-                    getAgencyAIConfigSuperAdmin(id)
-                ]);
-                setAgencyName(details.agency.name);
-                if (config) {
-                    setProvider(config.provider);
-                    setApiKey("");
-                    setModel(config.model);
-                    setCustomModelId(config.customModelId || "");
-                    setIsConfigured(true);
-                    // Load per-feature overrides
-                    const fc: FeatureConfigs = {};
-                    for (const { key } of FEATURE_LABELS) {
-                        const subConf = (config as Record<string, any>)[key] as AIFeatureConfig | undefined;
-                        if (subConf && Object.keys(subConf).length > 0) {
-                            fc[key] = {
-                                provider: subConf.provider,
-                                apiKey: subConf.apiKey || "",
-                                model: subConf.model,
-                                customModelId: subConf.customModelId || ""
-                            };
-                        }
-                    }
-                    setFeatureConfigs(fc);
-                    if (Object.keys(fc).length > 0) setShowFeatureModels(true);
-                }
-            } catch (e) {
-                setError(e instanceof Error ? e.message : "Failed to load AI configuration");
-            } finally {
-                setLoading(false);
-            }
+            await loadConfig(id);
+            setLoading(false);
         })();
     }, [params]);
+
 
     const handleProviderChange = (newProvider: AIProvider) => {
         setProvider(newProvider);
@@ -110,8 +117,8 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
                 ...(featureConfigs.taskChatbotConfig  ? { taskChatbotConfig:  featureConfigs.taskChatbotConfig as AIFeatureConfig }  : {}),
             };
             await updateAgencyAIConfigSuperAdmin(agencyId, config);
-            setIsConfigured(true);
-            setApiKey("");
+            // Re-fetch saved config so all feature toggles restore to their saved state
+            await loadConfig(agencyId);
             setSuccess("Singularity AI configured successfully!");
             setTimeout(() => setSuccess(""), 3000);
         } catch (e) {
