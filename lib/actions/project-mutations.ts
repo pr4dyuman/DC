@@ -49,7 +49,8 @@ export async function createProjectImpl(
     if (Array.isArray(project.serviceConfigs)) {
         project.serviceConfigs = project.serviceConfigs
             .map((config) => {
-                const normalizedName = sanitizeName(String(config?.name || config?.serviceId || ""), 200);
+                // Use name only — NEVER fall back to serviceId (which is a UUID)
+                const normalizedName = sanitizeName(String(config?.name || ""), 200);
                 if (!normalizedName) return null;
                 return {
                     ...config,
@@ -104,7 +105,8 @@ export async function createProjectImpl(
     const defaultPaymentConfig = createDefaultProjectPaymentConfig();
     const configByName = new Map(
         (project.serviceConfigs || [])
-            .map((cfg) => [String(cfg.name || cfg.serviceId).toLowerCase(), cfg] as const)
+            .filter((cfg) => !!cfg.name)
+            .map((cfg) => [String(cfg.name).toLowerCase(), cfg] as const)
     );
     const allServiceNames = Array.from(new Map([
         ...project.services.map((svcName) => [svcName.toLowerCase(), svcName] as const),
