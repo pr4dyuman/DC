@@ -64,6 +64,31 @@ export async function updateSystemSettingsImpl(
     return true;
 }
 
+export async function savePromptConfigImpl(promptConfig: Record<string, { standard?: string; live?: string }>) {
+    await verifySuperAdmin();
+    await connectDB();
+
+    // Sanitize — ensure values are strings, cap at 100k chars each
+    const safe: Record<string, { standard?: string; live?: string }> = {};
+    const ALLOWED_KEYS = ['agentMode', 'agentModeLite', 'chatMode', 'taskExplain', 'hourEstimate', 'taskChatbot'];
+    for (const key of ALLOWED_KEYS) {
+        const val = promptConfig[key];
+        if (!val) continue;
+        safe[key] = {};
+        if (typeof val.standard === 'string') safe[key].standard = val.standard.slice(0, 100_000);
+        if (typeof val.live === 'string') safe[key].live = val.live.slice(0, 100_000);
+    }
+
+    await SystemSettingsModel.updateOne(
+        { key: 'global' },
+        { $set: { promptConfig: safe } },
+        { upsert: true },
+    );
+
+    revalidatePath('/super-admin/settings');
+    return true;
+}
+
 export async function logSystemEventImpl(entry: SystemLogEntry) {
     try {
         await connectDB();

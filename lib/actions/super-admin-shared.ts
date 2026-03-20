@@ -57,7 +57,25 @@ export type SystemSettingsRecord = {
     notificationDefaults?: Partial<Record<'welcome' | 'project' | 'task' | 'invoice' | 'salary' | 'leave' | 'refund' | 'document' | 'security', boolean>>;
     emailDefaults?: EmailDefaultsRecord;
     defaultAiConfig?: StoredAIConfigRecord;
+    promptConfig?: PromptConfigRecord;
 };
+
+export type PromptFeatureConfig = {
+    /** Full replacement prompt for standard (non-live) model. Empty = use default. */
+    standard?: string;
+    /** Full replacement prompt for live/streaming model. Empty = use standard override or default. */
+    live?: string;
+};
+
+export type PromptConfigRecord = Partial<Record<PromptFeatureKey, PromptFeatureConfig>>;
+
+export type PromptFeatureKey =
+    | "agentMode"       // Singularity Agent (non-live)
+    | "agentModeLite"   // Singularity Agent — lite model guardrails
+    | "chatMode"        // Singularity Chat
+    | "taskExplain"     // Task Explain/Enhance
+    | "hourEstimate"    // Hour Estimation
+    | "taskChatbot";    // In-task chatbot
 
 export type SuperAdminPasswordRecord = {
     password?: string;

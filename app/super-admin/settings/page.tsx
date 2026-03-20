@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Shield, Bell, Database, Globe, Mail, Loader2, Brain } from "lucide-react";
+import { Shield, Bell, Database, Globe, Mail, Loader2, Brain, FileText } from "lucide-react";
 import { useDateFormat } from "@/context/TimezoneContext";
-import { getSystemSettings, updateSystemSettings, getAllAgenciesWithStats, getDefaultAiConfig, saveDefaultAiConfig } from "@/lib/actions/super-admin";
+import { getSystemSettings, updateSystemSettings, getAllAgenciesWithStats, getDefaultAiConfig, saveDefaultAiConfig, getPromptConfig, savePromptConfig } from "@/lib/actions/super-admin";
 import { AI_MODELS } from "@/lib/ai-models";
 import { AIConfig, Agency, AIProvider } from "@/lib/types";
 import { DEFAULT_EMAIL_CATEGORIES, DEFAULT_TASK_EMAIL_EVENTS } from "@/lib/email-constants";
@@ -20,6 +20,7 @@ import { SystemSettingsNotificationsSection } from "./_components/SystemSettings
 import { SystemSettingsPlatformSection } from "./_components/SystemSettingsPlatformSection";
 import { SystemSettingsSectionAccordion } from "./_components/SystemSettingsSectionAccordion";
 import { SystemSettingsSecuritySection } from "./_components/SystemSettingsSecuritySection";
+import { SystemSettingsPromptSection, type PromptConfigState } from "./_components/SystemSettingsPromptSection";
 
 type AgencyWithStats = Agency & {
     stats: {
@@ -83,6 +84,11 @@ export default function SystemSettingsPage() {
     const [savingDefaultAi, setSavingDefaultAi] = useState(false);
     const [savedDefaultAi, setSavedDefaultAi] = useState('');
     const [defaultAiFeatureConfigs, setDefaultAiFeatureConfigs] = useState<FeatureConfigs>({});
+
+    // Prompt config
+    const [promptConfig, setPromptConfig] = useState<PromptConfigState>({});
+    const [savingPrompt, setSavingPrompt] = useState(false);
+    const [savedPrompt, setSavedPrompt] = useState('');
 
     // Email defaults state
     const [emailGlobalEnabled, setEmailGlobalEnabled] = useState(true);
@@ -157,6 +163,11 @@ export default function SystemSettingsPage() {
                         setDefaultAiFeatureConfigs(fc);
                     }
                 } catch { /* ignore if not configured */ }
+                // Load prompt config
+                try {
+                    const pc = await getPromptConfig();
+                    if (pc) setPromptConfig(pc as PromptConfigState);
+                } catch { /* ignore */ }
             } catch (e) {
                 console.error("Failed to load settings:", e);
                 toast.error("Failed to load system settings");
@@ -321,6 +332,20 @@ export default function SystemSettingsPage() {
         }
     }, []);
 
+    const handleSavePromptConfig = useCallback(async (config: PromptConfigState) => {
+        setSavingPrompt(true);
+        try {
+            await savePromptConfig(config as Record<string, { standard?: string; live?: string }>);
+            setSavedPrompt('Saved!');
+            setTimeout(() => setSavedPrompt(''), 3000);
+        } catch (e) {
+            console.error('Failed to save prompt config:', e);
+            toast.error('Failed to save prompt overrides');
+        } finally {
+            setSavingPrompt(false);
+        }
+    }, []);
+
     const handleSuperAdminAlertToggle = useCallback(async (key: string, checked: boolean) => {
         setNotifications(prev => ({ ...prev, [key]: checked }));
         setUpdatingEmail(`sa-${key}`);
@@ -456,6 +481,23 @@ export default function SystemSettingsPage() {
                     notificationDefaults={notificationDefaults}
                     updatingNotif={updatingNotif}
                     onToggle={handleNotifToggle}
+                />
+            </SystemSettingsSectionAccordion>
+
+            {/* Prompt Management */}
+            <SystemSettingsSectionAccordion
+                title="Prompt Management"
+                description="Override AI prompts for each feature. Full replacement — overrides replace the built-in prompts entirely."
+                icon={<FileText className="h-6 w-6 text-orange-500" />}
+                iconBg="bg-orange-500/10"
+                isOpen={!!openSections.prompts}
+                onToggle={() => toggleSection('prompts')}
+            >
+                <SystemSettingsPromptSection
+                    promptConfig={promptConfig}
+                    saving={savingPrompt}
+                    saved={savedPrompt}
+                    onSave={(config) => { setPromptConfig(config); void handleSavePromptConfig(config); }}
                 />
             </SystemSettingsSectionAccordion>
 

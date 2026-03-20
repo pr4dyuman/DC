@@ -12,6 +12,7 @@ import { getAIPermissions } from "@/lib/actions";
 import { hasExplicitAIAccessSetting } from "@/lib/actions/access";
 import { resolveModel, getResolvedFeatureConfig } from "@/lib/ai-provider-shared";
 import { getCurrentAgency, checkTrialExpired } from "@/lib/agency-context";
+import { getPromptConfigPublic } from "@/lib/actions/super-admin";
 import {
     buildConversationPrompt,
     filterToolsByPermissions as filterToolsByPermissionsHelper,
@@ -139,6 +140,20 @@ export async function POST(req: NextRequest) {
 - When an uploaded file contains many tasks, you MUST call bulk_create_tasks MULTIPLE TIMES until ALL tasks from the file are created. Never stop at a subset.
 - Include ~30-40 tasks per bulk_create_tasks call to avoid truncation.
 - Keep responses concise. Do not over-explain or repeat yourself.`;
+            }
+
+            // Apply DB prompt override if set (full replacement)
+            try {
+                const promptConfig = await getPromptConfigPublic();
+                const featureKey = isLiteModel ? 'agentModeLite' : 'agentMode';
+                const overrideConfig = (promptConfig as Record<string, { standard?: string; live?: string } | undefined>)[featureKey];
+                const override = isLive ? (overrideConfig?.live || overrideConfig?.standard) : overrideConfig?.standard;
+                if (override && override.trim().length > 0) {
+                    console.log(`[Singularity Agent] Using DB prompt override for ${featureKey} (${override.length} chars)`);
+                    systemInstruction = override;
+                }
+            } catch (overrideErr) {
+                console.warn('[Singularity Agent] Could not load prompt override:', overrideErr);
             }
 
             const agentPrompt = `${systemInstruction}\n\n---\n\n${fullPrompt}`;

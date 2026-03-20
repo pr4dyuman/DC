@@ -181,6 +181,21 @@ export async function getSystemSettingsImpl(): Promise<SystemSettingsRecord | nu
     return toSerializable(createdSettings.toObject() as SystemSettingsRecord);
 }
 
+export async function getPromptConfigImpl() {
+    await verifySuperAdmin();
+    await connectDB();
+    const settings = await SystemSettingsModel.findOne({ key: 'global' }, { promptConfig: 1 }).lean() as SystemSettingsRecord | null;
+    return toSerializable(settings?.promptConfig ?? {});
+}
+
+/** Public (no auth) — used by the AI route to load prompt overrides. */
+export async function getPromptConfigPublicImpl() {
+    await connectDB();
+    const settings = await SystemSettingsModel.findOne({ key: 'global' }, { promptConfig: 1 }).lean() as SystemSettingsRecord | null;
+    const raw = settings?.promptConfig ?? {};
+    return JSON.parse(JSON.stringify(raw)) as typeof raw;
+}
+
 export async function getPublicSecuritySettingsImpl(): Promise<{
     allowSelfRegistration: boolean;
     enforceStrongPasswords: boolean;

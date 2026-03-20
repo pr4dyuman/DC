@@ -18,6 +18,8 @@ import {
     getDefaultAiConfigImpl,
     getDefaultCurrencyImpl,
     getNotificationDefaultsImpl,
+    getPromptConfigImpl,
+    getPromptConfigPublicImpl,
     getPublicSecuritySettingsImpl,
     getStorageByAgencyImpl,
     getSystemAnalyticsImpl,
@@ -28,6 +30,7 @@ import {
     logSystemEventImpl,
     subscribeNewsletterImpl,
     updateSystemSettingsImpl,
+    savePromptConfigImpl,
 } from "./super-admin-ops";
 import {
     activateAgencyImpl,
@@ -562,6 +565,19 @@ export async function getNotificationDefaults(): Promise<Record<string, boolean>
 
 export async function updateSystemSettings(section: 'platform' | 'security' | 'notifications' | 'emailDefaults' | 'notificationDefaults', data: SettingsUpdateRecord) {
     return updateSystemSettingsImpl(section, data);
+}
+
+export async function getPromptConfig() {
+    return getPromptConfigImpl();
+}
+
+/** No super-admin auth — used by the AI route at runtime. */
+export async function getPromptConfigPublic() {
+    return getPromptConfigPublicImpl();
+}
+
+export async function savePromptConfig(promptConfig: Record<string, { standard?: string; live?: string }>) {
+    return savePromptConfigImpl(promptConfig);
 }
 
 // =============================================================================
