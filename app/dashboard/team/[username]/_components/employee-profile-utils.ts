@@ -143,8 +143,10 @@ export function buildContributionStats(
             && (action.includes("done") || action.includes("completed") || action.includes("fixed") || action.includes("finished"))
         ) {
             const currentStored = taskCompletionTimes.get(title);
-            // Keep the EARLIEST completion date — backdated runs should always win over stale 2026 entries
-            if (!currentStored || activity.timestamp < currentStored) {
+            // Keep the LATEST completion date — for normal task flows (Done→Review→Done),
+            // the most recent Done date is the actual completion. The task-effects.ts
+            // fix already deletes old entries when backdating, so only one entry exists.
+            if (!currentStored || activity.timestamp > currentStored) {
                 taskCompletionTimes.set(title, activity.timestamp);
             }
         }
