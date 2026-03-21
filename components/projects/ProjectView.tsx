@@ -65,6 +65,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                                     projectId={project.id}
                                     currentSlug={project.slug}
                                     currentClientId={project.clientId}
+                                    currentClientIds={project.clientIds}
                                     currentUserId={currentUser?.id}
                                 />
                             )}
@@ -91,6 +92,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                                                 projectId={project.id}
                                                 currentSlug={project.slug}
                                                 currentClientId={project.clientId}
+                                                currentClientIds={project.clientIds}
                                                 currentUserId={currentUser?.id}
                                             />
                                         )}

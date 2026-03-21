@@ -77,12 +77,17 @@ export async function createProjectImpl(
     }
 
     const normalizedClientId = typeof project.clientId === "string" ? project.clientId.trim() : "";
-    if (normalizedClientId) {
-        const clientFields = await resolveProjectClientFields(normalizedClientId, agencyId);
+    const rawClientIds = Array.isArray((project as { clientIds?: unknown }).clientIds)
+        ? (project as { clientIds?: unknown[] }).clientIds as unknown[]
+        : [];
+    if (normalizedClientId || rawClientIds.length > 0) {
+        const clientFields = await resolveProjectClientFields(normalizedClientId, agencyId, rawClientIds);
         project.clientId = clientFields.clientId;
+        (project as { clientIds?: string[] }).clientIds = clientFields.clientIds;
         project.client = clientFields.client;
     } else {
         project.clientId = undefined;
+        (project as { clientIds?: string[] }).clientIds = [];
         project.client = project.client ? sanitizeName(project.client, 200) || undefined : undefined;
     }
 
@@ -206,16 +211,23 @@ export async function createProjectImpl(
         await InvoiceModel.insertMany(newInvoices);
     }
 
-    if (project.clientId && newInvoices.length > 0 && await isNotifEnabled("invoice")) {
-        await NotificationModel.create({
-            id: generateId(),
-            agencyId,
-            userId: project.clientId,
-            message: `${newInvoices.length} pending invoice(s) for project: ${project.name}`,
-            read: false,
-            timestamp: new Date().toISOString(),
-            link: "/dashboard/finance",
-        });
+    // Notify ALL linked clients about new invoices
+    const linkedClientIds: string[] = [
+        ...((newProject as { clientIds?: string[] }).clientIds || []),
+        ...(newProject.clientId && !((newProject as { clientIds?: string[] }).clientIds || []).includes(newProject.clientId) ? [newProject.clientId] : []),
+    ];
+    if (linkedClientIds.length > 0 && newInvoices.length > 0 && await isNotifEnabled("invoice")) {
+        await NotificationModel.insertMany(
+            linkedClientIds.map((cid) => ({
+                id: generateId(),
+                agencyId,
+                userId: cid,
+                message: `${newInvoices.length} pending invoice(s) for project: ${project.name}`,
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: "/dashboard/finance",
+            }))
+        );
     }
 
     await ActivityModel.create({
@@ -230,24 +242,31 @@ export async function createProjectImpl(
         entityType: "project",
     });
 
-    if (project.clientId) {
+    // Send project-created email to ALL linked clients
+    const allLinkedClientIds: string[] = [
+        ...((newProject as { clientIds?: string[] }).clientIds || []),
+        ...(newProject.clientId && !((newProject as { clientIds?: string[] }).clientIds || []).includes(newProject.clientId) ? [newProject.clientId] : []),
+    ];
+    if (allLinkedClientIds.length > 0) {
         try {
-            const client = await ClientModel.findOne({ id: project.clientId, agencyId })
+            const allClients = await ClientModel.find({ id: { $in: allLinkedClientIds }, agencyId })
                 .select("email name")
-                .lean() as { email?: string; name?: string } | null;
-            if (client?.email && client.name) {
-                const paymentPlan = project.serviceConfigs && project.serviceConfigs.length > 0
-                    ? project.serviceConfigs[0].paymentConfig?.type || "one-time"
-                    : "one-time";
-                await sendProjectCreatedEmail({
-                    clientEmail: client.email,
-                    clientName: client.name,
-                    projectName: project.name,
-                    budget: project.budget,
-                    paymentPlan,
-                    invoiceCount: newInvoices.length,
-                    projectLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/projects/${newProject.slug || newProject.id}`,
-                });
+                .lean() as Array<{ email?: string; name?: string }>;
+            for (const client of allClients) {
+                if (client?.email && client.name) {
+                    const paymentPlan = project.serviceConfigs && project.serviceConfigs.length > 0
+                        ? project.serviceConfigs[0].paymentConfig?.type || "one-time"
+                        : "one-time";
+                    await sendProjectCreatedEmail({
+                        clientEmail: client.email,
+                        clientName: client.name,
+                        projectName: project.name,
+                        budget: project.budget,
+                        paymentPlan,
+                        invoiceCount: newInvoices.length,
+                        projectLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/projects/${newProject.slug || newProject.id}`,
+                    });
+                }
             }
         } catch (emailError) {
             console.error("[Email] Failed to send project creation email:", emailError);

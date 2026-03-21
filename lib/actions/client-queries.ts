@@ -57,7 +57,10 @@ export async function getClientProjectsImpl(
     }
 
     await connectDB();
-    const projects = await ProjectModel.find({ clientId, agencyId }).skip(offset).limit(limit).lean() as ProjectLike[];
+    const projects = await ProjectModel.find({
+        $or: [{ clientId }, { clientIds: clientId }],
+        agencyId,
+    }).skip(offset).limit(limit).lean() as ProjectLike[];
     const hydratedProjects = await hydrateProjectsWithCurrentClients(projects, agencyId);
     const serviceLookupQuery = buildProjectServiceLookupQuery(hydratedProjects);
     const services = serviceLookupQuery

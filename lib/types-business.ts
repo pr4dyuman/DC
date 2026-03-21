@@ -82,6 +82,7 @@ export type Project = {
     name: string;
     client?: string;
     clientId?: string;
+    clientIds?: string[];
     services: string[];
     serviceConfigs?: ProjectServiceConfig[];
     status: "Active" | "Completed" | "On Hold" | "Cancelled";

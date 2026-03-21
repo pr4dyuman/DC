@@ -42,7 +42,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
     const [formData, setFormData] = useState<CreateProjectWizardFormData>({
         name: "",
         slug: "",
-        clientId: "",
+        clientIds: [],
         clientName: "",
         services: [],
         serviceConfigs: [] as ProjectServiceConfig[],
@@ -170,18 +170,15 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
         setSubmitting(true);
 
         try {
-            const client = clients.find((option) => option.id === formData.clientId);
-
             await createProject({
                 name: formData.name,
                 slug: formData.slug || undefined,
-                client: client?.name,
-                clientId: formData.clientId || undefined,
+                clientIds: formData.clientIds,
                 services: formData.services,
                 serviceConfigs: formData.serviceConfigs,
                 budget: formData.budget,
                 dueDate: formData.dueDate,
-            });
+            } as Parameters<typeof createProject>[0]);
 
             if (onProjectCreated) onProjectCreated();
             onOpenChange(false);

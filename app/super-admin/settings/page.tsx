@@ -11,7 +11,6 @@ import type { EmailCategory, TaskEmailEventKey, TaskEmailEventConfig } from "@/l
 import { toast } from "sonner";
 import { SystemSettingsAiAgencyList } from "./_components/SystemSettingsAiAgencyList";
 import { SystemSettingsDefaultAiSection, FeatureConfigs } from "./_components/SystemSettingsDefaultAiSection";
-import { AIFeatureConfigState } from "./_components/FeatureConfigEditor";
 import { SystemSettingsEmailAdminSection } from "./_components/SystemSettingsEmailAdminSection";
 import { SystemSettingsEmailCategorySection } from "./_components/SystemSettingsEmailCategorySection";
 import { SystemSettingsEmailGlobalControls } from "./_components/SystemSettingsEmailGlobalControls";
@@ -150,7 +149,7 @@ export default function SystemSettingsPage() {
                         // Load per-feature model overrides
                         const fc: FeatureConfigs = {};
                         for (const key of ["chatConfig", "agentConfig", "taskExplainConfig", "hourEstimateConfig", "taskChatbotConfig"] as const) {
-                            const subConf = (daiConfig as Record<string, any>)[key];
+                            const subConf = (daiConfig as AIConfig & Record<string, AIConfig | undefined>)[key];
                             if (subConf && Object.keys(subConf).length > 0) {
                                 fc[key] = {
                                     provider: subConf.provider,

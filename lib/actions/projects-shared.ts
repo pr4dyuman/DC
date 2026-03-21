@@ -35,30 +35,42 @@ export function createDefaultProjectPaymentConfig(): PaymentConfig {
     };
 }
 
-export async function hydrateProjectsWithCurrentClients<T extends { clientId?: string; client?: string }>(
+export async function hydrateProjectsWithCurrentClients<T extends { clientId?: string; clientIds?: string[]; client?: string }>(
     projects: T[],
     agencyId: string
 ): Promise<T[]> {
     if (!Array.isArray(projects) || projects.length === 0) return projects;
 
-    const clientIds = Array.from(new Set(
-        projects
-            .map((project) => String(project?.clientId || "").trim())
-            .filter(Boolean)
+    // Collect IDs from both legacy clientId and the new clientIds array
+    const allClientIds = Array.from(new Set(
+        projects.flatMap((project) => {
+            const ids: string[] = [];
+            const singular = String(project?.clientId || "").trim();
+            if (singular) ids.push(singular);
+            if (Array.isArray(project?.clientIds)) {
+                project.clientIds.forEach((id) => {
+                    const normalized = String(id || "").trim();
+                    if (normalized) ids.push(normalized);
+                });
+            }
+            return ids;
+        })
     ));
 
-    if (clientIds.length === 0) return projects;
+    if (allClientIds.length === 0) return projects;
 
-    const clients = await ClientModel.find({ id: { $in: clientIds }, agencyId })
+    const clients = await ClientModel.find({ id: { $in: allClientIds }, agencyId })
         .select("id name")
         .lean() as Array<{ id: string; name: string }>;
 
     const clientNameById = new Map(clients.map((client) => [String(client.id), String(client.name)] as const));
 
     return projects.map((project) => {
-        const clientId = String(project?.clientId || "").trim();
-        if (!clientId) return project;
-        const clientName = clientNameById.get(clientId);
+        // Primary display name: use clientId first, then first entry of clientIds
+        const primaryId = String(project?.clientId || "").trim()
+            || (Array.isArray(project?.clientIds) && project.clientIds.length > 0 ? String(project.clientIds[0]).trim() : "");
+        if (!primaryId) return project;
+        const clientName = clientNameById.get(primaryId);
         if (!clientName || clientName === project.client) return project;
         return { ...project, client: clientName };
     });
@@ -66,22 +78,45 @@ export async function hydrateProjectsWithCurrentClients<T extends { clientId?: s
 
 export async function resolveProjectClientFields(
     clientIdValue: unknown,
-    agencyId: string
-): Promise<{ clientId?: string; client?: string; unsetClient: boolean }> {
-    const normalizedClientId = typeof clientIdValue === "string" ? clientIdValue.trim() : "";
-    if (!normalizedClientId) {
+    agencyId: string,
+    clientIdsValue?: unknown
+): Promise<{ clientId?: string; clientIds?: string[]; client?: string; unsetClient: boolean }> {
+    // Build the canonical list from clientIds (array) first, fall back to singular clientId
+    const rawIds: string[] = [];
+
+    if (Array.isArray(clientIdsValue)) {
+        clientIdsValue.forEach((id) => {
+            const normalized = typeof id === "string" ? id.trim() : "";
+            if (normalized) rawIds.push(normalized);
+        });
+    }
+
+    // Also include a singular clientId if provided and not already in the list
+    const singularId = typeof clientIdValue === "string" ? clientIdValue.trim() : "";
+    if (singularId && !rawIds.includes(singularId)) {
+        rawIds.unshift(singularId);
+    }
+
+    if (rawIds.length === 0) {
         return { unsetClient: true };
     }
 
-    const clientDoc = await ClientModel.findOne({ id: normalizedClientId, agencyId })
+    // Validate ALL client IDs exist in this agency
+    const clientDocs = await ClientModel.find({ id: { $in: rawIds }, agencyId })
         .select("id name")
-        .lean() as { id: string; name: string } | null;
+        .lean() as Array<{ id: string; name: string }>;
 
-    if (!clientDoc) throw new Error(`Client with ID ${normalizedClientId} not found`);
+    const foundIds = new Set(clientDocs.map((c) => String(c.id)));
+    const missingIds = rawIds.filter((id) => !foundIds.has(id));
+    if (missingIds.length > 0) throw new Error(`Client(s) not found: ${missingIds.join(", ")}`);
+
+    // Preserve ordering: primary = first in rawIds list
+    const primaryDoc = clientDocs.find((c) => c.id === rawIds[0]) || clientDocs[0];
 
     return {
-        clientId: String(clientDoc.id),
-        client: String(clientDoc.name),
+        clientId: String(primaryDoc.id),
+        clientIds: rawIds,
+        client: String(primaryDoc.name),
         unsetClient: false,
     };
 }

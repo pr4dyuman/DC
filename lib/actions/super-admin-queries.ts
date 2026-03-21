@@ -128,7 +128,7 @@ export async function getAgencyAIConfigSuperAdminImpl(agencyId: string): Promise
     // Mask nested feature config API keys too
     const featureKeys = ['chatConfig', 'agentConfig', 'taskExplainConfig', 'hourEstimateConfig', 'taskChatbotConfig'] as const;
     for (const key of featureKeys) {
-        const fc = (config as Record<string, any>)[key];
+        const fc = (config as AIConfig & Record<string, { apiKey?: string } | undefined>)[key];
         if (fc?.apiKey) {
             const decrypted = decryptApiKey(fc.apiKey);
             fc.apiKey = decrypted.length > 4 ? '****' + decrypted.slice(-4) : '****';
@@ -153,7 +153,7 @@ export async function getDefaultAiConfigImpl(): Promise<AIConfig | null> {
     // Mask nested feature config API keys too
     const featureKeys = ['chatConfig', 'agentConfig', 'taskExplainConfig', 'hourEstimateConfig', 'taskChatbotConfig'] as const;
     for (const key of featureKeys) {
-        const fc = (maskedConfig as Record<string, any>)[key];
+        const fc = (maskedConfig as AIConfig & Record<string, { apiKey?: string } | undefined>)[key];
         if (fc?.apiKey) {
             const decrypted = decryptApiKey(fc.apiKey);
             fc.apiKey = decrypted.length > 4 ? '****' + decrypted.slice(-4) : '****';

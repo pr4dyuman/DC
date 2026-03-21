@@ -21,8 +21,15 @@ export function CreateProjectWizardSummaryStep({
                     <span className="font-medium">{formData.name}</span>
                 </div>
                 <div className="flex justify-between border-b pb-2">
-                    <span className="text-muted-foreground">Client</span>
-                    <span className="font-medium">{clients.find((client) => client.id === formData.clientId)?.name || "None"}</span>
+                    <span className="text-muted-foreground">Clients</span>
+                    <span className="font-medium">
+                        {formData.clientIds.length > 0
+                            ? clients
+                                .filter((c) => formData.clientIds.includes(c.id))
+                                .map((c) => c.name)
+                                .join(", ")
+                            : "None"}
+                    </span>
                 </div>
                 <div className="flex justify-between border-b pb-2">
                     <span className="text-muted-foreground">Due Date</span>

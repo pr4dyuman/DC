@@ -20,6 +20,7 @@ type ProjectQueryActor = {
 type ProjectDirectoryProject = {
     id: string;
     clientId?: string;
+    clientIds?: string[];
 };
 
 type ProjectDirectoryTask = {
@@ -88,7 +89,7 @@ export async function getProjectsImpl(
 
     const query: Record<string, unknown> = { agencyId };
     if (actor.role === "client") {
-        query.clientId = actor.id;
+        query.$or = [{ clientId: actor.id }, { clientIds: actor.id }];
     } else if (actor.role === "employee") {
         query.id = { $in: scopedProjectIds || [] };
     }
@@ -110,7 +111,10 @@ export async function getUserProjectsImpl(agencyId: string, userId: string) {
 
     const isClient = await ClientModel.exists({ id: userId, agencyId });
     if (isClient) {
-        const projects = await ProjectModel.find({ clientId: userId, agencyId }).lean() as ProjectLike[];
+        const projects = await ProjectModel.find({
+            $or: [{ clientId: userId }, { clientIds: userId }],
+            agencyId,
+        }).lean() as ProjectLike[];
         const hydratedProjects = await hydrateProjectsWithCurrentClients(projects, agencyId);
         const serviceLookupQuery = buildProjectServiceLookupQuery(hydratedProjects);
         const services = serviceLookupQuery
@@ -169,7 +173,7 @@ export async function getProjectDirectoryUsersImpl(agencyId: string, projectId: 
     await connectDB();
 
     const [project, tasks, services] = await Promise.all([
-        ProjectModel.findOne({ id: projectId, agencyId }).select("id clientId").lean() as Promise<ProjectDirectoryProject | null>,
+        ProjectModel.findOne({ id: projectId, agencyId }).select("id clientId clientIds").lean() as Promise<ProjectDirectoryProject | null>,
         TaskModel.find({ projectId, agencyId }).select("assigneeId createdBy comments").lean() as Promise<ProjectDirectoryTask[]>,
         ServiceModel.find({ projectId, agencyId }).select("employees").lean() as Promise<ProjectDirectoryService[]>,
     ]);
@@ -203,33 +207,34 @@ export async function getProjectDirectoryUsersImpl(agencyId: string, projectId: 
 
     const teamUsers = teamUsersRaw.map((user) => withAgencyIdFallback(sanitizeDoc(user) as ProjectDirectoryUser & { agencyId?: string }, agencyId));
 
-    if (!project.clientId) {
+    // Collect all linked client IDs (new array + legacy singular)
+    const linkedClientIds = Array.from(new Set([
+        ...(project.clientIds || []),
+        ...(project.clientId ? [project.clientId] : []),
+    ])).filter(Boolean);
+
+    if (linkedClientIds.length === 0) {
         return teamUsers;
     }
 
-    const client = await ClientModel.findOne({
-        id: project.clientId,
+    const clientDocs = await ClientModel.find({
+        id: { $in: linkedClientIds },
         agencyId,
         archived: { $ne: true },
-    }).select("id agencyId name email username companyName logo").lean() as ProjectDirectoryClient | null;
+    }).select("id agencyId name email username companyName logo").lean() as ProjectDirectoryClient[];
 
-    if (!client) {
-        return teamUsers;
-    }
+    const clientUsers = clientDocs.map((client) => ({
+        id: client.id,
+        agencyId: client.agencyId || agencyId,
+        name: client.name,
+        email: client.email,
+        role: "client" as const,
+        username: client.username || client.id,
+        avatar: client.logo || "",
+        jobTitle: client.companyName || "",
+    }));
 
-    return [
-        ...teamUsers,
-        {
-            id: client.id,
-            agencyId: client.agencyId || agencyId,
-            name: client.name,
-            email: client.email,
-            role: "client" as const,
-            username: client.username || client.id,
-            avatar: client.logo || "",
-            jobTitle: client.companyName || "",
-        },
-    ];
+    return [...teamUsers, ...clientUsers];
 }
 
 export async function getProjectTasksImpl(agencyId: string, projectIds: string[]) {

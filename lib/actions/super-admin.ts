@@ -362,7 +362,8 @@ export async function updateAgencyAIConfigSuperAdmin(agencyId: string, config: A
         encryptedApiKey = existingAgency.aiConfig.apiKey;
     }
 
-    const processFeatureConfig = (newConf: any, oldConf: any) => {
+    type RawFeatureConf = { apiKey?: string; provider?: string; model?: string; customModelId?: string };
+    const processFeatureConfig = (newConf: RawFeatureConf, oldConf?: RawFeatureConf) => {
         if (!newConf) return undefined;
         let encKey = "";
         if (newConf.apiKey && !newConf.apiKey.startsWith('****')) {
@@ -373,7 +374,7 @@ export async function updateAgencyAIConfigSuperAdmin(agencyId: string, config: A
         return {
             provider: newConf.provider,
             apiKey: encKey,
-            model: sanitizeString(newConf.model, 200),
+            model: sanitizeString(newConf.model ?? '', 200),
             ...(newConf.customModelId ? { customModelId: sanitizeString(newConf.customModelId, 200) } : {})
         };
     };
@@ -483,7 +484,8 @@ export async function saveDefaultAiConfig(config: AIConfig | null) {
         }
 
         const existingGlobal = await SystemSettingsModel.findOne({ key: 'global' }).lean() as SystemSettingsRecord | null;
-        const processFeatureConfigGlobal = (newConf: any, oldConf: any) => {
+        type RawFeatureConfGlobal = { apiKey?: string; provider?: string; model?: string; customModelId?: string };
+        const processFeatureConfigGlobal = (newConf: RawFeatureConfGlobal, oldConf?: RawFeatureConfGlobal) => {
             if (!newConf) return undefined;
             let encKey = "";
             if (newConf.apiKey && !newConf.apiKey.startsWith('****')) {
@@ -494,7 +496,7 @@ export async function saveDefaultAiConfig(config: AIConfig | null) {
             return {
                 provider: newConf.provider,
                 apiKey: encKey,
-                model: sanitizeString(newConf.model, 200),
+                model: sanitizeString(newConf.model ?? '', 200),
                 ...(newConf.customModelId ? { customModelId: sanitizeString(newConf.customModelId, 200) } : {})
             };
         };

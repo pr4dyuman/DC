@@ -14,9 +14,15 @@ async function ProjectData({ slug }: { slug: string }) {
         return <div>Project not found: {slug}</div>;
     }
 
-    // Clients can only view projects they own
-    if (currentUser.role === 'client' && project.clientId !== currentUser.id) {
-        redirect('/dashboard/projects');
+    // Clients can only view projects they are linked to (single or multi-client)
+    if (currentUser.role === 'client') {
+        const linkedIds: string[] = [
+            ...(project.clientId ? [project.clientId] : []),
+            ...(project.clientIds || []),
+        ];
+        if (!linkedIds.includes(currentUser.id)) {
+            redirect('/dashboard/projects');
+        }
     }
 
     const isAdminOrManager = currentUser.role === 'admin' || currentUser.role === 'manager';

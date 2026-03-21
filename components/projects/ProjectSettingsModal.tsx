@@ -16,10 +16,11 @@ interface ProjectSettingsModalProps {
     projectId: string;
     currentSlug?: string;
     currentClientId?: string;
+    currentClientIds?: string[];
     currentUserId?: string;
 }
 
-export function ProjectSettingsModal({ projectId, currentSlug, currentClientId }: ProjectSettingsModalProps) {
+export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, currentClientIds }: ProjectSettingsModalProps) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [status, setStatus] = useState<Project["status"] | "">("");
@@ -28,9 +29,17 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId }
 
     // Client State
     const [clients, setClients] = useState<Client[]>([]);
-    const [selectedClientId, setSelectedClientId] = useState(currentClientId || "");
+    // Canonical multi-client array (seeded from both currentClientIds and legacy currentClientId)
+    const buildInitialIds = () => {
+        const ids = Array.from(new Set([
+            ...(currentClientIds || []),
+            ...(currentClientId ? [currentClientId] : []),
+        ])).filter(Boolean);
+        return ids;
+    };
+    const [selectedClientIds, setSelectedClientIds] = useState<string[]>(buildInitialIds);
     const [name, setName] = useState("");
-    const [isEditingSelection, setIsEditingSelection] = useState(!currentClientId);
+    const [isEditingSelection, setIsEditingSelection] = useState(buildInitialIds().length === 0);
     const [clientLoading, setClientLoading] = useState(false);
 
     // AI State
@@ -66,23 +75,22 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId }
     }, [open, loadData]);
 
     useEffect(() => {
-        setSelectedClientId(currentClientId || "");
-    }, [currentClientId]);
+        setSelectedClientIds(buildInitialIds());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentClientId, currentClientIds]);
 
     // --- Client Handlers ---
-    const handleAssignClient = async (clientId: string) => {
+    const handleAssignClients = async (clientIds: string[]) => {
         setClientLoading(true);
-        await updateProject(projectId, { clientId });
-        setSelectedClientId(clientId);
-        setIsEditingSelection(false);
+        await updateProject(projectId, { clientIds } as Parameters<typeof updateProject>[1]);
+        setSelectedClientIds(clientIds);
+        setIsEditingSelection(clientIds.length === 0);
         setClientLoading(false);
         router.refresh();
     };
 
     const handleUpdateName = async () => {
         if (!name) return;
-
-        // Auto-generate safe slug
         const newSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
         // Update both name and slug
@@ -137,7 +145,6 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId }
         }
     };
 
-    const currentClient = clients.find(c => c.id === selectedClientId);
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -175,16 +182,16 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId }
                             statusLoading={statusLoading}
                             statusError={statusError}
                             name={name}
-                            currentClient={currentClient}
+
                             isEditingSelection={isEditingSelection}
-                            selectedClientId={selectedClientId}
+                            selectedClientIds={selectedClientIds}
                             clients={clients}
                             clientLoading={clientLoading}
                             onUpdateStatus={handleUpdateStatus}
                             onNameChange={setName}
                             onUpdateName={handleUpdateName}
                             onStartEditingSelection={() => setIsEditingSelection(true)}
-                            onAssignClient={handleAssignClient}
+                            onAssignClients={handleAssignClients}
                         />
                     </TabsContent>
 

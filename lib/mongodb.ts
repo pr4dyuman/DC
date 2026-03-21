@@ -148,6 +148,7 @@ const ProjectSchema = new Schema<Project>({
     name: { type: String, required: true },
     client: { type: String },
     clientId: { type: String },
+    clientIds: [{ type: String }],
     services: [{ type: String }],
     serviceConfigs: [ProjectServiceConfigSchema],
     status: { type: String, enum: ['Active', 'Completed', 'On Hold', 'Cancelled'], required: true },
@@ -160,6 +161,7 @@ const ProjectSchema = new Schema<Project>({
 
 // Note: id already has index from unique constraint
 ProjectSchema.index({ clientId: 1 });
+ProjectSchema.index({ clientIds: 1 });
 ProjectSchema.index({ status: 1 });
 ProjectSchema.index({ agencyId: 1, status: 1 });                          // Compound: agency+status
 ProjectSchema.index({ agencyId: 1, slug: 1 }, { unique: true, sparse: true }); // Slug unique per agency

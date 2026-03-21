@@ -6,7 +6,8 @@ export const SINGULARITY_TOOL_DECLARATIONS_PROJECT_TASK = [
             type: "OBJECT",
             properties: {
                 name: { type: "STRING", description: "Project name" },
-                clientId: { type: "STRING", description: "Client ID from the QUICK LOOKUP TABLE (optional)" },
+                clientId: { type: "STRING", description: "[Deprecated] Single client ID — use clientIds instead" },
+                clientIds: { type: "ARRAY", items: { type: "STRING" }, description: "List of client IDs from the QUICK LOOKUP TABLE (optional). Supports multiple clients on one project." },
                 budget: { type: "NUMBER", description: "Project budget in INR" },
                 dueDate: { type: "STRING", description: "Project deadline in YYYY-MM-DD format" },
                 status: { type: "STRING", description: "Project status - use 'Completed' for past/historical projects", enum: ["Active", "Completed", "On Hold"] },

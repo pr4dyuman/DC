@@ -41,7 +41,10 @@ export async function getTransactionsImpl(
     if (userId) query.userId = userId;
 
     if (actor.role === "client") {
-        const clientProjectIds = await ProjectModel.distinct("id", { clientId: actor.id, agencyId });
+        const clientProjectIds = await ProjectModel.distinct("id", {
+            $or: [{ clientId: actor.id }, { clientIds: actor.id }],
+            agencyId,
+        });
         if (projectId) {
             if (!clientProjectIds.includes(projectId)) return [];
             query.projectId = projectId;
@@ -57,9 +60,15 @@ export async function getTransactionsImpl(
 export async function getClientFinanceDataImpl(agencyId: string, clientId: string) {
     await connectDB();
 
-    const clientProjectIds = await ProjectModel.distinct("id", { clientId, agencyId });
+    const clientProjectIds = await ProjectModel.distinct("id", {
+        $or: [{ clientId }, { clientIds: clientId }],
+        agencyId,
+    });
     const [projects, invoices, transactions] = await Promise.all([
-        ProjectModel.find({ clientId, agencyId }).lean() as Promise<ProjectLike[]>,
+        ProjectModel.find({
+            $or: [{ clientId }, { clientIds: clientId }],
+            agencyId,
+        }).lean() as Promise<ProjectLike[]>,
         InvoiceModel.find({ projectId: { $in: clientProjectIds }, agencyId }).lean() as Promise<Invoice[]>,
         TransactionModel.find({ projectId: { $in: clientProjectIds }, agencyId }).lean() as Promise<Transaction[]>,
     ]);
@@ -133,7 +142,10 @@ export async function getInvoicesImpl(agencyId: string, actor: FinanceQueryActor
     if (projectId) query.projectId = projectId;
 
     if (actor.role === "client") {
-        const clientProjectIds = await ProjectModel.distinct("id", { clientId: actor.id, agencyId });
+        const clientProjectIds = await ProjectModel.distinct("id", {
+            $or: [{ clientId: actor.id }, { clientIds: actor.id }],
+            agencyId,
+        });
         if (projectId) {
             if (!clientProjectIds.includes(projectId)) return [];
             query.projectId = projectId;
@@ -262,7 +274,10 @@ export async function getPayrollStatusImpl(agencyId: string, userId?: string) {
 export async function getClientFinancialSummaryImpl(agencyId: string, clientId: string) {
     await connectDB();
 
-    const clientProjects = await ProjectModel.find({ clientId, agencyId }).lean() as ProjectLike[];
+    const clientProjects = await ProjectModel.find({
+        $or: [{ clientId }, { clientIds: clientId }],
+        agencyId,
+    }).lean() as ProjectLike[];
     const projectIds = clientProjects.map((project) => project.id);
 
     const [invoices, transactions] = await Promise.all([

@@ -135,15 +135,23 @@ export async function updateProjectImpl(
     const setUpdates: Record<string, unknown> = { ...updates };
     const unsetUpdates: Record<string, ""> = {};
 
-    if (Object.prototype.hasOwnProperty.call(setUpdates, "clientId")) {
-        const clientFields = await resolveProjectClientFields(setUpdates.clientId, agencyId);
+    if (Object.prototype.hasOwnProperty.call(setUpdates, "clientId")
+        || Object.prototype.hasOwnProperty.call(setUpdates, "clientIds")) {
+        const clientFields = await resolveProjectClientFields(
+            setUpdates.clientId,
+            agencyId,
+            setUpdates.clientIds
+        );
         delete setUpdates.clientId;
+        delete setUpdates.clientIds;
         delete setUpdates.client;
         if (clientFields.unsetClient) {
             unsetUpdates.clientId = "";
             unsetUpdates.client = "";
+            setUpdates.clientIds = [];
         } else {
             setUpdates.clientId = clientFields.clientId;
+            setUpdates.clientIds = clientFields.clientIds;
             setUpdates.client = clientFields.client;
         }
     }
@@ -169,49 +177,65 @@ export async function updateProjectImpl(
         );
     }
 
-    if (updates.status && oldProject && oldProject.status !== updates.status && oldProject.clientId && await isNotifEnabled("project")) {
+    if (updates.status && oldProject && oldProject.status !== updates.status && await isNotifEnabled("project")) {
         const statusMessages: Record<string, string> = {
             Active: "is now active and in progress",
             Completed: "has been completed",
             "On Hold": "has been put on hold",
             Cancelled: "has been cancelled",
         };
-        await NotificationModel.create({
-            id: generateId(),
-            agencyId,
-            userId: oldProject.clientId,
-            message: `Project "${oldProject.name}" ${statusMessages[updates.status] || `status updated to ${updates.status}`}`,
-            read: false,
-            timestamp: new Date().toISOString(),
-            link: `/dashboard/projects/${id}`,
-        });
+        // Notify ALL linked clients
+        const notifyClientIds: string[] = [
+            ...((oldProject as { clientIds?: string[] }).clientIds || []),
+            ...(oldProject.clientId && !((oldProject as { clientIds?: string[] }).clientIds || []).includes(oldProject.clientId) ? [oldProject.clientId] : []),
+        ];
+        if (notifyClientIds.length > 0) {
+            await NotificationModel.insertMany(
+                notifyClientIds.map((cid) => ({
+                    id: generateId(),
+                    agencyId,
+                    userId: cid,
+                    message: `Project "${oldProject.name}" ${statusMessages[updates.status!] || `status updated to ${updates.status}`}`,
+                    read: false,
+                    timestamp: new Date().toISOString(),
+                    link: `/dashboard/projects/${id}`,
+                }))
+            );
+        }
     }
 
-    if (updates.status && oldProject && oldProject.status !== updates.status && oldProject.clientId) {
-        try {
-            const client = await ClientModel.findOne({ id: oldProject.clientId, agencyId })
-                .select("email name")
-                .lean() as { email?: string; name?: string } | null;
-            if (client?.email && client.name) {
-                const statusMessages: Record<string, string> = {
-                    Active: "is now active and in progress",
-                    Completed: "has been completed",
-                    "On Hold": "has been put on hold",
-                    Cancelled: "has been cancelled",
-                };
-
-                await sendProjectStatusChangedEmail({
-                    clientEmail: client.email,
-                    clientName: client.name,
-                    projectName: oldProject.name,
-                    oldStatus: oldProject.status,
-                    newStatus: updates.status,
-                    statusMessage: statusMessages[updates.status] || `status updated to ${updates.status}`,
-                    projectLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/projects/${id}`,
-                });
+    if (updates.status && oldProject && oldProject.status !== updates.status) {
+        const emailClientIds: string[] = [
+            ...((oldProject as { clientIds?: string[] }).clientIds || []),
+            ...(oldProject.clientId && !((oldProject as { clientIds?: string[] }).clientIds || []).includes(oldProject.clientId) ? [oldProject.clientId] : []),
+        ];
+        if (emailClientIds.length > 0) {
+            try {
+                const allClients = await ClientModel.find({ id: { $in: emailClientIds }, agencyId })
+                    .select("email name")
+                    .lean() as Array<{ email?: string; name?: string }>;
+                for (const client of allClients) {
+                    if (client?.email && client.name) {
+                        const statusMessages: Record<string, string> = {
+                            Active: "is now active and in progress",
+                            Completed: "has been completed",
+                            "On Hold": "has been put on hold",
+                            Cancelled: "has been cancelled",
+                        };
+                        await sendProjectStatusChangedEmail({
+                            clientEmail: client.email,
+                            clientName: client.name,
+                            projectName: oldProject.name,
+                            oldStatus: oldProject.status,
+                            newStatus: updates.status!,
+                            statusMessage: statusMessages[updates.status!] || `status updated to ${updates.status}`,
+                            projectLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/projects/${id}`,
+                        });
+                    }
+                }
+            } catch (emailError) {
+                console.error("[Email] Failed to send project status change email:", emailError);
             }
-        } catch (emailError) {
-            console.error("[Email] Failed to send project status change email:", emailError);
         }
     }
 

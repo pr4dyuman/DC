@@ -159,7 +159,7 @@ export async function updateClientImpl(id: string, updates: Partial<Client>, age
         const oldName = oldClient?.name;
         if (oldName && oldName !== updates.name) {
             await ProjectModel.updateMany(
-                { clientId: id, agencyId },
+                { $or: [{ clientId: id }, { clientIds: id }], agencyId },
                 { $set: { client: updates.name } }
             );
         }
@@ -188,7 +188,7 @@ export async function deleteClientImpl(id: string, agencyId?: string) {
         { $set: { archived: true, archivedAt: archiveTimestamp } }
     );
     await ProjectModel.updateMany(
-        { clientId: id, agencyId, status: "Active" },
+        { $or: [{ clientId: id }, { clientIds: id }], agencyId, status: "Active" },
         {
             $set: {
                 status: "On Hold",
@@ -230,10 +230,12 @@ export async function unarchiveClientImpl(id: string, agencyId?: string) {
     );
     await ProjectModel.updateMany(
         {
-            clientId: id,
+            $and: [
+                { $or: [{ clientId: id }, { clientIds: id }] },
+                { $or: recoveryClauses },
+            ],
             agencyId,
             status: "On Hold",
-            $or: recoveryClauses,
         },
         {
             $set: { status: "Active" },

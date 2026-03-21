@@ -33,9 +33,10 @@ export async function executeProjectWriteTool(
                 budget: getNumberArg(args, "budget"),
                 dueDate: getOptionalStringArg(args, "dueDate") || new Date(Date.now() + 90 * 86400000).toISOString().split("T")[0],
                 clientId: getOptionalStringArg(args, "clientId"),
+                clientIds: getStringArrayArg(args, "clientIds"),
                 client: undefined,
                 services: getStringArrayArg(args, "services"),
-            });
+            } as Parameters<typeof createProject>[0]);
 
             const status = getOptionalStringArg(args, "status");
             const createdAt = getOptionalStringArg(args, "createdAt");

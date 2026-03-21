@@ -14,7 +14,7 @@ export type ServiceOption = {
 export type CreateProjectWizardFormData = {
     name: string;
     slug: string;
-    clientId: string;
+    clientIds: string[];
     clientName: string;
     services: string[];
     serviceConfigs: ProjectServiceConfig[];

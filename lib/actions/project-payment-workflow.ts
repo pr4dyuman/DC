@@ -128,17 +128,19 @@ export async function updateProjectPaymentImpl(
         if (!cfg) continue;
 
         // Derive installmentDates from firstPaymentDate+count if not set (legacy data)
-        let installmentDates = Array.isArray(cfg.installmentDates) && cfg.installmentDates.length > 0
+        const baseInstallmentDates = Array.isArray(cfg.installmentDates) && cfg.installmentDates.length > 0
             ? cfg.installmentDates
             : [];
-        if (installmentDates.length === 0 && cfg.type === "installment" && cfg.firstPaymentDate) {
-            const count = cfg.installments || 1;
-            for (let i = 0; i < count; i++) {
-                const d = new Date(cfg.firstPaymentDate);
-                d.setMonth(d.getMonth() + i);
-                installmentDates.push(d.toISOString().split("T")[0]);
-            }
-        }
+        const installmentDates = baseInstallmentDates.length === 0 && cfg.type === "installment" && cfg.firstPaymentDate
+            ? (() => {
+                const count = cfg.installments || 1;
+                return Array.from({ length: count }, (_, i) => {
+                    const d = new Date(cfg.firstPaymentDate!);
+                    d.setMonth(d.getMonth() + i);
+                    return d.toISOString().split("T")[0];
+                });
+            })()
+            : baseInstallmentDates;
 
         if (cfg.type === "installment" && installmentDates.length > 0) {
             const amountPerInstallment = cfg.installmentAmount

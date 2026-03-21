@@ -6,7 +6,7 @@ import { ArrowLeft, Sparkles, Eye, EyeOff, Check, AlertCircle, Trash2, Brain, Ch
 import { getAgencyDetails, getAgencyAIConfigSuperAdmin, updateAgencyAIConfigSuperAdmin, removeAgencyAIConfig } from "@/lib/actions/super-admin";
 import { AI_MODELS } from "@/lib/ai-models";
 import { AIProvider, AIConfig, AIFeatureConfig } from "@/lib/types";
-import { FeatureConfigEditor, AIFeatureConfigState, PROVIDER_INFO } from "../../_components/FeatureConfigEditor";
+import { FeatureConfigEditor, PROVIDER_INFO } from "../../_components/FeatureConfigEditor";
 
 const FEATURE_LABELS = [
     { key: "chatConfig" as const,         label: "Singularity Chat",    desc: "Conversational AI chat mode" },
@@ -18,7 +18,7 @@ const FEATURE_LABELS = [
 ];
 
 type FeatureModelKey = typeof FEATURE_LABELS[number]["key"];
-type FeatureConfigs = Partial<Record<FeatureModelKey, AIFeatureConfigState>>;
+type FeatureConfigs = Partial<Record<FeatureModelKey, AIFeatureConfig>>;
 
 export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: string }> }) {
     const [agencyId, setAgencyId] = useState<string>("");
@@ -58,7 +58,7 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
                 // Load per-feature overrides — restore toggles
                 const fc: FeatureConfigs = {};
                 for (const { key } of FEATURE_LABELS) {
-                    const subConf = (config as Record<string, any>)[key] as AIFeatureConfig | undefined;
+                    const subConf = (config as AIConfig & Record<string, AIFeatureConfig | undefined>)[key] as AIFeatureConfig | undefined;
                     if (subConf && Object.keys(subConf).length > 0) {
                         fc[key] = {
                             provider: subConf.provider,
