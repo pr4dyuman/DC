@@ -89,7 +89,7 @@ export function ProfileModalGeneralTab({
                     <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Avatar</span>
                 </div>
 
-                <div className="flex-1 space-y-4">
+                <div className="flex-1 min-w-0 space-y-4">
                     <div className="grid gap-2">
                         <Label htmlFor="name">Full Name</Label>
                         <Input
@@ -221,7 +221,7 @@ export function ProfileModalGeneralTab({
                                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Logo</span>
                             </div>
 
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-0">
                                 <div className="grid gap-2">
                                     <Label htmlFor="systemName">System Name</Label>
                                     <Input

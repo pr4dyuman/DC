@@ -117,7 +117,7 @@ export function EmployeeProfileHeaderCard({
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-3 min-w-[160px] sm:min-w-[200px]">
+                <div className="flex flex-col gap-3 w-full md:w-auto">
                     <div className="grid grid-cols-2 gap-3">
                         <Card className="bg-muted/50 border-border p-4 text-center">
                             <div className="text-2xl font-bold text-foreground">{completedTasks}</div>

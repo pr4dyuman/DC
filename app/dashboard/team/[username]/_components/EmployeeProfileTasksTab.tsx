@@ -52,21 +52,21 @@ export function EmployeeProfileTasksTab({
                                 {userRole === "client" ? "Tasks across all projects" : "Current workload and status"}
                             </CardDescription>
                         </div>
-                        <div className="flex gap-2">
-                            <div className="relative">
+                        <div className="flex flex-wrap gap-2">
+                            <div className="relative w-full sm:w-auto">
                                 <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-muted-foreground" />
                                 <input
                                     type="text"
                                     placeholder="Search tasks..."
                                     value={taskSearch}
                                     onChange={(event) => onTaskSearchChange(event.target.value)}
-                                    className="bg-secondary border border-border rounded-lg py-1.5 pl-8 pr-3 text-xs w-40 focus:outline-none focus:ring-1 focus:ring-primary text-foreground placeholder:text-muted-foreground"
+                                    className="bg-secondary border border-border rounded-lg py-1.5 pl-8 pr-3 text-xs w-full sm:w-40 focus:outline-none focus:ring-1 focus:ring-primary text-foreground placeholder:text-muted-foreground"
                                 />
                             </div>
                             <select
                                 value={taskStatusFilter}
                                 onChange={(event) => onTaskStatusFilterChange(event.target.value)}
-                                className="bg-secondary border border-border rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary text-foreground"
+                                className="flex-shrink-0 bg-secondary border border-border rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary text-foreground"
                             >
                                 <option value="all">All Status</option>
                                 <option value="Todo">Todo</option>
@@ -77,7 +77,7 @@ export function EmployeeProfileTasksTab({
                             <select
                                 value={taskSortBy}
                                 onChange={(event) => onTaskSortByChange(event.target.value)}
-                                className="bg-secondary border border-border rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary text-foreground"
+                                className="flex-shrink-0 bg-secondary border border-border rounded-lg py-1.5 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary text-foreground"
                             >
                                 <option value="default">Sort: Default</option>
                                 <option value="priority">Sort: Priority</option>

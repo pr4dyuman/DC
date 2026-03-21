@@ -252,7 +252,7 @@ export default function EmployeeProfilePage({ username }: { username: string }) 
                 <Link href="/dashboard/team" className="p-2 hover:bg-muted rounded-full transition-colors">
                     <ArrowLeft className="h-5 w-5" />
                 </Link>
-                <h1 className="text-2xl font-bold">{user.role === 'client' ? 'Client Profile' : 'Team Member Profile'}</h1>
+                <h1 className="text-2xl font-bold truncate min-w-0">{user.role === 'client' ? 'Client Profile' : 'Team Member Profile'}</h1>
 
                 <div className="ml-auto flex items-center gap-2">
                     <button

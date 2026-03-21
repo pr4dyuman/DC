@@ -224,7 +224,7 @@ export function ProfileModal({ user, open, setOpen }: ProfileModalProps) {
     return (
         <>
             <Dialog open={open} onOpenChange={handleOpenChange}>
-                <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden gap-0 max-h-[85vh] flex flex-col">
+                <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[550px] p-0 overflow-hidden gap-0 max-h-[85vh] flex flex-col">
                     <DialogHeader className="p-6 pb-2">
                         <DialogTitle className="text-xl">Edit Profile{isAdmin ? " & System" : ""}</DialogTitle>
                     </DialogHeader>

@@ -175,8 +175,8 @@ export function EmployeeProfileOverviewTab({
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="flex flex-col lg:flex-row gap-8">
-                            <div className="flex items-center gap-8">
+                        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
                                 <div className="relative w-28 h-28 shrink-0">
                                     <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                                         <circle cx="50" cy="50" r="42" strokeWidth="8" className="fill-none stroke-muted" />
@@ -198,7 +198,7 @@ export function EmployeeProfileOverviewTab({
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-4 min-w-[240px]">
+                                <div className="grid grid-cols-3 gap-4 w-full sm:w-auto">
                                     <div className="text-center">
                                         <div className="text-2xl font-bold text-cyan-500">{completedHours}h</div>
                                         <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mt-1">Completed</div>
