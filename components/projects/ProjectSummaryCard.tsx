@@ -94,9 +94,31 @@ export function ProjectSummaryCard({
                         </div>
 
                         <div className="flex items-center gap-2">
-                            {project.budget > 0 && (
-                                <span className="text-xs text-muted-foreground font-medium">{formatMoney(project.budget)}</span>
-                            )}
+                            {(() => {
+                                // Compute real deal value from service payment configs
+                                // (mirrors ProjectFinanceSummary logic)
+                                let totalFixed = 0;
+                                let totalMonthly = 0;
+                                if (project.serviceConfigs) {
+                                    project.serviceConfigs.forEach((cfg: { paymentConfig?: { type?: string; paymentDetailsLater?: boolean; installmentAmount?: number; installments?: number; monthlyAmount?: number } }) => {
+                                        const pc = cfg.paymentConfig;
+                                        if (!pc || pc.paymentDetailsLater) return;
+                                        if (pc.type === "installment" && pc.installmentAmount) {
+                                            totalFixed += pc.installmentAmount * (pc.installments || 1);
+                                        } else if (pc.type === "monthly" && pc.monthlyAmount) {
+                                            totalMonthly += pc.monthlyAmount;
+                                        }
+                                    });
+                                }
+                                // Use service configs value; fall back to project.budget only if no configs set
+                                const displayValue = totalFixed > 0 ? totalFixed : totalMonthly > 0 ? totalMonthly : project.budget || 0;
+                                if (displayValue <= 0) return null;
+                                return (
+                                    <span className="text-xs text-muted-foreground font-medium">
+                                        {formatMoney(displayValue)}{totalMonthly > 0 && totalFixed === 0 ? "/mo" : ""}
+                                    </span>
+                                );
+                            })()}
                             <DaysLabel dueDate={project.dueDate} status={project.status} />
                         </div>
                     </div>

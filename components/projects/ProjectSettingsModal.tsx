@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Settings, Sparkles } from "lucide-react";
-import { getClients, updateProject, deleteProject, getProjectAssets, toggleAssetAI, getProject, getAgencyAIConfig, syncProjectBudget } from "@/lib/actions";
+import { getClients, updateProject, deleteProject, getProjectAssets, toggleAssetAI, getProject, getAgencyAIConfig } from "@/lib/actions";
 import { Client, Asset, Project } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -44,10 +44,6 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
     const [dueDate, setDueDate] = useState("");
     const [dueDateLoading, setDueDateLoading] = useState(false);
 
-    const [budget, setBudget] = useState("");
-    const [budgetLoading, setBudgetLoading] = useState(false);
-    const [budgetError, setBudgetError] = useState("");
-
     const [assets, setAssets] = useState<Asset[]>([]);
     const [aiConfigured, setAiConfigured] = useState(false);
 
@@ -74,7 +70,6 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
                     setDueDate(d.toISOString().split('T')[0]);
                 }
             }
-            setBudget(projectData.budget > 0 ? String(projectData.budget) : "");
         }
         setAiConfigured(!!aiConfig);
     }, [projectId]);
@@ -135,27 +130,6 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
             toast.error("Failed to update due date");
         } finally {
             setDueDateLoading(false);
-        }
-    };
-
-    const handleUpdateBudget = async () => {
-        setBudgetError("");
-        const parsed = parseFloat(budget);
-        if (budget !== "0" && (isNaN(parsed) || parsed < 0)) {
-            setBudgetError("Enter a valid amount (0 to clear)");
-            return;
-        }
-        setBudgetLoading(true);
-        try {
-            await syncProjectBudget(projectId, isNaN(parsed) ? 0 : parsed);
-            toast.success(parsed === 0 ? "Deal value cleared" : "Deal value updated");
-            router.refresh();
-        } catch (error) {
-            const msg = error instanceof Error ? error.message : "Failed to update deal value";
-            setBudgetError(msg);
-            toast.error(msg);
-        } finally {
-            setBudgetLoading(false);
         }
     };
 
@@ -220,9 +194,6 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
                             name={name}
                             dueDate={dueDate}
                             dueDateLoading={dueDateLoading}
-                            budget={budget}
-                            budgetLoading={budgetLoading}
-                            budgetError={budgetError}
                             isEditingSelection={isEditingSelection}
                             selectedClientIds={selectedClientIds}
                             clients={clients}
@@ -232,8 +203,6 @@ export function ProjectSettingsModal({ projectId, currentSlug, currentClientId, 
                             onUpdateName={handleUpdateName}
                             onDueDateChange={setDueDate}
                             onUpdateDueDate={handleUpdateDueDate}
-                            onBudgetChange={setBudget}
-                            onUpdateBudget={handleUpdateBudget}
                             onStartEditingSelection={() => setIsEditingSelection(true)}
                             onAssignClients={handleAssignClients}
                         />

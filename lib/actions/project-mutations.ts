@@ -19,7 +19,7 @@ import {
     resolveProjectClientFields,
     type ProjectLike,
 } from "./projects-shared";
-export { updateProjectPaymentImpl, syncProjectBudgetImpl } from "./project-payment-workflow";
+export { updateProjectPaymentImpl } from "./project-payment-workflow";
 export { updateProjectImpl } from "./project-update-workflow";
 
 type ProjectMutationActor = {

@@ -3,7 +3,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import type { Client, Project } from "@/lib/types";
-import { Check, ExternalLink, Mail, Pencil, Plus, ShieldAlert, Users, CalendarDays, BadgeDollarSign, AlertCircle, Loader2 } from "lucide-react";
+import { Check, ExternalLink, Mail, Pencil, Plus, ShieldAlert, Users, CalendarDays, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 interface ProjectSettingsGeneralTabProps {
@@ -13,9 +13,6 @@ interface ProjectSettingsGeneralTabProps {
     name: string;
     dueDate: string;
     dueDateLoading: boolean;
-    budget: string;
-    budgetLoading: boolean;
-    budgetError: string;
     isEditingSelection: boolean;
     selectedClientIds: string[];
     clients: Client[];
@@ -25,8 +22,6 @@ interface ProjectSettingsGeneralTabProps {
     onUpdateName: () => void;
     onDueDateChange: (value: string) => void;
     onUpdateDueDate: () => void;
-    onBudgetChange: (value: string) => void;
-    onUpdateBudget: () => void;
     onStartEditingSelection: () => void;
     onAssignClients: (clientIds: string[]) => void;
 }
@@ -35,11 +30,9 @@ export function ProjectSettingsGeneralTab({
     status, statusLoading, statusError,
     name,
     dueDate, dueDateLoading,
-    budget, budgetLoading, budgetError,
     isEditingSelection, selectedClientIds, clients, clientLoading,
     onUpdateStatus, onNameChange, onUpdateName,
     onDueDateChange, onUpdateDueDate,
-    onBudgetChange, onUpdateBudget,
     onStartEditingSelection, onAssignClients,
 }: ProjectSettingsGeneralTabProps) {
     return (
@@ -107,36 +100,6 @@ export function ProjectSettingsGeneralTab({
                     </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">Set or update the project deadline.</p>
-            </div>
-
-            {/* Deal Value */}
-            <div className="space-y-2 p-4 rounded-lg border border-border/50 bg-muted/20">
-                <label className="text-sm font-medium flex items-center gap-2">
-                    <BadgeDollarSign className="w-4 h-4 text-muted-foreground" />Deal Value
-                </label>
-                <div className="flex gap-2">
-                    <input
-                        type="number"
-                        min="0"
-                        className="flex h-9 w-full rounded-md border border-input px-3 py-1 text-sm bg-muted/50"
-                        value={budget}
-                        onChange={(e) => onBudgetChange(e.target.value)}
-                        placeholder="e.g. 50000"
-                    />
-                    <Button size="sm" onClick={onUpdateBudget} disabled={budgetLoading}>
-                        {budgetLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
-                    </Button>
-                </div>
-                {budgetError ? (
-                    <p className="text-xs text-red-500 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />{budgetError}
-                    </p>
-                ) : (
-                    <p className="text-xs text-muted-foreground">
-                        Distributed equally across services.{" "}
-                        <span className="text-amber-500 font-medium">Enter 0 to remove deal value.</span>
-                    </p>
-                )}
             </div>
 
             {/* Assigned Clients */}
