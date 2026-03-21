@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Activity, Asset, Invoice, Notification, Project, Service, Task, Transaction, User } from "../db";
+import type { Activity, Asset, Invoice, Notification, Project, Task, Transaction, User } from "../db";
 import { revalidatePath } from "next/cache";
 import {
     ActivityModel,
@@ -22,9 +22,7 @@ import { sanitizeDoc, sortByDateDesc, withAgencyIdFallback } from "./shared";
 import { buildClientFinanceSummary } from "./finance-shared";
 import {
     buildProjectServiceLookupQuery,
-    getActiveProjectServiceDocs,
     hydrateProjectsWithCurrentServiceNames,
-    mapProjectServicesByProjectId,
     type ProjectServiceSnapshot,
 } from "./projects-shared";
 
@@ -48,8 +46,7 @@ type RevenueHistoryPoint = {
     year: number;
 };
 
-type DistributionProject = Pick<Project, "id" | "services" | "status" | "serviceConfigs">;
-type DistributionService = Pick<Service, "id" | "name" | "projectId">;
+
 
 function isInvoiceOverdueForMetrics(invoice: Partial<Invoice> | null | undefined, now = new Date(), timezone?: string): boolean {
     if (!invoice?.status) return false;
@@ -210,32 +207,24 @@ export async function getRevenueDataImpl(agencyId: string) {
 export async function getProjectDistributionImpl(agencyId: string) {
     await connectDB();
 
-    const projects = await ProjectModel.find({ agencyId, status: { $ne: "Archived" } })
-        .select("id services serviceConfigs status")
-        .lean() as DistributionProject[];
-
-    const serviceLookupQuery = buildProjectServiceLookupQuery(projects);
-    const services = serviceLookupQuery
-        ? await ServiceModel.find({ agencyId, ...serviceLookupQuery })
-            .select("id name projectId")
-            .lean() as DistributionService[]
-        : [];
+    // Group by status (controlled enum) — reliable across all agency types regardless of
+    // how services are named. Excludes Archived projects to match dashboard intent.
+    const projects = await ProjectModel.find({ agencyId })
+        .select("status")
+        .lean() as Array<Pick<Project, "status">>;
 
     const distribution: Record<string, number> = {};
-    const servicesByProjectId = mapProjectServicesByProjectId(projects, services);
 
     projects.forEach((project) => {
-        const activeServices = getActiveProjectServiceDocs(
-            project.services,
-            servicesByProjectId.get(project.id) || []
-        );
-
-        activeServices.forEach((service) => {
-            distribution[service.name] = (distribution[service.name] || 0) + 1;
-        });
+        const status = project.status || "Unknown";
+        distribution[status] = (distribution[status] || 0) + 1;
     });
 
-    return Object.entries(distribution).map(([name, value]) => ({ name, value }));
+    // Enforce a stable display order
+    const ORDER = ["Active", "Completed", "On Hold", "Paused", "Archived", "Unknown"];
+    return ORDER
+        .filter((status) => distribution[status] !== undefined)
+        .map((status) => ({ name: status, value: distribution[status] }));
 }
 
 export async function getRecentActivityImpl(actor: DashboardActor, agencyId: string, offset = 0, limit = 5): Promise<Activity[]> {

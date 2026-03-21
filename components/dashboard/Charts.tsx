@@ -61,20 +61,52 @@ export function RevenueChart({ data }: RevenueChartProps) {
     );
 }
 
-const COLORS = ['#a78bfa', '#34d399', '#fbbf24', '#fb7185'];
+// Semantic colors keyed to project status values
+const STATUS_COLORS: Record<string, string> = {
+    Active: '#34d399',      // emerald
+    Completed: '#a78bfa',   // violet
+    'On Hold': '#fbbf24',   // amber
+    Paused: '#60a5fa',      // blue
+    Archived: '#6b7280',    // gray
+    Unknown: '#fb7185',     // rose
+};
+
+const DEFAULT_COLOR = '#a78bfa';
+
+interface StatusTooltipProps {
+    active?: boolean;
+    payload?: Array<{ name: string; value: number; payload: ProjectDistributionPoint }>;
+}
+
+function StatusTooltip({ active, payload }: StatusTooltipProps) {
+    if (!active || !payload?.length) return null;
+    const { name, value } = payload[0].payload;
+    const total = payload[0].payload._total as number | undefined;
+    const pct = total && total > 0 ? Math.round((value / total) * 100) : null;
+    return (
+        <div style={{ backgroundColor: 'var(--card)', color: 'var(--card-foreground)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', fontSize: 13 }}>
+            <p style={{ fontWeight: 600, marginBottom: 2 }}>{name}</p>
+            <p>{value} project{value !== 1 ? 's' : ''}{pct !== null ? ` (${pct}%)` : ''}</p>
+        </div>
+    );
+}
 
 export function ProjectDistributionChart({ data }: { data: ProjectDistributionPoint[] }) {
+    const total = data.reduce((sum, d) => sum + d.value, 0);
+    // Attach total to each entry so the tooltip can compute percentages
+    const enriched = data.map((d) => ({ ...d, _total: total }));
+
     return (
         <Card className="col-span-3">
             <CardHeader>
-                <CardTitle>Project Distribution</CardTitle>
+                <CardTitle>Projects by Status</CardTitle>
             </CardHeader>
             <CardContent>
                 <div className="h-[250px] sm:h-[350px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie
-                                data={data}
+                                data={enriched}
                                 cx="50%"
                                 cy="50%"
                                 innerRadius={60}
@@ -82,16 +114,19 @@ export function ProjectDistributionChart({ data }: { data: ProjectDistributionPo
                                 paddingAngle={5}
                                 dataKey="value"
                             >
-                                {data.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                {enriched.map((entry) => (
+                                    <Cell
+                                        key={`cell-${entry.name}`}
+                                        fill={STATUS_COLORS[entry.name] ?? DEFAULT_COLOR}
+                                    />
                                 ))}
                             </Pie>
-                            <Tooltip />
+                            <Tooltip content={<StatusTooltip />} />
                             <Legend />
                         </PieChart>
                     </ResponsiveContainer>
                 </div>
             </CardContent>
         </Card>
-    )
+    );
 }
