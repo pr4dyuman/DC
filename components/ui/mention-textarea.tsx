@@ -329,26 +329,23 @@ export function MentionTextarea({
                     line-height: 1.5;
                 }
                 .mention-editor .mention-chip {
-                    display: inline-flex;
-                    align-items: center;
-                    background: rgba(99,102,241,0.12);
-                    color: #6366f1;
-                    border-radius: 4px;
-                    padding: 0 5px;
-                    font-weight: 600;
-                    font-size: 0.85em;
+                    display: inline;
+                    background: none;
+                    color: inherit;
+                    font-weight: 700;
+                    font-size: 1em;
                     cursor: pointer;
                     user-select: none;
-                    transition: background 0.15s;
+                    text-decoration: none;
+                    border-bottom: 1.5px dotted currentColor;
+                    padding-bottom: 0.5px;
+                    opacity: 0.85;
+                    transition: opacity 0.15s, border-color 0.15s;
                     white-space: nowrap;
-                    line-height: 1.6;
                 }
                 .mention-editor .mention-chip:hover {
-                    background: rgba(99,102,241,0.22);
-                    text-decoration: underline;
-                }
-                .dark .mention-editor .mention-chip {
-                    color: #818cf8;
+                    opacity: 1;
+                    border-bottom-style: solid;
                 }
             `}</style>
 

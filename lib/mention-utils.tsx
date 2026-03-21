@@ -35,7 +35,7 @@ export function renderCommentText(text: string): React.ReactNode[] {
             <Link
                 key={match.index}
                 href={`/dashboard/team/${userId}`}
-                className="inline-flex items-center bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold rounded px-1 hover:bg-indigo-500/20 hover:underline transition-colors text-[0.85em]"
+                className="font-bold opacity-85 border-b border-dotted border-current hover:opacity-100 hover:border-solid transition-opacity"
                 title={`View ${displayName}'s profile`}
             >
                 @{displayName}
