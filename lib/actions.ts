@@ -128,6 +128,7 @@ import {
 import {
     createProjectImpl,
     updateProjectPaymentImpl,
+    syncProjectBudgetImpl,
     updateProjectImpl,
 } from "./actions/project-mutations";
 import { globalSearchImpl, type SearchResult as SearchActionResult } from "./actions/search";
@@ -722,6 +723,18 @@ export async function updateProjectPayment(projectId: string, serviceId: string,
     const agency = await getCurrentAgency();
     if (!agency?.id) throw new Error('Agency context required');
     return updateProjectPaymentImpl(projectId, serviceId, paymentConfig, agency.id);
+}
+
+/**
+ * Redistributes a new deal value equally across all service payment configs.
+ * Budget 0 clears the deal value (marks all services as paymentDetailsLater).
+ * Throws if the project has no services.
+ */
+export async function syncProjectBudget(projectId: string, newBudget: number) {
+    await requireRole('admin', 'manager');
+    const agency = await getCurrentAgency();
+    if (!agency?.id) throw new Error('Agency context required');
+    return syncProjectBudgetImpl(projectId, newBudget, agency.id);
 }
 
 export async function getTasks(projectId: string) {
