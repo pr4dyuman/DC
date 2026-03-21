@@ -32,7 +32,7 @@ async function getPermissionSubjectRole(agencyId: string, userId: string) {
 
 export async function getTasksImpl(agencyId: string, projectId: string) {
     await connectDB();
-    const tasks = await TaskModel.find({ projectId, agencyId }).lean() as Task[];
+    const tasks = await TaskModel.find({ projectId, agencyId }).sort({ createdAt: -1 }).lean() as Task[];
     return tasks.map((task) => sanitizeDoc(task) as Task);
 }
 

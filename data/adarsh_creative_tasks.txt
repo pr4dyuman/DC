@@ -1,0 +1,257 @@
+Project Name: Adarsh Creative
+Project Description: School exam management website - Online admit card issuance and exam result lookup by roll number.
+Timeline:
+  - Phase 1 (Website Build): February 2025 (2 weeks)
+  - Phase 2 (Result Module): April 2025 (1 week)
+
+Team Allocations:
+- Chandan Sharma: Designer & Developer (100% of all Design and Dev work)
+
+=======================================================
+PHASE 1: Design & Branding (Feb 1 - Feb 3, 2025)
+=======================================================
+
+Task: Gather requirements from school/client
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Meet with the school admin to finalize the list of features needed — exam names, roll number format, admin login needs, and result display format.
+
+Task: Define color palette and basic visual identity
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Choose the school's brand colors or a clean, professional palette. Select a matching Google Font pair for headings and body text.
+
+Task: Design Homepage Wireframe
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Sketch the layout of the landing page — school name, logo, and quick-access buttons for "Download Admit Card" and "Check Result".
+
+Task: Design Admit Card Page Wireframe
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Lay out the admit card search form (roll number / name input) and the printable admit card preview section.
+
+Task: Design Result Page Wireframe
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Sketch the result lookup form (roll number input) and the result display card (marks, pass/fail status).
+
+Task: Create Final High-fi UI for All 3 Pages in Figma
+Assignee: Chandan Sharma
+Hours: 6h
+Description: Convert wireframes into full, polished screen designs for Homepage, Admit Card Page, and Result Page.
+
+=======================================================
+PHASE 2: Project Setup (Feb 4 - Feb 5, 2025)
+=======================================================
+
+Task: Initialize Next.js Project
+Assignee: Chandan Sharma
+Hours: 1h
+Description: Bootstrap the Next.js project using the App Router, install dependencies, and remove default boilerplate.
+
+Task: Configure Tailwind CSS
+Assignee: Chandan Sharma
+Hours: 1h
+Description: Install and configure Tailwind with the color palette and font tokens decided during design.
+
+Task: Setup Git Repository & Vercel Project
+Assignee: Chandan Sharma
+Hours: 1h
+Description: Create a GitHub repo, push the initial commit, and connect it to Vercel for automatic preview deployments.
+
+Task: Setup Database (Neon/PlanetScale)
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Provision a hosted Postgres database and connect it to the Next.js project using Prisma ORM.
+
+Task: Define Database Schema (Students, Exams, Results)
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Model tables for Student (name, roll_number, exam_id), Exam (exam name, date, centre), and Result (roll_number, subject marks, status).
+
+Task: Run Initial DB Migration
+Assignee: Chandan Sharma
+Hours: 1h
+Description: Push the schema to the hosted database using Prisma migrate and verify all tables are created correctly.
+
+=======================================================
+PHASE 3: Core Pages Implementation (Feb 6 - Feb 11, 2025)
+=======================================================
+
+Task: Build Shared Header/Navbar Component
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Create a simple top navigation bar with the school logo and links to Home, Admit Card, and Results pages.
+
+Task: Build Footer Component
+Assignee: Chandan Sharma
+Hours: 1h
+Description: Simple footer with school name, contact number, and address.
+
+Task: Implement Homepage (Landing Page)
+Assignee: Chandan Sharma
+Hours: 3h
+Description: Build the fully responsive home page with the school banner, welcome message, and prominent call-to-action buttons linking to the admit card and result pages.
+
+Task: Style Homepage for Mobile Responsiveness
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Test the homepage across common screen sizes and fix any layout issues on mobile devices (max-width breakpoints, font scaling).
+
+Task: Build Admit Card Search Form UI
+Assignee: Chandan Sharma
+Hours: 3h
+Description: Create the form allowing students to input their roll number to search for their admit card. Include proper input validation and loading states.
+
+Task: Implement Admit Card Lookup API Route
+Assignee: Chandan Sharma
+Hours: 3h
+Description: Create a Next.js API route /api/admit-card that accepts a roll number and fetches the matching student record and exam details from the database.
+
+Task: Build Printable Admit Card Preview Component
+Assignee: Chandan Sharma
+Hours: 4h
+Description: Render the fetched student data into a well-formatted admit card layout (name, roll no., exam details, photo placeholder, instructions) with a "Print" button using the browser print API.
+
+Task: Handle "Not Found" error state on Admit Card page
+Assignee: Chandan Sharma
+Hours: 1h
+Description: Display a friendly error message and a suggestion if no record is found for the entered roll number.
+
+Task: Style Admit Card Page for mobile
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Ensure the search form and admit card preview look great on both phones and desktops.
+
+Task: Build Result Lookup Search Form UI
+Assignee: Chandan Sharma
+Hours: 3h
+Description: Create the form on the Results page allowing students to enter their roll number to check their results.
+
+Task: Implement Result Lookup API Route
+Assignee: Chandan Sharma
+Hours: 3h
+Description: Create a Next.js API route /api/result that queries the results table by roll number and returns marks, grade, and pass/fail status.
+
+Task: Build Result Display Card Component
+Assignee: Chandan Sharma
+Hours: 4h
+Description: Render the fetched result data into a clear, well-labelled result card showing subject-wise marks, total, percentage, and a highlighted PASS/FAIL badge.
+
+Task: Handle "Not Found" and "Result Not Published" states
+Assignee: Chandan Sharma
+Hours: 1h
+Description: Show appropriate messages if the roll number doesn't exist, or if the result has not been published yet.
+
+Task: Style Results Page for mobile
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Ensure the result lookup and display works cleanly across all screen sizes.
+
+=======================================================
+PHASE 4: Admin Data Management (Feb 12 - Feb 14, 2025)
+=======================================================
+
+Task: Build a simple Admin login page
+Assignee: Chandan Sharma
+Hours: 3h
+Description: Create a basic login form with a hardcoded or database-stored admin password to protect the data management routes.
+
+Task: Build Student Data Upload UI (CSV import)
+Assignee: Chandan Sharma
+Hours: 4h
+Description: Admin screen where the school staff can upload a CSV file of student names, roll numbers, and exam assignments to bulk-populate the database.
+
+Task: Implement CSV Parsing & DB Insert Logic
+Assignee: Chandan Sharma
+Hours: 4h
+Description: Backend logic to read the uploaded CSV file, parse each row, validate data types, and insert student records into the database in a batch transaction.
+
+Task: Build Manual Student Entry Form (Admin)
+Assignee: Chandan Sharma
+Hours: 3h
+Description: A simple form for adding individual student records if a full CSV upload isn't available.
+
+=======================================================
+PHASE 5: Testing & Deployment (Feb 15 - Feb 17, 2025)
+=======================================================
+
+Task: End-to-end manual testing of Admit Card flow
+Assignee: Chandan Sharma
+Hours: 3h
+Description: Seed test data into the database and manually test the complete admit card lookup and print flow, checking for display accuracy and print formatting.
+
+Task: Seed real exam & student data
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Enter or import the actual student roster and exam schedule into the production database.
+
+Task: Cross-browser testing (Chrome, Safari, Firefox)
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Open the live website in major browsers and verify layout, fonts, and functionality are consistent.
+
+Task: Performance check & minor optimizations
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Run the website through Lighthouse to check load speed and make rapid improvements such as image optimization or lazy loading.
+
+Task: Deploy to Production on Vercel
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Trigger a production build on Vercel, confirm environment variables are set, and validate the live URL.
+
+Task: Domain configuration (if custom domain is used)
+Assignee: Chandan Sharma
+Hours: 1h
+Description: Connect the school's custom domain (if provided) to the Vercel project and verify SSL certificate is active.
+
+Task: Client handoff & walkthrough call
+Assignee: Chandan Sharma
+Hours: 1h
+Description: Walk the school admin through the website and the admin CSV upload process so they can manage data themselves going forward.
+
+=======================================================
+PHASE 6: Result Module (April 2025 - 1 Week)
+=======================================================
+
+Task: Requirements check for results feature
+Assignee: Chandan Sharma
+Hours: 1h
+Description: Confirm with the school the exact result format — subject names, marking scheme, and whether grade letters should be shown.
+
+Task: Update DB Schema for Results table (if needed)
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Add or alter the results table to accommodate subject marks, total marks, percentage, and a published/unpublished flag.
+
+Task: Build Result Upload UI (CSV import for marks)
+Assignee: Chandan Sharma
+Hours: 4h
+Description: Admin screen allowing staff to upload a results CSV with columns for roll number and marks per subject.
+
+Task: Implement Result CSV Parsing & DB Upsert Logic
+Assignee: Chandan Sharma
+Hours: 4h
+Description: Backend logic to read the results CSV, compute total, percentage, and pass/fail for each row, and upsert the data into the results table.
+
+Task: Build "Publish Results" toggle in Admin
+Assignee: Chandan Sharma
+Hours: 2h
+Description: A simple on/off switch allowing the admin to control whether results are live and publicly accessible to students.
+
+Task: Update Result Display Card with new subject columns
+Assignee: Chandan Sharma
+Hours: 3h
+Description: Adjust the result card component to properly display the subject-wise mark breakdown from the new schema.
+
+Task: Final testing of full result lookup flow
+Assignee: Chandan Sharma
+Hours: 2h
+Description: Enter test scores into the database, toggle publish on, and verify that students can accurately view their results by roll number.
+
+Task: Deploy updated result module to production
+Assignee: Chandan Sharma
+Hours: 1h
+Description: Push the result module changes to Vercel and test the live production result page with real data.
