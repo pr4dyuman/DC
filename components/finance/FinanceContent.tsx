@@ -175,9 +175,9 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
 
     return (
         <div className="flex-1 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between space-y-4 sm:space-y-0">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Finance</h2>
-                <div className="flex flex-col items-end">
+                <div className="flex flex-col items-start sm:items-end gap-1">
                     <div className="flex items-center space-x-2">
                         <AddTransactionModal users={users} projects={rawProjects} />
                     </div>
