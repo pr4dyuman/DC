@@ -68,9 +68,9 @@ export function ClientDashboard({
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             {/* Welcome Banner */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900 to-purple-900 p-8 text-white shadow-2xl">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900 to-purple-900 p-5 sm:p-8 text-white shadow-2xl">
                 <div className="relative z-10">
-                    <h1 className="text-3xl font-bold mb-2">Welcome back, {clientName}</h1>
+                    <h1 className="text-2xl sm:text-3xl font-bold mb-2">Welcome back, {clientName}</h1>
                     <p className="text-indigo-200">Here&#39;s what&#39;s happening with your projects today.</p>
                 </div>
                 {/* Abstract Shapes */}
