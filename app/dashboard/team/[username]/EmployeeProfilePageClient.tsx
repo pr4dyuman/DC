@@ -248,16 +248,16 @@ export default function EmployeeProfilePage({ username }: { username: string }) 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-10">
             {/* Header / Nav */}
-            <div className="flex items-center gap-4">
-                <Link href="/dashboard/team" className="p-2 hover:bg-muted rounded-full transition-colors">
+            <div className="flex items-center gap-2">
+                <Link href="/dashboard/team" className="p-2 hover:bg-muted rounded-full transition-colors shrink-0">
                     <ArrowLeft className="h-5 w-5" />
                 </Link>
-                <h1 className="text-2xl font-bold truncate min-w-0">{user.role === 'client' ? 'Client Profile' : 'Team Member Profile'}</h1>
+                <h1 className="hidden sm:block text-2xl font-bold truncate min-w-0">{user.role === 'client' ? 'Client Profile' : 'Team Member Profile'}</h1>
 
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
                     <button
                         onClick={() => downloadVCard(user)}
-                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-muted hover:bg-accent text-foreground rounded-lg transition-all border border-border"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm font-medium bg-muted hover:bg-accent text-foreground rounded-lg transition-all border border-border"
                         title="Download contact card"
                     >
                         <Download className="h-4 w-4" />
@@ -266,7 +266,7 @@ export default function EmployeeProfilePage({ username }: { username: string }) 
                     {!isSelf && (
                         <button
                             onClick={() => openChat(user.id)}
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-muted hover:bg-accent text-foreground rounded-lg transition-all border border-border"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 text-sm font-medium bg-muted hover:bg-accent text-foreground rounded-lg transition-all border border-border"
                         >
                             <MessageCircle className="h-4 w-4" />
                             <span className="hidden sm:inline">Message</span>
@@ -275,14 +275,14 @@ export default function EmployeeProfilePage({ username }: { username: string }) 
                     {(isSelf || currentUserRole === 'admin' || currentUserRole === 'manager') && (
                         <button
                             onClick={() => setIsEditDialogOpen(true)}
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg shadow-lg transition-all"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg shadow-lg transition-all"
                         >
                             <Pencil className="h-4 w-4" />
                             <span className="hidden sm:inline">Edit Profile</span>
                         </button>
                     )}
                     {isSelf && user.role !== 'client' && (
-                        <div className="ml-1">
+                        <div>
                             <LeaveRequestDialog userId={user.id} />
                         </div>
                     )}
