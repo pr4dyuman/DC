@@ -213,3 +213,54 @@ export async function updateProjectPaymentImpl(
     revalidatePath("/dashboard/finance");
 }
 
+
+/**
+ * Internal: redistributes a new budget equally across all service payment configs.
+ * Used by the Singularity AI `update_project` tool when budget changes.
+ * NOT exposed as a public user action — users edit payment via Service Payments tab.
+ */
+export async function syncProjectBudgetImpl(
+    projectId: string,
+    newBudget: number,
+    agencyId: string
+) {
+    await connectDB();
+
+    const projectDoc = await ProjectModel.findOne({ id: projectId, agencyId })
+        .select("id serviceConfigs dueDate")
+        .lean() as { id: string; serviceConfigs?: Array<{ serviceId: string; name: string; paymentConfig?: PaymentConfig }>; dueDate?: string } | null;
+    if (!projectDoc) throw new Error("Project not found");
+
+    const serviceConfigs = projectDoc.serviceConfigs || [];
+    if (serviceConfigs.length === 0) return; // Nothing to distribute — silently skip
+
+    const perServiceAmount = newBudget > 0 ? Math.round(newBudget / serviceConfigs.length) : 0;
+    const fallbackDate = projectDoc.dueDate || undefined;
+
+    const updatedConfigs = serviceConfigs.map((cfg) => {
+        const existing = cfg.paymentConfig || {};
+        const keepDates = Array.isArray(existing.installmentDates) && existing.installmentDates.length > 0;
+        return {
+            ...cfg,
+            paymentConfig: {
+                ...existing,
+                type: existing.type || "installment",
+                paymentDetailsLater: newBudget === 0,
+                installments: existing.installments || 1,
+                installmentAmount: perServiceAmount,
+                firstPaymentDate: existing.firstPaymentDate || fallbackDate,
+                installmentDates: keepDates ? existing.installmentDates : (fallbackDate ? [fallbackDate] : []),
+                monthlyAmount: existing.type === "monthly" ? perServiceAmount : (existing.monthlyAmount || 0),
+            } as PaymentConfig,
+        };
+    });
+
+    await ProjectModel.updateOne(
+        { id: projectId, agencyId },
+        { $set: { budget: newBudget, serviceConfigs: updatedConfigs } }
+    );
+
+    revalidatePath("/dashboard/projects/[slug]", "page");
+    revalidatePath("/dashboard/projects");
+    revalidatePath("/dashboard/finance");
+}

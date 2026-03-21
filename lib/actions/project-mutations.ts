@@ -19,7 +19,7 @@ import {
     resolveProjectClientFields,
     type ProjectLike,
 } from "./projects-shared";
-export { updateProjectPaymentImpl } from "./project-payment-workflow";
+export { updateProjectPaymentImpl, syncProjectBudgetImpl } from "./project-payment-workflow";
 export { updateProjectImpl } from "./project-update-workflow";
 
 type ProjectMutationActor = {
@@ -171,10 +171,28 @@ export async function createProjectImpl(
             if (!paymentConfig) continue;
 
             if (paymentConfig.type === "installment") {
-                if (paymentConfig.installmentDates && paymentConfig.installmentDates.length > 0) {
+                // Resolve installment dates — three-level fallback (mirrors updateProjectPaymentImpl):
+                // 1) explicit installmentDates[]  2) firstPaymentDate + count  3) project.dueDate
+                let installmentDates: string[] =
+                    Array.isArray(paymentConfig.installmentDates) && paymentConfig.installmentDates.length > 0
+                        ? paymentConfig.installmentDates
+                        : [];
+                if (installmentDates.length === 0 && paymentConfig.firstPaymentDate) {
+                    const count = paymentConfig.installments || 1;
+                    installmentDates = Array.from({ length: count }, (_, i) => {
+                        const d = new Date(paymentConfig.firstPaymentDate!);
+                        d.setMonth(d.getMonth() + i);
+                        return d.toISOString().split("T")[0];
+                    });
+                }
+                if (installmentDates.length === 0 && project.dueDate) {
+                    // Final fallback: schedule as a single payment on the project due date
+                    installmentDates = [project.dueDate];
+                }
+                if (installmentDates.length > 0) {
                     const amountPerInstallment = paymentConfig.installmentAmount
-                        || (project.budget / totalServices / paymentConfig.installmentDates.length);
-                    for (const installmentDate of paymentConfig.installmentDates) {
+                        || Math.round(project.budget / totalServices / installmentDates.length);
+                    for (const installmentDate of installmentDates) {
                         newInvoices.push({
                             id: generateId(),
                             projectId: newProject.id,

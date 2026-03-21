@@ -2,7 +2,9 @@ import {
     createProject,
     updateProject,
 } from "./actions";
+import { syncProjectBudgetImpl } from "./actions/project-mutations";
 import type { ProjectLike } from "./actions/projects-shared";
+import { getRequiredAgencyId as getAgencyId } from "./singularity-tool-project-task-shared";
 import { ProjectModel } from "./mongodb";
 import {
     getNumberArg,
@@ -98,6 +100,15 @@ export async function executeProjectWriteTool(
             const projSnapshot = await snapshotEntity("project", projectId);
             if (Object.keys(projUpdates).length > 0) {
                 await updateProject(projectId, projUpdates);
+            }
+            // When budget changes, distribute it across services so the card + finance stay in sync
+            if (budgetValue !== undefined) {
+                try {
+                    const agencyId = await getAgencyId();
+                    await syncProjectBudgetImpl(projectId, budgetValue, agencyId);
+                } catch (budgetErr) {
+                    console.warn("[update_project] Could not sync budget across services:", budgetErr);
+                }
             }
             if (Object.keys(projTimestamps).length > 0) {
                 const agencyId = await getRequiredAgencyId();
