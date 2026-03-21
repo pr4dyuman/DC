@@ -238,7 +238,7 @@ export async function syncProjectBudgetImpl(
     const fallbackDate = projectDoc.dueDate || undefined;
 
     const updatedConfigs = serviceConfigs.map((cfg) => {
-        const existing = cfg.paymentConfig || {};
+        const existing: Partial<PaymentConfig> = cfg.paymentConfig || {};
         const keepDates = Array.isArray(existing.installmentDates) && existing.installmentDates.length > 0;
         return {
             ...cfg,

@@ -87,7 +87,7 @@ export function ViewTaskModalComments({
                             value={commentText}
                             onChange={setCommentText}
                             users={users}
-                            onKeyDown={(event) => {
+                            onKeyDown={(event: React.KeyboardEvent<HTMLDivElement>) => {
                                 if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) handleAddComment();
                             }}
                             className="min-h-[72px] text-sm resize-none"

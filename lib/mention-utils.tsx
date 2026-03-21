@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 
 /** Regex to match @[Display Name](userId) mention format */
 export const MENTION_REGEX = /@\[([^\]]+)\]\(([^)]+)\)/g;
@@ -14,7 +15,10 @@ export function extractMentionedUserIds(text: string): string[] {
     return [...new Set(ids)];
 }
 
-/** Render comment text with blue clickable @mentions */
+/**
+ * Render comment text with clickable @mention chips that navigate to the user's profile.
+ * Mention format: @[Display Name](userId)
+ */
 export function renderCommentText(text: string): React.ReactNode[] {
     const regex = new RegExp(MENTION_REGEX.source, 'g');
     const parts: React.ReactNode[] = [];
@@ -26,14 +30,16 @@ export function renderCommentText(text: string): React.ReactNode[] {
             parts.push(text.slice(lastIndex, match.index));
         }
         const displayName = match[1];
+        const userId = match[2];
         parts.push(
-            <span
+            <Link
                 key={match.index}
-                className="text-blue-500 font-medium cursor-pointer hover:underline"
-                title={displayName}
+                href={`/dashboard/team/${userId}`}
+                className="inline-flex items-center bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold rounded px-1 hover:bg-indigo-500/20 hover:underline transition-colors text-[0.85em]"
+                title={`View ${displayName}'s profile`}
             >
                 @{displayName}
-            </span>
+            </Link>
         );
         lastIndex = match.index + match[0].length;
     }
