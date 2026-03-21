@@ -13,6 +13,7 @@ import { Pencil, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { DateTimeInput } from "@/components/ui/DateTimeInput";
+import { useRouter } from "next/navigation";
 import { useCurrency } from "@/context/CurrencyContext";
 
 interface PaymentSettingsCardProps {
@@ -21,6 +22,7 @@ interface PaymentSettingsCardProps {
 
 export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
     const { format: formatMoney, symbol } = useCurrency();
+    const router = useRouter();
     const [editingConfig, setEditingConfig] = useState<ProjectServiceConfig | null>(null);
     const [loading, setLoading] = useState(false);
     const [formConfig, setFormConfig] = useState<PaymentConfig | null>(null);
@@ -55,6 +57,7 @@ export function PaymentSettingsCard({ project }: PaymentSettingsCardProps) {
             await updateProjectPayment(project.id, editingConfig.serviceId, finalConfig);
             toast.success(`Payment settings updated for ${editingConfig.name}`);
             setEditingConfig(null);
+            router.refresh(); // Sync project card budget and finance summary
         } catch (error) {
             console.error('Failed to update payment', error);
             toast.error('Failed to update payment settings');

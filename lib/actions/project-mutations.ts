@@ -16,7 +16,6 @@ import {
 } from "../mongodb";
 import { isNotifEnabled, sanitizeDoc } from "./shared";
 import {
-    createDefaultProjectPaymentConfig,
     resolveProjectClientFields,
     type ProjectLike,
 } from "./projects-shared";
@@ -107,7 +106,6 @@ export async function createProjectImpl(
         agencyId,
     };
 
-    const defaultPaymentConfig = createDefaultProjectPaymentConfig();
     const configByName = new Map(
         (project.serviceConfigs || [])
             .filter((cfg) => !!cfg.name)
@@ -125,12 +123,43 @@ export async function createProjectImpl(
         employees: [],
     }));
     newProject.services = serviceDocs.map((doc) => doc.id);
+
+    // Auto-distribute budget across services when no explicit payment config is provided.
+    // This ensures the deal value always lives under a service, not as a floating field.
+    const totalServiceCount = serviceDocs.length || 1;
+    const perServiceBudget = project.budget > 0
+        ? Math.round(project.budget / totalServiceCount)
+        : 0;
+
     newProject.serviceConfigs = serviceDocs.map((doc) => {
         const existingConfig = configByName.get(doc.name.toLowerCase());
+        const existingPayment = existingConfig?.paymentConfig;
+
+        // Only use the existing payment config if it has a real amount set.
+        // If it's a "pay later" placeholder with no amount, replace with auto-filled config.
+        const hasRealAmount = existingPayment
+            && !existingPayment.paymentDetailsLater
+            && ((existingPayment.installmentAmount ?? 0) > 0 || (existingPayment.monthlyAmount ?? 0) > 0);
+
+        if (hasRealAmount) {
+            return {
+                serviceId: doc.id,
+                name: doc.name,
+                paymentConfig: existingPayment!,
+            };
+        }
+
+        // Auto-fill: distribute budget equally. Use "pay later" only if budget is 0.
         return {
             serviceId: doc.id,
             name: doc.name,
-            paymentConfig: existingConfig?.paymentConfig || defaultPaymentConfig,
+            paymentConfig: {
+                type: "installment",
+                paymentDetailsLater: perServiceBudget === 0,
+                installments: 1,
+                installmentAmount: perServiceBudget,
+                monthlyAmount: 0,
+            },
         };
     });
 

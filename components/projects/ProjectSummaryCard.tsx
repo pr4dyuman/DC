@@ -41,9 +41,10 @@ export function ProjectSummaryCard({
                                 )}
                                 {project.services?.slice(0, 2).map((serviceId: string) => {
                                     const service = services.find((item) => item.id === serviceId);
+                                    if (!service) return null; // Skip stale/unresolvable IDs — never show raw UUIDs
                                     return (
                                         <Badge key={serviceId} variant="secondary" className="font-normal text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
-                                            {service?.name || serviceId}
+                                            {service.name}
                                         </Badge>
                                     );
                                 })}

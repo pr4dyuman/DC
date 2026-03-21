@@ -68,22 +68,48 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
     };
 
     const handleNext = () => {
-        if (step === 2 && formData.serviceConfigs.length === 0) {
-            const configs = formData.services.map((serviceName) => {
-                const existing = formData.serviceConfigs.find((config) => config.serviceId === serviceName);
-                return existing || {
+        if (step === 2) {
+            // Only rebuild configs when none exist yet
+            if (formData.serviceConfigs.length === 0) {
+                const totalServices = formData.services.length || 1;
+                // Distribute budget equally across services; 0 budget → pay later
+                const amountPerService = formData.budget > 0
+                    ? Math.round(formData.budget / totalServices)
+                    : 0;
+                const configs = formData.services.map((serviceName) => ({
                     serviceId: serviceName,
                     name: serviceName,
                     paymentConfig: {
                         type: "installment",
-                        paymentDetailsLater: false,
+                        paymentDetailsLater: formData.budget === 0,
                         installments: 1,
-                        installmentAmount: 0,
+                        installmentAmount: amountPerService,
                         monthlyAmount: 0,
                     } as PaymentConfig,
-                };
-            });
-            setFormData((prev) => ({ ...prev, serviceConfigs: configs }));
+                }));
+                setFormData((prev) => ({ ...prev, serviceConfigs: configs }));
+            } else {
+                // Configs already exist (user went back & forward) — re-sync amounts
+                // if budget changed but amounts are still 0
+                const allZero = formData.serviceConfigs.every(
+                    (c) => !c.paymentConfig?.installmentAmount && !c.paymentConfig?.monthlyAmount
+                );
+                if (allZero && formData.budget > 0) {
+                    const totalServices = formData.serviceConfigs.length || 1;
+                    const amountPerService = Math.round(formData.budget / totalServices);
+                    setFormData((prev) => ({
+                        ...prev,
+                        serviceConfigs: prev.serviceConfigs.map((c) => ({
+                            ...c,
+                            paymentConfig: {
+                                ...c.paymentConfig,
+                                paymentDetailsLater: false,
+                                installmentAmount: amountPerService,
+                            } as PaymentConfig,
+                        })),
+                    }));
+                }
+            }
         }
 
         setStep((prev) => prev + 1);

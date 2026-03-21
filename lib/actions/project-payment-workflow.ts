@@ -185,10 +185,30 @@ export async function updateProjectPaymentImpl(
         await InvoiceModel.insertMany(newInvoices);
     }
 
-    console.log(`[payment-workflow] project=${projectId} regenerated ${newInvoices.length} invoices from ${allServiceConfigs.length} service configs`);
-    // ────────────────────────────────────────────────────────────────────────
+    // ── Sync project.budget ← sum of service payment configs ─────────────────
+    // The project card reads project.budget; payment configs are the source of truth.
+    // After any payment update we write the recalculated total back so both stay in sync.
+    const recalculatedBudget = allServiceConfigs.reduce((sum, cfg) => {
+        const pc = cfg.paymentConfig;
+        if (!pc || pc.paymentDetailsLater) return sum;
+        if (pc.type === "installment") {
+            return sum + (pc.installmentAmount || 0) * (pc.installments || 1);
+        }
+        // Monthly: count monthlyAmount as part of the deal value for display purposes
+        return sum + (pc.monthlyAmount || 0);
+    }, 0);
 
-    revalidatePath("/dashboard/projects/[id]", "page");
+    if (recalculatedBudget > 0) {
+        await ProjectModel.updateOne(
+            { id: projectId, agencyId },
+            { $set: { budget: recalculatedBudget } }
+        );
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    console.log(`[payment-workflow] project=${projectId} regenerated ${newInvoices.length} invoices from ${allServiceConfigs.length} service configs, synced budget=${recalculatedBudget}`);
+
+    revalidatePath("/dashboard/projects/[slug]", "page"); // Fixed: was incorrectly [id]
     revalidatePath("/dashboard/projects");
     revalidatePath("/dashboard/finance");
 }
