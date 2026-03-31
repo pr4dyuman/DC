@@ -3,6 +3,7 @@
 import { User, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig, LeaveRequest, LeaveStatus, UserPermissions, Transaction } from "./db";
 import type { AIConfig, AIPermissions } from "./types";
 import { getCurrentAgency } from "./agency-context";
+import { getAIBloggerAccessState } from "./ai-blogger-access";
 import { resolveUserOrClient } from "./utils-server";
 import { sanitizeMongoInput } from "./validation";
 import {
@@ -56,6 +57,35 @@ import {
     updateUserPermissionsImpl,
     verifyAgentPasswordImpl,
 } from "./actions/agency-settings";
+import {
+    createBlogStudioDraftImpl,
+    type CreateBlogStudioDraftInput,
+    createBlogStudioScheduleImpl,
+    type CreateBlogStudioScheduleInput,
+    deleteBlogStudioPostImpl,
+    deleteBlogStudioScheduleImpl,
+    generateBlogStudioDraftImpl,
+    generateBlogStudioFeaturedImageImpl,
+    refreshBlogStudioPostFromPerformanceImpl,
+    runBlogStudioScheduleNowImpl,
+    runBlogStudioPerformanceSyncImpl,
+    type GenerateBlogStudioFeaturedImageResult,
+    type GenerateBlogStudioDraftInput,
+    publishBlogStudioPostImpl,
+    testBlogStudioWebhookTargetImpl,
+    type TestBlogStudioWebhookTargetInput,
+    updateBlogStudioPostImpl,
+    type UpdateBlogStudioPostInput,
+    updateBlogStudioScheduleImpl,
+    type UpdateBlogStudioScheduleInput,
+    updateBlogStudioPostStatusImpl,
+    updateBlogStudioScheduleStatusImpl,
+    type RunBlogStudioScheduleNowResult,
+    type UpdateBlogStudioScheduleStatusInput,
+    upsertBlogStudioSettingsImpl,
+    type UpdateBlogStudioSettingsInput,
+    type UpdateBlogStudioPostStatusInput,
+} from "./actions/ai-blogger";
 import {
     addProjectAssetImpl,
     deleteProjectAssetImpl,
@@ -549,6 +579,362 @@ export async function createUser(user: Omit<User, "id" | "agencyId">) {
 
 export async function getCurrentUser() {
     return getCurrentUserImpl();
+}
+
+function assertAIBloggerServerAccess(input: {
+    role?: string | null;
+    plan?: "free" | "starter" | "pro" | "enterprise" | null;
+    status?: "active" | "suspended" | "trial" | "cancelled" | null;
+    featureEnabled?: boolean | null;
+}) {
+    const access = getAIBloggerAccessState(input);
+
+    if (access.canAccess) {
+        return;
+    }
+
+    switch (access.reason) {
+        case "role":
+            throw new Error("AI Blogger is restricted to workspace admins.");
+        case "trial":
+            throw new Error("AI Blogger stays locked during the trial.");
+        case "plan":
+            throw new Error("AI Blogger is only available on Pro or Enterprise plans.");
+        case "inactive":
+            throw new Error("The workspace plan must be active before AI Blogger can be used.");
+        case "feature":
+            throw new Error("AI Blogger is not enabled for this workspace. Ask a super-admin to enable it.");
+        default:
+            throw new Error("AI Blogger is not available for this account.");
+    }
+}
+
+export async function createBlogStudioDraft(input: CreateBlogStudioDraftInput) {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return createBlogStudioDraftImpl(
+        { id: agency.id, name: agency.name },
+        toActionActor(currentUser),
+        input
+    );
+}
+
+export async function updateBlogStudioPostStatus(slug: string, input: UpdateBlogStudioPostStatusInput) {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return updateBlogStudioPostStatusImpl(
+        agency.id,
+        toActionActor(currentUser),
+        sanitizeMongoInput(slug),
+        sanitizeMongoInput(input)
+    );
+}
+
+export type BulkUpdateBlogStudioPostStatusInput = {
+    slugs: string[];
+    status: UpdateBlogStudioPostStatusInput["status"];
+    scheduledFor?: string;
+};
+
+export type BulkUpdateBlogStudioPostStatusResult = {
+    succeeded: string[];
+    failed: { slug: string; error: string }[];
+};
+
+export async function bulkUpdateBlogStudioPostStatus(
+    input: BulkUpdateBlogStudioPostStatusInput,
+): Promise<BulkUpdateBlogStudioPostStatusResult> {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+
+    const actor = toActionActor(currentUser);
+    const result: BulkUpdateBlogStudioPostStatusResult = {
+        succeeded: [],
+        failed: [],
+    };
+
+    for (const slug of input.slugs) {
+        try {
+            await updateBlogStudioPostStatusImpl(
+                agency.id,
+                actor,
+                sanitizeMongoInput(slug),
+                sanitizeMongoInput({ status: input.status, scheduledFor: input.scheduledFor }),
+            );
+            result.succeeded.push(slug);
+        } catch (error) {
+            result.failed.push({
+                slug,
+                error: error instanceof Error ? error.message : "Unknown error",
+            });
+        }
+    }
+
+    return result;
+}
+
+export async function generateBlogStudioDraft(input: GenerateBlogStudioDraftInput) {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return generateBlogStudioDraftImpl(
+        { id: agency.id, name: agency.name },
+        toActionActor(currentUser),
+        input
+    );
+}
+
+export async function updateBlogStudioPost(slug: string, input: UpdateBlogStudioPostInput) {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return updateBlogStudioPostImpl(
+        agency.id,
+        toActionActor(currentUser),
+        sanitizeMongoInput(slug),
+        sanitizeMongoInput(input)
+    );
+}
+
+export async function generateBlogStudioFeaturedImage(slug: string): Promise<GenerateBlogStudioFeaturedImageResult> {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    const actor = await resolveUserOrClient(currentUser.id, agency.id);
+    if (!actor) throw new Error("Unable to resolve the current user.");
+    return generateBlogStudioFeaturedImageImpl(
+        agency.id,
+        toActionActor(actor),
+        sanitizeMongoInput(slug),
+    );
+}
+
+export async function refreshBlogStudioPostFromPerformance(slug: string) {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return refreshBlogStudioPostFromPerformanceImpl(
+        agency.id,
+        toActionActor(currentUser),
+        sanitizeMongoInput(slug),
+    );
+}
+
+export async function runBlogStudioPerformanceSync(force = true) {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return runBlogStudioPerformanceSyncImpl({
+        agencyId: agency.id,
+        force,
+        limit: 1,
+        trigger: "manual",
+    });
+}
+
+export async function publishBlogStudioPost(slug: string) {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return publishBlogStudioPostImpl(
+        agency.id,
+        toActionActor(currentUser),
+        sanitizeMongoInput(slug)
+    );
+}
+
+export async function testBlogStudioWebhookTarget(input: TestBlogStudioWebhookTargetInput) {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return testBlogStudioWebhookTargetImpl(
+        agency.id,
+        sanitizeMongoInput(input),
+    );
+}
+
+export async function deleteBlogStudioPost(slug: string, deletePublished: boolean = false) {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return deleteBlogStudioPostImpl(
+        agency.id,
+        sanitizeMongoInput(slug),
+        deletePublished
+    );
+}
+
+export async function upsertBlogStudioSettings(input: UpdateBlogStudioSettingsInput) {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return upsertBlogStudioSettingsImpl(
+        { id: agency.id, name: agency.name },
+        toActionActor(currentUser),
+        sanitizeMongoInput(input)
+    );
+}
+
+export async function createBlogStudioSchedule(input: CreateBlogStudioScheduleInput) {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return createBlogStudioScheduleImpl(
+        { id: agency.id, name: agency.name },
+        toActionActor(currentUser),
+        sanitizeMongoInput(input)
+    );
+}
+
+export async function updateBlogStudioScheduleStatus(scheduleId: string, input: UpdateBlogStudioScheduleStatusInput) {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return updateBlogStudioScheduleStatusImpl(
+        agency.id,
+        toActionActor(currentUser),
+        sanitizeMongoInput(scheduleId),
+        sanitizeMongoInput(input)
+    );
+}
+
+export async function updateBlogStudioSchedule(scheduleId: string, input: UpdateBlogStudioScheduleInput) {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return updateBlogStudioScheduleImpl(
+        { id: agency.id, name: agency.name },
+        toActionActor(currentUser),
+        sanitizeMongoInput(scheduleId),
+        sanitizeMongoInput(input)
+    );
+}
+
+export async function deleteBlogStudioSchedule(scheduleId: string) {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return deleteBlogStudioScheduleImpl(
+        agency.id,
+        toActionActor(currentUser),
+        sanitizeMongoInput(scheduleId)
+    );
+}
+
+export async function runBlogStudioScheduleNow(scheduleId: string): Promise<RunBlogStudioScheduleNowResult> {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return runBlogStudioScheduleNowImpl(
+        agency.id,
+        toActionActor(currentUser),
+        sanitizeMongoInput(scheduleId)
+    );
 }
 
 export async function updateUserTimezone(timezone: string) {

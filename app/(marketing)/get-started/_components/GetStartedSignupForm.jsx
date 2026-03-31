@@ -23,6 +23,7 @@ export default function GetStartedSignupForm({
     onOtpChange,
     onSendOtp,
     onSubmit,
+    onOpenSignIn,
 }) {
     return (
         <section id="signup" className="py-20 sm:py-24 lg:py-32 relative">
@@ -283,9 +284,15 @@ export default function GetStartedSignupForm({
 
                     <p className="text-center text-sm text-gray-600 mt-4">
                         Already have an account?{" "}
-                        <Link href="/login" className="text-[#F5EE30] hover:underline">
-                            Sign in
-                        </Link>
+                        {onOpenSignIn ? (
+                            <button type="button" onClick={onOpenSignIn} className="text-[#F5EE30] hover:underline">
+                                Sign in
+                            </button>
+                        ) : (
+                            <Link href="/login" className="text-[#F5EE30] hover:underline">
+                                Sign in
+                            </Link>
+                        )}
                     </p>
                 </form>
             </div>

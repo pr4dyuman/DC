@@ -1,0 +1,486 @@
+==============================================================
+SUPER-ADMIN AI BLOGGER — FULL UI & FEATURE AUDIT
+==============================================================
+Date: 2026-03-27
+
+
+==============================================================
+SECTION 1: PAGE STRUCTURE & ROUTES
+==============================================================
+
+Routes:
+  /super-admin/ai-blogger              → Overview (agency list)
+  /super-admin/ai-blogger/agency/[id]  → Agency AI Blogger Config (main working page)
+  /super-admin/ai-blogger/generate     → Scope Page (placeholder — not implemented)
+  /super-admin/ai-blogger/posts        → Scope Page (placeholder — not implemented)
+  /super-admin/ai-blogger/posts/[slug] → Scope Page (placeholder — not implemented)
+  /super-admin/ai-blogger/settings     → Scope Page (placeholder — not implemented)
+
+Layout: app/super-admin/ai-blogger/layout.tsx (18 lines)
+  - Wraps all AI Blogger super-admin pages
+  - Renders AIBloggerSuperAdminNav horizontally at the top
+  - Calls getAIBloggerSuperAdminContext to verify superadmin role
+
+Nav: _components/ai-blogger-super-admin-nav.tsx (73 lines)
+  - 5 tabs: Overview, Agency Config (dynamic), Generate, Posts, Settings
+  - "Agency Config" tab only appears when an agency is selected
+  - Active state uses primary color highlight
+  - Horizontally scrollable pill nav
+
+VERDICT: Page structure is CORRECT ✅
+  - Overview landing page properly lists all agencies
+  - Agency Config is the main working page
+  - 3 unimplemented routes (Generate, Posts, Settings) use honest
+    "scope pages" instead of dead routes or broken redirects
+  - Scope pages clearly explain what exists vs what is missing
+
+
+==============================================================
+SECTION 2: OVERVIEW PAGE AUDIT
+==============================================================
+
+File: app/super-admin/ai-blogger/page.tsx (137 lines)
+
+What It Shows:
+  - Page title "AI Blogger Admin" with Brain icon + gradient badge
+  - "Separate from system AI settings" label
+  - Config-first context note
+  - Agency list (all agencies, not just AI Blogger enabled ones)
+
+Per Agency Row:
+  ✅ Agency name (truncated, bold)
+  ✅ Plan badge (uppercase)
+  ✅ Status badge
+  ✅ "AI Blogger on" / "AI Blogger off" badge (green/muted)
+  ✅ User count, project count, client count
+  ✅ Published posts count (from getBlogStudioOverviewImpl)
+  ✅ Refresh candidates count (amber TrendingUp icon)
+  ✅ Top refresh signal (post title + opportunity summary)
+  ✅ "Manage AI" button → links to /agency/[id]
+
+Behavior:
+  - If an agency is already in context, redirects to /agency/[id]
+  - Fetches overview data in parallel for all AI Blogger agencies
+
+ISSUES:
+  ⚠️ I1. No search/filter for agencies
+     When there are many agencies, scrolling through all of them is
+     cumbersome. Adding a search input would help.
+     PRIORITY: LOW (most deployments have <20 agencies)
+
+  ⚠️ I2. No readiness summary per agency
+     The agency row shows published/refresh counts but doesn't show
+     a quick at-a-glance readiness indicator (e.g. "5/6 ready" or
+     "2 issues") from the readiness checks in the config page.
+     PRIORITY: MEDIUM
+
+  ⚠️ I3. No total/aggregate stats banner
+     There's no platform-wide totals bar (e.g. "42 total published,
+     7 refresh candidates across all agencies").
+     PRIORITY: LOW
+
+
+==============================================================
+SECTION 3: AGENCY CONFIG PAGE AUDIT (Main Working Page)
+==============================================================
+
+File: components/super-admin/AIBloggerAgencyConfigClient.tsx (~3100 lines)
+Route: /super-admin/ai-blogger/agency/[id]
+
+This is a massive "use client" component that is the heart of
+super-admin AI Blogger management. It contains:
+
+3A. HEADER
+  ✅ Back link to AI Blogger overview
+  ✅ Brain icon with gradient
+  ✅ "AI Blogger Admin" title with agency name
+  ✅ Agency plan badge (uppercase)
+  ✅ Config status badge (Separate config active / Using defaults)
+  ✅ Save All Changes button (gradient, icon, loading state)
+  ✅ Remove Config button (red, only when configured)
+
+3B. STATUS ALERTS
+  ✅ Error alert (red)
+  ✅ Success alert (green)
+
+3C. PRESETS
+  ✅ Three preset modes: Basic, SEO Strong, Best Possible
+  ✅ Active preset shows with purple highlight ring
+  ✅ Each preset has label and description
+  ✅ Clicking a preset applies a preconfigured set of values
+
+3D. OVERVIEW STATS (when available)
+  ✅ Total posts, Published, Avg SEO Score, Refresh Candidates,
+     Avg Days Since Publish, Total Runs, Failed Runs
+  ✅ Cards with formatted numbers
+  ✅ Trend icon on refresh candidates
+
+3E. READINESS PANEL
+  ✅ "Readiness Checks" with X/6 count
+  ✅ Checks: Live trends, SERP analysis, Grounded research,
+     Search Console, Page performance, Publish rules
+  ✅ Green check/amber alert icons per check
+  ✅ Readiness issues list with warning descriptions
+  ✅ Reset All to Defaults button
+
+3F. PIPELINE OVERVIEW
+  ✅ Stage-by-stage overview badges showing status label +
+     model for each pipeline stage (Keywords → Research →
+     SEO → Blog → Image)
+  ✅ Key inheritance summary text
+
+3G. LIVE TRENDS CONFIG
+  ✅ Enabled toggle
+  ✅ Fallback to AI toggle
+  ✅ Provider selector (ValueSERP, etc.)
+  ✅ Primary API key (password field with toggle)
+  ✅ Fallback API key
+  ✅ Trend freshness window, max trends
+
+3H. WEBSITE CRAWL CONFIG
+  ✅ Enabled toggle
+  ✅ Provider selector
+  ✅ Max pages slider/number
+  ✅ Primary/fallback API keys
+
+3I. SERP ANALYSIS CONFIG
+  ✅ Enabled toggle
+  ✅ Provider selector (ValueSERP, SerpAPI, etc.)
+  ✅ Max competitors
+  ✅ Device target (desktop/mobile)
+  ✅ Country code, language
+  ✅ Primary/fallback API keys
+
+3J. GROUNDED RESEARCH CONFIG
+  ✅ Enabled toggle
+  ✅ Max sources
+  ✅ Trust preference (high-only, balanced, any)
+  ✅ Freshness preference (recent-first, any, archival)
+  ✅ Reset section button
+
+3K. SEARCH CONSOLE CONFIG
+  ✅ Enabled toggle
+  ✅ Property URL
+  ✅ Auth status display
+  ✅ Credentials JSON (hidden by default)
+  ✅ Lookback days
+  ✅ Click threshold
+  ✅ Reset section button
+
+3L. PAGE PERFORMANCE CONFIG
+  ✅ Enabled toggle
+  ✅ Provider (PageSpeed Insights)
+  ✅ Strategy (mobile/desktop/both)
+  ✅ Performance threshold
+  ✅ API key
+  ✅ Reset section button
+
+3M. IMAGE GENERATION CONFIG
+  ✅ Enabled toggle
+  ✅ Provider selector (OpenAI, etc.)
+  ✅ Image model (gpt-image-1, dall-e-3, etc.)
+  ✅ Custom model ID (when model = custom)
+  ✅ Image size (1024x1024, 1792x1024, etc.)
+  ✅ Image quality (standard/hd)
+  ✅ Image style (vivid/natural)
+  ✅ Primary/fallback API keys
+  ✅ Reset section button
+
+3N. PUBLISH RULES CONFIG
+  ✅ Minimum SEO score (number input, 0-100)
+  ✅ 7 toggle rules:
+     - Require internal links
+     - Require meta description
+     - Require FAQ for informational intent
+     - Require image alt text
+     - Require manual approval
+     - Require canonical URL
+     - Require schema markup
+  ✅ Reset section button
+
+3O. AUTHOR & ENTITY MODELING (NEWLY ADDED)
+  ✅ Author attribution toggle
+  ✅ Author name, URL, bio, image URL
+  ✅ Social profiles (textarea, one per line)
+  ✅ Organization name, URL, logo URL
+  ✅ Service names (textarea, one per line)
+  ✅ Schema toggles:
+     - Article schema
+     - Organization schema
+     - FAQ schema
+     - Breadcrumb schema
+  ✅ Entity modeling master toggle
+
+3P. AI PIPELINE CONFIGURATION (5 Stages)
+  ✅ Each stage (extractKeywords, research, seoAnalysis,
+     writeBlog, generateImage) is collapsible
+  ✅ Stage visual: icon, color, status badge
+  ✅ Provider selector from PROVIDER_INFO
+  ✅ Per-stage API key (password + visibility toggle)
+  ✅ Model selector from AI_MODELS
+  ✅ Custom model ID field (when model = custom)
+  ✅ System prompt editor with reset-to-default
+
+3Q. CURRENT PIPELINE FOOTER
+  ✅ Pipeline flow visualization (badges with arrows)
+  ✅ Shows stage label + model for each step
+
+ISSUES WITH AGENCY CONFIG:
+  ⚠️ I4. No form validation / save confirmation
+     The Save button has no unsaved-changes indicator. User can
+     navigate away after making changes without any warning.
+     PRIORITY: MEDIUM
+
+  ⚠️ I5. No loading skeleton
+     While data loads, only a centered spinner is shown. A section-
+     level skeleton would feel more polished.
+     PRIORITY: LOW
+
+  ⚠️ I6. Author/Entity section has no reset button
+     Every other section (grounded research, search console, page
+     perf, image gen, publish rules) has a "Reset section" button.
+     The new Author & Entity section does not.
+     PRIORITY: LOW — needs getDefaultAIBloggerAuthorConfig and
+     getDefaultAIBloggerEntityModelingConfig added to resetSection
+
+  ⚠️ I7. No dirty-state tracking
+     The config page doesn't track whether any values have been
+     changed from the loaded state. This means the Save button is
+     always enabled, and there's no visual diff of changes.
+     PRIORITY: LOW
+
+  ⚠️ I8. Readiness checks don't include author/entity
+     The readiness panel checks 6 items but doesn't validate
+     whether author config is enabled but has empty name, or
+     entity modeling is on but missing organization name.
+     PRIORITY: MEDIUM
+
+
+==============================================================
+SECTION 4: SCOPE PAGES AUDIT
+==============================================================
+
+Three routes are implemented as "scope pages" — honest placeholder
+pages that explain what is and isn't built yet:
+
+4A. Generate (/super-admin/ai-blogger/generate)
+  File: app/super-admin/ai-blogger/generate/page.tsx (24 lines)
+  Content: getGenerateRouteContent()
+  ✅ WandSparkles icon
+  ✅ "Config-first" status badge
+  ✅ Context note (adapts based on whether agency is selected)
+  ✅ 3 cards: What Exists, What Is Not Here Yet, Phase Decision
+  ✅ Action: "Open Selected Agency Config" / "Choose Agency"
+  ✅ Action: "Back to Overview"
+
+4B. Posts (/super-admin/ai-blogger/posts)
+  File: app/super-admin/ai-blogger/posts/page.tsx (24 lines)
+  Content: getPostsRouteContent()
+  ✅ FileText icon
+  ✅ "Queue not implemented" status badge
+  ✅ Similar 3-card layout
+  ✅ Proper back links
+
+4C. Post Detail (/super-admin/ai-blogger/posts/[slug])
+  File: app/super-admin/ai-blogger/posts/[slug]/page.tsx (33 lines)
+  Content: getPostDetailRouteContent(slug)
+  ✅ Shows the requested slug in the description
+  ✅ "Editor not implemented" status badge
+  ✅ Links to "Open Posts Scope" and agency config
+
+4D. Settings (/super-admin/ai-blogger/settings)
+  File: app/super-admin/ai-blogger/settings/page.tsx (24 lines)
+  Content: getSettingsRouteContent()
+  ✅ Settings2 icon
+  ✅ "Agency-specific today" status badge
+  ✅ Proper explanation of what exists vs missing
+
+VERDICT: Scope pages are WELL DESIGNED ✅
+  - Clean, honest, and helpful — no broken or empty routes
+  - Each page adapts its context note based on agency selection
+  - Route content is centralized in route-content.ts (196 lines)
+  - Shared layout via AIBloggerSuperAdminScopePage component
+
+ISSUES:
+  ⚠️ I9. Scope pages could show basic stats
+     The scope pages currently show only text. They could show
+     aggregate stats (total posts count across agencies, etc.)
+     to make them more useful while remaining as scope pages.
+     PRIORITY: LOW
+
+  ⚠️ I10. No indication in nav that 3 tabs are placeholders
+     The nav shows Generate / Posts / Settings as equal tabs to
+     Overview and Agency Config, but 3 of them are just scope
+     pages. A subtle badge like "(scope)" or dimmed text could
+     help set expectations before clicking.
+     PRIORITY: LOW
+
+
+==============================================================
+SECTION 5: COMPONENT & SHARED UTILITIES AUDIT
+==============================================================
+
+5A. AIBloggerSuperAdminScopePage (131 lines)
+  ✅ Reusable, well-typed component
+  ✅ Accepts icon, title, description, status badge, cards, actions
+  ✅ Back link with configurable label and href
+  ✅ Actions with primary/secondary variant styling
+  ✅ Clean card grid layout (3 columns)
+
+5B. Route Content Definitions (196 lines)
+  ✅ 4 route content functions centralized in one file
+  ✅ Each function adapts based on selectedAgencyId
+  ✅ Consistent structure: title, description, statusLabel,
+     contextNote, actions, cards
+
+5C. Super-Admin Context (17 lines)
+  ✅ Uses React cache for deduplication
+  ✅ Requires superadmin role via requireRole("superadmin")
+  ✅ Gets current agency from session context
+
+5D. AIBloggerAgencyConfigClient (~3100 lines)
+  ✅ Massive but well-organized single-file component
+  ✅ Uses useMemo extensively for derived state
+  ✅ All config sections follow consistent visual patterns
+  ✅ Proper loading/saving/error states
+
+ISSUES:
+  ⚠️ I11. Agency config component is very large (~3100 lines)
+     May benefit from splitting into subcomponents:
+       - Pipeline stage editor (repeated 5x)
+       - Config section (trends/crawl/serp/etc. each similar)
+       - Readiness check panel
+     PRIORITY: LOW (works correctly, just long)
+
+
+==============================================================
+SECTION 6: BACKEND FEATURE ALIGNMENT
+==============================================================
+
+Backend Feature → Super-Admin UI Surface:
+
+1. AI Pipeline (5 stages)           → ✅ Full per-stage config
+2. Live Trends (ValueSERP etc.)     → ✅ Full config with keys
+3. Website Crawl                    → ✅ Full config with keys
+4. SERP Analysis                    → ✅ Full config with keys
+5. Grounded Research                → ✅ Full config + trust/freshness
+6. Search Console                   → ✅ Full config + auth status
+7. Page Performance                 → ✅ Full config + threshold
+8. Image Generation                 → ✅ Full config + model/size/quality
+9. Publish Rules                    → ✅ Full config + 7 toggles + score
+10. Author Config                   → ✅ Full config (NEWLY ADDED)
+11. Entity Modeling                 → ✅ Full config (NEWLY ADDED)
+12. Presets (Basic/SEO/Best)        → ✅ Working preset system
+13. Overview Stats                  → ✅ Posts/SEO/runs/refresh counts
+14. Readiness Checks                → ✅ 6-item readiness panel
+15. Pipeline Visualization          → ✅ Flow badge strip
+
+ALIGNMENT: 15/15 features surfaced ✅ (100%)
+
+
+==============================================================
+SECTION 7: ENHANCEMENT RECOMMENDATIONS
+==============================================================
+
+PRIORITY 1 — HIGH (should fix):
+
+  S1. Add Reset Button for Author & Entity Section
+      Add an "author" and "entityModeling" reset option to the
+      existing resetSection function, and add a Reset Section
+      button to the Author & Entity Modeling panel header.
+      WHERE: AIBloggerAgencyConfigClient.tsx
+
+  S2. Add Author/Entity to Readiness Checks
+      The readiness panel should check:
+        - Author enabled but name is empty
+        - Entity enabled but organization name is empty
+      WHERE: AIBloggerAgencyConfigClient.tsx → readinessChecks
+
+PRIORITY 2 — MEDIUM (recommended):
+
+  S3. Add Unsaved Changes Indicator on Save Button
+      Track dirty state by comparing config to `initialConfig`.
+      Show "Unsaved changes" text or dot indicator on Save button.
+      Optionally show browser beforeunload warning.
+      WHERE: AIBloggerAgencyConfigClient.tsx
+
+  S4. Add Readiness Summary to Overview Agency Rows
+      Show a small "5/6 checks ready" or "2 issues" badge on each
+      agency row so the admin can quickly spot which agencies need
+      attention without opening each config page.
+      WHERE: app/super-admin/ai-blogger/page.tsx
+
+PRIORITY 3 — LOW (polish):
+
+  S5. Add Search/Filter to Overview Agency List
+      For deployments with many agencies, add a search input to
+      filter the agency list by name, plan, or AI Blogger status.
+      WHERE: Overview page (would need to become client component)
+
+  S6. Add Loading Skeleton to Agency Config
+      Replace the centered spinner with section-level skeleton
+      placeholders for a more polished loading experience.
+      WHERE: AIBloggerAgencyConfigClient.tsx
+
+  S7. Mark Scope Tab Pages as Placeholders in Nav
+      Add subtle "(scope)" text or dimmed styling to the Generate,
+      Posts, and Settings nav tabs so admins know these are not
+      yet functional before clicking.
+      WHERE: _components/ai-blogger-super-admin-nav.tsx
+
+  S8. Add Aggregate Stats to Scope Pages
+      Show basic cross-agency totals (total posts, total published,
+      total refresh candidates) on the Posts and Settings scope
+      pages to make them useful while remaining as scope pages.
+      WHERE: Posts scope page + Settings scope page
+
+  S9. Split Agency Config into Subcomponents
+      Extract repeated patterns (pipeline stage editor, config
+      section panels) into smaller components for maintainability.
+      Not urgent since the current file is correct, just long.
+      WHERE: AIBloggerAgencyConfigClient.tsx → new subcomponents
+
+
+==============================================================
+SECTION 8: SUMMARY
+==============================================================
+
+PAGES AUDITED:                    8 routes (6 page files + 1 layout + 1 client component)
+COMPONENTS AUDITED:               4 shared components
+BACKEND FEATURES SURFACED:       15/15 (100%) ✅
+OVERALL QUALITY:                  HIGH — well-structured, honest scope pages, consistent design
+
+KEY ISSUES FOUND:
+  I1.  No agency search/filter in overview          (LOW)
+  I2.  No readiness summary per agency row          (MEDIUM)
+  I3.  No aggregate stats banner on overview        (LOW)
+  I4.  No unsaved-changes indicator on config       (MEDIUM)
+  I5.  No loading skeleton for config page          (LOW)
+  I6.  Author/Entity section missing reset button   (LOW)
+  I7.  No dirty-state tracking on config            (LOW)
+  I8.  Readiness checks don't cover author/entity   (MEDIUM)
+  I9.  Scope pages show only text, no stats         (LOW)
+  I10. Nav doesn't indicate placeholder tabs        (LOW)
+  I11. Agency config component is ~3100 lines       (LOW)
+
+ENHANCEMENT RECOMMENDATIONS:
+  S1.  Add reset button for Author & Entity         (HIGH)
+  S2.  Add author/entity to readiness checks        (HIGH)
+  S3.  Add unsaved changes indicator                (MEDIUM)
+  S4.  Add readiness summary to agency rows         (MEDIUM)
+  S5.  Add search/filter to agency list             (LOW)
+  S6.  Add loading skeleton to agency config        (LOW)
+  S7.  Mark scope tabs in nav                       (LOW)
+  S8.  Add aggregate stats to scope pages           (LOW)
+  S9.  Split agency config into subcomponents       (LOW)
+
+STRONGEST ELEMENTS:
+  - Agency Config page covers every backend feature
+  - Scope pages are honest and well-designed
+  - Preset system (Basic/SEO Strong/Best Possible) is excellent
+  - Readiness checks with issue breakdown is very useful
+  - Pipeline visualization footer gives at-a-glance status
+
+==============================================================
+END OF AUDIT
+==============================================================

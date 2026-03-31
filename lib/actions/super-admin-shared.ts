@@ -2,7 +2,7 @@ import "server-only";
 
 import { SuperAdminModel, SystemSettingsModel, connectDB } from "../mongodb";
 import { getSessionUser } from "../auth";
-import type { Agency, AIConfig, AIFeatureConfig } from "../types";
+import type { Agency, AIBloggerStageConfig, AIConfig, AIFeatureConfig } from "../types";
 
 type SerializableRecord = Record<string, unknown>;
 
@@ -16,6 +16,38 @@ type StoredAIConfigRecord = {
     taskExplainConfig?: AIFeatureConfig;
     hourEstimateConfig?: AIFeatureConfig;
     taskChatbotConfig?: AIFeatureConfig;
+    heavyTasksConfig?: AIFeatureConfig;
+};
+
+type StoredAIBloggerStageConfigRecord = {
+    provider?: AIBloggerStageConfig["provider"];
+    apiKey?: string;
+    fallbackApiKey?: string;
+    model?: string;
+    customModelId?: string;
+    systemPrompt?: string;
+};
+
+type StoredAIBloggerTrendsConfigRecord = {
+    enabled?: boolean;
+    provider?: "serpapi";
+    apiKey?: string;
+    fallbackApiKey?: string;
+    fallbackEnabled?: boolean;
+    fallbackToAi?: boolean;
+    defaultLocation?: string;
+};
+
+export type StoredAIBloggerConfigRecord = {
+    fallbackEnabled?: boolean;
+    trends?: StoredAIBloggerTrendsConfigRecord;
+    extractKeywords?: StoredAIBloggerStageConfigRecord;
+    research?: StoredAIBloggerStageConfigRecord;
+    seoAnalysis?: StoredAIBloggerStageConfigRecord;
+    writeBlog?: StoredAIBloggerStageConfigRecord;
+    generateImage?: StoredAIBloggerStageConfigRecord;
+    updatedAt?: string;
+    updatedBy?: string;
 };
 
 type EmailEventSettingsRecord = {
@@ -34,6 +66,7 @@ type EmailDefaultsRecord = {
     taskUpdates?: boolean;
     leaveManagement?: boolean;
     documentApproval?: boolean;
+    aiBloggerAlerts?: boolean;
     taskEmailEvents?: Partial<Record<'taskCreated' | 'taskInProgress' | 'taskDone', EmailEventSettingsRecord>>;
 };
 
@@ -58,6 +91,14 @@ export type SystemSettingsRecord = {
     emailDefaults?: EmailDefaultsRecord;
     defaultAiConfig?: StoredAIConfigRecord;
     promptConfig?: PromptConfigRecord;
+    aiBloggerSearchConsole?: {
+        enabled: boolean;
+        propertyUrl?: string;
+        credentialsJson?: string;
+        syncFrequencyHours: number;
+        lookbackDays: number;
+        authStatus: "not-connected" | "configured";
+    };
 };
 
 export type PromptFeatureConfig = {
@@ -139,6 +180,7 @@ export type SettingsUpdateRecord = Record<string, unknown>;
 export type AgencyPlanUpdate = Partial<Pick<Agency, "plan" | "limits" | "features" | "planDuration" | "planExpiresAt" | "status" | "updatedAt">>;
 
 export type StoredAIConfig = StoredAIConfigRecord;
+export type StoredAIBloggerConfig = StoredAIBloggerConfigRecord;
 
 export async function verifySuperAdmin() {
     const sessionUser = await getSessionUser();

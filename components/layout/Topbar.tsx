@@ -28,9 +28,18 @@ interface TopbarProps {
     agencyName?: string;
     agencyLogo?: string;
     agencyPlan?: string;
+    agencyStatus?: string;
+    agencyHasAIBlogger?: boolean;
 }
 
-export function Topbar({ currentUser: propUser, agencyName, agencyLogo, agencyPlan }: TopbarProps) {
+export function Topbar({
+    currentUser: propUser,
+    agencyName,
+    agencyLogo,
+    agencyPlan,
+    agencyStatus,
+    agencyHasAIBlogger,
+}: TopbarProps) {
     const router = useRouter();
 
     const [user, setUser] = useState<CurrentUserResult | undefined>(propUser);
@@ -132,7 +141,18 @@ export function Topbar({ currentUser: propUser, agencyName, agencyLogo, agencyPl
             <div className="h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 flex items-center justify-between z-10">
                 <div className="flex items-center gap-4">
                     <div className="md:hidden mr-2">
-                        {mounted && <MobileSidebar currentUserId={user.id} currentUserUsername={user.username} currentUserRole={user.role} agencyName={agencyName} agencyLogo={agencyLogo} agencyPlan={agencyPlan} />}
+                        {mounted && (
+                            <MobileSidebar
+                                currentUserId={user.id}
+                                currentUserUsername={user.username}
+                                currentUserRole={user.role}
+                                agencyName={agencyName}
+                                agencyLogo={agencyLogo}
+                                agencyPlan={agencyPlan}
+                                agencyStatus={agencyStatus}
+                                agencyHasAIBlogger={agencyHasAIBlogger}
+                            />
+                        )}
                     </div>
                     <h2 className="text-lg font-semibold">Dashboard</h2>
                 </div>

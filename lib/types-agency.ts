@@ -13,6 +13,7 @@ export type AgencyLimits = {
 
 export type AgencyFeatures = {
     aiAssistant: boolean;
+    aiBlogger: boolean;
     advancedReporting: boolean;
     apiAccess: boolean;
     whiteLabel: boolean;
@@ -27,6 +28,183 @@ export type AIFeatureConfig = {
     apiKey: string;
     model: string;
     customModelId?: string;
+};
+
+export type AIBloggerStageKey =
+    | "extractKeywords"
+    | "research"
+    | "seoAnalysis"
+    | "writeBlog"
+    | "generateImage";
+
+export type AIBloggerStageConfig = {
+    provider: AIProvider;
+    apiKey?: string;
+    fallbackApiKey?: string;
+    model: string;
+    customModelId?: string;
+    systemPrompt: string;
+};
+
+export type AIBloggerTrendProvider = "serpapi";
+export type AIBloggerWebsiteCrawlProvider = "basic-fetch";
+export type AIBloggerSerpProvider = "serpapi";
+export type AIBloggerSerpDevice = "desktop" | "mobile";
+export type AIBloggerGroundedResearchTrustPreference = "balanced" | "high-only";
+export type AIBloggerGroundedResearchFreshnessPreference = "balanced" | "recent-first" | "evergreen-ok";
+export type AIBloggerGroundedResearchSourceType =
+    | "government"
+    | "education"
+    | "official"
+    | "industry"
+    | "competitor"
+    | "news"
+    | "reference";
+export type AIBloggerPagePerformanceProvider = "pagespeed";
+export type AIBloggerPagePerformanceStrategy = "mobile" | "desktop" | "both";
+export type AIBloggerSearchConsoleAuthStatus = "not-connected" | "configured";
+export type AIBloggerImageGenerationProvider = "openai" | "gemini";
+export type AIBloggerImageGenerationSize = "1024x1024" | "1792x1024" | "1024x1792";
+export type AIBloggerImageGenerationQuality = "standard" | "hd";
+export type AIBloggerImageGenerationStyle = "natural" | "vivid";
+
+export type AIBloggerTrendsConfig = {
+    enabled: boolean;
+    provider: AIBloggerTrendProvider;
+    apiKey?: string;
+    fallbackApiKey?: string;
+    fallbackEnabled: boolean;
+    fallbackToAi: boolean;
+    defaultLocation: string;
+};
+
+export type AIBloggerWebsiteCrawlConfig = {
+    enabled: boolean;
+    provider: AIBloggerWebsiteCrawlProvider;
+    maxPages: number;
+    timeoutMs: number;
+    refreshWindowHours: number;
+    allowedPaths: string[];
+    blockedPaths: string[];
+};
+
+export type AIBloggerSerpConfig = {
+    enabled: boolean;
+    provider: AIBloggerSerpProvider;
+    apiKey?: string;
+    fallbackApiKey?: string;
+    fallbackEnabled: boolean;
+    defaultLocation: string;
+    device: AIBloggerSerpDevice;
+    maxCompetitors: number;
+    refreshWindowHours: number;
+};
+
+export type AIBloggerGroundedResearchConfig = {
+    enabled: boolean;
+    maxSources: number;
+    trustPreference: AIBloggerGroundedResearchTrustPreference;
+    freshnessPreference: AIBloggerGroundedResearchFreshnessPreference;
+    allowedSourceTypes: AIBloggerGroundedResearchSourceType[];
+    blockedDomains: string[];
+    refreshWindowHours: number;
+};
+
+export type AIBloggerSearchConsoleConfig = {
+    enabled: boolean;
+    propertyUrl: string;
+    credentialsJson?: string;
+    authStatus: AIBloggerSearchConsoleAuthStatus;
+    syncFrequencyHours: number;
+    lookbackDays: number;
+};
+
+export type AIBloggerPagePerformanceConfig = {
+    enabled: boolean;
+    provider: AIBloggerPagePerformanceProvider;
+    apiKey?: string;
+    strategy: AIBloggerPagePerformanceStrategy;
+    performanceThreshold: number;
+    refreshWindowHours: number;
+};
+
+export type AIBloggerImageGenerationConfig = {
+    enabled: boolean;
+    provider: AIBloggerImageGenerationProvider;
+    apiKey?: string;
+    fallbackApiKey?: string;
+    model: string;
+    customModelId?: string;
+    size: AIBloggerImageGenerationSize;
+    quality: AIBloggerImageGenerationQuality;
+    style: AIBloggerImageGenerationStyle;
+};
+
+export type AIBloggerPublishRulesConfig = {
+    requireInternalLinks: boolean;
+    requireMetaDescription: boolean;
+    requireFaqForInformational: boolean;
+    requireImageAltText: boolean;
+    requireManualApproval: boolean;
+    minimumSeoScore: number;
+    requireCanonicalUrl: boolean;
+    requireSchemaMarkup: boolean;
+    aiReviewPolicy: {
+        enableFinalChecker: boolean;
+        apiKey?: string;
+        model?: string;
+        customModelId?: string;
+        autoFixStructuralIssues: boolean;
+        autoFixToneMismatch: boolean;
+        flagWeakBusinessFit: boolean;
+        flagWeakCtaAlignment: boolean;
+        softenQuestionableClaims: boolean;
+        flagSoftCannibalization: boolean;
+        requireHumanReviewForHighRiskClaims: boolean;
+        requireHumanReviewForHighRiskCannibalization: boolean;
+        requireGroundedSourcesForClaims: boolean;
+    };
+};
+export type AIBloggerAuthorConfig = {
+    enabled: boolean;
+    name: string;
+    url?: string;
+    bio?: string;
+    socialProfiles?: string[];
+    imageUrl?: string;
+};
+
+export type AIBloggerEntityModelingConfig = {
+    enabled: boolean;
+    organizationName?: string;
+    organizationUrl?: string;
+    organizationLogoUrl?: string;
+    serviceNames?: string[];
+    enableArticleSchema: boolean;
+    enableOrganizationSchema: boolean;
+    enableFaqSchema: boolean;
+    enableBreadcrumbSchema: boolean;
+};
+
+export type AIBloggerConfig = {
+    fallbackEnabled: boolean;
+    trends: AIBloggerTrendsConfig;
+    crawl: AIBloggerWebsiteCrawlConfig;
+    serp: AIBloggerSerpConfig;
+    groundedResearch: AIBloggerGroundedResearchConfig;
+    searchConsole: AIBloggerSearchConsoleConfig;
+    pagePerformance: AIBloggerPagePerformanceConfig;
+    imageGeneration: AIBloggerImageGenerationConfig;
+    publishRules: AIBloggerPublishRulesConfig;
+    author: AIBloggerAuthorConfig;
+    entityModeling: AIBloggerEntityModelingConfig;
+    extractKeywords: AIBloggerStageConfig;
+    research: AIBloggerStageConfig;
+    seoAnalysis: AIBloggerStageConfig;
+    writeBlog: AIBloggerStageConfig;
+    generateImage: AIBloggerStageConfig;
+    updatedAt?: string;
+    updatedBy?: string;
 };
 
 export type AIConfig = {
@@ -110,6 +288,7 @@ export type Agency = {
             taskUpdates?: boolean;
             leaveManagement?: boolean;
             documentApproval?: boolean;
+            aiBloggerAlerts?: boolean;
             taskEmailPriorities?: {
                 high?: boolean;
                 medium?: boolean;
@@ -127,6 +306,7 @@ export type Agency = {
     updatedAt?: string;
     lastActivityAt?: string;
     aiConfig?: AIConfig;
+    aiBloggerConfig?: AIBloggerConfig;
     aiPermissions?: AIPermissions;
     features: AgencyFeatures;
 };
@@ -166,6 +346,7 @@ export const AGENCY_PLANS: Record<AgencyPlan, { limits: AgencyLimits; features: 
         },
         features: {
             aiAssistant: false,
+            aiBlogger: false,
             advancedReporting: false,
             apiAccess: false,
             whiteLabel: false,
@@ -185,6 +366,7 @@ export const AGENCY_PLANS: Record<AgencyPlan, { limits: AgencyLimits; features: 
         },
         features: {
             aiAssistant: true,
+            aiBlogger: false,
             advancedReporting: true,
             apiAccess: false,
             whiteLabel: false,
@@ -204,6 +386,7 @@ export const AGENCY_PLANS: Record<AgencyPlan, { limits: AgencyLimits; features: 
         },
         features: {
             aiAssistant: true,
+            aiBlogger: true,
             advancedReporting: true,
             apiAccess: true,
             whiteLabel: true,
@@ -223,6 +406,7 @@ export const AGENCY_PLANS: Record<AgencyPlan, { limits: AgencyLimits; features: 
         },
         features: {
             aiAssistant: true,
+            aiBlogger: true,
             advancedReporting: true,
             apiAccess: true,
             whiteLabel: true,

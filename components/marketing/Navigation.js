@@ -23,6 +23,7 @@ export default function Navigation() {
     { name: "PPC", href: "/services/ppc" },
     { name: "Influencer Marketing", href: "/services/influencer-marketing" },
     { name: "Manage Company", href: "/services/manage-company" },
+    { name: "AI Blogger", href: "/services/ai-blogger" },
   ];
 
   // Keep marketing navigation aligned with the real authenticated session.

@@ -29,11 +29,7 @@ const MENTION_REGEX = /@\[([^\]]+)\]\(([^)]+)\)/g;
  * Mentions become non-editable chips; plain text becomes escaped text nodes.
  */
 function rawToHtml(raw: string): string {
-    // Escape HTML entities in non-mention parts
-    const parts = raw.split(MENTION_REGEX);
-    // raw.split with capturing groups: [before, name, id, after, name, id, ...]
     let html = "";
-    let i = 0;
     const regex = new RegExp(MENTION_REGEX.source, "g");
     let lastIndex = 0;
     let m: RegExpExecArray | null;
@@ -131,7 +127,7 @@ export function MentionTextarea({
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [mentionQuery, setMentionQuery] = useState("");
     const [selectedIndex, setSelectedIndex] = useState(0);
-    const [isEmpty, setIsEmpty] = useState(!value);
+    const isEmpty = !value.trim();
 
     const filteredUsers = users
         .filter((u) => u.name.toLowerCase().includes(mentionQuery.toLowerCase()))
@@ -143,7 +139,6 @@ export function MentionTextarea({
         if (!editor || initializedRef.current) return;
         editor.innerHTML = rawToHtml(value);
         initializedRef.current = true;
-        setIsEmpty(!value.trim());
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Sync when value is externally reset (e.g. cleared to "" after submit)
@@ -154,8 +149,6 @@ export function MentionTextarea({
         // Only reset if value was cleared/changed externally and differs from current DOM
         if (value === "" && currentRaw !== "") {
             editor.innerHTML = "";
-            setIsEmpty(true);
-            setShowSuggestions(false);
         }
     }, [value]);
 
@@ -176,7 +169,6 @@ export function MentionTextarea({
         if (!editor) return;
         const raw = htmlToRaw(editor);
         onChange(raw);
-        setIsEmpty(!raw.trim());
 
         const rawBefore = getRawBeforeCaret(editor);
         detectMention(rawBefore);
@@ -263,7 +255,6 @@ export function MentionTextarea({
             // Sync state
             const raw = htmlToRaw(editor);
             onChange(raw);
-            setIsEmpty(false);
             editor.focus();
         },
         [onChange]

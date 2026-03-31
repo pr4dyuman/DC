@@ -16,7 +16,7 @@ const FEATURE_LABELS: { key: FeatureModelKey; label: string; desc: string }[] = 
     { key: "taskExplainConfig",  label: "Task Explain/Enhance", desc: "AI task analysis & description enhancement" },
     { key: "hourEstimateConfig", label: "Hour Estimation",      desc: "AI-powered task hour estimation" },
     { key: "taskChatbotConfig",  label: "Task Chatbot",         desc: "In-task AI assistant chat" },
-    { key: "heavyTasksConfig",   label: "Heavy Tasks (Singularity)", desc: "Powerful model for complex admin tasks — activated via the ⚡ toggle" },
+    { key: "heavyTasksConfig",   label: "AI Blogger + Heavy Tasks", desc: "Used by AI Blogger generation and Singularity heavy-task mode" },
 ];
 
 interface DefaultAiState {

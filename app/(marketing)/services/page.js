@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 
 export default function Services() {
   const servicesData = [
@@ -70,6 +71,16 @@ export default function Services() {
       link: "/services/manage-company",
       tagline: "AI-POWERED MANAGEMENT",
     },
+    {
+      id: "08",
+      title: "AI",
+      titleHighlight: "Blogger",
+      image: "/ai-blogger.svg",
+      description:
+        "Plan, generate, optimize, and schedule SEO-focused blogs from one clean workflow built for agencies and growth teams.",
+      link: "/services/ai-blogger",
+      tagline: "CONTENT ENGINE FOR GROWTH",
+    },
   ];
 
   return (
@@ -118,12 +129,12 @@ export default function Services() {
                     {service.description}
                   </p>
                   <div className={`text-center ${isEven ? 'lg:text-left' : 'lg:text-right'}`}>
-                    <a
+                    <Link
                       href={service.link}
                       className="inline-block bg-white text-black font-bold uppercase px-6 py-3 rounded-full hover:bg-[#F5EE30] transition-all w-full sm:w-auto text-center"
                     >
                       Explore Service
-                    </a>
+                    </Link>
                   </div>
                 </div>
               </div>

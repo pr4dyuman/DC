@@ -351,7 +351,7 @@ export default function VideoProduction() {
 
     {/* Circle Button */}
     <div className="flex justify-center md:justify-end">
-      <a href="/get-started" class="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white text-black font-bold flex items-center justify-center shadow-lg hover:bg-yellow-400 transition-all">GET STARTED</a>
+      <a href="/get-started" className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white text-black font-bold flex items-center justify-center shadow-lg hover:bg-yellow-400 transition-all">GET STARTED</a>
     </div>
   </div>
 </div>

@@ -23,7 +23,7 @@ export type ProjectTaskBulkToolName =
     | "bulk_edit_tasks"
     | "bulk_create_tasks";
 type BulkSnapshotEntity = (entityType: "task", entityId: string) => Promise<unknown>;
-type TaskEditFields = Partial<Pick<Task, "priority" | "category">>;
+type TaskEditFields = Partial<Pick<Task, "title" | "description" | "priority" | "category">>;
 type TaskTimestampFields = Partial<Pick<Task, "createdAt" | "updatedAt">>;
 type BulkTaskInput = {
     title: string;
@@ -192,8 +192,12 @@ export async function executeProjectTaskBulkTool(
                     const timestampUpdates: TaskTimestampFields = {};
 
                     if (updates) {
+                        const titleValue = getOptionalStringArg(updates, "title");
+                        const descriptionValue = getOptionalStringArg(updates, "description");
                         const priorityValue = getOptionalStringArg(updates, "priority");
                         const categoryValue = getOptionalStringArg(updates, "category");
+                        if (titleValue) editUpdates.title = titleValue;
+                        if (descriptionValue) editUpdates.description = descriptionValue;
                         if (priorityValue) editUpdates.priority = priorityValue as Task["priority"];
                         if (categoryValue) editUpdates.category = categoryValue;
                     }

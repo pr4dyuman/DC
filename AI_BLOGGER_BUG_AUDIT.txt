@@ -1,0 +1,202 @@
+================================================================================
+ AI BLOGGER — FULL WORKFLOW BUG AUDIT
+ Generated: 2026-03-27
+================================================================================
+
+Files audited:
+  • lib/ai-blogger-workflow.ts (state machine, transitions)
+  • components/ai-blogger/AIBloggerPostStatusControls.tsx (status UI)
+  • components/ai-blogger/AIBloggerPostEditorForm.tsx (editor save)
+  • components/ai-blogger/AIBloggerPostActions.tsx (copy/export)
+  • components/ai-blogger/AIBloggerDraftBuilder.tsx (generate flow)
+  • lib/actions/ai-blogger.ts — updateBlogStudioPostStatusImpl (status action)
+  • lib/actions/ai-blogger.ts — publishBlogStudioPostImpl (publish action)
+  • lib/actions/ai-blogger.ts — validateBlogStudioPublishPackage (validator)
+  • lib/ai-blogger-seo-audit.ts (SEO scoring)
+  • app/dashboard/ai-blogger/posts/[slug]/page.tsx (post detail page)
+
+================================================================================
+ BUGS (will cause incorrect behavior or crashes)
+================================================================================
+
+BUG-1: DEAD CODE / CONTRADICTORY STATUS CHECK IN publishBlogStudioPostImpl
+  Severity: MEDIUM
+  File: lib/actions/ai-blogger.ts, lines 6470-6487
+  
+  Problem:
+    Line 6470: if (currentPost.status !== "Approved" && currentPost.status !== "Scheduled")
+      → Implies both "Approved" and "Scheduled" can proceed
+    Line 6485: if (currentPost.status !== "Scheduled") throw Error(...)
+      → Immediately rejects "Approved" posts
+  
+  Impact: The first guard (6470) is misleading dead code. A post in "Approved"
+  status passes the first check but hits the second throw. The user sees a
+  confusing error: "DC blog publishing requires the post to be scheduled first"
+  instead of being guided to schedule it first.
+  
+  Fix: Remove the Approved branch from the first guard or replace both guards
+  with a single clear check:
+    if (currentPost.status !== "Scheduled") {
+      throw new Error("Schedule this post before publishing to the DC blog.");
+    }
+
+
+BUG-2: SCHEMA MARKUP CHECK RUNS AFTER MarketingBlog.create()
+  Severity: HIGH
+  File: lib/actions/ai-blogger.ts, lines 6521-6555
+  
+  Problem:
+    Line 6521: marketingPost = await MarketingBlog.create({...})
+      → Marketing blog entry is CREATED first
+    Line 6553: if (requireSchemaMarkup && !schemaMarkup) throw Error(...)
+      → Schema check happens AFTER the entry already exists in the DB
+  
+  Impact: If schema markup is required but the function fails to generate it
+  (e.g., buildMarketingBlogSchemaMarkup returns empty), the marketing blog entry
+  is already committed to the database as a published post. The throw aborts the
+  AI Blogger status update but the marketing blog entry orphan persists with
+  status "published" — visible on the public blog without matching AI Blogger
+  record update.
+  
+  Fix: Move the schema generation and check BEFORE MarketingBlog.create(), or
+  wrap the entire operation in a transaction/rollback.
+
+
+BUG-3: PUBLISH VALIDATOR SEO SCORE USES post.seoScore (AI ESTIMATE) NOT AUDIT SCORE
+  Severity: MEDIUM
+  File: lib/actions/ai-blogger.ts, lines 3200-3210
+  
+  Problem:
+    validateBlogStudioPublishPackage checks `post.seoScore` (the AI-estimated
+    score from generation time) against publishRules.minimumSeoScore.
+    
+    But publishBlogStudioPostImpl (line 6497) checks `publishAudit.score` (the
+    live recalculated audit score) against the SAME threshold.
+  
+  Impact: A post can show "ready to publish" in the UI (validator says
+  canPublish = true based on old AI score) but then FAIL the actual publish
+  action (which recalculates the real audit score). The user clicks Publish,
+  sees no blockers, but gets a server error.
+  
+  Fix: Either pass the live audit score into the validator, or make the
+  validator call getBlogStudioSeoAudit internally. The two checks should use
+  the same score source.
+
+
+BUG-4: FULL-FORM ADVANCE BUTTON DOES NOT CHECK BLOCKER/PUBLISH DISABLED STATE
+  Severity: LOW
+  File: components/ai-blogger/AIBloggerPostStatusControls.tsx, line 333
+  
+  Problem:
+    The full (non-compact) advance button at line 333 only checks `isPending`
+    for its disabled state:
+      <AIBloggerGradientButton ... disabled={isPending}>
+    
+    But the compact version at line 172 correctly checks ALL blockers:
+      disabled={isPending || (blockingStatuses && readinessBlockers.length > 0) || publishBlocked}
+  
+  Impact: In full view, the button is visually enabled when there are SEO
+  blockers or publish blockers. Clicking it triggers handleAdvance which does
+  check and shows a toast error — so it's not exploitable, but it's a UX bug
+  where the button appears clickable when it shouldn't be.
+  
+  Fix: Add the same disabled check to the full-form button:
+    disabled={isPending || (blockingStatuses && readinessBlockers.length > 0) || publishBlocked}
+
+
+================================================================================
+ ISSUES (logic concerns, edge cases, minor problems)
+================================================================================
+
+ISSUE-1: PUBLISH ROLLBACK GAP
+  Severity: MEDIUM
+  File: lib/actions/ai-blogger.ts, lines 6521-6577
+  
+  If MarketingBlog.create() succeeds but BlogStudioPostModel.findOneAndUpdate()
+  fails (line 6562-6577), the marketing blog post exists publicly but the AI
+  Blogger record is NOT marked as Published. No cleanup/rollback occurs. The
+  marketing blog post will be live and orphaned.
+  
+  Recommendation: Implement a try-catch around the pair of operations, or use a
+  two-phase approach where the marketing blog entry is created in "draft" status
+  first, then flipped to "published" after the AI Blogger record is updated.
+
+
+ISSUE-2: EDITOR FORM SAVES seoScore AS THE OLD VALUE
+  Severity: LOW
+  File: components/ai-blogger/AIBloggerPostEditorForm.tsx, line 394
+  
+  handleSubmit sends `seoScore: post.seoScore` — the ORIGINAL seoScore from
+  when the page loaded, not a recalculated score. Since the user may have
+  changed content, title, keyword, etc., the saved seoScore becomes stale.
+  
+  Recommendation: Either remove seoScore from the save payload (let the
+  backend recalculate), or recalculate it live in the editor.
+
+
+ISSUE-3: VALIDATE PUBLISH PACKAGE CHECKS post.internalLinks BUT NOT CONTENT BODY LINKS
+  Severity: LOW
+  File: lib/actions/ai-blogger.ts, lines 3137-3152
+  
+  The validator checks `post.internalLinks?.length` (the "accepted internal
+  links" array from the editor link map) but NOT whether internal links are
+  actually present in the blog content body. A post could have 5 "accepted"
+  links but zero actual links in the HTML/markdown body — the validator says OK.
+  
+  The SEO audit (ai-blogger-seo-audit.ts) separately checks for actual body
+  links via regex, but the publish validator bypasses this.
+  
+  Recommendation: Add a content body internal link check to the validator, or
+  delegate to the SEO audit's hasInternalLinks check.
+
+
+ISSUE-4: DUPLICATE countInternalLinks FUNCTION 
+  Severity: VERY LOW (code quality)
+  Files: lib/ai-blogger-seo-audit.ts AND components/ai-blogger/AIBloggerPostEditorForm.tsx
+  
+  The same countInternalLinks function with identical regex patterns is
+  copy-pasted in both files (audit: lines 43-63, editor: lines 66-86).
+  
+  Recommendation: Extract to a shared utility in lib/ and import from both.
+
+
+ISSUE-5: DraftBuilder FORM HAS DUAL ACTION MODE STATE
+  Severity: VERY LOW (dead code)
+  File: components/ai-blogger/AIBloggerDraftBuilder.tsx, lines 487-488
+  
+  Two state variables track nearly the same concept:
+    const [formMode, setFormMode] = useState<"ai" | "manual">("ai");
+    const [actionMode, setActionMode] = useState<"manual" | "ai">("ai");
+  
+  These appear to be a leftover from a refactor. `formMode` and `actionMode`
+  could likely be collapsed into a single state variable.
+  
+  Recommendation: Audit which is actually used and remove the duplicate.
+
+
+ISSUE-6: SCHEMA PREVIEW CARD MAY CRASH ON MALFORMED JSON
+  Severity: LOW
+  File: app/dashboard/ai-blogger/posts/[slug]/page.tsx (E8 schema card)
+  
+  The schema preview card does:
+    {JSON.stringify(JSON.parse(schemaJsonLd), null, 2)}
+  
+  If buildBlogStudioArticleJsonLd ever returns malformed JSON (shouldn't happen
+  but defensive coding matters), JSON.parse would throw and crash the page.
+  
+  Recommendation: Wrap in try-catch or just display schemaJsonLd directly.
+
+
+================================================================================
+ STATUS SUMMARY
+================================================================================
+
+  BUGS found:    4  (1 HIGH, 2 MEDIUM, 1 LOW)
+  ISSUES found:  6  (1 MEDIUM, 2 LOW, 3 VERY LOW)
+  
+  Critical path safety: The publish action's post-creation schema check (BUG-2)
+  is the most dangerous — it can leave orphan marketing blog posts in
+  production. BUG-3 can cause publish attempts to fail unexpectedly despite
+  the UI showing "ready." Both should be addressed before next deploy.
+
+================================================================================

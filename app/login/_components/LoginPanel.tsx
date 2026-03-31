@@ -108,7 +108,7 @@ export default function LoginPanel({
             </div>
 
             <Link
-                href="/get-started"
+                href="/get-started?mode=auth#signup"
                 className="block w-full py-3 border-2 border-[#F5EE30] text-[#F5EE30] font-glacial-bold uppercase tracking-widest text-sm text-center hover:bg-[#F5EE30] hover:text-black transition-all duration-300"
             >
                 Get Started - Free 7-Day Trial

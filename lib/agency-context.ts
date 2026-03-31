@@ -250,7 +250,7 @@ export async function decrementAgencyUsage(
  */
 export async function isFeatureEnabled(
     agencyId: string,
-    feature: 'aiAssistant' | 'advancedReporting' | 'apiAccess' | 'whiteLabel' | 'customDomain' | 'ssoEnabled'
+    feature: 'aiAssistant' | 'aiBlogger' | 'advancedReporting' | 'apiAccess' | 'whiteLabel' | 'customDomain' | 'ssoEnabled'
 ): Promise<boolean> {
     try {
         await connectDB();

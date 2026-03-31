@@ -12,7 +12,9 @@ import {
     FileText,
     LogOut,
     X,
-    Brain
+    Brain,
+    Sparkles,
+    BookOpen,
 } from "lucide-react";
 import { logout } from "@/lib/auth";
 
@@ -22,6 +24,8 @@ const navigation = [
     { name: "Users", href: "/super-admin/users", icon: Users },
     { name: "Analytics", href: "/super-admin/analytics", icon: BarChart3 },
     { name: "AI Usage", href: "/super-admin/analytics/ai", icon: Brain },
+    { name: "AI Blogger", href: "/super-admin/ai-blogger", icon: Sparkles },
+    { name: "Blog Management", href: "/super-admin/blogs", icon: BookOpen },
     { name: "Billing", href: "/super-admin/billing", icon: CreditCard },
     { name: "System Logs", href: "/super-admin/logs", icon: FileText },
     { name: "Settings", href: "/super-admin/settings", icon: Settings },

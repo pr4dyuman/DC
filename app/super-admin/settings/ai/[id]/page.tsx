@@ -14,7 +14,7 @@ const FEATURE_LABELS = [
     { key: "taskExplainConfig" as const,  label: "Task Explain/Enhance", desc: "AI task analysis & description enhancement" },
     { key: "hourEstimateConfig" as const, label: "Hour Estimation",     desc: "AI-powered task hour estimation" },
     { key: "taskChatbotConfig" as const,  label: "Task Chatbot",        desc: "In-task AI assistant chat" },
-    { key: "heavyTasksConfig" as const,  label: "Heavy Tasks (Singularity)", desc: "Powerful model for complex admin tasks — activated via the ⚡ toggle in Singularity" },
+    { key: "heavyTasksConfig" as const,  label: "AI Blogger + Heavy Tasks", desc: "Used by AI Blogger generation and Singularity heavy-task mode" },
 ];
 
 type FeatureModelKey = typeof FEATURE_LABELS[number]["key"];
@@ -116,6 +116,7 @@ export default function AgencyAIConfigPage({ params }: { params: Promise<{ id: s
                 ...(featureConfigs.taskExplainConfig  ? { taskExplainConfig:  featureConfigs.taskExplainConfig as AIFeatureConfig }  : {}),
                 ...(featureConfigs.hourEstimateConfig ? { hourEstimateConfig: featureConfigs.hourEstimateConfig as AIFeatureConfig } : {}),
                 ...(featureConfigs.taskChatbotConfig  ? { taskChatbotConfig:  featureConfigs.taskChatbotConfig as AIFeatureConfig }  : {}),
+                ...(featureConfigs.heavyTasksConfig   ? { heavyTasksConfig:   featureConfigs.heavyTasksConfig as AIFeatureConfig }   : {}),
             };
             await updateAgencyAIConfigSuperAdmin(agencyId, config);
             // Re-fetch saved config so all feature toggles restore to their saved state

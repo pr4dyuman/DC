@@ -67,6 +67,26 @@ const ServicesSection = () => {
       link: "/services/influencer-marketing",
       gradientColor: "#F5EE30",
     },
+    {
+      id: "07",
+      title: "Manage",
+      titleHighlight: "Company",
+      image: "/dashboard-mockup.png",
+      description:
+        "AI-powered agency management platform for projects, finances, invoicing, and operational visibility.",
+      link: "/services/manage-company",
+      gradientColor: "#F5EE30",
+    },
+    {
+      id: "08",
+      title: "AI",
+      titleHighlight: "Blogger",
+      image: "/ai-blogger.svg",
+      description:
+        "Plan, generate, optimize, and schedule SEO-focused blogs in one workflow built for agencies and growth teams.",
+      link: "/services/ai-blogger",
+      gradientColor: "#F5EE30",
+    },
   ]
 
   return (

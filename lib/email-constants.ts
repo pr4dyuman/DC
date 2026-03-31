@@ -37,6 +37,10 @@ export const EMAIL_TEMPLATES = {
   // Account Creation
   CLIENT_ACCOUNT_CREATED: 20,
   EMPLOYEE_ACCOUNT_CREATED: 21,
+
+  // AI Blogger
+  AI_BLOGGER_SCHEDULE_FAILED: 22,
+  AI_BLOGGER_SCHEDULE_PAUSED: 23,
 } as const;
 
 /**
@@ -52,7 +56,8 @@ export type EmailCategory =
   | 'projectUpdates'
   | 'taskUpdates'
   | 'leaveManagement'
-  | 'documentApproval';
+  | 'documentApproval'
+  | 'aiBloggerAlerts';
 
 export const EMAIL_CATEGORY_INFO: Record<EmailCategory, { label: string; description: string; priority: 'critical' | 'optional' }> = {
   accountCreation: { label: 'Account Creation', description: 'Login credentials for new employees & clients', priority: 'critical' },
@@ -63,6 +68,7 @@ export const EMAIL_CATEGORY_INFO: Record<EmailCategory, { label: string; descrip
   taskUpdates: { label: 'Task Updates', description: 'Task assigned, status changed, comments', priority: 'optional' },
   leaveManagement: { label: 'Leave Management', description: 'Leave requested, approved, rejected, cancelled', priority: 'optional' },
   documentApproval: { label: 'Document Approval', description: 'Document update requests and responses', priority: 'optional' },
+  aiBloggerAlerts: { label: 'AI Blogger Alerts', description: 'Schedule failures and pauses', priority: 'optional' },
 };
 
 /** Map each template ID to its category */
@@ -87,6 +93,8 @@ export const TEMPLATE_TO_CATEGORY: Record<number, EmailCategory> = {
   [EMAIL_TEMPLATES.LEAVE_CANCELLED]: 'leaveManagement',
   [EMAIL_TEMPLATES.DOCUMENT_UPDATE_REQUESTED]: 'documentApproval',
   [EMAIL_TEMPLATES.DOCUMENT_UPDATE_RESPONSE]: 'documentApproval',
+  [EMAIL_TEMPLATES.AI_BLOGGER_SCHEDULE_FAILED]: 'aiBloggerAlerts',
+  [EMAIL_TEMPLATES.AI_BLOGGER_SCHEDULE_PAUSED]: 'aiBloggerAlerts',
 };
 
 /** Default category states — critical ON, optional OFF */
@@ -99,6 +107,7 @@ export const DEFAULT_EMAIL_CATEGORIES: Record<EmailCategory, boolean> = {
   taskUpdates: false,
   leaveManagement: false,
   documentApproval: false,
+  aiBloggerAlerts: true,
 };
 
 /** Task email event types with per-recipient toggles */

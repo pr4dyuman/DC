@@ -21,7 +21,8 @@ type AIUsageFeature =
     | "ai-enhance"
     | "ai-task-chat"
     | "ai-chatbot"
-    | "ai-hour-estimate";
+    | "ai-hour-estimate"
+    | "ai-blogger";
 
 type AIUsageLogDoc = {
     agencyId: string;
@@ -77,6 +78,7 @@ const SystemSettingsSchema = new Schema({
         taskUpdates: { type: Boolean, default: false },
         leaveManagement: { type: Boolean, default: false },
         documentApproval: { type: Boolean, default: false },
+        aiBloggerAlerts: { type: Boolean, default: true },
         taskEmailEvents: {
             taskCreated: {
                 enabled: { type: Boolean, default: true },
@@ -95,6 +97,8 @@ const SystemSettingsSchema = new Schema({
             },
         },
     },
+    defaultAiConfig: { type: Schema.Types.Mixed },
+    promptConfig: { type: Schema.Types.Mixed, default: {} },
 }, { timestamps: true });
 
 const SystemLogSchema = new Schema({
@@ -114,7 +118,7 @@ const AIUsageLogSchema = new Schema({
     feature: {
         type: String,
         required: true,
-        enum: ["singularity-agent", "singularity-chat", "ai-explain", "ai-enhance", "ai-task-chat", "ai-chatbot", "ai-hour-estimate"],
+        enum: ["singularity-agent", "singularity-chat", "ai-explain", "ai-enhance", "ai-task-chat", "ai-chatbot", "ai-hour-estimate", "ai-blogger"],
         index: true,
     },
     model: { type: String, required: true },

@@ -58,6 +58,7 @@ const AgencySettingsSchema = new Schema({
 
 const AgencyFeaturesSchema = new Schema({
     aiAssistant: { type: Boolean, default: false },
+    aiBlogger: { type: Boolean, default: false },
     advancedReporting: { type: Boolean, default: false },
     apiAccess: { type: Boolean, default: false },
     whiteLabel: { type: Boolean, default: false },
@@ -65,11 +66,160 @@ const AgencyFeaturesSchema = new Schema({
     ssoEnabled: { type: Boolean, default: false },
 }, { _id: false });
 
+const AIFeatureConfigSchema = new Schema({
+    provider: { type: String, enum: ["gemini", "openai", "nvidia", "github", "groq"], required: true },
+    apiKey: { type: String },
+    model: { type: String, required: true },
+    customModelId: { type: String },
+}, { _id: false });
+
 const AIConfigSchema = new Schema({
-    provider: { type: String, enum: ["gemini", "openai", "nvidia", "github"], required: true },
+    provider: { type: String, enum: ["gemini", "openai", "nvidia", "github", "groq"], required: true },
     apiKey: { type: String, required: true },
     model: { type: String, required: true },
     customModelId: { type: String },
+    chatConfig: { type: AIFeatureConfigSchema },
+    agentConfig: { type: AIFeatureConfigSchema },
+    taskExplainConfig: { type: AIFeatureConfigSchema },
+    hourEstimateConfig: { type: AIFeatureConfigSchema },
+    taskChatbotConfig: { type: AIFeatureConfigSchema },
+    heavyTasksConfig: { type: AIFeatureConfigSchema },
+}, { _id: false });
+
+const AIBloggerStageConfigSchema = new Schema({
+    provider: { type: String, enum: ["gemini", "openai", "nvidia", "github", "groq"], required: true },
+    apiKey: { type: String, default: "" },
+    fallbackApiKey: { type: String, default: "" },
+    model: { type: String, required: true },
+    customModelId: { type: String },
+    systemPrompt: { type: String, required: true },
+}, { _id: false });
+
+const AIBloggerTrendsConfigSchema = new Schema({
+    enabled: { type: Boolean, default: false },
+    provider: { type: String, enum: ["serpapi"], default: "serpapi" },
+    apiKey: { type: String, default: "" },
+    fallbackApiKey: { type: String, default: "" },
+    fallbackEnabled: { type: Boolean, default: true },
+    fallbackToAi: { type: Boolean, default: true },
+    defaultLocation: { type: String, default: "us" },
+}, { _id: false });
+
+const AIBloggerWebsiteCrawlConfigSchema = new Schema({
+    enabled: { type: Boolean, default: true },
+    provider: { type: String, enum: ["basic-fetch"], default: "basic-fetch" },
+    maxPages: { type: Number, default: 4 },
+    timeoutMs: { type: Number, default: 8000 },
+    refreshWindowHours: { type: Number, default: 24 },
+    allowedPaths: [{ type: String }],
+    blockedPaths: [{ type: String }],
+}, { _id: false });
+
+const AIBloggerSerpConfigSchema = new Schema({
+    enabled: { type: Boolean, default: true },
+    provider: { type: String, enum: ["serpapi"], default: "serpapi" },
+    apiKey: { type: String, default: "" },
+    fallbackApiKey: { type: String, default: "" },
+    fallbackEnabled: { type: Boolean, default: true },
+    defaultLocation: { type: String, default: "us" },
+    device: { type: String, enum: ["desktop", "mobile"], default: "desktop" },
+    maxCompetitors: { type: Number, default: 5 },
+    refreshWindowHours: { type: Number, default: 24 },
+}, { _id: false });
+
+const AIBloggerGroundedResearchConfigSchema = new Schema({
+    enabled: { type: Boolean, default: true },
+    maxSources: { type: Number, default: 5 },
+    trustPreference: { type: String, enum: ["balanced", "high-only"], default: "balanced" },
+    freshnessPreference: {
+        type: String,
+        enum: ["balanced", "recent-first", "evergreen-ok"],
+        default: "balanced",
+    },
+    allowedSourceTypes: [{
+        type: String,
+        enum: ["government", "education", "official", "industry", "competitor", "news", "reference"],
+    }],
+    blockedDomains: [{ type: String }],
+    refreshWindowHours: { type: Number, default: 24 },
+}, { _id: false });
+
+const AIBloggerSearchConsoleConfigSchema = new Schema({
+    enabled: { type: Boolean, default: false },
+    propertyUrl: { type: String, default: "" },
+    credentialsJson: { type: String, default: "" },
+    authStatus: { type: String, enum: ["not-connected", "configured"], default: "not-connected" },
+    syncFrequencyHours: { type: Number, default: 24 },
+    lookbackDays: { type: Number, default: 28 },
+}, { _id: false });
+
+const AIBloggerPagePerformanceConfigSchema = new Schema({
+    enabled: { type: Boolean, default: false },
+    provider: { type: String, enum: ["pagespeed"], default: "pagespeed" },
+    apiKey: { type: String, default: "" },
+    strategy: { type: String, enum: ["mobile", "desktop", "both"], default: "mobile" },
+    performanceThreshold: { type: Number, default: 60 },
+    refreshWindowHours: { type: Number, default: 24 * 7 },
+}, { _id: false });
+
+const AIBloggerImageGenerationConfigSchema = new Schema({
+    enabled: { type: Boolean, default: false },
+    provider: { type: String, enum: ["openai", "gemini"], default: "openai" },
+    apiKey: { type: String, default: "" },
+    fallbackApiKey: { type: String, default: "" },
+    model: { type: String, default: "dall-e-3" },
+    customModelId: { type: String },
+    size: { type: String, enum: ["1024x1024", "1792x1024", "1024x1792"], default: "1792x1024" },
+    quality: { type: String, enum: ["standard", "hd"], default: "standard" },
+    style: { type: String, enum: ["natural", "vivid"], default: "vivid" },
+}, { _id: false });
+
+const AIBloggerPublishRulesConfigSchema = new Schema({
+    requireInternalLinks: { type: Boolean, default: true },
+    requireMetaDescription: { type: Boolean, default: true },
+    requireFaqForInformational: { type: Boolean, default: false },
+    requireImageAltText: { type: Boolean, default: true },
+    requireManualApproval: { type: Boolean, default: true },
+    minimumSeoScore: { type: Number, default: 80 },
+    requireCanonicalUrl: { type: Boolean, default: true },
+    requireSchemaMarkup: { type: Boolean, default: true },
+    aiReviewPolicy: {
+        type: new Schema({
+            enableFinalChecker: { type: Boolean, default: true },
+            apiKey: { type: String, default: "" },
+            model: { type: String, default: "" },
+            customModelId: { type: String, default: "" },
+            autoFixStructuralIssues: { type: Boolean, default: true },
+            autoFixToneMismatch: { type: Boolean, default: true },
+            flagWeakBusinessFit: { type: Boolean, default: true },
+            flagWeakCtaAlignment: { type: Boolean, default: true },
+            softenQuestionableClaims: { type: Boolean, default: true },
+            flagSoftCannibalization: { type: Boolean, default: true },
+            requireHumanReviewForHighRiskClaims: { type: Boolean, default: true },
+            requireHumanReviewForHighRiskCannibalization: { type: Boolean, default: true },
+            requireGroundedSourcesForClaims: { type: Boolean, default: true },
+        }, { _id: false }),
+        default: () => ({}),
+    },
+}, { _id: false });
+
+const AIBloggerConfigSchema = new Schema({
+    fallbackEnabled: { type: Boolean, default: true },
+    trends: { type: AIBloggerTrendsConfigSchema, default: () => ({}) },
+    crawl: { type: AIBloggerWebsiteCrawlConfigSchema, default: () => ({}) },
+    serp: { type: AIBloggerSerpConfigSchema, default: () => ({}) },
+    groundedResearch: { type: AIBloggerGroundedResearchConfigSchema, default: () => ({}) },
+    searchConsole: { type: AIBloggerSearchConsoleConfigSchema, default: () => ({}) },
+    pagePerformance: { type: AIBloggerPagePerformanceConfigSchema, default: () => ({}) },
+    imageGeneration: { type: AIBloggerImageGenerationConfigSchema, default: () => ({}) },
+    publishRules: { type: AIBloggerPublishRulesConfigSchema, default: () => ({}) },
+    extractKeywords: { type: AIBloggerStageConfigSchema, required: true },
+    research: { type: AIBloggerStageConfigSchema, required: true },
+    seoAnalysis: { type: AIBloggerStageConfigSchema, required: true },
+    writeBlog: { type: AIBloggerStageConfigSchema, required: true },
+    generateImage: { type: AIBloggerStageConfigSchema, required: true },
+    updatedAt: { type: String },
+    updatedBy: { type: String },
 }, { _id: false });
 
 const AIPermissionsSchema = new Schema({
@@ -128,6 +278,7 @@ const AgencySchema = new Schema({
     lastActivityAt: { type: String },
     features: { type: AgencyFeaturesSchema, required: true },
     aiConfig: { type: AIConfigSchema },
+    aiBloggerConfig: { type: AIBloggerConfigSchema },
     aiPermissions: { type: AIPermissionsSchema },
 }, { timestamps: true });
 

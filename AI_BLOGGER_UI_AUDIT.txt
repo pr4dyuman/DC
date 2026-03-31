@@ -1,0 +1,315 @@
+==============================================================
+AI BLOGGER UI vs BACKEND FEATURE ALIGNMENT AUDIT
+==============================================================
+Date: 2026-03-27
+
+This audit checks whether all backend features built in the
+AI Blogger SEO Solidify Plan (Items 1-13) are properly surfaced
+in the dashboard UI, verifies page/element placement, and
+identifies enhancement opportunities.
+
+
+==============================================================
+SECTION 1: PAGE STRUCTURE AUDIT
+==============================================================
+
+Dashboard Pages:
+  /dashboard/ai-blogger              → Overview (main dashboard)
+  /dashboard/ai-blogger/generate     → Generate New Blog (draft builder)
+  /dashboard/ai-blogger/posts        → Posts List (queue view)
+  /dashboard/ai-blogger/posts/[slug] → Post Detail (editor + SEO panels)
+  /dashboard/ai-blogger/settings     → Settings (workspace config)
+
+Super-Admin Pages:
+  /super-admin/ai-blogger            → Super admin overview
+  /super-admin/ai-blogger/agency     → Agency-level config
+  /super-admin/ai-blogger/posts      → All posts across agencies
+  /super-admin/ai-blogger/settings   → Global settings
+  /super-admin/ai-blogger/generate   → Generate (admin override)
+
+VERDICT: Page structure is CORRECT and well-organized.
+  - Overview is the landing page ✅
+  - Generate is a dedicated page ✅
+  - Post detail is under posts/[slug] ✅
+  - Settings has its own route ✅
+
+
+==============================================================
+SECTION 2: FEATURE ALIGNMENT (BACKEND vs UI)
+==============================================================
+
+-------------------------------------------------------
+2A. FEATURES WITH FULL UI COVERAGE ✅
+-------------------------------------------------------
+
+1. SEO Audit System
+   Backend: getBlogStudioSeoAudit (score, checks, blockers, suggestions)
+   UI: Hard SEO Audit card with circular gauge, blocker list,
+       improvement checks, publish package items, score comparison
+   Location: Post Detail → Sidebar → "Hard SEO Audit" card
+   STATUS: ✅ FULLY SURFACED
+
+2. Cannibalization Detection
+   Backend: getBlogStudioCannibalizationReportImpl
+   UI: Dedicated "Cannibalization Check" card with risk badge,
+       overlap score, match list with similarity percentages
+   Location: Post Detail → Left column
+   STATUS: ✅ FULLY SURFACED
+
+3. Internal Link Map & Health
+   Backend: getBlogStudioInternalLinkSuggestions, internalLinkHealth
+   UI: "Internal Link Map" card with health badge, accepted/cluster-
+       aligned/inbound/related metrics, full link list with details
+   Location: Post Detail → Left column
+   STATUS: ✅ FULLY SURFACED
+
+4. Performance Loop (Search Console)
+   Backend: Performance snapshots, refreshOpportunity, sync status
+   UI: "Performance Loop" card with clicks/impressions/CTR/position,
+       refresh opportunity badge, top queries, sync status
+   Location: Post Detail → Sidebar
+   STATUS: ✅ FULLY SURFACED
+
+5. Website Intelligence
+   Backend: getAIBloggerWebsiteIntelligence (crawl, paths, topics)
+   UI: "Website Intelligence" card with crawl summary, priority paths,
+       topic hints, page titles, FAQ signals
+   Location: Post Detail → Sidebar
+   STATUS: ✅ FULLY SURFACED
+
+6. SERP Analysis
+   Backend: getAIBloggerSerpAnalysis (intent, competitors, PAA, gaps)
+   UI: "SERP Snapshot" card with intent, competitor domains, featured
+       snippet style, people also ask, content gaps, top results
+   Location: Post Detail → Sidebar
+   STATUS: ✅ FULLY SURFACED
+
+7. Grounded Research
+   Backend: externalSources, researchNotes
+   UI: "Grounded Research" card with source list (type, trust level,
+       freshness badges), domain info, source notes section
+   Location: Post Detail → Left column
+   STATUS: ✅ FULLY SURFACED
+
+8. Featured Image Display
+   Backend: featuredImageUrl, featuredImageAlt, featuredImageSource
+   UI: "Featured Image" card with preview, source badge, alt text,
+       open image link
+   Location: Post Detail → Sidebar
+   STATUS: ✅ FULLY SURFACED
+
+9. Draft Editor (Post Editor Form)
+   Backend: updatePost with all fields
+   UI: AIBloggerPostEditorForm component with full field editing
+   Location: Post Detail → Left column → "Draft Editor" card
+   STATUS: ✅ FULLY SURFACED
+
+10. Cluster Context
+    Backend: contentClusterId, parentTopicSlug, related posts
+    UI: "Cluster Context" card with cluster ID, parent topic,
+        related drafts list
+    Location: Post Detail → Left column
+    STATUS: ✅ FULLY SURFACED
+
+11. Advanced Draft Packs
+    Backend: draftBrief (businessFit, searchIntent, contentType, etc.)
+    UI: "Advanced Draft Packs" card with business fit, CTA goal,
+        title direction, metadata direction, entities, warnings,
+        featured image prompt, FAQ pack
+    Location: Post Detail → Left column
+    STATUS: ✅ FULLY SURFACED
+
+12. Overview Dashboard Metrics
+    Backend: getBlogStudioOverviewImpl
+    UI: Draft Queue, Ready To Review, Active Schedules, Published
+        Posts, Refresh Queue metrics; Workflow Snapshot; Performance
+        Refresh Queue; Recent Drafts; Recent Runs; Active Schedules
+    Location: Overview page
+    STATUS: ✅ FULLY SURFACED
+
+13. Generate Page Config Plans
+    Backend: All config modules (trends, serp, crawl, grounded
+             research, page performance, publish rules)
+    UI: DraftBuilder receives all plan configs as props
+    Location: Generate page
+    STATUS: ✅ FULLY SURFACED
+
+
+-------------------------------------------------------
+2B. FEATURES WITH PARTIAL/NO UI COVERAGE ⚠️
+-------------------------------------------------------
+
+14. SERP Strategy Layer (Item 9 Backend Features)
+    Backend: assessRankingDifficulty, detectDominantContentFormat,
+             extractTitleAnglePatterns, buildSectionGapAnalysis
+    UI: NOT surfaced anywhere in the dashboard
+    IMPACT: Medium — these are deep analysis functions that run
+            during generation but their outputs aren't stored as
+            post fields or shown in any UI card
+    STATUS: ⚠️ BACKEND ONLY (by design — consumed during AI generation)
+
+15. Grounded Research Improvements (Item 10 Backend Features)
+    Backend: extractKeyClaims, buildCitationBlock, source diversity
+    UI: NOT surfaced — the source card shows type/trust/freshness
+        but NOT key claims, citation blocks, or diversity scores
+    IMPACT: Low — these are generation-time utilities
+    STATUS: ⚠️ BACKEND ONLY (by design — consumed during AI generation)
+
+16. Author / Entity Modeling (Item 11)
+    Backend: AIBloggerAuthorConfig, AIBloggerEntityModelingConfig,
+             buildBlogStudioArticleJsonLd
+    UI: NOT visible in dashboard or super-admin UI. Author name,
+        bio, social profiles, organization details, schema toggles
+        are configured via super-admin API but have NO UI fields
+    IMPACT: HIGH — super-admin needs UI fields to configure author
+            and entity modeling settings
+    STATUS: ⚠️ NO UI — CONFIG FIELDS NEED SUPER-ADMIN UI
+
+17. Image System Maturity (Item 12)
+    Backend: BlogStudioImageMeta (dimensions, format, size, license),
+             BlogStudioImageCrop, BlogStudioImageHistoryEntry,
+             imageHistory tracking in updatePost
+    UI: Featured Image card shows only URL, alt text, and source.
+        Does NOT show image dimensions, format, file size, crop
+        coords, or replacement history
+    IMPACT: Medium — image metadata would be useful in the editor
+    STATUS: ⚠️ PARTIAL — image metadata and history not surfaced
+
+18. Publish Package Validation (Item 13)
+    Backend: validateBlogStudioPublishPackage with 8-category check
+             (metadata, content, image, internal-links, schema,
+             cannibalization, seo-score, approval)
+    UI: Existing SEO Audit shows blockers/checks. The new detailed
+        publish validation with fix hints is NOT called or shown.
+        The publish status controls don't use this new validator
+    IMPACT: HIGH — this is the whole point of Item 13, it should
+            gate the publish action with clear blocker explanations
+    STATUS: ⚠️ NOT INTEGRATED — validator exists but not wired into
+            the publish flow or UI
+
+
+==============================================================
+SECTION 3: ELEMENT PLACEMENT VERIFICATION
+==============================================================
+
+Post Detail Page — Left Column (Main Content):
+  1. Draft Editor             ✅ Correct placement
+  2. Post Status Controls     ✅ Correct placement
+  3. SEO Priorities            ✅ Correct placement
+  4. Cannibalization Check     ✅ Correct placement
+  5. Internal Link Map         ✅ Correct placement
+  6. Cluster Context           ✅ Correct placement
+  7. Grounded Research         ✅ Correct placement
+  8. Advanced Draft Packs      ✅ Correct placement
+
+Post Detail Page — Right Column (Sidebar):
+  1. Performance Loop          ✅ Correct placement
+  2. Website Intelligence      ✅ Correct placement
+  3. SERP Snapshot             ✅ Correct placement
+  4. Featured Image            ✅ Correct placement
+  5. Hard SEO Audit            ✅ Correct placement
+  6. Brief & Meta              ✅ Correct placement
+  7. Outline & Tags            ✅ Correct placement
+
+Overview Page:
+  1. Welcome + Action Buttons  ✅ Correct placement
+  2. Metric Cards (5)          ✅ Correct placement
+  3. Performance Sync Card     ✅ Correct placement
+  4. Workflow + Command Center ✅ Correct placement
+  5. Performance Refresh Queue ✅ Correct placement
+  6. Recent Drafts + Runs      ✅ Correct placement
+  7. Active Schedules          ✅ Correct placement
+
+VERDICT: All elements are on their CORRECT pages ✅
+
+
+==============================================================
+SECTION 4: ENHANCEMENT RECOMMENDATIONS
+==============================================================
+
+PRIORITY 1 — CRITICAL (should do):
+
+  E1. Wire Publish Validation into Publish Flow
+      - Call validateBlogStudioPublishPackage before allowing
+        status change to "Published"
+      - Show blockers with fixHint as a modal or inline panel
+      - Prevent publish if canPublish === false
+      - Where: AIBloggerPostStatusControls component
+
+  E2. Add Author/Entity Config UI in Super-Admin
+      - Add form fields for author (name, URL, bio, social profiles)
+      - Add organization fields (name, url, logo, services)
+      - Add schema toggles (enableArticle, enableFaq, enableBreadcrumb)
+      - Where: super-admin/ai-blogger/agency page or a new
+        "Author & Entity" section in settings
+
+PRIORITY 2 — RECOMMENDED (nice to have):
+
+  E3. Show Image Metadata in Featured Image Card
+      - Display image dimensions (width x height)
+      - Show file format and size
+      - Show license/attribution if present
+      - Where: Post Detail → sidebar "Featured Image" card
+
+  E4. Show Image Replacement History
+      - List previous featured images with timestamps
+      - Show who replaced it and why
+      - Collapsible section under the Featured Image card
+      - Where: Post Detail → sidebar "Featured Image" card
+
+  E5. Surface Key Claims in Grounded Research Card
+      - Show extracted claims per source (stats, quotes)
+      - Display citation-ready blocks
+      - Add source diversity score summary
+      - Where: Post Detail → "Grounded Research" card
+
+  E6. Surface SERP Strategy Outputs When Available
+      - Show ranking difficulty score
+      - Show dominant content format detection
+      - Display title angle patterns
+      - Show section gap analysis
+      - Where: Post Detail → "SERP Snapshot" card (add a second
+        section below the existing SERP data)
+
+PRIORITY 3 — POLISH (optional):
+
+  E7. Add Publish Validation Badge to Posts List
+      - Show a small "Ready" / "X Blockers" badge on each post
+        in the posts list view for quick scanning
+      - Where: Post List page → each post row
+
+  E8. Add Schema Markup Preview in Post Detail
+      - Show the generated JSON-LD as formatted code block
+      - Add "Copy Schema" button for manual use
+      - Where: Post Detail → new "Schema Markup" card in sidebar
+
+  E9. Show Readiness Score on Overview Recent Drafts
+      - Add a "ready" / "needs work" indicator on each recent
+        draft card on the overview page
+      - Where: Overview → "Recent Drafts" section
+
+
+==============================================================
+SECTION 5: SUMMARY
+==============================================================
+
+TOTAL BACKEND FEATURES:      18 audited capabilities
+FULLY SURFACED IN UI:         13 (72%)
+PARTIAL / NOT SURFACED:       5 (28%)
+ALL ELEMENTS ON CORRECT PAGE: YES ✅
+
+KEY GAPS TO ADDRESS:
+  1. Publish validation not wired into publish flow (HIGH)
+  2. Author/Entity config has no UI fields (HIGH)
+  3. Image metadata/history not shown (MEDIUM)
+  4. SERP strategy outputs not shown (LOW — by design)
+  5. Research claims/citations not shown (LOW — by design)
+
+The UI is well-structured and already covers the majority of
+backend features. The two HIGH-priority gaps (E1 publish validation
+integration and E2 author/entity config UI) should be addressed
+to complete the SEO solidification work.
+
+==============================================================
+END OF AUDIT
+==============================================================

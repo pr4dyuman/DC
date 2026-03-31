@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "blog-ai-studio/**",
+    ".codex-eslint-report.json",
+    "eslint-full.json",
+    "eslint-output.json",
   ]),
 ]);
 

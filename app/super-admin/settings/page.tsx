@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Shield, Bell, Database, Globe, Mail, Loader2, Brain, FileText } from "lucide-react";
+import { Shield, Bell, Database, Globe, Mail, Loader2, Brain, FileText, BarChart3 } from "lucide-react";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { getSystemSettings, updateSystemSettings, getAllAgenciesWithStats, getDefaultAiConfig, saveDefaultAiConfig, getPromptConfig, savePromptConfig } from "@/lib/actions/super-admin";
 import { AI_MODELS } from "@/lib/ai-models";
@@ -20,6 +20,7 @@ import { SystemSettingsPlatformSection } from "./_components/SystemSettingsPlatf
 import { SystemSettingsSectionAccordion } from "./_components/SystemSettingsSectionAccordion";
 import { SystemSettingsSecuritySection } from "./_components/SystemSettingsSecuritySection";
 import { SystemSettingsPromptSection, type PromptConfigState } from "./_components/SystemSettingsPromptSection";
+import { SystemSettingsBlogManagementSection } from "./_components/SystemSettingsBlogManagementSection";
 
 type AgencyWithStats = Agency & {
     stats: {
@@ -108,7 +109,7 @@ export default function SystemSettingsPage() {
             try {
                 const [settings, agencyList] = await Promise.all([
                     getSystemSettings(),
-                    getAllAgenciesWithStats()
+                    getAllAgenciesWithStats(),
                 ]);
                 if (settings?.platform) setPlatform(prev => ({ ...prev, ...settings.platform }));
                 if (settings?.security) setSecurity(prev => ({ ...prev, ...settings.security }));
@@ -148,7 +149,7 @@ export default function SystemSettingsPage() {
                         setDefaultAiConfigured(true);
                         // Load per-feature model overrides
                         const fc: FeatureConfigs = {};
-                        for (const key of ["chatConfig", "agentConfig", "taskExplainConfig", "hourEstimateConfig", "taskChatbotConfig"] as const) {
+                        for (const key of ["chatConfig", "agentConfig", "taskExplainConfig", "hourEstimateConfig", "taskChatbotConfig", "heavyTasksConfig"] as const) {
                             const subConf = (daiConfig as AIConfig & Record<string, AIConfig | undefined>)[key];
                             if (subConf && Object.keys(subConf).length > 0) {
                                 fc[key] = {
@@ -295,7 +296,7 @@ export default function SystemSettingsPage() {
             };
             if (defaultAi.customModelId) configToSave.customModelId = defaultAi.customModelId;
             // Include per-feature object overrides
-            for (const key of ["chatConfig", "agentConfig", "taskExplainConfig", "hourEstimateConfig", "taskChatbotConfig"] as const) {
+            for (const key of ["chatConfig", "agentConfig", "taskExplainConfig", "hourEstimateConfig", "taskChatbotConfig", "heavyTasksConfig"] as const) {
                 const val = defaultAiFeatureConfigs[key];
                 if (val) (configToSave as Record<string, unknown>)[key] = val;
             }
@@ -498,6 +499,18 @@ export default function SystemSettingsPage() {
                     saved={savedPrompt}
                     onSave={(config) => { setPromptConfig(config); void handleSavePromptConfig(config); }}
                 />
+            </SystemSettingsSectionAccordion>
+
+            {/* Blog Management */}
+            <SystemSettingsSectionAccordion
+                title="Blog Management"
+                description="Manage and publish blogs from AI Blogger and other sources"
+                icon={<FileText className="h-6 w-6 text-blue-500" />}
+                iconBg="bg-blue-500/10"
+                isOpen={!!openSections.blogs}
+                onToggle={() => toggleSection('blogs')}
+            >
+                <SystemSettingsBlogManagementSection />
             </SystemSettingsSectionAccordion>
 
             {/* System Info */}

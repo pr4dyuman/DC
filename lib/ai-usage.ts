@@ -9,7 +9,8 @@ export type AIFeature =
     | 'ai-enhance'
     | 'ai-task-chat'
     | 'ai-chatbot'
-    | 'ai-hour-estimate';
+    | 'ai-hour-estimate'
+    | 'ai-blogger';
 
 /**
  * Log an AI API call for usage tracking.

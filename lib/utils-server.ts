@@ -1,7 +1,8 @@
 import { connectDB, UserModel, ClientModel, SuperAdminModel, decryptApiKey } from "./mongodb";
-import { User, AIConfig } from "./types";
+import { User, AIBloggerConfig, AIConfig } from "./types";
 import { randomUUID } from "crypto";
 import { getCurrentAgency } from "./agency-context";
+import { AI_BLOGGER_STAGE_KEYS } from "./ai-blogger-config";
 
 type ResolvedUser = Omit<User, "role"> & {
     role: User["role"] | "superadmin";
@@ -78,5 +79,73 @@ export async function getAgencyAIConfigServer(): Promise<AIConfig | null> {
     if (!agency || !agency.aiConfig) return null;
     const config = agency.aiConfig as AIConfig;
     if (config?.apiKey) config.apiKey = decryptApiKey(config.apiKey);
+
+    const featureKeys = ["chatConfig", "agentConfig", "taskExplainConfig", "hourEstimateConfig", "taskChatbotConfig", "heavyTasksConfig"] as const;
+    for (const key of featureKeys) {
+        const featureConfig = config[key];
+        if (featureConfig?.apiKey) {
+            featureConfig.apiKey = decryptApiKey(featureConfig.apiKey);
+        }
+    }
+
+    return config;
+}
+
+export async function getAgencyAIBloggerConfigServer(): Promise<AIBloggerConfig | null> {
+    await connectDB();
+    const agency = await getCurrentAgency();
+    if (!agency || !agency.aiBloggerConfig) return null;
+
+    const config = agency.aiBloggerConfig as AIBloggerConfig;
+
+    if (config.trends?.apiKey) {
+        config.trends.apiKey = decryptApiKey(config.trends.apiKey);
+    }
+
+    if (config.trends?.fallbackApiKey) {
+        config.trends.fallbackApiKey = decryptApiKey(config.trends.fallbackApiKey);
+    }
+
+    if (config.serp?.apiKey) {
+        config.serp.apiKey = decryptApiKey(config.serp.apiKey);
+    }
+
+    if (config.serp?.fallbackApiKey) {
+        config.serp.fallbackApiKey = decryptApiKey(config.serp.fallbackApiKey);
+    }
+
+    if (config.searchConsole?.credentialsJson) {
+        config.searchConsole.credentialsJson = decryptApiKey(config.searchConsole.credentialsJson);
+    }
+
+    if (config.pagePerformance?.apiKey) {
+        config.pagePerformance.apiKey = decryptApiKey(config.pagePerformance.apiKey);
+    }
+
+    if (config.imageGeneration?.apiKey) {
+        config.imageGeneration.apiKey = decryptApiKey(config.imageGeneration.apiKey);
+    }
+
+    if (config.imageGeneration?.fallbackApiKey) {
+        config.imageGeneration.fallbackApiKey = decryptApiKey(config.imageGeneration.fallbackApiKey);
+    }
+
+    if (config.publishRules?.aiReviewPolicy?.apiKey) {
+        config.publishRules.aiReviewPolicy.apiKey = decryptApiKey(config.publishRules.aiReviewPolicy.apiKey);
+    }
+
+    for (const key of AI_BLOGGER_STAGE_KEYS) {
+        const stageConfig = config[key];
+        if (!stageConfig) continue;
+
+        if (stageConfig.apiKey) {
+            stageConfig.apiKey = decryptApiKey(stageConfig.apiKey);
+        }
+
+        if (stageConfig.fallbackApiKey) {
+            stageConfig.fallbackApiKey = decryptApiKey(stageConfig.fallbackApiKey);
+        }
+    }
+
     return config;
 }

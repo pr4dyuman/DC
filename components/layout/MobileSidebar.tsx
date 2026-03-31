@@ -13,11 +13,22 @@ interface MobileSidebarProps {
     agencyName?: string;
     agencyLogo?: string;
     agencyPlan?: string;
+    agencyStatus?: string;
+    agencyHasAIBlogger?: boolean;
 }
 
 const subscribe = () => () => { };
 
-export function MobileSidebar({ currentUserId, currentUserUsername, currentUserRole, agencyName, agencyLogo, agencyPlan }: MobileSidebarProps) {
+export function MobileSidebar({
+    currentUserId,
+    currentUserUsername,
+    currentUserRole,
+    agencyName,
+    agencyLogo,
+    agencyPlan,
+    agencyStatus,
+    agencyHasAIBlogger,
+}: MobileSidebarProps) {
     const [open, setOpen] = useState(false);
     const pathname = usePathname();
     const isHydrated = useSyncExternalStore(subscribe, () => true, () => false);
@@ -48,6 +59,8 @@ export function MobileSidebar({ currentUserId, currentUserUsername, currentUserR
                         agencyName={agencyName}
                         agencyLogo={agencyLogo}
                         agencyPlan={agencyPlan}
+                        agencyStatus={agencyStatus}
+                        agencyHasAIBlogger={agencyHasAIBlogger}
                     />
                 </div>
             </SheetContent>

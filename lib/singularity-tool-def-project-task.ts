@@ -181,7 +181,7 @@ export const SINGULARITY_TOOL_DECLARATIONS_PROJECT_TASK = [
     },
     {
         name: "bulk_edit_tasks",
-        description: "Edit/update fields on multiple existing tasks at once. Use for bulk backdating timestamps (createdAt, updatedAt), changing priorities, categories, or other fields across many tasks. Provide a projectId to target all tasks in a project, or specific taskIds.",
+        description: "Edit/update fields on multiple existing tasks at once. Use for bulk backdating timestamps (createdAt, updatedAt), changing priorities, categories, titles, descriptions, or other fields across many tasks. Provide a projectId to target all tasks in a project, or specific taskIds.",
         parameters: {
             type: "OBJECT",
             properties: {
@@ -193,8 +193,10 @@ export const SINGULARITY_TOOL_DECLARATIONS_PROJECT_TASK = [
                 },
                 updates: {
                     type: "OBJECT",
-                    description: "Fields to update on every matched task",
+                    description: "Fields to update on every matched task. Note: title and description apply the SAME value to ALL matched tasks — only use these when you want a uniform change (e.g. a shared prefix/suffix or a complete replacement).",
                     properties: {
+                        title: { type: "STRING", description: "New title to set on all matched tasks (replaces existing title)" },
+                        description: { type: "STRING", description: "New description to set on all matched tasks (replaces existing description)" },
                         priority: { type: "STRING", description: "New priority for all tasks", enum: ["Low", "Medium", "High"] },
                         category: { type: "STRING", description: "New category for all tasks" },
                     },

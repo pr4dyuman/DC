@@ -4,6 +4,18 @@ export { OtpModel, RateLimitModel } from "./mongodb-auth-models";
 export { AIUsageLogModel, SystemLogModel, SystemSettingsModel } from "./mongodb-platform-models";
 export { AgencyModel, SuperAdminModel } from "./mongodb-tenant-models";
 export { SingularityChatSessionModel, SingularityCheckpointModel } from "./mongodb-singularity-models";
+export {
+    BlogStudioPipelineJobModel,
+    BlogStudioGroundedResearchSnapshotModel,
+    BlogStudioPerformanceSyncRunModel,
+    BlogStudioPerformanceSnapshotModel,
+    BlogStudioPostModel,
+    BlogStudioRunModel,
+    BlogStudioSettingsModel,
+    BlogStudioScheduleModel,
+    BlogStudioSiteSnapshotModel,
+    BlogStudioSerpSnapshotModel,
+} from "./mongodb-blog-studio-models";
 import { connectMongo } from "./mongodb-connection";
 import {
     User, Client, Project, Task, Invoice, Transaction, Service,

@@ -72,6 +72,8 @@ export async function AuthenticatedLayout({
                         agencyName={agencyName}
                         agencyLogo={agencyLogo}
                         agencyPlan={agency?.plan}
+                        agencyStatus={agency?.status}
+                        agencyHasAIBlogger={agency?.features?.aiBlogger}
                     />
                 </div>
                 <main className="md:pl-72 min-h-screen pb-10" style={{ backgroundColor: 'var(--content-bg)', color: 'var(--foreground)' }}>
@@ -80,6 +82,8 @@ export async function AuthenticatedLayout({
                         agencyName={agencyName}
                         agencyLogo={agencyLogo}
                         agencyPlan={agency?.plan}
+                        agencyStatus={agency?.status}
+                        agencyHasAIBlogger={agency?.features?.aiBlogger}
                     />
                     <div className="p-4 sm:p-6 lg:p-8">
                         {children}

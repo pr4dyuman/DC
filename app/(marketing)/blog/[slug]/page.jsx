@@ -10,6 +10,195 @@ import { notFound } from 'next/navigation';
 
 // Cache for 60 seconds
 export const revalidate = 60;
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://digitalcorvids.com";
+const SITE_NAME = "Digital Corvids";
+
+function getBlogUrl(slug) {
+  return `${SITE_URL.replace(/\/+$/, '')}/blog/${slug}`;
+}
+
+function normalizeUrl(value, fallback) {
+  if (!value) {
+    return fallback;
+  }
+
+  try {
+    const url = new URL(value);
+    const pathname = url.pathname === '/' ? '/' : url.pathname.replace(/\/+$/, '');
+    return `${url.protocol}//${url.host.toLowerCase()}${pathname}`;
+  } catch {
+    return fallback;
+  }
+}
+
+function getAbsoluteAssetUrl(value) {
+  if (!value) return undefined;
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    return value;
+  }
+  return `${SITE_URL.replace(/\/+$/, '')}${value.startsWith('/') ? value : `/${value}`}`;
+}
+
+function stripHtml(value = '') {
+  return value
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildEmergencyDescription(blog) {
+  const plainText = stripHtml(blog.content || '');
+  if (!plainText) {
+    return blog.title;
+  }
+
+  return plainText.length <= 160 ? plainText : `${plainText.slice(0, 157).trimEnd()}...`;
+}
+
+function getBlogDescription(blog) {
+  return blog.metaDescription?.trim() || blog.shortDescription?.trim() || buildEmergencyDescription(blog);
+}
+
+function getBlogDisplayDescription(blog) {
+  return blog.shortDescription?.trim() || blog.metaDescription?.trim() || buildEmergencyDescription(blog);
+}
+
+function getBlogKeywords(blog) {
+  return blog.metaKeywords
+    ? blog.metaKeywords.split(',').map((item) => item.trim()).filter(Boolean)
+    : [];
+}
+
+function getReadTimeLabel(content = "") {
+  return `${Math.max(1, Math.ceil(content.split(/\s+/).filter(Boolean).length / 200))} MIN READ`;
+}
+
+function serializeJsonLd(value) {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
+}
+
+function buildFallbackSchemaMarkup(blog) {
+  const canonicalUrl = normalizeUrl(blog.canonicalUrl, getBlogUrl(blog.slug));
+  const imageUrl = getAbsoluteAssetUrl(blog.image);
+  const description = getBlogDescription(blog);
+  const publishedAt = blog.publishedAt || blog.createdAt;
+  const updatedAt = blog.updatedAt || publishedAt;
+  const articleSchema = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: blog.metaTitle || blog.title,
+    description,
+    image: imageUrl ? [{
+      "@type": "ImageObject",
+      url: imageUrl,
+      caption: blog.imageAlt || blog.title,
+    }] : undefined,
+    datePublished: publishedAt,
+    dateModified: updatedAt,
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": canonicalUrl,
+    },
+    author: {
+      "@type": "Organization",
+      name: "Digital Corvids",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: SITE_NAME,
+      url: SITE_URL,
+    },
+    keywords: blog.metaKeywords || undefined,
+    articleSection: blog.category || "INSIGHTS",
+  };
+
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: SITE_URL,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Blog",
+        item: `${SITE_URL.replace(/\/+$/, '')}/blog`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: blog.title,
+        item: canonicalUrl,
+      },
+    ],
+  };
+
+  const faqItems = Array.isArray(blog.faqItems) ? blog.faqItems.filter((item) => item?.question && item?.answer) : [];
+  const faqSchema = faqItems.length > 0
+    ? {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: faqItems.map((item) => ({
+          "@type": "Question",
+          name: item.question,
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: item.answer,
+          },
+        })),
+      }
+    : null;
+
+  return serializeJsonLd([articleSchema, breadcrumbSchema, faqSchema].filter(Boolean));
+}
+
+function resolveSchemaMarkup(blog) {
+  if (blog.schemaMarkup?.trim()) {
+    try {
+      return serializeJsonLd(JSON.parse(blog.schemaMarkup));
+    } catch {
+      return buildFallbackSchemaMarkup(blog);
+    }
+  }
+
+  return buildFallbackSchemaMarkup(blog);
+}
+
+function getResolvedBlogSeo(blog) {
+  const canonicalUrl = normalizeUrl(blog.canonicalUrl, getBlogUrl(blog.slug));
+  const title = blog.metaTitle?.trim() || `${blog.title} | ${SITE_NAME}`;
+  const description = getBlogDescription(blog);
+  const displayDescription = getBlogDisplayDescription(blog);
+  const imageUrl = getAbsoluteAssetUrl(blog.image);
+  const imageAlt = blog.imageAlt?.trim() || blog.title;
+  const keywords = getBlogKeywords(blog);
+  const publishedAt = blog.publishedAt || blog.createdAt;
+  const updatedAt = blog.updatedAt || publishedAt;
+  const schemaMarkup = resolveSchemaMarkup(blog);
+
+  return {
+    canonicalUrl,
+    title,
+    description,
+    displayDescription,
+    imageUrl,
+    imageAlt,
+    keywords,
+    publishedAt,
+    updatedAt,
+    schemaMarkup,
+  };
+}
 
 async function getBlog(slug) {
   await dbConnect();
@@ -29,7 +218,9 @@ async function getBlog(slug) {
   return {
     ...blog,
     _id: blog._id.toString(),
+    publishedAt: blog.publishedAt instanceof Date ? blog.publishedAt.toISOString() : undefined,
     createdAt: blog.createdAt.toISOString(),
+    updatedAt: blog.updatedAt instanceof Date ? blog.updatedAt.toISOString() : blog.createdAt.toISOString(),
   };
 }
 
@@ -39,9 +230,38 @@ export async function generateMetadata({ params }) {
 
   if (!blog) return { title: 'Not Found' };
 
+  const seo = getResolvedBlogSeo(blog);
+
   return {
-    title: `${blog.title} | Digital Corvids`,
-    description: blog.content.substring(0, 150) + '...',
+    title: seo.title,
+    description: seo.description,
+    keywords: seo.keywords.length > 0 ? seo.keywords : undefined,
+    alternates: {
+      canonical: seo.canonicalUrl,
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+    openGraph: {
+      type: 'article',
+      url: seo.canonicalUrl,
+      title: seo.title,
+      description: seo.description,
+      publishedTime: seo.publishedAt,
+      modifiedTime: seo.updatedAt,
+      authors: [SITE_NAME],
+      section: blog.category || 'Insights',
+      siteName: SITE_NAME,
+      tags: seo.keywords.length > 0 ? seo.keywords : undefined,
+      images: seo.imageUrl ? [{ url: seo.imageUrl, alt: seo.imageAlt }] : undefined,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: seo.title,
+      description: seo.description,
+      images: seo.imageUrl ? [seo.imageUrl] : undefined,
+    },
   };
 }
 
@@ -54,15 +274,19 @@ export default async function BlogPost({ params }) {
     notFound();
   }
 
-  // Deriving missing existing UI fields
+  const seo = getResolvedBlogSeo(post);
   const category = post.category || "INSIGHTS";
-  const author = "Digital Corvids";
-  const dateStr = new Date(post.createdAt).toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' });
-  // Rough read time estimate
-  const readTime = Math.ceil(post.content.split(' ').length / 200) + " MIN READ";
+  const author = SITE_NAME;
+  const dateStr = new Date(seo.publishedAt).toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' });
+  const readTime = getReadTimeLabel(post.content);
+  const faqItems = Array.isArray(post.faqItems) ? post.faqItems.filter((item) => item?.question && item?.answer) : [];
 
   return (
     <div className="bg-black min-h-screen flex flex-col font-glacial text-white selection:bg-[#F5EE30] selection:text-black">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: seo.schemaMarkup }}
+      />
 
       <article className="flex-grow">
         {/* Immersive Hero Section */}
@@ -70,7 +294,7 @@ export default async function BlogPost({ params }) {
           {post.image && (
             <Image
               src={post.image}
-              alt={post.title}
+              alt={seo.imageAlt}
               fill
               className="object-cover"
               priority
@@ -81,6 +305,19 @@ export default async function BlogPost({ params }) {
 
           <div className="absolute bottom-0 left-0 w-full px-4 sm:px-6 md:px-10 lg:px-16 pb-12 md:pb-16">
             <div className="max-w-5xl mx-auto">
+              <nav aria-label="Breadcrumb" className="mb-5 text-xs font-bold uppercase tracking-[0.24em] text-white/60">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link href="/" className="transition-colors hover:text-[#F5EE30]">
+                    Home
+                  </Link>
+                  <span>/</span>
+                  <Link href="/blog" className="transition-colors hover:text-[#F5EE30]">
+                    Blog
+                  </Link>
+                  <span>/</span>
+                  <span className="text-white/80">{category}</span>
+                </div>
+              </nav>
               <Link
                 href="/blog"
                 className="inline-flex items-center text-white/80 hover:text-[#F5EE30] transition-colors mb-6 font-bold tracking-widest uppercase text-sm group"
@@ -98,6 +335,10 @@ export default async function BlogPost({ params }) {
               <h1 className="text-4xl md:text-6xl lg:text-7xl font-etna leading-[1.1] mb-8 text-white drop-shadow-2xl max-w-4xl uppercase">
                 {post.title}
               </h1>
+
+              <p className="max-w-3xl text-base leading-7 text-gray-300 md:text-lg">
+                {seo.displayDescription}
+              </p>
 
               <div className="flex flex-wrap items-center gap-6 md:gap-8 text-gray-300 text-sm font-bold tracking-wide uppercase border-t border-white/20 pt-6">
                 <div className="flex items-center gap-3">
@@ -139,12 +380,29 @@ export default async function BlogPost({ params }) {
               dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content) }}
             />
 
+            {faqItems.length > 0 && (
+              <section className="mt-16 rounded-[28px] border border-white/10 bg-white/[0.03] p-6 md:p-8">
+                <div className="mb-6">
+                  <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#F5EE30]">FAQ</p>
+                  <h2 className="mt-3 font-etna text-3xl text-white">COMMON QUESTIONS</h2>
+                </div>
+                <div className="space-y-6">
+                  {faqItems.map((item, index) => (
+                    <div key={`${post._id}-faq-${index}`} className="border-b border-white/10 pb-5 last:border-b-0 last:pb-0">
+                      <h3 className="font-etna text-xl text-white">{item.question}</h3>
+                      <p className="mt-2 text-base leading-7 text-gray-300">{item.answer}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* Share Section */}
             <div className="mt-20 pt-10 border-t border-gray-800 flex flex-col md:flex-row items-center justify-between gap-6">
               <span className="font-etna text-2xl text-gray-400">SHARE THIS ARTICLE</span>
               <div className="flex gap-4">
                 {(() => {
-                  const url = encodeURIComponent(`https://digitalcorvids.com/blog/${slug}`);
+                  const url = encodeURIComponent(seo.canonicalUrl);
                   const title = encodeURIComponent(post.title);
                   const platforms = [
                     { name: 'Twitter', href: `https://twitter.com/intent/tweet?url=${url}&text=${title}` },

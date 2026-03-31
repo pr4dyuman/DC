@@ -1,12 +1,15 @@
 "use server";
 
 import { AgencyModel, UserModel, SuperAdminModel, ClientModel, SettingsModel, SystemSettingsModel, connectDB, encryptApiKey } from "../mongodb";
-import { Agency, User, AGENCY_PLANS, AIConfig } from "../types";
+import { Agency, User, AGENCY_PLANS, AIBloggerConfig, AIBloggerStageConfig, AIConfig } from "../types";
 import { generateId } from "../utils-server";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { sanitizeName, sanitizeString, sanitizePhone, validateEmail, validatePassword, validateStrongPassword } from "../validation";
+import { mergeAIBloggerConfig } from "../ai-blogger-config";
+import { getBlogStudioOverviewImpl } from "./ai-blogger";
 import {
+    getAgencyAIBloggerConfigSuperAdminImpl,
     getAIUsageByAgencyImpl,
     getAIUsageByUserImpl,
     getAIUsageForAgencyImpl,
@@ -25,6 +28,7 @@ import {
     getSystemAnalyticsImpl,
     getSystemLogsImpl,
     getSystemSettingsImpl,
+    getAgencySearchConsoleMetricsImpl,
 } from "./super-admin-queries";
 import {
     logSystemEventImpl,
@@ -322,6 +326,22 @@ export async function getAgencyAIConfigSuperAdmin(agencyId: string): Promise<AIC
     return getAgencyAIConfigSuperAdminImpl(agencyId);
 }
 
+export async function getAgencyAIBloggerConfigSuperAdmin(agencyId: string): Promise<AIBloggerConfig | null> {
+    return getAgencyAIBloggerConfigSuperAdminImpl(agencyId);
+}
+
+export async function getAgencyAIBloggerOverviewSuperAdmin(agencyId: string) {
+    await verifySuperAdmin();
+    await connectDB();
+
+    const agency = await AgencyModel.findOne({ id: agencyId }).select("id name").lean();
+    if (!agency) {
+        throw new Error("Agency not found");
+    }
+
+    return getBlogStudioOverviewImpl(agency.id, agency.name);
+}
+
 /**
  * Update AI config for a specific agency (super-admin only)
  */
@@ -394,6 +414,7 @@ export async function updateAgencyAIConfigSuperAdmin(agencyId: string, config: A
                     ...(config.taskExplainConfig  ? { taskExplainConfig:  processFeatureConfig(config.taskExplainConfig,  existingAgency?.aiConfig?.taskExplainConfig) } : {}),
                     ...(config.hourEstimateConfig ? { hourEstimateConfig: processFeatureConfig(config.hourEstimateConfig, existingAgency?.aiConfig?.hourEstimateConfig) } : {}),
                     ...(config.taskChatbotConfig  ? { taskChatbotConfig:  processFeatureConfig(config.taskChatbotConfig,  existingAgency?.aiConfig?.taskChatbotConfig) } : {}),
+                    ...(config.heavyTasksConfig   ? { heavyTasksConfig:   processFeatureConfig(config.heavyTasksConfig,   existingAgency?.aiConfig?.heavyTasksConfig) } : {}),
                 },
                 updatedAt: new Date().toISOString()
             }
@@ -427,6 +448,446 @@ export async function removeAgencyAIConfig(agencyId: string) {
 
     revalidatePath(`/super-admin/agencies/${agencyId}`);
     revalidatePath(`/super-admin/agencies/${agencyId}/ai`);
+
+    return true;
+}
+
+// =============================================================================
+// AI Blogger Configuration (Per-Agency)
+// =============================================================================
+
+export async function updateAgencyAIBloggerConfigSuperAdmin(agencyId: string, config: AIBloggerConfig) {
+    const sa = await verifySuperAdmin();
+    await connectDB();
+
+    const existingAgency = await AgencyModel.findOne({ id: agencyId }).lean();
+    if (!existingAgency) throw new Error("Agency not found");
+
+    const mergedConfig = mergeAIBloggerConfig(config, existingAgency.aiConfig);
+    const validProviders = ['gemini', 'openai', 'nvidia', 'github', 'groq'];
+
+    const processStageConfig = (
+        stageName: string,
+        nextConfig: AIBloggerStageConfig,
+        previousConfig?: AIBloggerStageConfig,
+    ) => {
+        if (!validProviders.includes(nextConfig.provider)) {
+            throw new Error(`${stageName}: invalid provider "${nextConfig.provider}".`);
+        }
+
+        const model = sanitizeString(nextConfig.model || "", 200);
+        if (!model) {
+            throw new Error(`${stageName}: model is required.`);
+        }
+
+        const primaryApiKey = nextConfig.apiKey?.trim() || "";
+        const fallbackApiKey = nextConfig.fallbackApiKey?.trim() || "";
+
+        const resolvedPrimaryApiKey = primaryApiKey
+            ? primaryApiKey.startsWith("****")
+                ? previousConfig?.apiKey || ""
+                : encryptApiKey(primaryApiKey)
+            : "";
+
+        const resolvedFallbackApiKey = fallbackApiKey
+            ? fallbackApiKey.startsWith("****")
+                ? previousConfig?.fallbackApiKey || ""
+                : encryptApiKey(fallbackApiKey)
+            : "";
+
+        return {
+            provider: nextConfig.provider,
+            apiKey: resolvedPrimaryApiKey,
+            fallbackApiKey: resolvedFallbackApiKey,
+            model,
+            ...(nextConfig.customModelId
+                ? { customModelId: sanitizeString(nextConfig.customModelId, 200) }
+                : {}),
+            systemPrompt: sanitizeString(nextConfig.systemPrompt || "", 100000),
+        };
+    };
+
+    const processTrendsConfig = (
+        nextConfig: AIBloggerConfig["trends"],
+        previousConfig?: AIBloggerConfig["trends"],
+    ) => {
+        const validProviders = ["serpapi"] as const;
+
+        if (!validProviders.includes(nextConfig.provider)) {
+            throw new Error(`Live Trends: invalid provider "${nextConfig.provider}".`);
+        }
+
+        const primaryApiKey = nextConfig.apiKey?.trim() || "";
+        const fallbackApiKey = nextConfig.fallbackApiKey?.trim() || "";
+
+        const resolvedPrimaryApiKey = primaryApiKey
+            ? primaryApiKey.startsWith("****")
+                ? previousConfig?.apiKey || ""
+                : encryptApiKey(primaryApiKey)
+            : "";
+
+        const resolvedFallbackApiKey = fallbackApiKey
+            ? fallbackApiKey.startsWith("****")
+                ? previousConfig?.fallbackApiKey || ""
+                : encryptApiKey(fallbackApiKey)
+            : "";
+
+        if (nextConfig.enabled && !resolvedPrimaryApiKey) {
+            throw new Error("Live Trends requires a primary API key before it can be enabled.");
+        }
+
+        return {
+            enabled: Boolean(nextConfig.enabled),
+            provider: nextConfig.provider,
+            apiKey: resolvedPrimaryApiKey,
+            fallbackApiKey: resolvedFallbackApiKey,
+            fallbackEnabled: Boolean(nextConfig.fallbackEnabled),
+            fallbackToAi: Boolean(nextConfig.fallbackToAi),
+            defaultLocation: sanitizeString(nextConfig.defaultLocation || "us", 12).toLowerCase() || "us",
+        };
+    };
+
+    const processCrawlConfig = (
+        nextConfig: AIBloggerConfig["crawl"],
+    ) => {
+        const validProviders = ["basic-fetch"] as const;
+
+        if (!validProviders.includes(nextConfig.provider)) {
+            throw new Error(`Website Crawl: invalid provider "${nextConfig.provider}".`);
+        }
+
+        const sanitizePathList = (values: string[] | undefined) =>
+            Array.from(
+                new Set(
+                    (values || [])
+                        .map((value) => sanitizeString(value || "", 200).trim())
+                        .filter(Boolean),
+                ),
+            ).slice(0, 20);
+
+        return {
+            enabled: Boolean(nextConfig.enabled),
+            provider: nextConfig.provider,
+            maxPages: Math.min(6, Math.max(1, Math.round(nextConfig.maxPages || 4))),
+            timeoutMs: Math.min(15000, Math.max(2000, Math.round(nextConfig.timeoutMs || 8000))),
+            refreshWindowHours: Math.min(24 * 30, Math.max(1, Math.round(nextConfig.refreshWindowHours || 24))),
+            allowedPaths: sanitizePathList(nextConfig.allowedPaths),
+            blockedPaths: sanitizePathList(nextConfig.blockedPaths),
+        };
+    };
+
+    const processSerpConfig = (
+        nextConfig: AIBloggerConfig["serp"],
+        previousConfig: AIBloggerConfig["serp"] | undefined,
+        processedTrendsConfig: AIBloggerConfig["trends"],
+    ): AIBloggerConfig["serp"] => {
+        const validProviders = ["serpapi"] as const;
+
+        if (!validProviders.includes(nextConfig.provider)) {
+            throw new Error(`SERP Analysis: invalid provider "${nextConfig.provider}".`);
+        }
+
+        const primaryApiKey = nextConfig.apiKey?.trim() || "";
+        const fallbackApiKey = nextConfig.fallbackApiKey?.trim() || "";
+
+        const resolvedPrimaryApiKey = primaryApiKey
+            ? primaryApiKey.startsWith("****")
+                ? previousConfig?.apiKey || ""
+                : encryptApiKey(primaryApiKey)
+            : "";
+
+        const resolvedFallbackApiKey = fallbackApiKey
+            ? fallbackApiKey.startsWith("****")
+                ? previousConfig?.fallbackApiKey || ""
+                : encryptApiKey(fallbackApiKey)
+            : "";
+
+        if (nextConfig.enabled && !resolvedPrimaryApiKey && !processedTrendsConfig.apiKey) {
+            throw new Error("SERP Analysis requires a primary API key or a configured Live Trends key before it can be enabled.");
+        }
+
+        return {
+            enabled: Boolean(nextConfig.enabled),
+            provider: nextConfig.provider,
+            apiKey: resolvedPrimaryApiKey,
+            fallbackApiKey: resolvedFallbackApiKey,
+            fallbackEnabled: Boolean(nextConfig.fallbackEnabled),
+            defaultLocation: sanitizeString(nextConfig.defaultLocation || "us", 12).toLowerCase() || "us",
+            device: nextConfig.device === "mobile" ? "mobile" : "desktop",
+            maxCompetitors: Math.min(10, Math.max(3, Math.round(nextConfig.maxCompetitors || 5))),
+            refreshWindowHours: Math.min(24 * 30, Math.max(1, Math.round(nextConfig.refreshWindowHours || 24))),
+        };
+    };
+
+    const processGroundedResearchConfig = (
+        nextConfig: AIBloggerConfig["groundedResearch"],
+    ): AIBloggerConfig["groundedResearch"] => {
+        const validSourceTypes = new Set([
+            "government",
+            "education",
+            "official",
+            "industry",
+            "competitor",
+            "news",
+            "reference",
+        ]);
+
+        return {
+            enabled: Boolean(nextConfig.enabled),
+            maxSources: Math.min(8, Math.max(1, Math.round(nextConfig.maxSources || 5))),
+            trustPreference: nextConfig.trustPreference === "high-only" ? "high-only" : "balanced",
+            freshnessPreference:
+                nextConfig.freshnessPreference === "recent-first" ||
+                nextConfig.freshnessPreference === "evergreen-ok"
+                    ? nextConfig.freshnessPreference
+                    : "balanced",
+            allowedSourceTypes: Array.from(
+                new Set(
+                    (nextConfig.allowedSourceTypes || [])
+                        .map((value) => sanitizeString(value || "", 40))
+                        .filter((value): value is typeof nextConfig.allowedSourceTypes[number] => validSourceTypes.has(value)),
+                ),
+            ).slice(0, 7),
+            blockedDomains: Array.from(
+                new Set(
+                    (nextConfig.blockedDomains || [])
+                        .map((value) => sanitizeString(value || "", 120).trim().toLowerCase())
+                        .filter(Boolean),
+                ),
+            ).slice(0, 30),
+            refreshWindowHours: Math.min(24 * 30, Math.max(1, Math.round(nextConfig.refreshWindowHours || 24))),
+        };
+    };
+
+    const processSearchConsoleConfig = (
+        nextConfig: AIBloggerConfig["searchConsole"],
+        previousConfig?: AIBloggerConfig["searchConsole"],
+    ): AIBloggerConfig["searchConsole"] => {
+        const propertyUrl = sanitizeString(nextConfig.propertyUrl || "", 300).trim();
+        const credentialsJson = nextConfig.credentialsJson?.trim() || "";
+        const resolvedCredentialsJson = credentialsJson
+            ? credentialsJson.startsWith("****")
+                ? previousConfig?.credentialsJson || ""
+                : encryptApiKey(credentialsJson)
+            : "";
+        const authStatus =
+            Boolean(nextConfig.enabled && propertyUrl && resolvedCredentialsJson)
+                ? "configured"
+                : nextConfig.authStatus === "configured" && propertyUrl && resolvedCredentialsJson
+                    ? "configured"
+                    : "not-connected";
+
+        return {
+            enabled: Boolean(nextConfig.enabled),
+            propertyUrl,
+            credentialsJson: resolvedCredentialsJson,
+            authStatus,
+            syncFrequencyHours: Math.min(24 * 30, Math.max(1, Math.round(nextConfig.syncFrequencyHours || 24))),
+            lookbackDays: Math.min(365, Math.max(7, Math.round(nextConfig.lookbackDays || 28))),
+        };
+    };
+
+    const processPagePerformanceConfig = (
+        nextConfig: AIBloggerConfig["pagePerformance"],
+        previousConfig?: AIBloggerConfig["pagePerformance"],
+    ): AIBloggerConfig["pagePerformance"] => {
+        const validProviders = ["pagespeed"] as const;
+        if (!validProviders.includes(nextConfig.provider)) {
+            throw new Error(`Page Performance: invalid provider "${nextConfig.provider}".`);
+        }
+
+        const apiKey = nextConfig.apiKey?.trim() || "";
+        const resolvedApiKey = apiKey
+            ? apiKey.startsWith("****")
+                ? previousConfig?.apiKey || ""
+                : encryptApiKey(apiKey)
+            : "";
+
+        return {
+            enabled: Boolean(nextConfig.enabled),
+            provider: nextConfig.provider,
+            apiKey: resolvedApiKey,
+            strategy:
+                nextConfig.strategy === "desktop" || nextConfig.strategy === "both"
+                    ? nextConfig.strategy
+                    : "mobile",
+            performanceThreshold: Math.min(100, Math.max(1, Math.round(nextConfig.performanceThreshold || 60))),
+            refreshWindowHours: Math.min(24 * 30, Math.max(1, Math.round(nextConfig.refreshWindowHours || 24 * 7))),
+        };
+    };
+
+    const processImageGenerationConfig = (
+        nextConfig: AIBloggerConfig["imageGeneration"],
+        previousConfig?: AIBloggerConfig["imageGeneration"],
+    ): AIBloggerConfig["imageGeneration"] => {
+        const validProviders = ["openai", "gemini"] as const;
+        if (!validProviders.includes(nextConfig.provider)) {
+            throw new Error(`Image Generation: invalid provider "${nextConfig.provider}".`);
+        }
+
+        const model = sanitizeString(nextConfig.model || "", 200);
+        if (!model) {
+            throw new Error("Image Generation: model is required.");
+        }
+
+        const apiKey = nextConfig.apiKey?.trim() || "";
+        const fallbackApiKey = nextConfig.fallbackApiKey?.trim() || "";
+        const resolvedApiKey = apiKey
+            ? apiKey.startsWith("****")
+                ? previousConfig?.apiKey || ""
+                : encryptApiKey(apiKey)
+            : "";
+        const resolvedFallbackApiKey = fallbackApiKey
+            ? fallbackApiKey.startsWith("****")
+                ? previousConfig?.fallbackApiKey || ""
+                : encryptApiKey(fallbackApiKey)
+            : "";
+
+        if (nextConfig.enabled && !resolvedApiKey) {
+            throw new Error("Image Generation requires a primary API key before it can be enabled.");
+        }
+
+        return {
+            enabled: Boolean(nextConfig.enabled),
+            provider: nextConfig.provider,
+            apiKey: resolvedApiKey,
+            fallbackApiKey: resolvedFallbackApiKey,
+            model,
+            ...(nextConfig.customModelId
+                ? { customModelId: sanitizeString(nextConfig.customModelId, 200) }
+                : {}),
+            size:
+                nextConfig.size === "1024x1024" || nextConfig.size === "1024x1792"
+                    ? nextConfig.size
+                    : "1792x1024",
+            quality: nextConfig.quality === "hd" ? "hd" : "standard",
+            style: nextConfig.style === "natural" ? "natural" : "vivid",
+        };
+    };
+
+    const processPublishRulesConfig = (
+        nextConfig: AIBloggerConfig["publishRules"],
+        previousConfig?: AIBloggerConfig["publishRules"],
+    ): AIBloggerConfig["publishRules"] => {
+        const finalCheckerApiKey = sanitizeString(nextConfig.aiReviewPolicy?.apiKey || "", 1000);
+        const resolvedFinalCheckerApiKey = finalCheckerApiKey
+            ? finalCheckerApiKey.startsWith("****")
+                ? previousConfig?.aiReviewPolicy?.apiKey || ""
+                : encryptApiKey(finalCheckerApiKey)
+            : "";
+
+        return {
+            requireInternalLinks: Boolean(nextConfig.requireInternalLinks),
+            requireMetaDescription: Boolean(nextConfig.requireMetaDescription),
+            requireFaqForInformational: Boolean(nextConfig.requireFaqForInformational),
+            requireImageAltText: Boolean(nextConfig.requireImageAltText),
+            requireManualApproval: Boolean(nextConfig.requireManualApproval),
+            minimumSeoScore: Math.min(100, Math.max(0, Math.round(nextConfig.minimumSeoScore || 80))),
+            requireCanonicalUrl: Boolean(nextConfig.requireCanonicalUrl),
+            requireSchemaMarkup: Boolean(nextConfig.requireSchemaMarkup),
+            aiReviewPolicy: {
+                enableFinalChecker: Boolean(nextConfig.aiReviewPolicy?.enableFinalChecker),
+                apiKey: resolvedFinalCheckerApiKey,
+                model: sanitizeString(nextConfig.aiReviewPolicy?.model || "", 200),
+                customModelId: sanitizeString(nextConfig.aiReviewPolicy?.customModelId || "", 200),
+                autoFixStructuralIssues: Boolean(nextConfig.aiReviewPolicy?.autoFixStructuralIssues),
+                autoFixToneMismatch: Boolean(nextConfig.aiReviewPolicy?.autoFixToneMismatch),
+                flagWeakBusinessFit: Boolean(nextConfig.aiReviewPolicy?.flagWeakBusinessFit),
+                flagWeakCtaAlignment: Boolean(nextConfig.aiReviewPolicy?.flagWeakCtaAlignment),
+                softenQuestionableClaims: Boolean(nextConfig.aiReviewPolicy?.softenQuestionableClaims),
+                flagSoftCannibalization: Boolean(nextConfig.aiReviewPolicy?.flagSoftCannibalization),
+                requireHumanReviewForHighRiskClaims:
+                    Boolean(nextConfig.aiReviewPolicy?.requireHumanReviewForHighRiskClaims),
+                requireHumanReviewForHighRiskCannibalization:
+                    Boolean(nextConfig.aiReviewPolicy?.requireHumanReviewForHighRiskCannibalization),
+                requireGroundedSourcesForClaims:
+                    Boolean(nextConfig.aiReviewPolicy?.requireGroundedSourcesForClaims),
+            },
+        };
+    };
+
+    const nextTrendsConfig = processTrendsConfig(mergedConfig.trends, existingAgency.aiBloggerConfig?.trends);
+
+    const nextStoredConfig: AIBloggerConfig = {
+        fallbackEnabled: mergedConfig.fallbackEnabled,
+        trends: nextTrendsConfig,
+        crawl: processCrawlConfig(mergedConfig.crawl),
+        serp: processSerpConfig(mergedConfig.serp, existingAgency.aiBloggerConfig?.serp, nextTrendsConfig),
+        groundedResearch: processGroundedResearchConfig(mergedConfig.groundedResearch),
+        searchConsole: processSearchConsoleConfig(
+            mergedConfig.searchConsole,
+            existingAgency.aiBloggerConfig?.searchConsole,
+        ),
+        pagePerformance: processPagePerformanceConfig(
+            mergedConfig.pagePerformance,
+            existingAgency.aiBloggerConfig?.pagePerformance,
+        ),
+        imageGeneration: processImageGenerationConfig(
+            mergedConfig.imageGeneration,
+            existingAgency.aiBloggerConfig?.imageGeneration,
+        ),
+        publishRules: processPublishRulesConfig(mergedConfig.publishRules, existingAgency.aiBloggerConfig?.publishRules),
+        author: mergedConfig.author,
+        entityModeling: mergedConfig.entityModeling,
+        extractKeywords: processStageConfig(
+            "Topic & Keywords",
+            mergedConfig.extractKeywords,
+            existingAgency.aiBloggerConfig?.extractKeywords,
+        ),
+        research: processStageConfig(
+            "Research",
+            mergedConfig.research,
+            existingAgency.aiBloggerConfig?.research,
+        ),
+        seoAnalysis: processStageConfig(
+            "SEO Analysis",
+            mergedConfig.seoAnalysis,
+            existingAgency.aiBloggerConfig?.seoAnalysis,
+        ),
+        writeBlog: processStageConfig(
+            "Write Blog",
+            mergedConfig.writeBlog,
+            existingAgency.aiBloggerConfig?.writeBlog,
+        ),
+        generateImage: processStageConfig(
+            "Generate Image",
+            mergedConfig.generateImage,
+            existingAgency.aiBloggerConfig?.generateImage,
+        ),
+        updatedAt: new Date().toISOString(),
+        updatedBy: sa.userId,
+    };
+
+    await AgencyModel.updateOne(
+        { id: agencyId },
+        {
+            $set: {
+                aiBloggerConfig: nextStoredConfig,
+                updatedAt: new Date().toISOString(),
+            },
+        },
+    );
+
+    revalidatePath("/super-admin/ai-blogger");
+    revalidatePath(`/super-admin/ai-blogger/agency/${agencyId}`);
+
+    return true;
+}
+
+export async function removeAgencyAIBloggerConfigSuperAdmin(agencyId: string) {
+    await verifySuperAdmin();
+    await connectDB();
+
+    await AgencyModel.updateOne(
+        { id: agencyId },
+        {
+            $unset: { aiBloggerConfig: "" },
+            $set: { updatedAt: new Date().toISOString() },
+        },
+    );
+
+    revalidatePath("/super-admin/ai-blogger");
+    revalidatePath(`/super-admin/ai-blogger/agency/${agencyId}`);
 
     return true;
 }
@@ -516,6 +977,7 @@ export async function saveDefaultAiConfig(config: AIConfig | null) {
                         ...(config.taskExplainConfig  ? { taskExplainConfig:  processFeatureConfigGlobal(config.taskExplainConfig,  existingGlobal?.defaultAiConfig?.taskExplainConfig) } : {}),
                         ...(config.hourEstimateConfig ? { hourEstimateConfig: processFeatureConfigGlobal(config.hourEstimateConfig, existingGlobal?.defaultAiConfig?.hourEstimateConfig) } : {}),
                         ...(config.taskChatbotConfig  ? { taskChatbotConfig:  processFeatureConfigGlobal(config.taskChatbotConfig,  existingGlobal?.defaultAiConfig?.taskChatbotConfig) } : {}),
+                        ...(config.heavyTasksConfig   ? { heavyTasksConfig:   processFeatureConfigGlobal(config.heavyTasksConfig,   existingGlobal?.defaultAiConfig?.heavyTasksConfig) } : {}),
                     }
                 }
             },
@@ -648,3 +1110,19 @@ export async function getAIUsageByUser(days: number = 30) {
 export async function getStorageByAgency() {
     return getStorageByAgencyImpl();
 }
+
+// =============================================================================
+// SEARCH CONSOLE METRICS
+// =============================================================================
+
+/**
+ * Get Search Console metrics for a specific agency
+ */
+export async function getAgencySearchConsoleMetrics(agencyId: string) {
+    return getAgencySearchConsoleMetricsImpl(agencyId);
+}
+
+/**
+ * Search Console configuration - DEPRECATED (Use OAuth instead)
+ * All clients now use Google OAuth via AIBloggerSettingsWorkspace
+ */

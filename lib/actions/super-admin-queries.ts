@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { AIConfig } from "../types";
+import type { AIBloggerConfig, AIConfig } from "../types";
 import {
     AgencyModel,
     AIUsageLogModel,
@@ -9,9 +9,12 @@ import {
     SystemLogModel,
     SystemSettingsModel,
     UserModel,
+    BlogStudioPerformanceSnapshotModel,
+    BlogStudioPerformanceSyncRunModel,
     connectDB,
     decryptApiKey,
 } from "../mongodb";
+import { AI_BLOGGER_STAGE_KEYS } from "../ai-blogger-config";
 import {
     type AgencyLookupRecord,
     type AIUsageByAgencyRow,
@@ -126,7 +129,7 @@ export async function getAgencyAIConfigSuperAdminImpl(agencyId: string): Promise
         config.apiKey = decrypted.length > 4 ? '****' + decrypted.slice(-4) : '****';
     }
     // Mask nested feature config API keys too
-    const featureKeys = ['chatConfig', 'agentConfig', 'taskExplainConfig', 'hourEstimateConfig', 'taskChatbotConfig'] as const;
+    const featureKeys = ['chatConfig', 'agentConfig', 'taskExplainConfig', 'hourEstimateConfig', 'taskChatbotConfig', 'heavyTasksConfig'] as const;
     for (const key of featureKeys) {
         const fc = (config as AIConfig & Record<string, { apiKey?: string } | undefined>)[key];
         if (fc?.apiKey) {
@@ -134,6 +137,80 @@ export async function getAgencyAIConfigSuperAdminImpl(agencyId: string): Promise
             fc.apiKey = decrypted.length > 4 ? '****' + decrypted.slice(-4) : '****';
         }
     }
+    return config;
+}
+
+export async function getAgencyAIBloggerConfigSuperAdminImpl(agencyId: string): Promise<AIBloggerConfig | null> {
+    await verifySuperAdmin();
+    await connectDB();
+
+    const agency = await AgencyModel.findOne({ id: agencyId }).lean();
+    if (!agency) throw new Error("Agency not found");
+
+    if (!agency.aiBloggerConfig) return null;
+
+    const config = toSerializable(agency.aiBloggerConfig) as AIBloggerConfig;
+
+    if (config.trends?.apiKey) {
+        const decrypted = decryptApiKey(config.trends.apiKey);
+        config.trends.apiKey = decrypted.length > 4 ? `****${decrypted.slice(-4)}` : "****";
+    }
+
+    if (config.trends?.fallbackApiKey) {
+        const decrypted = decryptApiKey(config.trends.fallbackApiKey);
+        config.trends.fallbackApiKey = decrypted.length > 4 ? `****${decrypted.slice(-4)}` : "****";
+    }
+
+    if (config.serp?.apiKey) {
+        const decrypted = decryptApiKey(config.serp.apiKey);
+        config.serp.apiKey = decrypted.length > 4 ? `****${decrypted.slice(-4)}` : "****";
+    }
+
+    if (config.serp?.fallbackApiKey) {
+        const decrypted = decryptApiKey(config.serp.fallbackApiKey);
+        config.serp.fallbackApiKey = decrypted.length > 4 ? `****${decrypted.slice(-4)}` : "****";
+    }
+
+    if (config.searchConsole?.credentialsJson) {
+        const decrypted = decryptApiKey(config.searchConsole.credentialsJson);
+        config.searchConsole.credentialsJson = decrypted.length > 4 ? `****${decrypted.slice(-4)}` : "****";
+    }
+
+    if (config.pagePerformance?.apiKey) {
+        const decrypted = decryptApiKey(config.pagePerformance.apiKey);
+        config.pagePerformance.apiKey = decrypted.length > 4 ? `****${decrypted.slice(-4)}` : "****";
+    }
+
+    if (config.imageGeneration?.apiKey) {
+        const decrypted = decryptApiKey(config.imageGeneration.apiKey);
+        config.imageGeneration.apiKey = decrypted.length > 4 ? `****${decrypted.slice(-4)}` : "****";
+    }
+
+    if (config.imageGeneration?.fallbackApiKey) {
+        const decrypted = decryptApiKey(config.imageGeneration.fallbackApiKey);
+        config.imageGeneration.fallbackApiKey = decrypted.length > 4 ? `****${decrypted.slice(-4)}` : "****";
+    }
+
+    if (config.publishRules?.aiReviewPolicy?.apiKey) {
+        const decrypted = decryptApiKey(config.publishRules.aiReviewPolicy.apiKey);
+        config.publishRules.aiReviewPolicy.apiKey = decrypted.length > 4 ? `****${decrypted.slice(-4)}` : "****";
+    }
+
+    for (const key of AI_BLOGGER_STAGE_KEYS) {
+        const stage = config[key];
+        if (!stage) continue;
+
+        if (stage.apiKey) {
+            const decrypted = decryptApiKey(stage.apiKey);
+            stage.apiKey = decrypted.length > 4 ? `****${decrypted.slice(-4)}` : "****";
+        }
+
+        if (stage.fallbackApiKey) {
+            const decrypted = decryptApiKey(stage.fallbackApiKey);
+            stage.fallbackApiKey = decrypted.length > 4 ? `****${decrypted.slice(-4)}` : "****";
+        }
+    }
+
     return config;
 }
 
@@ -151,7 +228,7 @@ export async function getDefaultAiConfigImpl(): Promise<AIConfig | null> {
         maskedConfig.apiKey = decrypted.length > 4 ? '****' + decrypted.slice(-4) : '****';
     }
     // Mask nested feature config API keys too
-    const featureKeys = ['chatConfig', 'agentConfig', 'taskExplainConfig', 'hourEstimateConfig', 'taskChatbotConfig'] as const;
+    const featureKeys = ['chatConfig', 'agentConfig', 'taskExplainConfig', 'hourEstimateConfig', 'taskChatbotConfig', 'heavyTasksConfig'] as const;
     for (const key of featureKeys) {
         const fc = (maskedConfig as AIConfig & Record<string, { apiKey?: string } | undefined>)[key];
         if (fc?.apiKey) {
@@ -490,3 +567,107 @@ export async function getStorageByAgencyImpl() {
         storageLimit: (agency.limits?.maxStorage || 0) * 1024 * 1024,
     }));
 }
+
+// =============================================================================
+// SEARCH CONSOLE METRICS
+// =============================================================================
+
+export type SearchConsoleMetricsDataImpl = {
+    totalPosts: number;
+    publishedPosts: number;
+    snapshotsCoverage: number;
+    avgClicks: number;
+    avgImpressions: number;
+    avgCTR: number;
+    avgPosition: number;
+    lastSyncAt: string | null;
+    lastSyncStatus: "success" | "failed" | null;
+    syncRunsSample: Array<{
+        id: string;
+        status: "synced" | "failed" | "skipped";
+        postsEvaluated: number;
+        snapshotsStored: number;
+        completedAt: string;
+        summary: string;
+    }>;
+};
+
+export async function getAgencySearchConsoleMetricsImpl(agencyId: string): Promise<SearchConsoleMetricsDataImpl> {
+    await verifySuperAdmin();
+    await connectDB();
+
+    // Get all posts for this agency
+    const { BlogStudioPostModel } = await import("../mongodb");
+    const allPosts = await BlogStudioPostModel.find({ agencyId }).select("id status").lean() as any[];
+    const totalPosts = allPosts.length;
+    const publishedPosts = allPosts.filter((p) => p.status === "Published").length;
+
+    // Get latest snapshots for coverage
+    const snapshots = await BlogStudioPerformanceSnapshotModel.find({
+        agencyId,
+    })
+        .sort({ refreshedAt: -1 })
+        .lean() as any[];
+
+    const uniquePostsWithSnapshots = new Set(snapshots.map((s) => s.postId));
+    const snapshotsCoverage = uniquePostsWithSnapshots.size;
+
+    // Calculate aggregate stats from all snapshots
+    let totalClicks = 0;
+    let totalImpressions = 0;
+    let ctrSum = 0;
+    let positionSum = 0;
+    let snapshotCount = 0;
+
+    for (const snapshot of snapshots) {
+        totalClicks += snapshot.clicks || 0;
+        totalImpressions += snapshot.impressions || 0;
+        ctrSum += snapshot.ctr || 0;
+        positionSum += snapshot.position || 0;
+        snapshotCount += 1;
+    }
+
+    const avgClicks = snapshotCount > 0 ? totalClicks / snapshotCount : 0;
+    const avgImpressions = snapshotCount > 0 ? totalImpressions / snapshotCount : 0;
+    const avgCTR = snapshotCount > 0 ? ctrSum / snapshotCount : 0;
+    const avgPosition = snapshotCount > 0 ? positionSum / snapshotCount : 0;
+
+    // Get recent sync runs
+    const syncRuns = await BlogStudioPerformanceSyncRunModel.find({
+        agencyId,
+    })
+        .sort({ completedAt: -1 })
+        .limit(10)
+        .lean() as any[];
+
+    const lastSyncRun = syncRuns[0];
+    const lastSyncAt = lastSyncRun?.completedAt || null;
+    const lastSyncStatus = lastSyncRun?.status === "synced" ? "success" : lastSyncRun?.status === "failed" ? "failed" : null;
+
+    const syncRunsSample = syncRuns.map((run: any) => ({
+        id: run._id?.toString() || "",
+        status: run.status || "skipped",
+        postsEvaluated: run.postsEvaluated || 0,
+        snapshotsStored: run.snapshotsStored || 0,
+        completedAt: run.completedAt || new Date().toISOString(),
+        summary: run.summary || "",
+    }));
+
+    return {
+        totalPosts,
+        publishedPosts,
+        snapshotsCoverage,
+        avgClicks,
+        avgImpressions,
+        avgCTR,
+        avgPosition,
+        lastSyncAt,
+        lastSyncStatus,
+        syncRunsSample,
+    };
+}
+
+// =============================================================================
+// SEARCH CONSOLE CONFIG MANAGEMENT - DEPRECATED (Use OAuth instead)
+// =============================================================================
+
