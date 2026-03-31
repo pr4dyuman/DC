@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUserId, getSessionAgencyId } from "@/lib/auth";
+import { getSessionUser } from "@/lib/auth";
 import { BlogStudioSettingsModel, connectDB, encryptApiKey } from "@/lib/mongodb";
 
 /**
@@ -10,8 +10,9 @@ import { BlogStudioSettingsModel, connectDB, encryptApiKey } from "@/lib/mongodb
 export async function POST(req: NextRequest) {
     try {
         // Verify user is authenticated
-        const userId = await getSessionUserId();
-        const agencyId = await getSessionAgencyId();
+        const session = await getSessionUser();
+        const userId = session?.userId;
+        const agencyId = session?.agencyId;
 
         if (!userId || !agencyId) {
             return NextResponse.json(
