@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2, Check, AlertCircle, LogOut, RefreshCw } from "lucide-react";
+import { Loader2, Check, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import {
     AlertDialog,
@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { AIBloggerGlassCard } from "./AIBloggerPrimitives";
 
 interface SearchConsoleOAuthButtonProps {
-    currentStatus?: "not-connected" | "connected" | "token-expired";
+    currentStatus?: "not-connected" | "configured";
     selectedDomain?: string;
     onConnected?: () => void;
     onDisconnected?: () => void;
@@ -176,7 +176,7 @@ export function SearchConsoleOAuthButton({
     };
 
     // Render based on status
-    if (currentStatus === "connected" && selectedDomain) {
+    if (currentStatus === "configured" && selectedDomain) {
         return (
             <>
                 <AIBloggerGlassCard className="p-4 space-y-3">
@@ -230,27 +230,6 @@ export function SearchConsoleOAuthButton({
                     </AlertDialogContent>
                 </AlertDialog>
             </>
-        );
-    }
-
-    if (currentStatus === "token-expired") {
-        return (
-            <AIBloggerGlassCard className="p-4 space-y-3 border-amber-200 bg-amber-50">
-                <div className="flex items-center gap-3">
-                    <AlertCircle className="w-5 h-5 text-amber-600" />
-                    <div>
-                        <p className="text-sm font-medium text-amber-900">Token Expired</p>
-                        <p className="text-xs text-amber-700">Please reconnect to continue syncing</p>
-                    </div>
-                </div>
-                <Button onClick={handleConnect} disabled={isLoading} className="w-full gap-2">
-                    {isLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                        "Reconnect Google"
-                    )}
-                </Button>
-            </AIBloggerGlassCard>
         );
     }
 
