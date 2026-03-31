@@ -7490,8 +7490,8 @@ export async function generateBlogStudioDraftImpl(
     // Initialize generation logger
     if (jobId) {
         await generationLogger.startRun(jobId, agency.id, agency.name || "Unknown", actor.id, {
-            mode: input.brief.sourceMode || "website",
-            sourceValue: input.brief.sourceValue,
+            mode: input.brief?.sourceMode || "website",
+            sourceValue: input.brief?.sourceValue || "",
             wordCount: input.wordCount || 2000,
             title: input.title || undefined,
         });
@@ -7806,8 +7806,8 @@ export async function generateBlogStudioDraftImpl(
                         trendsSource: fetchTrendsSource,
                     },
                     metrics: {
-                        tokensIn: discoveryStage.tokens.inputTokens,
-                        tokensOut: discoveryStage.tokens.outputTokens,
+                        tokensIn: discoveryStage.tokens?.inputTokens ?? 0,
+                        tokensOut: discoveryStage.tokens?.outputTokens ?? 0,
                     },
                 }
             );

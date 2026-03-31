@@ -59,8 +59,8 @@ export interface GenerationRunLog {
 }
 
 export class AIBloggerGenerationLogger {
-  private logsDir: string;
-  private currentRun: GenerationRunLog;
+  private logsDir = "";
+  private currentRun!: GenerationRunLog;
   private enableFileLogging: boolean;
 
   constructor(enableFileLogging: boolean = true) {
