@@ -5606,7 +5606,7 @@ export async function getBlogStudioPerformanceSyncStatusImpl(
     const executionContext = await getAgencyAIBloggerExecutionContext(agencyId);
     // TODO: searchConsoleOAuth integration pending (OAuth implementation 75% complete)
     // const oauthConfig = executionContext.aiBloggerConfig?.searchConsoleOAuth;
-    const oauthConfig: { enabled: boolean; selectedDomain: string; authStatus: "not-connected" | "connected" } = {
+    const oauthConfig: { enabled: boolean; selectedDomain: string; authStatus: "not-connected" | "configured" } = {
         enabled: false,
         selectedDomain: "",
         authStatus: "not-connected",
@@ -5633,7 +5633,7 @@ export async function getBlogStudioPerformanceSyncStatusImpl(
     const hasValidConfig = Boolean(
         oauthConfig?.enabled &&
         oauthConfig?.selectedDomain?.trim() &&
-        oauthConfig?.authStatus === "connected",
+        oauthConfig?.authStatus === "configured",
     );
     const latestSnapshotAt = latestSnapshot?.refreshedAt || null;
     const syncWindowMs = 24 * 60 * 60 * 1000; // 24 hours for OAuth
@@ -5710,7 +5710,7 @@ async function syncAgencyBlogStudioPerformanceImpl(
     const aiBloggerConfig = executionContext.aiBloggerConfig;
     // TODO: searchConsoleOAuth integration pending (OAuth implementation 75% complete)
     // const oauthConfig = aiBloggerConfig?.searchConsoleOAuth;
-    const oauthConfig: { enabled: boolean; selectedDomain: string; authStatus: "not-connected" | "connected" } = {
+    const oauthConfig: { enabled: boolean; selectedDomain: string; authStatus: "not-connected" | "configured" } = {
         enabled: false,
         selectedDomain: "",
         authStatus: "not-connected",
@@ -5757,7 +5757,7 @@ async function syncAgencyBlogStudioPerformanceImpl(
     if (
         !oauthConfig?.enabled ||
         !oauthConfig?.selectedDomain?.trim() ||
-        oauthConfig?.authStatus !== "connected"
+        oauthConfig?.authStatus !== "configured"
     ) {
         const result: BlogStudioPerformanceSyncAgencyResult = {
             agencyId,
