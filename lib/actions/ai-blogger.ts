@@ -7185,7 +7185,7 @@ Rules:
 
         await recordBlogStudioRunImpl(agencyId, actor, {
             postId: currentPost.id,
-            sourceMode: currentPost.brief.sourceMode,
+            sourceMode: currentPost.brief.sourceMode || "website",
             status: "completed",
             selectedTopic: currentPost.brief.primaryKeyword || currentPost.title,
             summary: `Refreshed ${currentPost.slug} from Search Console signals and moved it to SEO Review.`,
@@ -7223,7 +7223,7 @@ Rules:
 
         await recordBlogStudioRunImpl(agencyId, actor, {
             postId: currentPost.id,
-            sourceMode: currentPost.brief.sourceMode,
+            sourceMode: currentPost.brief.sourceMode || "website",
             status: "failed",
             selectedTopic: currentPost.brief.primaryKeyword || currentPost.title,
             summary: `Refresh failed for ${currentPost.slug}: ${message}`,
@@ -8857,7 +8857,7 @@ Rules:
 
         await recordBlogStudioRunImpl(agency.id, actor, {
             postId: created.id,
-            sourceMode: brief.sourceMode,
+            sourceMode: brief.sourceMode || "website",
             status: "completed",
             selectedTopic: selectedTopicForRun,
             summary: `Generated ${created.wordCount || requestedWordCount} words for ${created.target.label} via staged AI pipeline.`,
@@ -8941,7 +8941,7 @@ Rules:
         );
 
         await recordBlogStudioRunImpl(agency.id, actor, {
-            sourceMode: brief.sourceMode,
+            sourceMode: brief.sourceMode || "website",
             status: "failed",
             selectedTopic: selectedTopicForRun,
             summary: message,
@@ -9991,7 +9991,7 @@ async function executeBlogStudioScheduleRun(
         await recordBlogStudioRunImpl(schedule.agencyId, actor, {
             postId: createdPost.id,
             scheduleId: schedule.id,
-            sourceMode: schedule.brief.sourceMode,
+            sourceMode: schedule.brief.sourceMode || "website",
             status: "completed",
             selectedTopic: schedule.name,
             summary: successSummary,
@@ -10069,7 +10069,7 @@ async function executeBlogStudioScheduleRun(
 
         await recordBlogStudioRunImpl(schedule.agencyId, actor, {
             scheduleId: schedule.id,
-            sourceMode: schedule.brief.sourceMode,
+            sourceMode: schedule.brief.sourceMode || "website",
             status: "failed",
             selectedTopic: schedule.name,
             summary: failSummary,
