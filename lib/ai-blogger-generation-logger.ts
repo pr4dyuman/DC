@@ -5,6 +5,10 @@
 
 import * as fs from "fs/promises";
 import * as path from "path";
+import { connectDB } from "./mongodb";
+
+// MongoDB collection for generation logs
+let GenerationLogModel: any;
 
 export interface StepLog {
   stepNumber: number;
@@ -236,24 +240,21 @@ export class AIBloggerGenerationLogger {
 
     console.log("═".repeat(80) + "\n");
 
-    // Save files if enabled
+    // Save to files if enabled (local development)
     if (this.enableFileLogging) {
       try {
-        // Save JSON
+        await fs.mkdir(this.logsDir, { recursive: true });
         await fs.writeFile(
           path.join(this.logsDir, "run.json"),
           JSON.stringify(this.currentRun, null, 2)
         );
 
-        // Save human-readable TXT
         const txtContent = this.generateTxtReport();
         await fs.writeFile(path.join(this.logsDir, "run.txt"), txtContent);
 
-        // Save timeline
         const timelineContent = this.generateTimeline();
         await fs.writeFile(path.join(this.logsDir, "timeline.txt"), timelineContent);
 
-        // Save diagnostics if there were errors
         if (this.currentRun.metrics.stepsFailed > 0) {
           const diagnostics = {
             generationJobId: this.currentRun.jobId,
@@ -277,6 +278,19 @@ export class AIBloggerGenerationLogger {
       } catch (err) {
         console.error("[GENERATION-LOG] Error saving log files:", err);
       }
+    }
+
+    // Save to MongoDB (works on Vercel + local)
+    try {
+      await connectDB();
+      const collection = (await import("./mongodb")).db.collection("blog_generation_logs");
+      await collection.insertOne({
+        ...this.currentRun,
+        savedAt: new Date(),
+      });
+      console.log(`[GENERATION-LOG] 💾 Logs saved to MongoDB (ID: ${this.currentRun.jobId})`);
+    } catch (err) {
+      console.error("[GENERATION-LOG] Error saving to MongoDB:", err);
     }
   }
 
