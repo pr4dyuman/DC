@@ -5606,7 +5606,11 @@ export async function getBlogStudioPerformanceSyncStatusImpl(
     const executionContext = await getAgencyAIBloggerExecutionContext(agencyId);
     // TODO: searchConsoleOAuth integration pending (OAuth implementation 75% complete)
     // const oauthConfig = executionContext.aiBloggerConfig?.searchConsoleOAuth;
-    const oauthConfig = undefined;
+    const oauthConfig = {
+        enabled: false,
+        selectedDomain: "",
+        authStatus: "not-connected" as const,
+    };
     const [publishedPosts, latestSnapshotDoc, latestRunDoc, latestFailedRunDoc] = await Promise.all([
         BlogStudioPostModel.countDocuments({ agencyId, status: "Published" }),
         BlogStudioPerformanceSnapshotModel.findOne({ agencyId })
@@ -5706,7 +5710,11 @@ async function syncAgencyBlogStudioPerformanceImpl(
     const aiBloggerConfig = executionContext.aiBloggerConfig;
     // TODO: searchConsoleOAuth integration pending (OAuth implementation 75% complete)
     // const oauthConfig = aiBloggerConfig?.searchConsoleOAuth;
-    const oauthConfig = undefined;
+    const oauthConfig = {
+        enabled: false,
+        selectedDomain: "",
+        authStatus: "not-connected" as const,
+    };
 
     if (!executionContext.features?.aiBlogger) {
         const result: BlogStudioPerformanceSyncAgencyResult = {
