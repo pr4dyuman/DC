@@ -5604,7 +5604,9 @@ export async function getBlogStudioPerformanceSyncStatusImpl(
     await connectDB();
 
     const executionContext = await getAgencyAIBloggerExecutionContext(agencyId);
-    const oauthConfig = executionContext.aiBloggerConfig?.searchConsoleOAuth;
+    // TODO: searchConsoleOAuth integration pending (OAuth implementation 75% complete)
+    // const oauthConfig = executionContext.aiBloggerConfig?.searchConsoleOAuth;
+    const oauthConfig = undefined;
     const [publishedPosts, latestSnapshotDoc, latestRunDoc, latestFailedRunDoc] = await Promise.all([
         BlogStudioPostModel.countDocuments({ agencyId, status: "Published" }),
         BlogStudioPerformanceSnapshotModel.findOne({ agencyId })
@@ -5683,11 +5685,7 @@ export async function getBlogStudioPostPerformanceReportImpl(
 
     return {
         isPublished: post.status === "Published",
-        hasSearchConsoleConfig: Boolean(
-            aiBloggerConfig?.searchConsoleOAuth?.enabled &&
-            aiBloggerConfig?.searchConsoleOAuth?.selectedDomain?.trim() &&
-            aiBloggerConfig?.searchConsoleOAuth?.authStatus === "connected",
-        ),
+        hasSearchConsoleConfig: false, // TODO: OAuth integration pending
         syncStatus,
         latestSnapshot,
         previousSnapshot,
@@ -5706,7 +5704,9 @@ async function syncAgencyBlogStudioPerformanceImpl(
 
     const executionContext = await getAgencyAIBloggerExecutionContext(agencyId);
     const aiBloggerConfig = executionContext.aiBloggerConfig;
-    const oauthConfig = aiBloggerConfig?.searchConsoleOAuth;
+    // TODO: searchConsoleOAuth integration pending (OAuth implementation 75% complete)
+    // const oauthConfig = aiBloggerConfig?.searchConsoleOAuth;
+    const oauthConfig = undefined;
 
     if (!executionContext.features?.aiBlogger) {
         const result: BlogStudioPerformanceSyncAgencyResult = {
