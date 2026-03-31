@@ -541,33 +541,6 @@ export function AIBloggerSettingsWorkspace({
         "SEO settings saved",
     );
 
-    const saveSearchConsole = (data: SearchConsoleConfigFormData) => {
-        setSavingSearchConsole(true);
-        setPendingAction("search-console");
-        startTransition(async () => {
-            try {
-                await upsertBlogStudioSettings({
-                    searchConsole: {
-                        enabled: data.enabled,
-                        propertyUrl: data.propertyUrl,
-                        credentialsJson: data.credentialsJson,
-                        syncFrequencyHours: data.syncFrequencyHours,
-                        lookbackDays: data.lookbackDays,
-                        authStatus: data.credentialsJson ? "configured" : "not-connected",
-                    },
-                });
-                toast.success("Search Console configuration saved");
-                router.refresh();
-            } catch (error: unknown) {
-                const message = error instanceof Error ? error.message : "Failed to save Search Console configuration";
-                toast.error(message);
-            } finally {
-                setSavingSearchConsole(false);
-                setPendingAction("");
-            }
-        });
-    };
-
     const runWebhookHealthCheck = () => {
         const validationMessage = validatePublishingForm({
             defaultTargetType,
