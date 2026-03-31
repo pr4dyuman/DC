@@ -454,7 +454,7 @@ export type BlogStudioSettings = {
         accessToken?: string;
         accessTokenExpiresAt?: number;
         lastTokenRefreshAt?: number;
-        authStatus: "not-connected" | "connected" | "token-expired";
+        authStatus: "not-connected" | "configured";
         authorizedAt?: string;
         oauthProvider: "google";
     };
