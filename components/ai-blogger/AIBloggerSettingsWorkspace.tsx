@@ -74,6 +74,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { WebhookDocumentationModal } from "@/components/ai-blogger/WebhookDocumentationModal";
 import { SearchConsoleOAuthButton } from "@/components/ai-blogger/SearchConsoleOAuthButton";
+import { SessionDebugWidget } from "@/components/ai-blogger/SessionDebugWidget";
 
 type AIBloggerSettingsWorkspaceProps = {
     settings: BlogStudioSettings;
@@ -464,8 +465,10 @@ export function AIBloggerSettingsWorkspace({
                 router.refresh();
             } catch (error: unknown) {
                 const message = error instanceof Error ? error.message : "AI Blogger update failed";
+                console.error(`[${key}] Action failed:`, message);
                 toast.error(message);
             } finally {
+                // Ensure pending state is always cleared
                 setPendingAction("");
             }
         });
@@ -1557,6 +1560,8 @@ export function AIBloggerSettingsWorkspace({
                 onClose={() => setIsDocModalOpen(false)}
                 webhookUrl={webhookUrl}
             />
+
+            <SessionDebugWidget />
         </>
     );
 }

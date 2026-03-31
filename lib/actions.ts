@@ -834,20 +834,25 @@ export async function deleteBlogStudioPost(slug: string, deletePublished: boolea
 }
 
 export async function upsertBlogStudioSettings(input: UpdateBlogStudioSettingsInput) {
-    const currentUser = await requireRole('admin');
-    const agency = await getCurrentAgency();
-    if (!agency) throw new Error("Unauthorized");
-    assertAIBloggerServerAccess({
-        role: currentUser.role,
-        plan: agency.plan,
-        status: agency.status,
-        featureEnabled: agency.features?.aiBlogger,
-    });
-    return upsertBlogStudioSettingsImpl(
-        { id: agency.id, name: agency.name },
-        toActionActor(currentUser),
-        sanitizeMongoInput(input)
-    );
+    try {
+        const currentUser = await requireRole('admin');
+        const agency = await getCurrentAgency();
+        if (!agency) throw new Error("Unauthorized");
+        assertAIBloggerServerAccess({
+            role: currentUser.role,
+            plan: agency.plan,
+            status: agency.status,
+            featureEnabled: agency.features?.aiBlogger,
+        });
+        return upsertBlogStudioSettingsImpl(
+            { id: agency.id, name: agency.name },
+            toActionActor(currentUser),
+            sanitizeMongoInput(input)
+        );
+    } catch (error: unknown) {
+        console.error("[upsertBlogStudioSettings] Error:", error instanceof Error ? error.message : String(error));
+        throw error;
+    }
 }
 
 export async function createBlogStudioSchedule(input: CreateBlogStudioScheduleInput) {
