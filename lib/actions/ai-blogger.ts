@@ -5606,10 +5606,20 @@ export async function getBlogStudioPerformanceSyncStatusImpl(
     const executionContext = await getAgencyAIBloggerExecutionContext(agencyId);
     // TODO: searchConsoleOAuth integration pending (OAuth implementation 75% complete)
     // const oauthConfig = executionContext.aiBloggerConfig?.searchConsoleOAuth;
-    const oauthConfig: { enabled: boolean; selectedDomain: string; authStatus: "not-connected" | "configured" } = {
+    const oauthConfig: {
+        enabled: boolean;
+        selectedDomain: string;
+        authStatus: "not-connected" | "configured";
+        refreshToken?: string;
+        accessToken?: string;
+        accessTokenExpiresAt?: number;
+    } = {
         enabled: false,
         selectedDomain: "",
         authStatus: "not-connected",
+        refreshToken: undefined,
+        accessToken: undefined,
+        accessTokenExpiresAt: undefined,
     };
     const [publishedPosts, latestSnapshotDoc, latestRunDoc, latestFailedRunDoc] = await Promise.all([
         BlogStudioPostModel.countDocuments({ agencyId, status: "Published" }),
@@ -5710,10 +5720,20 @@ async function syncAgencyBlogStudioPerformanceImpl(
     const aiBloggerConfig = executionContext.aiBloggerConfig;
     // TODO: searchConsoleOAuth integration pending (OAuth implementation 75% complete)
     // const oauthConfig = aiBloggerConfig?.searchConsoleOAuth;
-    const oauthConfig: { enabled: boolean; selectedDomain: string; authStatus: "not-connected" | "configured" } = {
+    const oauthConfig: {
+        enabled: boolean;
+        selectedDomain: string;
+        authStatus: "not-connected" | "configured";
+        refreshToken?: string;
+        accessToken?: string;
+        accessTokenExpiresAt?: number;
+    } = {
         enabled: false,
         selectedDomain: "",
         authStatus: "not-connected",
+        refreshToken: undefined,
+        accessToken: undefined,
+        accessTokenExpiresAt: undefined,
     };
 
     if (!executionContext.features?.aiBlogger) {
