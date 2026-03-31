@@ -9486,10 +9486,13 @@ export async function upsertBlogStudioSettingsImpl(
             hasSecret: !!nextSettings.publishing.defaultTarget.webhookConfig?.secret,
         });
 
+        // Remove createdBy and createdAt from $set to avoid conflict with $setOnInsert
+        const { createdBy: _, createdAt: __, ...updateFields } = nextSettings;
+
         await BlogStudioSettingsModel.updateOne(
             { agencyId: agency.id },
             {
-                $set: nextSettings,
+                $set: updateFields,
                 $setOnInsert: {
                     createdBy: actor.id,
                     createdAt: now,
