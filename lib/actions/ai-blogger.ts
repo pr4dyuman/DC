@@ -2209,22 +2209,31 @@ function sanitizeTarget(
         };
     }
 
-    const inputSecret = sanitizeText(target?.webhookConfig?.secret, 4000);
-    const persistedSecret = inputSecret
-        ? options.encryptWebhookSecret
-            ? encryptApiKey(inputSecret)
-            : inputSecret
-        : sanitizeText(resolvedTarget.webhookConfig.secret, 4000);
+    try {
+        const inputSecret = sanitizeText(target?.webhookConfig?.secret, 4000);
+        const persistedSecret = inputSecret
+            ? options.encryptWebhookSecret
+                ? encryptApiKey(inputSecret)
+                : inputSecret
+            : sanitizeText(resolvedTarget.webhookConfig.secret, 4000);
 
-    return {
-        ...resolvedTarget,
-        webhookConfig: {
-            ...resolvedTarget.webhookConfig,
-            secret: persistedSecret || undefined,
-            secretMasked: undefined,
-            hasSecret: Boolean(persistedSecret),
-        },
-    };
+        return {
+            ...resolvedTarget,
+            webhookConfig: {
+                ...resolvedTarget.webhookConfig,
+                secret: persistedSecret || undefined,
+                secretMasked: undefined,
+                hasSecret: Boolean(persistedSecret),
+            },
+        };
+    } catch (error) {
+        console.error("[sanitizeTarget] Error sanitizing webhook config:", {
+            error: error instanceof Error ? error.message : String(error),
+            hasInputSecret: !!target?.webhookConfig?.secret,
+            encryptionEnabled: options?.encryptWebhookSecret,
+        });
+        throw error;
+    }
 }
 
 function sanitizeBrief(brief: Partial<BlogStudioBrief> | undefined, fallback: BlogStudioBrief): BlogStudioBrief {
@@ -9469,6 +9478,14 @@ export async function upsertBlogStudioSettingsImpl(
     // can still result in one client's changes being lost if they read/modify in parallel.
     // For critical financial/compliance data, consider adding optimistic locking with version fields.
     try {
+        console.log("[UPSERT-SETTINGS] Saving webhook config:", {
+            type: nextSettings.publishing.defaultTarget.type,
+            label: nextSettings.publishing.defaultTarget.label,
+            hasWebhookConfig: !!nextSettings.publishing.defaultTarget.webhookConfig,
+            webhookUrl: nextSettings.publishing.defaultTarget.webhookConfig?.url,
+            hasSecret: !!nextSettings.publishing.defaultTarget.webhookConfig?.secret,
+        });
+
         await BlogStudioSettingsModel.updateOne(
             { agencyId: agency.id },
             {
@@ -9482,6 +9499,11 @@ export async function upsertBlogStudioSettingsImpl(
         );
     } catch (updateError) {
         const errorMsg = updateError instanceof Error ? updateError.message : "Unknown error";
+        console.error("[UPSERT-SETTINGS] Database error details:", {
+            error: errorMsg,
+            stack: updateError instanceof Error ? updateError.stack : undefined,
+            targetType: nextSettings.publishing.defaultTarget.type,
+        });
         blogLog("UPSERT-SETTINGS", "Database error", { error: errorMsg });
         throw new Error(`Failed to save AI Blogger settings: ${errorMsg}`);
     }

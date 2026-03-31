@@ -5,10 +5,6 @@
 
 import * as fs from "fs/promises";
 import * as path from "path";
-import { connectDB } from "./mongodb";
-
-// MongoDB collection for generation logs
-let GenerationLogModel: any;
 
 export interface StepLog {
   stepNumber: number;
@@ -240,7 +236,7 @@ export class AIBloggerGenerationLogger {
 
     console.log("═".repeat(80) + "\n");
 
-    // Save to files if enabled (local development)
+    // Save to files if enabled (local development only - Vercel has ephemeral storage)
     if (this.enableFileLogging) {
       try {
         await fs.mkdir(this.logsDir, { recursive: true });
@@ -280,18 +276,8 @@ export class AIBloggerGenerationLogger {
       }
     }
 
-    // Save to MongoDB (works on Vercel + local)
-    try {
-      await connectDB();
-      const collection = (await import("./mongodb")).db.collection("blog_generation_logs");
-      await collection.insertOne({
-        ...this.currentRun,
-        savedAt: new Date(),
-      });
-      console.log(`[GENERATION-LOG] 💾 Logs saved to MongoDB (ID: ${this.currentRun.jobId})`);
-    } catch (err) {
-      console.error("[GENERATION-LOG] Error saving to MongoDB:", err);
-    }
+    // Console output serves as primary log on Vercel (check Vercel Function Logs)
+    console.log(`[GENERATION-LOG] ✅ Generation run completed (${this.currentRun.jobId})`)
   }
 
   private generateTxtReport(): string {
