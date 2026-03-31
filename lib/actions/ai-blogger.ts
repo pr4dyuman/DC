@@ -7490,7 +7490,7 @@ export async function generateBlogStudioDraftImpl(
     // Initialize generation logger
     if (jobId) {
         await generationLogger.startRun(jobId, agency.id, agency.name || "Unknown", actor.id, {
-            mode: input.brief.sourceMode,
+            mode: input.brief.sourceMode || "website",
             sourceValue: input.brief.sourceValue,
             wordCount: input.wordCount || 2000,
             title: input.title || undefined,
