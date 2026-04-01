@@ -364,9 +364,6 @@ export function AIBloggerSettingsWorkspace({
     const [isDocModalOpen, setIsDocModalOpen] = useState(false);
     const [oauthRefreshKey, setOAuthRefreshKey] = useState(0);
 
-    const [tone, setTone] = useState(settings.brandVoice.tone);
-    const [audience, setAudience] = useState(settings.brandVoice.audience);
-    const [ctaStyle, setCtaStyle] = useState(settings.brandVoice.ctaStyle);
     const [bannedTerms, setBannedTerms] = useState(settings.brandVoice.bannedTerms.join(", "));
 
     const [defaultTargetType, setDefaultTargetType] = useState<BlogStudioTargetType>(settings.publishing.defaultTarget.type);
@@ -478,13 +475,13 @@ export function AIBloggerSettingsWorkspace({
         "brand",
         () => upsertBlogStudioSettings({
             brandVoice: {
-                tone,
-                audience,
-                ctaStyle,
+                tone: "",
+                audience: "",
+                ctaStyle: "",
                 bannedTerms: splitCommaList(bannedTerms),
             },
         }),
-        "Brand voice saved",
+        "Editorial guardrails saved",
     );
 
     const savePublishing = () => {
@@ -636,9 +633,9 @@ export function AIBloggerSettingsWorkspace({
                         sourceMode: scheduleSourceMode,
                         sourceValue: scheduleSourceValue,
                         trendFocus: scheduleTrendFocus,
-                        audience,
-                        tone,
-                        cta: ctaStyle,
+                        audience: "",
+                        tone: "",
+                        cta: "",
                         primaryKeyword: scheduleKeyword,
                         language: defaultLanguage,
                         location: defaultLocation,
@@ -769,7 +766,7 @@ export function AIBloggerSettingsWorkspace({
                     {([
                         { icon: Target, label: "Target", value: settings.publishing.defaultTarget.label },
                         { icon: Globe2, label: "Publish mode", value: getBlogStudioPublishModeLabel(settings.publishing.publishMode) },
-                        { icon: Bot, label: "Audience", value: settings.brandVoice.audience },
+                        { icon: Bot, label: "Voice mode", value: "Context-driven AI" },
                         { icon: CalendarClock, label: "Active schedules", value: String(activeSchedules) },
                     ] as const).map((item) => (
                         <AIBloggerGlassCard key={item.label} className="p-4">
@@ -808,26 +805,15 @@ export function AIBloggerSettingsWorkspace({
                                         <Bot className="h-5 w-5" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-semibold">Brand Voice</h3>
+                                        <h3 className="text-lg font-semibold">Editorial Guardrails</h3>
                                         <p className="text-sm text-muted-foreground">
-                                            Set the default tone, audience, CTA style, and restricted phrases for new drafts.
+                                            AI now infers audience, tone, and CTA from the source context. Use guardrails here only to block wording you never want in drafts.
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="ai-blogger-tone">Tone</Label>
-                                        <Input id="ai-blogger-tone" value={tone} onChange={(event) => setTone(event.target.value)} className="h-12 rounded-2xl border-border/60 bg-background/60" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="ai-blogger-audience">Audience</Label>
-                                        <Input id="ai-blogger-audience" value={audience} onChange={(event) => setAudience(event.target.value)} className="h-12 rounded-2xl border-border/60 bg-background/60" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="ai-blogger-cta">CTA Style</Label>
-                                        <Input id="ai-blogger-cta" value={ctaStyle} onChange={(event) => setCtaStyle(event.target.value)} className="h-12 rounded-2xl border-border/60 bg-background/60" />
-                                    </div>
+                                <div className="rounded-[22px] border border-border/60 bg-background/50 px-4 py-4 text-sm leading-6 text-muted-foreground">
+                                    Audience, tone, and CTA are inferred inside the existing AI Brief Pack step using website intelligence, SERP intent, grounded research, and business fit.
                                 </div>
 
                                 <div className="space-y-2">
@@ -852,7 +838,7 @@ export function AIBloggerSettingsWorkspace({
                                         ) : (
                                             <>
                                                 <Save className="h-4 w-4" />
-                                                Save Brand Voice
+                                                Save Guardrails
                                             </>
                                         )}
                                     </AIBloggerGradientButton>

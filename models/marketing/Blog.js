@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { getMarketingDbConnectionHandle } from '@/lib/marketing-db';
 
 const BlogSchema = new mongoose.Schema({
   title: {
@@ -9,6 +10,10 @@ const BlogSchema = new mongoose.Schema({
   slug: {
     type: String,
     unique: true,
+    trim: true,
+  },
+  sourcePostId: {
+    type: String,
     trim: true,
   },
   content: {
@@ -64,6 +69,12 @@ const BlogSchema = new mongoose.Schema({
         type: String,
         trim: true,
       },
+    },
+  ],
+  peopleAlsoAsk: [
+    {
+      type: String,
+      trim: true,
     },
   ],
   schemaMarkup: {
@@ -148,6 +159,7 @@ const BlogSchema = new mongoose.Schema({
 BlogSchema.pre('save', async function() {
   this.updatedAt = new Date();
   if (this.title && !this.slug) {
+    const BlogModel = this.constructor;
     let baseSlug = this.title
       .toLowerCase()
       .trim()
@@ -156,7 +168,7 @@ BlogSchema.pre('save', async function() {
       .replace(/^-+|-+$/g, '');
     let slug = baseSlug;
     let counter = 1;
-    while (await mongoose.models.Blog?.exists({ slug, _id: { $ne: this._id } })) {
+    while (await BlogModel.exists({ slug, _id: { $ne: this._id } })) {
       slug = `${baseSlug}-${counter}`;
       counter++;
     }
@@ -171,5 +183,8 @@ BlogSchema.index({ createdAt: -1 }); // For sorting by date
 BlogSchema.index({ status: 1 }); // For filtering by status
 BlogSchema.index({ category: 1 }); // For filtering by category
 BlogSchema.index({ contentClusterId: 1, createdAt: -1 }); // For sorted cluster queries
+BlogSchema.index({ sourcePostId: 1 }, { unique: true, sparse: true }); // Stable webhook upserts
 
-export default mongoose.models.Blog || mongoose.model('Blog', BlogSchema);
+const marketingConnection = getMarketingDbConnectionHandle();
+
+export default marketingConnection.models.Blog || marketingConnection.model('Blog', BlogSchema);

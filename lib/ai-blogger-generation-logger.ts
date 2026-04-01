@@ -1,15 +1,18 @@
 /**
  * Comprehensive logging system for blog generation pipeline
- * Logs all 15 steps with INPUT-PROCESS-OUTPUT to both console and files
+ * Logs the full staged workflow with INPUT-PROCESS-OUTPUT to both console and files
  */
 
 import * as fs from "fs/promises";
 import * as path from "path";
 
+type StepStatus = "pending" | "in-progress" | "completed" | "failed" | "skipped";
+type StepCompletionStatus = "completed" | "failed" | "skipped";
+
 export interface StepLog {
   stepNumber: number;
   stepName: string;
-  status: "pending" | "in-progress" | "completed" | "failed" | "skipped";
+  status: StepStatus;
   input: Record<string, any>;
   process: {
     startedAt: string;
@@ -21,6 +24,7 @@ export interface StepLog {
     summary: string;
     data?: Record<string, any>;
     metrics?: Record<string, any>;
+    rawText?: string;
   };
   errors?: string[];
 }
@@ -55,6 +59,12 @@ export interface GenerationRunLog {
     seoScore: number;
     internalLinks: number;
     faqItems: number;
+  };
+  failure?: {
+    message: string;
+    stepName?: string;
+    stepNumber?: number;
+    recordedAt: string;
   };
 }
 
@@ -109,7 +119,7 @@ export class AIBloggerGenerationLogger {
       },
     };
 
-    console.log(`\n[GENERATION-LOG] 🚀 Starting generation run: ${jobId}`);
+    console.log(`\n[GENERATION-LOG] Starting generation run: ${jobId}`);
     console.log(`[GENERATION-LOG] Agency: ${agencyName} (${agencyId})`);
     console.log(`[GENERATION-LOG] Mode: ${input.mode} | Source: ${input.sourceValue}`);
     console.log(`[GENERATION-LOG] Word target: ${input.wordCount}`);
@@ -129,10 +139,13 @@ export class AIBloggerGenerationLogger {
       summary: string;
       data?: Record<string, any>;
       metrics?: Record<string, any>;
+      rawText?: string;
+      status?: StepCompletionStatus;
     },
     errors?: string[]
   ) {
-    const status = errors?.length ? "failed" : output?.data ? "completed" : "skipped";
+    const status: StepStatus =
+      output.status || (errors?.length ? "failed" : output?.data ? "completed" : "skipped");
 
     const step: StepLog = {
       stepNumber,
@@ -149,13 +162,13 @@ export class AIBloggerGenerationLogger {
         summary: output.summary,
         data: output.data,
         metrics: output.metrics,
+        rawText: output.rawText,
       },
       errors,
     };
 
     this.currentRun.steps.push(step);
 
-    // Update metrics
     if (output.metrics?.tokensIn) {
       this.currentRun.metrics.totalTokensIn += output.metrics.tokensIn;
     }
@@ -179,21 +192,25 @@ export class AIBloggerGenerationLogger {
       this.currentRun.metrics.fallbacksUsed++;
     }
 
-    // Console output
-    const statusIcon =
-      status === "completed" ? "✅" : status === "failed" ? "❌" : status === "skipped" ? "⏭️" : "⏳";
-    console.log(
-      `\n[STEP ${stepNumber}] ${statusIcon} ${stepName} | Duration: ${process.durationMs}ms`
-    );
-    console.log(`  📥 INPUT: ${JSON.stringify(input).substring(0, 100)}...`);
-    console.log(`  ⚙️  PROCESS: ${output.summary}`);
+    const statusLabel =
+      status === "completed"
+        ? "OK"
+        : status === "failed"
+          ? "FAILED"
+          : status === "skipped"
+            ? "SKIPPED"
+            : "RUNNING";
+    console.log(`\n[STEP ${stepNumber}] [${statusLabel}] ${stepName} | Duration: ${process.durationMs}ms`);
+    console.log(`  INPUT: ${this.truncateForConsole(JSON.stringify(input), 180)}`);
+    console.log(`  SUMMARY: ${output.summary}`);
     if (output.metrics) {
-      console.log(
-        `  📊 METRICS: Tokens IN=${output.metrics.tokensIn} OUT=${output.metrics.tokensOut}`
-      );
+      console.log(`  METRICS: Tokens IN=${output.metrics.tokensIn} OUT=${output.metrics.tokensOut}`);
+    }
+    if (output.rawText) {
+      console.log(`  RAW OUTPUT: ${this.truncateForConsole(output.rawText, 180)}`);
     }
     if (errors?.length) {
-      console.log(`  ❌ ERRORS: ${errors.join(" | ")}`);
+      console.log(`  ERRORS: ${errors.join(" | ")}`);
     }
   }
 
@@ -207,16 +224,27 @@ export class AIBloggerGenerationLogger {
     this.currentRun.finalDraft = data;
   }
 
+  setFailure(data: {
+    message: string;
+    stepName?: string;
+    stepNumber?: number;
+  }) {
+    this.currentRun.failure = {
+      ...data,
+      recordedAt: new Date().toISOString(),
+    };
+  }
+
   async finalize(status: "completed" | "failed") {
     this.currentRun.completedAt = new Date().toISOString();
     this.currentRun.status = status;
     this.currentRun.metrics.totalDurationMs =
       new Date(this.currentRun.completedAt).getTime() - new Date(this.currentRun.startedAt).getTime();
 
-    console.log("\n" + "═".repeat(80));
-    console.log("📊 FINAL METRICS");
-    console.log("═".repeat(80));
-    console.log(`Status: ${status === "completed" ? "✅ SUCCESS" : "❌ FAILED"}`);
+    console.log("\n" + "=".repeat(80));
+    console.log("FINAL METRICS");
+    console.log("=".repeat(80));
+    console.log(`Status: ${status === "completed" ? "SUCCESS" : "FAILED"}`);
     console.log(`Total duration: ${this.formatMs(this.currentRun.metrics.totalDurationMs)}`);
     console.log(`Steps completed: ${this.currentRun.metrics.stepsCompleted}/${this.currentRun.steps.length}`);
     console.log(`Steps failed: ${this.currentRun.metrics.stepsFailed}`);
@@ -226,7 +254,7 @@ export class AIBloggerGenerationLogger {
     console.log(`Fallbacks used: ${this.currentRun.metrics.fallbacksUsed}`);
 
     if (this.currentRun.finalDraft) {
-      console.log(`\n📝 DRAFT STATS:`);
+      console.log(`\nDRAFT STATS:`);
       console.log(`  Title: "${this.currentRun.finalDraft.title}"`);
       console.log(`  Word count: ${this.currentRun.finalDraft.wordCount}`);
       console.log(`  SEO score: ${this.currentRun.finalDraft.seoScore}/100`);
@@ -234,9 +262,15 @@ export class AIBloggerGenerationLogger {
       console.log(`  FAQ items: ${this.currentRun.finalDraft.faqItems}`);
     }
 
-    console.log("═".repeat(80) + "\n");
+    if (this.currentRun.failure) {
+      console.log(`\nFAILURE: ${this.currentRun.failure.message}`);
+      if (this.currentRun.failure.stepName) {
+        console.log(`Failure step: ${this.currentRun.failure.stepName}`);
+      }
+    }
 
-    // Save to files if enabled (local development only - Vercel has ephemeral storage)
+    console.log("=".repeat(80) + "\n");
+
     if (this.enableFileLogging) {
       try {
         await fs.mkdir(this.logsDir, { recursive: true });
@@ -251,17 +285,19 @@ export class AIBloggerGenerationLogger {
         const timelineContent = this.generateTimeline();
         await fs.writeFile(path.join(this.logsDir, "timeline.txt"), timelineContent);
 
-        if (this.currentRun.metrics.stepsFailed > 0) {
+        if (this.currentRun.status === "failed") {
           const diagnostics = {
             generationJobId: this.currentRun.jobId,
             agencyId: this.currentRun.agencyId,
+            status: this.currentRun.status,
+            failure: this.currentRun.failure,
             failedSteps: this.currentRun.steps
-              .filter((s) => s.status === "failed")
-              .map((s) => ({
-                step: s.stepNumber,
-                name: s.stepName,
-                errors: s.errors,
-                timestamp: s.process.completedAt,
+              .filter((step) => step.status === "failed")
+              .map((step) => ({
+                step: step.stepNumber,
+                name: step.stepName,
+                errors: step.errors,
+                timestamp: step.process.completedAt,
               })),
           };
           await fs.writeFile(
@@ -270,32 +306,37 @@ export class AIBloggerGenerationLogger {
           );
         }
 
-        console.log(`[GENERATION-LOG] 📁 Logs saved to: ${this.logsDir}`);
+        console.log(`[GENERATION-LOG] Logs saved to: ${this.logsDir}`);
       } catch (err) {
         console.error("[GENERATION-LOG] Error saving log files:", err);
       }
     }
 
-    // Console output serves as primary log on Vercel (check Vercel Function Logs)
-    console.log(`[GENERATION-LOG] ✅ Generation run completed (${this.currentRun.jobId})`)
+    console.log(`[GENERATION-LOG] Generation run completed (${this.currentRun.jobId})`);
   }
 
   private generateTxtReport(): string {
     const lines: string[] = [];
 
-    lines.push("═".repeat(80));
+    lines.push("=".repeat(80));
     lines.push("  AI BLOGGER GENERATION RUN");
-    lines.push("═".repeat(80));
+    lines.push("=".repeat(80));
     lines.push("");
     lines.push(`Job ID:      ${this.currentRun.jobId}`);
     lines.push(`Agency:      ${this.currentRun.agencyName} (${this.currentRun.agencyId})`);
     lines.push(`Started:     ${this.currentRun.startedAt}`);
     lines.push(`Completed:   ${this.currentRun.completedAt}`);
-    lines.push(`Status:      ${this.currentRun.status === "completed" ? "✅ SUCCESS" : "❌ FAILED"}`);
+    lines.push(`Status:      ${this.currentRun.status === "completed" ? "SUCCESS" : "FAILED"}`);
+    if (this.currentRun.failure) {
+      lines.push(`Failure:     ${this.currentRun.failure.message}`);
+      if (this.currentRun.failure.stepName) {
+        lines.push(`Failed at:   ${this.currentRun.failure.stepName}`);
+      }
+    }
     lines.push("");
 
     lines.push("INPUT");
-    lines.push("─".repeat(80));
+    lines.push("-".repeat(80));
     lines.push(`  Mode:          ${this.currentRun.input.mode}`);
     lines.push(`  Source:        ${this.currentRun.input.sourceValue}`);
     lines.push(`  Word target:   ${this.currentRun.input.wordCount}`);
@@ -304,20 +345,11 @@ export class AIBloggerGenerationLogger {
     }
     lines.push("");
 
-    // Log each step
     for (const step of this.currentRun.steps) {
       lines.push("");
-      lines.push("─".repeat(80));
-      const stepIcon =
-        step.status === "completed"
-          ? "✅"
-          : step.status === "failed"
-            ? "❌"
-            : step.status === "skipped"
-              ? "⏭️"
-              : "⏳";
-      lines.push(`STEP ${step.stepNumber} ${stepIcon} ${step.stepName}`);
-      lines.push("─".repeat(80));
+      lines.push("-".repeat(80));
+      lines.push(`STEP ${step.stepNumber} [${step.status.toUpperCase()}] ${step.stepName}`);
+      lines.push("-".repeat(80));
 
       lines.push(`STATUS:       ${step.status.toUpperCase()}`);
       lines.push(`Duration:     ${step.process.durationMs}ms`);
@@ -325,18 +357,14 @@ export class AIBloggerGenerationLogger {
       if (Object.keys(step.input).length > 0) {
         lines.push(`\nINPUT:`);
         for (const [key, value] of Object.entries(step.input)) {
-          const displayValue =
-            typeof value === "object" ? JSON.stringify(value).substring(0, 60) : String(value);
-          lines.push(`  ${key}: ${displayValue}`);
+          this.appendKeyValueLines(lines, key, value);
         }
       }
 
       if (Object.keys(step.process.details).length > 0) {
         lines.push(`\nPROCESS DETAILS:`);
         for (const [key, value] of Object.entries(step.process.details)) {
-          const displayValue =
-            typeof value === "object" ? JSON.stringify(value).substring(0, 60) : String(value);
-          lines.push(`  ${key}: ${displayValue}`);
+          this.appendKeyValueLines(lines, key, value);
         }
       }
 
@@ -346,14 +374,14 @@ export class AIBloggerGenerationLogger {
       if (step.output.metrics) {
         lines.push(`\nMETRICS:`);
         for (const [key, value] of Object.entries(step.output.metrics)) {
-          lines.push(`  ${key}: ${value}`);
+          this.appendKeyValueLines(lines, key, value);
         }
       }
 
       if (step.errors && step.errors.length > 0) {
         lines.push(`\nERRORS:`);
         for (const error of step.errors) {
-          lines.push(`  ❌ ${error}`);
+          lines.push(`  - ${error}`);
         }
       }
 
@@ -364,12 +392,19 @@ export class AIBloggerGenerationLogger {
           lines.push(`  ${line}`);
         }
       }
+
+      if (step.output.rawText) {
+        lines.push(`\nRAW MODEL OUTPUT:`);
+        for (const line of step.output.rawText.split("\n")) {
+          lines.push(`  ${line}`);
+        }
+      }
     }
 
     lines.push("");
-    lines.push("═".repeat(80));
+    lines.push("=".repeat(80));
     lines.push("FINAL METRICS");
-    lines.push("═".repeat(80));
+    lines.push("=".repeat(80));
     lines.push(`Total duration:     ${this.formatMs(this.currentRun.metrics.totalDurationMs)}`);
     lines.push(`Steps completed:    ${this.currentRun.metrics.stepsCompleted}/${this.currentRun.steps.length}`);
     lines.push(`Steps failed:       ${this.currentRun.metrics.stepsFailed}`);
@@ -380,9 +415,9 @@ export class AIBloggerGenerationLogger {
 
     if (this.currentRun.finalDraft) {
       lines.push("");
-      lines.push("─".repeat(80));
+      lines.push("-".repeat(80));
       lines.push("DRAFT STATISTICS");
-      lines.push("─".repeat(80));
+      lines.push("-".repeat(80));
       lines.push(`Title:              ${this.currentRun.finalDraft.title}`);
       lines.push(`Word count:         ${this.currentRun.finalDraft.wordCount}`);
       lines.push(`SEO score:          ${this.currentRun.finalDraft.seoScore}/100`);
@@ -391,9 +426,9 @@ export class AIBloggerGenerationLogger {
     }
 
     lines.push("");
-    lines.push("═".repeat(80));
-    lines.push(`  STATUS: ${this.currentRun.status === "completed" ? "✅ GENERATION SUCCESSFUL" : "❌ GENERATION FAILED"}`);
-    lines.push("═".repeat(80));
+    lines.push("=".repeat(80));
+    lines.push(`  STATUS: ${this.currentRun.status === "completed" ? "GENERATION SUCCESSFUL" : "GENERATION FAILED"}`);
+    lines.push("=".repeat(80));
 
     return lines.join("\n");
   }
@@ -402,7 +437,7 @@ export class AIBloggerGenerationLogger {
     const lines: string[] = [];
 
     lines.push("BLOG GENERATION TIMELINE");
-    lines.push("═".repeat(80));
+    lines.push("=".repeat(80));
     lines.push("");
     lines.push(`Job ID: ${this.currentRun.jobId}`);
     lines.push(`Started: ${this.currentRun.startedAt}`);
@@ -413,29 +448,28 @@ export class AIBloggerGenerationLogger {
     let cumulativeMs = 0;
     for (const step of this.currentRun.steps) {
       cumulativeMs += step.process.durationMs || 0;
-      const icon =
+      const statusLabel =
         step.status === "completed"
-          ? "✅"
+          ? "OK"
           : step.status === "failed"
-            ? "❌"
+            ? "FAIL"
             : step.status === "skipped"
-              ? "⏭️"
-              : "⏳";
+              ? "SKIP"
+              : "RUN";
       const durationStr = this.formatMs(step.process.durationMs || 0);
       const cumulativeStr = this.formatMs(cumulativeMs);
 
       lines.push(
-        `${icon} Step ${step.stepNumber.toString().padStart(2)} | ${step.stepName.padEnd(25)} | ${durationStr.padStart(8)} | Cumulative: ${cumulativeStr}`
+        `[${statusLabel}] Step ${step.stepNumber.toString().padStart(2)} | ${step.stepName.padEnd(25)} | ${durationStr.padStart(8)} | Cumulative: ${cumulativeStr}`
       );
     }
 
     lines.push("");
-    lines.push("─".repeat(80));
+    lines.push("-".repeat(80));
     lines.push(
       `Total: ${this.formatMs(this.currentRun.metrics.totalDurationMs)} (${this.currentRun.metrics.stepsCompleted} steps, ${this.currentRun.metrics.stepsFailed} failed)`
     );
 
-    // Find slowest step
     const sortedByDuration = [...this.currentRun.steps].sort(
       (a, b) => (b.process.durationMs || 0) - (a.process.durationMs || 0)
     );
@@ -444,9 +478,7 @@ export class AIBloggerGenerationLogger {
       lines.push("Slowest steps:");
       for (let i = 0; i < Math.min(3, sortedByDuration.length); i++) {
         const step = sortedByDuration[i];
-        lines.push(
-          `  ${i + 1}. ${step.stepName} - ${this.formatMs(step.process.durationMs || 0)}`
-        );
+        lines.push(`  ${i + 1}. ${step.stepName} - ${this.formatMs(step.process.durationMs || 0)}`);
       }
     }
 
@@ -459,8 +491,34 @@ export class AIBloggerGenerationLogger {
     }
     return `${(ms / 1000).toFixed(1)}s`;
   }
+
+  private truncateForConsole(value: string, maxLength: number): string {
+    if (value.length <= maxLength) {
+      return value;
+    }
+    return `${value.slice(0, maxLength)}...`;
+  }
+
+  private appendKeyValueLines(lines: string[], key: string, value: unknown) {
+    if (
+      value === null ||
+      value === undefined ||
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
+      lines.push(`  ${key}: ${String(value)}`);
+      return;
+    }
+
+    lines.push(`  ${key}:`);
+    const serialized = JSON.stringify(value, null, 2);
+    for (const line of serialized.split("\n")) {
+      lines.push(`    ${line}`);
+    }
+  }
 }
 
 export const generationLogger = new AIBloggerGenerationLogger(
-  process.env.NODE_ENV !== 'production' // Only enable file logging in development
+  process.env.NODE_ENV !== "production"
 );

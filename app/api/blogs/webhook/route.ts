@@ -8,8 +8,10 @@ import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 import dbConnect from "@/lib/marketing-db";
+import { normalizeMarketingCanonicalUrl, normalizeMarketingImageSrc } from "@/lib/marketing-blog-utils";
 import { decryptApiKey } from "@/lib/mongodb";
 import Blog from "@/models/marketing/Blog";
+import BlogPublishingAudit from "@/models/marketing/BlogPublishingAudit";
 
 /**
  * Type for incoming webhook payload
@@ -22,6 +24,7 @@ type IncomingWebhookPayload = {
         slug: string;
         content: string;
         excerpt: string;
+        metaKeywords?: string;
         metaTitle: string;
         metaDescription: string;
         canonicalUrl: string;
@@ -29,6 +32,11 @@ type IncomingWebhookPayload = {
         imageAlt: string;
         schemaMarkup?: string;
         category?: string;
+        faqItems?: Array<{
+            question?: string;
+            answer?: string;
+        }>;
+        peopleAlsoAsk?: string[];
         internalLinks?: Array<{
             href: string;
             title: string;
@@ -55,6 +63,32 @@ function hasNonEmptyString(value: unknown): value is string {
 function isValidDateString(value: string): boolean {
     const date = new Date(value);
     return !Number.isNaN(date.getTime());
+}
+
+function normalizeFaqItems(
+    items?: Array<{ question?: string; answer?: string }>,
+) {
+    if (!Array.isArray(items)) {
+        return [];
+    }
+
+    return items
+        .map((item) => ({
+            question: hasNonEmptyString(item?.question) ? item.question.trim() : "",
+            answer: hasNonEmptyString(item?.answer) ? item.answer.trim() : "",
+        }))
+        .filter((item) => item.question && item.answer);
+}
+
+function normalizeQuestionList(items?: string[]) {
+    if (!Array.isArray(items)) {
+        return [];
+    }
+
+    return items
+        .filter((item) => hasNonEmptyString(item))
+        .map((item) => item.trim())
+        .filter(Boolean);
 }
 
 let cachedMainMongoClientPromise: Promise<MongoClient> | null = null;
@@ -289,36 +323,65 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Invalid payload structure" }, { status: 400 });
         }
 
-        // Log incoming webhook
+        // Log incoming webhook with data completeness check
         console.log("[Webhook] Received blog", {
             event: payload.event,
             title: payload.blog.title,
             slug: payload.blog.slug,
             source: payload.source?.agencyName || "Unknown",
+            dataCheck: {
+                hasFaqItems: (payload.blog.faqItems?.length || 0) > 0,
+                faqCount: payload.blog.faqItems?.length || 0,
+                hasPeopleAlsoAsk: (payload.blog.peopleAlsoAsk?.length || 0) > 0,
+                paaCount: payload.blog.peopleAlsoAsk?.length || 0,
+                hasInternalLinks: (payload.blog.internalLinks?.length || 0) > 0,
+                linkCount: payload.blog.internalLinks?.length || 0,
+                hasSchemaMarkup: !!payload.blog.schemaMarkup,
+                hasContentCluster: !!payload.blog.contentClusterId,
+                contentLength: payload.blog.content?.length || 0,
+            },
         });
 
         // Connect to database
         await dbConnect();
 
-        // Check if blog already exists by slug
-        const existingBlog = await Blog.findOne({ slug: payload.blog.slug });
-        const isUpdate = !!existingBlog;
-
         // Prepare blog data
+        const normalizedImage = normalizeMarketingImageSrc(payload.blog.image);
+        const normalizedCanonicalUrl = normalizeMarketingCanonicalUrl(
+            payload.blog.canonicalUrl,
+            payload.blog.slug,
+        );
+        const normalizedFaqItems = normalizeFaqItems(payload.blog.faqItems);
+        const normalizedPeopleAlsoAsk = normalizeQuestionList(payload.blog.peopleAlsoAsk);
+        const normalizedSourcePostId = hasNonEmptyString(payload.blog.id)
+            ? payload.blog.id.trim()
+            : "";
+
+        const existingBlog =
+            (normalizedSourcePostId
+                ? await Blog.findOne({ sourcePostId: normalizedSourcePostId })
+                : null) ||
+            await Blog.findOne({ slug: payload.blog.slug });
+        const isUpdate = !!existingBlog;
+        const previousSlug = existingBlog?.slug || "";
+
         const blogData = {
+            sourcePostId: normalizedSourcePostId || undefined,
             title: payload.blog.title,
             slug: payload.blog.slug,
             content: payload.blog.content,
-            image: payload.blog.image,
+            image: normalizedImage,
             imageAlt: payload.blog.imageAlt || payload.blog.title,
             shortDescription: payload.blog.excerpt,
             category: payload.blog.category || "AI Blogger",
             status: "published",
-            metaKeywords: "",
+            metaKeywords: hasNonEmptyString(payload.blog.metaKeywords) ? payload.blog.metaKeywords.trim() : "",
             metaTitle: payload.blog.metaTitle,
             metaDescription: payload.blog.metaDescription,
-            canonicalUrl: payload.blog.canonicalUrl,
+            canonicalUrl: normalizedCanonicalUrl,
             schemaMarkup: payload.blog.schemaMarkup,
+            faqItems: normalizedFaqItems,
+            peopleAlsoAsk: normalizedPeopleAlsoAsk,
             internalLinks: payload.blog.internalLinks || [],
             contentClusterId: payload.blog.contentClusterId,
             parentTopicSlug: payload.blog.parentTopicSlug,
@@ -330,10 +393,15 @@ export async function POST(request: NextRequest) {
 
         if (isUpdate) {
             // Update existing blog
-            savedBlog = await Blog.findOneAndUpdate({ slug: payload.blog.slug }, blogData, { returnDocument: 'after' });
+            savedBlog = await Blog.findByIdAndUpdate(
+                existingBlog._id,
+                blogData,
+                { returnDocument: 'after' },
+            );
             console.log("[Webhook] Updated blog", {
                 slug: payload.blog.slug,
                 duration: `${Date.now() - startTime}ms`,
+                sourcePostId: normalizedSourcePostId || "missing",
             });
         } else {
             // Create new blog
@@ -341,12 +409,54 @@ export async function POST(request: NextRequest) {
             console.log("[Webhook] Created blog", {
                 slug: payload.blog.slug,
                 duration: `${Date.now() - startTime}ms`,
+                sourcePostId: normalizedSourcePostId || "missing",
             });
+        }
+
+        // Create publishing audit record
+        try {
+            const auditData = {
+                blogSlug: payload.blog.slug,
+                blogId: savedBlog._id,
+                sourcePostId: payload.blog.id,
+                agencyId: payload.source?.agencyId || "unknown",
+                agencyName: payload.source?.agencyName || "Unknown",
+                publishingEvent: payload.event || "blog.published",
+                publishedByAIBlogger: payload.source?.publishedAt ? new Date(payload.source.publishedAt) : new Date(),
+                receivedByDC: new Date(),
+                webhookStatus: "success",
+                contentSnapshot: {
+                    title: payload.blog.title,
+                    wordCount: payload.blog.content?.split(/\s+/).length || 0,
+                    hasInternalLinks: (payload.blog.internalLinks?.length || 0) > 0,
+                    internalLinkCount: payload.blog.internalLinks?.length || 0,
+                    hasFaqItems: (payload.blog.faqItems?.length || 0) > 0,
+                    faqItemCount: payload.blog.faqItems?.length || 0,
+                    hasSchemaMarkup: !!payload.blog.schemaMarkup,
+                    metaKeywordsCount: payload.blog.metaKeywords?.split(',').length || 0,
+                },
+                status: "published",
+            };
+
+            await BlogPublishingAudit.create(auditData);
+            console.log("[Webhook] Created audit record", {
+                slug: payload.blog.slug,
+                agencyId: auditData.agencyId,
+            });
+        } catch (auditError) {
+            console.warn("[Webhook] Failed to create audit record (non-blocking)", {
+                slug: payload.blog.slug,
+                error: auditError instanceof Error ? auditError.message : String(auditError),
+            });
+            // Non-blocking error - audit failure shouldn't fail the webhook
         }
 
         // Revalidate blog pages for ISR (Incremental Static Regeneration)
         try {
             revalidatePath("/blog");
+            if (previousSlug && previousSlug !== payload.blog.slug) {
+                revalidatePath(`/blog/${previousSlug}`);
+            }
             revalidatePath(`/blog/${payload.blog.slug}`);
             console.log("[Webhook] Revalidated paths", { slug: payload.blog.slug });
         } catch (revalidateError) {

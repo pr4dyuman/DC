@@ -232,6 +232,10 @@ export default async function AIBloggerPostDetailPage({
         undefined,
         undefined,
         auditScore,
+        {
+            audit: seoAudit,
+            cannibalization: cannibalizationReport,
+        },
     );
     const schemaJsonLd = buildBlogStudioArticleJsonLd(post, {
         author: aiBloggerConfig?.author,

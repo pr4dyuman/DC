@@ -218,9 +218,9 @@ export function AIBloggerPostEditorForm({
     const [content, setContent] = useState(post.content || "");
     const [primaryKeyword, setPrimaryKeyword] = useState(post.brief.primaryKeyword || "");
     const [trendFocus, setTrendFocus] = useState(post.brief.trendFocus || "");
-    const [audience, setAudience] = useState(post.brief.audience || settings.brandVoice.audience);
-    const [tone, setTone] = useState(post.brief.tone || settings.brandVoice.tone);
-    const [cta, setCta] = useState(post.brief.cta || settings.brandVoice.ctaStyle);
+    const [audience, setAudience] = useState(post.brief.audience || "");
+    const [tone, setTone] = useState(post.brief.tone || "");
+    const [cta, setCta] = useState(post.brief.cta || "");
     const [language, setLanguage] = useState(post.brief.language || settings.seo.defaultLanguage);
     const [location, setLocation] = useState(post.brief.location || settings.seo.defaultLocation);
     const [targetType, setTargetType] = useState<BlogStudioTargetType>(post.target.type);
@@ -912,6 +912,7 @@ export function AIBloggerPostEditorForm({
                                 {[
                                     ["Business Fit", draftBrief.businessFitSummary],
                                     ["CTA Goal", draftBrief.ctaGoal],
+                                    ["Tone Direction", draftBrief.toneDirection],
                                     ["Title Direction", draftBrief.titleDirection],
                                     ["Metadata Direction", draftBrief.metadataDirection],
                                 ].map(([label, value]) => value ? (

@@ -140,18 +140,6 @@ export function validateStatusTransition(
         if (settings?.seo?.requireMetaDescription && (!post.metaDescription || !post.metaDescription.trim())) {
             errors.push("Cannot approve: Meta description is required by workspace settings.");
         }
-        // Check word count if settings define it
-        const wordCount = post.wordCount || (post.content?.split(/\s+/).length || 0);
-        if (wordCount < (settings?.seo?.minWords || 300)) {
-            errors.push(
-                `Cannot approve: Content too short (${wordCount} words). Minimum: ${settings?.seo?.minWords || 300} words.`
-            );
-        }
-        if (wordCount > (settings?.seo?.maxWords || 8000)) {
-            errors.push(
-                `Cannot approve: Content too long (${wordCount} words). Maximum: ${settings?.seo?.maxWords || 8000} words.`
-            );
-        }
     } else if (nextStatus === "Scheduled") {
         if (isBlogStudioDraftOnlyMode(settings)) {
             errors.push("Cannot schedule: this workspace is configured for Draft Only publishing.");

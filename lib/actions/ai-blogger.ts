@@ -63,6 +63,12 @@ import { sendWebhookToAgency, buildWebhookPayload, logWebhookDelivery, pingWebho
 import { fetchAIBloggerTrendSignals, type AIBloggerTrendSignals } from "../ai-blogger-trends";
 import { isValidUrl } from "../ai-blogger-url-utils";
 import {
+    normalizeMarketingCanonicalUrl,
+    normalizeMarketingSiteOrigin,
+    toAbsoluteMarketingImageUrl,
+} from "../marketing-blog-utils";
+import { buildMarketingBlogHtml } from "../marketing-blog-content";
+import {
     getAIBloggerWebsiteIntelligence,
     type AIBloggerWebsiteIntelligence,
 } from "../ai-blogger-website-intelligence";
@@ -107,6 +113,7 @@ import type {
     BlogStudioScheduleCadence,
     BlogStudioScheduleLastRunStatus,
     BlogStudioScheduleStatus,
+    BlogStudioSeoAudit,
     BlogStudioSettings,
     BlogStudioTarget,
     BlogStudioPerformanceSyncTrigger,
@@ -217,6 +224,10 @@ type BlogStudioPerformancePromptInsight = {
     refreshOpportunity: BlogStudioRefreshOpportunity;
     similarityScore: number;
 };
+
+const LEGACY_DEFAULT_BRAND_TONE = "Clear, practical, confident";
+const LEGACY_DEFAULT_BRAND_AUDIENCE = "Agency owners, operators, and marketing teams";
+const LEGACY_DEFAULT_CTA_STYLE = "Invite one clear next step without sounding pushy";
 
 const CANNIBALIZATION_STOP_WORDS = new Set([
     "a",
@@ -629,6 +640,13 @@ function sanitizeText(value: string | undefined, maxLength: number, fallback = "
     return value.trim().slice(0, maxLength);
 }
 
+function sanitizeProvidedText(value: string | undefined, maxLength: number, fallback = "") {
+    if (value === undefined) {
+        return fallback;
+    }
+    return value.trim().slice(0, maxLength);
+}
+
 function getPromptAgencyName(agencyName: string | undefined) {
     return sanitizeText(agencyName, 160, DEFAULT_PROMPT_AGENCY_NAME);
 }
@@ -977,6 +995,7 @@ function sanitizeDraftBrief(value: BlogStudioDraftBrief | undefined) {
         businessFitWarnings: sanitizeStringArray(value.businessFitWarnings, 4, 180),
         targetAudience: sanitizeText(value.targetAudience, 180),
         ctaGoal: sanitizeText(value.ctaGoal, 180),
+        toneDirection: sanitizeText(value.toneDirection, 220),
         titleDirection: sanitizeText(value.titleDirection, 220),
         metadataDirection: sanitizeText(value.metadataDirection, 220),
         searchIntent: sanitizeSearchIntent(value.searchIntent),
@@ -991,6 +1010,7 @@ function sanitizeDraftBrief(value: BlogStudioDraftBrief | undefined) {
         businessFitWarnings.length === 0 &&
         !sanitized.targetAudience &&
         !sanitized.ctaGoal &&
+        !sanitized.toneDirection &&
         !sanitized.titleDirection &&
         !sanitized.metadataDirection &&
         !sanitized.searchIntent &&
@@ -1962,9 +1982,9 @@ function getDefaultBlogStudioSettings(agencyId: string, agencyName?: string): Bl
     return {
         agencyId,
         brandVoice: {
-            tone: "Clear, practical, confident",
-            audience: "Agency owners, operators, and marketing teams",
-            ctaStyle: "Invite one clear next step without sounding pushy",
+            tone: "",
+            audience: "",
+            ctaStyle: "",
             bannedTerms: [],
         },
         seo: {
@@ -2242,14 +2262,14 @@ function sanitizeBrief(brief: Partial<BlogStudioBrief> | undefined, fallback: Bl
             brief?.sourceMode === "website" || brief?.sourceMode === "trending" || brief?.sourceMode === "keywords"
                 ? brief.sourceMode
                 : fallback.sourceMode,
-        sourceValue: sanitizeText(brief?.sourceValue, 300, fallback.sourceValue || ""),
-        trendFocus: sanitizeText(brief?.trendFocus, 160, fallback.trendFocus || ""),
-        audience: sanitizeText(brief?.audience, 160, fallback.audience || ""),
-        tone: sanitizeText(brief?.tone, 160, fallback.tone || ""),
-        cta: sanitizeText(brief?.cta, 160, fallback.cta || ""),
-        primaryKeyword: sanitizeText(brief?.primaryKeyword, 120, fallback.primaryKeyword || ""),
-        language: sanitizeText(brief?.language, 12, fallback.language || ""),
-        location: sanitizeText(brief?.location, 12, fallback.location || ""),
+        sourceValue: sanitizeProvidedText(brief?.sourceValue, 300, fallback.sourceValue || ""),
+        trendFocus: sanitizeProvidedText(brief?.trendFocus, 160, fallback.trendFocus || ""),
+        audience: sanitizeProvidedText(brief?.audience, 160, fallback.audience || ""),
+        tone: sanitizeProvidedText(brief?.tone, 160, fallback.tone || ""),
+        cta: sanitizeProvidedText(brief?.cta, 160, fallback.cta || ""),
+        primaryKeyword: sanitizeProvidedText(brief?.primaryKeyword, 120, fallback.primaryKeyword || ""),
+        language: sanitizeProvidedText(brief?.language, 12, fallback.language || ""),
+        location: sanitizeProvidedText(brief?.location, 12, fallback.location || ""),
     };
 }
 
@@ -2437,9 +2457,9 @@ Requested title: ${title}
 Source mode: ${brief.sourceMode}
 Source detail: ${brief.sourceValue}
 Trend focus: ${brief.trendFocus || "Not provided"}
-Audience: ${brief.audience || settings.brandVoice.audience}
-Tone: ${brief.tone || settings.brandVoice.tone}
-CTA style: ${brief.cta || settings.brandVoice.ctaStyle}
+Audience: ${getContextInferredAudience(brief.audience)}
+Tone: ${getContextInferredTone(brief.tone)}
+CTA style: ${getContextInferredCta(brief.cta)}
 Primary keyword: ${brief.primaryKeyword || "Not provided"}
 Language: ${brief.language || settings.seo.defaultLanguage}
 Location: ${brief.location || settings.seo.defaultLocation}
@@ -2466,7 +2486,9 @@ Return JSON only with this exact shape:
 }
 
 Content writing rules — READ CAREFULLY:
-- Write the content field as clean, human-quality editorial prose, NOT raw markdown.
+- Write the content field as structured body copy that can be converted directly into polished blog HTML.
+- Separate paragraphs with one blank line.
+- When you add an internal link, format it as [anchor text](/relative-path) or [anchor text](https://your-domain/path). Never paste a bare URL into the sentence.
 - Use ## for section headings and ### for sub-headings ONLY — never use # (H1) inside the body since the blog title is already the H1.
 - NEVER use em-dashes (—) or double-hyphens (--) as a stylistic device. Replace them with commas, periods, or restructure the sentence.
 - NEVER use bullet-point lists (- item) or numbered lists unless the topic is literally a step-by-step technical tutorial. Prose paragraphs only.
@@ -2576,13 +2598,15 @@ function buildAIBloggerFinalCheckerPrompt(input: {
 Agency: ${getPromptAgencyName(input.agencyName)}
 Title: ${input.draft.title}
 Primary keyword: ${input.draft.brief.primaryKeyword || "not provided"}
-Audience: ${input.draft.draftBrief?.targetAudience || input.draft.brief.audience || input.settings.brandVoice.audience}
-Tone: ${input.draft.brief.tone || input.settings.brandVoice.tone}
-CTA goal: ${input.draft.draftBrief?.ctaGoal || input.draft.brief.cta || input.settings.brandVoice.ctaStyle}
+Audience: ${getContextInferredAudience(input.draft.brief.audience, input.draft.draftBrief?.targetAudience)}
+Tone: ${getContextInferredTone(input.draft.brief.tone, input.draft.draftBrief?.toneDirection)}
+CTA goal: ${getContextInferredCta(input.draft.brief.cta, input.draft.draftBrief?.ctaGoal)}
 Search intent: ${input.draft.searchIntent || "not specified"}
 Content type: ${input.draft.contentType || "not specified"}
 Current score: ${input.audit.score}
 Current blockers: ${input.audit.blockers.join(" | ") || "none"}
+Current word count: ${input.draft.wordCount ?? countWords(input.draft.content)}
+Target word range: ${input.settings.seo.minWords}-${input.settings.seo.maxWords}
 AI-style red flags: ${detectedStyleFlags.join(" | ") || "none detected"}
 Structural auto-fix enabled: ${aiReviewPolicy.autoFixStructuralIssues ? "yes" : "no"}
 Tone auto-fix enabled: ${aiReviewPolicy.autoFixToneMismatch ? "yes" : "no"}
@@ -2663,10 +2687,12 @@ CORE PRESERVATION:
 
 PROSE & STYLE:
   - Vary sentence and paragraph length naturally. Avoid repetitive paragraph rhythm
+  - Keep one blank line between paragraphs so paragraph spacing survives publishing
   - Add concrete specificity: examples, scenarios, data points where the draft feels vague
   - Use second person ("you", "your") to speak directly to the reader
   - Write real closing paragraphs—don't use "In conclusion", "In summary", "In a nutshell"
   - Use ## for section headings and ### for sub-headings only. Never use # inside the body
+  - Keep internal links inline in the body using [anchor text](/path) syntax. Never leave a raw URL visible in a sentence
   - Never use em-dashes (—), double hyphens (--), or corporate buzzwords
 
 METADATA RULES:
@@ -2681,6 +2707,8 @@ STRUCTURE & SECTIONS:
   - Preserve existing internal links when relevant; never reduce below required threshold
   - Do not remove clear CTAs, grounded citation markers, or useful headings unless replacing with a stronger version
   - Ensure all sections flow naturally with transitional sentences, not just isolated headings
+  - Return the full revised article, not a summary, compressed version, or shortened recap
+  - If the current draft already sits inside the target word range, keep the revision within roughly 10% of its current length unless fixing a clear structural problem
 
 KEYWORD & SEO:
   - Keep primary keyword natural, not stuffed. Include naturally in intro, 1 heading, and 1-2 body sections
@@ -2794,7 +2822,8 @@ ${suggestions
 Rules:
 - Include 2 to 3 internal links in the article body when they fit naturally.
 - Prefer service pages for commercial context and blog pages for supporting education.
-- Use or closely adapt the suggested anchor text without making it repetitive.`;
+- Use or closely adapt the suggested anchor text without making it repetitive.
+- Insert links inline as [anchor text](href). Do not paste bare URLs into the body.`;
 }
 
 function getPerformancePromptSignalLabel(
@@ -2975,6 +3004,7 @@ type AdvancedBriefResult = {
     businessFitWarnings: string[];
     targetAudience: string;
     ctaGoal: string;
+    toneDirection: string;
     titleDirection: string;
     metadataDirection: string;
     searchIntent?: BlogStudioPost["searchIntent"];
@@ -3319,6 +3349,7 @@ function parseAdvancedBriefResponse(
     defaults: {
         audience: string;
         ctaGoal: string;
+        toneDirection?: string;
         searchIntent?: BlogStudioPost["searchIntent"];
     },
 ): AdvancedBriefResult {
@@ -3328,6 +3359,7 @@ function parseAdvancedBriefResponse(
         businessFitWarnings?: string[];
         targetAudience?: string;
         ctaGoal?: string;
+        toneDirection?: string;
         titleDirection?: string;
         metadataDirection?: string;
         searchIntent?: BlogStudioPost["searchIntent"];
@@ -3344,6 +3376,7 @@ function parseAdvancedBriefResponse(
         businessFitWarnings: sanitizeStringArray(parsed?.businessFitWarnings, 4, 180),
         targetAudience: sanitizeText(parsed?.targetAudience, 180, defaults.audience),
         ctaGoal: sanitizeText(parsed?.ctaGoal, 180, defaults.ctaGoal),
+        toneDirection: sanitizeText(parsed?.toneDirection, 220, defaults.toneDirection),
         titleDirection: sanitizeText(parsed?.titleDirection, 220),
         metadataDirection: sanitizeText(parsed?.metadataDirection, 220),
         searchIntent: sanitizeSearchIntent(parsed?.searchIntent) || defaults.searchIntent,
@@ -3363,6 +3396,30 @@ function buildBusinessFitRejectionMessage(
     ].filter(Boolean);
 
     return `Topic rejected before drafting because the business fit score is ${score}/${MINIMUM_BUSINESS_FIT_SCORE}. Refine the topic, CTA path, or audience alignment and try again.${detailParts.length > 0 ? ` ${detailParts.join(" ")}` : ""}`;
+}
+
+function getContextInferredAudience(audience?: string, inferredAudience?: string) {
+    const explicitAudience = sanitizeText(audience, 180) === LEGACY_DEFAULT_BRAND_AUDIENCE
+        ? ""
+        : sanitizeText(audience, 180);
+    const derivedAudience = sanitizeText(inferredAudience, 180);
+    return explicitAudience || derivedAudience || "Infer the best-fit audience from the website, offer, search intent, and source context.";
+}
+
+function getContextInferredTone(tone?: string, inferredTone?: string) {
+    const explicitTone = sanitizeText(tone, 220) === LEGACY_DEFAULT_BRAND_TONE
+        ? ""
+        : sanitizeText(tone, 220);
+    const derivedTone = sanitizeText(inferredTone, 220);
+    return explicitTone || derivedTone || "Infer the strongest editorial tone from the business context, website language, and search intent. Keep it human, specific, and commercially relevant.";
+}
+
+function getContextInferredCta(cta?: string, inferredCta?: string) {
+    const explicitCta = sanitizeText(cta, 220) === LEGACY_DEFAULT_CTA_STYLE
+        ? ""
+        : sanitizeText(cta, 220);
+    const derivedCta = sanitizeText(inferredCta, 220);
+    return explicitCta || derivedCta || "Infer the most natural next step from the offer, internal link targets, business fit, and likely reader intent.";
 }
 
 function parseMetadataPackResponse(rawText: string, fallbackTitle: string): MetadataPackResult {
@@ -4064,20 +4121,36 @@ function buildDraftCanonicalUrl(
 function shouldUseFinalCheckerRevision(
     currentDraft: Pick<
         BlogStudioPost,
-        "title" | "metaTitle" | "metaDescription" | "excerpt" | "featuredImageAlt" | "outline" | "internalLinks"
+        "title" | "metaTitle" | "metaDescription" | "excerpt" | "featuredImageAlt" | "outline" | "internalLinks" | "content" | "wordCount"
     >,
     nextDraft: Pick<
         BlogStudioPost,
-        "title" | "metaTitle" | "metaDescription" | "excerpt" | "featuredImageAlt" | "outline" | "internalLinks"
+        "title" | "metaTitle" | "metaDescription" | "excerpt" | "featuredImageAlt" | "outline" | "internalLinks" | "content" | "wordCount"
     >,
+    settings: Pick<BlogStudioSettings, "seo">,
     publishRules: AIBloggerConfig["publishRules"],
     currentAudit: ReturnType<typeof getBlogStudioSeoAudit>,
     nextAudit: ReturnType<typeof getBlogStudioSeoAudit>,
 ) {
+    const currentWordCount = currentDraft.wordCount ?? countWords(currentDraft.content);
+    const nextWordCount = nextDraft.wordCount ?? countWords(nextDraft.content);
     const currentInternalLinkCount = currentDraft.internalLinks?.length || 0;
     const nextInternalLinkCount = nextDraft.internalLinks?.length || 0;
+    const regressionSensitiveChecks = [
+        "word-range",
+        "headings",
+        "section-coverage",
+        "concrete-specifics",
+        "cta-presence",
+        "claims-grounding",
+        "tone-alignment",
+    ] as const;
 
     if (currentDraft.title?.trim() && !nextDraft.title?.trim()) {
+        return false;
+    }
+
+    if (currentDraft.content?.trim() && !nextDraft.content?.trim()) {
         return false;
     }
 
@@ -4104,6 +4177,21 @@ function shouldUseFinalCheckerRevision(
         return false;
     }
 
+    if (currentDraft.outline?.length >= 4 && nextDraft.outline?.length + 1 < currentDraft.outline.length) {
+        return false;
+    }
+
+    if (currentWordCount >= settings.seo.minWords) {
+        const currentWithinTargetRange = currentWordCount <= settings.seo.maxWords;
+        const minimumAcceptedWordCount = currentWithinTargetRange
+            ? Math.max(settings.seo.minWords, Math.floor(currentWordCount * 0.9))
+            : settings.seo.minWords;
+
+        if (nextWordCount < minimumAcceptedWordCount) {
+            return false;
+        }
+    }
+
     if (publishRules.requireInternalLinks && nextInternalLinkCount < 2) {
         return false;
     }
@@ -4114,6 +4202,15 @@ function shouldUseFinalCheckerRevision(
 
     if (currentInternalLinkCount >= 2 && nextInternalLinkCount < 2) {
         return false;
+    }
+
+    for (const checkKey of regressionSensitiveChecks) {
+        const currentPassed = currentAudit.checks.some((check) => check.key === checkKey && check.passed);
+        const nextPassed = nextAudit.checks.some((check) => check.key === checkKey && check.passed);
+
+        if (currentPassed && !nextPassed) {
+            return false;
+        }
     }
 
     if (nextAudit.requiredChecksPassed && !currentAudit.requiredChecksPassed) {
@@ -4129,6 +4226,23 @@ function shouldUseFinalCheckerRevision(
     }
 
     return false;
+}
+
+function buildFinalCheckerStepNote(input: {
+    accepted: boolean;
+    scoreBefore: number;
+    scoreAfter: number;
+    blockersBefore: number;
+    blockersAfter: number;
+    wordCountBefore: number;
+    wordCountAfter: number;
+    usedFallback?: boolean;
+}) {
+    const decision = input.accepted
+        ? "Accepted revision"
+        : "Reviewed full draft and kept the original";
+
+    return `${decision} | SEO ${input.scoreBefore} -> ${input.scoreAfter} | Blockers ${input.blockersBefore} -> ${input.blockersAfter} | Words ${input.wordCountBefore} -> ${input.wordCountAfter}${input.usedFallback ? " | Fallback key used" : ""}`;
 }
 
 
@@ -4280,10 +4394,18 @@ function buildMarketingBlogSchemaMarkup(input: {
 
 function toBlogStudioPost(doc: unknown) {
     const post = sanitizeDoc(doc) as BlogStudioPost;
+    const normalizedTarget = normalizePersistedBlogStudioTarget(post.target);
 
     return {
         ...post,
-        target: normalizePersistedBlogStudioTarget(post.target),
+        // Posts should inherit live webhook settings from the workspace target.
+        // Older records may contain a stale webhookConfig snapshot that can block
+        // publishing even after the workspace webhook is enabled.
+        target: {
+            type: normalizedTarget.type,
+            label: normalizedTarget.label,
+            externalId: normalizedTarget.externalId,
+        },
     };
 }
 
@@ -4350,6 +4472,10 @@ export function validateBlogStudioPublishPackage(
     existingPostSlugs?: string[],
     existingPostTitles?: string[],
     liveAuditScore?: number,
+    options?: {
+        audit?: BlogStudioSeoAudit;
+        cannibalization?: BlogStudioCannibalizationReport;
+    },
 ): BlogStudioPublishValidation {
     const issues: BlogStudioPublishBlocker[] = [];
     const rules = publishRules;
@@ -4369,7 +4495,11 @@ export function validateBlogStudioPublishPackage(
         requireHumanReviewForHighRiskCannibalization: true,
         requireGroundedSourcesForClaims: true,
     };
-    const audit = getBlogStudioSeoAudit(post, settings, publishRules);
+    const audit =
+        options?.audit ||
+        getBlogStudioSeoAudit(post, settings, publishRules, {
+            cannibalization: options?.cannibalization,
+        });
     const getAuditIssueSeverity = (key: string): "blocker" | "warning" => {
         const check = audit.checks.find((item) => item.key === key);
         return check?.severity === "required" ? "blocker" : "warning";
@@ -4577,12 +4707,17 @@ export function validateBlogStudioPublishPackage(
 
     // ─── Schema checks ──────────────────────────────────────────
     const schemaMarkup = post.schemaMarkup?.trim() || "";
+    const schemaGeneratedOnPublish = effectiveTarget.type === "webhook";
     if (!schemaMarkup && rules?.requireSchemaMarkup) {
         issues.push({
             category: "schema",
-            severity: "blocker",
-            message: "Structured data / schema markup is missing",
-            fixHint: "Generate Article JSON-LD schema using the entity modeling config.",
+            severity: schemaGeneratedOnPublish ? "warning" : "blocker",
+            message: schemaGeneratedOnPublish
+                ? "Structured data / schema markup will be generated automatically at publish time"
+                : "Structured data / schema markup is missing",
+            fixHint: schemaGeneratedOnPublish
+                ? "You can publish now. Add saved schema only if you want to preview the JSON-LD before publishing."
+                : "Generate Article JSON-LD schema using the entity modeling config.",
         });
     } else if (!schemaMarkup) {
         issues.push({
@@ -4623,7 +4758,7 @@ export function validateBlogStudioPublishPackage(
 
     // ─── SEO score checks ────────────────────────────────────────
     const minimumSeoScore = rules?.minimumSeoScore ?? 0;
-    const seoScore = liveAuditScore ?? post.seoScore ?? 0;
+    const seoScore = liveAuditScore ?? audit.score ?? post.seoScore ?? 0;
     if (minimumSeoScore > 0 && seoScore < minimumSeoScore) {
         issues.push({
             category: "seo-score",
@@ -4665,6 +4800,7 @@ export function validateBlogStudioPublishPackage(
         warnings,
         blockersCount: blockers.length,
         warningsCount: warnings.length,
+        auditScore: seoScore,
         summary: summaryParts.join(" "),
         validatedAt: new Date().toISOString(),
     };
@@ -6332,9 +6468,9 @@ export async function createBlogStudioDraftImpl(
     const brief = sanitizeBrief(input.brief, {
         sourceMode: "website",
         sourceValue: "",
-        audience: settings.brandVoice.audience,
-        tone: settings.brandVoice.tone,
-        cta: settings.brandVoice.ctaStyle,
+        audience: "",
+        tone: "",
+        cta: "",
         primaryKeyword: "",
         language: settings.seo.defaultLanguage,
         location: settings.seo.defaultLocation,
@@ -6361,6 +6497,7 @@ export async function createBlogStudioDraftImpl(
 
     const slug = await ensureUniquePostSlug(agency.id, title);
     const storedAIBloggerConfig = await getAgencyMergedAIBloggerConfigForStorage(agency.id);
+    const internalLinks = sanitizePostInternalLinks(input.internalLinks, 8);
     const derivedSiteUrl = resolveBlogStudioSiteUrl({
         canonicalUrl: input.canonicalUrl,
         brief,
@@ -6401,6 +6538,7 @@ export async function createBlogStudioDraftImpl(
         contentType: sanitizeContentType(input.contentType),
         contentClusterId: clusterFields.contentClusterId,
         parentTopicSlug: clusterFields.parentTopicSlug,
+        internalLinks,
         featuredImagePrompt: sanitizeText(input.featuredImagePrompt, 320),
         researchNotes: sanitizeStringArray(input.researchNotes, 8, 220),
         externalSources: sanitizeExternalSources(input.externalSources, 6),
@@ -6462,9 +6600,9 @@ export async function updateBlogStudioPostImpl(
     const brief = sanitizeBrief(input.brief, {
         sourceMode: currentPost.brief.sourceMode,
         sourceValue: currentPost.brief.sourceValue || "",
-        audience: currentPost.brief.audience || settings.brandVoice.audience,
-        tone: currentPost.brief.tone || settings.brandVoice.tone,
-        cta: currentPost.brief.cta || settings.brandVoice.ctaStyle,
+        audience: currentPost.brief.audience || "",
+        tone: currentPost.brief.tone || "",
+        cta: currentPost.brief.cta || "",
         primaryKeyword: currentPost.brief.primaryKeyword || "",
         language: currentPost.brief.language || settings.seo.defaultLanguage,
         location: currentPost.brief.location || settings.seo.defaultLocation,
@@ -6768,8 +6906,8 @@ Current excerpt: ${currentPost.excerpt || "not provided"}
 Primary keyword: ${currentPost.brief.primaryKeyword || "not provided"}
 Search intent: ${currentPost.searchIntent || "not specified"}
 Content type: ${currentPost.contentType || "not specified"}
-Audience: ${currentPost.draftBrief?.targetAudience || currentPost.brief.audience || settings.brandVoice.audience}
-CTA goal: ${currentPost.draftBrief?.ctaGoal || currentPost.brief.cta || settings.brandVoice.ctaStyle}
+Audience: ${getContextInferredAudience(currentPost.brief.audience, currentPost.draftBrief?.targetAudience)}
+CTA goal: ${getContextInferredCta(currentPost.brief.cta, currentPost.draftBrief?.ctaGoal)}
 Current outline:
 ${currentPost.outline.length > 0 ? currentPost.outline.map((section) => `- ${section}`).join("\n") : "- Use the current post structure as a starting point"}
 ${currentPerformancePromptBlock ? `\n${currentPerformancePromptBlock}` : ""}
@@ -6832,8 +6970,8 @@ Current primary keyword: ${currentPost.brief.primaryKeyword || "not provided"}
 Current search intent: ${currentPost.searchIntent || "not specified"}
 Current content type: ${currentPost.contentType || "not specified"}
 Business fit: ${currentPost.draftBrief?.businessFitSummary || "not specified"}
-Target audience: ${currentPost.draftBrief?.targetAudience || currentPost.brief.audience || settings.brandVoice.audience}
-CTA goal: ${currentPost.draftBrief?.ctaGoal || currentPost.brief.cta || settings.brandVoice.ctaStyle}
+Target audience: ${getContextInferredAudience(currentPost.brief.audience, currentPost.draftBrief?.targetAudience)}
+CTA goal: ${getContextInferredCta(currentPost.brief.cta, currentPost.draftBrief?.ctaGoal)}
 Current outline:
 ${currentPost.outline.length > 0 ? currentPost.outline.map((section) => `- ${section}`).join("\n") : "- Use the existing post structure"}
 Current FAQ:
@@ -6960,6 +7098,16 @@ Rules:
         };
         let refreshedSeoAudit = getBlogStudioSeoAudit(refreshedAuditDraft, settings, resolvedPublishRules);
 
+        addRunStep(
+            "rewrite-post",
+            "Rewrite Post",
+            "completed",
+            `Refreshed copy generated | ${refreshedDraft.wordCount} words | Sections: ${refreshedDraft.outline.length}${draftStage.usedFallback ? " | Fallback key used" : ""}`,
+            draftStepStartedAt,
+        );
+
+        const refreshFinalCheckerStepStartedAt = getNowIso();
+
         if (resolvedPublishRules.aiReviewPolicy.enableFinalChecker && refreshedDraft.content.trim()) {
             try {
                 const finalCheckerPrompt = buildAIBloggerFinalCheckerPrompt({
@@ -7056,24 +7204,61 @@ Rules:
                     seoScore: checkedDraftData.seoScore,
                 };
                 const checkedSeoAudit = getBlogStudioSeoAudit(checkedAuditDraft, settings, resolvedPublishRules);
+                const wordCountBefore = refreshedDraft.wordCount ?? countWords(refreshedDraft.content);
+                const wordCountAfter = checkedDraftData.wordCount ?? countWords(checkedDraftData.content);
+                const acceptedFinalCheckerRevision = shouldUseFinalCheckerRevision(
+                    refreshedAuditDraft,
+                    checkedAuditDraft,
+                    settings,
+                    resolvedPublishRules,
+                    refreshedSeoAudit,
+                    checkedSeoAudit,
+                );
+                const finalCheckerNote = buildFinalCheckerStepNote({
+                    accepted: acceptedFinalCheckerRevision,
+                    scoreBefore: refreshedSeoAudit.score,
+                    scoreAfter: checkedSeoAudit.score,
+                    blockersBefore: refreshedSeoAudit.blockers.length,
+                    blockersAfter: checkedSeoAudit.blockers.length,
+                    wordCountBefore,
+                    wordCountAfter,
+                    usedFallback: finalCheckerStage.usedFallback,
+                });
 
-                if (shouldUseFinalCheckerRevision(refreshedAuditDraft, checkedAuditDraft, resolvedPublishRules, refreshedSeoAudit, checkedSeoAudit)) {
+                if (acceptedFinalCheckerRevision) {
                     refreshedDraft = checkedDraftData;
                     refreshedAuditDraft = checkedAuditDraft;
                     refreshedSeoAudit = checkedSeoAudit;
                 }
+
+                addRunStep(
+                    "final-ai-checker",
+                    "Final AI Checker",
+                    "completed",
+                    finalCheckerNote,
+                    refreshFinalCheckerStepStartedAt,
+                );
             } catch (error) {
                 blogLogError("FINAL-AI-CHECKER", "Refresh final checker revision failed", error);
+                addRunStep(
+                    "final-ai-checker",
+                    "Final AI Checker",
+                    "failed",
+                    `Final checker failed: ${getErrorMessage(error)}`,
+                    refreshFinalCheckerStepStartedAt,
+                );
             }
+        } else {
+            addRunStep(
+                "final-ai-checker",
+                "Final AI Checker",
+                "skipped",
+                resolvedPublishRules.aiReviewPolicy.enableFinalChecker
+                    ? "Skipped because the refreshed draft content was empty."
+                    : "Disabled in publish rules.",
+                refreshFinalCheckerStepStartedAt,
+            );
         }
-
-        addRunStep(
-            "rewrite-post",
-            "Rewrite Post",
-            "completed",
-            `Refreshed copy generated${draftStage.usedFallback ? " | Fallback key used" : ""}`,
-            draftStepStartedAt,
-        );
 
         const imageStepStartedAt = getNowIso();
         let imagePack = {
@@ -7090,8 +7275,8 @@ Current title: ${currentPost.title}
 Refreshed title: ${refreshedDraft.title || metadataPack.title || currentPost.title}
 Search intent: ${currentPost.searchIntent || "not specified"}
 Content type: ${currentPost.contentType || "not specified"}
-Audience: ${currentPost.draftBrief?.targetAudience || currentPost.brief.audience || settings.brandVoice.audience}
-Tone: ${currentPost.brief.tone || settings.brandVoice.tone}
+Audience: ${getContextInferredAudience(currentPost.brief.audience, currentPost.draftBrief?.targetAudience)}
+Tone: ${getContextInferredTone(currentPost.brief.tone, currentPost.draftBrief?.toneDirection)}
 ${currentPerformancePromptBlock ? `\n${currentPerformancePromptBlock}` : ""}
 
 Return JSON only with this shape:
@@ -7512,9 +7697,9 @@ export async function generateBlogStudioDraftImpl(
     const brief = sanitizeBrief(input.brief, {
         sourceMode: "website",
         sourceValue: "",
-        audience: settings.brandVoice.audience,
-        tone: settings.brandVoice.tone,
-        cta: settings.brandVoice.ctaStyle,
+        audience: "",
+        tone: "",
+        cta: "",
         primaryKeyword: "",
         language: settings.seo.defaultLanguage,
         location: settings.seo.defaultLocation,
@@ -7556,14 +7741,20 @@ export async function generateBlogStudioDraftImpl(
         stepStartedAt: string,
         stepCompletedAt?: string,
     ) => {
-        runSteps.push({
+        const nextStep: BlogStudioRunStep = {
             key,
             label,
             status,
             notes: sanitizeText(notes, 240),
             startedAt: stepStartedAt,
             completedAt: stepCompletedAt || getNowIso(),
-        });
+        };
+        const existingIndex = runSteps.findIndex((step) => step.key === key);
+        if (existingIndex >= 0) {
+            runSteps[existingIndex] = nextStep;
+        } else {
+            runSteps.push(nextStep);
+        }
 
         // Emit SSE event if streaming is active.
         if (jobId) {
@@ -7590,6 +7781,8 @@ export async function generateBlogStudioDraftImpl(
 
     try {
         let websiteIntelligence: AIBloggerWebsiteIntelligence | null = null;
+        let websiteIntelligenceStepStatus: "completed" | "failed" | "skipped" = "skipped";
+        let websiteIntelligenceError: string | undefined;
         const crawlConfig = aiBloggerConfig?.crawl;
 
         if (brief.sourceMode === "website") {
@@ -7597,7 +7790,6 @@ export async function generateBlogStudioDraftImpl(
             emitStepStart("website-intelligence", "Website Intelligence");
 
             try {
-                blogLogStep("PIPELINE", "Website Intelligence starting", { url: brief.sourceValue, maxPages: crawlConfig?.maxPages });
                 websiteIntelligence = await getAIBloggerWebsiteIntelligence(brief.sourceValue || "", {
                     agencyId: agency.id,
                     enabled: crawlConfig?.enabled ?? true,
@@ -7607,33 +7799,26 @@ export async function generateBlogStudioDraftImpl(
                     allowedPaths: crawlConfig?.allowedPaths,
                     blockedPaths: crawlConfig?.blockedPaths,
                 });
-
-                if (websiteIntelligence) {
-                    blogLogOutput("WEBSITE-INTEL", JSON.stringify({ pageCount: websiteIntelligence.pageCount, cacheStatus: websiteIntelligence.cacheStatus, topicHints: websiteIntelligence.topicHints?.slice(0, 5), priorityPaths: websiteIntelligence.priorityPaths?.slice(0, 5) }));
-                    addRunStep(
-                        "website-intelligence",
-                        "Website Intelligence",
-                        "completed",
-                        `${websiteIntelligence.cacheStatus === "cached" ? "Cache hit" : "Fresh crawl"} | Pages: ${websiteIntelligence.pageCount} | Paths: ${websiteIntelligence.priorityPaths.slice(0, 3).join(", ") || "n/a"}`,
-                        websiteStepStartedAt,
-                    );
-                } else {
-                    addRunStep(
-                        "website-intelligence",
-                        "Website Intelligence",
-                        "skipped",
-                        crawlConfig?.enabled === false
-                            ? "Website crawl is disabled in AI Blogger admin. Continued with URL-based prompting."
-                            : "Website crawl could not extract usable HTML. Continued with URL-based prompting.",
-                        websiteStepStartedAt,
-                    );
-                }
+                addRunStep(
+                    "website-intelligence",
+                    "Website Intelligence",
+                    websiteIntelligence ? "completed" : "skipped",
+                    websiteIntelligence
+                        ? `${websiteIntelligence.cacheStatus === "cached" ? "Cache hit" : "Fresh crawl"} | Pages: ${websiteIntelligence.pageCount}`
+                        : crawlConfig?.enabled === false
+                            ? "Website intelligence is disabled in AI Blogger admin."
+                            : "Website intelligence returned no crawlable site context.",
+                    websiteStepStartedAt,
+                );
+                websiteIntelligenceStepStatus = websiteIntelligence ? "completed" : "skipped";
             } catch (error) {
+                websiteIntelligenceError = getErrorMessage(error);
+                websiteIntelligenceStepStatus = "failed";
                 addRunStep(
                     "website-intelligence",
                     "Website Intelligence",
                     "failed",
-                    `Website crawl failed: ${getErrorMessage(error)}`,
+                    `Website intelligence failed: ${websiteIntelligenceError}`,
                     websiteStepStartedAt,
                 );
             }
@@ -7656,22 +7841,67 @@ export async function generateBlogStudioDraftImpl(
                         },
                     },
                     {
+                        status: websiteIntelligenceStepStatus,
                         summary: websiteIntelligence
                             ? `${websiteIntelligence.cacheStatus === "cached" ? "Cache hit" : "Fresh crawl"} | ${websiteIntelligence.pageCount} pages fetched`
-                            : "Skipped or failed",
+                            : websiteIntelligenceError
+                                ? `Website intelligence failed: ${websiteIntelligenceError}`
+                                : crawlConfig?.enabled === false
+                                    ? "Website intelligence is disabled in AI Blogger admin."
+                                    : "Website intelligence returned no crawlable site context.",
                         data: {
                             pageCount: websiteIntelligence?.pageCount,
-                            paths: websiteIntelligence?.priorityPaths?.slice(0, 5),
-                            topics: websiteIntelligence?.topicHints?.slice(0, 5),
+                            paths: websiteIntelligence?.priorityPaths || [],
+                            topics: websiteIntelligence?.topicHints || [],
+                            pageTitles: websiteIntelligence?.pageTitles || [],
+                            faqQuestions: websiteIntelligence?.faqQuestions || [],
+                            serviceSignals: websiteIntelligence?.serviceSignals || [],
+                            ctaPatterns: websiteIntelligence?.ctaPatterns || [],
+                            proofSignals: websiteIntelligence?.proofSignals || [],
+                            summary: websiteIntelligence?.summary,
+                            cacheStatus: websiteIntelligence?.cacheStatus,
+                            error: websiteIntelligenceError,
                         },
-                    }
+                    },
+                    websiteIntelligenceError ? [websiteIntelligenceError] : undefined,
+                );
+            }
+        } else {
+            const websiteStepStartedAt = getNowIso();
+            addRunStep(
+                "website-intelligence",
+                "Website Intelligence",
+                "skipped",
+                "Skipped because the source mode is not website.",
+                websiteStepStartedAt,
+            );
+
+            if (jobId) {
+                await generationLogger.logStep(
+                    1,
+                    "Website Intelligence",
+                    { url: brief.sourceValue, maxPages: crawlConfig?.maxPages, enabled: crawlConfig?.enabled },
+                    {
+                        startedAt: websiteStepStartedAt,
+                        completedAt: websiteStepStartedAt,
+                        durationMs: 0,
+                        details: {
+                            sourceMode: brief.sourceMode,
+                        },
+                    },
+                    {
+                        status: "skipped",
+                        summary: "Skipped because the source mode is not website.",
+                        data: {
+                            sourceMode: brief.sourceMode,
+                        },
+                    },
                 );
             }
         }
 
         const websitePromptBlock = formatWebsiteIntelligenceForPrompt(websiteIntelligence);
         const step1StartedAt = getNowIso();
-        emitStepStart("fetch-trends", "Fetch Trends");
         const fallbackCandidates = sanitizeStringArray(
             [
                 ...buildKeywordCandidatesFromSource(brief.sourceValue || "", 10),
@@ -7724,14 +7954,12 @@ export async function generateBlogStudioDraftImpl(
                 ]
                     .filter(Boolean)
                     .join("\n\n");
-                blogLogInput("DISCOVERY (live-trends)", liveTrendsPrompt);
                 discoveryStage = await runAIBloggerStage(
                     aiConfig,
                     aiBloggerConfig,
                     "extractKeywords",
                     liveTrendsPrompt,
                 );
-                blogLogOutput("DISCOVERY (live-trends)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
             } catch (error) {
                 if (!allowAiDiscoveryFallback) {
                     throw error;
@@ -7739,7 +7967,6 @@ export async function generateBlogStudioDraftImpl(
 
                 discoverySummary = `Live trends unavailable, fell back to AI-only discovery: ${getErrorMessage(error)}`;
                 fetchTrendsSource = "ai-fallback-after-live-failure";
-                blogLogInput("DISCOVERY (ai-fallback)", aiOnlyDiscoveryPrompt);
                 discoveryStage = await runAIBloggerStage(
                     aiConfig,
                     aiBloggerConfig,
@@ -7750,7 +7977,6 @@ export async function generateBlogStudioDraftImpl(
             }
         } else if (allowAiDiscoveryFallback) {
             fetchTrendsSource = "ai-only-discovery";
-            blogLogInput("DISCOVERY (ai-only)", aiOnlyDiscoveryPrompt);
             discoveryStage = await runAIBloggerStage(
                 aiConfig,
                 aiBloggerConfig,
@@ -7810,10 +8036,13 @@ export async function generateBlogStudioDraftImpl(
                 {
                     summary: `Topic selected: "${selectedTopicForRun}" | ${discoverySummary}`,
                     data: {
+                        candidateTopics: discovery.candidateTopics,
                         selectedTopic: selectedTopicForRun,
-                        relatedQueries: discovery.relatedQueries.slice(0, 5),
+                        relatedQueries: discovery.relatedQueries,
+                        sourceSummary: discovery.sourceSummary,
                         trendsSource: fetchTrendsSource,
                     },
+                    rawText: discoveryStage.text,
                     metrics: {
                         tokensIn: discoveryStage.tokens?.inputTokens ?? 0,
                         tokensOut: discoveryStage.tokens?.outputTokens ?? 0,
@@ -7823,12 +8052,12 @@ export async function generateBlogStudioDraftImpl(
         }
 
         let serpAnalysis: AIBloggerSerpAnalysis | null = null;
+        let serpAnalysisStepStatus: "completed" | "failed" | "skipped" = "skipped";
+        let serpAnalysisError: string | undefined;
         const serpConfig = aiBloggerConfig?.serp;
         const serpStepStartedAt = getNowIso();
-        emitStepStart("serp-analysis", "SERP Analysis");
 
         try {
-            blogLogStep("PIPELINE", "SERP Analysis starting", { topic: selectedTopicForRun, enabled: serpConfig?.enabled ?? false });
             serpAnalysis = await getAIBloggerSerpAnalysis(selectedTopicForRun, {
                 agencyId: agency.id,
                 enabled: serpConfig?.enabled ?? false,
@@ -7848,7 +8077,6 @@ export async function generateBlogStudioDraftImpl(
             });
 
             if (serpAnalysis) {
-                blogLogOutput("SERP-ANALYSIS", JSON.stringify({ intent: serpAnalysis.intent, competitors: serpAnalysis.competitorDomains?.slice(0, 5), peopleAlsoAsk: serpAnalysis.peopleAlsoAsk?.slice(0, 3), topUrls: serpAnalysis.topResultUrls?.slice(0, 3), cacheStatus: serpAnalysis.cacheStatus }));
                 addRunStep(
                     "serp-analysis",
                     "SERP Analysis",
@@ -7856,6 +8084,7 @@ export async function generateBlogStudioDraftImpl(
                     `${serpAnalysis.cacheStatus === "cached" ? "Cache hit" : "Fresh SERP"} | Intent: ${serpAnalysis.intent} | Competitors: ${serpAnalysis.competitorDomains.slice(0, 3).join(", ") || "n/a"}${serpAnalysis.usedFallbackKey ? " | Fallback key used" : ""}`,
                     serpStepStartedAt,
                 );
+                serpAnalysisStepStatus = "completed";
             } else {
                 addRunStep(
                     "serp-analysis",
@@ -7864,13 +8093,16 @@ export async function generateBlogStudioDraftImpl(
                     "SERP analysis is disabled in AI Blogger admin. Continued without competitor snapshot.",
                     serpStepStartedAt,
                 );
+                serpAnalysisStepStatus = "skipped";
             }
         } catch (error) {
+            serpAnalysisError = getErrorMessage(error);
+            serpAnalysisStepStatus = "failed";
             addRunStep(
                 "serp-analysis",
                 "SERP Analysis",
                 "failed",
-                `SERP analysis failed: ${getErrorMessage(error)}`,
+                `SERP analysis failed: ${serpAnalysisError}`,
                 serpStepStartedAt,
             );
         }
@@ -7893,26 +8125,34 @@ export async function generateBlogStudioDraftImpl(
                     },
                 },
                 {
+                    status: serpAnalysisStepStatus,
                     summary: serpAnalysis
                         ? `Found ${serpAnalysis.competitorDomains.length} competitors | Intent: ${serpAnalysis.intent}`
-                        : "Skipped or failed",
+                        : serpAnalysisError
+                            ? `SERP analysis failed: ${serpAnalysisError}`
+                            : "SERP analysis skipped or disabled.",
                     data: {
                         intent: serpAnalysis?.intent,
-                        competitors: serpAnalysis?.competitorDomains?.slice(0, 5),
+                        competitors: serpAnalysis?.competitorDomains || [],
+                        peopleAlsoAsk: serpAnalysis?.peopleAlsoAsk || [],
                         peopleAlsoAsks: serpAnalysis?.peopleAlsoAsk?.length || 0,
                         featuredSnippet: serpAnalysis?.featuredSnippetStyle,
+                        topResultUrls: serpAnalysis?.topResultUrls || [],
+                        error: serpAnalysisError,
                     },
                     metrics: {
                         competitorCount: serpAnalysis?.competitorDomains.length || 0,
                     },
-                }
+                },
+                serpAnalysisError ? [serpAnalysisError] : undefined,
             );
         }
 
         const serpPromptBlock = formatSerpAnalysisForPrompt(serpAnalysis);
         let groundedResearch: AIBloggerGroundedResearch | null = null;
+        let groundedResearchStepStatus: "completed" | "failed" | "skipped" = "skipped";
+        let groundedResearchError: string | undefined;
         const groundedResearchStepStartedAt = getNowIso();
-        emitStepStart("grounded-research", "Grounded Research");
 
         if (aiBloggerConfig?.groundedResearch?.enabled === false) {
             addRunStep(
@@ -7922,10 +8162,10 @@ export async function generateBlogStudioDraftImpl(
                 "Grounded research is disabled in AI Blogger admin settings.",
                 groundedResearchStepStartedAt,
             );
+            groundedResearchStepStatus = "skipped";
         } else {
             try {
-                blogLogStep("PIPELINE", "Grounded Research starting", { topic: selectedTopicForRun, sourceUrls: serpAnalysis?.topResultUrls?.length ?? 0 });
-                groundedResearch = await getAIBloggerGroundedResearch(selectedTopicForRun, {
+                    groundedResearch = await getAIBloggerGroundedResearch(selectedTopicForRun, {
                     agencyId: agency.id,
                     location: brief.location || settings.seo.defaultLocation,
                     refreshWindowHours: aiBloggerConfig?.groundedResearch?.refreshWindowHours || 24,
@@ -7937,7 +8177,6 @@ export async function generateBlogStudioDraftImpl(
                     const highTrustCount = groundedResearch.sources.filter(
                         (source) => source.trustLevel === "high",
                     ).length;
-                    blogLogOutput("GROUNDED-RESEARCH", JSON.stringify({ sources: groundedResearch.sources.length, highTrust: highTrustCount, cacheStatus: groundedResearch.cacheStatus, domains: groundedResearch.sources.map(s => s.domain).slice(0, 5) }));
 
                     addRunStep(
                         "grounded-research",
@@ -7946,6 +8185,7 @@ export async function generateBlogStudioDraftImpl(
                         `${groundedResearch.cacheStatus === "cached" ? "Cache hit" : "Fresh sources"} | Sources: ${groundedResearch.sources.length} | High trust: ${highTrustCount}`,
                         groundedResearchStepStartedAt,
                     );
+                    groundedResearchStepStatus = "completed";
                 } else {
                     addRunStep(
                         "grounded-research",
@@ -7956,13 +8196,16 @@ export async function generateBlogStudioDraftImpl(
                             : "Grounded research needs SERP source URLs, so this run continued without external sources.",
                         groundedResearchStepStartedAt,
                     );
+                    groundedResearchStepStatus = "skipped";
                 }
             } catch (error) {
+                groundedResearchError = getErrorMessage(error);
+                groundedResearchStepStatus = "failed";
                 addRunStep(
                     "grounded-research",
                     "Grounded Research",
                     "failed",
-                    `Grounded research failed: ${getErrorMessage(error)}`,
+                    `Grounded research failed: ${groundedResearchError}`,
                     groundedResearchStepStartedAt,
                 );
             }
@@ -7988,19 +8231,29 @@ export async function generateBlogStudioDraftImpl(
                     },
                 },
                 {
+                    status: groundedResearchStepStatus,
                     summary: groundedResearch
                         ? `Found ${groundedResearch.sources.length} sources (${highTrustCount} high-trust)`
-                        : "Skipped or failed",
+                        : groundedResearchError
+                            ? `Grounded research failed: ${groundedResearchError}`
+                            : aiBloggerConfig?.groundedResearch?.enabled === false
+                                ? "Grounded research is disabled in AI Blogger admin settings."
+                                : "Grounded research skipped because no qualifying source set was available.",
                     data: {
                         sourcesCount: groundedResearch?.sources.length || 0,
                         highTrustCount,
-                        domains: groundedResearch?.sources.slice(0, 5).map(s => s.domain),
+                        domains: groundedResearch?.sources.map((source) => source.domain) || [],
+                        sources: groundedResearch?.sources || [],
+                        error: groundedResearchError,
                     },
-                }
+                },
+                groundedResearchError ? [groundedResearchError] : undefined,
             );
         }
 
         const groundedResearchPromptBlock = formatGroundedResearchForPrompt(groundedResearch);
+        const performanceFeedbackStartedAt = getNowIso();
+        emitStepStart("performance-feedback", "Performance Feedback");
         const performanceInsights = await getBlogStudioPerformancePromptInsights(
             agency.id,
             {
@@ -8018,10 +8271,48 @@ export async function generateBlogStudioDraftImpl(
             performanceInsights.length > 0
                 ? `Matched ${performanceInsights.length} published performance snapshot${performanceInsights.length === 1 ? "" : "s"} for prompt guidance.`
                 : "No closely related published performance snapshots were found for this topic.",
-            groundedResearchStepStartedAt,
+            performanceFeedbackStartedAt,
         );
+
+        // Log Step 5: Performance Feedback
+        if (jobId) {
+            const performanceFeedbackEndTime = getNowIso();
+            const performanceFeedbackDuration = new Date(performanceFeedbackEndTime).getTime() - new Date(performanceFeedbackStartedAt).getTime();
+            await generationLogger.logStep(
+                5,
+                "Performance Feedback",
+                {
+                    topic: selectedTopicForRun,
+                    primaryKeyword: brief.primaryKeyword || "",
+                    sourceValue: brief.sourceValue,
+                },
+                {
+                    startedAt: performanceFeedbackStartedAt,
+                    completedAt: performanceFeedbackEndTime,
+                    durationMs: performanceFeedbackDuration,
+                    details: {
+                        snapshotsFound: performanceInsights.length,
+                        lookbackLimit: 3,
+                    },
+                },
+                {
+                    status: performanceInsights.length > 0 ? "completed" : "skipped",
+                    summary: performanceInsights.length > 0
+                        ? `Matched ${performanceInsights.length} published performance snapshot${performanceInsights.length === 1 ? "" : "s"}`
+                        : "No related performance snapshots found",
+                    data: {
+                        snapshotsCount: performanceInsights.length,
+                        snapshots: performanceInsights.map((snapshot) => ({
+                            title: snapshot.postTitle,
+                            clicks: snapshot.clicks,
+                            impressions: snapshot.impressions,
+                            similarityScore: snapshot.similarityScore,
+                        })),
+                    },
+                }
+            );
+        }
         const step3StartedAt = getNowIso();
-        emitStepStart("deep-research", "Deep Research");
         const researchPrompt = `Run the "Deep Research" stage for a blog generation pipeline.
 
 Agency: ${getPromptAgencyName(agency.name)}
@@ -8029,9 +8320,9 @@ Topic: ${selectedTopicForRun}
 Source mode: ${brief.sourceMode}
 Source value: ${brief.sourceValue}
 Trend focus: ${brief.trendFocus || "not provided"}
-Audience: ${brief.audience || settings.brandVoice.audience}
-Tone: ${brief.tone || settings.brandVoice.tone}
-CTA style: ${brief.cta || settings.brandVoice.ctaStyle}
+Audience: ${getContextInferredAudience(brief.audience)}
+Tone: ${getContextInferredTone(brief.tone)}
+CTA style: ${getContextInferredCta(brief.cta)}
 Primary keyword hint: ${brief.primaryKeyword || "not provided"}
 Language: ${brief.language || settings.seo.defaultLanguage}
 Location: ${brief.location || settings.seo.defaultLocation}
@@ -8059,7 +8350,6 @@ Rules:
 - If grounded sources are unavailable, state that clearly in sourceNotes—don't invent supporting data.
 - JSON only, no markdown/code fences.`;
 
-        blogLogInput("DEEP-RESEARCH", researchPrompt);
         const researchStage = await runAIBloggerStage(
             aiConfig,
             aiBloggerConfig,
@@ -8068,10 +8358,8 @@ Rules:
         );
         stageRuntimeConfigs.research = researchStage.runtimeConfig;
         mergeTokenTotals(tokenTotals, researchStage.tokens);
-        blogLogOutput("DEEP-RESEARCH", researchStage.text, { tokens: researchStage.tokens, usedFallback: researchStage.usedFallback });
 
         const research = parseResearchInsightsResponse(researchStage.text);
-        blogLogStep("DEEP-RESEARCH", "Parsed", { insights: research.researchInsights.length, sourceNotes: research.sourceNotes.length });
 
         addRunStep(
             "deep-research",
@@ -8081,8 +8369,44 @@ Rules:
             step3StartedAt,
         );
 
+        // Log Step 6: Deep Research
+        if (jobId) {
+            const deepResearchEndTime = getNowIso();
+            const deepResearchDuration = new Date(deepResearchEndTime).getTime() - new Date(step3StartedAt).getTime();
+            await generationLogger.logStep(
+                6,
+                "Deep Research",
+                {
+                    topic: selectedTopicForRun,
+                    sourceUrls: serpAnalysis?.topResultUrls?.slice(0, 3) || [],
+                    groundedResearchEnabled: aiBloggerConfig?.groundedResearch?.enabled ?? true,
+                    refreshWindowHours: aiBloggerConfig?.groundedResearch?.refreshWindowHours || 24,
+                },
+                {
+                    startedAt: step3StartedAt,
+                    completedAt: deepResearchEndTime,
+                    durationMs: deepResearchDuration,
+                    details: {
+                        fallbackUsed: researchStage.usedFallback,
+                        model: researchStage.runtimeConfig?.model,
+                    },
+                },
+                {
+                    summary: `Generated ${research.researchInsights.length} research insights and ${research.sourceNotes.length} source notes`,
+                    data: {
+                        researchInsights: research.researchInsights,
+                        sourceNotes: research.sourceNotes,
+                    },
+                    rawText: researchStage.text,
+                    metrics: {
+                        tokensIn: researchStage.tokens?.inputTokens ?? 0,
+                        tokensOut: researchStage.tokens?.outputTokens ?? 0,
+                    },
+                }
+            );
+        }
+
         const step4StartedAt = getNowIso();
-        emitStepStart("keywords", "Keywords");
         const seoPrompt = `Run the "Keywords + SEO Analysis" stage for a blog generation pipeline.
 
 Agency: ${getPromptAgencyName(agency.name)}
@@ -8090,9 +8414,9 @@ Topic: ${selectedTopicForRun}
 Source mode: ${brief.sourceMode}
 Source value: ${brief.sourceValue}
 Trend focus: ${brief.trendFocus || "not provided"}
-Audience: ${brief.audience || settings.brandVoice.audience}
-Tone: ${brief.tone || settings.brandVoice.tone}
-CTA style: ${brief.cta || settings.brandVoice.ctaStyle}
+Audience: ${getContextInferredAudience(brief.audience)}
+Tone: ${getContextInferredTone(brief.tone)}
+CTA style: ${getContextInferredCta(brief.cta)}
 Primary keyword hint: ${brief.primaryKeyword || "not provided"}
 Language: ${brief.language || settings.seo.defaultLanguage}
 Location: ${brief.location || settings.seo.defaultLocation}
@@ -8165,6 +8489,47 @@ Rules:
             `Primary: ${effectivePrimaryKeyword || "n/a"} | Secondary: ${planning.keywordPlan.secondaryKeywords.length}${seoStage.usedFallback ? " | Fallback key used" : ""}`,
             step4StartedAt,
         );
+
+        // Log Step 7: Keywords
+        if (jobId) {
+            const keywordsEndTime = getNowIso();
+            const keywordsDuration = new Date(keywordsEndTime).getTime() - new Date(step4StartedAt).getTime();
+            await generationLogger.logStep(
+                7,
+                "Keywords",
+                {
+                    topic: selectedTopicForRun,
+                    primaryKeywordHint: brief.primaryKeyword,
+                    wordTarget: requestedWordCount,
+                    seoConfig: {
+                        defaultLanguage: settings.seo.defaultLanguage,
+                        defaultLocation: settings.seo.defaultLocation,
+                    },
+                },
+                {
+                    startedAt: step4StartedAt,
+                    completedAt: keywordsEndTime,
+                    durationMs: keywordsDuration,
+                    details: {
+                        fallbackUsed: seoStage.usedFallback,
+                        model: seoStage.runtimeConfig?.model,
+                    },
+                },
+                {
+                    summary: `Identified primary keyword and ${planning.keywordPlan.secondaryKeywords.length} secondary keywords`,
+                    data: {
+                        primaryKeyword: effectivePrimaryKeyword,
+                        secondaryKeywords: planning.keywordPlan.secondaryKeywords,
+                        metaKeywords: planning.keywordPlan.metaKeywords,
+                    },
+                    rawText: seoStage.text,
+                    metrics: {
+                        tokensIn: seoStage.tokens?.inputTokens ?? 0,
+                        tokensOut: seoStage.tokens?.outputTokens ?? 0,
+                    },
+                }
+            );
+        }
         addRunStep(
             "seo-analysis",
             "SEO Analysis",
@@ -8173,6 +8538,48 @@ Rules:
             step4StartedAt,
         );
 
+        // Log Step 8: SEO Analysis
+        if (jobId) {
+            emitPipelineEvent(jobId, { type: "step-start", step: "seo-analysis", label: "SEO Analysis" });
+            const seoAnalysisEndTime = getNowIso();
+            const seoAnalysisDuration = new Date(seoAnalysisEndTime).getTime() - new Date(step4StartedAt).getTime();
+            await generationLogger.logStep(
+                8,
+                "SEO Analysis",
+                {
+                    topic: selectedTopicForRun,
+                    primaryKeyword: effectivePrimaryKeyword,
+                    wordCountRequest: requestedWordCount,
+                    searchIntent: serpAnalysis?.intent,
+                    sectionAngles: planning.sectionAngles.length,
+                },
+                {
+                    startedAt: step4StartedAt,
+                    completedAt: seoAnalysisEndTime,
+                    durationMs: seoAnalysisDuration,
+                    details: {
+                        fallbackUsed: seoStage.usedFallback,
+                        model: seoStage.runtimeConfig?.model,
+                    },
+                },
+                {
+                    summary: `Generated SEO plan with score target ${planning.seo.score} and word target ${effectiveWordTarget}`,
+                    data: {
+                        seoScore: planning.seo.score,
+                        recommendedWordCount: effectiveWordTarget,
+                        metaDescription: planning.seo.metaDescription,
+                        sectionAngles: planning.sectionAngles,
+                        keywordPlan: planning.keywordPlan,
+                    },
+                    rawText: seoStage.text,
+                    metrics: {
+                        tokensIn: seoStage.tokens?.inputTokens ?? 0,
+                        tokensOut: seoStage.tokens?.outputTokens ?? 0,
+                    },
+                }
+            );
+        }
+
         const enrichedBrief: BlogStudioBrief = {
             ...brief,
             primaryKeyword: effectivePrimaryKeyword || brief.primaryKeyword || "",
@@ -8180,7 +8587,6 @@ Rules:
         const plannedOutlineFallback = sanitizeStringArray(planning.sectionAngles, 12, 180);
 
         const step5StartedAt = getNowIso();
-        emitStepStart("brief-pack", "Brief Pack");
         const advancedBriefPrompt = `Build the "Advanced Brief Pack" for a blog generation pipeline.
 
 Agency: ${getPromptAgencyName(agency.name)}
@@ -8188,9 +8594,9 @@ Topic: ${selectedTopicForRun}
 Primary keyword: ${effectivePrimaryKeyword || "not provided"}
 Secondary keywords: ${planning.keywordPlan.secondaryKeywords.join(", ") || "none"}
 Trend focus: ${enrichedBrief.trendFocus || "not provided"}
-Audience: ${enrichedBrief.audience || settings.brandVoice.audience}
-Tone: ${enrichedBrief.tone || settings.brandVoice.tone}
-CTA style: ${enrichedBrief.cta || settings.brandVoice.ctaStyle}
+Audience: ${getContextInferredAudience(enrichedBrief.audience)}
+Tone: ${getContextInferredTone(enrichedBrief.tone)}
+CTA style: ${getContextInferredCta(enrichedBrief.cta)}
 Language: ${enrichedBrief.language || settings.seo.defaultLanguage}
 Location: ${enrichedBrief.location || settings.seo.defaultLocation}
 ${websitePromptBlock ? `\n${websitePromptBlock}` : ""}
@@ -8209,6 +8615,7 @@ Return JSON only with this shape:
   "businessFitWarnings": ["string"],
   "targetAudience": "string",
   "ctaGoal": "string",
+  "toneDirection": "string",
   "titleDirection": "string",
   "metadataDirection": "string",
   "searchIntent": "informational | commercial | navigational | transactional",
@@ -8221,6 +8628,7 @@ Rules:
 - businessFitScore must be an integer from 0 to 100.
 - businessFitWarnings should contain 0 to 3 short warnings when the topic is weak, broad, or hard to connect to the offer.
 - entities should contain 3 to 8 concrete entities or concepts.
+- toneDirection should be a short editorial direction the writer can follow without sounding generic.
 - searchIntent must be one of the provided values.
 - contentType must be one of the provided values.
 - Align the brief to real business fit, search intent, and CTA value.
@@ -8239,8 +8647,9 @@ Rules:
         blogLogOutput("BRIEF-PACK", advancedBriefStage.text, { tokens: advancedBriefStage.tokens, usedFallback: advancedBriefStage.usedFallback });
 
         const advancedBrief = parseAdvancedBriefResponse(advancedBriefStage.text, {
-            audience: enrichedBrief.audience || settings.brandVoice.audience,
-            ctaGoal: enrichedBrief.cta || settings.brandVoice.ctaStyle,
+            audience: enrichedBrief.audience || "",
+            ctaGoal: enrichedBrief.cta || "",
+            toneDirection: enrichedBrief.tone || "",
             searchIntent: serpAnalysis?.intent,
         });
         blogLogStep("BRIEF-PACK", "Parsed", { fitScore: advancedBrief.businessFitScore, intent: advancedBrief.searchIntent, contentType: advancedBrief.contentType, entities: advancedBrief.entities.length });
@@ -8252,6 +8661,54 @@ Rules:
             `Fit: ${typeof advancedBrief.businessFitScore === "number" ? advancedBrief.businessFitScore : "n/a"} | Intent: ${advancedBrief.searchIntent || "n/a"} | Type: ${advancedBrief.contentType || "n/a"} | Entities: ${advancedBrief.entities.length}${advancedBrief.businessFitWarnings.length > 0 ? ` | Warnings: ${advancedBrief.businessFitWarnings.length}` : ""}${advancedBriefStage.usedFallback ? " | Fallback key used" : ""}`,
             step5StartedAt,
         );
+
+        // Log Step 9: Brief Pack
+        if (jobId) {
+            const briefPackEndTime = getNowIso();
+            const briefPackDuration = new Date(briefPackEndTime).getTime() - new Date(step5StartedAt).getTime();
+            await generationLogger.logStep(
+                9,
+                "Brief Pack",
+                {
+                    topic: selectedTopicForRun,
+                    primaryKeyword: effectivePrimaryKeyword,
+                    audience: enrichedBrief.audience || "AI inferred",
+                    tone: enrichedBrief.tone || "AI inferred",
+                    cta: enrichedBrief.cta || "AI inferred",
+                    searchIntent: serpAnalysis?.intent,
+                },
+                {
+                    startedAt: step5StartedAt,
+                    completedAt: briefPackEndTime,
+                    durationMs: briefPackDuration,
+                    details: {
+                        fallbackUsed: advancedBriefStage.usedFallback,
+                        model: advancedBriefStage.runtimeConfig?.model,
+                    },
+                },
+                {
+                    summary: `Generated advanced brief with business fit score ${advancedBrief.businessFitScore}, intent: ${advancedBrief.searchIntent}`,
+                    data: {
+                        businessFitScore: advancedBrief.businessFitScore,
+                        businessFitSummary: advancedBrief.businessFitSummary,
+                        targetAudience: advancedBrief.targetAudience,
+                        ctaGoal: advancedBrief.ctaGoal,
+                        toneDirection: advancedBrief.toneDirection,
+                        titleDirection: advancedBrief.titleDirection,
+                        metadataDirection: advancedBrief.metadataDirection,
+                        searchIntent: advancedBrief.searchIntent,
+                        contentType: advancedBrief.contentType,
+                        entities: advancedBrief.entities,
+                        warnings: advancedBrief.businessFitWarnings,
+                    },
+                    rawText: advancedBriefStage.text,
+                    metrics: {
+                        tokensIn: advancedBriefStage.tokens?.inputTokens ?? 0,
+                        tokensOut: advancedBriefStage.tokens?.outputTokens ?? 0,
+                    },
+                }
+            );
+        }
 
         if (
             typeof advancedBrief.businessFitScore === "number" &&
@@ -8277,7 +8734,7 @@ Search intent: ${advancedBrief.searchIntent || serpAnalysis?.intent || "not spec
 Content type: ${advancedBrief.contentType || "not specified"}
 Trend focus: ${enrichedBrief.trendFocus || "not provided"}
 Title direction: ${advancedBrief.titleDirection || "not specified"}
-CTA goal: ${advancedBrief.ctaGoal || enrichedBrief.cta || settings.brandVoice.ctaStyle}
+CTA goal: ${getContextInferredCta(enrichedBrief.cta, advancedBrief.ctaGoal)}
 Business fit: ${advancedBrief.businessFitSummary || "not specified"}
 Research insights:
 ${research.researchInsights.length > 0 ? research.researchInsights.map((insight) => `- ${insight}`).join("\n") : "- Use best-practice analysis for this topic"}
@@ -8319,6 +8776,44 @@ Rules:
             `Outline sections: ${outlinePack.outline.length}${outlineStage.usedFallback ? " | Fallback key used" : ""}`,
             step6StartedAt,
         );
+
+        // Log Step 10: Outline Pack
+        if (jobId) {
+            const outlinePackEndTime = getNowIso();
+            const outlinePackDuration = new Date(outlinePackEndTime).getTime() - new Date(step6StartedAt).getTime();
+            await generationLogger.logStep(
+                10,
+                "Outline Pack",
+                {
+                    topic: selectedTopicForRun,
+                    primaryKeyword: effectivePrimaryKeyword,
+                    searchIntent: advancedBrief.searchIntent,
+                    contentType: advancedBrief.contentType,
+                    businessFitScore: advancedBrief.businessFitScore,
+                },
+                {
+                    startedAt: step6StartedAt,
+                    completedAt: outlinePackEndTime,
+                    durationMs: outlinePackDuration,
+                    details: {
+                        fallbackUsed: outlineStage.usedFallback,
+                        model: outlineStage.runtimeConfig?.model,
+                    },
+                },
+                {
+                    summary: `Created outline with ${outlinePack.outline.length} sections`,
+                    data: {
+                        outline: outlinePack.outline,
+                        sectionCount: outlinePack.outline.length,
+                    },
+                    rawText: outlineStage.text,
+                    metrics: {
+                        tokensIn: outlineStage.tokens?.inputTokens ?? 0,
+                        tokensOut: outlineStage.tokens?.outputTokens ?? 0,
+                    },
+                }
+            );
+        }
 
         const step7StartedAt = getNowIso();
         emitStepStart("metadata-pack", "Metadata Pack");
@@ -8375,6 +8870,46 @@ Rules:
             step7StartedAt,
         );
 
+        // Log Step 11: Metadata Pack
+        if (jobId) {
+            const metadataPackEndTime = getNowIso();
+            const metadataPackDuration = new Date(metadataPackEndTime).getTime() - new Date(step7StartedAt).getTime();
+            await generationLogger.logStep(
+                11,
+                "Metadata Pack",
+                {
+                    topic: selectedTopicForRun,
+                    primaryKeyword: effectivePrimaryKeyword,
+                    titleDirection: advancedBrief.titleDirection,
+                    metadataDirection: advancedBrief.metadataDirection,
+                    searchIntent: advancedBrief.searchIntent,
+                },
+                {
+                    startedAt: step7StartedAt,
+                    completedAt: metadataPackEndTime,
+                    durationMs: metadataPackDuration,
+                    details: {
+                        fallbackUsed: metadataStage.usedFallback,
+                        model: metadataStage.runtimeConfig?.model,
+                    },
+                },
+                {
+                    summary: `Generated metadata with title, meta title, and description`,
+                    data: {
+                        title: metadataPack.title,
+                        metaTitle: metadataPack.metaTitle,
+                        metaDescription: metadataPack.metaDescription,
+                        excerpt: metadataPack.excerpt,
+                    },
+                    rawText: metadataStage.text,
+                    metrics: {
+                        tokensIn: metadataStage.tokens?.inputTokens ?? 0,
+                        tokensOut: metadataStage.tokens?.outputTokens ?? 0,
+                    },
+                }
+            );
+        }
+
         const step8StartedAt = getNowIso();
         emitStepStart("faq-pack", "FAQ Pack");
         const faqPrompt = `Build the "FAQ Pack" for a blog generation pipeline.
@@ -8428,6 +8963,44 @@ Rules:
             step8StartedAt,
         );
 
+        // Log Step 12: FAQ Pack
+        if (jobId) {
+            const faqPackEndTime = getNowIso();
+            const faqPackDuration = new Date(faqPackEndTime).getTime() - new Date(step8StartedAt).getTime();
+            await generationLogger.logStep(
+                12,
+                "FAQ Pack",
+                {
+                    topic: selectedTopicForRun,
+                    primaryKeyword: effectivePrimaryKeyword,
+                    searchIntent: advancedBrief.searchIntent,
+                    peopleAlsoAskCount: serpAnalysis?.peopleAlsoAsk?.length ?? 0,
+                    peopleAlsoAsk: serpAnalysis?.peopleAlsoAsk?.slice(0, 3) || [],
+                },
+                {
+                    startedAt: step8StartedAt,
+                    completedAt: faqPackEndTime,
+                    durationMs: faqPackDuration,
+                    details: {
+                        fallbackUsed: faqStage.usedFallback,
+                        model: faqStage.runtimeConfig?.model,
+                    },
+                },
+                {
+                    summary: `Generated ${faqPack.faqItems.length} FAQ items`,
+                    data: {
+                        faqItemsCount: faqPack.faqItems.length,
+                        faqItems: faqPack.faqItems,
+                    },
+                    rawText: faqStage.text,
+                    metrics: {
+                        tokensIn: faqStage.tokens?.inputTokens ?? 0,
+                        tokensOut: faqStage.tokens?.outputTokens ?? 0,
+                    },
+                }
+            );
+        }
+
         const step9StartedAt = getNowIso();
         emitStepStart("internal-links", "Internal Links");
         const draftContextPost: BlogStudioPost = {
@@ -8460,6 +9033,7 @@ Rules:
                 businessFitWarnings: advancedBrief.businessFitWarnings,
                 targetAudience: advancedBrief.targetAudience,
                 ctaGoal: advancedBrief.ctaGoal,
+                toneDirection: advancedBrief.toneDirection,
                 titleDirection: advancedBrief.titleDirection,
                 metadataDirection: advancedBrief.metadataDirection,
                 searchIntent: advancedBrief.searchIntent,
@@ -8502,6 +9076,38 @@ Rules:
             step9StartedAt,
         );
 
+        // Log Step 13: Internal Links
+        if (jobId) {
+            const internalLinksEndTime = getNowIso();
+            const internalLinksDuration = new Date(internalLinksEndTime).getTime() - new Date(step9StartedAt).getTime();
+            await generationLogger.logStep(
+                13,
+                "Internal Links",
+                {
+                    topic: selectedTopicForRun,
+                    draftTitle: metadataPack.title || title,
+                    primaryKeyword: effectivePrimaryKeyword,
+                    secondaryKeywords: planning.keywordPlan.secondaryKeywords.slice(0, 5),
+                    siteUrl: draftSiteUrl,
+                },
+                {
+                    startedAt: step9StartedAt,
+                    completedAt: internalLinksEndTime,
+                    durationMs: internalLinksDuration,
+                    details: {
+                        suggestionsRequested: 5,
+                    },
+                },
+                {
+                    summary: `Identified ${internalLinkSuggestions.length} internal linking opportunities`,
+                    data: {
+                        suggestionsCount: internalLinkSuggestions.length,
+                        suggestions: internalLinkSuggestions,
+                    },
+                }
+            );
+        }
+
         const step10StartedAt = getNowIso();
         emitStepStart("write-blog", "Write Blog");
         const draftPrompt = `${getAIBloggerPrompt(
@@ -8517,8 +9123,9 @@ Pipeline context:
 Selected topic: ${selectedTopicForRun}
 Source summary: ${discovery.sourceSummary || "Not provided"}
 Business fit: ${advancedBrief.businessFitSummary || "not specified"}
-Target audience: ${advancedBrief.targetAudience || enrichedBrief.audience || settings.brandVoice.audience}
-CTA goal: ${advancedBrief.ctaGoal || enrichedBrief.cta || settings.brandVoice.ctaStyle}
+Target audience: ${getContextInferredAudience(enrichedBrief.audience, advancedBrief.targetAudience)}
+Tone direction: ${getContextInferredTone(enrichedBrief.tone, advancedBrief.toneDirection)}
+CTA goal: ${getContextInferredCta(enrichedBrief.cta, advancedBrief.ctaGoal)}
 Search intent: ${advancedBrief.searchIntent || serpAnalysis?.intent || "not specified"}
 Content type: ${advancedBrief.contentType || "not specified"}
 Research insights:
@@ -8628,7 +9235,66 @@ Rules:
         };
         let finalSeoAudit = getBlogStudioSeoAudit(finalAuditDraft, settings, resolvedPublishRules);
 
+        // Log Step 14: Write Blog
+        if (jobId) {
+            const writeBlogEndTime = getNowIso();
+            const writeBlogDuration = new Date(writeBlogEndTime).getTime() - new Date(step10StartedAt).getTime();
+            await generationLogger.logStep(
+                14,
+                "Write Blog",
+                {
+                    topic: selectedTopicForRun,
+                    title: metadataPack.title || title,
+                    primaryKeyword: effectivePrimaryKeyword,
+                    wordTarget: effectiveWordTarget,
+                    outlineCount: outlinePack.outline.length,
+                    faqCount: faqPack.faqItems.length,
+                    searchIntent: advancedBrief.searchIntent,
+                },
+                {
+                    startedAt: step10StartedAt,
+                    completedAt: writeBlogEndTime,
+                    durationMs: writeBlogDuration,
+                    details: {
+                        fallbackUsed: draftStage.usedFallback,
+                        model: draftStage.runtimeConfig?.model,
+                    },
+                },
+                {
+                    summary: `Generated blog content of ${finalDraft.wordCount} words with ${finalDraft.outline.length} sections`,
+                    data: {
+                        title: finalDraft.title,
+                        excerpt: finalDraft.excerpt,
+                        metaTitle: finalDraft.metaTitle,
+                        metaDescription: finalDraft.metaDescription,
+                        content: finalDraft.content,
+                        wordCount: finalDraft.wordCount,
+                        seoScore: finalDraft.seoScore,
+                        outline: finalDraft.outline,
+                        tags: finalDraft.tags,
+                        internalLinks: finalDraft.internalLinks,
+                        featuredImageAlt: finalDraft.featuredImageAlt,
+                    },
+                    rawText: draftStage.text,
+                    metrics: {
+                        tokensIn: draftStage.tokens?.inputTokens ?? 0,
+                        tokensOut: draftStage.tokens?.outputTokens ?? 0,
+                    },
+                }
+            );
+        }
+
+        addRunStep(
+            "write-blog",
+            "Write Blog",
+            "completed",
+            `Content: ${finalDraft.wordCount} words | Sections: ${finalDraft.outline.length} | Internal links: ${finalDraft.internalLinks?.length ?? 0}${draftStage.usedFallback ? " | Fallback key used" : ""}`,
+            step10StartedAt,
+        );
+        const finalCheckerStepStartedAt = getNowIso();
+
         if (resolvedPublishRules.aiReviewPolicy.enableFinalChecker && finalDraft.content.trim()) {
+            emitStepStart("final-ai-checker", "Final AI Checker");
             try {
                 const finalCheckerPrompt = buildAIBloggerFinalCheckerPrompt({
                     agencyName: agency.name,
@@ -8698,24 +9364,183 @@ Rules:
                     seoScore: checkedDraftData.seoScore,
                 };
                 const checkedSeoAudit = getBlogStudioSeoAudit(checkedAuditDraft, settings, resolvedPublishRules);
-                blogLogStep("FINAL-AI-CHECKER", "Parsed", { scoreBefore: finalSeoAudit.score, scoreAfter: checkedSeoAudit.score, blockersBefore: finalSeoAudit.blockers.length, blockersAfter: checkedSeoAudit.blockers.length });
+                const wordCountBefore = finalDraft.wordCount ?? countWords(finalDraft.content);
+                const wordCountAfter = checkedDraftData.wordCount ?? countWords(checkedDraftData.content);
+                const scoreBefore = finalSeoAudit.score;
+                const blockersBefore = finalSeoAudit.blockers.length;
+                const blockersBeforeList = [...finalSeoAudit.blockers];
+                const acceptedFinalCheckerRevision = shouldUseFinalCheckerRevision(
+                    finalAuditDraft,
+                    checkedAuditDraft,
+                    settings,
+                    resolvedPublishRules,
+                    finalSeoAudit,
+                    checkedSeoAudit,
+                );
+                const finalCheckerNote = buildFinalCheckerStepNote({
+                    accepted: acceptedFinalCheckerRevision,
+                    scoreBefore,
+                    scoreAfter: checkedSeoAudit.score,
+                    blockersBefore,
+                    blockersAfter: checkedSeoAudit.blockers.length,
+                    wordCountBefore,
+                    wordCountAfter,
+                    usedFallback: finalCheckerStage.usedFallback,
+                });
 
-                if (shouldUseFinalCheckerRevision(finalAuditDraft, checkedAuditDraft, resolvedPublishRules, finalSeoAudit, checkedSeoAudit)) {
+                blogLogStep("FINAL-AI-CHECKER", "Parsed", {
+                    scoreBefore,
+                    scoreAfter: checkedSeoAudit.score,
+                    blockersBefore,
+                    blockersAfter: checkedSeoAudit.blockers.length,
+                    accepted: acceptedFinalCheckerRevision,
+                });
+
+                if (acceptedFinalCheckerRevision) {
                     finalDraft = checkedDraftData;
                     finalAuditDraft = checkedAuditDraft;
                     finalSeoAudit = checkedSeoAudit;
                 }
+
+                addRunStep(
+                    "final-ai-checker",
+                    "Final AI Checker",
+                    "completed",
+                    finalCheckerNote,
+                    finalCheckerStepStartedAt,
+                );
+
+                if (jobId) {
+                    const finalCheckerEndTime = getNowIso();
+                    const finalCheckerDuration = new Date(finalCheckerEndTime).getTime() - new Date(finalCheckerStepStartedAt).getTime();
+                    await generationLogger.logStep(
+                        15,
+                        "Final AI Checker",
+                        {
+                            title: finalAuditDraft.title,
+                            currentSeoScore: scoreBefore,
+                            currentWordCount: wordCountBefore,
+                            enabled: true,
+                        },
+                        {
+                            startedAt: finalCheckerStepStartedAt,
+                            completedAt: finalCheckerEndTime,
+                            durationMs: finalCheckerDuration,
+                            details: {
+                                acceptedRevision: acceptedFinalCheckerRevision,
+                                fallbackUsed: finalCheckerStage.usedFallback,
+                                model: finalCheckerStage.runtimeConfig?.model,
+                                scoreBefore,
+                                scoreAfter: checkedSeoAudit.score,
+                                blockersBefore,
+                                blockersAfter: checkedSeoAudit.blockers.length,
+                                wordCountBefore,
+                                wordCountAfter,
+                            },
+                        },
+                        {
+                            summary: finalCheckerNote,
+                            data: {
+                                acceptedRevision: acceptedFinalCheckerRevision,
+                                blockersBefore: blockersBeforeList,
+                                blockersAfter: checkedSeoAudit.blockers,
+                                checkerDraft: checkedDraftData,
+                                workflowDraftUsed: finalDraft,
+                            },
+                            rawText: finalCheckerStage.text,
+                            metrics: {
+                                tokensIn: finalCheckerStage.tokens?.inputTokens ?? 0,
+                                tokensOut: finalCheckerStage.tokens?.outputTokens ?? 0,
+                            },
+                        }
+                    );
+                }
             } catch (error) {
                 blogLogError("FINAL-AI-CHECKER", "Final checker revision failed", error);
+                addRunStep(
+                    "final-ai-checker",
+                    "Final AI Checker",
+                    "failed",
+                    `Final checker failed: ${getErrorMessage(error)}`,
+                    finalCheckerStepStartedAt,
+                );
+
+                if (jobId) {
+                    const finalCheckerEndTime = getNowIso();
+                    const finalCheckerDuration = new Date(finalCheckerEndTime).getTime() - new Date(finalCheckerStepStartedAt).getTime();
+                    await generationLogger.logStep(
+                        15,
+                        "Final AI Checker",
+                        {
+                            title: finalAuditDraft.title,
+                            currentSeoScore: finalSeoAudit.score,
+                            currentWordCount: finalDraft.wordCount ?? countWords(finalDraft.content),
+                            enabled: true,
+                        },
+                        {
+                            startedAt: finalCheckerStepStartedAt,
+                            completedAt: finalCheckerEndTime,
+                            durationMs: finalCheckerDuration,
+                            details: {},
+                        },
+                        {
+                            status: "failed",
+                            summary: "Final checker failed.",
+                            data: {
+                                error: getErrorMessage(error),
+                            },
+                        },
+                        [getErrorMessage(error)]
+                    );
+                }
+            }
+        } else {
+            const finalCheckerSkipReason = resolvedPublishRules.aiReviewPolicy.enableFinalChecker
+                ? "Skipped because the generated draft content was empty."
+                : "Disabled in publish rules.";
+
+            addRunStep(
+                "final-ai-checker",
+                "Final AI Checker",
+                "skipped",
+                finalCheckerSkipReason,
+                finalCheckerStepStartedAt,
+            );
+
+            if (jobId) {
+                await generationLogger.logStep(
+                    15,
+                    "Final AI Checker",
+                    {
+                        title: finalAuditDraft.title,
+                        enabled: resolvedPublishRules.aiReviewPolicy.enableFinalChecker,
+                    },
+                    {
+                        startedAt: finalCheckerStepStartedAt,
+                        completedAt: finalCheckerStepStartedAt,
+                        durationMs: 0,
+                        details: {},
+                    },
+                    {
+                        status: "skipped",
+                        summary: finalCheckerSkipReason,
+                        data: {
+                            enabled: resolvedPublishRules.aiReviewPolicy.enableFinalChecker,
+                            reason: finalCheckerSkipReason,
+                        },
+                    }
+                );
             }
         }
-
         const step11StartedAt = getNowIso();
         emitStepStart("generate-image", "Generate Image");
         let imagePack = {
             featuredImagePrompt: "",
             featuredImageAlt: finalDraft.featuredImageAlt || metadataPack.title || title,
         };
+        let imageStage: AIBloggerStageRunResult | null = null;
+        let imageStepStatus: "completed" | "failed" | "skipped" = "skipped";
+        let imagePackError: string | undefined;
 
         try {
             const imagePrompt = `Build the "Image Pack" for a blog generation pipeline.
@@ -8725,8 +9550,8 @@ Topic: ${selectedTopicForRun}
 Title: ${finalDraft.title || metadataPack.title || title}
 Search intent: ${advancedBrief.searchIntent || serpAnalysis?.intent || "not specified"}
 Content type: ${advancedBrief.contentType || "not specified"}
-Audience: ${advancedBrief.targetAudience || enrichedBrief.audience || settings.brandVoice.audience}
-Tone: ${enrichedBrief.tone || settings.brandVoice.tone}
+Audience: ${getContextInferredAudience(enrichedBrief.audience, advancedBrief.targetAudience)}
+Tone: ${getContextInferredTone(enrichedBrief.tone, advancedBrief.toneDirection)}
 Business fit: ${advancedBrief.businessFitSummary || "not specified"}
 
 Return JSON only with this shape:
@@ -8742,7 +9567,7 @@ Rules:
 - JSON only, no markdown/code fences.`;
 
             blogLogInput("IMAGE-PACK", imagePrompt);
-            const imageStage = await runAIBloggerStage(
+            imageStage = await runAIBloggerStage(
                 aiConfig,
                 aiBloggerConfig,
                 "generateImage",
@@ -8757,21 +9582,71 @@ Rules:
                 finalDraft.title || metadataPack.title || title,
             );
             blogLogStep("IMAGE-PACK", "Parsed", { prompt: imagePack.featuredImagePrompt?.slice(0, 100), alt: imagePack.featuredImageAlt });
+            imageStepStatus = imagePack.featuredImagePrompt?.trim() ? "completed" : "skipped";
 
             addRunStep(
                 "generate-image",
                 "Generate Image",
-                "completed",
-                `Image prompt ready${imageStage.usedFallback ? " | Fallback key used" : ""}`,
+                imageStepStatus,
+                imageStepStatus === "completed"
+                    ? `Image prompt ready${imageStage.usedFallback ? " | Fallback key used" : ""}`
+                    : "Image stage returned no usable featured image prompt.",
                 step11StartedAt,
             );
         } catch (error) {
+            imagePackError = getErrorMessage(error);
+            imageStepStatus = "failed";
             addRunStep(
                 "generate-image",
                 "Generate Image",
                 "failed",
-                `Image pack failed: ${getErrorMessage(error)}`,
+                `Image pack failed: ${imagePackError}`,
                 step11StartedAt,
+            );
+        }
+
+        // Log Step 16: Generate Image
+        if (jobId) {
+            const generateImageEndTime = getNowIso();
+            const generateImageDuration = new Date(generateImageEndTime).getTime() - new Date(step11StartedAt).getTime();
+            const imageSucceeded = imagePack.featuredImagePrompt && imagePack.featuredImagePrompt.trim().length > 0;
+            await generationLogger.logStep(
+                16,
+                "Generate Image",
+                {
+                    topic: selectedTopicForRun,
+                    title: finalDraft.title,
+                    searchIntent: advancedBrief.searchIntent,
+                    contentType: advancedBrief.contentType,
+                    tone: getContextInferredTone(enrichedBrief.tone, advancedBrief.toneDirection),
+                    audience: getContextInferredAudience(enrichedBrief.audience, advancedBrief.targetAudience),
+                },
+                {
+                    startedAt: step11StartedAt,
+                    completedAt: generateImageEndTime,
+                    durationMs: generateImageDuration,
+                    details: {
+                        promptGenerated: imageSucceeded,
+                        model: "image-generation",
+                    },
+                },
+                {
+                    status: imageStepStatus,
+                    summary: imageSucceeded
+                        ? `Generated featured image prompt and alt text`
+                        : imagePackError
+                            ? `Image generation failed: ${imagePackError}`
+                            : `Image generation returned no usable prompt`,
+                    data: {
+                        prompt: imagePack.featuredImagePrompt,
+                        promptLength: imagePack.featuredImagePrompt?.length ?? 0,
+                        alt: imagePack.featuredImageAlt,
+                        status: imageStepStatus,
+                        error: imagePackError,
+                    },
+                    rawText: imageStage?.text,
+                },
+                imagePackError ? [imagePackError] : undefined,
             );
         }
 
@@ -8797,6 +9672,7 @@ Rules:
                 businessFitWarnings: advancedBrief.businessFitWarnings,
                 targetAudience: advancedBrief.targetAudience,
                 ctaGoal: advancedBrief.ctaGoal,
+                toneDirection: advancedBrief.toneDirection,
                 titleDirection: advancedBrief.titleDirection,
                 metadataDirection: advancedBrief.metadataDirection,
                 searchIntent: advancedBrief.searchIntent,
@@ -8918,8 +9794,8 @@ Rules:
                 title: created.title,
                 wordCount: created.wordCount || effectiveWordTarget,
                 seoScore: finalSeoAudit.score,
-                internalLinks: baseGeneratedInternalLinks.length,
-                faqItems: faqPack.faqItems.length,
+                internalLinks: created.internalLinks?.length || finalDraft.internalLinks?.length || 0,
+                faqItems: created.faqItems?.length || faqPack.faqItems.length,
             });
 
             await generationLogger.finalize("completed");
@@ -8975,6 +9851,11 @@ Rules:
 
         // Log failure to generation logger
         if (jobId) {
+            const lastLoggedStep = [...runSteps].reverse().find((step) => step.key !== "pipeline");
+            generationLogger.setFailure({
+                message,
+                stepName: lastLoggedStep?.label || "Pipeline",
+            });
             await generationLogger.finalize("failed");
         }
 
@@ -9024,67 +9905,133 @@ export async function publishBlogStudioPostImpl(
         throw new Error("This workspace is configured for Draft Only publishing. Switch the publish mode before publishing scheduled posts.");
     }
 
-    const webhookTargetError = getBlogStudioWebhookTargetError(effectiveTarget);
-    if (webhookTargetError) {
-        throw new Error(webhookTargetError);
-    }
-
-    const content = sanitizeText(currentPost.content, 50000);
-    if (!content) {
-        throw new Error("Add the blog content before publishing.");
-    }
-
     const now = new Date().toISOString();
 
     const cannibalization = await getBlogStudioCannibalizationReportImpl(agencyId, currentPost);
-    const publishAudit = getBlogStudioSeoAudit(currentPost, settings, aiBloggerConfig.publishRules, {
-        cannibalization,
+    const publishValidation = validateBlogStudioPublishPackage(
+        currentPost,
+        settings,
+        aiBloggerConfig.publishRules,
+        undefined,
+        undefined,
+        undefined,
+        {
+            cannibalization,
+        },
+    );
+    if (!publishValidation.canPublish) {
+        const blockerSummary = publishValidation.blockers
+            .map((issue) => issue.message)
+            .join(" ");
+        throw new Error(`This draft is not ready to publish. ${blockerSummary || publishValidation.summary}`);
+    }
+    blogLogStep("PUBLISH", "Publish validation passed", {
+        score: publishValidation.auditScore,
+        warnings: publishValidation.warningsCount,
     });
-    if (publishAudit.blockers.length > 0) {
-        throw new Error(`This draft is not ready to publish. Please ${publishAudit.blockers.join(", ")}.`);
-    }
-    blogLogStep("PUBLISH", "SEO audit passed", { score: publishAudit.score });
 
-    if (publishAudit.score < aiBloggerConfig.publishRules.minimumSeoScore) {
-        throw new Error(
-            `This draft is not ready to publish. Raise the SEO score to at least ${aiBloggerConfig.publishRules.minimumSeoScore} (current score: ${publishAudit.score}).`,
-        );
-    }
-
-    if (aiBloggerConfig.publishRules.requireManualApproval && !currentPost.approvedBy) {
-        throw new Error("This workspace requires manual approval before publishing.");
-    }
+    const content = sanitizeText(currentPost.content, 50000);
 
     const resolvedMetaTitle = currentPost.metaTitle?.trim() || currentPost.title;
     const resolvedMetaDescription =
         currentPost.metaDescription?.trim() ||
         buildMetaDescription("", currentPost.excerpt, content, currentPost.title);
     const resolvedImageAlt = currentPost.featuredImageAlt?.trim() || currentPost.title;
-    const resolvedImageUrl =
+    const resolvedImageUrl = toAbsoluteMarketingImageUrl(
         currentPost.featuredImageUrl?.trim() ||
-        `${MARKETING_SITE_URL.replace(/\/+$/, "")}/ai-blogger.svg`;
+        `${MARKETING_SITE_URL.replace(/\/+$/, "")}/ai-blogger.svg`,
+    ) || `${MARKETING_SITE_URL.replace(/\/+$/, "")}/ai-blogger.svg`;
     const resolvedFaqItems = buildMarketingBlogFaqItems(currentPost);
     const resolvedCategory = getMarketingCategory(currentPost);
     const resolvedKeywords = getMarketingMetaKeywords(currentPost);
-    const resolvedSiteUrl =
+    const serpQuery =
+        sanitizeText(currentPost.brief.primaryKeyword, 160, currentPost.title) ||
+        currentPost.title;
+    const publishSerpAnalysis = serpQuery
+        ? await getAIBloggerSerpAnalysis(serpQuery, {
+            agencyId,
+            enabled: aiBloggerConfig?.serp?.enabled ?? false,
+            apiKey: aiBloggerConfig?.serp?.apiKey,
+            fallbackApiKey: aiBloggerConfig?.serp?.fallbackApiKey,
+            fallbackEnabled: aiBloggerConfig?.serp?.fallbackEnabled ?? true,
+            location:
+                currentPost.brief.location ||
+                aiBloggerConfig?.serp?.defaultLocation ||
+                settings.seo.defaultLocation,
+            device: aiBloggerConfig?.serp?.device,
+            maxCompetitors: aiBloggerConfig?.serp?.maxCompetitors,
+            refreshWindowHours: aiBloggerConfig?.serp?.refreshWindowHours,
+            trendsApiKey: aiBloggerConfig?.trends?.apiKey,
+            trendsFallbackApiKey: aiBloggerConfig?.trends?.fallbackApiKey,
+            trendsFallbackEnabled: aiBloggerConfig?.trends?.fallbackEnabled,
+        }).catch((error) => {
+            blogLogError("PUBLISH", "SERP snapshot lookup failed (non-blocking)", error);
+            return null;
+        })
+        : null;
+    const resolvedPeopleAlsoAsk =
+        publishSerpAnalysis?.peopleAlsoAsk?.filter((item) => Boolean(item?.trim())).slice(0, 6) ||
+        resolvedFaqItems.map((item) => item.question);
+    const resolvedSiteUrl = normalizeMarketingSiteOrigin(
         resolveBlogStudioSiteUrl({
             canonicalUrl: currentPost.canonicalUrl,
             brief: currentPost.brief,
             author: aiBloggerConfig?.author,
             entityModeling: aiBloggerConfig?.entityModeling,
-        }) || MARKETING_SITE_URL;
+        }) || MARKETING_SITE_URL,
+    );
     const resolvedOrganizationName =
         sanitizeText(
             aiBloggerConfig?.entityModeling?.organizationName,
             160,
             effectiveTarget.label || "Publishing Target",
         ) || "Publishing Target";
+    const publishedSlug = sanitizeText(
+        currentPost.slug,
+        180,
+        currentPost.publishedEntrySlug || currentPost.slug,
+    );
+    const renderedPublishedContent = buildMarketingBlogHtml(currentPost.content || "", {
+        internalLinks: currentPost.internalLinks,
+        siteUrl: resolvedSiteUrl,
+    });
+    const trackedPublishLinkSuggestions: BlogStudioInternalLinkSuggestion[] = (currentPost.internalLinks || []).map(
+        (link, index) => ({
+            id: `${currentPost.id || currentPost.slug}-publish-link-${index}`,
+            title: link.title,
+            href: link.href,
+            source: link.source,
+            description: link.matchReason || link.title,
+            suggestedAnchor: link.anchorText,
+            matchReason: link.matchReason || link.title,
+            score: link.score,
+            relationType: link.relationType,
+            clusterAligned: Boolean(link.clusterAligned),
+            suggestedSectionHeading: link.suggestedSectionHeading,
+            targetPostSlug: link.targetPostSlug,
+            targetClusterId: link.targetClusterId,
+            targetParentTopicSlug: link.targetParentTopicSlug,
+        }),
+    );
+    const resolvedPublishedInternalLinks = buildTrackedInternalLinksFromContent(
+        renderedPublishedContent,
+        trackedPublishLinkSuggestions,
+        resolvedSiteUrl,
+    );
 
-    const resolvedCanonicalUrl =
+    if (settings.seo.requireInternalLinks && !hasInternalLinks(renderedPublishedContent, resolvedSiteUrl)) {
+        throw new Error(
+            "This workspace requires inline internal links before publishing. Add links in the body using [anchor text](/path) syntax.",
+        );
+    }
+
+    const resolvedCanonicalUrl = normalizeMarketingCanonicalUrl(
         currentPost.canonicalUrl?.trim() ||
-        `${resolvedSiteUrl.replace(/\/+$/, "")}/blog/${currentPost.slug}`;
+        `${resolvedSiteUrl.replace(/\/+$/, "")}/blog/${publishedSlug}`,
+        publishedSlug,
+    );
     const schemaMarkup = buildMarketingBlogSchemaMarkup({
-        slug: currentPost.slug,
+        slug: publishedSlug,
         title: resolvedMetaTitle,
         description: resolvedMetaDescription,
         canonicalUrl: resolvedCanonicalUrl,
@@ -9111,7 +10058,7 @@ export async function publishBlogStudioPostImpl(
         currentPost.canonicalUrl,
         MARKETING_SITE_URL,
     ]);
-    const agencyDoc = await AgencyModel.findById(agencyId).select("name").lean();
+    const agencyDoc = await AgencyModel.findOne({ id: agencyId }).select("name").lean();
     const agencyName = agencyDoc?.name || "Unknown Agency";
 
     const persistWebhookStatus = async (success: boolean, errorMessage = "") => {
@@ -9160,6 +10107,8 @@ export async function publishBlogStudioPostImpl(
 
         const publishedPostSnapshot: BlogStudioPost = {
             ...currentPost,
+            content: renderedPublishedContent,
+            internalLinks: resolvedPublishedInternalLinks,
             target: effectiveTarget,
             metaTitle: resolvedMetaTitle,
             metaDescription: resolvedMetaDescription,
@@ -9168,7 +10117,7 @@ export async function publishBlogStudioPostImpl(
             featuredImageAlt: resolvedImageAlt,
             featuredImageUrl: resolvedImageUrl,
             publishedAt: now,
-            publishedEntrySlug: currentPost.slug,
+            publishedEntrySlug: publishedSlug,
             publishedTargetUrl: webhookUrl,
             publishedMetadataValidatedAt: now,
             updatedAt: now,
@@ -9178,7 +10127,15 @@ export async function publishBlogStudioPostImpl(
             publishedPostSnapshot,
             agencyId,
             agencyName,
-            { category: resolvedCategory },
+            {
+                category: resolvedCategory,
+                content: renderedPublishedContent,
+                internalLinks: resolvedPublishedInternalLinks,
+                metaKeywords: resolvedKeywords,
+                peopleAlsoAsk: resolvedPeopleAlsoAsk,
+                siteUrl: resolvedSiteUrl,
+                slug: publishedSlug,
+            },
         );
         const webhookResult = await sendWebhookToAgency(effectiveTarget.webhookConfig!, webhookPayload);
 
@@ -9186,7 +10143,7 @@ export async function publishBlogStudioPostImpl(
             agencyId,
             webhookUrl,
             currentPost.id,
-            currentPost.slug,
+            publishedSlug,
             webhookPayload,
             [webhookResult],
         );
@@ -9231,7 +10188,7 @@ export async function publishBlogStudioPostImpl(
                 $set: {
                     status: "Published",
                     publishedAt: now,
-                    publishedEntrySlug: currentPost.slug,
+                    publishedEntrySlug: publishedSlug,
                     publishedTargetUrl: webhookUrl,
                     deliveryStatus: "success",
                     deliveryError: "",
@@ -9435,9 +10392,9 @@ export async function upsertBlogStudioSettingsImpl(
     const nextSettings: BlogStudioSettings = {
         agencyId: agency.id,
         brandVoice: {
-            tone: sanitizeText(input.brandVoice?.tone, 120, existing.brandVoice.tone),
-            audience: sanitizeText(input.brandVoice?.audience, 160, existing.brandVoice.audience),
-            ctaStyle: sanitizeText(input.brandVoice?.ctaStyle, 160, existing.brandVoice.ctaStyle),
+            tone: sanitizeProvidedText(input.brandVoice?.tone, 120, existing.brandVoice.tone),
+            audience: sanitizeProvidedText(input.brandVoice?.audience, 160, existing.brandVoice.audience),
+            ctaStyle: sanitizeProvidedText(input.brandVoice?.ctaStyle, 160, existing.brandVoice.ctaStyle),
             bannedTerms: sanitizeStringArray(
                 input.brandVoice?.bannedTerms ?? existing.brandVoice.bannedTerms,
                 20,
@@ -9545,9 +10502,9 @@ export async function createBlogStudioScheduleImpl(
         brief: sanitizeBrief(input.brief, {
             sourceMode: "trending",
             sourceValue: "",
-            audience: settings.brandVoice.audience,
-            tone: settings.brandVoice.tone,
-            cta: settings.brandVoice.ctaStyle,
+            audience: "",
+            tone: "",
+            cta: "",
             primaryKeyword: "",
             language: settings.seo.defaultLanguage,
             location: settings.seo.defaultLocation,

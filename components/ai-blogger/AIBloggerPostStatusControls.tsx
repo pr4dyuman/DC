@@ -115,6 +115,8 @@ export function AIBloggerPostStatusControls({
     const blockingStatuses = nextStatus === "Approved" || nextStatus === "Scheduled";
     const readinessBlockers = blockingStatuses ? (audit?.blockers || []) : [];
     const publishBlocked = publishesToWebhook && publishValidation && !publishValidation.canPublish;
+    const wordRangeWarning = audit?.checks.find((check) => check.key === "word-range" && !check.passed) ?? null;
+    const publishWarnings = publishesToWebhook ? (publishValidation?.warnings || []) : [];
     const publishedHref = useMemo(() => {
         const candidate = publishedUrl?.trim() || "";
         if (!candidate) {
@@ -204,12 +206,18 @@ export function AIBloggerPostStatusControls({
                 if (publishesToWebhook) {
                     await publishBlogStudioPost(slug);
                     toast.success("Published to webhook target");
+                    if (wordRangeWarning) {
+                        toast("Published with warning: word count is outside the target range.");
+                    }
                 } else {
                     await updateBlogStudioPostStatus(slug, {
                         status: nextStatus,
                         scheduledFor: nextStatus === "Scheduled" && scheduledValue ? new Date(scheduledValue).toISOString() : undefined,
                     });
                     toast.success(`${nextStatus} status saved`);
+                    if (nextStatus === "Approved" && wordRangeWarning) {
+                        toast("Approved with warning: word count is outside the target range.");
+                    }
                 }
                 router.refresh();
             } catch (submitError: unknown) {
@@ -412,31 +420,45 @@ export function AIBloggerPostStatusControls({
                     </div>
                 ) : null}
 
-                {publishBlocked && publishValidation ? (
+                {!publishBlocked && wordRangeWarning ? (
+                    <div className="rounded-[24px] border border-amber-500/20 bg-amber-500/5 px-4 py-4 text-sm text-amber-700 dark:text-amber-300">
+                        <p className="font-medium text-foreground">Non-blocking warning</p>
+                        <p className="mt-2 leading-6">{wordRangeWarning.detail}</p>
+                        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                            You can continue anyway, but this post is outside the recommended SEO word range.
+                        </p>
+                    </div>
+                ) : null}
+
+                {(publishBlocked || publishWarnings.length > 0) && publishValidation ? (
                     <div className="space-y-3">
-                        <div className="rounded-[24px] border border-destructive/30 bg-destructive/5 px-4 py-4 text-sm text-destructive">
-                            <p className="font-medium text-foreground">Publish Blockers</p>
-                            <p className="mt-2 leading-6">{publishValidation.summary}</p>
-                        </div>
-                        {publishValidation.blockers.slice(0, 5).map((blocker, index) => (
-                            <div
-                                key={`publish-blocker-${index}`}
-                                className="rounded-[22px] border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm"
-                            >
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <Badge variant="outline" className="rounded-full border-destructive/30 text-[10px] uppercase tracking-[0.16em] text-destructive">
-                                        {blocker.category}
-                                    </Badge>
-                                    <span className="font-medium text-foreground">{blocker.message}</span>
+                        {publishBlocked ? (
+                            <>
+                                <div className="rounded-[24px] border border-destructive/30 bg-destructive/5 px-4 py-4 text-sm text-destructive">
+                                    <p className="font-medium text-foreground">Publish Blockers</p>
+                                    <p className="mt-2 leading-6">{publishValidation.summary}</p>
                                 </div>
-                                <p className="mt-1.5 text-xs leading-5 text-muted-foreground">{blocker.fixHint}</p>
-                            </div>
-                        ))}
-                        {publishValidation.warnings.length > 0 ? (
+                                {publishValidation.blockers.slice(0, 5).map((blocker, index) => (
+                                    <div
+                                        key={`publish-blocker-${index}`}
+                                        className="rounded-[22px] border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm"
+                                    >
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <Badge variant="outline" className="rounded-full border-destructive/30 text-[10px] uppercase tracking-[0.16em] text-destructive">
+                                                {blocker.category}
+                                            </Badge>
+                                            <span className="font-medium text-foreground">{blocker.message}</span>
+                                        </div>
+                                        <p className="mt-1.5 text-xs leading-5 text-muted-foreground">{blocker.fixHint}</p>
+                                    </div>
+                                ))}
+                            </>
+                        ) : null}
+                        {publishWarnings.length > 0 ? (
                             <div className="rounded-[24px] border border-amber-500/20 bg-amber-500/5 px-4 py-4 text-sm text-amber-700 dark:text-amber-300">
-                                <p className="font-medium text-foreground">{publishValidation.warnings.length} warning(s) to review</p>
+                                <p className="font-medium text-foreground">{publishWarnings.length} warning(s) to review</p>
                                 <p className="mt-2 leading-6">
-                                    {publishValidation.warnings.slice(0, 3).map((w) => w.message).join(". ")}
+                                    {publishWarnings.slice(0, 3).map((w) => w.message).join(". ")}
                                 </p>
                             </div>
                         ) : null}

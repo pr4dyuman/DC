@@ -16,6 +16,47 @@ if (!MARKETING_DB_URI) {
 }
 
 let cachedConnection: mongoose.Connection | null = null;
+let cachedConnectionPromise: Promise<mongoose.Connection> | null = null;
+
+function createMarketingConnection() {
+    if (!MARKETING_DB_URI) {
+        throw new Error(
+            "Marketing blog database URI not configured. " +
+            "Please set MARKETING_DB_URI or MONGODB_URI environment variable."
+        );
+    }
+
+    return mongoose.createConnection(MARKETING_DB_URI, {
+        dbName: "marketing-blog",
+        // Connection options for production stability
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+        // TLS/SSL configuration for MongoDB Atlas
+        tls: true,
+        tlsInsecure: false, // Validate certificates properly
+        // Retry configuration for transient failures
+        retryWrites: true,
+        // Connection pool configuration
+        maxPoolSize: 10,
+        minPoolSize: 2,
+        maxIdleTimeMS: 60000,
+    });
+}
+
+/**
+ * Returns the shared marketing DB connection handle synchronously.
+ * This is used by models so they bind to the correct database even
+ * before a route explicitly awaits the connection.
+ */
+export function getMarketingDbConnectionHandle(): mongoose.Connection {
+    if (cachedConnection) {
+        return cachedConnection;
+    }
+
+    const connection = createMarketingConnection();
+    cachedConnection = connection;
+    return connection;
+}
 
 /**
  * Connects to the marketing blog MongoDB database
@@ -26,38 +67,28 @@ export default async function dbConnect(): Promise<mongoose.Connection> {
         return cachedConnection;
     }
 
-    if (!MARKETING_DB_URI) {
-        throw new Error(
-            "Marketing blog database URI not configured. " +
-            "Please set MARKETING_DB_URI or MONGODB_URI environment variable."
-        );
-    }
-
     try {
-        const conn = await mongoose.connect(MARKETING_DB_URI, {
-            dbName: "marketing-blog",
-            // Connection options for production stability
-            serverSelectionTimeoutMS: 10000,
-            socketTimeoutMS: 45000,
-            // TLS/SSL configuration for MongoDB Atlas
-            tls: true,
-            tlsInsecure: false, // Validate certificates properly
-            // Retry configuration for transient failures
-            retryWrites: true,
-            // Connection pool configuration
-            maxPoolSize: 10,
-            minPoolSize: 2,
-            maxIdleTimeMS: 60000,
-        });
+        if (!cachedConnectionPromise) {
+            const connection = getMarketingDbConnectionHandle();
+            cachedConnectionPromise = connection.asPromise().then(() => {
+                console.debug("[Marketing DB] Connected to marketing blog database");
+                return connection;
+            }).catch((error) => {
+                cachedConnectionPromise = null;
+                cachedConnection = null;
+                console.error("[Marketing DB] Connection failed:", error);
+                throw new Error(
+                    `Failed to connect to marketing blog database: ${error instanceof Error ? error.message : String(error)}`
+                );
+            });
+        }
 
-        cachedConnection = conn.connection;
-        console.debug("[Marketing DB] Connected to marketing blog database");
+        cachedConnection = await cachedConnectionPromise;
         return cachedConnection;
     } catch (error) {
-        console.error("[Marketing DB] Connection failed:", error);
-        throw new Error(
-            `Failed to connect to marketing blog database: ${error instanceof Error ? error.message : String(error)}`
-        );
+        throw error instanceof Error
+            ? error
+            : new Error(`Failed to connect to marketing blog database: ${String(error)}`);
     }
 }
 
@@ -75,6 +106,7 @@ export async function closeConnection(): Promise<void> {
     if (cachedConnection) {
         await cachedConnection.close();
         cachedConnection = null;
+        cachedConnectionPromise = null;
         console.debug("[Marketing DB] Disconnected from marketing blog database");
     }
 }

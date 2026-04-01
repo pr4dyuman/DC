@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { getMarketingDbConnectionHandle } from '@/lib/marketing-db';
 
 const CategorySchema = new mongoose.Schema({
   name: {
@@ -30,4 +31,6 @@ CategorySchema.pre('save', async function() {
   }
 });
 
-export default mongoose.models.Category || mongoose.model('Category', CategorySchema);
+const marketingConnection = getMarketingDbConnectionHandle();
+
+export default marketingConnection.models.Category || marketingConnection.model('Category', CategorySchema);

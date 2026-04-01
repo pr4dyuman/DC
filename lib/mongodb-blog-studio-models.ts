@@ -104,6 +104,7 @@ const BlogStudioDraftBriefSchema = new Schema<BlogStudioDraftBrief>(
         businessFitWarnings: [{ type: String }],
         targetAudience: { type: String, default: "" },
         ctaGoal: { type: String, default: "" },
+        toneDirection: { type: String, default: "" },
         titleDirection: { type: String, default: "" },
         metadataDirection: { type: String, default: "" },
         searchIntent: {
@@ -112,7 +113,7 @@ const BlogStudioDraftBriefSchema = new Schema<BlogStudioDraftBrief>(
         },
         contentType: {
             type: String,
-            enum: ["evergreen-guide", "trend-reaction", "comparison", "how-to", "solution-explainer"],
+            enum: ["evergreen-guide", "trend-reaction", "comparison", "how-to", "solution-explainer", "category-authority"],
         },
         entities: [{ type: String }],
     },
@@ -286,7 +287,7 @@ const BlogStudioPostSchema = new Schema<BlogStudioPost>(
         },
         contentType: {
             type: String,
-            enum: ["evergreen-guide", "trend-reaction", "comparison", "how-to", "solution-explainer"],
+            enum: ["evergreen-guide", "trend-reaction", "comparison", "how-to", "solution-explainer", "category-authority"],
         },
         contentClusterId: { type: String, index: true },
         parentTopicSlug: { type: String, index: true },

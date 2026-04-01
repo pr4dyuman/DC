@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
     BarChart3,
@@ -192,6 +192,11 @@ const AI_PIPELINE_STEPS: PipelineStepDefinition[] = [
         icon: Search,
     },
     {
+        key: "performance-feedback",
+        label: "Performance Feedback",
+        icon: CalendarClock,
+    },
+    {
         key: "deep-research",
         label: "Deep Research",
         icon: Brain,
@@ -235,6 +240,11 @@ const AI_PIPELINE_STEPS: PipelineStepDefinition[] = [
         key: "write-blog",
         label: "Write Blog",
         icon: FilePenLine,
+    },
+    {
+        key: "final-ai-checker",
+        label: "Final AI Checker",
+        icon: ShieldCheck,
     },
     {
         key: "generate-image",
@@ -508,6 +518,30 @@ function buildPipelineStepNotes(steps: BlogStudioGenerationStepInsight[]): Pipel
     }, {});
 }
 
+function mapGenerationStepStatusToPipelineState(status: BlogStudioGenerationStepInsight["status"]): PipelineStepState {
+    if (status === "running") {
+        return "active";
+    }
+    if (status === "failed") {
+        return "failed";
+    }
+    if (status === "pending") {
+        return "pending";
+    }
+    return "completed";
+}
+
+function buildPipelineStepStates(
+    steps: BlogStudioGenerationStepInsight[],
+    current?: PipelineStepsMap,
+): PipelineStepsMap {
+    const next = current ? { ...current } : getInitialPipelineSteps();
+    for (const step of steps) {
+        next[step.key] = mapGenerationStepStatusToPipelineState(step.status);
+    }
+    return next;
+}
+
 export function AIBloggerDraftBuilder({
     settings,
     trendPlan,
@@ -538,9 +572,6 @@ export function AIBloggerDraftBuilder({
     const [sourceValue, setSourceValue] = useState("");
     const [trendFocus, setTrendFocus] = useState("");
     const [primaryKeyword, setPrimaryKeyword] = useState("");
-    const [audience, setAudience] = useState(settings.brandVoice.audience);
-    const [tone, setTone] = useState(settings.brandVoice.tone);
-    const [cta, setCta] = useState(settings.brandVoice.ctaStyle);
     const [targetType, setTargetType] = useState<BlogStudioTargetType>(settings.publishing.defaultTarget.type);
     const [excerpt, setExcerpt] = useState("");
     const [content, setContent] = useState("");
@@ -596,9 +627,10 @@ export function AIBloggerDraftBuilder({
             eventSourceRef.current.close();
             eventSourceRef.current = null;
         }
+        activeJobIdRef.current = null;
     }, []);
 
-    const handlePipelineEvent = useCallback(
+    const handlePipelineEvent = useEffectEvent(
         (data: {
             type: string;
             step?: string;
@@ -711,18 +743,13 @@ export function AIBloggerDraftBuilder({
                     const result = isBlogStudioGenerateDraftResult(data.result) ? data.result : null;
                     if (result) {
                         setPipelineStatus("success");
-                        setPipelineSteps(() =>
-                            AI_PIPELINE_STEPS.reduce<PipelineStepsMap>((acc, step) => {
-                                acc[step.key] = "completed";
-                                return acc;
-                            }, {}),
-                        );
+                        setPipelineSteps((current) => buildPipelineStepStates(result.diagnostics.steps, current));
                         setPipelineStepLabels((current) => ({
                             ...current,
                             "fetch-trends": result.diagnostics.fetchTrendsLabel,
                         }));
                         setPipelineStepNotes(buildPipelineStepNotes(result.diagnostics.steps));
-                        setPipelineCompletionMessage("All steps completed. Opening the draft...");
+                        setPipelineCompletionMessage("Draft generated. Opening the draft...");
                         pushPipelineLog("Fetch Trends", `Source: ${result.diagnostics.fetchTrendsLabel} — ${result.diagnostics.fetchTrendsNotes}`, "output");
                         if (typeof result.diagnostics.businessFitScore === "number") {
                             pushPipelineLog("Business Fit", `Score: ${result.diagnostics.businessFitScore}/100${result.diagnostics.businessFitSummary ? ` — ${result.diagnostics.businessFitSummary}` : ""}`, "success");
@@ -790,12 +817,31 @@ export function AIBloggerDraftBuilder({
                 setPipelineStatus("failed");
             }
         },
-        [closeEventSource, pushPipelineLog, pipelineSteps],
     );
+
+    const handleSSEError = useEffectEvent(() => {
+        if (pipelineStatus === "running" && !streamReconnectNoticeRef.current) {
+            streamReconnectNoticeRef.current = true;
+            pushPipelineLog(
+                "Pipeline",
+                "Connection interrupted. Waiting for the live stream to reconnect...",
+                "warn",
+            );
+        }
+    });
 
     /** Connect (or reconnect) an SSE stream for a given jobId. */
     const connectSSE = useCallback(
         (jobId: string) => {
+            const existing = eventSourceRef.current;
+            if (
+                activeJobIdRef.current === jobId &&
+                existing &&
+                existing.readyState !== EventSource.CLOSED
+            ) {
+                return;
+            }
+
             closeEventSource();
 
             // Increment the nonce so stale error/close callbacks from old
@@ -827,17 +873,10 @@ export function AIBloggerDraftBuilder({
             es.onerror = () => {
                 // Only react if this is still the active connection.
                 if (connectionNonceRef.current !== nonce) return;
-                if (pipelineStatus === "running" && !streamReconnectNoticeRef.current) {
-                    streamReconnectNoticeRef.current = true;
-                    pushPipelineLog(
-                        "Pipeline",
-                        "Connection interrupted. Waiting for the live stream to reconnect...",
-                        "warn",
-                    );
-                }
+                handleSSEError();
             };
         },
-        [closeEventSource, handlePipelineEvent, pipelineStatus, pushPipelineLog],
+        [closeEventSource],
     );
 
     /** Reset the pipeline UI to idle state. */
@@ -1074,12 +1113,12 @@ export function AIBloggerDraftBuilder({
     );
     const strategySettingBadges = useMemo(
         () => [
-            `Audience: ${audience}`,
-            `Tone: ${tone}`,
-            `CTA: ${cta}`,
+            "Audience: AI inferred",
+            "Tone: AI inferred",
+            "CTA: AI inferred",
             `Target: ${targetLabel}`,
         ],
-        [audience, cta, targetLabel, tone],
+        [targetLabel],
     );
     const targetConfigurationNote = useMemo(() => {
         if (targetType === "manual-export") {
@@ -1158,9 +1197,6 @@ export function AIBloggerDraftBuilder({
                 sourceMode,
                 sourceValue: sourceValue.trim(),
                 trendFocus,
-                audience,
-                tone,
-                cta,
                 primaryKeyword,
                 language: settings.seo.defaultLanguage,
                 location: settings.seo.defaultLocation,
@@ -1218,9 +1254,6 @@ export function AIBloggerDraftBuilder({
                     sourceMode,
                     sourceValue: sourceValue.trim(),
                     trendFocus,
-                    audience,
-                    tone,
-                    cta,
                     primaryKeyword,
                     language: settings.seo.defaultLanguage,
                     location: settings.seo.defaultLocation,
@@ -1514,49 +1547,17 @@ export function AIBloggerDraftBuilder({
                                     onClick={() => setShowEditorialDefaults((current) => !current)}
                                     className="flex w-full flex-col gap-2.5 text-left sm:flex-row sm:items-center sm:justify-between"
                                 >
-                                    <p className="text-sm font-semibold text-foreground">Editorial defaults</p>
+                                    <p className="text-sm font-semibold text-foreground">Editorial direction</p>
                                     <div className="flex flex-wrap gap-2">
-                                        <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">
-                                            Audience: {audience}
-                                        </div>
-                                        <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">
-                                            Tone: {tone}
-                                        </div>
-                                        <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">
-                                            CTA: {cta}
-                                        </div>
+                                        <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">Audience: AI inferred</div>
+                                        <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">Tone: AI inferred</div>
+                                        <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">CTA: AI inferred</div>
                                     </div>
                                 </button>
 
                                 {showEditorialDefaults ? (
-                                    <div className="mt-4 grid gap-4 border-t border-border/60 pt-4 xl:grid-cols-3">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="ai-blogger-audience">Audience</Label>
-                                            <Input
-                                                id="ai-blogger-audience"
-                                                value={audience}
-                                                onChange={(event) => setAudience(event.target.value)}
-                                                className="h-11 rounded-2xl border-border/60 bg-background/60"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="ai-blogger-tone">Tone</Label>
-                                            <Input
-                                                id="ai-blogger-tone"
-                                                value={tone}
-                                                onChange={(event) => setTone(event.target.value)}
-                                                className="h-11 rounded-2xl border-border/60 bg-background/60"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="ai-blogger-cta">CTA style</Label>
-                                            <Input
-                                                id="ai-blogger-cta"
-                                                value={cta}
-                                                onChange={(event) => setCta(event.target.value)}
-                                                className="h-11 rounded-2xl border-border/60 bg-background/60"
-                                            />
-                                        </div>
+                                    <div className="mt-4 border-t border-border/60 pt-4 text-sm leading-6 text-muted-foreground">
+                                        AI Blogger now decides audience, tone, and CTA inside the existing Brief Pack step using your source input, website intelligence, SERP intent, grounded research, and business-fit analysis.
                                     </div>
                                 ) : null}
                             </div>

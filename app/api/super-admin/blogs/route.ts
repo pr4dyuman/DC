@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectDB } from "@/lib/mongodb";
+import dbConnect from "@/lib/marketing-db";
 import Blog from "@/models/marketing/Blog";
 import { verifySuperAdmin } from "@/lib/actions/super-admin-shared";
 
 export async function POST(request: NextRequest) {
   try {
     await verifySuperAdmin();
-    await connectDB();
+    await dbConnect();
 
     const body = await request.json();
 

@@ -1,6 +1,6 @@
 "use server";
 
-import { connectDB } from "@/lib/mongodb";
+import dbConnect from "@/lib/marketing-db";
 import Blog from "@/models/marketing/Blog";
 import mongoose from "mongoose";
 import { logBlogAuditChange } from "@/lib/blog-audit-log";
@@ -73,13 +73,82 @@ function serializeDate(value?: Date | string | null): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
+function serializeFaqItems(doc: StoredBlogDocument): BlogDocument["faqItems"] {
+  if (!Array.isArray(doc.faqItems)) {
+    return undefined;
+  }
+
+  return doc.faqItems.map((item) => ({
+    question: typeof item?.question === "string" ? item.question : undefined,
+    answer: typeof item?.answer === "string" ? item.answer : undefined,
+  }));
+}
+
+function serializeInternalLinks(doc: StoredBlogDocument): BlogDocument["internalLinks"] {
+  if (!Array.isArray(doc.internalLinks)) {
+    return undefined;
+  }
+
+  return doc.internalLinks.map((link) => ({
+    href: typeof link?.href === "string" ? link.href : "",
+    title: typeof link?.title === "string" ? link.title : "",
+    anchorText: typeof link?.anchorText === "string" ? link.anchorText : "",
+    source:
+      link?.source === "service" || link?.source === "page" || link?.source === "blog"
+        ? link.source
+        : "page",
+    relationType:
+      link?.relationType === "cluster-parent" ||
+      link?.relationType === "cluster-supporting" ||
+      link?.relationType === "pillar-parent" ||
+      link?.relationType === "pillar-supporting" ||
+      link?.relationType === "service-authority" ||
+      link?.relationType === "related-reading" ||
+      link?.relationType === "site-supporting"
+        ? link.relationType
+        : "related-reading",
+    score: typeof link?.score === "number" ? link.score : undefined,
+    matchReason: typeof link?.matchReason === "string" ? link.matchReason : undefined,
+    clusterAligned: typeof link?.clusterAligned === "boolean" ? link.clusterAligned : undefined,
+    suggestedSectionHeading:
+      typeof link?.suggestedSectionHeading === "string" ? link.suggestedSectionHeading : undefined,
+    targetPostSlug: typeof link?.targetPostSlug === "string" ? link.targetPostSlug : undefined,
+    targetClusterId: typeof link?.targetClusterId === "string" ? link.targetClusterId : undefined,
+    targetParentTopicSlug:
+      typeof link?.targetParentTopicSlug === "string" ? link.targetParentTopicSlug : undefined,
+    placement:
+      link?.placement === "introduction" ||
+      link?.placement === "body" ||
+      link?.placement === "faq" ||
+      link?.placement === "conclusion"
+        ? link.placement
+        : undefined,
+  }));
+}
+
 function serializeBlogDocument(doc: StoredBlogDocument): BlogDocument {
   return {
-    ...doc,
     _id: typeof doc._id === "string" ? doc._id : doc._id.toString(),
+    title: doc.title,
+    slug: doc.slug,
+    content: doc.content,
+    image: doc.image,
+    imageAlt: doc.imageAlt,
+    shortDescription: doc.shortDescription,
+    category: doc.category,
+    status: doc.status,
+    metaKeywords: doc.metaKeywords,
+    metaTitle: doc.metaTitle,
+    metaDescription: doc.metaDescription,
+    canonicalUrl: doc.canonicalUrl,
+    schemaMarkup: doc.schemaMarkup,
+    contentClusterId: doc.contentClusterId,
+    parentTopicSlug: doc.parentTopicSlug,
     publishedAt: serializeDate(doc.publishedAt),
     createdAt: serializeDate(doc.createdAt) || new Date().toISOString(),
     updatedAt: serializeDate(doc.updatedAt) || new Date().toISOString(),
+    faqItems: serializeFaqItems(doc),
+    internalLinks: serializeInternalLinks(doc),
   };
 }
 
@@ -124,7 +193,7 @@ export async function getBlogsListPaginated(
 ): Promise<PaginatedBlogsResult> {
   try {
     await verifySuperAdmin();
-    await connectDB();
+    await dbConnect();
 
     // Validate pagination parameters to prevent DOS and division by zero
     if (!Number.isFinite(page) || page < 1) {
@@ -203,7 +272,7 @@ export async function getBlogsListPaginated(
 export async function getBlogById(id: string): Promise<BlogDocument> {
   try {
     await verifySuperAdmin();
-    await connectDB();
+    await dbConnect();
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new Error("Invalid blog ID");
@@ -249,7 +318,7 @@ export async function updateBlog(
 ): Promise<BlogDocument> {
   try {
     await verifySuperAdmin();
-    await connectDB();
+    await dbConnect();
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new Error("Invalid blog ID");
@@ -314,7 +383,7 @@ export async function updateBlog(
 export async function deleteBlog(id: string): Promise<void> {
   try {
     await verifySuperAdmin();
-    await connectDB();
+    await dbConnect();
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new Error("Invalid blog ID");
@@ -405,7 +474,7 @@ export async function validateBlogSEOMetadata(blog: {
 export async function getBlogCategories(): Promise<string[]> {
   try {
     await verifySuperAdmin();
-    await connectDB();
+    await dbConnect();
 
     const categories = await Blog.distinct("category").exec();
     return categories.filter((cat) => cat).sort();
@@ -426,7 +495,7 @@ export async function getBlogStats(): Promise<{
 }> {
   try {
     await verifySuperAdmin();
-    await connectDB();
+    await dbConnect();
 
     const totalBlogs = await Blog.countDocuments().exec();
     const publishedBlogs = await Blog.countDocuments({ status: "published" }).exec();
@@ -456,7 +525,7 @@ export async function getBlogStats(): Promise<{
 export async function bulkDeleteBlogs(ids: string[]): Promise<{ deletedCount: number }> {
   try {
     await verifySuperAdmin();
-    await connectDB();
+    await dbConnect();
 
     const validIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
 
@@ -497,7 +566,7 @@ export async function bulkUpdateBlogStatus(
 ): Promise<{ modifiedCount: number }> {
   try {
     await verifySuperAdmin();
-    await connectDB();
+    await dbConnect();
 
     const validIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
 

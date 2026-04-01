@@ -3,7 +3,9 @@
  * Handles sending published blogs to agency webhook endpoints
  */
 
-import type { BlogStudioWebhookConfig, BlogStudioPost } from "./types-ai-blogger";
+import { buildMarketingBlogHtml } from "./marketing-blog-content";
+import type { BlogStudioPost } from "./types-ai-blogger";
+import type { BlogStudioWebhookConfig } from "./types-ai-blogger";
 
 /**
  * Webhook payload sent to agency endpoints
@@ -16,6 +18,7 @@ export type WebhookPayload = {
         slug: string;
         content: string;
         excerpt: string;
+        metaKeywords?: string;
         metaTitle: string;
         metaDescription: string;
         canonicalUrl: string;
@@ -23,6 +26,11 @@ export type WebhookPayload = {
         imageAlt: string;
         schemaMarkup?: string;
         category: string;
+        faqItems?: Array<{
+            question: string;
+            answer: string;
+        }>;
+        peopleAlsoAsk?: string[];
         internalLinks: Array<{
             href: string;
             title: string;
@@ -314,16 +322,30 @@ export function buildWebhookPayload(
     agencyName: string,
     options?: {
         category?: string;
+        content?: string;
+        internalLinks?: BlogStudioPost["internalLinks"];
+        metaKeywords?: string;
+        peopleAlsoAsk?: string[];
+        siteUrl?: string;
+        slug?: string;
     },
 ): WebhookPayload {
+    const resolvedSlug = options?.slug?.trim() || post.publishedEntrySlug?.trim() || post.slug;
+    const resolvedInternalLinks = options?.internalLinks || post.internalLinks || [];
+    const resolvedContent = buildMarketingBlogHtml(options?.content || post.content || "", {
+        internalLinks: resolvedInternalLinks,
+        siteUrl: options?.siteUrl,
+    });
+
     return {
         event: "blog.published",
         blog: {
             id: post.id,
             title: post.title,
-            slug: post.slug,
-            content: post.content || "",
+            slug: resolvedSlug,
+            content: resolvedContent,
             excerpt: post.excerpt,
+            metaKeywords: options?.metaKeywords || "",
             metaTitle: post.metaTitle || "",
             metaDescription: post.metaDescription || "",
             canonicalUrl: post.canonicalUrl || "",
@@ -331,7 +353,16 @@ export function buildWebhookPayload(
             imageAlt: post.featuredImageAlt || "",
             schemaMarkup: post.schemaMarkup,
             category: options?.category || "",
-            internalLinks: (post.internalLinks || []).map((link) => ({
+            faqItems: (post.faqItems || [])
+                .filter((item) => Boolean(item?.question?.trim() && item?.answer?.trim()))
+                .map((item) => ({
+                    question: item.question.trim(),
+                    answer: item.answer.trim(),
+                })),
+            peopleAlsoAsk: (options?.peopleAlsoAsk || [])
+                .map((item) => item?.trim() || "")
+                .filter(Boolean),
+            internalLinks: resolvedInternalLinks.map((link) => ({
                 href: link.href,
                 title: link.title,
                 anchorText: link.anchorText,

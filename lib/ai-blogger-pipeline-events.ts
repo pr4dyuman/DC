@@ -152,11 +152,14 @@ function ensureMemoryJob(jobId: string, owner?: Partial<PipelineJobOwner>) {
         return existing;
     }
 
+    const emitter = new EventEmitter();
+    emitter.setMaxListeners(0); // Unlimited listeners (each SSE reconnection adds one)
+
     const job: PipelineJob = {
         agencyId: owner?.agencyId,
         createdBy: owner?.createdBy,
         events: [],
-        emitter: new EventEmitter(),
+        emitter,
         status: "running",
         createdAt: Date.now(),
     };
@@ -310,12 +313,13 @@ export async function createPipelineJob(jobId: string, owner: PipelineJobOwner):
                     createdAt: now,
                 },
             },
-            { upsert: true, new: false },
+            { upsert: true, returnDocument: 'before' },
         );
     });
 }
 
 export function emitPipelineEvent(jobId: string, event: Omit<PipelineEvent, "timestamp">) {
+    console.log(`[PIPELINE] emitPipelineEvent: ${jobId} - ${event.type}${event.step ? ` (${event.step})` : ''}`);
     const job = ensureMemoryJob(jobId);
     const fullEvent: PipelineEvent = {
         ...event,
@@ -372,7 +376,7 @@ export function emitPipelineEvent(jobId: string, event: Omit<PipelineEvent, "tim
                     createdAt: new Date(job.createdAt).toISOString(),
                 },
             },
-            { upsert: true, new: false },
+            { upsert: true, returnDocument: 'before' },
         );
     });
 }
@@ -384,6 +388,7 @@ export function subscribePipelineEvents(
 ): (() => void) | null {
     const job = jobs.get(jobId);
     if (!job) {
+        console.log(`[PIPELINE] subscribePipelineEvents: Job ${jobId} not found in memory. Available jobs: ${Array.from(jobs.keys()).join(', ')}`);
         return null;
     }
 

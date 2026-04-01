@@ -124,10 +124,12 @@ export async function POST(request: Request) {
         }
 
         const jobId = crypto.randomUUID();
+        console.log(`[GENERATE-ROUTE] Creating pipeline job: ${jobId}`);
         await createPipelineJob(jobId, {
             agencyId: agency.id,
             createdBy: currentUser.id,
         });
+        console.log(`[GENERATE-ROUTE] Pipeline job created: ${jobId}`);
 
         // Fire-and-forget: the pipeline runs in the background.
         // Results are streamed via SSE on /api/ai-blogger/generate/stream.

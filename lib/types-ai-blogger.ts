@@ -142,6 +142,7 @@ export type BlogStudioDraftBrief = {
     businessFitWarnings?: string[];
     targetAudience: string;
     ctaGoal: string;
+    toneDirection: string;
     titleDirection: string;
     metadataDirection: string;
     searchIntent?: BlogStudioSearchIntent;
@@ -361,6 +362,7 @@ export type BlogStudioPublishValidation = {
     warnings: BlogStudioPublishBlocker[];
     blockersCount: number;
     warningsCount: number;
+    auditScore: number;
     summary: string;
     validatedAt: string;
 };

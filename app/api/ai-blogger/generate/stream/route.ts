@@ -4,10 +4,7 @@ import { getAIBloggerAccessState } from "@/lib/ai-blogger-access";
 import { getPipelineJobSnapshot, subscribePipelineEvents, type PipelineEvent } from "@/lib/ai-blogger-pipeline-events";
 
 export const dynamic = "force-dynamic";
-
-// Track active streams per job to prevent resource exhaustion
-const activeStreams = new Map<string, number>();
-const MAX_STREAMS_PER_JOB = 2;
+export const maxDuration = 300; // 5 minutes - SSE connections need to stay open
 
 export async function GET(request: Request) {
     const url = new URL(request.url);
@@ -15,12 +12,6 @@ export async function GET(request: Request) {
 
     if (!jobId) {
         return new Response("Missing jobId", { status: 400 });
-    }
-
-    // Check if too many streams already active for this job
-    const activeCount = activeStreams.get(jobId) || 0;
-    if (activeCount >= MAX_STREAMS_PER_JOB) {
-        return new Response("Too many connections for this generation job", { status: 429 });
     }
 
     const currentUser = await requireRole("admin");
@@ -44,21 +35,23 @@ export async function GET(request: Request) {
         return new Response("Job not found", { status: 404 });
     }
 
+    console.log(`[SSE] Initial snapshot: status=${initialSnapshot.status}, events=${initialSnapshot.events.length}, jobId=${jobId}`);
+
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
         start(controller) {
-            // Track this stream
-            const currentCount = activeStreams.get(jobId) || 0;
-            activeStreams.set(jobId, currentCount + 1);
-
             let closed = false;
             let emittedCount = 0;
             let cleanup: (() => void) | null = null;
             let closeTimeout: ReturnType<typeof setTimeout> | null = null;
             let pollInterval: ReturnType<typeof setInterval> | null = null;
             let idleTimeout: ReturnType<typeof setTimeout> | null = null;
+            let keepAliveInterval: ReturnType<typeof setInterval> | null = null;
             let abortListener: (() => void) | null = null;
+            const startTime = Date.now();
+
+            console.log(`[SSE] Stream start for ${jobId}`);
 
             const clearTimers = () => {
                 if (closeTimeout) {
@@ -73,6 +66,10 @@ export async function GET(request: Request) {
                     clearTimeout(idleTimeout);
                     idleTimeout = null;
                 }
+                if (keepAliveInterval) {
+                    clearInterval(keepAliveInterval);
+                    keepAliveInterval = null;
+                }
             };
 
             const closeStream = () => {
@@ -81,17 +78,10 @@ export async function GET(request: Request) {
                 }
 
                 closed = true;
+                console.log(`[SSE] closeStream called for ${jobId}`);
                 clearTimers();
                 cleanup?.();
                 cleanup = null;
-
-                // Untrack this stream
-                const count = activeStreams.get(jobId) || 1;
-                if (count <= 1) {
-                    activeStreams.delete(jobId);
-                } else {
-                    activeStreams.set(jobId, count - 1);
-                }
 
                 if (abortListener) {
                     try {
@@ -135,7 +125,7 @@ export async function GET(request: Request) {
                         // Ignore enqueue failures on close.
                     }
                     closeStream();
-                }, 150_000);
+                }, 300_000); // 5 minutes - accommodate long-running steps like Fetch Trends
             };
 
             const sendEvent = (event: PipelineEvent) => {
@@ -148,7 +138,9 @@ export async function GET(request: Request) {
                 );
                 emittedCount += 1;
 
+                // Only close on final completion, not on step-complete
                 if (event.type === "complete" || event.type === "error") {
+                    console.log(`[SSE] Scheduling close because of ${event.type} event`);
                     scheduleClose();
                     return;
                 }
@@ -159,10 +151,12 @@ export async function GET(request: Request) {
             controller.enqueue(
                 encoder.encode(`data: ${JSON.stringify({ type: "connected", jobId })}\n\n`),
             );
+            console.log(`[SSE] Sent connected event for ${jobId}`);
 
             for (const event of initialSnapshot.events) {
                 sendEvent(event);
             }
+            console.log(`[SSE] Sent ${initialSnapshot.events.length} initial events for ${jobId}`);
 
             if (initialSnapshot.status !== "running") {
                 scheduleClose();
@@ -171,16 +165,47 @@ export async function GET(request: Request) {
 
             resetIdleTimeout();
 
+            // Start keep-alive immediately to prevent browser timeout during setup
+            let keepAliveCount = 0;
+            console.log(`[SSE] Starting keep-alive comments (every 300ms) for ${jobId}`);
+            keepAliveInterval = setInterval(() => {
+                if (!closed) {
+                    try {
+                        controller.enqueue(encoder.encode(": keep-alive\n\n"));
+                        keepAliveCount += 1;
+                        if (keepAliveCount % 10 === 0) {
+                            console.log(`[SSE] Keep-alive #${keepAliveCount} sent for ${jobId}`);
+                        }
+                    } catch {
+                        // Stream closed, interval will be cleared by closeStream
+                    }
+                }
+            }, 300);
+
+            // Send first keep-alive immediately to signal data is flowing
+            try {
+                controller.enqueue(encoder.encode(": keep-alive\n\n"));
+                console.log(`[SSE] Immediate keep-alive sent for ${jobId}`);
+            } catch {
+                // Ignore if stream is already closed
+            }
+
             cleanup = subscribePipelineEvents(jobId, sendEvent, { replayPastEvents: false });
 
+            console.log(`[SSE] subscribePipelineEvents returned: ${cleanup ? 'cleanup function' : 'null'} for ${jobId}`);
+
             if (!cleanup) {
+                console.log(`[SSE] No live subscription available, setting up polling for ${jobId}`);
                 let consecutiveErrors = 0;
                 const MAX_CONSECUTIVE_ERRORS = 3;
+                let pollCount = 0;
 
                 const pollSnapshot = async () => {
+                    pollCount += 1;
                     try {
                         const snapshot = await getPipelineJobSnapshot(jobId);
                         if (!snapshot.exists || snapshot.agencyId !== agency.id) {
+                            console.log(`[SSE] Poll #${pollCount}: Job not found or unauthorized`);
                             sendEvent({
                                 type: "error",
                                 message: "Job expired or is no longer available.",
@@ -193,9 +218,10 @@ export async function GET(request: Request) {
                             return;
                         }
 
+                        const nextEvents = snapshot.events.slice(emittedCount);
+                        console.log(`[SSE] Poll #${pollCount}: Found ${nextEvents.length} new events (total: ${snapshot.events.length}, status: ${snapshot.status})`);
                         consecutiveErrors = 0; // Reset on successful poll
 
-                        const nextEvents = snapshot.events.slice(emittedCount);
                         for (const event of nextEvents) {
                             sendEvent(event);
                         }
@@ -209,9 +235,10 @@ export async function GET(request: Request) {
                         }
                     } catch (error) {
                         consecutiveErrors += 1;
-                        console.error(`[AI-BLOGGER] Poll error (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`, error);
+                        console.error(`[SSE] Poll #${pollCount} error (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`, error);
 
                         if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                            console.error(`[SSE] Max polling errors reached, closing stream for ${jobId}`);
                             sendEvent({
                                 type: "error",
                                 message: "Generation service unavailable. Please try again.",
@@ -233,9 +260,17 @@ export async function GET(request: Request) {
             }
 
             abortListener = () => {
-                closeStream();
+                const elapsed = Date.now() - startTime;
+                console.log(`[SSE] Abort signal for ${jobId}, closed=${closed}, emitted=${emittedCount} events after ${elapsed}ms`);
+                if (!closed) {
+                    closeStream();
+                }
             };
             request.signal.addEventListener("abort", abortListener);
+            console.log(`[SSE] Stream setup complete for ${jobId}, cleanup=${cleanup ? 'live' : 'polling'}`);
+        },
+        cancel() {
+            // Client disconnected - cleanup will be handled by abort listener or stream close
         },
     });
 
