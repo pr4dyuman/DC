@@ -33,6 +33,16 @@ export async function connectMongo() {
             bufferCommands: false,
             serverSelectionTimeoutMS: 10000,
             socketTimeoutMS: 45000,
+            // TLS/SSL configuration for MongoDB Atlas
+            tls: true,
+            tlsInsecure: false, // Validate certificates properly
+            // Retry configuration for transient failures
+            retryWrites: true,
+            w: "majority",
+            // Connection pool configuration
+            maxPoolSize: 10,
+            minPoolSize: 2,
+            maxIdleTimeMS: 60000,
         };
 
         console.log("Attempting to connect to MongoDB...");

@@ -39,6 +39,16 @@ export default async function dbConnect(): Promise<mongoose.Connection> {
             // Connection options for production stability
             serverSelectionTimeoutMS: 10000,
             socketTimeoutMS: 45000,
+            // TLS/SSL configuration for MongoDB Atlas
+            tls: true,
+            tlsInsecure: false, // Validate certificates properly
+            // Retry configuration for transient failures
+            retryWrites: true,
+            w: "majority",
+            // Connection pool configuration
+            maxPoolSize: 10,
+            minPoolSize: 2,
+            maxIdleTimeMS: 60000,
         });
 
         cachedConnection = conn.connection;

@@ -5,12 +5,22 @@ import { getPipelineJobSnapshot, subscribePipelineEvents, type PipelineEvent } f
 
 export const dynamic = "force-dynamic";
 
+// Track active streams per job to prevent resource exhaustion
+const activeStreams = new Map<string, number>();
+const MAX_STREAMS_PER_JOB = 2;
+
 export async function GET(request: Request) {
     const url = new URL(request.url);
     const jobId = url.searchParams.get("jobId") || "";
 
     if (!jobId) {
         return new Response("Missing jobId", { status: 400 });
+    }
+
+    // Check if too many streams already active for this job
+    const activeCount = activeStreams.get(jobId) || 0;
+    if (activeCount >= MAX_STREAMS_PER_JOB) {
+        return new Response("Too many connections for this generation job", { status: 429 });
     }
 
     const currentUser = await requireRole("admin");
@@ -38,6 +48,10 @@ export async function GET(request: Request) {
 
     const stream = new ReadableStream({
         start(controller) {
+            // Track this stream
+            const currentCount = activeStreams.get(jobId) || 0;
+            activeStreams.set(jobId, currentCount + 1);
+
             let closed = false;
             let emittedCount = 0;
             let cleanup: (() => void) | null = null;
@@ -70,6 +84,14 @@ export async function GET(request: Request) {
                 clearTimers();
                 cleanup?.();
                 cleanup = null;
+
+                // Untrack this stream
+                const count = activeStreams.get(jobId) || 1;
+                if (count <= 1) {
+                    activeStreams.delete(jobId);
+                } else {
+                    activeStreams.set(jobId, count - 1);
+                }
 
                 if (abortListener) {
                     try {
@@ -152,24 +174,55 @@ export async function GET(request: Request) {
             cleanup = subscribePipelineEvents(jobId, sendEvent, { replayPastEvents: false });
 
             if (!cleanup) {
+                let consecutiveErrors = 0;
+                const MAX_CONSECUTIVE_ERRORS = 3;
+
                 const pollSnapshot = async () => {
-                    const snapshot = await getPipelineJobSnapshot(jobId);
-                    if (!snapshot.exists || snapshot.agencyId !== agency.id) {
-                        sendEvent({
-                            type: "error",
-                            message: "Job expired or is no longer available.",
-                            timestamp: new Date().toISOString(),
-                        });
-                        return;
-                    }
+                    try {
+                        const snapshot = await getPipelineJobSnapshot(jobId);
+                        if (!snapshot.exists || snapshot.agencyId !== agency.id) {
+                            sendEvent({
+                                type: "error",
+                                message: "Job expired or is no longer available.",
+                                timestamp: new Date().toISOString(),
+                            });
+                            if (pollInterval) {
+                                clearInterval(pollInterval);
+                                pollInterval = null;
+                            }
+                            return;
+                        }
 
-                    const nextEvents = snapshot.events.slice(emittedCount);
-                    for (const event of nextEvents) {
-                        sendEvent(event);
-                    }
+                        consecutiveErrors = 0; // Reset on successful poll
 
-                    if (snapshot.status !== "running" && nextEvents.length === 0) {
-                        scheduleClose();
+                        const nextEvents = snapshot.events.slice(emittedCount);
+                        for (const event of nextEvents) {
+                            sendEvent(event);
+                        }
+
+                        if (snapshot.status !== "running" && nextEvents.length === 0) {
+                            if (pollInterval) {
+                                clearInterval(pollInterval);
+                                pollInterval = null;
+                            }
+                            scheduleClose();
+                        }
+                    } catch (error) {
+                        consecutiveErrors += 1;
+                        console.error(`[AI-BLOGGER] Poll error (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`, error);
+
+                        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                            sendEvent({
+                                type: "error",
+                                message: "Generation service unavailable. Please try again.",
+                                timestamp: new Date().toISOString(),
+                            });
+                            if (pollInterval) {
+                                clearInterval(pollInterval);
+                                pollInterval = null;
+                            }
+                            scheduleClose();
+                        }
                     }
                 };
 

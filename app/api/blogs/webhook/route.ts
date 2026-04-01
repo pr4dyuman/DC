@@ -113,6 +113,15 @@ async function getMainMongoClient() {
     if (!cachedMainMongoClientPromise) {
         const client = new MongoClient(mongoUri, {
             serverSelectionTimeoutMS: 10000,
+            // TLS/SSL configuration for MongoDB Atlas
+            tls: true,
+            tlsInsecure: false, // Validate certificates properly
+            // Retry configuration for transient failures
+            retryWrites: true,
+            // Connection pool configuration
+            maxPoolSize: 10,
+            minPoolSize: 2,
+            maxIdleTimeMS: 60000,
         });
         cachedMainMongoClientPromise = client.connect().catch((error) => {
             cachedMainMongoClientPromise = null;
