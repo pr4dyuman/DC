@@ -7463,7 +7463,7 @@ export async function updateBlogStudioPostStatusImpl(
     const updated = await BlogStudioPostModel.findOneAndUpdate(
         { agencyId, slug },
         { $set: updatePayload },
-        { new: true }
+        { returnDocument: 'after' }
     ).lean();
 
     if (!updated) {

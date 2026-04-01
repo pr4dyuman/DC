@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
         publishedAt: new Date(blog.publishedAt),
         status: "published",
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
 
     return NextResponse.json(
@@ -118,7 +118,7 @@ app.post("/api/webhooks/blog-published", async (req, res) => {
         publishedAt: new Date(blog.publishedAt),
         status: "published",
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
 
     res.json({ success: true, blogId: savedBlog._id });
