@@ -461,4 +461,6 @@ export class AIBloggerGenerationLogger {
   }
 }
 
-export const generationLogger = new AIBloggerGenerationLogger(true);
+export const generationLogger = new AIBloggerGenerationLogger(
+  process.env.NODE_ENV !== 'production' // Only enable file logging in development
+);

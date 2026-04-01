@@ -277,7 +277,7 @@ export async function updateBlog(
     const blog = (await Blog.findByIdAndUpdate(
       id,
       { $set: updates },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).lean().exec()) as StoredBlogDocument | null;
 
     if (!blog) {

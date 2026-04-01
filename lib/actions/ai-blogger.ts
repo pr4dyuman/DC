@@ -6156,7 +6156,7 @@ async function syncAgencyBlogStudioPerformanceImpl(
             },
             {
                 upsert: true,
-                new: true,
+                returnDocument: 'after',
             },
         ).lean();
     }
@@ -6592,7 +6592,7 @@ export async function updateBlogStudioPostImpl(
     const updated = await BlogStudioPostModel.findOneAndUpdate(
         { agencyId, slug },
         updateOp,
-        { new: true },
+        { returnDocument: 'after' },
     ).lean();
 
     if (!updated) {
@@ -7169,7 +7169,7 @@ Rules:
                     seoScore: refreshedSeoAudit.score,
                 },
             },
-            { new: true },
+            { returnDocument: 'after' },
         ).lean();
 
         if (!updated) {
@@ -7304,7 +7304,7 @@ export async function generateBlogStudioFeaturedImageImpl(
                     updatedBy: actor.id,
                 },
             },
-            { new: true },
+            { returnDocument: 'after' },
         ).lean();
 
         if (!updated) {
@@ -9149,7 +9149,7 @@ export async function publishBlogStudioPostImpl(
                     updatedBy: actor.id,
                 },
             },
-            { new: true },
+            { returnDocument: 'after' },
         ).lean();
 
         if (!claimedPost) {
@@ -9246,7 +9246,7 @@ export async function publishBlogStudioPostImpl(
                     publishedEntryId: 1,
                 },
             },
-            { new: true },
+            { returnDocument: 'after' },
         ).lean();
 
         if (!updated) {
@@ -9274,7 +9274,7 @@ export async function publishBlogStudioPostImpl(
                         updatedBy: actor.id,
                     },
                 },
-                { new: true },
+                { returnDocument: 'after' },
             ).lean();
 
             if (restored) {
@@ -9659,7 +9659,7 @@ export async function updateBlogStudioScheduleImpl(
         {
             $set: nextSchedule,
         },
-        { new: true },
+        { returnDocument: 'after' },
     ).lean();
 
     if (!updated) {
@@ -9831,7 +9831,7 @@ async function claimBlogStudioScheduleLock(
                 updatedBy: actorId,
             },
         },
-        { new: true },
+        { returnDocument: 'after' },
     ).lean();
 
     // SECURITY FIX: Verify the lock was actually claimed by checking the returned document
@@ -10010,7 +10010,7 @@ async function executeBlogStudioScheduleRun(
                     updatedBy: actor.id,
                 },
             },
-            { new: true },
+            { returnDocument: 'after' },
         ).lean();
 
         await recordBlogStudioRunImpl(schedule.agencyId, actor, {
@@ -10089,7 +10089,7 @@ async function executeBlogStudioScheduleRun(
                     updatedBy: actor.id,
                 },
             },
-            { new: true },
+            { returnDocument: 'after' },
         ).lean();
 
         await recordBlogStudioRunImpl(schedule.agencyId, actor, {

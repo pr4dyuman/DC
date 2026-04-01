@@ -321,7 +321,7 @@ export async function POST(request: NextRequest) {
 
         if (isUpdate) {
             // Update existing blog
-            savedBlog = await Blog.findOneAndUpdate({ slug: payload.blog.slug }, blogData, { new: true });
+            savedBlog = await Blog.findOneAndUpdate({ slug: payload.blog.slug }, blogData, { returnDocument: 'after' });
             console.log("[Webhook] Updated blog", {
                 slug: payload.blog.slug,
                 duration: `${Date.now() - startTime}ms`,
