@@ -44,7 +44,6 @@ export default async function dbConnect(): Promise<mongoose.Connection> {
             tlsInsecure: false, // Validate certificates properly
             // Retry configuration for transient failures
             retryWrites: true,
-            w: "majority",
             // Connection pool configuration
             maxPoolSize: 10,
             minPoolSize: 2,
