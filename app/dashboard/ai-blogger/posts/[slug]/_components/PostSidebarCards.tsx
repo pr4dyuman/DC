@@ -15,6 +15,7 @@ import {
 import {
     AIBloggerGlassCard,
 } from "@/components/ai-blogger/AIBloggerPrimitives";
+import { AIBloggerLiveWordCount } from "@/components/ai-blogger/AIBloggerLiveWordCount";
 import { Badge } from "@/components/ui/badge";
 import { getBlogStudioSeoLabel } from "@/lib/ai-blogger-seo-audit";
 import {
@@ -484,7 +485,13 @@ export function PostOutlineTagsCard({
                             Word Range
                         </div>
                         <p className="text-sm font-medium">
-                            {wordCount} / {minWords}-{maxWords}
+                            <AIBloggerLiveWordCount
+                                postId={postId}
+                                initialWordCount={wordCount}
+                                format="range"
+                                minWords={minWords}
+                                maxWords={maxWords}
+                            />
                         </p>
                     </div>
                 </div>

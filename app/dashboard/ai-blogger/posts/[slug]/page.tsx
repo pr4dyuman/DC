@@ -10,6 +10,7 @@ import {
 
 import { AIBloggerPostActions } from "@/components/ai-blogger/AIBloggerPostActions";
 import { AIBloggerPostEditorForm } from "@/components/ai-blogger/AIBloggerPostEditorForm";
+import { AIBloggerLiveWordCount } from "@/components/ai-blogger/AIBloggerLiveWordCount";
 import { AIBloggerLockedState } from "@/components/ai-blogger/AIBloggerLockedState";
 import { AIBloggerBreadcrumb } from "@/components/ai-blogger/AIBloggerBreadcrumb";
 import {
@@ -42,6 +43,7 @@ import {
     humanizeBlogStudioValue,
     isBlogStudioTrendLed,
 } from "@/lib/ai-blogger-presentation";
+import { buildBlogStudioBlockerResolutionPreview } from "@/lib/ai-blogger-blocker-resolution";
 import { getAgencyAIBloggerConfigServer } from "@/lib/utils-server";
 
 import {
@@ -166,7 +168,7 @@ export default async function AIBloggerPostDetailPage({
 
     /* ── Derived state ────────────────────────────────────────── */
 
-    const wordCount = post.wordCount ?? countWords(post.content);
+    const wordCount = countWords(post.content) || post.wordCount || 0;
     const seoAudit = getBlogStudioSeoAudit(post, settings, aiBloggerConfig?.publishRules, {
         cannibalization: cannibalizationReport,
     });
@@ -225,6 +227,10 @@ export default async function AIBloggerPostDetailPage({
         : internalLinkHealth?.status === "weak"
             ? "amber"
             : "destructive";
+    const blockerResolutionSiteUrl =
+        aiBloggerConfig?.entityModeling?.organizationUrl ||
+        aiBloggerConfig?.author?.url ||
+        (post.brief.sourceMode === "website" ? post.brief.sourceValue : "");
     const publishValidation = validateBlogStudioPublishPackage(
         post,
         settings,
@@ -237,6 +243,14 @@ export default async function AIBloggerPostDetailPage({
             cannibalization: cannibalizationReport,
         },
     );
+    const blockerResolutionPreview = buildBlogStudioBlockerResolutionPreview({
+        post,
+        settings,
+        publishRules: aiBloggerConfig?.publishRules,
+        audit: seoAudit,
+        publishValidation,
+        siteUrl: blockerResolutionSiteUrl,
+    });
     const schemaJsonLd = buildBlogStudioArticleJsonLd(post, {
         author: aiBloggerConfig?.author,
         entityModeling: aiBloggerConfig?.entityModeling,
@@ -347,7 +361,7 @@ export default async function AIBloggerPostDetailPage({
                         {/* Word count */}
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/60 px-3 py-1 text-xs text-muted-foreground">
                             <FileText className="h-3 w-3" />
-                            {wordCount} words
+                            <AIBloggerLiveWordCount postId={post.id} initialWordCount={wordCount} />
                         </span>
 
                         {/* Source */}
@@ -394,6 +408,7 @@ export default async function AIBloggerPostDetailPage({
                     {/* Editor card — no inner sub-header, clean edges */}
                     <AIBloggerGlassCard className="p-5 sm:p-6">
                         <AIBloggerPostEditorForm
+                            key={`${post.id}:${post.updatedAt}`}
                             post={post}
                             settings={settings}
                             internalLinkSuggestions={internalLinkSuggestions}
@@ -488,6 +503,7 @@ export default async function AIBloggerPostDetailPage({
                             audit={seoAudit}
                             publishValidation={publishValidation}
                             publishingSettings={settings.publishing}
+                            blockerResolutionPreview={blockerResolutionPreview}
                             auditScore={auditScore}
                             blockersCount={blockersCount}
                             isReady={isReady}

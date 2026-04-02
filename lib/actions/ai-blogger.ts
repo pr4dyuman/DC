@@ -35,6 +35,7 @@ import {
     normalizeBlogStudioTargetType,
     resolveBlogStudioTargetType,
 } from "../ai-blogger-targets";
+import { buildBlogStudioBlockerResolutionPreview } from "../ai-blogger-blocker-resolution";
 import {
     getDefaultBlogStudioScheduledFor,
     isBlogStudioDraftOnlyMode,
@@ -75,6 +76,8 @@ import {
 import { getValidSearchConsoleAccessToken } from "../ai-blogger-search-console-oauth";
 import { generationLogger } from "../ai-blogger-generation-logger";
 import type {
+    BlogStudioBlockerResolutionPreview,
+    BlogStudioBlockerResolutionResult,
     BlogStudioCannibalizationMatch,
     BlogStudioCannibalizationReport,
     BlogStudioBrief,
@@ -112,6 +115,7 @@ import type {
     BlogStudioSchedule,
     BlogStudioScheduleCadence,
     BlogStudioScheduleLastRunStatus,
+    BlogStudioResolvedBlocker,
     BlogStudioScheduleStatus,
     BlogStudioSeoAudit,
     BlogStudioSettings,
@@ -2578,6 +2582,219 @@ function formatSeoAuditIssuesForPrompt(audit: ReturnType<typeof getBlogStudioSeo
         .join("\n");
 }
 
+function formatPublishValidationIssuesForPrompt(validation: BlogStudioPublishValidation) {
+    if (validation.blockers.length === 0) {
+        return "- No publish blockers are currently open.";
+    }
+
+    return validation.blockers
+        .slice(0, 12)
+        .map((blocker) => `- ${blocker.category}: ${blocker.message} | Fix hint: ${blocker.fixHint}`)
+        .join("\n");
+}
+
+function formatResolvedBlockersForPrompt(
+    heading: string,
+    blockers: BlogStudioResolvedBlocker[],
+) {
+    if (blockers.length === 0) {
+        return `${heading}\n- None`;
+    }
+
+    return `${heading}\n${blockers
+        .map((blocker) => `- ${blocker.category}: ${blocker.message} | Fix hint: ${blocker.fixHint}`)
+        .join("\n")}`;
+}
+
+function formatBlockerResolutionPreviewForPrompt(preview: BlogStudioBlockerResolutionPreview) {
+    return [
+        formatResolvedBlockersForPrompt("AI-fixable blockers:", preview.aiFixable),
+        formatResolvedBlockersForPrompt("Human-review blockers:", preview.humanRequired),
+        formatResolvedBlockersForPrompt("System/config blockers:", preview.systemRequired),
+    ].join("\n\n");
+}
+
+function formatCannibalizationForPrompt(report: BlogStudioCannibalizationReport | null) {
+    if (!report) {
+        return "";
+    }
+
+    const matches = (report.matches || [])
+        .slice(0, 5)
+        .map((match, index) => `${index + 1}. ${match.title} | ${match.slug} | Score: ${match.similarityScore} | Overlap: ${match.reason}`)
+        .join("\n");
+
+    return `Cannibalization context:
+- Risk: ${report.risk}
+- Summary: ${report.summary}
+${matches ? `- Top overlaps:\n${matches}` : "- Top overlaps: none"}
+
+Rules:
+- If overlap is soft or medium, you may differentiate angle, title, metadata, headings, and CTA.
+- If overlap is clearly high-risk, do not pretend it is fully solved. Reduce overlap where possible and leave the blocker visible for human review.`;
+}
+
+function mergeBlockerResolverInternalLinkSuggestions(
+    post: Pick<BlogStudioPost, "id" | "slug" | "internalLinks">,
+    suggestions: BlogStudioInternalLinkSuggestion[],
+    siteUrl?: string,
+) {
+    const merged = new Map<string, BlogStudioInternalLinkSuggestion>();
+
+    const seedSuggestion = (suggestion: BlogStudioInternalLinkSuggestion) => {
+        const normalizedHref =
+            normalizeInternalLinkHref(suggestion.href, siteUrl) ||
+            suggestion.href.trim();
+        if (!normalizedHref || merged.has(normalizedHref)) {
+            return;
+        }
+
+        merged.set(normalizedHref, {
+            ...suggestion,
+            href: normalizedHref,
+        });
+    };
+
+    for (const suggestion of suggestions) {
+        seedSuggestion(suggestion);
+    }
+
+    for (const [index, link] of (post.internalLinks || []).entries()) {
+        const normalizedHref =
+            normalizeInternalLinkHref(link.href, siteUrl) ||
+            link.href.trim();
+        if (!normalizedHref || merged.has(normalizedHref)) {
+            continue;
+        }
+
+        seedSuggestion({
+            id: `${post.id || post.slug}-saved-link-${index}`,
+            title: link.title,
+            href: normalizedHref,
+            source: link.source,
+            description: link.matchReason || link.title,
+            suggestedAnchor: link.anchorText,
+            matchReason: link.matchReason || "Previously accepted internal link target.",
+            score: link.score || 0,
+            relationType: link.relationType,
+            clusterAligned: Boolean(link.clusterAligned),
+            suggestedSectionHeading: link.suggestedSectionHeading,
+            targetPostSlug: link.targetPostSlug,
+            targetClusterId: link.targetClusterId,
+            targetParentTopicSlug: link.targetParentTopicSlug,
+        });
+    }
+
+    return Array.from(merged.values()).slice(0, 8);
+}
+
+function buildAIBloggerBlockerResolverPrompt(input: {
+    agencyName?: string;
+    draft: BlogStudioPost;
+    settings: BlogStudioSettings;
+    publishRules: AIBloggerConfig["publishRules"];
+    audit: BlogStudioSeoAudit;
+    publishValidation: BlogStudioPublishValidation;
+    blockerPreview: BlogStudioBlockerResolutionPreview;
+    internalLinksPromptBlock?: string;
+    groundedResearchPromptBlock?: string;
+    websitePromptBlock?: string;
+    serpPromptBlock?: string;
+    cannibalizationPromptBlock?: string;
+}) {
+    const aiReviewPolicy = input.publishRules.aiReviewPolicy;
+    const detectedStyleFlags = detectAIBloggerStyleRedFlags(input.draft.content || "");
+
+    return `Run the "AI Blocker Resolver" stage for an AI Blogger draft.
+
+Goal:
+- Fix only the blockers that are safe to solve from the current draft context.
+- Save the improved draft only. Never publish, schedule, or advance workflow state.
+- Leave human-review or system/config blockers visible instead of pretending they are solved.
+
+Agency: ${getPromptAgencyName(input.agencyName)}
+Title: ${input.draft.title}
+Primary keyword: ${input.draft.brief.primaryKeyword || "not provided"}
+Audience: ${getContextInferredAudience(input.draft.brief.audience, input.draft.draftBrief?.targetAudience)}
+Tone: ${getContextInferredTone(input.draft.brief.tone, input.draft.draftBrief?.toneDirection)}
+CTA goal: ${getContextInferredCta(input.draft.brief.cta, input.draft.draftBrief?.ctaGoal)}
+Search intent: ${input.draft.searchIntent || "not specified"}
+Content type: ${input.draft.contentType || "not specified"}
+Current SEO score: ${input.audit.score}
+Current SEO blockers: ${input.audit.blockers.join(" | ") || "none"}
+Current publish blockers: ${input.publishValidation.blockers.map((blocker) => blocker.message).join(" | ") || "none"}
+Current word count: ${input.draft.wordCount ?? countWords(input.draft.content)}
+Target word range: ${input.settings.seo.minWords}-${input.settings.seo.maxWords}
+AI-style red flags: ${detectedStyleFlags.join(" | ") || "none detected"}
+Structural auto-fix enabled: ${aiReviewPolicy.autoFixStructuralIssues ? "yes" : "no"}
+Tone auto-fix enabled: ${aiReviewPolicy.autoFixToneMismatch ? "yes" : "no"}
+Soften questionable claims: ${aiReviewPolicy.softenQuestionableClaims ? "yes" : "no"}
+Require grounded support for claims: ${aiReviewPolicy.requireGroundedSourcesForClaims ? "yes" : "no"}
+
+Current metadata:
+- Meta title: ${input.draft.metaTitle || input.draft.title}
+- Meta description: ${input.draft.metaDescription || input.draft.excerpt}
+- Excerpt: ${input.draft.excerpt || "not provided"}
+- Featured image alt: ${input.draft.featuredImageAlt || input.draft.title}
+
+Current outline:
+${input.draft.outline.length > 0 ? input.draft.outline.map((item) => `- ${item}`).join("\n") : "- Use the existing body structure"}
+
+Current FAQ pack:
+${input.draft.faqItems?.length ? input.draft.faqItems.map((item, index) => `${index + 1}. ${item.question} - ${item.answer}`).join("\n") : "No FAQ items are currently stored"}
+
+SEO issues to fix:
+${formatSeoAuditIssuesForPrompt(input.audit)}
+
+Publish validation issues to fix:
+${formatPublishValidationIssuesForPrompt(input.publishValidation)}
+
+${formatBlockerResolutionPreviewForPrompt(input.blockerPreview)}
+${input.cannibalizationPromptBlock ? `\n\n${input.cannibalizationPromptBlock}` : ""}
+${input.groundedResearchPromptBlock ? `\n\n${input.groundedResearchPromptBlock}` : ""}
+${input.internalLinksPromptBlock ? `\n\n${input.internalLinksPromptBlock}` : ""}
+${input.serpPromptBlock ? `\n\n${input.serpPromptBlock}` : ""}
+${input.websitePromptBlock ? `\n\n${input.websitePromptBlock}` : ""}
+
+Current content:
+${sanitizeText(input.draft.content, 35000)}
+
+Return JSON only with this exact shape:
+{
+  "title": "string",
+  "primaryKeyword": "string",
+  "metaTitle": "string",
+  "metaDescription": "string",
+  "excerpt": "string",
+  "content": "string",
+  "outline": ["string"],
+  "tags": ["string"],
+  "metaKeywords": ["string"],
+  "featuredImageAlt": "string",
+  "faqItems": [
+    {
+      "question": "string",
+      "answer": "string"
+    }
+  ],
+  "seoScore": 0,
+  "wordCount": 0
+}
+
+CRITICAL RULES:
+- Fix AI-fixable blockers first: metadata, content depth, FAQ coverage, internal links, featured image alt text, tone cleanup, and safe claim softening.
+- Do not claim to fix workflow, scheduling, webhook configuration, manual approval, or any blocker that clearly requires a human or system change.
+- Preserve the core topic, audience, business fit, and search intent unless the current framing is the blocker.
+- Preserve inline [1], [2] citations when grounded sources support factual claims.
+- If support is weak, soften the wording instead of inventing certainty.
+- Keep internal links inline as [anchor text](/path) syntax. Do not paste raw URLs into sentences.
+- Use ## for section headings and ### for sub-headings only. Never use # inside the body.
+- Never use em-dashes, double hyphens, or AI filler phrases like "In today's digital landscape".
+- Do not blank strong metadata, remove useful FAQs, or reduce internal links below the required threshold.
+- Keep one blank line between paragraphs.
+- JSON only, no markdown code fences, no commentary.`;
+}
+
 function buildAIBloggerFinalCheckerPrompt(input: {
     agencyName?: string;
     draft: BlogStudioPost;
@@ -2970,6 +3187,241 @@ function parseGeneratedDraftResponse(rawText: string, requestedTitle: string) {
             wordCount: countWords(fallbackContent),
         };
     }
+}
+
+function parseBlockerResolverResponse(
+    rawText: string,
+    currentPost: Pick<BlogStudioPost, "title" | "brief" | "faqItems">,
+) {
+    try {
+        const parsed = JSON.parse(extractFirstJsonObject(rawText)) as {
+            title?: string;
+            primaryKeyword?: string;
+            metaTitle?: string;
+            metaDescription?: string;
+            excerpt?: string;
+            content?: string;
+            outline?: string[];
+            tags?: string[];
+            metaKeywords?: string[];
+            featuredImageAlt?: string;
+            faqItems?: Array<{ question?: string; answer?: string }>;
+            seoScore?: number;
+            wordCount?: number;
+        };
+
+        const base = parseGeneratedDraftResponse(rawText, currentPost.title);
+        const primaryKeyword = sanitizeText(
+            parsed.primaryKeyword,
+            120,
+            currentPost.brief.primaryKeyword || "",
+        );
+
+        return {
+            ...base,
+            primaryKeyword,
+            faqItems: sanitizeFaqItems(parsed.faqItems, 6),
+        };
+    } catch {
+        const base = parseGeneratedDraftResponse(rawText, currentPost.title);
+        return {
+            ...base,
+            primaryKeyword: sanitizeText(currentPost.brief.primaryKeyword, 120),
+            faqItems: sanitizeFaqItems(currentPost.faqItems, 6),
+        };
+    }
+}
+
+function buildBlockerResolutionChangedFields(
+    currentPost: Pick<
+        BlogStudioPost,
+        | "title"
+        | "brief"
+        | "metaTitle"
+        | "metaDescription"
+        | "excerpt"
+        | "content"
+        | "outline"
+        | "tags"
+        | "featuredImageAlt"
+        | "faqItems"
+        | "internalLinks"
+        | "canonicalUrl"
+        | "schemaMarkup"
+        | "seoScore"
+        | "wordCount"
+    >,
+    nextPost: Pick<
+        BlogStudioPost,
+        | "title"
+        | "brief"
+        | "metaTitle"
+        | "metaDescription"
+        | "excerpt"
+        | "content"
+        | "outline"
+        | "tags"
+        | "featuredImageAlt"
+        | "faqItems"
+        | "internalLinks"
+        | "canonicalUrl"
+        | "schemaMarkup"
+        | "seoScore"
+        | "wordCount"
+    >,
+) {
+    const changedFields: string[] = [];
+    const pushIfChanged = (key: string, currentValue: unknown, nextValue: unknown) => {
+        if (JSON.stringify(currentValue) !== JSON.stringify(nextValue)) {
+            changedFields.push(key);
+        }
+    };
+
+    pushIfChanged("title", currentPost.title, nextPost.title);
+    pushIfChanged("primaryKeyword", currentPost.brief.primaryKeyword || "", nextPost.brief.primaryKeyword || "");
+    pushIfChanged("metaTitle", currentPost.metaTitle || "", nextPost.metaTitle || "");
+    pushIfChanged("metaDescription", currentPost.metaDescription || "", nextPost.metaDescription || "");
+    pushIfChanged("excerpt", currentPost.excerpt || "", nextPost.excerpt || "");
+    pushIfChanged("content", currentPost.content || "", nextPost.content || "");
+    pushIfChanged("outline", currentPost.outline || [], nextPost.outline || []);
+    pushIfChanged("tags", currentPost.tags || [], nextPost.tags || []);
+    pushIfChanged("featuredImageAlt", currentPost.featuredImageAlt || "", nextPost.featuredImageAlt || "");
+    pushIfChanged("faqItems", currentPost.faqItems || [], nextPost.faqItems || []);
+    pushIfChanged("internalLinks", currentPost.internalLinks || [], nextPost.internalLinks || []);
+    pushIfChanged("canonicalUrl", currentPost.canonicalUrl || "", nextPost.canonicalUrl || "");
+    pushIfChanged("schemaMarkup", currentPost.schemaMarkup || "", nextPost.schemaMarkup || "");
+    pushIfChanged("seoScore", currentPost.seoScore ?? null, nextPost.seoScore ?? null);
+    pushIfChanged("wordCount", currentPost.wordCount ?? null, nextPost.wordCount ?? null);
+
+    return changedFields;
+}
+
+function shouldUseBlockerResolverRevision(
+    currentDraft: Pick<
+        BlogStudioPost,
+        | "title"
+        | "metaTitle"
+        | "metaDescription"
+        | "excerpt"
+        | "featuredImageAlt"
+        | "outline"
+        | "internalLinks"
+        | "content"
+        | "wordCount"
+        | "faqItems"
+        | "canonicalUrl"
+        | "schemaMarkup"
+        | "brief"
+    >,
+    nextDraft: Pick<
+        BlogStudioPost,
+        | "title"
+        | "metaTitle"
+        | "metaDescription"
+        | "excerpt"
+        | "featuredImageAlt"
+        | "outline"
+        | "internalLinks"
+        | "content"
+        | "wordCount"
+        | "faqItems"
+        | "canonicalUrl"
+        | "schemaMarkup"
+        | "brief"
+    >,
+    settings: Pick<BlogStudioSettings, "seo">,
+    publishRules: AIBloggerConfig["publishRules"],
+    currentAudit: ReturnType<typeof getBlogStudioSeoAudit>,
+    nextAudit: ReturnType<typeof getBlogStudioSeoAudit>,
+    currentPublishValidation: BlogStudioPublishValidation,
+    nextPublishValidation: BlogStudioPublishValidation,
+    currentBlockerPreview: BlogStudioBlockerResolutionPreview,
+    nextBlockerPreview: BlogStudioBlockerResolutionPreview,
+) {
+    if (
+        currentDraft.brief.primaryKeyword?.trim() &&
+        !nextDraft.brief.primaryKeyword?.trim()
+    ) {
+        return false;
+    }
+
+    if (
+        (publishRules.requireFaqForInformational || currentDraft.faqItems?.length) &&
+        currentDraft.faqItems?.length &&
+        (!nextDraft.faqItems || nextDraft.faqItems.length === 0)
+    ) {
+        return false;
+    }
+
+    if (
+        (publishRules.requireCanonicalUrl || currentDraft.canonicalUrl?.trim()) &&
+        !nextDraft.canonicalUrl?.trim()
+    ) {
+        return false;
+    }
+
+    if (
+        (publishRules.requireSchemaMarkup || currentDraft.schemaMarkup?.trim()) &&
+        nextDraft.canonicalUrl?.trim() &&
+        !nextDraft.schemaMarkup?.trim()
+    ) {
+        return false;
+    }
+
+    if (nextBlockerPreview.humanRequiredCount > currentBlockerPreview.humanRequiredCount) {
+        return false;
+    }
+
+    if (nextBlockerPreview.systemRequiredCount > currentBlockerPreview.systemRequiredCount) {
+        return false;
+    }
+
+    const acceptedByCoreGuardrails = shouldUseFinalCheckerRevision(
+        currentDraft,
+        nextDraft,
+        settings,
+        publishRules,
+        currentAudit,
+        nextAudit,
+    );
+
+    if (acceptedByCoreGuardrails) {
+        return true;
+    }
+
+    if (nextBlockerPreview.aiFixableCount < currentBlockerPreview.aiFixableCount) {
+        return true;
+    }
+
+    if (nextPublishValidation.blockersCount < currentPublishValidation.blockersCount) {
+        return true;
+    }
+
+    return false;
+}
+
+function buildBlockerResolutionSummary(input: {
+    aiFixedCount: number;
+    remainingHumanCount: number;
+    remainingSystemCount: number;
+    remainingAiCount: number;
+    changedFieldsCount: number;
+}) {
+    const fixedPart = input.aiFixedCount > 0
+        ? `AI fixed ${input.aiFixedCount} blocker${input.aiFixedCount === 1 ? "" : "s"}`
+        : "AI reviewed the draft but did not fully clear any blocker";
+    const changedPart = input.changedFieldsCount > 0
+        ? `and updated ${input.changedFieldsCount} field${input.changedFieldsCount === 1 ? "" : "s"}`
+        : "without changing any saved fields";
+    const remainingParts = [
+        input.remainingAiCount > 0 ? `${input.remainingAiCount} AI-fixable still remain` : "",
+        input.remainingHumanCount > 0 ? `${input.remainingHumanCount} need human review` : "",
+        input.remainingSystemCount > 0 ? `${input.remainingSystemCount} need settings fixes` : "",
+    ].filter(Boolean);
+
+    return remainingParts.length > 0
+        ? `${fixedPart} ${changedPart}. Remaining: ${remainingParts.join(", ")}.`
+        : `${fixedPart} ${changedPart}. No blockers remain.`;
 }
 
 type TopicDiscoveryResult = {
@@ -7428,6 +7880,429 @@ Rules:
 
         throw new Error(message);
     }
+}
+
+export async function resolveBlogStudioPostBlockersWithAIImpl(
+    agencyId: string,
+    actor: ActionActor,
+    slug: string,
+): Promise<BlogStudioBlockerResolutionResult> {
+    await connectDB();
+
+    const startedMs = Date.now();
+    const now = new Date().toISOString();
+    const postDoc = await BlogStudioPostModel.findOne({ agencyId, slug }).lean();
+
+    if (!postDoc) {
+        throw new Error("AI Blogger post not found.");
+    }
+
+    const currentPost = toBlogStudioPost(postDoc);
+    if (currentPost.status === "Published") {
+        throw new Error("Published posts cannot use the AI blocker resolver.");
+    }
+
+    const [settings, executionContext] = await Promise.all([
+        getBlogStudioRuntimeSettingsImpl(agencyId),
+        getAgencyAIBloggerExecutionContext(agencyId),
+    ]);
+    const aiConfig = executionContext.aiConfig;
+    const aiBloggerConfig = executionContext.aiBloggerConfig;
+    const mergedConfig = getAgencyMergedAIBloggerConfig(aiConfig, aiBloggerConfig);
+    const publishRules = mergedConfig.publishRules;
+    const currentSiteUrl =
+        resolveBlogStudioSiteUrl({
+            canonicalUrl: currentPost.canonicalUrl,
+            brief: currentPost.brief,
+            author: aiBloggerConfig?.author,
+            entityModeling: aiBloggerConfig?.entityModeling,
+        }) || undefined;
+    const serpQuery =
+        sanitizeText(currentPost.brief.primaryKeyword, 160, currentPost.title) ||
+        currentPost.title;
+
+    const [
+        currentCannibalization,
+        internalLinkSuggestions,
+        serpAnalysis,
+        websiteIntelligence,
+    ] = await Promise.all([
+        getBlogStudioCannibalizationReportImpl(agencyId, currentPost),
+        getBlogStudioInternalLinkSuggestions(currentPost, 6, {
+            siteUrl: currentSiteUrl,
+        }),
+        serpQuery
+            ? getAIBloggerSerpAnalysis(serpQuery, {
+                agencyId,
+                enabled: aiBloggerConfig?.serp?.enabled ?? false,
+                apiKey: aiBloggerConfig?.serp?.apiKey,
+                fallbackApiKey: aiBloggerConfig?.serp?.fallbackApiKey,
+                fallbackEnabled: aiBloggerConfig?.serp?.fallbackEnabled ?? true,
+                location:
+                    currentPost.brief.location ||
+                    aiBloggerConfig?.serp?.defaultLocation ||
+                    settings.seo.defaultLocation,
+                device: aiBloggerConfig?.serp?.device,
+                maxCompetitors: aiBloggerConfig?.serp?.maxCompetitors,
+                refreshWindowHours: aiBloggerConfig?.serp?.refreshWindowHours,
+                trendsApiKey: aiBloggerConfig?.trends?.apiKey,
+                trendsFallbackApiKey: aiBloggerConfig?.trends?.fallbackApiKey,
+                trendsFallbackEnabled: aiBloggerConfig?.trends?.fallbackEnabled,
+            }).catch((error) => {
+                blogLogError("BLOCKER-RESOLVER", "SERP analysis failed (non-fatal)", error);
+                return null;
+            })
+            : Promise.resolve(null),
+        currentPost.brief.sourceMode === "website" && currentPost.brief.sourceValue?.trim()
+            ? getAIBloggerWebsiteIntelligence(currentPost.brief.sourceValue, {
+                agencyId,
+                enabled: aiBloggerConfig?.crawl?.enabled ?? true,
+                maxPages: aiBloggerConfig?.crawl?.maxPages,
+                timeoutMs: aiBloggerConfig?.crawl?.timeoutMs,
+                refreshWindowHours: aiBloggerConfig?.crawl?.refreshWindowHours,
+                allowedPaths: aiBloggerConfig?.crawl?.allowedPaths,
+                blockedPaths: aiBloggerConfig?.crawl?.blockedPaths,
+            }).catch((error) => {
+                blogLogError("BLOCKER-RESOLVER", "Website intelligence failed (non-fatal)", error);
+                return null;
+            })
+            : Promise.resolve(null),
+    ]);
+
+    const currentAudit = getBlogStudioSeoAudit(currentPost, settings, publishRules, {
+        cannibalization: currentCannibalization,
+    });
+    const currentPublishValidation = validateBlogStudioPublishPackage(
+        currentPost,
+        settings,
+        publishRules,
+        undefined,
+        undefined,
+        currentAudit.score,
+        {
+            audit: currentAudit,
+            cannibalization: currentCannibalization,
+        },
+    );
+    const blockersBefore = buildBlogStudioBlockerResolutionPreview({
+        post: currentPost,
+        settings,
+        publishRules,
+        audit: currentAudit,
+        publishValidation: currentPublishValidation,
+        siteUrl: currentSiteUrl,
+    });
+
+    if (!blockersBefore.hasBlockingIssues) {
+        return {
+            post: currentPost,
+            changedFields: [],
+            blockersBefore,
+            blockersAfter: blockersBefore,
+            aiFixed: [],
+            remainingHuman: [],
+            remainingSystem: [],
+            summary: "No blockers were found on this draft.",
+        };
+    }
+
+    if (!blockersBefore.hasAiFixable) {
+        return {
+            post: currentPost,
+            changedFields: [],
+            blockersBefore,
+            blockersAfter: blockersBefore,
+            aiFixed: [],
+            remainingHuman: blockersBefore.humanRequired,
+            remainingSystem: blockersBefore.systemRequired,
+            summary: buildBlockerResolutionSummary({
+                aiFixedCount: 0,
+                remainingAiCount: blockersBefore.aiFixableCount,
+                remainingHumanCount: blockersBefore.humanRequiredCount,
+                remainingSystemCount: blockersBefore.systemRequiredCount,
+                changedFieldsCount: 0,
+            }),
+        };
+    }
+
+    const mergedInternalLinkSuggestions = mergeBlockerResolverInternalLinkSuggestions(
+        currentPost,
+        internalLinkSuggestions,
+        currentSiteUrl,
+    );
+    const prompt = buildAIBloggerBlockerResolverPrompt({
+        agencyName: executionContext.name,
+        draft: currentPost,
+        settings,
+        publishRules,
+        audit: currentAudit,
+        publishValidation: currentPublishValidation,
+        blockerPreview: blockersBefore,
+        internalLinksPromptBlock: formatInternalLinkSuggestionsForPrompt(mergedInternalLinkSuggestions),
+        groundedResearchPromptBlock: currentPost.externalSources?.length
+            ? formatGroundedResearchForPrompt({
+                query: serpQuery,
+                normalizedQuery: normalizeCannibalizationPhrase(serpQuery),
+                location: currentPost.brief.location || settings.seo.defaultLocation,
+                sources: currentPost.externalSources,
+                summary: `Stored source pack for ${currentPost.title}`,
+                cacheStatus: "cached",
+                refreshedAt: currentPost.updatedAt,
+            })
+            : "",
+        websitePromptBlock: formatWebsiteIntelligenceForPrompt(websiteIntelligence),
+        serpPromptBlock: formatSerpAnalysisForPrompt(serpAnalysis),
+        cannibalizationPromptBlock: formatCannibalizationForPrompt(currentCannibalization),
+    });
+    const runtimeConfig = resolveAIBloggerFinalCheckerRuntimeConfig(aiConfig, aiBloggerConfig);
+    const blockerResolutionStage = await runAIBloggerRuntimeConfig(
+        runtimeConfig,
+        prompt,
+        Boolean(aiBloggerConfig?.fallbackEnabled),
+    );
+    const parsed = parseBlockerResolverResponse(blockerResolutionStage.text, currentPost);
+    const nextTitle = sanitizeText(parsed.title, 180, currentPost.title);
+    const nextContent = sanitizeText(parsed.content, 50000, currentPost.content || "");
+    const nextExcerpt = buildExcerpt(parsed.excerpt, nextContent, nextTitle);
+    const nextMetaTitle = buildMetaTitle(parsed.metaTitle, nextTitle);
+    const nextMetaDescription = buildMetaDescription(parsed.metaDescription, nextExcerpt, nextContent, nextTitle);
+    const nextBrief = sanitizeBrief(
+        {
+            ...currentPost.brief,
+            primaryKeyword: parsed.primaryKeyword || currentPost.brief.primaryKeyword,
+        },
+        currentPost.brief,
+    );
+    const nextTags = sanitizeStringArray(
+        [
+            ...parsed.tags,
+            ...currentPost.tags,
+            nextBrief.primaryKeyword || "",
+        ],
+        12,
+        40,
+    );
+    const nextOutline = parsed.outline.length > 0 ? parsed.outline : currentPost.outline;
+    const nextFaqItems = parsed.faqItems.length > 0
+        ? parsed.faqItems
+        : sanitizeFaqItems(currentPost.faqItems, 6);
+    const nextFeaturedImageAlt = sanitizeText(
+        parsed.featuredImageAlt,
+        200,
+        currentPost.featuredImageAlt || nextTitle,
+    );
+    const nextWordCount = resolveDraftWordCount(
+        parsed.wordCount ?? currentPost.wordCount,
+        nextContent,
+        settings,
+    );
+    const nextSiteUrl = normalizeMarketingSiteOrigin(
+        resolveBlogStudioSiteUrl({
+            canonicalUrl: currentPost.canonicalUrl,
+            brief: nextBrief,
+            author: aiBloggerConfig?.author,
+            entityModeling: aiBloggerConfig?.entityModeling,
+        }) || currentSiteUrl || "",
+    );
+    const nextInternalLinks = buildTrackedInternalLinksFromContent(
+        nextContent,
+        mergeBlockerResolverInternalLinkSuggestions(
+            currentPost,
+            mergedInternalLinkSuggestions,
+            nextSiteUrl || currentSiteUrl,
+        ),
+        nextSiteUrl || currentSiteUrl,
+    );
+    const canonicalCandidate =
+        currentPost.canonicalUrl?.trim() ||
+        (nextSiteUrl ? buildDraftCanonicalUrl(currentPost.slug, nextSiteUrl) : "");
+    const nextCanonicalUrl = canonicalCandidate
+        ? normalizeMarketingCanonicalUrl(canonicalCandidate, currentPost.slug)
+        : "";
+    let nextDraft: BlogStudioPost = {
+        ...currentPost,
+        title: nextTitle,
+        excerpt: nextExcerpt,
+        metaTitle: nextMetaTitle,
+        metaDescription: nextMetaDescription,
+        canonicalUrl: nextCanonicalUrl || currentPost.canonicalUrl,
+        featuredImageAlt: nextFeaturedImageAlt,
+        content: nextContent,
+        tags: nextTags,
+        outline: nextOutline,
+        brief: nextBrief,
+        faqItems: nextFaqItems,
+        internalLinks: nextInternalLinks,
+        wordCount: nextWordCount,
+        seoScore: currentPost.seoScore,
+        updatedAt: now,
+        updatedBy: actor.id,
+    };
+
+    if (
+        nextSiteUrl &&
+        nextDraft.canonicalUrl?.trim() &&
+        (
+            publishRules.requireSchemaMarkup ||
+            !nextDraft.schemaMarkup?.trim() ||
+            blockersBefore.aiFixable.some((blocker) => blocker.key === "schema-markup")
+        )
+    ) {
+        nextDraft = {
+            ...nextDraft,
+            schemaMarkup: buildMarketingBlogSchemaMarkup({
+                slug: nextDraft.slug,
+                title: nextDraft.metaTitle?.trim() || nextDraft.title,
+                description: nextDraft.metaDescription?.trim() || nextDraft.excerpt,
+                canonicalUrl: nextDraft.canonicalUrl,
+                siteUrl: nextSiteUrl,
+                organizationName:
+                    sanitizeText(
+                        aiBloggerConfig?.entityModeling?.organizationName,
+                        160,
+                        currentPost.target.label || executionContext.name || "Publishing Target",
+                    ) || "Publishing Target",
+                imageUrl: toAbsoluteMarketingImageUrl(
+                    currentPost.featuredImageUrl?.trim() ||
+                    `${MARKETING_SITE_URL.replace(/\/+$/, "")}/ai-blogger.svg`,
+                ) || undefined,
+                imageAlt: nextFeaturedImageAlt,
+                organizationLogoUrl: aiBloggerConfig?.entityModeling?.organizationLogoUrl,
+                category: getMarketingCategory({
+                    ...nextDraft,
+                    tags: nextTags,
+                }),
+                keywords: getMarketingMetaKeywords({
+                    ...nextDraft,
+                    tags: nextTags,
+                    brief: nextBrief,
+                }),
+                publishedAt: currentPost.publishedAt,
+                updatedAt: now,
+                faqItems: nextFaqItems,
+            }),
+        };
+    }
+
+    const nextCannibalization = await getBlogStudioCannibalizationReportImpl(agencyId, nextDraft);
+    const nextAudit = getBlogStudioSeoAudit(nextDraft, settings, publishRules, {
+        cannibalization: nextCannibalization,
+    });
+    nextDraft = {
+        ...nextDraft,
+        seoScore: nextAudit.score,
+    };
+    const nextPublishValidation = validateBlogStudioPublishPackage(
+        nextDraft,
+        settings,
+        publishRules,
+        undefined,
+        undefined,
+        nextAudit.score,
+        {
+            audit: nextAudit,
+            cannibalization: nextCannibalization,
+        },
+    );
+    const blockersAfter = buildBlogStudioBlockerResolutionPreview({
+        post: nextDraft,
+        settings,
+        publishRules,
+        audit: nextAudit,
+        publishValidation: nextPublishValidation,
+        siteUrl: nextSiteUrl || currentSiteUrl,
+    });
+
+    if (!shouldUseBlockerResolverRevision(
+        currentPost,
+        nextDraft,
+        settings,
+        publishRules,
+        currentAudit,
+        nextAudit,
+        currentPublishValidation,
+        nextPublishValidation,
+        blockersBefore,
+        blockersAfter,
+    )) {
+        throw new Error("AI blocker resolution did not improve the draft enough to save safely.");
+    }
+
+    const updated = await BlogStudioPostModel.findOneAndUpdate(
+        { agencyId, slug },
+        {
+            $set: {
+                title: nextDraft.title,
+                excerpt: nextDraft.excerpt,
+                metaTitle: nextDraft.metaTitle,
+                metaDescription: nextDraft.metaDescription,
+                canonicalUrl: nextDraft.canonicalUrl,
+                schemaMarkup: nextDraft.schemaMarkup,
+                featuredImageAlt: nextDraft.featuredImageAlt,
+                content: nextDraft.content,
+                tags: nextDraft.tags,
+                outline: nextDraft.outline,
+                brief: nextDraft.brief,
+                faqItems: nextDraft.faqItems,
+                internalLinks: nextDraft.internalLinks,
+                seoScore: nextAudit.score,
+                wordCount: nextDraft.wordCount,
+                updatedAt: now,
+                updatedBy: actor.id,
+            },
+        },
+        { returnDocument: "after" },
+    ).lean();
+
+    if (!updated) {
+        throw new Error("Failed to save the AI blocker resolver changes.");
+    }
+
+    const updatedPost = toBlogStudioPost(updated);
+    const changedFields = buildBlockerResolutionChangedFields(currentPost, nextDraft);
+    const aiFixed = blockersBefore.aiFixable.filter(
+        (blocker) => !blockersAfter.blockers.some((afterBlocker) => afterBlocker.key === blocker.key),
+    );
+    const result: BlogStudioBlockerResolutionResult = {
+        post: updatedPost,
+        changedFields,
+        blockersBefore,
+        blockersAfter,
+        aiFixed,
+        remainingHuman: blockersAfter.humanRequired,
+        remainingSystem: blockersAfter.systemRequired,
+        summary: buildBlockerResolutionSummary({
+            aiFixedCount: aiFixed.length,
+            remainingAiCount: blockersAfter.aiFixableCount,
+            remainingHumanCount: blockersAfter.humanRequiredCount,
+            remainingSystemCount: blockersAfter.systemRequiredCount,
+            changedFieldsCount: changedFields.length,
+        }),
+    };
+
+    await recordBlogStudioActivity(
+        agencyId,
+        actor,
+        "Resolved AI Blogger blockers with AI",
+        updatedPost.title,
+        updatedPost.id,
+    );
+
+    await logAIUsage({
+        agencyId,
+        userId: actor.id,
+        feature: "ai-blogger",
+        model: `${blockerResolutionStage.runtimeConfig.provider}:${getResolvedAIBloggerModel(blockerResolutionStage.runtimeConfig)}`,
+        provider: blockerResolutionStage.runtimeConfig.provider,
+        durationMs: Date.now() - startedMs,
+        ...blockerResolutionStage.tokens,
+    });
+
+    revalidateAIBloggerRoute();
+    revalidateAIBloggerRoute("/posts");
+    revalidateAIBloggerRoute(`/posts/${slug}`);
+
+    return result;
 }
 
 export async function generateBlogStudioFeaturedImageImpl(

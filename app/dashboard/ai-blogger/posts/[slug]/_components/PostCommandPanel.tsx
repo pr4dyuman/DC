@@ -13,6 +13,7 @@ import {
     shouldBlogStudioAutoSchedule,
 } from "@/lib/ai-blogger-workflow";
 import type {
+    BlogStudioBlockerResolutionPreview,
     BlogStudioPostStatus,
     BlogStudioPublishValidation,
     BlogStudioPublishingSettings,
@@ -82,6 +83,7 @@ export function PostCommandPanel({
     audit,
     publishValidation,
     publishingSettings,
+    blockerResolutionPreview,
     auditScore,
     blockersCount,
     isReady,
@@ -100,6 +102,7 @@ export function PostCommandPanel({
     audit?: BlogStudioSeoAudit;
     publishValidation?: BlogStudioPublishValidation;
     publishingSettings?: BlogStudioPublishingSettings;
+    blockerResolutionPreview?: BlogStudioBlockerResolutionPreview;
     auditScore: number;
     blockersCount: number;
     isReady: boolean;
@@ -158,6 +161,7 @@ export function PostCommandPanel({
                 audit={audit}
                 publishValidation={publishValidation}
                 publishingSettings={publishingSettings}
+                blockerResolutionPreview={blockerResolutionPreview}
             />
 
             <AIBloggerGlassCard className="p-5">

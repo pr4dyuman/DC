@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, ExternalLink, ImagePlus, Link2, Loader2, Save, Search, Sparkles, Trash2, UploadCloud, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -26,6 +26,7 @@ import type {
 import {
     AIBloggerGradientButton,
 } from "@/components/ai-blogger/AIBloggerPrimitives";
+import { publishAIBloggerWordCount } from "@/components/ai-blogger/AIBloggerLiveWordCount";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -277,6 +278,10 @@ export function AIBloggerPostEditorForm({
                 ? "Uploaded"
                 : "No asset";
     const imageBusy = isUploadingImage || isImageActionPending;
+
+    useEffect(() => {
+        publishAIBloggerWordCount(post.id, liveWordCount);
+    }, [liveWordCount, post.id]);
 
     const toggleAcceptedInternalLink = (suggestion: BlogStudioInternalLinkSuggestion) => {
         const normalizedSuggestionHref = normalizeInternalLinkHref(suggestion.href, siteUrl) || suggestion.href;

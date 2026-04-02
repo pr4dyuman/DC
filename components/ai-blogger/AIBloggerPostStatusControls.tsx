@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ExternalLink, Loader2, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, ExternalLink, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
     publishBlogStudioPost,
     deleteBlogStudioPost,
+    resolveBlogStudioPostBlockersWithAI,
     updateBlogStudioPostStatus,
 } from "@/lib/actions";
 import {
@@ -17,9 +18,12 @@ import {
     shouldBlogStudioAutoSchedule,
 } from "@/lib/ai-blogger-workflow";
 import type {
+    BlogStudioBlockerResolutionPreview,
+    BlogStudioBlockerResolutionResult,
     BlogStudioPostStatus,
     BlogStudioPublishValidation,
     BlogStudioPublishingSettings,
+    BlogStudioResolvedBlocker,
     BlogStudioSeoAudit,
     BlogStudioTargetType,
     BlogStudioWebhookStatus,
@@ -75,8 +79,62 @@ type AIBloggerPostStatusControlsProps = {
     audit?: BlogStudioSeoAudit;
     publishValidation?: BlogStudioPublishValidation;
     publishingSettings?: BlogStudioPublishingSettings;
+    blockerResolutionPreview?: BlogStudioBlockerResolutionPreview;
     compact?: boolean;
 };
+
+type BlockerResolutionClientResult = Pick<
+    BlogStudioBlockerResolutionResult,
+    "changedFields" | "blockersAfter" | "aiFixed" | "remainingHuman" | "remainingSystem" | "summary"
+>;
+
+const BLOCKER_RESOLUTION_STORAGE_PREFIX = "ai-blogger:blocker-resolution:";
+
+function getBlockerResolutionStorageKey(slug: string) {
+    return `${BLOCKER_RESOLUTION_STORAGE_PREFIX}${slug}`;
+}
+
+function BlockerResolutionList({
+    title,
+    blockers,
+    tone,
+}: {
+    title: string;
+    blockers: BlogStudioResolvedBlocker[];
+    tone: "emerald" | "amber" | "destructive" | "primary";
+}) {
+    if (blockers.length === 0) {
+        return null;
+    }
+
+    const toneClasses =
+        tone === "emerald"
+            ? "border-emerald-500/20 bg-emerald-500/5"
+            : tone === "amber"
+                ? "border-amber-500/20 bg-amber-500/5"
+                : tone === "destructive"
+                    ? "border-destructive/20 bg-destructive/5"
+                    : "border-primary/20 bg-primary/5";
+
+    return (
+        <div className={`rounded-[22px] border px-4 py-3 ${toneClasses}`}>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
+            <div className="mt-3 space-y-2">
+                {blockers.map((blocker) => (
+                    <div key={`${title}-${blocker.key}`} className="rounded-[18px] border border-border/50 bg-background/70 px-3 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline" className="rounded-full text-[10px] uppercase tracking-[0.16em]">
+                                {blocker.category}
+                            </Badge>
+                            <span className="text-sm font-medium text-foreground">{blocker.message}</span>
+                        </div>
+                        <p className="mt-1.5 text-xs leading-5 text-muted-foreground">{blocker.fixHint}</p>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 export function AIBloggerPostStatusControls({
     slug,
@@ -92,6 +150,7 @@ export function AIBloggerPostStatusControls({
     audit,
     publishValidation,
     publishingSettings,
+    blockerResolutionPreview,
     compact = false,
 }: AIBloggerPostStatusControlsProps) {
     const router = useRouter();
@@ -101,6 +160,9 @@ export function AIBloggerPostStatusControls({
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [deleteWithPublished, setDeleteWithPublished] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [activeAction, setActiveAction] = useState<"advance" | "fix-blockers" | null>(null);
+    const [blockerResolutionResult, setBlockerResolutionResult] = useState<BlockerResolutionClientResult | null>(null);
+    const blockerResolutionStorageKey = getBlockerResolutionStorageKey(slug);
 
     const workflowSettings = publishingSettings ? { publishing: publishingSettings } : undefined;
     const draftOnlyMode = isBlogStudioDraftOnlyMode(workflowSettings);
@@ -115,6 +177,14 @@ export function AIBloggerPostStatusControls({
     const blockingStatuses = nextStatus === "Approved" || nextStatus === "Scheduled";
     const readinessBlockers = blockingStatuses ? (audit?.blockers || []) : [];
     const publishBlocked = publishesToWebhook && publishValidation && !publishValidation.canPublish;
+    const aiFixableBlockers = blockerResolutionPreview?.aiFixable || [];
+    const hasAiFixableBlockers = status !== "Published" && Boolean(blockerResolutionPreview?.hasAiFixable);
+    const needsHumanOrSystemFixesOnly =
+        status !== "Published" &&
+        Boolean(blockerResolutionPreview?.hasBlockingIssues) &&
+        !Boolean(blockerResolutionPreview?.hasAiFixable);
+    const isAdvancing = isPending && activeAction === "advance";
+    const isResolvingBlockers = isPending && activeAction === "fix-blockers";
     const wordRangeWarning = audit?.checks.find((check) => check.key === "word-range" && !check.passed) ?? null;
     const publishWarnings = publishesToWebhook ? (publishValidation?.warnings || []) : [];
     const publishedHref = useMemo(() => {
@@ -179,6 +249,26 @@ export function AIBloggerPostStatusControls({
         status,
     ]);
 
+    useEffect(() => {
+        if (typeof window === "undefined") {
+            return;
+        }
+
+        const stored = window.sessionStorage.getItem(blockerResolutionStorageKey);
+        if (!stored) {
+            return;
+        }
+
+        try {
+            setBlockerResolutionResult(JSON.parse(stored) as BlockerResolutionClientResult);
+        } catch {
+            window.sessionStorage.removeItem(blockerResolutionStorageKey);
+            return;
+        }
+
+        window.sessionStorage.removeItem(blockerResolutionStorageKey);
+    }, [blockerResolutionStorageKey]);
+
     const handleAdvance = () => {
         if (!nextStatus || !actionLabel) {
             return;
@@ -202,6 +292,7 @@ export function AIBloggerPostStatusControls({
         setError("");
 
         startTransition(async () => {
+            setActiveAction("advance");
             try {
                 if (publishesToWebhook) {
                     await publishBlogStudioPost(slug);
@@ -224,6 +315,53 @@ export function AIBloggerPostStatusControls({
                 const message = submitError instanceof Error ? submitError.message : "Failed to update post status";
                 setError(message);
                 toast.error(message);
+            } finally {
+                setActiveAction(null);
+            }
+        });
+    };
+
+    const handleFixBlockers = () => {
+        if (!hasAiFixableBlockers) {
+            toast.error("No AI-fixable blockers are available on this draft.");
+            return;
+        }
+
+        setError("");
+        setBlockerResolutionResult(null);
+
+        startTransition(async () => {
+            setActiveAction("fix-blockers");
+            try {
+                const result = await resolveBlogStudioPostBlockersWithAI(slug);
+                const nextResult: BlockerResolutionClientResult = {
+                    changedFields: result.changedFields,
+                    blockersAfter: result.blockersAfter,
+                    aiFixed: result.aiFixed,
+                    remainingHuman: result.remainingHuman,
+                    remainingSystem: result.remainingSystem,
+                    summary: result.summary,
+                };
+
+                setBlockerResolutionResult(nextResult);
+
+                if (typeof window !== "undefined") {
+                    window.sessionStorage.setItem(blockerResolutionStorageKey, JSON.stringify(nextResult));
+                }
+
+                if (result.aiFixed.length > 0) {
+                    toast.success(result.summary);
+                } else {
+                    toast(result.summary);
+                }
+
+                router.refresh();
+            } catch (resolveError: unknown) {
+                const message = resolveError instanceof Error ? resolveError.message : "Failed to resolve blockers with AI";
+                setError(message);
+                toast.error(message);
+            } finally {
+                setActiveAction(null);
             }
         });
     };
@@ -280,7 +418,7 @@ export function AIBloggerPostStatusControls({
                     disabled={isDisabled}
                     className="h-11 px-6 text-base"
                 >
-                    {isPending ? (
+                    {isAdvancing ? (
                         <>
                             <Loader2 className="h-4 w-4 animate-spin" />
                             {publishesToWebhook ? "Publishing" : "Saving"}
@@ -465,6 +603,50 @@ export function AIBloggerPostStatusControls({
                     </div>
                 ) : null}
 
+                {hasAiFixableBlockers ? (
+                    <div className="rounded-[24px] border border-primary/20 bg-primary/5 px-4 py-4 text-sm">
+                        <div className="flex items-start gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+                                <Sparkles className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="font-medium text-foreground">Fix blockers with AI</p>
+                                <p className="mt-1.5 leading-6 text-muted-foreground">
+                                    AI can work on {aiFixableBlockers.length} blocker{aiFixableBlockers.length === 1 ? "" : "s"} right now, including {aiFixableBlockers.slice(0, 3).map((blocker) => blocker.category).join(", ")}.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                {isResolvingBlockers ? (
+                    <div className="rounded-[24px] border border-primary/25 bg-primary/[0.06] px-4 py-4 text-sm">
+                        <div className="flex items-start gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="font-medium text-foreground">AI is fixing blockers now</p>
+                                <p className="mt-1.5 leading-6 text-muted-foreground">
+                                    Reviewing the draft, rewriting safe sections, rebuilding metadata and links, then re-running validation.
+                                </p>
+                                <p className="mt-2 text-xs leading-5 text-primary">
+                                    The post editor will refresh automatically with the updated draft when this finishes.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                {needsHumanOrSystemFixesOnly ? (
+                    <div className="rounded-[24px] border border-border/60 bg-background/60 px-4 py-4 text-sm text-muted-foreground">
+                        <p className="font-medium text-foreground">Remaining blockers need review outside AI</p>
+                        <p className="mt-2 leading-6">
+                            {blockerResolutionPreview?.humanRequiredCount || 0} need human review and {blockerResolutionPreview?.systemRequiredCount || 0} need settings or workflow changes.
+                        </p>
+                    </div>
+                ) : null}
+
                 <div className="flex flex-col items-start gap-4 pt-2">
                     <p className="max-w-md text-sm leading-6 text-muted-foreground">
                         {workflowComplete
@@ -481,25 +663,77 @@ export function AIBloggerPostStatusControls({
                                 : "This only updates the AI Blogger record."
                             : "No further workflow steps remain."}
                     </p>
-                    {!workflowComplete && nextStatus && actionLabel ? (
-                        <AIBloggerGradientButton type="button" onClick={handleAdvance} disabled={isPending || (blockingStatuses && readinessBlockers.length > 0) || publishBlocked}>
-                            {isPending ? (
-                                <>
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    {publishesToWebhook ? "Publishing" : "Saving"}
-                                </>
-                            ) : (
-                                <>
-                                    {publishesToWebhook ? "Publish To Webhook Target" : actionLabel}
-                                </>
-                            )}
-                        </AIBloggerGradientButton>
-                    ) : (
-                        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-4 py-2 text-sm font-medium text-emerald-600">
-                            <CheckCircle2 className="h-4 w-4" />
-                            {draftOnlyStopsWorkflow ? "Draft Only Mode" : readyForManualExport ? "Ready For Manual Export" : "Workflow Complete"}
+                    <div className="flex flex-wrap items-center gap-3">
+                        {!workflowComplete && nextStatus && actionLabel ? (
+                            <AIBloggerGradientButton type="button" onClick={handleAdvance} disabled={isPending || (blockingStatuses && readinessBlockers.length > 0) || publishBlocked}>
+                                {isAdvancing ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        {publishesToWebhook ? "Publishing" : "Saving"}
+                                    </>
+                                ) : (
+                                    <>
+                                        {publishesToWebhook ? "Publish To Webhook Target" : actionLabel}
+                                    </>
+                                )}
+                            </AIBloggerGradientButton>
+                        ) : (
+                            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-4 py-2 text-sm font-medium text-emerald-600">
+                                <CheckCircle2 className="h-4 w-4" />
+                                {draftOnlyStopsWorkflow ? "Draft Only Mode" : readyForManualExport ? "Ready For Manual Export" : "Workflow Complete"}
+                            </div>
+                        )}
+
+                        {hasAiFixableBlockers ? (
+                            <AIBloggerGradientButton type="button" variant="outline" onClick={handleFixBlockers} disabled={isPending}>
+                                {isResolvingBlockers ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Fixing Blockers
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="h-4 w-4" />
+                                        Fix Blockers With AI
+                                    </>
+                                )}
+                            </AIBloggerGradientButton>
+                        ) : null}
+                    </div>
+
+                    {blockerResolutionResult ? (
+                        <div className="w-full rounded-[24px] border border-primary/20 bg-primary/[0.04] px-4 py-4">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">AI Blocker Resolver</p>
+                                    <p className="mt-1.5 text-sm leading-6 text-foreground">{blockerResolutionResult.summary}</p>
+                                </div>
+                                <Badge variant="outline" className="rounded-full border-primary/25 text-primary">
+                                    {blockerResolutionResult.aiFixed.length} fixed
+                                </Badge>
+                            </div>
+
+                            {blockerResolutionResult.changedFields.length > 0 ? (
+                                <div className="mt-4">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Updated fields</p>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        {blockerResolutionResult.changedFields.map((field) => (
+                                            <Badge key={field} variant="outline" className="rounded-full">
+                                                {field}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            <div className="mt-4 space-y-3">
+                                <BlockerResolutionList title="Fixed This Pass" blockers={blockerResolutionResult.aiFixed} tone="emerald" />
+                                <BlockerResolutionList title="Still AI-Fixable" blockers={blockerResolutionResult.blockersAfter.aiFixable} tone="primary" />
+                                <BlockerResolutionList title="Needs Human Review" blockers={blockerResolutionResult.remainingHuman} tone="amber" />
+                                <BlockerResolutionList title="Needs Settings Fix" blockers={blockerResolutionResult.remainingSystem} tone="destructive" />
+                            </div>
                         </div>
-                    )}
+                    ) : null}
                 </div>
             </div>
 

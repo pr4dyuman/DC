@@ -1,7 +1,7 @@
 "use server";
 
 import { User, Invoice, Task, Notification, Activity, Client, Asset, PaymentConfig, LeaveRequest, LeaveStatus, UserPermissions, Transaction } from "./db";
-import type { AIConfig, AIPermissions } from "./types";
+import type { AIConfig, AIPermissions, BlogStudioBlockerResolutionResult } from "./types";
 import { getCurrentAgency } from "./agency-context";
 import { getAIBloggerAccessState } from "./ai-blogger-access";
 import { resolveUserOrClient } from "./utils-server";
@@ -67,6 +67,7 @@ import {
     generateBlogStudioDraftImpl,
     generateBlogStudioFeaturedImageImpl,
     refreshBlogStudioPostFromPerformanceImpl,
+    resolveBlogStudioPostBlockersWithAIImpl,
     runBlogStudioScheduleNowImpl,
     runBlogStudioPerformanceSyncImpl,
     type GenerateBlogStudioFeaturedImageResult,
@@ -759,6 +760,25 @@ export async function refreshBlogStudioPostFromPerformance(slug: string) {
         featureEnabled: agency.features?.aiBlogger,
     });
     return refreshBlogStudioPostFromPerformanceImpl(
+        agency.id,
+        toActionActor(currentUser),
+        sanitizeMongoInput(slug),
+    );
+}
+
+export async function resolveBlogStudioPostBlockersWithAI(
+    slug: string,
+): Promise<BlogStudioBlockerResolutionResult> {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return resolveBlogStudioPostBlockersWithAIImpl(
         agency.id,
         toActionActor(currentUser),
         sanitizeMongoInput(slug),

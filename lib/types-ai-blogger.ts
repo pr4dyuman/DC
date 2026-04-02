@@ -367,6 +367,52 @@ export type BlogStudioPublishValidation = {
     validatedAt: string;
 };
 
+export type BlogStudioBlockerResolutionKind =
+    | "ai-fixable"
+    | "human-required"
+    | "system-required";
+
+export type BlogStudioBlockerResolutionSource =
+    | "seo-audit"
+    | "publish-validation"
+    | "workflow";
+
+export type BlogStudioBlockerResolutionCategory =
+    | BlogStudioPublishBlockerCategory
+    | "workflow";
+
+export type BlogStudioResolvedBlocker = {
+    key: string;
+    category: BlogStudioBlockerResolutionCategory;
+    source: BlogStudioBlockerResolutionSource;
+    resolutionKind: BlogStudioBlockerResolutionKind;
+    message: string;
+    fixHint: string;
+};
+
+export type BlogStudioBlockerResolutionPreview = {
+    blockers: BlogStudioResolvedBlocker[];
+    aiFixable: BlogStudioResolvedBlocker[];
+    humanRequired: BlogStudioResolvedBlocker[];
+    systemRequired: BlogStudioResolvedBlocker[];
+    aiFixableCount: number;
+    humanRequiredCount: number;
+    systemRequiredCount: number;
+    hasAiFixable: boolean;
+    hasBlockingIssues: boolean;
+};
+
+export type BlogStudioBlockerResolutionResult = {
+    post: BlogStudioPost;
+    changedFields: string[];
+    blockersBefore: BlogStudioBlockerResolutionPreview;
+    blockersAfter: BlogStudioBlockerResolutionPreview;
+    aiFixed: BlogStudioResolvedBlocker[];
+    remainingHuman: BlogStudioResolvedBlocker[];
+    remainingSystem: BlogStudioResolvedBlocker[];
+    summary: string;
+};
+
 export type BlogStudioInternalLinkSuggestionSource = "service" | "page" | "blog";
 
 export type BlogStudioInternalLinkRelationType =
