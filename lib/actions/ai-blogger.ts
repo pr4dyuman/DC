@@ -19,6 +19,7 @@ import {
 import { generateContent } from "../ai-provider";
 import {
     AI_TIMEOUT_MS,
+    AI_BLOGGER_TIMEOUT_MS,
     getResolvedFeatureConfig,
     OPENAI_COMPAT_BASE_URLS,
     resolveModel,
@@ -4252,7 +4253,7 @@ async function generateFeaturedImageWithOpenAI(
                 },
                 body: JSON.stringify(payload),
             }),
-            AI_TIMEOUT_MS,
+            AI_BLOGGER_TIMEOUT_MS,
         );
 
         if (!response.ok) {
@@ -4338,7 +4339,7 @@ async function generateFeaturedImageWithGemini(
                         },
                     }),
                 }),
-                AI_TIMEOUT_MS,
+                AI_BLOGGER_TIMEOUT_MS,
             );
 
             if (!response.ok) {
@@ -4374,7 +4375,7 @@ async function generateFeaturedImageWithGemini(
                     },
                 }),
             }),
-            AI_TIMEOUT_MS,
+            AI_BLOGGER_TIMEOUT_MS,
         );
 
         if (!response.ok) {

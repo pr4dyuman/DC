@@ -9,7 +9,13 @@ export type TokenUsage = {
 
 export type MultimodalPart = string | GeminiPart;
 
-export const AI_TIMEOUT_MS = 60_000;
+// General AI chat/agent calls — 2 minutes gives headroom for heavy models.
+export const AI_TIMEOUT_MS = 120_000;
+
+// Long-form blog generation: a single Gemini call writing 2000+ words can
+// legitimately take 60–120s on slower models or under API load.
+// This is used by the AI blogger pipeline only.
+export const AI_BLOGGER_TIMEOUT_MS = 150_000;
 
 export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     return Promise.race([
