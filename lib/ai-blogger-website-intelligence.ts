@@ -71,7 +71,7 @@ function uniqueStrings(values: string[], maxItems: number, maxLength: number) {
     ).slice(0, maxItems);
 }
 
-function normalizeUrl(rawUrl: string) {
+export function normalizeUrl(rawUrl: string) {
     const input = rawUrl.trim();
 
     if (!input) {
@@ -639,7 +639,7 @@ function toWebsiteIntelligence(snapshot: Pick<
     };
 }
 
-async function getCachedWebsiteIntelligence(
+export async function getCachedWebsiteIntelligence(
     agencyId: string,
     normalizedUrl: string,
     refreshWindowHours: number,

@@ -71,6 +71,8 @@ import {
 import { buildMarketingBlogHtml } from "../marketing-blog-content";
 import {
     getAIBloggerWebsiteIntelligence,
+    getCachedWebsiteIntelligence,
+    normalizeUrl as normalizeWebsiteUrl,
     type AIBloggerWebsiteIntelligence,
 } from "../ai-blogger-website-intelligence";
 import { getValidSearchConsoleAccessToken } from "../ai-blogger-search-console-oauth";
@@ -8638,24 +8640,59 @@ export async function generateBlogStudioDraftImpl(
             emitStepStart("website-intelligence", "Website Intelligence");
 
             try {
-                // Hard 45-second cap so the website-intelligence step can never hang the
-                // entire 300s Vercel worker budget. Slow sitemaps or cold MongoDB connections
-                // on a fresh serverless instance would otherwise block indefinitely.
-                const WEBSITE_INTEL_TIMEOUT_MS = 45_000;
-                websiteIntelligence = await Promise.race([
-                    getAIBloggerWebsiteIntelligence(brief.sourceValue || "", {
-                        agencyId: agency.id,
-                        enabled: crawlConfig?.enabled ?? true,
-                        maxPages: crawlConfig?.maxPages,
-                        timeoutMs: crawlConfig?.timeoutMs,
-                        refreshWindowHours: crawlConfig?.refreshWindowHours,
-                        allowedPaths: crawlConfig?.allowedPaths,
-                        blockedPaths: crawlConfig?.blockedPaths,
-                    }),
-                    new Promise<null>((resolve) =>
-                        setTimeout(() => resolve(null), WEBSITE_INTEL_TIMEOUT_MS)
-                    ),
-                ]);
+                // ── Website intelligence strategy (Vercel parallel architecture) ───────
+                // The /generate route fires a /precache function IN PARALLEL that crawls
+                // the website with its OWN 300s Vercel budget and stores results in MongoDB.
+                // The worker polls MongoDB every 5s for up to 60s waiting for that data.
+                // On cache hit → instant use, worker's AI budget is fully preserved.
+                // On poll timeout → short emergency crawl (25s) as a safety net.
+                // This gives website crawling effectively 300s without touching AI time.
+
+                const POLL_INTERVAL_MS  = 5_000;  // check MongoDB every 5s
+                const POLL_MAX_WAIT_MS  = 60_000; // wait up to 60s for precache
+                const FALLBACK_CRAWL_MS = 25_000; // emergency crawl if precache missed
+                const refreshWindowHours = crawlConfig?.refreshWindowHours ?? 24;
+
+                // Step 1: poll MongoDB for the cache being filled by the precache function
+                const normalizedSourceUrl = normalizeWebsiteUrl(brief.sourceValue || "")?.toString() ?? "";
+                if (agency.id && normalizedSourceUrl) {
+                    const pollStart = Date.now();
+                    while (!websiteIntelligence && Date.now() - pollStart < POLL_MAX_WAIT_MS) {
+                        const cached = await getCachedWebsiteIntelligence(
+                            agency.id,
+                            normalizedSourceUrl,
+                            refreshWindowHours,
+                        ).catch(() => null);
+                        if (cached) {
+                            websiteIntelligence = cached;
+                            break;
+                        }
+                        // Wait before next poll (skip wait on last iteration)
+                        if (Date.now() - pollStart + POLL_INTERVAL_MS < POLL_MAX_WAIT_MS) {
+                            await new Promise<void>((r) => setTimeout(r, POLL_INTERVAL_MS));
+                        } else {
+                            break;
+                        }
+                    }
+                }
+
+                // Step 2: if still no cache (precache slow/missed), do short emergency crawl
+                if (!websiteIntelligence) {
+                    console.warn(`[WORKER] Precache miss after ${POLL_MAX_WAIT_MS / 1000}s — attempting emergency crawl (${FALLBACK_CRAWL_MS / 1000}s timeout)`);
+                    websiteIntelligence = await Promise.race([
+                        getAIBloggerWebsiteIntelligence(brief.sourceValue || "", {
+                            agencyId: agency.id,
+                            enabled: crawlConfig?.enabled ?? true,
+                            maxPages: Math.min(crawlConfig?.maxPages ?? 4, 4), // cap at 4 for emergency
+                            timeoutMs: Math.min(crawlConfig?.timeoutMs ?? 8000, 8000),
+                            refreshWindowHours,
+                            allowedPaths: crawlConfig?.allowedPaths,
+                            blockedPaths: crawlConfig?.blockedPaths,
+                        }),
+                        new Promise<null>((resolve) => setTimeout(() => resolve(null), FALLBACK_CRAWL_MS)),
+                    ]);
+                }
+
                 addRunStep(
                     "website-intelligence",
                     "Website Intelligence",

@@ -42,3 +42,6 @@ next-env.d.ts
 
 # database backups (may contain sensitive data)
 /data/backup/
+
+# Local generation logs
+logs/

@@ -158,18 +158,39 @@ export async function POST(request: Request) {
         const workerSecret = process.env.AI_BLOGGER_WORKER_SECRET;
         if (workerSecret) {
             const baseUrl = getAppBaseUrl();
-            const workerUrl = `${baseUrl}/api/ai-blogger/generate/worker`;
-            console.log(`[GENERATE-ROUTE] Dispatching to worker: ${workerUrl}`);
+            const authHeaders = {
+                "Content-Type": "application/json",
+                "x-worker-secret": workerSecret,
+            };
 
-            // Fire the worker — we don't await the full response because the
-            // worker takes minutes. We just need to confirm the HTTP request
-            // was accepted. The worker runs in its own 300s serverless context.
+            // ── 1. Website precache — runs in its OWN 300s Vercel function ─────
+            // Fires in parallel with the worker so the worker never burns its
+            // AI budget waiting for a page crawl. The worker polls MongoDB for
+            // the result. On Vercel, this is a completely separate serverless
+            // invocation with an independent execution budget.
+            if (brief.sourceMode === "website" && brief.sourceValue?.trim()) {
+                const precacheUrl = `${baseUrl}/api/ai-blogger/generate/precache`;
+                console.log(`[GENERATE-ROUTE] Dispatching precache for: ${brief.sourceValue}`);
+                fetch(precacheUrl, {
+                    method: "POST",
+                    headers: authHeaders,
+                    body: JSON.stringify({
+                        jobId,
+                        agencyId: agency.id,
+                        sourceUrl: brief.sourceValue,
+                    }),
+                }).catch((err) => {
+                    const msg = err instanceof Error ? err.message : "Precache dispatch failed";
+                    console.warn(`[GENERATE-ROUTE] Precache dispatch error (non-fatal): ${msg}`);
+                });
+            }
+
+            // ── 2. Main worker — AI pipeline, polls MongoDB for website cache ──
+            const workerUrl = `${baseUrl}/api/ai-blogger/generate/worker`;
+            console.log(`[GENERATE-ROUTE] Dispatching worker: ${workerUrl}`);
             fetch(workerUrl, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "x-worker-secret": workerSecret,
-                },
+                headers: authHeaders,
                 body: JSON.stringify({
                     jobId,
                     agency: { id: agency.id, name: agency.name },
@@ -177,7 +198,6 @@ export async function POST(request: Request) {
                     input: pipelineInput,
                 }),
             }).catch((fetchError) => {
-                // If the fetch itself fails (DNS, network), log and emit error.
                 const msg = fetchError instanceof Error ? fetchError.message : "Worker dispatch failed";
                 console.error(`[GENERATE-ROUTE] Worker dispatch error: ${msg}`);
                 emitPipelineEvent(jobId, { type: "error", message: `Worker dispatch failed: ${msg}` });
