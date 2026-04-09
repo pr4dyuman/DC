@@ -1285,13 +1285,18 @@ export async function getClientById(id: string) {
     return getClientByIdImpl(agency.id, id);
 }
 
-export async function createClient(client: Omit<Client, "id" | "agencyId">) {
-    const currentUser = await getCurrentUser();
-    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
-        throw new Error("Unauthorized: Only Admins can create clients.");
+export async function createClient(client: Omit<Client, "id" | "agencyId">): Promise<{ success: true; data: Client } | { success: false; error: string }> {
+    try {
+        const currentUser = await getCurrentUser();
+        if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+            return { success: false, error: "Unauthorized: Only Admins can create clients." };
+        }
+        const agencyCtx = await getCurrentAgency();
+        const data = await createClientImpl(client, agencyCtx ? { id: agencyCtx.id, name: agencyCtx.name } : null);
+        return { success: true, data };
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : "Failed to create client." };
     }
-    const agencyCtx = await getCurrentAgency();
-    return createClientImpl(client, agencyCtx ? { id: agencyCtx.id, name: agencyCtx.name } : null);
 }
 
 export async function updateClient(id: string, updates: Partial<Client>) {

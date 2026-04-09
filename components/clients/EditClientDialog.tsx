@@ -115,7 +115,11 @@ export function EditClientDialog({ client, open, onOpenChange, onSuccess }: Edit
             if (client) {
                 await updateClient(client.id, formData);
             } else {
-                await createClient({ ...formData, password });
+                const result = await createClient({ ...formData, password });
+                if (!result.success) {
+                    toast.error(result.error);
+                    return;
+                }
             }
             if (onSuccess) onSuccess();
             onOpenChange(false);

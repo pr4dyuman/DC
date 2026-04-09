@@ -66,7 +66,7 @@ export async function executeManagementTool(
 ): Promise<ToolExecutionResult> {
     switch (name) {
         case "create_client": {
-            const newClient = await createClient({
+            const result = await createClient({
                 name: getStringArg(args, "name"),
                 email: getStringArg(args, "email"),
                 companyName: getStringArg(args, "companyName"),
@@ -75,6 +75,11 @@ export async function executeManagementTool(
                 logo: getOptionalStringArg(args, "logo"),
             });
 
+            if (!result.success) {
+                return { success: false, data: null, summary: `Failed to create client: ${result.error}` };
+            }
+
+            const newClient = result.data;
             const createdAt = getOptionalStringArg(args, "createdAt");
             if (createdAt) {
                 const agencyId = await getRequiredAgencyId();
