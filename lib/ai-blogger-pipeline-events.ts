@@ -456,3 +456,50 @@ export async function getPipelineJobStatus(jobId: string): Promise<{ exists: boo
         agencyId: snapshot.agencyId,
     };
 }
+
+/**
+ * Attach a workflow run ID to an existing pipeline job.
+ * Called by the WorkflowKit step route after the workflow has been created.
+ */
+export async function attachPipelineWorkflowRun(jobId: string, workflowRunId: string): Promise<void> {
+    const job = ensureMemoryJob(jobId);
+    (job as PipelineJob & { workflowRunId?: string }).workflowRunId = workflowRunId;
+
+    await queuePersistence(jobId, async () => {
+        await connectDB();
+        await BlogStudioPipelineJobModel.findOneAndUpdate(
+            { id: jobId },
+            {
+                $set: {
+                    workflowRunId,
+                    updatedAt: new Date().toISOString(),
+                    expiresAt: new Date(Date.now() + JOB_RETENTION_MS),
+                },
+                $setOnInsert: {
+                    id: jobId,
+                    agencyId: job.agencyId || "unknown",
+                    createdBy: job.createdBy,
+                    createdAt: new Date(job.createdAt).toISOString(),
+                    events: [],
+                },
+            },
+            { upsert: true, returnDocument: 'before' },
+        );
+    });
+}
+
+/**
+ * Wait for any pending MongoDB write for the given job to settle.
+ * Used by cleanup code to ensure events are persisted before a serverless
+ * function exits.
+ */
+export async function awaitPipelineJobPersistence(jobId: string): Promise<void> {
+    if (!jobId) {
+        return;
+    }
+    const pending = writes.get(jobId);
+    if (!pending) {
+        return;
+    }
+    await pending.catch(() => undefined);
+}
