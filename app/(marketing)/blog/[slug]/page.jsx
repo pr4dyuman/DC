@@ -318,75 +318,103 @@ async function canViewDraftBlog() {
 }
 
 async function getBlog(slug) {
-  await dbConnect();
-  const isAdmin = await canViewDraftBlog();
+  try {
+    await dbConnect();
+    const isAdmin = await canViewDraftBlog();
 
-  let blog = await Blog.findOne(
-    isAdmin ? { slug } : { slug, status: "published" }
-  ).lean();
-
-  if (!blog && /^[0-9a-fA-F]{24}$/.test(slug)) {
-    blog = await Blog.findOne(
-      isAdmin ? { _id: slug } : { _id: slug, status: "published" }
+    let blog = await Blog.findOne(
+      isAdmin ? { slug } : { slug, status: "published" }
     ).lean();
-  }
 
-  if (!blog) {
+    if (!blog && /^[0-9a-fA-F]{24}$/.test(slug)) {
+      blog = await Blog.findOne(
+        isAdmin ? { _id: slug } : { _id: slug, status: "published" }
+      ).lean();
+    }
+
+    if (!blog) {
+      return null;
+    }
+
+    // Serialize MongoDB ObjectId fields to plain strings to prevent
+    // React Server Component serialization failures in production.
+    const serializeInternalLinks = (links) => {
+      if (!Array.isArray(links)) return [];
+      return links.map((link) => ({
+        ...link,
+        _id: link._id ? link._id.toString() : undefined,
+      }));
+    };
+
+    return {
+      ...blog,
+      _id: blog._id.toString(),
+      image: normalizeMarketingImageSrc(blog.image),
+      canonicalUrl: normalizeMarketingCanonicalUrl(blog.canonicalUrl, blog.slug),
+      publishedAt: toIsoDate(blog.publishedAt),
+      createdAt: toIsoDate(blog.createdAt) || new Date().toISOString(),
+      updatedAt: toIsoDate(blog.updatedAt, blog.createdAt) || new Date().toISOString(),
+      internalLinks: serializeInternalLinks(blog.internalLinks),
+      faqItems: Array.isArray(blog.faqItems)
+        ? blog.faqItems.map((item) => ({ ...item, _id: item._id ? item._id.toString() : undefined }))
+        : [],
+      peopleAlsoAsk: Array.isArray(blog.peopleAlsoAsk) ? blog.peopleAlsoAsk : [],
+    };
+  } catch (error) {
+    console.error("[Blog Page] Failed to fetch blog:", slug, error);
     return null;
   }
-
-  return {
-    ...blog,
-    _id: blog._id.toString(),
-    image: normalizeMarketingImageSrc(blog.image),
-    canonicalUrl: normalizeMarketingCanonicalUrl(blog.canonicalUrl, blog.slug),
-    publishedAt: toIsoDate(blog.publishedAt),
-    createdAt: toIsoDate(blog.createdAt) || new Date().toISOString(),
-    updatedAt: toIsoDate(blog.updatedAt, blog.createdAt) || new Date().toISOString(),
-  };
 }
 
 export async function generateMetadata({ params }) {
-  const resolvedParams = await params;
-  const blog = await getBlog(resolvedParams.slug);
+  try {
+    const resolvedParams = await params;
+    const blog = await getBlog(resolvedParams.slug);
 
-  if (!blog) {
-    return { title: "Not Found" };
+    if (!blog) {
+      return { title: "Not Found" };
+    }
+
+    const seo = getResolvedBlogSeo(blog);
+
+    return {
+      title: seo.title,
+      description: seo.description,
+      keywords: seo.keywords.length > 0 ? seo.keywords : undefined,
+      alternates: {
+        canonical: seo.canonicalUrl,
+      },
+      robots: {
+        index: true,
+        follow: true,
+      },
+      openGraph: {
+        type: "article",
+        url: seo.canonicalUrl,
+        title: seo.title,
+        description: seo.description,
+        publishedTime: seo.publishedAt,
+        modifiedTime: seo.updatedAt,
+        authors: [SITE_NAME],
+        section: blog.category || "Insights",
+        siteName: SITE_NAME,
+        tags: seo.keywords.length > 0 ? seo.keywords : undefined,
+        images: seo.imageUrl ? [{ url: seo.imageUrl, alt: seo.imageAlt }] : undefined,
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: seo.title,
+        description: seo.description,
+        images: seo.imageUrl ? [seo.imageUrl] : undefined,
+      },
+    };
+  } catch (error) {
+    console.error("[Blog Page] generateMetadata failed:", error);
+    return {
+      title: `${SITE_NAME} | Blog`,
+      description: "Read our latest insights and articles.",
+    };
   }
-
-  const seo = getResolvedBlogSeo(blog);
-
-  return {
-    title: seo.title,
-    description: seo.description,
-    keywords: seo.keywords.length > 0 ? seo.keywords : undefined,
-    alternates: {
-      canonical: seo.canonicalUrl,
-    },
-    robots: {
-      index: true,
-      follow: true,
-    },
-    openGraph: {
-      type: "article",
-      url: seo.canonicalUrl,
-      title: seo.title,
-      description: seo.description,
-      publishedTime: seo.publishedAt,
-      modifiedTime: seo.updatedAt,
-      authors: [SITE_NAME],
-      section: blog.category || "Insights",
-      siteName: SITE_NAME,
-      tags: seo.keywords.length > 0 ? seo.keywords : undefined,
-      images: seo.imageUrl ? [{ url: seo.imageUrl, alt: seo.imageAlt }] : undefined,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: seo.title,
-      description: seo.description,
-      images: seo.imageUrl ? [seo.imageUrl] : undefined,
-    },
-  };
 }
 
 export default async function BlogPost({ params }) {
