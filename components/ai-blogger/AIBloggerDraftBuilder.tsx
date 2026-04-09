@@ -586,9 +586,11 @@ export function AIBloggerDraftBuilder({
     const [pipelineStepLabels, setPipelineStepLabels] = useState<PipelineStepLabelsMap>({});
     const [pipelineCompletionMessage, setPipelineCompletionMessage] = useState("");
     const [postSlugToNavigate, setPostSlugToNavigate] = useState<string | null>(null);
-    const [pipelineStartTime, setPipelineStartTime] = useState<number | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [_pipelineStartTime, setPipelineStartTime] = useState<number | null>(null);
     const [pipelineElapsedTime, setPipelineElapsedTime] = useState(0);
-    const [failedStepKey, setFailedStepKey] = useState<string | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [_failedStepKey, setFailedStepKey] = useState<string | null>(null);
     const [errorType, setErrorType] = useState<"validation" | "api-limit" | "timeout" | "network" | "unknown" | null>(null);
     const [canRetry, setCanRetry] = useState(false);
     const eventSourceRef = useRef<EventSource | null>(null);
@@ -597,6 +599,15 @@ export function AIBloggerDraftBuilder({
     const streamReconnectNoticeRef = useRef(false);
     const logScrollRef = useRef<HTMLDivElement | null>(null);
     const elapsedTimeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const eventCursorRef = useRef<number>(0);
+    const reconnectAttemptRef = useRef<number>(0);
+    const pipelineStatusRef = useRef<PipelineStatus>(pipelineStatus);
+    const statusPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // Keep pipelineStatusRef in sync so the onerror callback always reads the latest.
+    useEffect(() => {
+        pipelineStatusRef.current = pipelineStatus;
+    }, [pipelineStatus]);
 
     const STORAGE_KEY = "ai-blogger-active-job";
 
@@ -830,64 +841,162 @@ export function AIBloggerDraftBuilder({
         }
     });
 
-    /** Connect (or reconnect) an SSE stream for a given jobId. */
-    const connectSSE = useCallback(
+    /** Last-resort fallback: poll the status endpoint when SSE is completely unavailable. */
+    const startStatusPolling = useEffectEvent(
         (jobId: string) => {
-            const existing = eventSourceRef.current;
-            if (
-                activeJobIdRef.current === jobId &&
-                existing &&
-                existing.readyState !== EventSource.CLOSED
-            ) {
-                return;
-            }
+            if (statusPollIntervalRef.current) return; // Already polling
 
-            closeEventSource();
-
-            // Increment the nonce so stale error/close callbacks from old
-            // connections can detect they are no longer the active one.
-            const nonce = connectionNonceRef.current + 1;
-            connectionNonceRef.current = nonce;
-
-            // Safely encode the jobId parameter
-            const params = new URLSearchParams();
-            params.set("jobId", jobId);
-            const es = new EventSource(`/api/ai-blogger/generate/stream?${params.toString()}`);
-            eventSourceRef.current = es;
-            activeJobIdRef.current = jobId;
-
-            es.onmessage = (event) => {
-                // Ignore events from stale connections.
-                if (connectionNonceRef.current !== nonce) return;
+            const poll = async () => {
                 try {
-                    const data = JSON.parse(event.data);
-                    handlePipelineEvent(data);
-                } catch (parseError) {
-                    // Log parse errors for debugging but continue processing other events
-                    if (process.env.NODE_ENV === "development") {
-                        console.warn("[AI-BLOGGER] [SSE] JSON parse error:", parseError, "Raw data:", event.data);
+                    const res = await fetch(`/api/ai-blogger/generate/status?jobId=${encodeURIComponent(jobId)}`);
+                    if (!res.ok) return;
+                    const json = await res.json();
+
+                    if (json.status === "completed" && json.result) {
+                        // Deliver the result to the UI via handlePipelineEvent
+                        handlePipelineEvent({ type: "complete", result: json.result });
+                        if (statusPollIntervalRef.current) {
+                            clearInterval(statusPollIntervalRef.current);
+                            statusPollIntervalRef.current = null;
+                        }
+                    } else if (json.status === "failed") {
+                        handlePipelineEvent({
+                            type: "error",
+                            message: json.error || "Pipeline failed (detected via status polling).",
+                        });
+                        if (statusPollIntervalRef.current) {
+                            clearInterval(statusPollIntervalRef.current);
+                            statusPollIntervalRef.current = null;
+                        }
                     }
+                    // If still "running", keep polling — next interval will check again.
+                } catch {
+                    // Network error during polling — ignore and retry on next interval.
                 }
             };
 
-            es.onerror = () => {
-                // Only react if this is still the active connection.
-                if (connectionNonceRef.current !== nonce) return;
-                handleSSEError();
-            };
+            void poll(); // First check immediately
+            statusPollIntervalRef.current = setInterval(() => {
+                void poll();
+            }, 5000);
         },
-        [closeEventSource],
     );
+
+    /** Connect (or reconnect) an SSE stream for a given jobId. */
+    const connectSSERef = useRef<(jobId: string) => void>(() => {});
+    connectSSERef.current = (jobId: string) => {
+        const existing = eventSourceRef.current;
+        if (
+            activeJobIdRef.current === jobId &&
+            existing &&
+            existing.readyState !== EventSource.CLOSED
+        ) {
+            return;
+        }
+
+        closeEventSource();
+
+        // Increment the nonce so stale error/close callbacks from old
+        // connections can detect they are no longer the active one.
+        const nonce = connectionNonceRef.current + 1;
+        connectionNonceRef.current = nonce;
+
+        // Build the SSE URL with cursor so the server skips already-delivered events.
+        const params = new URLSearchParams();
+        params.set("jobId", jobId);
+        if (eventCursorRef.current > 0) {
+            params.set("cursor", String(eventCursorRef.current));
+        }
+        const es = new EventSource(`/api/ai-blogger/generate/stream?${params.toString()}`);
+        eventSourceRef.current = es;
+        activeJobIdRef.current = jobId;
+
+        es.onmessage = (event) => {
+            // Ignore events from stale connections.
+            if (connectionNonceRef.current !== nonce) return;
+
+            // Reset reconnect counter — we're receiving live data.
+            reconnectAttemptRef.current = 0;
+
+            try {
+                const data = JSON.parse(event.data);
+                // eslint-disable-next-line react-hooks/rules-of-hooks -- called from EventSource callback, not during render
+                handlePipelineEvent(data);
+                // Track cursor after successful processing so reconnect can skip
+                // events the client already processed. "connected" events don't go
+                // through the server's sendEvent (no id: field), so only count
+                // events that have a server-assigned id.
+                if (data.type !== "connected") {
+                    eventCursorRef.current += 1;
+                }
+            } catch (parseError) {
+                // Log parse errors for debugging but continue processing other events
+                if (process.env.NODE_ENV === "development") {
+                    console.warn("[AI-BLOGGER] [SSE] JSON parse error:", parseError, "Raw data:", event.data);
+                }
+            }
+        };
+
+        es.onerror = () => {
+            // Only react if this is still the active connection.
+            if (connectionNonceRef.current !== nonce) return;
+            // eslint-disable-next-line react-hooks/rules-of-hooks -- called from EventSource callback, not during render
+            handleSSEError();
+
+            // Auto-reconnect when the stream is closed (e.g. Vercel 300s timeout)
+            // and the pipeline is still running.
+            if (
+                es.readyState === EventSource.CLOSED &&
+                pipelineStatusRef.current === "running"
+            ) {
+                const attempt = reconnectAttemptRef.current;
+                const MAX_RECONNECT_ATTEMPTS = 10;
+
+                if (attempt < MAX_RECONNECT_ATTEMPTS) {
+                    const delay = Math.min(2000 * Math.pow(1.5, attempt), 10000);
+                    reconnectAttemptRef.current = attempt + 1;
+                    console.log(
+                        `[AI-BLOGGER] [SSE] Stream closed, reconnecting in ${Math.round(delay)}ms (attempt ${attempt + 1}/${MAX_RECONNECT_ATTEMPTS}, cursor=${eventCursorRef.current})`,
+                    );
+                    setTimeout(() => {
+                        // If another connectSSE call or resetPipeline happened since
+                        // this timeout was scheduled, bail — don't double-reconnect.
+                        if (connectionNonceRef.current !== nonce) return;
+                        connectSSERef.current(jobId);
+                    }, delay);
+                } else {
+                    // Max attempts exhausted — fall back to polling status endpoint.
+                    console.warn(
+                        `[AI-BLOGGER] [SSE] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) exhausted, falling back to status polling`,
+                    );
+                    pushPipelineLog(
+                        "Pipeline",
+                        "Live stream unavailable. Checking status in the background…",
+                        "warn",
+                    );
+                    // eslint-disable-next-line react-hooks/rules-of-hooks -- called from EventSource callback, not during render
+                    startStatusPolling(jobId);
+                }
+            }
+        };
+    };
+    const connectSSE = connectSSERef.current;
 
     /** Reset the pipeline UI to idle state. */
     const resetPipeline = useCallback(() => {
         closeEventSource();
         activeJobIdRef.current = null;
         connectionNonceRef.current += 1;
+        eventCursorRef.current = 0;
+        reconnectAttemptRef.current = 0;
         try { localStorage.removeItem(STORAGE_KEY); } catch {}
         if (elapsedTimeIntervalRef.current) {
             clearInterval(elapsedTimeIntervalRef.current);
             elapsedTimeIntervalRef.current = null;
+        }
+        if (statusPollIntervalRef.current) {
+            clearInterval(statusPollIntervalRef.current);
+            statusPollIntervalRef.current = null;
         }
         setPipelineVisible(false);
         setPipelineStatus("idle");
@@ -925,12 +1034,16 @@ export function AIBloggerDraftBuilder({
         };
     }, [postSlugToNavigate, router]);
 
-    // Cleanup elapsed time interval on unmount
+    // Cleanup intervals on unmount
     useEffect(() => {
         return () => {
             if (elapsedTimeIntervalRef.current) {
                 clearInterval(elapsedTimeIntervalRef.current);
                 elapsedTimeIntervalRef.current = null;
+            }
+            if (statusPollIntervalRef.current) {
+                clearInterval(statusPollIntervalRef.current);
+                statusPollIntervalRef.current = null;
             }
         };
     }, []);
@@ -988,7 +1101,8 @@ export function AIBloggerDraftBuilder({
             }
             closeEventSource();
         };
-    }, [closeEventSource, connectSSE]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- connectSSE is read from a ref, always current
+    }, [closeEventSource]);
 
     const sourceDetailHelpText = useMemo(() => getSourceDetailHelpText(sourceMode), [sourceMode]);
     const sourceFieldLabel = useMemo(() => getSourceFieldLabel(sourceMode), [sourceMode]);
@@ -1184,6 +1298,8 @@ export function AIBloggerDraftBuilder({
             setErrorType(null);
             setCanRetry(false);
             streamReconnectNoticeRef.current = false;
+            eventCursorRef.current = 0;
+            reconnectAttemptRef.current = 0;
 
             // Start elapsed time tracking
             if (elapsedTimeIntervalRef.current) {

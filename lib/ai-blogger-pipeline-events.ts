@@ -318,6 +318,25 @@ export async function createPipelineJob(jobId: string, owner: PipelineJobOwner):
     });
 }
 
+/**
+ * Remove the in-memory job entry for a given jobId.
+ *
+ * Call this after dispatching the pipeline to a separate worker endpoint so
+ * the SSE stream route falls back to MongoDB polling instead of subscribing
+ * to a local EventEmitter that will never receive events.
+ */
+export function releaseLocalPipelineJob(jobId: string): void {
+    const job = jobs.get(jobId);
+    if (job) {
+        try {
+            job.emitter.removeAllListeners();
+        } catch {
+            // Best-effort cleanup.
+        }
+        jobs.delete(jobId);
+    }
+}
+
 export function emitPipelineEvent(jobId: string, event: Omit<PipelineEvent, "timestamp">) {
     console.log(`[PIPELINE] emitPipelineEvent: ${jobId} - ${event.type}${event.step ? ` (${event.step})` : ''}`);
     const job = ensureMemoryJob(jobId);

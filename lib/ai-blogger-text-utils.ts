@@ -51,14 +51,19 @@ export function sanitizeStringArray(
 
 /**
  * Decodes HTML entities to their string equivalents
- * Handles: &nbsp; &amp; &quot; &#39; &apos; &lt; &gt;
+ * Handles named: &nbsp; &amp; &quot; &#39; &apos; &lt; &gt;
+ * Handles hex: &#x27; &#x2019; &#x2018; &#x2013; &#x2014; &#xA0;
  */
 export function decodeHtml(value: string): string {
     return value
-        .replace(/&nbsp;/gi, " ")
+        .replace(/&nbsp;|&#xA0;/gi, " ")
         .replace(/&amp;/gi, "&")
         .replace(/&quot;/gi, '"')
-        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&#39;|&apos;|&#x27;/gi, "'")
+        .replace(/&#x2019;/gi, "\u2019")
+        .replace(/&#x2018;/gi, "\u2018")
+        .replace(/&#x2013;/gi, "\u2013")
+        .replace(/&#x2014;/gi, "\u2014")
         .replace(/&lt;/gi, "<")
         .replace(/&gt;/gi, ">");
 }

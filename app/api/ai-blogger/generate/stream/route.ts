@@ -9,6 +9,8 @@ export const maxDuration = 300; // 5 minutes - SSE connections need to stay open
 export async function GET(request: Request) {
     const url = new URL(request.url);
     const jobId = url.searchParams.get("jobId") || "";
+    const cursorParam = url.searchParams.get("cursor");
+    const cursor = cursorParam ? Math.max(0, Math.floor(Number(cursorParam)) || 0) : 0;
 
     if (!jobId) {
         return new Response("Missing jobId", { status: 400 });
@@ -35,14 +37,14 @@ export async function GET(request: Request) {
         return new Response("Job not found", { status: 404 });
     }
 
-    console.log(`[SSE] Initial snapshot: status=${initialSnapshot.status}, events=${initialSnapshot.events.length}, jobId=${jobId}`);
+    console.log(`[SSE] Initial snapshot: status=${initialSnapshot.status}, events=${initialSnapshot.events.length}, cursor=${cursor}, jobId=${jobId}`);
 
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
         start(controller) {
             let closed = false;
-            let emittedCount = 0;
+            let emittedCount = cursor;
             let cleanup: (() => void) | null = null;
             let closeTimeout: ReturnType<typeof setTimeout> | null = null;
             let pollInterval: ReturnType<typeof setInterval> | null = null;
@@ -134,7 +136,7 @@ export async function GET(request: Request) {
                 }
 
                 controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
+                    encoder.encode(`id: ${emittedCount}\ndata: ${JSON.stringify(event)}\n\n`),
                 );
                 emittedCount += 1;
 
@@ -153,10 +155,14 @@ export async function GET(request: Request) {
             );
             console.log(`[SSE] Sent connected event for ${jobId}`);
 
-            for (const event of initialSnapshot.events) {
+            // Replay events from the cursor position to avoid duplicates on reconnect.
+            const eventsToReplay = cursor > 0
+                ? initialSnapshot.events.slice(cursor)
+                : initialSnapshot.events;
+            for (const event of eventsToReplay) {
                 sendEvent(event);
             }
-            console.log(`[SSE] Sent ${initialSnapshot.events.length} initial events for ${jobId}`);
+            console.log(`[SSE] Sent ${eventsToReplay.length} events (skipped ${cursor}) for ${jobId}`);
 
             if (initialSnapshot.status !== "running") {
                 scheduleClose();

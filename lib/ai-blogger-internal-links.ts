@@ -645,6 +645,14 @@ export async function getBlogStudioInternalLinkSuggestions(
                 suggestedSectionHeading,
             };
         })
+        .filter(({ candidate, score }) => {
+            // Blog candidates from a shared table may be irrelevant cross-client content.
+            // Require a minimum relevance score for blog candidates only.
+            if (candidate.source === "blog" && score < 8) {
+                return false;
+            }
+            return true;
+        })
         .sort((left, right) => {
             if (right.score !== left.score) {
                 return right.score - left.score;

@@ -5,8 +5,27 @@ import { requireRole, toActionActor } from "@/lib/actions/access";
 import { getCurrentAgency } from "@/lib/agency-context";
 import { getAIBloggerAccessState } from "@/lib/ai-blogger-access";
 import { generateBlogStudioDraftImpl } from "@/lib/actions/ai-blogger";
-import { createPipelineJob, emitPipelineEvent } from "@/lib/ai-blogger-pipeline-events";
+import { createPipelineJob, emitPipelineEvent, releaseLocalPipelineJob } from "@/lib/ai-blogger-pipeline-events";
 import type { BlogStudioBrief, BlogStudioTarget } from "@/lib/types-ai-blogger";
+
+/**
+ * Resolve the base URL for internal API calls.
+ * In development, always use localhost so the worker runs in the same dev server.
+ * In production: NEXT_PUBLIC_APP_URL (explicit) → VERCEL_URL (auto) → localhost fallback.
+ */
+function getAppBaseUrl(): string {
+    if (process.env.NODE_ENV === "development") {
+        const port = process.env.PORT || "3000";
+        return `http://localhost:${port}`;
+    }
+    if (process.env.NEXT_PUBLIC_APP_URL) {
+        return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+    }
+    if (process.env.VERCEL_URL) {
+        return `https://${process.env.VERCEL_URL}`;
+    }
+    return "http://localhost:3000";
+}
 
 type GenerateDraftRequestBody = {
     title?: string;
@@ -34,7 +53,7 @@ function isGenerateDraftRequestBody(value: unknown): value is GenerateDraftReque
 }
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 30; // Just validates + triggers the worker — completes fast.
 
 export async function POST(request: Request) {
     try {
@@ -131,18 +150,62 @@ export async function POST(request: Request) {
         });
         console.log(`[GENERATE-ROUTE] Pipeline job created: ${jobId}`);
 
-        // Fire-and-forget: the pipeline runs in the background.
-        // Results are streamed via SSE on /api/ai-blogger/generate/stream.
-        generateBlogStudioDraftImpl(
-            { id: agency.id, name: agency.name },
-            toActionActor(currentUser),
-            { title: title || "", brief, target, wordCount },
-            jobId,
-        ).catch(async (error) => {
-            const message = error instanceof Error ? error.message : "Unknown pipeline error";
-            console.error("[AI-BLOGGER] [SSE-PIPELINE] Fatal error:", message);
-            await emitPipelineEvent(jobId, { type: "error", message });
-        });
+        const actor = toActionActor(currentUser);
+        const pipelineInput = { title: title || "", brief, target, wordCount };
+
+        // Prefer the dedicated worker endpoint when the secret is configured.
+        // Falls back to the original in-process execution if not.
+        const workerSecret = process.env.AI_BLOGGER_WORKER_SECRET;
+        if (workerSecret) {
+            const baseUrl = getAppBaseUrl();
+            const workerUrl = `${baseUrl}/api/ai-blogger/generate/worker`;
+            console.log(`[GENERATE-ROUTE] Dispatching to worker: ${workerUrl}`);
+
+            // Fire the worker — we don't await the full response because the
+            // worker takes minutes. We just need to confirm the HTTP request
+            // was accepted. The worker runs in its own 300s serverless context.
+            fetch(workerUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-worker-secret": workerSecret,
+                },
+                body: JSON.stringify({
+                    jobId,
+                    agency: { id: agency.id, name: agency.name },
+                    actor,
+                    input: pipelineInput,
+                }),
+            }).catch((fetchError) => {
+                // If the fetch itself fails (DNS, network), log and emit error.
+                const msg = fetchError instanceof Error ? fetchError.message : "Worker dispatch failed";
+                console.error(`[GENERATE-ROUTE] Worker dispatch error: ${msg}`);
+                emitPipelineEvent(jobId, { type: "error", message: `Worker dispatch failed: ${msg}` });
+            });
+
+            // In production (Vercel), remove the in-memory job so the SSE stream
+            // falls back to MongoDB polling — the worker runs on a separate serverless
+            // instance and won't share the EventEmitter.
+            // In development (localhost), keep the in-memory job because the worker
+            // runs in the same Node.js process and events flow via the shared emitter.
+            if (process.env.NODE_ENV !== "development") {
+                releaseLocalPipelineJob(jobId);
+            }
+        } else {
+            // Fallback: run in-process (original behaviour).
+            // This is a dangling promise — less reliable on Vercel.
+            console.warn(`[GENERATE-ROUTE] AI_BLOGGER_WORKER_SECRET not set — running pipeline in-process (legacy mode)`);
+            generateBlogStudioDraftImpl(
+                { id: agency.id, name: agency.name },
+                actor,
+                pipelineInput,
+                jobId,
+            ).catch(async (error) => {
+                const message = error instanceof Error ? error.message : "Unknown pipeline error";
+                console.error("[AI-BLOGGER] [SSE-PIPELINE] Fatal error:", message);
+                await emitPipelineEvent(jobId, { type: "error", message });
+            });
+        }
 
         return NextResponse.json({ ok: true, jobId });
     } catch (error) {

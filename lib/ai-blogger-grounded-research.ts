@@ -28,7 +28,31 @@ export type AIBloggerGroundedResearch = {
 };
 
 const USER_AGENT =
-    "Mozilla/5.0 (compatible; AIBloggerResearchBot/1.0; +https://example.com/ai-blogger)";
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+
+const BOT_BLOCK_SIGNATURES = [
+    "<title>Just a moment...</title>",
+    "<title>Attention Required</title>",
+    "<title>Access Denied</title>",
+    "<title>403 Forbidden</title>",
+    "cf-browser-verification",
+    "_cf_chl_opt",
+    "challenges.cloudflare.com",
+    "Checking your browser",
+    "Please enable cookies",
+    "<title>Security Check</title>",
+];
+
+function isBotBlocked(html: string): boolean {
+    const lowerHtml = html.slice(0, 8000).toLowerCase();
+    return BOT_BLOCK_SIGNATURES.some((sig) => lowerHtml.includes(sig.toLowerCase()));
+}
+
+function logSourceFetch(url: string, status: string, detail?: string) {
+    const domain = extractDomain(url);
+    const message = detail ? `[grounded-research] ${domain}: ${status} — ${detail}` : `[grounded-research] ${domain}: ${status}`;
+    console.log(message);
+}
 
 const BLOCKED_HOST_PATTERNS = [
     /(^|\.)google\./i,
@@ -378,16 +402,70 @@ function buildGroundedResearchSummary(query: string, sources: BlogStudioExternal
     );
 }
 
-async function fetchGroundedSource(url: string): Promise<BlogStudioExternalSource | null> {
+const FETCH_HEADERS = {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "User-Agent": USER_AGENT,
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+};
+
+const FETCH_TIMEOUT_MS = 15_000;
+
+function parseHtmlToSource(html: string, url: string, lastModifiedHeader: string | null): BlogStudioExternalSource | null {
+    const domain = extractDomain(url);
+    const title = extractTitle(html);
+    const description = extractMetaContent(html, [
+        "description",
+        "og:description",
+        "twitter:description",
+    ]);
+    const headings = extractHeadings(html);
+    const paragraphs = extractParagraphs(html);
+    const publishedAt = extractPublishedAt(html, lastModifiedHeader);
+    const type = getSourceType(domain, url, title, description);
+    const freshness = getFreshness(publishedAt, type);
+    const trustLevel = getTrustLevel(type, domain, publishedAt);
+    const summary = buildSourceSummary(title, description, headings, paragraphs);
+    const keyClaims = extractKeyClaims(paragraphs);
+    const citationBlock = buildCitationBlock(title, url, domain, publishedAt, type);
+
+    if (!title || !summary) {
+        return null;
+    }
+
+    return {
+        id: crypto.randomUUID(),
+        title,
+        url,
+        domain,
+        summary,
+        type,
+        freshness,
+        trustLevel,
+        publishedAt,
+        keyClaims,
+        citationBlock,
+    };
+}
+
+async function fetchFromWebCache(url: string): Promise<string | null> {
     try {
-        const response = await fetch(url, {
+        const cacheUrl = `https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(url)}`;
+        const response = await fetch(cacheUrl, {
             method: "GET",
             cache: "no-store",
             headers: {
-                Accept: "text/html,application/xhtml+xml",
-                "User-Agent": USER_AGENT,
+                ...FETCH_HEADERS,
+                "Referer": "https://www.google.com/",
             },
-            signal: AbortSignal.timeout(9000),
+            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
 
         if (!response.ok) {
@@ -400,43 +478,77 @@ async function fetchGroundedSource(url: string): Promise<BlogStudioExternalSourc
         }
 
         const html = await response.text();
-        const domain = extractDomain(url);
-        const title = extractTitle(html);
-        const description = extractMetaContent(html, [
-            "description",
-            "og:description",
-            "twitter:description",
-        ]);
-        const headings = extractHeadings(html);
-        const paragraphs = extractParagraphs(html);
-        const publishedAt = extractPublishedAt(html, response.headers.get("last-modified"));
-        const type = getSourceType(domain, url, title, description);
-        const freshness = getFreshness(publishedAt, type);
-        const trustLevel = getTrustLevel(type, domain, publishedAt);
-        const summary = buildSourceSummary(title, description, headings, paragraphs);
-        const keyClaims = extractKeyClaims(paragraphs);
-        const citationBlock = buildCitationBlock(title, url, domain, publishedAt, type);
-
-        if (!title || !summary) {
+        if (isBotBlocked(html) || html.length < 500) {
             return null;
         }
 
-        return {
-            id: crypto.randomUUID(),
-            title,
-            url,
-            domain,
-            summary,
-            type,
-            freshness,
-            trustLevel,
-            publishedAt,
-            keyClaims,
-            citationBlock,
-        };
+        return html;
     } catch {
         return null;
     }
+}
+
+async function fetchGroundedSource(url: string): Promise<BlogStudioExternalSource | null> {
+    // ─── Direct fetch ────────────────────────────────────────────────
+    try {
+        const response = await fetch(url, {
+            method: "GET",
+            cache: "no-store",
+            headers: {
+                ...FETCH_HEADERS,
+                "Referer": "https://www.google.com/",
+            },
+            redirect: "follow",
+            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        });
+
+        if (!response.ok) {
+            logSourceFetch(url, "http-error", `status ${response.status}`);
+        } else {
+            const contentType = response.headers.get("content-type") || "";
+            if (!contentType.toLowerCase().includes("text/html")) {
+                logSourceFetch(url, "non-html", contentType);
+            } else {
+                const html = await response.text();
+
+                if (isBotBlocked(html)) {
+                    logSourceFetch(url, "bot-blocked", "Cloudflare/WAF challenge detected");
+                } else if (html.length < 500) {
+                    logSourceFetch(url, "empty-body", `${html.length} bytes`);
+                } else {
+                    const source = parseHtmlToSource(html, url, response.headers.get("last-modified"));
+                    if (source) {
+                        logSourceFetch(url, "ok", `title: ${source.title.slice(0, 60)}`);
+                        return source;
+                    }
+                    logSourceFetch(url, "parse-failed", "no title or summary extracted");
+                }
+            }
+        }
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "unknown";
+        logSourceFetch(url, "fetch-error", message.slice(0, 100));
+    }
+
+    // ─── WebCache fallback ───────────────────────────────────────────
+    try {
+        logSourceFetch(url, "trying-webcache");
+        const cachedHtml = await fetchFromWebCache(url);
+        if (cachedHtml) {
+            const source = parseHtmlToSource(cachedHtml, url, null);
+            if (source) {
+                logSourceFetch(url, "webcache-ok", `title: ${source.title.slice(0, 60)}`);
+                return source;
+            }
+            logSourceFetch(url, "webcache-parse-failed", "no title or summary extracted");
+        } else {
+            logSourceFetch(url, "webcache-miss", "not available in cache");
+        }
+    } catch {
+        logSourceFetch(url, "webcache-error");
+    }
+
+    return null;
 }
 
 function applyGroundedResearchFilters(
