@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 @custom-variant dark (&:is(.dark *));
 
 /* =========================
@@ -420,3 +421,281 @@ body {
   50% { border-color: rgba(6, 182, 212, 0.5); }
 }
 .singularity-calling-pulse { animation: singularity-border-pulse 1.5s ease-in-out infinite; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Blog Article Prose Styles (.blog-prose)
+   Applied to dangerouslySetInnerHTML content from the AI Blogger pipeline.
+   This is intentionally scoped and not reliant solely on Tailwind prose utils.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.blog-prose {
+  color: #d1d5db; /* gray-300 */
+  font-family: "Glacial Indifference", sans-serif;
+  font-size: 1.0625rem;
+  line-height: 1.85;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Headings */
+.blog-prose h1,
+.blog-prose h2,
+.blog-prose h3,
+.blog-prose h4,
+.blog-prose h5,
+.blog-prose h6 {
+  font-family: "Etna", sans-serif;
+  color: #ffffff;
+  line-height: 1.2;
+  font-weight: 400;
+}
+
+.blog-prose h2 {
+  font-size: 1.875rem;
+  margin-top: 3rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.blog-prose h3 {
+  font-size: 1.375rem;
+  margin-top: 2.25rem;
+  margin-bottom: 1rem;
+}
+
+.blog-prose h4 {
+  font-size: 1.125rem;
+  margin-top: 1.75rem;
+  margin-bottom: 0.75rem;
+  color: #e5e7eb;
+}
+
+/* First heading — no top margin */
+.blog-prose > h2:first-child,
+.blog-prose > h3:first-child,
+.blog-prose > h4:first-child {
+  margin-top: 0;
+}
+
+/* Paragraphs */
+.blog-prose p {
+  margin-bottom: 1.5rem;
+  color: #d1d5db;
+}
+
+.blog-prose p:last-child {
+  margin-bottom: 0;
+}
+
+/* Links — internal and external */
+.blog-prose a {
+  color: #F5EE30;
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(245, 238, 48, 0.3);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.blog-prose a:hover {
+  color: #fffde0;
+  border-bottom-color: #F5EE30;
+}
+
+/* Strong & Em */
+.blog-prose strong {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.blog-prose em {
+  color: #e5e7eb;
+  font-style: italic;
+}
+
+/* Lists */
+.blog-prose ul,
+.blog-prose ol {
+  margin-top: 0.5rem;
+  margin-bottom: 1.5rem;
+  padding-left: 1.75rem;
+}
+
+.blog-prose ul li,
+.blog-prose ol li {
+  margin-bottom: 0.5rem;
+  color: #d1d5db;
+  line-height: 1.75;
+}
+
+.blog-prose ul {
+  list-style-type: disc;
+}
+
+.blog-prose ol {
+  list-style-type: decimal;
+}
+
+.blog-prose ul li::marker {
+  color: #F5EE30;
+}
+
+.blog-prose ol li::marker {
+  color: #F5EE30;
+  font-weight: 700;
+}
+
+/* Nested lists */
+.blog-prose ul ul,
+.blog-prose ol ol,
+.blog-prose ul ol,
+.blog-prose ol ul {
+  margin-top: 0.375rem;
+  margin-bottom: 0;
+}
+
+/* Blockquote */
+.blog-prose blockquote {
+  margin: 2rem 0;
+  padding: 1.25rem 1.5rem;
+  border-left: 3px solid #F5EE30;
+  background: rgba(245, 238, 48, 0.04);
+  border-radius: 0 0.5rem 0.5rem 0;
+  font-style: italic;
+}
+
+.blog-prose blockquote p {
+  color: #9ca3af;
+  margin-bottom: 0;
+}
+
+/* Code — inline */
+.blog-prose code {
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
+  font-size: 0.875em;
+  color: #F5EE30;
+  background: rgba(245, 238, 48, 0.08);
+  padding: 0.15em 0.45em;
+  border-radius: 0.25rem;
+  font-style: normal;
+}
+
+/* Code — block */
+.blog-prose pre {
+  margin: 1.75rem 0;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.75rem;
+  overflow-x: auto;
+}
+
+.blog-prose pre code {
+  background: none;
+  padding: 0;
+  color: #d1d5db;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+/* Horizontal Rule */
+.blog-prose hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 2.5rem 0;
+}
+
+/* Images */
+.blog-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  margin: 1.75rem 0;
+  display: block;
+}
+
+/* Tables */
+.blog-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.75rem 0;
+  font-size: 0.9375rem;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.blog-prose thead {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.blog-prose th {
+  color: #ffffff;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.blog-prose td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: #d1d5db;
+  vertical-align: top;
+}
+
+.blog-prose tr:last-child td {
+  border-bottom: none;
+}
+
+.blog-prose tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Smaller variant for FAQ answers */
+.blog-prose-sm {
+  font-size: 0.9375rem;
+  line-height: 1.75;
+}
+
+.blog-prose-sm p {
+  margin-bottom: 0.875rem;
+}
+
+.blog-prose-sm h2,
+.blog-prose-sm h3 {
+  margin-top: 1.25rem;
+  margin-bottom: 0.625rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .blog-prose {
+    font-size: 1rem;
+  }
+
+  .blog-prose h2 {
+    font-size: 1.5rem;
+    margin-top: 2rem;
+  }
+
+  .blog-prose h3 {
+    font-size: 1.25rem;
+    margin-top: 1.75rem;
+  }
+
+  .blog-prose pre {
+    font-size: 0.8125rem;
+    padding: 1rem;
+  }
+
+  .blog-prose table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

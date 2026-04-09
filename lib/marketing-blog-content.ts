@@ -54,6 +54,74 @@ function resolveInternalLinkCandidates(link: MarketingBlogInternalLink, siteUrl?
     ).sort((left, right) => right.length - left.length);
 }
 
+// ─── Internal link injection for already-HTML content ────────────────────────
+// When the pipeline produces HTML directly, we need to inject missing internal
+// links by scanning text nodes (content between tags) for unlinked anchor text
+// occurrences and wrapping them with the appropriate <a> tag.
+function injectInternalLinksIntoHtml(
+    content: string,
+    internalLinks: MarketingBlogInternalLink[] | undefined,
+    siteUrl?: string,
+): string {
+    if (!content.trim() || !internalLinks?.length) {
+        return content;
+    }
+
+    let result = content;
+
+    for (const link of internalLinks) {
+        const anchorText = link.anchorText?.trim() || link.title?.trim() || "";
+        const resolvedHref = normalizeInternalLinkHref(link.href, siteUrl) || link.href?.trim() || "";
+
+        if (!anchorText || !resolvedHref || !isSafeHref(resolvedHref)) {
+            continue;
+        }
+
+        const safeAnchor = escapeRegex(anchorText);
+        const safeHref = escapeHtml(resolvedHref);
+
+        // Match the anchor text only when it is:
+        //   - NOT preceded by href=" or href=' (already in a link attribute)
+        //   - NOT inside an existing <a ...> tag
+        // Strategy: split on existing <a...>...</a> blocks and only replace in
+        // text segments outside those blocks. This avoids parsing full HTML with
+        // regex which is fragile.
+        const anchorTagPattern = /(<a[\s\S]*?<\/a>)/gi;
+        const parts = result.split(anchorTagPattern);
+
+        let replaced = false;
+        const newParts = parts.map((part) => {
+            // If this part is an anchor tag itself, leave it untouched
+            if (/^<a[\s\S]*<\/a>$/i.test(part)) {
+                return part;
+            }
+
+            if (replaced) {
+                return part;
+            }
+
+            // Only replace the FIRST occurrence of the anchor text in plain/HTML text
+            // to avoid over-linking (Google penalises the same anchor text multiple times)
+            const replacePattern = new RegExp(
+                `((?:^|>)[^<]*)\\b(${safeAnchor})\\b`,
+                "i",
+            );
+
+            const newPart = part.replace(replacePattern, (_, before, match) => {
+                replaced = true;
+                return `${before}<a href="${safeHref}">${match}</a>`;
+            });
+
+            return newPart;
+        });
+
+        result = newParts.join("");
+    }
+
+    return result;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function injectTrackedInternalLinks(
     content: string,
     internalLinks: MarketingBlogInternalLink[] | undefined,
@@ -256,10 +324,18 @@ export function buildMarketingBlogHtml(
         return "";
     }
 
+    // ── HTML Content Path ──────────────────────────────────────────────────────
+    // The AI pipeline emits HTML directly. In this case we skip the markdown
+    // converter but still inject internal links using the HTML-aware injector.
     if (contentLooksLikeHtml(rawContent)) {
-        return rawContent;
+        return injectInternalLinksIntoHtml(
+            rawContent,
+            options?.internalLinks,
+            options?.siteUrl,
+        );
     }
 
+    // ── Markdown/Plain Text Path ───────────────────────────────────────────────
     const contentWithInlineLinks = injectTrackedInternalLinks(
         rawContent,
         options?.internalLinks,

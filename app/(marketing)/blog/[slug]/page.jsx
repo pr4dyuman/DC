@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Calendar, User, Clock, ChevronDown } from "lucide-react";
+import { ArrowLeft, Calendar, User, Clock, ChevronDown, Share2 } from "lucide-react";
 import dbConnect from "@/lib/marketing-db";
 import Blog from "@/models/marketing/Blog";
 import { checkAuth } from "@/lib/authMiddleware";
@@ -131,7 +131,7 @@ function getReadTimeLabel(content = "") {
   return `${Math.max(
     1,
     Math.ceil(plainText.split(/\s+/).filter(Boolean).length / 200)
-  )} MIN READ`;
+  )} min read`;
 }
 
 function extractHeadingsFromHtml(htmlContent = "") {
@@ -449,7 +449,7 @@ export default async function BlogPost({ params }) {
   const author = SITE_NAME;
   const dateStr = new Date(seo.publishedAt || post.createdAt).toLocaleDateString("en-US", {
     year: "numeric",
-    month: "short",
+    month: "long",
     day: "numeric",
   });
   const faqItems = getStoredFaqItems(post);
@@ -472,13 +472,46 @@ export default async function BlogPost({ params }) {
   const useNativeHeroImage = isRemoteMarketingImageSrc(heroImageSrc);
   const isSvgHeroImage = isSvgMarketingImageSrc(heroImageSrc);
 
+  const shareUrl = encodeURIComponent(seo.canonicalUrl);
+  const shareTitle = encodeURIComponent(post.title);
+  const shareLinks = [
+    {
+      name: "Twitter / X",
+      href: `https://twitter.com/intent/tweet?url=${shareUrl}&text=${shareTitle}`,
+      icon: (
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.745l7.733-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+        </svg>
+      ),
+    },
+    {
+      name: "LinkedIn",
+      href: `https://www.linkedin.com/sharing/share-offsite/?url=${shareUrl}`,
+      icon: (
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+        </svg>
+      ),
+    },
+    {
+      name: "Facebook",
+      href: `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`,
+      icon: (
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path fillRule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clipRule="evenodd" />
+        </svg>
+      ),
+    },
+  ];
+
   return (
     <div className="bg-black min-h-screen flex flex-col font-glacial text-white selection:bg-[#F5EE30] selection:text-black">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: seo.schemaMarkup }} />
 
       <article className="flex-grow">
+        {/* ── Hero Image ── */}
         {showImage && (
-          <div className="relative w-full h-[70vh] min-h-[500px]">
+          <div className="relative w-full h-[60vh] min-h-[420px] max-h-[700px] overflow-hidden">
             {useNativeHeroImage ? (
               <img
                 src={heroImageSrc}
@@ -495,177 +528,237 @@ export default async function BlogPost({ params }) {
                 unoptimized={isSvgHeroImage}
               />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/30" />
+            {/* multi-stop gradient for smooth content merge */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+            {/* subtle vignette sides */}
+            <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-black/30" />
           </div>
         )}
 
-        <div className="bg-black relative px-4 py-16 sm:px-6 md:px-10 md:py-24 lg:px-16">
-          <div className="max-w-3xl mx-auto relative z-10">
-            <div className="mb-8">
-              <Link
-                href="/blog"
-                className="inline-flex items-center gap-2 text-[#F5EE30] hover:text-white transition-colors mb-6 text-sm font-bold uppercase tracking-wide"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back
-              </Link>
-              <span className="inline-block bg-[#F5EE30] text-black px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-full">
-                {category}
-              </span>
+        {/* ── Main Content Area ── */}
+        <div className={`relative ${showImage ? "-mt-32 z-10" : "pt-16"}`}>
+          <div className="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8">
+
+            {/* ── Header Card ── */}
+            <div className="bg-[#0d0d0d] border border-white/[0.07] rounded-2xl p-8 md:p-12 mb-8 shadow-2xl">
+
+              {/* breadcrumb + category */}
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+                <Link
+                  href="/blog"
+                  className="inline-flex items-center gap-2 text-gray-400 hover:text-[#F5EE30] transition-colors text-sm font-medium group"
+                >
+                  <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+                  All Articles
+                </Link>
+                <span className="inline-flex items-center gap-1.5 bg-[#F5EE30]/10 border border-[#F5EE30]/20 text-[#F5EE30] px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-full">
+                  {category}
+                </span>
+              </div>
+
+              {/* title */}
+              <h1 className="font-etna text-3xl sm:text-4xl md:text-5xl lg:text-[3.25rem] leading-[1.15] mb-6 text-white">
+                {post.title}
+              </h1>
+
+              {/* description */}
+              <p className="text-gray-300 text-lg md:text-xl leading-relaxed mb-8 max-w-3xl">
+                {seo.displayDescription}
+              </p>
+
+              {/* meta row */}
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-6 border-t border-white/[0.07]">
+                <div className="flex items-center gap-2 text-gray-400 text-sm">
+                  <div className="w-7 h-7 rounded-full bg-[#F5EE30]/10 border border-[#F5EE30]/20 flex items-center justify-center flex-shrink-0">
+                    <User className="w-3.5 h-3.5 text-[#F5EE30]" />
+                  </div>
+                  <span className="font-medium text-gray-300">{author}</span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-400 text-sm">
+                  <div className="w-7 h-7 rounded-full bg-[#F5EE30]/10 border border-[#F5EE30]/20 flex items-center justify-center flex-shrink-0">
+                    <Calendar className="w-3.5 h-3.5 text-[#F5EE30]" />
+                  </div>
+                  <span>{dateStr}</span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-400 text-sm">
+                  <div className="w-7 h-7 rounded-full bg-[#F5EE30]/10 border border-[#F5EE30]/20 flex items-center justify-center flex-shrink-0">
+                    <Clock className="w-3.5 h-3.5 text-[#F5EE30]" />
+                  </div>
+                  <span>{readTime}</span>
+                </div>
+              </div>
             </div>
 
-            <h1 className="font-etna text-4xl md:text-5xl lg:text-6xl leading-tight mb-6 text-white">
-              {post.title}
-            </h1>
+            {/* ── Two-column layout: Sidebar + Content ── */}
+            <div className="flex gap-8 items-start">
 
-            <p className="text-gray-400 text-lg mb-8 leading-relaxed">
-              {seo.displayDescription}
-            </p>
+              {/* ── Left: TOC Sidebar (desktop) ── */}
+              {shouldShowToc && (
+                <aside className="hidden lg:block w-64 flex-shrink-0 sticky top-8">
+                  <div className="bg-[#0d0d0d] border border-white/[0.07] rounded-xl p-6">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F5EE30] mb-4">
+                      On This Page
+                    </p>
+                    <nav className="space-y-1">
+                      {headings.map((heading) => (
+                        <a
+                          key={heading.id}
+                          href={`#${heading.id}`}
+                          className={`block text-sm py-1.5 px-3 rounded-lg transition-all hover:bg-[#F5EE30]/5 hover:text-[#F5EE30] ${
+                            heading.level === 2
+                              ? "text-gray-300 font-medium"
+                              : "text-gray-500 ml-3 text-xs"
+                          }`}
+                        >
+                          {heading.text}
+                        </a>
+                      ))}
+                    </nav>
+                  </div>
+                </aside>
+              )}
 
-            <div className="flex flex-wrap items-center gap-6 md:gap-8 text-gray-300 text-sm font-bold uppercase tracking-wide mb-12 border-t border-white/20 pt-6">
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-[#F5EE30]" />
-                <span>{author}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-[#F5EE30]" />
-                <span>{dateStr}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-[#F5EE30]" />
-                <span>{readTime}</span>
-              </div>
-            </div>
+              {/* ── Right: Main Article Content ── */}
+              <div className="flex-1 min-w-0">
 
-            {shouldShowToc && (
-              <div className="mb-12 p-6 border border-white/10 rounded-lg bg-white/[0.02]">
-                <p className="text-xs font-bold uppercase tracking-wide text-[#F5EE30] mb-4">
-                  ON THIS PAGE
-                </p>
-                <nav className="space-y-2.5">
-                  {headings.map((heading) => (
-                    <a
-                      key={heading.id}
-                      href={`#${heading.id}`}
-                      className={`block text-sm transition-colors hover:text-[#F5EE30] ${
-                        heading.level === 2
-                          ? "text-gray-300 font-medium"
-                          : "text-gray-400 ml-4"
-                      }`}
-                    >
-                      {heading.text}
-                    </a>
-                  ))}
-                </nav>
-              </div>
-            )}
-
-            {peopleAlsoAsk.length > 0 && (
-              <div className="mb-12 p-6 md:p-8 border border-white/10 rounded-lg bg-white/[0.02]">
-                <p className="text-xs font-bold uppercase tracking-wide text-[#F5EE30] mb-4">
-                  SEARCH INTENT
-                </p>
-                <h2 className="font-etna text-3xl text-white mb-6">PEOPLE ALSO ASK</h2>
-                <div className="grid gap-4">
-                  {peopleAlsoAsk.map((question, index) => (
-                    <div
-                      key={`paa-${index}`}
-                      className="bg-white/[0.03] border border-white/10 rounded-lg p-5 hover:border-white/20 hover:bg-white/[0.05] transition-all"
-                    >
-                      <p className="text-white text-base font-medium leading-relaxed">{question}</p>
+                {/* Mobile TOC */}
+                {shouldShowToc && (
+                  <details className="lg:hidden mb-6 bg-[#0d0d0d] border border-white/[0.07] rounded-xl overflow-hidden group">
+                    <summary className="flex items-center justify-between cursor-pointer px-6 py-4 hover:bg-white/[0.02] transition-colors">
+                      <span className="text-xs font-bold uppercase tracking-[0.15em] text-[#F5EE30]">
+                        On This Page
+                      </span>
+                      <ChevronDown className="w-4 h-4 text-gray-400 transition-transform group-open:rotate-180" />
+                    </summary>
+                    <div className="border-t border-white/[0.07] px-6 py-4">
+                      <nav className="space-y-1">
+                        {headings.map((heading) => (
+                          <a
+                            key={heading.id}
+                            href={`#${heading.id}`}
+                            className={`block text-sm py-1.5 transition-colors hover:text-[#F5EE30] ${
+                              heading.level === 2
+                                ? "text-gray-300 font-medium"
+                                : "text-gray-500 ml-4 text-xs"
+                            }`}
+                          >
+                            {heading.text}
+                          </a>
+                        ))}
+                      </nav>
                     </div>
-                  ))}
+                  </details>
+                )}
+
+                {/* People Also Ask */}
+                {peopleAlsoAsk.length > 0 && (
+                  <div className="mb-8 bg-[#0d0d0d] border border-white/[0.07] rounded-xl p-6 md:p-8">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F5EE30] mb-3">
+                      Search Intent
+                    </p>
+                    <h2 className="font-etna text-2xl text-white mb-5">People Also Ask</h2>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {peopleAlsoAsk.map((question, index) => (
+                        <div
+                          key={`paa-${index}`}
+                          className="bg-black/40 border border-white/[0.06] rounded-lg p-4 hover:border-[#F5EE30]/20 hover:bg-[#F5EE30]/[0.02] transition-all cursor-default"
+                        >
+                          <p className="text-gray-300 text-sm leading-relaxed">{question}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Article Body ── */}
+                <div className="bg-[#0d0d0d] border border-white/[0.07] rounded-xl p-6 md:p-10 mb-8">
+                  <div
+                    className="blog-prose"
+                    dangerouslySetInnerHTML={{ __html: sanitizedContent }}
+                  />
                 </div>
-              </div>
-            )}
 
-            <div
-              className="prose prose-invert max-w-none mb-12
-              prose-headings:font-etna prose-headings:text-white
-              prose-h2:text-3xl md:prose-h2:text-4xl prose-h2:mt-16 prose-h2:mb-8 prose-h2:leading-tight
-              prose-h3:text-2xl md:prose-h3:text-3xl prose-h3:mt-12 prose-h3:mb-6 prose-h3:leading-tight
-              prose-h4:text-xl prose-h4:mt-10 prose-h4:mb-4
-              prose-p:text-gray-300 prose-p:text-base md:prose-p:text-lg prose-p:leading-relaxed prose-p:mb-7
-              prose-a:text-[#F5EE30] prose-a:no-underline hover:prose-a:underline prose-a:transition-colors prose-a:font-medium
-              prose-strong:text-white prose-strong:font-semibold
-              prose-em:text-gray-200 prose-em:italic
-              prose-ul:text-gray-300 prose-ul:text-base md:prose-ul:text-lg prose-ul:mb-8 prose-ul:pl-6
-              prose-li:mb-4 prose-li:leading-relaxed
-              prose-ol:text-gray-300 prose-ol:text-base md:prose-ol:text-lg prose-ol:mb-8 prose-ol:pl-6
-              prose-blockquote:border-l-4 prose-blockquote:border-[#F5EE30] prose-blockquote:bg-white/[0.05] prose-blockquote:text-gray-300 prose-blockquote:pl-6 prose-blockquote:pr-6 prose-blockquote:py-5 prose-blockquote:italic prose-blockquote:my-10 prose-blockquote:rounded
-              prose-code:bg-white/[0.08] prose-code:text-[#F5EE30] prose-code:px-2.5 prose-code:py-1 prose-code:rounded prose-code:text-sm prose-code:font-mono prose-code:not-italic
-              prose-pre:bg-white/[0.03] prose-pre:border prose-pre:border-white/10 prose-pre:rounded-lg prose-pre:p-6 prose-pre:my-10 prose-pre:text-gray-300 prose-pre:text-sm
-              prose-hr:border-white/20 prose-hr:my-12
-              prose-img:rounded-lg prose-img:my-10 prose-img:border prose-img:border-white/10
-              prose-table:text-gray-300 prose-thead:bg-white/[0.03] prose-th:text-white prose-th:font-semibold prose-th:border-white/10 prose-td:border-white/10
-              font-sans"
-              dangerouslySetInnerHTML={{ __html: sanitizedContent }}
-            />
+                {/* FAQ Section */}
+                {faqItems.length > 0 && (
+                  <div className="mb-8 bg-[#0d0d0d] border border-white/[0.07] rounded-xl overflow-hidden">
+                    <div className="px-6 md:px-8 pt-6 md:pt-8 pb-4">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F5EE30] mb-3">
+                        FAQ
+                      </p>
+                      <h2 className="font-etna text-2xl text-white">Frequently Asked Questions</h2>
+                    </div>
+                    <div className="px-6 md:px-8 pb-6 md:pb-8 space-y-3">
+                      {faqItems.map((item, index) => (
+                        <details
+                          key={`faq-${index}`}
+                          className="group bg-black/30 border border-white/[0.06] rounded-xl overflow-hidden hover:border-white/[0.12] transition-all"
+                          open={index === 0}
+                        >
+                          <summary className="flex items-start justify-between cursor-pointer p-5 hover:bg-white/[0.02] transition-colors gap-4">
+                            <span className="font-etna text-base text-white leading-snug">{item.question}</span>
+                            <ChevronDown className="w-4 h-4 text-[#F5EE30] transition-transform group-open:rotate-180 flex-shrink-0 mt-0.5" />
+                          </summary>
+                          <div
+                            className="px-5 pb-5 border-t border-white/[0.06] pt-4 blog-prose blog-prose-sm"
+                            dangerouslySetInnerHTML={{
+                              __html: serverSanitizeHtml(
+                                buildMarketingBlogHtml(item.answer, { siteUrl: SITE_URL })
+                              ),
+                            }}
+                          />
+                        </details>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-            {faqItems.length > 0 && (
-              <div className="mb-12 p-6 md:p-8 border border-white/10 rounded-lg bg-white/[0.02]">
-                <p className="text-xs font-bold uppercase tracking-wide text-[#F5EE30] mb-4">
-                  FAQ
-                </p>
-                <h2 className="font-etna text-3xl text-white mb-8">FREQUENTLY ASKED QUESTIONS</h2>
-                <div className="space-y-4">
-                  {faqItems.map((item, index) => (
-                    <details
-                      key={`faq-${index}`}
-                      className="group bg-white/[0.02] border border-white/10 rounded-lg overflow-hidden hover:border-white/20 transition-all"
-                      open={index === 0}
-                    >
-                      <summary className="flex items-center justify-between cursor-pointer p-5 md:p-6 hover:bg-white/[0.05] transition-colors">
-                        <span className="font-etna text-lg text-white pr-6">{item.question}</span>
-                        <ChevronDown className="w-5 h-5 text-[#F5EE30] transition-transform group-open:rotate-180 flex-shrink-0" />
-                      </summary>
-                      <div
-                        className="px-5 md:px-6 pb-5 md:pb-6 border-t border-white/10 pt-5 prose prose-invert max-w-none
-                        prose-p:text-gray-300 prose-p:text-base prose-p:leading-relaxed prose-p:mb-4 md:prose-p:text-lg
-                        prose-a:text-[#F5EE30] prose-a:no-underline hover:prose-a:underline
-                        prose-strong:text-white prose-strong:font-semibold
-                        prose-ul:text-gray-300 prose-ul:pl-6 prose-li:mb-2
-                        prose-ol:text-gray-300 prose-ol:pl-6"
-                        dangerouslySetInnerHTML={{
-                          __html: serverSanitizeHtml(
-                            buildMarketingBlogHtml(item.answer, { siteUrl: SITE_URL })
-                          ),
-                        }}
-                      />
-                    </details>
-                  ))}
+                {/* Share Section */}
+                <div className="bg-[#0d0d0d] border border-white/[0.07] rounded-xl p-6 md:p-8">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-[#F5EE30]/10 border border-[#F5EE30]/20 flex items-center justify-center flex-shrink-0">
+                        <Share2 className="w-4 h-4 text-[#F5EE30]" />
+                      </div>
+                      <div>
+                        <p className="text-white font-etna text-lg">Share this article</p>
+                        <p className="text-gray-500 text-xs mt-0.5">Spread the knowledge</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {shareLinks.map((platform) => (
+                        <a
+                          key={platform.name}
+                          href={platform.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Share on ${platform.name}`}
+                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/[0.12] text-gray-300 hover:border-[#F5EE30] hover:text-black hover:bg-[#F5EE30] transition-all duration-200 text-xs font-bold uppercase tracking-wide"
+                        >
+                          {platform.icon}
+                          <span className="hidden sm:inline">{platform.name}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
 
-            <div className="mt-16 pt-10 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-8">
-              <h3 className="font-etna text-2xl text-white">SHARE THIS ARTICLE</h3>
-              <div className="flex gap-4 flex-wrap">
-                {(() => {
-                  const url = encodeURIComponent(seo.canonicalUrl);
-                  const title = encodeURIComponent(post.title);
-                  const platforms = [
-                    { name: "Twitter", href: `https://twitter.com/intent/tweet?url=${url}&text=${title}` },
-                    { name: "LinkedIn", href: `https://www.linkedin.com/sharing/share-offsite/?url=${url}` },
-                    { name: "Facebook", href: `https://www.facebook.com/sharer/sharer.php?u=${url}` },
-                  ];
-
-                  return platforms.map((platform) => (
-                    <a
-                      key={platform.name}
-                      href={platform.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-6 py-3 rounded-full border border-white/20 text-white hover:border-[#F5EE30] hover:bg-[#F5EE30] hover:text-black transition-all duration-300 font-bold uppercase text-xs tracking-wider whitespace-nowrap"
-                    >
-                      {platform.name}
-                    </a>
-                  ));
-                })()}
+                {/* Back to Blog */}
+                <div className="mt-8 text-center">
+                  <Link
+                    href="/blog"
+                    className="inline-flex items-center gap-2 text-gray-400 hover:text-[#F5EE30] transition-colors text-sm group"
+                  >
+                    <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+                    Back to all articles
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        {/* bottom spacing */}
+        <div className="pb-20" />
       </article>
     </div>
   );
