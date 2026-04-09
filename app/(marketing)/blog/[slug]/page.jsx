@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Calendar, User, Clock, ChevronDown } from "lucide-react";
-import DOMPurify from "isomorphic-dompurify";
 import dbConnect from "@/lib/marketing-db";
 import Blog from "@/models/marketing/Blog";
 import { checkAuth } from "@/lib/authMiddleware";
@@ -14,6 +13,26 @@ import {
   toAbsoluteMarketingImageUrl,
 } from "@/lib/marketing-blog-utils";
 import { notFound } from "next/navigation";
+
+
+// ─── Server-safe HTML sanitizer ────────────────────────────────────────────────
+// isomorphic-dompurify is intentionally NOT used here — in Next.js 16 production,
+// dompurify accesses browser globals (window/document) at module init time,
+// causing a Server Component crash BEFORE rendering begins. Since our HTML content
+// is already AI-generated and passed through buildMarketingBlogHtml, a targeted
+// strip of dangerous patterns is both safe and sufficient.
+function serverSanitizeHtml(html = "") {
+  return html
+    // Remove script blocks entirely
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    // Remove style blocks entirely
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
+    // Strip inline event handlers (onclick, onload, onerror, etc.)
+    .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, "")
+    // Neutralise javascript: URIs
+    .replace(/javascript\s*:/gi, "void:");
+}
+// ────────────────────────────────────────────────────────────────────────────────
 
 export const revalidate = 60;
 
@@ -444,7 +463,7 @@ export default async function BlogPost({ params }) {
   const contentWithHeadingIds = shouldShowToc
     ? addHeadingIdsToHtml(renderedContent, headings)
     : renderedContent;
-  const sanitizedContent = DOMPurify.sanitize(contentWithHeadingIds);
+  const sanitizedContent = serverSanitizeHtml(contentWithHeadingIds);
   const readTime = getReadTimeLabel(renderedContent || post.content);
 
   const heroImageSrc = normalizeMarketingImageSrc(post.image);
@@ -608,7 +627,7 @@ export default async function BlogPost({ params }) {
                         prose-ul:text-gray-300 prose-ul:pl-6 prose-li:mb-2
                         prose-ol:text-gray-300 prose-ol:pl-6"
                         dangerouslySetInnerHTML={{
-                          __html: DOMPurify.sanitize(
+                          __html: serverSanitizeHtml(
                             buildMarketingBlogHtml(item.answer, { siteUrl: SITE_URL })
                           ),
                         }}
