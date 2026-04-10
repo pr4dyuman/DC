@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
-import Navigation from "@/components/marketing/Navigation";
-import Footer from "@/components/marketing/Footer";
 
 const subscribe = () => () => {};
 
@@ -12,7 +10,6 @@ export default function NotFound() {
 
     return (
         <div className="min-h-screen bg-black text-white flex flex-col">
-            <Navigation />
 
             <main className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 pt-20 pb-16">
                 <div className="max-w-4xl w-full text-center">
@@ -108,8 +105,6 @@ export default function NotFound() {
                     </div>
                 </div>
             </main>
-
-            <Footer />
 
         </div>
     );
