@@ -557,6 +557,7 @@ const BlogStudioSerpSnapshotSchema = new Schema<BlogStudioSerpSnapshot>(
         topResultUrls: [{ type: String }],
         competitorDomains: [{ type: String }],
         peopleAlsoAsk: [{ type: String }],
+        relatedSearches: [{ type: String }],
         headingPatterns: [{ type: String }],
         contentGaps: [{ type: String }],
         featuredSnippetStyle: { type: String, default: "" },

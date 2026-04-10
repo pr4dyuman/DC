@@ -44,6 +44,7 @@ export type AIBloggerSerpAnalysis = {
     topResultUrls: string[];
     competitorDomains: string[];
     peopleAlsoAsk: string[];
+    relatedSearches: string[];
     headingPatterns: string[];
     contentGaps: string[];
     featuredSnippetStyle: string;
@@ -95,6 +96,86 @@ function getPeopleAlsoAsk(data: unknown) {
     );
 }
 
+function getRelatedSearches(data: unknown) {
+    if (!data || typeof data !== "object") {
+        return [];
+    }
+
+    const record = data as {
+        related_searches?: Array<{ query?: string }>;
+    };
+
+    return sanitizeStringArray(
+        (record.related_searches || []).map((item) => item.query),
+        8,
+        180,
+    );
+}
+
+/**
+ * When SerpAPI returns 0 PAA items, generate synthetic question-style entries
+ * from competitor headings and related searches. This ensures the FAQ pack
+ * always has real SERP-derived questions to work with.
+ */
+function buildSyntheticPAA(
+    headingPatterns: string[],
+    relatedSearches: string[],
+    query: string,
+): string[] {
+    const QUESTION_PATTERNS = /^(how|what|why|when|where|which|who|can|do|does|is|are|should|will|would)/i;
+    const synthetic: string[] = [];
+    const seen = new Set<string>();
+    const queryLower = query.toLowerCase();
+
+    // 1. Extract headings that are already question-shaped
+    for (const heading of headingPatterns) {
+        const trimmed = heading.trim();
+        if (trimmed.endsWith("?") || QUESTION_PATTERNS.test(trimmed)) {
+            const normalized = trimmed.toLowerCase();
+            if (!seen.has(normalized) && !normalized.includes(queryLower.slice(0, 20))) {
+                seen.add(normalized);
+                synthetic.push(trimmed.endsWith("?") ? trimmed : `${trimmed}?`);
+            }
+        }
+    }
+
+    // 2. Convert how-to/what-is style headings into questions
+    for (const heading of headingPatterns) {
+        const trimmed = heading.trim();
+        const lower = trimmed.toLowerCase();
+        if (seen.has(lower) || trimmed.endsWith("?")) continue;
+
+        if (/^(how to|getting started|understanding|introduction to|guide to)/i.test(trimmed)) {
+            const question = `How do you ${trimmed.replace(/^(how to|getting started with|understanding|introduction to|guide to)\s*/i, "")}?`;
+            if (!seen.has(question.toLowerCase())) {
+                seen.add(question.toLowerCase());
+                synthetic.push(question);
+            }
+        }
+    }
+
+    // 3. Convert related searches into questions if they aren't already
+    for (const search of relatedSearches) {
+        const trimmed = search.trim();
+        const lower = trimmed.toLowerCase();
+        if (seen.has(lower)) continue;
+
+        if (QUESTION_PATTERNS.test(trimmed) || trimmed.endsWith("?")) {
+            seen.add(lower);
+            synthetic.push(trimmed.endsWith("?") ? trimmed : `${trimmed}?`);
+        } else {
+            // Convert factual search phrases into questions
+            const question = `What is ${trimmed}?`;
+            if (!seen.has(question.toLowerCase())) {
+                seen.add(question.toLowerCase());
+                synthetic.push(question);
+            }
+        }
+    }
+
+    return sanitizeStringArray(synthetic, 6, 180);
+}
+
 function getFeaturedSnippetStyle(data: unknown) {
     if (!data || typeof data !== "object") {
         return "No featured snippet detected";
@@ -133,15 +214,49 @@ function getFeaturedSnippetStyle(data: unknown) {
     return sanitizeText(answerBox.type, 120, "Featured snippet detected");
 }
 
+const EXCLUDED_COMPETITOR_DOMAINS = new Set([
+    "reddit.com",
+    "quora.com",
+    "stackexchange.com",
+    "stackoverflow.com",
+    "medium.com",
+    "twitter.com",
+    "x.com",
+    "facebook.com",
+    "linkedin.com",
+    "pinterest.com",
+    "youtube.com",
+    "tiktok.com",
+    "instagram.com",
+    "threads.net",
+]);
+
+function isExcludedCompetitorDomain(hostname: string) {
+    const normalized = hostname.replace(/^www\./, "").toLowerCase();
+    if (EXCLUDED_COMPETITOR_DOMAINS.has(normalized)) {
+        return true;
+    }
+
+    for (const excluded of EXCLUDED_COMPETITOR_DOMAINS) {
+        if (normalized.endsWith(`.${excluded}`)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 function getCompetitorDomains(results: OrganicResult[]) {
     return sanitizeStringArray(
-        results.map((result) => {
-            try {
-                return new URL(result.link).hostname.replace(/^www\./, "");
-            } catch {
-                return "";
-            }
-        }),
+        results
+            .map((result) => {
+                try {
+                    return new URL(result.link).hostname.replace(/^www\./, "");
+                } catch {
+                    return "";
+                }
+            })
+            .filter((domain) => domain && !isExcludedCompetitorDomain(domain)),
         8,
         120,
     );
@@ -483,6 +598,7 @@ function toSerpAnalysis(
         | "topResultUrls"
         | "competitorDomains"
         | "peopleAlsoAsk"
+        | "relatedSearches"
         | "headingPatterns"
         | "contentGaps"
         | "featuredSnippetStyle"
@@ -505,6 +621,7 @@ function toSerpAnalysis(
         topResultUrls: snapshot.topResultUrls,
         competitorDomains: snapshot.competitorDomains,
         peopleAlsoAsk: snapshot.peopleAlsoAsk,
+        relatedSearches: snapshot.relatedSearches || [],
         headingPatterns: snapshot.headingPatterns,
         contentGaps: snapshot.contentGaps,
         featuredSnippetStyle: snapshot.featuredSnippetStyle,
@@ -575,6 +692,7 @@ async function storeSerpSnapshot(agencyId: string, analysis: AIBloggerSerpAnalys
                 topResultUrls: analysis.topResultUrls,
                 competitorDomains: analysis.competitorDomains,
                 peopleAlsoAsk: analysis.peopleAlsoAsk,
+                relatedSearches: analysis.relatedSearches,
                 headingPatterns: analysis.headingPatterns,
                 contentGaps: analysis.contentGaps,
                 featuredSnippetStyle: analysis.featuredSnippetStyle,
@@ -778,7 +896,8 @@ export async function getAIBloggerSerpAnalysis(
         throw new Error("SerpAPI returned no organic results for SERP Analysis.");
     }
 
-    const peopleAlsoAsk = getPeopleAlsoAsk(data);
+    const rawPeopleAlsoAsk = getPeopleAlsoAsk(data);
+    const relatedSearches = getRelatedSearches(data);
     const featuredSnippetStyle = getFeaturedSnippetStyle(data);
     const competitorPages = (
         await Promise.all(organicResults.slice(0, 3).map((result) => fetchCompetitorPage(result.link)))
@@ -795,6 +914,14 @@ export async function getAIBloggerSerpAnalysis(
         maxCompetitors,
         400,
     );
+
+    // When SerpAPI returns 0 PAA items, generate synthetic questions from
+    // competitor headings and related searches so the FAQ pack and content
+    // gap analysis always have real SERP-derived question intelligence.
+    const peopleAlsoAsk = rawPeopleAlsoAsk.length > 0
+        ? rawPeopleAlsoAsk
+        : buildSyntheticPAA(headingPatterns, relatedSearches, query);
+
     const intent = inferSearchIntent(query, topResultTitles, competitorDomains);
     const contentGaps = buildContentGaps(query, peopleAlsoAsk, headingPatterns);
     const rankingDifficulty = assessRankingDifficulty(competitorDomains, featuredSnippetStyle, intent);
@@ -828,6 +955,7 @@ export async function getAIBloggerSerpAnalysis(
         topResultUrls,
         competitorDomains,
         peopleAlsoAsk,
+        relatedSearches,
         headingPatterns,
         contentGaps,
         featuredSnippetStyle,

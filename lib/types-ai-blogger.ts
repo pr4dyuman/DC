@@ -576,6 +576,7 @@ export type BlogStudioSerpSnapshot = {
     topResultUrls: string[];
     competitorDomains: string[];
     peopleAlsoAsk: string[];
+    relatedSearches: string[];
     headingPatterns: string[];
     contentGaps: string[];
     featuredSnippetStyle: string;

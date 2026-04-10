@@ -27,8 +27,21 @@ export type AIBloggerGroundedResearch = {
     refreshedAt: string;
 };
 
-const USER_AGENT =
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+const USER_AGENT_DESKTOP =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+const USER_AGENT_MOBILE =
+    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36";
+
+export type GroundedSourceFetchDiagnostic = {
+    url: string;
+    domain: string;
+    directStatus: string;
+    mobileRetryStatus: string;
+    waybackStatus: string;
+    ampCacheStatus: string;
+    finalResult: "ok" | "failed";
+};
 
 const BOT_BLOCK_SIGNATURES = [
     "<title>Just a moment...</title>",
@@ -402,19 +415,21 @@ function buildGroundedResearchSummary(query: string, sources: BlogStudioExternal
     );
 }
 
-const FETCH_HEADERS = {
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
-    "User-Agent": USER_AGENT,
-    "Cache-Control": "no-cache",
-    "Pragma": "no-cache",
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "none",
-    "Sec-Fetch-User": "?1",
-    "Upgrade-Insecure-Requests": "1",
-};
+function buildFetchHeaders(userAgent: string) {
+    return {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "User-Agent": userAgent,
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
+    };
+}
 
 const FETCH_TIMEOUT_MS = 15_000;
 
@@ -455,16 +470,18 @@ function parseHtmlToSource(html: string, url: string, lastModifiedHeader: string
     };
 }
 
-async function fetchFromWebCache(url: string): Promise<string | null> {
+async function fetchFromWaybackMachine(url: string): Promise<string | null> {
     try {
-        const cacheUrl = `https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(url)}`;
-        const response = await fetch(cacheUrl, {
+        // Try Wayback Machine's most recent snapshot
+        const waybackUrl = `https://web.archive.org/web/2024if_/${url}`;
+        const response = await fetch(waybackUrl, {
             method: "GET",
             cache: "no-store",
             headers: {
-                ...FETCH_HEADERS,
-                "Referer": "https://www.google.com/",
+                "User-Agent": USER_AGENT_DESKTOP,
+                "Accept": "text/html,application/xhtml+xml",
             },
+            redirect: "follow",
             signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
 
@@ -488,14 +505,58 @@ async function fetchFromWebCache(url: string): Promise<string | null> {
     }
 }
 
-async function fetchGroundedSource(url: string): Promise<BlogStudioExternalSource | null> {
-    // ─── Direct fetch ────────────────────────────────────────────────
+async function fetchFromAmpCache(url: string): Promise<string | null> {
+    try {
+        const parsed = new URL(url);
+        const ampUrl = `https://${parsed.hostname.replace(/\./g, "-")}.cdn.ampproject.org/c/s/${parsed.hostname}${parsed.pathname}`;
+        const response = await fetch(ampUrl, {
+            method: "GET",
+            cache: "no-store",
+            headers: {
+                "User-Agent": USER_AGENT_MOBILE,
+                "Accept": "text/html,application/xhtml+xml",
+            },
+            redirect: "follow",
+            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.toLowerCase().includes("text/html")) {
+            return null;
+        }
+
+        const html = await response.text();
+        if (isBotBlocked(html) || html.length < 500) {
+            return null;
+        }
+
+        return html;
+    } catch {
+        return null;
+    }
+}
+
+function tryParseSourceFromHtml(html: string, url: string, lastModifiedHeader: string | null): BlogStudioExternalSource | null {
+    if (isBotBlocked(html)) {
+        return null;
+    }
+    if (html.length < 500) {
+        return null;
+    }
+    return parseHtmlToSource(html, url, lastModifiedHeader);
+}
+
+async function directFetch(url: string, userAgent: string): Promise<{ source: BlogStudioExternalSource | null; status: string }> {
     try {
         const response = await fetch(url, {
             method: "GET",
             cache: "no-store",
             headers: {
-                ...FETCH_HEADERS,
+                ...buildFetchHeaders(userAgent),
                 "Referer": "https://www.google.com/",
             },
             redirect: "follow",
@@ -503,52 +564,113 @@ async function fetchGroundedSource(url: string): Promise<BlogStudioExternalSourc
         });
 
         if (!response.ok) {
-            logSourceFetch(url, "http-error", `status ${response.status}`);
-        } else {
-            const contentType = response.headers.get("content-type") || "";
-            if (!contentType.toLowerCase().includes("text/html")) {
-                logSourceFetch(url, "non-html", contentType);
-            } else {
-                const html = await response.text();
-
-                if (isBotBlocked(html)) {
-                    logSourceFetch(url, "bot-blocked", "Cloudflare/WAF challenge detected");
-                } else if (html.length < 500) {
-                    logSourceFetch(url, "empty-body", `${html.length} bytes`);
-                } else {
-                    const source = parseHtmlToSource(html, url, response.headers.get("last-modified"));
-                    if (source) {
-                        logSourceFetch(url, "ok", `title: ${source.title.slice(0, 60)}`);
-                        return source;
-                    }
-                    logSourceFetch(url, "parse-failed", "no title or summary extracted");
-                }
-            }
+            return { source: null, status: `http-${response.status}` };
         }
+
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.toLowerCase().includes("text/html")) {
+            return { source: null, status: `non-html:${contentType.slice(0, 40)}` };
+        }
+
+        const html = await response.text();
+        if (isBotBlocked(html)) {
+            return { source: null, status: "bot-blocked" };
+        }
+        if (html.length < 500) {
+            return { source: null, status: `empty-body:${html.length}b` };
+        }
+
+        const source = parseHtmlToSource(html, url, response.headers.get("last-modified"));
+        if (source) {
+            return { source, status: "ok" };
+        }
+        return { source: null, status: "parse-failed" };
     } catch (error) {
         const message = error instanceof Error ? error.message : "unknown";
-        logSourceFetch(url, "fetch-error", message.slice(0, 100));
+        return { source: null, status: `error:${message.slice(0, 60)}` };
+    }
+}
+
+async function fetchGroundedSourceWithDiagnostics(
+    url: string,
+): Promise<{ source: BlogStudioExternalSource | null; diagnostic: GroundedSourceFetchDiagnostic }> {
+    const domain = extractDomain(url);
+    const diagnostic: GroundedSourceFetchDiagnostic = {
+        url,
+        domain,
+        directStatus: "skipped",
+        mobileRetryStatus: "skipped",
+        waybackStatus: "skipped",
+        ampCacheStatus: "skipped",
+        finalResult: "failed",
+    };
+
+    // ─── Strategy 1: Direct fetch with desktop UA ─────────────────
+    const desktopResult = await directFetch(url, USER_AGENT_DESKTOP);
+    diagnostic.directStatus = desktopResult.status;
+    logSourceFetch(url, `direct:${desktopResult.status}`);
+
+    if (desktopResult.source) {
+        diagnostic.finalResult = "ok";
+        return { source: desktopResult.source, diagnostic };
     }
 
-    // ─── WebCache fallback ───────────────────────────────────────────
+    // ─── Strategy 2: Retry with mobile UA (bypasses some WAFs) ────
+    if (desktopResult.status === "bot-blocked" || desktopResult.status.startsWith("http-403") || desktopResult.status.startsWith("http-429")) {
+        const mobileResult = await directFetch(url, USER_AGENT_MOBILE);
+        diagnostic.mobileRetryStatus = mobileResult.status;
+        logSourceFetch(url, `mobile-retry:${mobileResult.status}`);
+
+        if (mobileResult.source) {
+            diagnostic.finalResult = "ok";
+            return { source: mobileResult.source, diagnostic };
+        }
+    }
+
+    // ─── Strategy 3: Wayback Machine fallback ────────────────────
     try {
-        logSourceFetch(url, "trying-webcache");
-        const cachedHtml = await fetchFromWebCache(url);
-        if (cachedHtml) {
-            const source = parseHtmlToSource(cachedHtml, url, null);
+        logSourceFetch(url, "trying-wayback");
+        const waybackHtml = await fetchFromWaybackMachine(url);
+        if (waybackHtml) {
+            const source = tryParseSourceFromHtml(waybackHtml, url, null);
             if (source) {
-                logSourceFetch(url, "webcache-ok", `title: ${source.title.slice(0, 60)}`);
-                return source;
+                diagnostic.waybackStatus = "ok";
+                diagnostic.finalResult = "ok";
+                logSourceFetch(url, "wayback-ok", `title: ${source.title.slice(0, 60)}`);
+                return { source, diagnostic };
             }
-            logSourceFetch(url, "webcache-parse-failed", "no title or summary extracted");
+            diagnostic.waybackStatus = "parse-failed";
         } else {
-            logSourceFetch(url, "webcache-miss", "not available in cache");
+            diagnostic.waybackStatus = "miss";
         }
     } catch {
-        logSourceFetch(url, "webcache-error");
+        diagnostic.waybackStatus = "error";
+        logSourceFetch(url, "wayback-error");
     }
 
-    return null;
+    // ─── Strategy 4: Google AMP Cache fallback ───────────────────
+    try {
+        logSourceFetch(url, "trying-amp-cache");
+        const ampHtml = await fetchFromAmpCache(url);
+        if (ampHtml) {
+            const source = tryParseSourceFromHtml(ampHtml, url, null);
+            if (source) {
+                diagnostic.ampCacheStatus = "ok";
+                diagnostic.finalResult = "ok";
+                logSourceFetch(url, "amp-cache-ok", `title: ${source.title.slice(0, 60)}`);
+                return { source, diagnostic };
+            }
+            diagnostic.ampCacheStatus = "parse-failed";
+        } else {
+            diagnostic.ampCacheStatus = "miss";
+        }
+    } catch {
+        diagnostic.ampCacheStatus = "error";
+        logSourceFetch(url, "amp-cache-error");
+    }
+
+    logSourceFetch(url, "all-strategies-failed");
+    return { source: null, diagnostic };
 }
 
 function applyGroundedResearchFilters(
@@ -700,10 +822,13 @@ export async function getAIBloggerGroundedResearch(
             | "freshnessPreference"
         >;
     },
-): Promise<AIBloggerGroundedResearch | null> {
+): Promise<{
+    result: AIBloggerGroundedResearch | null;
+    fetchDiagnostics: GroundedSourceFetchDiagnostic[];
+}> {
     const query = sanitizeText(rawQuery, 180);
     if (!query) {
-        return null;
+        return { result: null, fetchDiagnostics: [] };
     }
 
     const groundedResearchConfig = options.groundedResearchConfig;
@@ -713,7 +838,7 @@ export async function getAIBloggerGroundedResearch(
         groundedResearchConfig?.blockedDomains || [],
     );
     if (sourceUrls.length === 0) {
-        return null;
+        return { result: null, fetchDiagnostics: [] };
     }
 
     const normalizedQuery = normalizeQuery(query);
@@ -729,13 +854,16 @@ export async function getAIBloggerGroundedResearch(
         );
 
         if (cached) {
-            return cached;
+            return { result: cached, fetchDiagnostics: [] };
         }
     }
 
-    const fetchedSources = (
-        await Promise.all(sourceUrls.map((url) => fetchGroundedSource(url)))
-    )
+    const fetchResults = await Promise.all(
+        sourceUrls.map((url) => fetchGroundedSourceWithDiagnostics(url)),
+    );
+    const fetchDiagnostics = fetchResults.map((result) => result.diagnostic);
+    const fetchedSources = fetchResults
+        .map((result) => result.source)
         .filter((source): source is BlogStudioExternalSource => Boolean(source));
 
     const sources = applyGroundedResearchFilters(fetchedSources, {
@@ -754,7 +882,7 @@ export async function getAIBloggerGroundedResearch(
     });
 
     if (sources.length === 0) {
-        return null;
+        return { result: null, fetchDiagnostics };
     }
 
     const groundedResearch: AIBloggerGroundedResearch = {
@@ -771,5 +899,5 @@ export async function getAIBloggerGroundedResearch(
         await storeGroundedResearchSnapshot(options.agencyId, groundedResearch);
     }
 
-    return groundedResearch;
+    return { result: groundedResearch, fetchDiagnostics };
 }

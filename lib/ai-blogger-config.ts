@@ -181,7 +181,7 @@ export function getDefaultAIBloggerGroundedResearchConfig(): AIBloggerGroundedRe
         maxSources: 5,
         trustPreference: "balanced",
         freshnessPreference: "balanced",
-        allowedSourceTypes: ["government", "education", "official", "industry", "reference", "news"],
+        allowedSourceTypes: ["government", "education", "official", "industry", "competitor", "reference", "news"],
         blockedDomains: [],
         refreshWindowHours: 24,
     };
