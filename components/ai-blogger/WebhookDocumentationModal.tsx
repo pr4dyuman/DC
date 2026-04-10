@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = await request.json();
-    const { blog } = payload;
+    const { blog, source } = payload;
 
     // Validate
     if (!blog?.slug) {
@@ -65,9 +65,17 @@ export async function POST(request: NextRequest) {
       {
         title: blog.title,
         content: blog.content,
+        excerpt: blog.excerpt,
         metaTitle: blog.metaTitle,
         metaDescription: blog.metaDescription,
+        metaKeywords: blog.metaKeywords,
         canonicalUrl: blog.canonicalUrl,
+        category: blog.category,
+        image: blog.image,
+        imageAlt: blog.imageAlt,
+        schemaMarkup: blog.schemaMarkup,
+        faqItems: blog.faqItems,
+        peopleAlsoAsk: blog.peopleAlsoAsk,
         internalLinks: blog.internalLinks,
         contentClusterId: blog.contentClusterId,
         parentTopicSlug: blog.parentTopicSlug,
@@ -97,7 +105,7 @@ app.use(express.json());
 
 app.post("/api/webhooks/blog-published", async (req, res) => {
   try {
-    const { blog } = req.body;
+    const { blog, source } = req.body;
 
     // Validate
     if (!blog?.slug) {
@@ -110,9 +118,17 @@ app.post("/api/webhooks/blog-published", async (req, res) => {
       {
         title: blog.title,
         content: blog.content,
+        excerpt: blog.excerpt,
         metaTitle: blog.metaTitle,
         metaDescription: blog.metaDescription,
+        metaKeywords: blog.metaKeywords,
         canonicalUrl: blog.canonicalUrl,
+        category: blog.category,
+        image: blog.image,
+        imageAlt: blog.imageAlt,
+        schemaMarkup: blog.schemaMarkup,
+        faqItems: blog.faqItems,
+        peopleAlsoAsk: blog.peopleAlsoAsk,
         internalLinks: blog.internalLinks,
         contentClusterId: blog.contentClusterId,
         publishedAt: new Date(blog.publishedAt),
@@ -142,6 +158,7 @@ def blog_webhook(request):
   try:
     payload = json.loads(request.body)
     blog = payload.get("blog")
+    source = payload.get("source")
 
     # Validate
     if not blog or not blog.get("slug"):
@@ -156,11 +173,20 @@ def blog_webhook(request):
       defaults={
         "title": blog["title"],
         "content": blog["content"],
+        "excerpt": blog.get("excerpt", ""),
         "meta_title": blog["metaTitle"],
         "meta_description": blog["metaDescription"],
+        "meta_keywords": blog.get("metaKeywords", ""),
         "canonical_url": blog.get("canonicalUrl"),
+        "category": blog.get("category", ""),
+        "image": blog.get("image", ""),
+        "image_alt": blog.get("imageAlt", ""),
+        "schema_markup": blog.get("schemaMarkup"),
+        "faq_items": blog.get("faqItems", []),
+        "people_also_ask": blog.get("peopleAlsoAsk", []),
         "internal_links": blog.get("internalLinks", []),
         "content_cluster_id": blog.get("contentClusterId"),
+        "parent_topic_slug": blog.get("parentTopicSlug"),
         "status": "published",
       }
     )
@@ -183,6 +209,7 @@ Route::post('/api/webhooks/blog-published', function (Request $request) {
   try {
     $payload = $request->json();
     $blog = $payload['blog'];
+    $source = $payload['source'];
 
     // Validate
     if (!$blog || !isset($blog['slug'])) {
@@ -198,11 +225,20 @@ Route::post('/api/webhooks/blog-published', function (Request $request) {
       [
         'title' => $blog['title'],
         'content' => $blog['content'],
+        'excerpt' => $blog['excerpt'] ?? '',
         'meta_title' => $blog['metaTitle'],
         'meta_description' => $blog['metaDescription'],
+        'meta_keywords' => $blog['metaKeywords'] ?? '',
         'canonical_url' => $blog['canonicalUrl'] ?? null,
+        'category' => $blog['category'] ?? '',
+        'image' => $blog['image'] ?? '',
+        'image_alt' => $blog['imageAlt'] ?? '',
+        'schema_markup' => $blog['schemaMarkup'] ?? null,
+        'faq_items' => $blog['faqItems'] ?? [],
+        'people_also_ask' => $blog['peopleAlsoAsk'] ?? [],
         'internal_links' => $blog['internalLinks'] ?? [],
         'content_cluster_id' => $blog['contentClusterId'] ?? null,
+        'parent_topic_slug' => $blog['parentTopicSlug'] ?? null,
         'status' => 'published',
       ]
     );
@@ -225,21 +261,34 @@ Route::post('/api/webhooks/blog-published', function (Request $request) {
 
 const payloadExample = {
   event: "blog.published",
-  timestamp: "2026-03-30T14:23:45Z",
-  agencyId: "agency-123",
   blog: {
-    _id: "blog-567",
+    id: "blog-567",
     title: "Complete Guide to SEO in 2026",
     slug: "complete-guide-seo-2026",
     content: "<h1>Complete Guide...</h1><p>Content here...</p>",
     excerpt: "Learn the best SEO practices...",
+    metaKeywords: "SEO, search engine optimization, SEO guide 2026",
     metaTitle: "Complete Guide to SEO 2026",
     metaDescription: "Master modern SEO with comprehensive guide...",
     canonicalUrl: "https://yoursite.com/blog/complete-guide-seo-2026",
-    category: "SEO",
     image: "https://cdn.example.com/images/seo-guide.jpg",
     imageAlt: "SEO optimization checklist",
     schemaMarkup: '{"@context": "https://schema.org", "@type": "BlogPosting"...}',
+    category: "SEO",
+    faqItems: [
+      {
+        question: "What is SEO?",
+        answer: "SEO (Search Engine Optimization) is the practice of improving...",
+      },
+      {
+        question: "How long does SEO take?",
+        answer: "SEO is a long-term strategy that typically takes 3-6 months...",
+      },
+    ],
+    peopleAlsoAsk: [
+      "What are the best SEO tools?",
+      "How to do keyword research?",
+    ],
     internalLinks: [
       {
         href: "/blog/keyword-research",
@@ -252,6 +301,11 @@ const payloadExample = {
     ],
     contentClusterId: "cluster-seo",
     parentTopicSlug: "seo-pillar",
+    publishedAt: "2026-03-30T14:23:45Z",
+  },
+  source: {
+    agencyId: "agency-123",
+    agencyName: "Your Agency",
     publishedAt: "2026-03-30T14:23:45Z",
   },
 };
