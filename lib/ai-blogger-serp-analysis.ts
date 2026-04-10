@@ -164,35 +164,48 @@ function extractTitle(html: string) {
 }
 
 async function fetchCompetitorPage(url: string): Promise<SerpCompetitorPage | null> {
-    try {
-        const response = await fetch(url, {
-            method: "GET",
-            cache: "no-store",
-            headers: {
-                Accept: "text/html,application/xhtml+xml",
-                "User-Agent": USER_AGENT,
-            },
-            signal: AbortSignal.timeout(8000),
-        });
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            const response = await fetch(url, {
+                method: "GET",
+                cache: "no-store",
+                headers: {
+                    Accept: "text/html,application/xhtml+xml",
+                    "User-Agent": USER_AGENT,
+                },
+                signal: AbortSignal.timeout(8000),
+            });
 
-        if (!response.ok) {
+            if (!response.ok) {
+                // Retry on server errors (502, 503, 504), not on client errors (404, 403)
+                if (attempt === 0 && response.status >= 500) {
+                    await new Promise((resolve) => setTimeout(resolve, 2000));
+                    continue;
+                }
+                return null;
+            }
+
+            const contentType = response.headers.get("content-type") || "";
+            if (!contentType.toLowerCase().includes("text/html")) {
+                return null;
+            }
+
+            const html = await response.text();
+
+            return {
+                title: extractTitle(html),
+                headings: extractHeadings(html),
+            };
+        } catch {
+            if (attempt === 0) {
+                await new Promise((resolve) => setTimeout(resolve, 2000));
+                continue;
+            }
             return null;
         }
-
-        const contentType = response.headers.get("content-type") || "";
-        if (!contentType.toLowerCase().includes("text/html")) {
-            return null;
-        }
-
-        const html = await response.text();
-
-        return {
-            title: extractTitle(html),
-            headings: extractHeadings(html),
-        };
-    } catch {
-        return null;
     }
+
+    return null;
 }
 
 function inferSearchIntent(

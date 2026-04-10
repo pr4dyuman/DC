@@ -9156,23 +9156,32 @@ export async function generateBlogStudioDraftImpl(
         const groundedResearchPromptBlock = formatGroundedResearchForPrompt(groundedResearch);
         const performanceFeedbackStartedAt = getNowIso();
         emitStepStart("performance-feedback", "Performance Feedback");
-        const performanceInsights = await getBlogStudioPerformancePromptInsights(
-            agency.id,
-            {
-                selectedTopic: selectedTopicForRun,
-                primaryKeyword: brief.primaryKeyword,
-                sourceValue: brief.sourceValue,
-            },
-            3,
-        );
+        let performanceInsights: BlogStudioPerformancePromptInsight[] = [];
+        let performanceInsightsError: string | undefined;
+        try {
+            performanceInsights = await getBlogStudioPerformancePromptInsights(
+                agency.id,
+                {
+                    selectedTopic: selectedTopicForRun,
+                    primaryKeyword: brief.primaryKeyword,
+                    sourceValue: brief.sourceValue,
+                },
+                3,
+            );
+        } catch (error) {
+            performanceInsightsError = getErrorMessage(error);
+            blogLogError("PERFORMANCE-FEEDBACK", "Performance feedback lookup failed", error);
+        }
         const performanceInsightsPromptBlock = formatPerformanceInsightsForPrompt(performanceInsights);
         addRunStep(
             "performance-feedback",
             "Performance Feedback",
-            performanceInsights.length > 0 ? "completed" : "skipped",
-            performanceInsights.length > 0
-                ? `Matched ${performanceInsights.length} published performance snapshot${performanceInsights.length === 1 ? "" : "s"} for prompt guidance.`
-                : "No closely related published performance snapshots were found for this topic.",
+            performanceInsightsError ? "failed" : performanceInsights.length > 0 ? "completed" : "skipped",
+            performanceInsightsError
+                ? `Performance feedback failed: ${performanceInsightsError}`
+                : performanceInsights.length > 0
+                    ? `Matched ${performanceInsights.length} published performance snapshot${performanceInsights.length === 1 ? "" : "s"} for prompt guidance.`
+                    : "No closely related published performance snapshots were found for this topic.",
             performanceFeedbackStartedAt,
         );
 
@@ -9198,12 +9207,15 @@ export async function generateBlogStudioDraftImpl(
                     },
                 },
                 {
-                    status: performanceInsights.length > 0 ? "completed" : "skipped",
-                    summary: performanceInsights.length > 0
-                        ? `Matched ${performanceInsights.length} published performance snapshot${performanceInsights.length === 1 ? "" : "s"}`
-                        : "No related performance snapshots found",
+                    status: performanceInsightsError ? "failed" : performanceInsights.length > 0 ? "completed" : "skipped",
+                    summary: performanceInsightsError
+                        ? `Performance feedback failed: ${performanceInsightsError}`
+                        : performanceInsights.length > 0
+                            ? `Matched ${performanceInsights.length} published performance snapshot${performanceInsights.length === 1 ? "" : "s"}`
+                            : "No related performance snapshots found",
                     data: {
                         snapshotsCount: performanceInsights.length,
+                        error: performanceInsightsError,
                         snapshots: performanceInsights.map((snapshot) => ({
                             title: snapshot.postTitle,
                             clicks: snapshot.clicks,
@@ -9211,7 +9223,8 @@ export async function generateBlogStudioDraftImpl(
                             similarityScore: snapshot.similarityScore,
                         })),
                     },
-                }
+                },
+                performanceInsightsError ? [performanceInsightsError] : undefined,
             );
         }
         const step3StartedAt = getNowIso();
@@ -10037,20 +10050,29 @@ Rules:
             author: aiBloggerConfig?.author,
             entityModeling: aiBloggerConfig?.entityModeling,
         });
-        const internalLinkSuggestions = await getBlogStudioInternalLinkSuggestions(draftContextPost, 5, {
-            siteUrl: draftSiteUrl,
-        });
+        let internalLinkSuggestions: BlogStudioInternalLinkSuggestion[] = [];
+        let internalLinksError: string | undefined;
+        try {
+            internalLinkSuggestions = await getBlogStudioInternalLinkSuggestions(draftContextPost, 5, {
+                siteUrl: draftSiteUrl,
+            });
+        } catch (error) {
+            internalLinksError = getErrorMessage(error);
+            blogLogError("INTERNAL-LINKS", "Internal link suggestions failed", error);
+        }
         const internalLinksPromptBlock = formatInternalLinkSuggestionsForPrompt(internalLinkSuggestions);
-        blogLogOutput("INTERNAL-LINKS", JSON.stringify({ count: internalLinkSuggestions.length, links: internalLinkSuggestions.slice(0, 5).map(s => ({ title: s.title, href: s.href })) }));
+        blogLogOutput("INTERNAL-LINKS", JSON.stringify({ count: internalLinkSuggestions.length, links: internalLinkSuggestions.slice(0, 5).map(s => ({ title: s.title, href: s.href })), error: internalLinksError }));
 
         addRunStep(
             "internal-links",
             "Internal Links",
-            "completed",
-            `Planned ${internalLinkSuggestions.length} link targets | ${internalLinkSuggestions
-                .slice(0, 2)
-                .map((suggestion) => suggestion.title)
-                .join(", ") || "No suggestions found"}`,
+            internalLinksError ? "failed" : "completed",
+            internalLinksError
+                ? `Internal links failed: ${internalLinksError}`
+                : `Planned ${internalLinkSuggestions.length} link targets | ${internalLinkSuggestions
+                    .slice(0, 2)
+                    .map((suggestion) => suggestion.title)
+                    .join(", ") || "No suggestions found"}`,
             step9StartedAt,
         );
 
@@ -10077,12 +10099,17 @@ Rules:
                     },
                 },
                 {
-                    summary: `Identified ${internalLinkSuggestions.length} internal linking opportunities`,
+                    status: internalLinksError ? "failed" : "completed",
+                    summary: internalLinksError
+                        ? `Internal links failed: ${internalLinksError}`
+                        : `Identified ${internalLinkSuggestions.length} internal linking opportunities`,
                     data: {
                         suggestionsCount: internalLinkSuggestions.length,
                         suggestions: internalLinkSuggestions,
+                        error: internalLinksError,
                     },
-                }
+                },
+                internalLinksError ? [internalLinksError] : undefined,
             );
         }
 

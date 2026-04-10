@@ -522,44 +522,58 @@ function enqueueCrawlUrl(
 }
 
 async function fetchPage(url: URL, timeoutMs: number): Promise<CrawledPage | null> {
-    try {
-        const response = await fetch(url.toString(), {
-            headers: {
-                "User-Agent": USER_AGENT,
-                Accept: "text/html,application/xhtml+xml",
-            },
-            redirect: "follow",
-            cache: "no-store",
-            signal: AbortSignal.timeout(timeoutMs),
-        });
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            const response = await fetch(url.toString(), {
+                headers: {
+                    "User-Agent": USER_AGENT,
+                    Accept: "text/html,application/xhtml+xml",
+                },
+                redirect: "follow",
+                cache: "no-store",
+                signal: AbortSignal.timeout(timeoutMs),
+            });
 
-        if (!response.ok) {
+            if (!response.ok) {
+                // Retry on server errors (502, 503, 504), not on client errors (404, 403)
+                if (attempt === 0 && response.status >= 500) {
+                    await new Promise((resolve) => setTimeout(resolve, 2000));
+                    continue;
+                }
+                return null;
+            }
+
+            const contentType = response.headers.get("content-type") || "";
+            if (!contentType.toLowerCase().includes("text/html")) {
+                return null;
+            }
+
+            const html = await response.text();
+
+            return {
+                url: url.toString(),
+                title: extractTitle(html),
+                description: extractDescription(html),
+                headings: extractHeadings(html),
+                faqQuestions: extractFaqQuestions(html),
+                internalLinks: extractInternalLinks(html, url),
+                excerpt: extractBodyExcerpt(html),
+                serviceSignals: extractServiceSignals(html),
+                ctaPatterns: extractCtaPatterns(html),
+                proofSignals: extractProofSignals(html),
+            };
+        } catch (error) {
+            if (attempt === 0) {
+                console.warn("[AI-BLOGGER] Retrying page fetch:", url.toString(), error instanceof Error ? error.message : error);
+                await new Promise((resolve) => setTimeout(resolve, 2000));
+                continue;
+            }
+            console.error("[AI-BLOGGER] Failed to fetch page:", url.toString(), error instanceof Error ? error.message : error);
             return null;
         }
-
-        const contentType = response.headers.get("content-type") || "";
-        if (!contentType.toLowerCase().includes("text/html")) {
-            return null;
-        }
-
-        const html = await response.text();
-
-        return {
-            url: url.toString(),
-            title: extractTitle(html),
-            description: extractDescription(html),
-            headings: extractHeadings(html),
-            faqQuestions: extractFaqQuestions(html),
-            internalLinks: extractInternalLinks(html, url),
-            excerpt: extractBodyExcerpt(html),
-            serviceSignals: extractServiceSignals(html),
-            ctaPatterns: extractCtaPatterns(html),
-            proofSignals: extractProofSignals(html),
-        };
-    } catch (error) {
-        console.error("[AI-BLOGGER] Failed to fetch page:", url.toString(), error instanceof Error ? error.message : error);
-        return null;
     }
+
+    return null;
 }
 
 function buildPriorityPaths(pages: CrawledPage[]) {
