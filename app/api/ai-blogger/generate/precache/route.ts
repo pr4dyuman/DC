@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 import { connectDB } from "@/lib/mongodb";
 import { getAIBloggerWebsiteIntelligence } from "@/lib/ai-blogger-website-intelligence";
-import { emitPipelineEvent } from "@/lib/ai-blogger-pipeline-events";
 
 
 export const dynamic = "force-dynamic";
@@ -87,21 +86,10 @@ export async function POST(request: Request) {
 
         if (intel) {
             console.log(`[PRECACHE] Crawl complete for job ${jobId}: ${intel.pageCount} pages (${intel.cacheStatus})`);
-            // Let the SSE stream/status polling know the precache finished.
-            await emitPipelineEvent(jobId, {
-                type: "step-complete",
-                step: "website-intelligence",
-                label: "Website Intelligence",
-                notes: `${intel.cacheStatus === "cached" ? "Cache hit" : "Fresh crawl"} | Pages: ${intel.pageCount}`,
-            });
+            // BUG-05: do NOT emit SSE events here. The worker owns pipeline SSE events.
+            // Emitting from precache causes duplicate step-complete events on the client.
         } else {
             console.warn(`[PRECACHE] Crawl returned no data for job ${jobId}: ${sourceUrl}`);
-            await emitPipelineEvent(jobId, {
-                type: "step-complete",
-                step: "website-intelligence",
-                label: "Website Intelligence",
-                notes: "Website intelligence returned no crawlable content.",
-            });
         }
 
         return NextResponse.json({ ok: true, pages: intel?.pageCount ?? 0 });

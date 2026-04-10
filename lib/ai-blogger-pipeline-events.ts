@@ -297,7 +297,8 @@ export async function createPipelineJob(jobId: string, owner: PipelineJobOwner):
 
     await queuePersistence(jobId, async () => {
         await connectDB();
-        await BlogStudioPipelineJobModel.findOneAndUpdate(
+        // BUG-09: updateOne is sufficient — we never used the returned document.
+        await BlogStudioPipelineJobModel.updateOne(
             { id: jobId },
             {
                 $set: {
@@ -313,7 +314,7 @@ export async function createPipelineJob(jobId: string, owner: PipelineJobOwner):
                     createdAt: now,
                 },
             },
-            { upsert: true, returnDocument: 'before' },
+            { upsert: true },
         );
     });
 }
@@ -367,36 +368,42 @@ export function emitPipelineEvent(jobId: string, event: Omit<PipelineEvent, "tim
             expiresAt: new Date(Date.now() + JOB_RETENTION_MS),
         };
 
+        // BUG-02: track fields to $unset separately — setting `undefined` inside $set is a
+        // Mongoose no-op and leaves stale values in MongoDB on retries.
+        const unsetPayload: Record<string, number> = {};
+
         if (fullEvent.type === "complete") {
             setPayload.status = "complete";
             setPayload.completedAt = fullEvent.timestamp;
             setPayload.result = fullEvent.result;
-            setPayload.errorMessage = undefined;
+            unsetPayload.errorMessage = 1; // properly clear any previous error
         } else if (fullEvent.type === "error") {
             setPayload.status = "error";
             setPayload.completedAt = fullEvent.timestamp;
             setPayload.errorMessage = fullEvent.message || "Pipeline failed.";
         }
 
-        await BlogStudioPipelineJobModel.findOneAndUpdate(
-            { id: jobId },
-            {
-                $push: {
-                    events: {
-                        $each: [toPersistedEvent(fullEvent)],
-                        $slice: -MAX_EVENTS_PER_JOB,
-                    },
-                },
-                $set: setPayload,
-                $setOnInsert: {
-                    id: jobId,
-                    agencyId: job.agencyId || "unknown",
-                    createdBy: job.createdBy,
-                    createdAt: new Date(job.createdAt).toISOString(),
+        // BUG-09: updateOne is sufficient — we never used the returned document.
+        const updateDoc: Record<string, unknown> = {
+            $push: {
+                events: {
+                    $each: [toPersistedEvent(fullEvent)],
+                    $slice: -MAX_EVENTS_PER_JOB,
                 },
             },
-            { upsert: true, returnDocument: 'before' },
-        );
+            $set: setPayload,
+            $setOnInsert: {
+                id: jobId,
+                agencyId: job.agencyId || "unknown",
+                createdBy: job.createdBy,
+                createdAt: new Date(job.createdAt).toISOString(),
+            },
+        };
+        if (Object.keys(unsetPayload).length > 0) {
+            updateDoc.$unset = unsetPayload;
+        }
+
+        await BlogStudioPipelineJobModel.updateOne({ id: jobId }, updateDoc, { upsert: true });
     });
 }
 
@@ -467,7 +474,8 @@ export async function attachPipelineWorkflowRun(jobId: string, workflowRunId: st
 
     await queuePersistence(jobId, async () => {
         await connectDB();
-        await BlogStudioPipelineJobModel.findOneAndUpdate(
+        // BUG-09: updateOne is sufficient — we never used the returned document.
+        await BlogStudioPipelineJobModel.updateOne(
             { id: jobId },
             {
                 $set: {
@@ -483,7 +491,7 @@ export async function attachPipelineWorkflowRun(jobId: string, workflowRunId: st
                     events: [],
                 },
             },
-            { upsert: true, returnDocument: 'before' },
+            { upsert: true },
         );
     });
 }

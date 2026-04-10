@@ -127,7 +127,11 @@ export async function GET(request: Request) {
                         // Ignore enqueue failures on close.
                     }
                     closeStream();
-                }, 300_000); // 5 minutes - accommodate long-running steps like Fetch Trends
+                // BUG-10: 90s idle timeout is enough to catch a genuinely stalled pipeline
+                // while still giving long steps like Fetch Trends adequate time.
+                // The old 300s matched maxDuration exactly, so it fired silently with no
+                // cleanup when Vercel hard-killed the function.
+                }, 90_000);
             };
 
             const sendEvent = (event: PipelineEvent) => {
@@ -171,9 +175,10 @@ export async function GET(request: Request) {
 
             resetIdleTimeout();
 
-            // Start keep-alive immediately to prevent browser timeout during setup
+            // BUG-17: 15s keep-alive is more than sufficient to satisfy any proxy or
+            // browser timeout. The old 300ms generated ~600 writes per 3-minute run.
             let keepAliveCount = 0;
-            console.log(`[SSE] Starting keep-alive comments (every 300ms) for ${jobId}`);
+            console.log(`[SSE] Starting keep-alive comments (every 15s) for ${jobId}`);
             keepAliveInterval = setInterval(() => {
                 if (!closed) {
                     try {
@@ -186,7 +191,7 @@ export async function GET(request: Request) {
                         // Stream closed, interval will be cleared by closeStream
                     }
                 }
-            }, 300);
+            }, 15_000);
 
             // Send first keep-alive immediately to signal data is flowing
             try {
@@ -232,7 +237,15 @@ export async function GET(request: Request) {
                             sendEvent(event);
                         }
 
-                        if (snapshot.status !== "running" && nextEvents.length === 0) {
+                        // BUG-03: do NOT close until the client has actually received
+                        // a terminal event. MongoDB $push (events) and $set (status) are
+                        // persisted via separate queued writes, so status can flip to
+                        // "complete" before the events array is visible to a polling read.
+                        // Closing on status-only would leave the client stuck on "running".
+                        const hasTerminalEvent = snapshot.events.some(
+                            (e) => e.type === "complete" || e.type === "error",
+                        );
+                        if (snapshot.status !== "running" && hasTerminalEvent && nextEvents.length === 0) {
                             if (pollInterval) {
                                 clearInterval(pollInterval);
                                 pollInterval = null;

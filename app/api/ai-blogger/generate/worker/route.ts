@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { generateBlogStudioDraftImpl } from "@/lib/actions/ai-blogger";
-import { emitPipelineEvent, getPipelineJobSnapshot } from "@/lib/ai-blogger-pipeline-events";
+import { emitPipelineEvent, getPipelineJobSnapshot, awaitPipelineJobPersistence } from "@/lib/ai-blogger-pipeline-events";
 import type { BlogStudioBrief, BlogStudioTarget } from "@/lib/types-ai-blogger";
 
 export const dynamic = "force-dynamic";
@@ -123,6 +123,10 @@ export async function POST(request: Request) {
             ),
         ]);
         console.log(`[WORKER] Pipeline completed for job ${jobId}`);
+        // BUG-01: flush the final 'complete' event write to MongoDB before Vercel
+        // kills the serverless function. Without this, the job can stay stuck at
+        // status="running" forever if the process exits before the queued write settles.
+        await awaitPipelineJobPersistence(jobId);
         return NextResponse.json({ ok: true });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown pipeline error";
@@ -131,6 +135,8 @@ export async function POST(request: Request) {
         // Emit the error event so the SSE stream / status polling can deliver it to the client.
         try {
             await emitPipelineEvent(jobId, { type: "error", message });
+            // BUG-01: flush the error event to MongoDB before the function exits.
+            await awaitPipelineJobPersistence(jobId);
         } catch (emitError) {
             console.error(`[WORKER] Failed to emit error event for job ${jobId}:`, emitError);
         }

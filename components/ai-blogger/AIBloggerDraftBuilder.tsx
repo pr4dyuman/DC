@@ -542,6 +542,9 @@ function buildPipelineStepStates(
     return next;
 }
 
+// BUG-12: module-level constant so it isn't re-created on every component render.
+const STORAGE_KEY = "ai-blogger-active-job";
+
 export function AIBloggerDraftBuilder({
     settings,
     trendPlan,
@@ -603,13 +606,16 @@ export function AIBloggerDraftBuilder({
     const reconnectAttemptRef = useRef<number>(0);
     const pipelineStatusRef = useRef<PipelineStatus>(pipelineStatus);
     const statusPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    // BUG-08: prevents a rapid double-click from kicking off two fetches and
+    // creating two orphaned pipeline jobs (only one jobId gets saved to localStorage).
+    const isSubmittingRef = useRef(false);
 
     // Keep pipelineStatusRef in sync so the onerror callback always reads the latest.
     useEffect(() => {
         pipelineStatusRef.current = pipelineStatus;
     }, [pipelineStatus]);
 
-    const STORAGE_KEY = "ai-blogger-active-job";
+    // BUG-12: STORAGE_KEY moved to module level above.
 
     const pushPipelineLog = useCallback(
         (label: string, message: string, level: PipelineLogLevel = "info") => {
@@ -831,7 +837,10 @@ export function AIBloggerDraftBuilder({
     );
 
     const handleSSEError = useEffectEvent(() => {
-        if (pipelineStatus === "running" && !streamReconnectNoticeRef.current) {
+        // BUG-07: use the ref, not the state variable. This callback fires from an
+        // EventSource handler which closes over the render-time value of `pipelineStatus`;
+        // the ref is always kept in sync via the useEffect above.
+        if (pipelineStatusRef.current === "running" && !streamReconnectNoticeRef.current) {
             streamReconnectNoticeRef.current = true;
             pushPipelineLog(
                 "Pipeline",
@@ -1283,6 +1292,9 @@ export function AIBloggerDraftBuilder({
         setActionMode(mode);
 
         if (mode === "ai") {
+            // BUG-08: bail immediately if a fetch is already in-flight.
+            if (isSubmittingRef.current) return;
+            isSubmittingRef.current = true;
             // --- SSE-based AI generation ---
             setPipelineVisible(true);
             setPipelineStatus("running");
@@ -1341,12 +1353,14 @@ export function AIBloggerDraftBuilder({
                         clearInterval(elapsedTimeIntervalRef.current);
                         elapsedTimeIntervalRef.current = null;
                     }
+                    isSubmittingRef.current = false; // BUG-08: release lock before early return
                     return;
                 }
 
                 const jobId = json.jobId as string;
                 try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ jobId, ts: startTs })); } catch {}
                 connectSSE(jobId);
+                isSubmittingRef.current = false; // BUG-08: SSE is live — release the submit lock
             } catch (fetchError) {
                 const msg = fetchError instanceof Error ? fetchError.message : "Network error";
                 setError(msg);
@@ -1357,6 +1371,7 @@ export function AIBloggerDraftBuilder({
                     clearInterval(elapsedTimeIntervalRef.current);
                     elapsedTimeIntervalRef.current = null;
                 }
+                isSubmittingRef.current = false; // BUG-08: release lock on network / parse error
             }
             return;
         }
