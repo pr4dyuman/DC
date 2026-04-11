@@ -341,7 +341,7 @@ export async function fetchAIBloggerTrendSignals(input: FetchTrendSignalsInput):
             input.sourceValue,
             ...(input.fallbackCandidates || []),
         ],
-        8,
+        10,  // Test up to 10 keyword candidates for broader trend signal coverage
         120,
     );
 
