@@ -573,6 +573,7 @@ export function AIBloggerDraftBuilder({
     const [title, setTitle] = useState("");
     const [sourceMode, setSourceMode] = useState<BlogStudioInputMode>("website");
     const [sourceValue, setSourceValue] = useState("");
+    const [targetWebsiteUrl, setTargetWebsiteUrl] = useState("");
     const [trendFocus, setTrendFocus] = useState("");
     const [primaryKeyword, setPrimaryKeyword] = useState("");
     const [targetType, setTargetType] = useState<BlogStudioTargetType>(settings.publishing.defaultTarget.type);
@@ -1277,6 +1278,15 @@ export function AIBloggerDraftBuilder({
             return;
         }
 
+        if (
+            sourceMode !== "website" &&
+            targetWebsiteUrl.trim() &&
+            !isValidWebsiteUrl(targetWebsiteUrl.trim())
+        ) {
+            setError("The target website URL must start with http:// or https://.");
+            return;
+        }
+
         const normalizedWordCount = Number.parseInt(wordCount, 10);
         if (!Number.isFinite(normalizedWordCount)) {
             setError(`Enter a word target between ${settings.seo.minWords} and ${settings.seo.maxWords}.`);
@@ -1328,6 +1338,10 @@ export function AIBloggerDraftBuilder({
                 primaryKeyword,
                 language: settings.seo.defaultLanguage,
                 location: settings.seo.defaultLocation,
+                // Only pass targetWebsiteUrl for non-website modes
+                ...(sourceMode !== "website" && targetWebsiteUrl.trim()
+                    ? { targetWebsiteUrl: targetWebsiteUrl.trim() }
+                    : {}),
             };
             const target = {
                 type: targetType,
@@ -1388,6 +1402,10 @@ export function AIBloggerDraftBuilder({
                     primaryKeyword,
                     language: settings.seo.defaultLanguage,
                     location: settings.seo.defaultLocation,
+                    // Only pass targetWebsiteUrl for non-website modes
+                    ...(sourceMode !== "website" && targetWebsiteUrl.trim()
+                        ? { targetWebsiteUrl: targetWebsiteUrl.trim() }
+                        : {}),
                 };
                 const target = {
                     type: targetType,
@@ -1591,6 +1609,35 @@ export function AIBloggerDraftBuilder({
                                 </p>
                             </div>
                         </div>
+
+                        {/* Optional target website for internal links — only shown in non-website modes */}
+                        {sourceMode !== "website" && (
+                            <div className="rounded-[22px] border border-border/60 bg-background/45 p-4">
+                                <div className="space-y-3">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="ai-blogger-target-website">
+                                            Internal links — target website <span className="text-muted-foreground font-normal">(optional)</span>
+                                        </Label>
+                                        <p className="text-xs leading-5 text-muted-foreground">
+                                            Enter your website URL so AI Blogger can crawl your pages and inject real internal links into the blog. Leave blank to skip internal linking.
+                                        </p>
+                                    </div>
+                                    <Input
+                                        id="ai-blogger-target-website"
+                                        type="url"
+                                        value={targetWebsiteUrl}
+                                        onChange={(event) => setTargetWebsiteUrl(event.target.value)}
+                                        placeholder="https://your-site.com"
+                                        className="h-11 rounded-2xl border-border/60 bg-background/60"
+                                    />
+                                    {targetWebsiteUrl.trim() && !isValidWebsiteUrl(targetWebsiteUrl.trim()) && (
+                                        <p className="text-xs text-destructive">
+                                            Enter a full URL starting with https:// or http://
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         {sourceMode === "website" ? (
                             <div className="rounded-[22px] border border-border/60 bg-background/45 p-4">

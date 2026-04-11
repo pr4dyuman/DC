@@ -89,6 +89,11 @@ export type BlogStudioBrief = {
     primaryKeyword?: string;
     language?: string;
     location?: string;
+    /**
+     * Optional website URL for internal link crawling when sourceMode is "trending" or "keywords".
+     * Has no effect when sourceMode is "website" (sourceValue is used instead).
+     */
+    targetWebsiteUrl?: string;
 };
 
 export type BlogStudioExternalSourceType =

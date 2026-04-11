@@ -1265,7 +1265,7 @@ function getMarketingCanonicalUrl(slug: string) {
 
 function resolveBlogStudioSiteUrl(input: {
     canonicalUrl?: string;
-    brief?: Pick<BlogStudioBrief, "sourceMode" | "sourceValue">;
+    brief?: Pick<BlogStudioBrief, "sourceMode" | "sourceValue" | "targetWebsiteUrl">;
     author?: { url?: string };
     entityModeling?: { organizationUrl?: string };
     websiteSourceUrl?: string;
@@ -1274,7 +1274,11 @@ function resolveBlogStudioSiteUrl(input: {
         input.canonicalUrl,
         input.entityModeling?.organizationUrl,
         input.author?.url,
-        input.brief?.sourceMode === "website" ? input.brief.sourceValue : "",
+        // Website mode: use sourceValue (the crawled URL).
+        // Trending / keywords mode: use targetWebsiteUrl if the user supplied one.
+        input.brief?.sourceMode === "website"
+            ? input.brief.sourceValue
+            : input.brief?.targetWebsiteUrl,
         input.websiteSourceUrl,
     ];
 
@@ -8887,6 +8891,106 @@ export async function generateBlogStudioDraftImpl(
                             proofSignals: websiteIntelligence?.proofSignals || [],
                             summary: websiteIntelligence?.summary,
                             cacheStatus: websiteIntelligence?.cacheStatus,
+                            error: websiteIntelligenceError,
+                        },
+                    },
+                    websiteIntelligenceError ? [websiteIntelligenceError] : undefined,
+                );
+            }
+        } else if (brief.targetWebsiteUrl?.trim()) {
+            // ── Trending / Keywords mode WITH a targetWebsiteUrl supplied by the user ──
+            // Run a direct crawl (no precache polling — that only fires for website mode).
+            // This gives internal link suggestions their source pages without touching
+            // the website-mode path in any way.
+            const websiteStepStartedAt = getNowIso();
+            emitStepStart("website-intelligence", "Website Intelligence (target site)");
+
+            try {
+                const targetUrl = brief.targetWebsiteUrl.trim();
+                const normalizedTargetUrl = normalizeWebsiteUrl(targetUrl)?.toString() ?? "";
+                const refreshWindowHours = crawlConfig?.refreshWindowHours ?? 24;
+                const configuredMaxPages = crawlConfig?.maxPages ?? 8;
+
+                // Check cache first — the site may have been crawled recently.
+                if (agency.id && normalizedTargetUrl) {
+                    const cached = await getCachedWebsiteIntelligence(
+                        agency.id,
+                        normalizedTargetUrl,
+                        refreshWindowHours,
+                        configuredMaxPages,
+                    ).catch(() => null);
+                    if (cached) {
+                        websiteIntelligence = cached;
+                    }
+                }
+
+                // If no cache, do a direct crawl with a 25s safety timeout.
+                if (!websiteIntelligence) {
+                    const emergencyMaxPages = Math.max(Math.ceil(configuredMaxPages / 2), 2);
+                    websiteIntelligence = await Promise.race([
+                        getAIBloggerWebsiteIntelligence(targetUrl, {
+                            agencyId: agency.id,
+                            enabled: crawlConfig?.enabled ?? true,
+                            maxPages: emergencyMaxPages,
+                            timeoutMs: Math.min(crawlConfig?.timeoutMs ?? 8000, 10000),
+                            refreshWindowHours,
+                            allowedPaths: crawlConfig?.allowedPaths,
+                            blockedPaths: crawlConfig?.blockedPaths,
+                        }),
+                        new Promise<null>((resolve) => setTimeout(() => resolve(null), 25_000)),
+                    ]);
+                }
+
+                addRunStep(
+                    "website-intelligence",
+                    "Website Intelligence (target site)",
+                    websiteIntelligence ? "completed" : "skipped",
+                    websiteIntelligence
+                        ? `${websiteIntelligence.cacheStatus === "cached" ? "Cache hit" : "Fresh crawl"} | Pages: ${websiteIntelligence.pageCount} | Source: ${targetUrl}`
+                        : "Target website crawl returned no content.",
+                    websiteStepStartedAt,
+                );
+                websiteIntelligenceStepStatus = websiteIntelligence ? "completed" : "skipped";
+
+            } catch (error) {
+                websiteIntelligenceError = getErrorMessage(error);
+                websiteIntelligenceStepStatus = "failed";
+                addRunStep(
+                    "website-intelligence",
+                    "Website Intelligence (target site)",
+                    "failed",
+                    `Target website intelligence failed: ${websiteIntelligenceError}`,
+                    websiteStepStartedAt,
+                );
+            }
+
+            if (jobId) {
+                const step1EndTime = getNowIso();
+                const step1Duration = new Date(step1EndTime).getTime() - new Date(websiteStepStartedAt).getTime();
+                await generationLogger.logStep(
+                    1,
+                    "Website Intelligence (target site)",
+                    { url: brief.targetWebsiteUrl, maxPages: crawlConfig?.maxPages, enabled: crawlConfig?.enabled },
+                    {
+                        startedAt: websiteStepStartedAt,
+                        completedAt: step1EndTime,
+                        durationMs: step1Duration,
+                        details: {
+                            cacheStatus: websiteIntelligence?.cacheStatus,
+                            pagesFetched: websiteIntelligence?.pageCount,
+                        },
+                    },
+                    {
+                        status: websiteIntelligenceStepStatus,
+                        summary: websiteIntelligence
+                            ? `${websiteIntelligence.cacheStatus === "cached" ? "Cache hit" : "Fresh crawl"} | ${websiteIntelligence.pageCount} pages fetched`
+                            : websiteIntelligenceError
+                                ? `Target website intelligence failed: ${websiteIntelligenceError}`
+                                : "Target website crawl returned no content.",
+                        data: {
+                            pageCount: websiteIntelligence?.pageCount,
+                            paths: websiteIntelligence?.priorityPaths || [],
+                            topics: websiteIntelligence?.topicHints || [],
                             error: websiteIntelligenceError,
                         },
                     },
