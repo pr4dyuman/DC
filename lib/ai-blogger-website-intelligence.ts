@@ -37,7 +37,7 @@ export type AIBloggerWebsiteIntelligence = {
 
 const DEFAULT_MAX_PAGES = 8;
 const DEFAULT_TIMEOUT_MS = 8000;
-const DEFAULT_REFRESH_WINDOW_HOURS = 24;
+const DEFAULT_REFRESH_WINDOW_HOURS = 6;  // Re-crawl if cache is older than 6h (was 24h)
 const MAX_INTERNAL_LINKS_PER_PAGE = 40;
 const MAX_SITEMAP_URLS = 100;
 const MAX_NESTED_SITEMAPS = 4;
