@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import type { ConfigSectionProps } from "./shared";
+import { SERPAPI_GEO_COUNTRIES, type ConfigSectionProps } from "./shared";
 
 export default function SerpSettings({ config, setConfig, visibleKeys, toggleKeyVisibility }: ConfigSectionProps) {
     return (
@@ -34,7 +34,7 @@ export default function SerpSettings({ config, setConfig, visibleKeys, toggleKey
 
                 <div className="flex flex-wrap items-center gap-3">
                     <span className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground">
-                        {config.serp.defaultLocation.toUpperCase()}
+                        {SERPAPI_GEO_COUNTRIES.find((c) => c.code === config.serp.defaultLocation)?.name || config.serp.defaultLocation.toUpperCase()}
                     </span>
                     <span className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground">
                         {config.serp.device}
@@ -84,21 +84,29 @@ export default function SerpSettings({ config, setConfig, visibleKeys, toggleKey
 
                 <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground">Default Location</Label>
-                    <Input
-                        type="text"
+                    <Select
                         value={config.serp.defaultLocation}
-                        onChange={(event) =>
+                        onValueChange={(value) =>
                             setConfig((current) => ({
                                 ...current,
                                 serp: {
                                     ...current.serp,
-                                    defaultLocation: event.target.value.toLowerCase(),
+                                    defaultLocation: value,
                                 },
                             }))
                         }
-                        placeholder="us"
-                        className="h-11 rounded-xl border-border bg-background"
-                    />
+                    >
+                        <SelectTrigger className="h-11 rounded-xl border-border bg-background">
+                            <SelectValue placeholder="Select country" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-64">
+                            {SERPAPI_GEO_COUNTRIES.map((country) => (
+                                <SelectItem key={country.code} value={country.code}>
+                                    {country.name} ({country.code.toUpperCase()})
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
 
                 <div className="space-y-2">
