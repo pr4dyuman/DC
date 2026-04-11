@@ -3069,7 +3069,7 @@ Rules:
 - Distribute links across DIFFERENT sections — never cluster multiple links in the same paragraph or section.
 - When a suggested section heading is provided (e.g. "Section: ..."), place the link in or near that section.
 - Prefer service pages for commercial context and blog pages for supporting education.
-- Use or closely adapt the suggested anchor text without making it repetitive.
+- Use SHORT, NATURAL anchor text (2–5 words max). Do NOT paste the full page title as anchor text. Example: instead of "How to Manage Your Company Using AI-Powered Tools: 2026 Strategy", write "our AI tools guide" or "this workflow guide".
 - Insert links inline as [anchor text](href). Do not paste bare URLs into the body.
 - Prioritize links with higher relevance scores.`;
 }
@@ -3949,7 +3949,7 @@ function parseFaqPackResponse(rawText: string): FaqPackResult {
     }>(rawText);
 
     return {
-        faqItems: sanitizeFaqItems(parsed?.faqItems, 5),
+        faqItems: sanitizeFaqItems(parsed?.faqItems, 7),
     };
 }
 

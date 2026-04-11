@@ -451,16 +451,20 @@ function parseHtmlToSource(html: string, url: string, lastModifiedHeader: string
     const keyClaims = extractKeyClaims(paragraphs);
     const citationBlock = buildCitationBlock(title, url, domain, publishedAt, type);
 
-    if (!title || !summary) {
+    if (!title) {
         return null;
     }
+
+    // Fall back to page title as summary when description/headings/paragraphs are all empty
+    // (common on SDK docs, SPA-heavy pages, and content behind JS rendering)
+    const effectiveSummary = summary || sanitizeText(title, 280);
 
     return {
         id: crypto.randomUUID(),
         title,
         url,
         domain,
-        summary,
+        summary: effectiveSummary,
         type,
         freshness,
         trustLevel,
