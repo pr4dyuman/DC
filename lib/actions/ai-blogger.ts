@@ -8081,11 +8081,13 @@ export async function resolveBlogStudioPostBlockersWithAIImpl(
         cannibalizationPromptBlock: formatCannibalizationForPrompt(currentCannibalization),
     });
     const runtimeConfig = resolveAIBloggerFinalCheckerRuntimeConfig(aiConfig, aiBloggerConfig);
+    blogLogInput("BLOCKER-RESOLVER", prompt);
     const blockerResolutionStage = await runAIBloggerRuntimeConfig(
         runtimeConfig,
         prompt,
         Boolean(aiBloggerConfig?.fallbackEnabled),
     );
+    blogLogOutput("BLOCKER-RESOLVER", blockerResolutionStage.text, { tokens: blockerResolutionStage.tokens, usedFallback: blockerResolutionStage.usedFallback });
     const parsed = parseBlockerResolverResponse(blockerResolutionStage.text, currentPost);
     const nextTitle = sanitizeText(parsed.title, 180, currentPost.title);
     const nextContent = sanitizeText(parsed.content, 50000, currentPost.content || "");
@@ -8940,12 +8942,14 @@ export async function generateBlogStudioDraftImpl(
                 ]
                     .filter(Boolean)
                     .join("\n\n");
+                blogLogInput("DISCOVERY (live-trends)", liveTrendsPrompt);
                 discoveryStage = await runAIBloggerStage(
                     aiConfig,
                     aiBloggerConfig,
                     "extractKeywords",
                     liveTrendsPrompt,
                 );
+                blogLogOutput("DISCOVERY (live-trends)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
             } catch (error) {
                 if (!allowAiDiscoveryFallback) {
                     throw error;
@@ -8953,6 +8957,7 @@ export async function generateBlogStudioDraftImpl(
 
                 discoverySummary = `Live trends unavailable, fell back to AI-only discovery: ${getErrorMessage(error)}`;
                 fetchTrendsSource = "ai-fallback-after-live-failure";
+                blogLogInput("DISCOVERY (ai-fallback)", aiOnlyDiscoveryPrompt);
                 discoveryStage = await runAIBloggerStage(
                     aiConfig,
                     aiBloggerConfig,
@@ -8963,6 +8968,7 @@ export async function generateBlogStudioDraftImpl(
             }
         } else if (allowAiDiscoveryFallback) {
             fetchTrendsSource = "ai-only-discovery";
+            blogLogInput("DISCOVERY (ai-only)", aiOnlyDiscoveryPrompt);
             discoveryStage = await runAIBloggerStage(
                 aiConfig,
                 aiBloggerConfig,
@@ -9392,6 +9398,7 @@ Rules:
 - If grounded sources are unavailable, state that clearly in sourceNotes—don't invent supporting data.
 - JSON only, no markdown/code fences.`;
 
+        blogLogInput("DEEP-RESEARCH", researchPrompt);
         const researchStage = await runAIBloggerStage(
             aiConfig,
             aiBloggerConfig,
@@ -9400,6 +9407,7 @@ Rules:
         );
         stageRuntimeConfigs.research = researchStage.runtimeConfig;
         mergeTokenTotals(tokenTotals, researchStage.tokens);
+        blogLogOutput("DEEP-RESEARCH", researchStage.text, { tokens: researchStage.tokens, usedFallback: researchStage.usedFallback });
 
         const research = parseResearchInsightsResponse(researchStage.text);
 
