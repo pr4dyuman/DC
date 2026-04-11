@@ -35,12 +35,12 @@ export type AIBloggerWebsiteIntelligence = {
     refreshedAt: string;
 };
 
-const DEFAULT_MAX_PAGES = 4;
+const DEFAULT_MAX_PAGES = 8;
 const DEFAULT_TIMEOUT_MS = 8000;
 const DEFAULT_REFRESH_WINDOW_HOURS = 24;
-const MAX_INTERNAL_LINKS_PER_PAGE = 24;
-const MAX_SITEMAP_URLS = 32;
-const MAX_NESTED_SITEMAPS = 3;
+const MAX_INTERNAL_LINKS_PER_PAGE = 40;
+const MAX_SITEMAP_URLS = 100;
+const MAX_NESTED_SITEMAPS = 4;
 const USER_AGENT =
     "Mozilla/5.0 (compatible; AIBloggerCrawler/1.0; +https://example.com/ai-blogger)";
 const SKIPPED_FILE_PATTERN =
@@ -453,21 +453,34 @@ async function fetchSitemapLinksFromUrl(
 }
 
 async function getSitemapCandidates(baseUrl: URL, timeoutMs: number) {
+    // Start with common sitemap locations that various CMS platforms use.
     const sitemapCandidates = new Set<string>([
         new URL("/sitemap.xml", baseUrl).toString(),
+        new URL("/sitemap_index.xml", baseUrl).toString(),
+        new URL("/sitemap-index.xml", baseUrl).toString(),
     ]);
+
+    // Try to discover more from robots.txt
     const robotsTxt = await fetchTextResource(new URL("/robots.txt", baseUrl), timeoutMs, "text/plain,*/*");
 
-    parseRobotsTxtSitemaps(robotsTxt).forEach((rawSitemapUrl) => {
-        try {
-            const sitemapUrl = new URL(rawSitemapUrl, baseUrl);
-            if (sitemapUrl.origin === baseUrl.origin) {
-                sitemapCandidates.add(sitemapUrl.toString());
+    if (robotsTxt) {
+        parseRobotsTxtSitemaps(robotsTxt).forEach((rawSitemapUrl) => {
+            try {
+                const sitemapUrl = new URL(rawSitemapUrl, baseUrl);
+                if (sitemapUrl.origin === baseUrl.origin) {
+                    sitemapCandidates.add(sitemapUrl.toString());
+                }
+            } catch {
+                return;
             }
-        } catch {
-            return;
-        }
-    });
+        });
+    } else {
+        // No robots.txt — also try CMS-specific sitemap patterns
+        console.log(`[AI-BLOGGER] No robots.txt found for ${baseUrl.toString()} — trying common sitemap patterns`);
+        sitemapCandidates.add(new URL("/post-sitemap.xml", baseUrl).toString());
+        sitemapCandidates.add(new URL("/page-sitemap.xml", baseUrl).toString());
+        sitemapCandidates.add(new URL("/wp-sitemap.xml", baseUrl).toString());
+    }
 
     const seenSitemaps = new Set<string>();
     const discoveredLinks: string[] = [];
@@ -582,7 +595,7 @@ function buildPriorityPaths(pages: CrawledPage[]) {
             const url = new URL(page.url);
             return url.pathname || "/";
         }),
-        8,
+        50,
         120,
     );
 }
@@ -590,7 +603,7 @@ function buildPriorityPaths(pages: CrawledPage[]) {
 function buildTopicHints(pages: CrawledPage[]) {
     return uniqueStrings(
         pages.flatMap((page) => [page.title, page.description, ...page.headings]),
-        18,
+        40,
         120,
     );
 }
@@ -657,6 +670,8 @@ export async function getCachedWebsiteIntelligence(
     agencyId: string,
     normalizedUrl: string,
     refreshWindowHours: number,
+    /** If the cached snapshot has fewer pages than this, treat it as stale so we re-crawl with the higher page count. */
+    minPages?: number,
 ) {
     await connectDB();
 
@@ -676,6 +691,12 @@ export async function getCachedWebsiteIntelligence(
 
     const refreshWindowMs = refreshWindowHours * 60 * 60 * 1000;
     if (Date.now() - refreshedAtMs > refreshWindowMs) {
+        return null;
+    }
+
+    // Smart invalidation: if the admin raised maxPages since the last crawl,
+    // skip the cache so a fresh crawl picks up additional pages.
+    if (typeof minPages === "number" && minPages > 0 && snapshot.pageCount < minPages) {
         return null;
     }
 
@@ -734,6 +755,8 @@ export async function getAIBloggerWebsiteIntelligence(
         refreshWindowHours?: number;
         allowedPaths?: string[];
         blockedPaths?: string[];
+        /** When true, skip the cache entirely and force a fresh live crawl. */
+        forceRefresh?: boolean;
     },
 ): Promise<AIBloggerWebsiteIntelligence | null> {
     const sourceUrl = normalizeUrl(rawUrl);
@@ -746,8 +769,9 @@ export async function getAIBloggerWebsiteIntelligence(
         return null;
     }
 
-    const maxPages = Math.min(Math.max(options?.maxPages || DEFAULT_MAX_PAGES, 1), 8);
-    const timeoutMs = Math.min(Math.max(options?.timeoutMs || DEFAULT_TIMEOUT_MS, 2000), 15000);
+    // No hard ceiling — respect whatever the admin configured.
+    const maxPages = Math.max(options?.maxPages || DEFAULT_MAX_PAGES, 1);
+    const timeoutMs = Math.min(Math.max(options?.timeoutMs || DEFAULT_TIMEOUT_MS, 2000), 30000);
     const refreshWindowHours = Math.min(
         Math.max(options?.refreshWindowHours || DEFAULT_REFRESH_WINDOW_HOURS, 1),
         24 * 30,
@@ -755,11 +779,13 @@ export async function getAIBloggerWebsiteIntelligence(
     const allowedPaths = (options?.allowedPaths || []).map(normalizePathRule).filter(Boolean);
     const blockedPaths = (options?.blockedPaths || []).map(normalizePathRule).filter(Boolean);
 
-    if (options?.agencyId) {
+    if (options?.agencyId && !options?.forceRefresh) {
         const cached = await getCachedWebsiteIntelligence(
             options.agencyId,
             sourceUrl.toString(),
             refreshWindowHours,
+            // Smart invalidation: skip cache if it has fewer pages than what admin now wants.
+            maxPages,
         );
 
         if (cached) {
@@ -813,13 +839,13 @@ export async function getAIBloggerWebsiteIntelligence(
         sourceUrl: rawUrl.trim(),
         normalizedUrl: sourceUrl.toString(),
         pageCount: fetchedPages.length,
-        pageTitles: uniqueStrings(fetchedPages.map((page) => page.title), 8, 160),
+        pageTitles: uniqueStrings(fetchedPages.map((page) => page.title), 50, 160),
         topicHints: buildTopicHints(fetchedPages),
-        faqQuestions: uniqueStrings(fetchedPages.flatMap((page) => page.faqQuestions), 8, 180),
+        faqQuestions: uniqueStrings(fetchedPages.flatMap((page) => page.faqQuestions), 20, 180),
         priorityPaths: buildPriorityPaths(fetchedPages),
-        serviceSignals: uniqueStrings(fetchedPages.flatMap((page) => page.serviceSignals), 10, 140),
-        ctaPatterns: uniqueStrings(fetchedPages.flatMap((page) => page.ctaPatterns), 8, 140),
-        proofSignals: uniqueStrings(fetchedPages.flatMap((page) => page.proofSignals), 8, 160),
+        serviceSignals: uniqueStrings(fetchedPages.flatMap((page) => page.serviceSignals), 20, 140),
+        ctaPatterns: uniqueStrings(fetchedPages.flatMap((page) => page.ctaPatterns), 16, 140),
+        proofSignals: uniqueStrings(fetchedPages.flatMap((page) => page.proofSignals), 16, 160),
         summary: buildSummary(sourceUrl, fetchedPages),
         cacheStatus: "live",
         refreshedAt: new Date().toISOString(),

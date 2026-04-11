@@ -108,7 +108,7 @@ const AIBloggerTrendsConfigSchema = new Schema({
 const AIBloggerWebsiteCrawlConfigSchema = new Schema({
     enabled: { type: Boolean, default: true },
     provider: { type: String, enum: ["basic-fetch"], default: "basic-fetch" },
-    maxPages: { type: Number, default: 4 },
+    maxPages: { type: Number, default: 8 },
     timeoutMs: { type: Number, default: 8000 },
     refreshWindowHours: { type: Number, default: 24 },
     allowedPaths: [{ type: String }],

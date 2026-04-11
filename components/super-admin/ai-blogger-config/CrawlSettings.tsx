@@ -30,7 +30,8 @@ export default function CrawlSettings({ config, setConfig }: ConfigSectionProps)
                     <div className="rounded-xl border border-border/60 bg-background/70 px-4 py-3 text-sm leading-6 text-muted-foreground">
                         {AI_BLOGGER_CRAWL_PROVIDER_META[config.crawl.provider].description}
                         {` `}
-                        These settings apply before topic discovery when Website URL mode is selected.
+                        Pages are discovered via sitemap.xml, robots.txt hints, and internal link following with priority scoring.
+                        Sites without a sitemap or robots.txt will still be crawled through homepage link discovery.
                     </div>
                 </div>
 
@@ -86,19 +87,22 @@ export default function CrawlSettings({ config, setConfig }: ConfigSectionProps)
                     <Input
                         type="number"
                         min={1}
-                        max={6}
+                        max={50}
                         value={config.crawl.maxPages}
                         onChange={(event) =>
                             setConfig((current) => ({
                                 ...current,
                                 crawl: {
                                     ...current.crawl,
-                                    maxPages: Number.parseInt(event.target.value || "4", 10) || 4,
+                                    maxPages: Number.parseInt(event.target.value || "8", 10) || 8,
                                 },
                             }))
                         }
                         className="h-11 rounded-xl border-border bg-background"
                     />
+                    <p className="text-xs text-muted-foreground">
+                        How many pages to crawl per website. The crawler prioritizes key pages (services, about, pricing) automatically.
+                    </p>
                 </div>
 
                 <div className="space-y-2">

@@ -8695,6 +8695,7 @@ export async function generateBlogStudioDraftImpl(
                 const POLL_MAX_WAIT_MS  = 60_000; // wait up to 60s for precache
                 const FALLBACK_CRAWL_MS = 25_000; // emergency crawl if precache missed
                 const refreshWindowHours = crawlConfig?.refreshWindowHours ?? 24;
+                const configuredMaxPages = crawlConfig?.maxPages ?? 8;
 
                 // Step 1: poll MongoDB for the cache being filled by the precache function
                 const normalizedSourceUrl = normalizeWebsiteUrl(brief.sourceValue || "")?.toString() ?? "";
@@ -8705,6 +8706,8 @@ export async function generateBlogStudioDraftImpl(
                             agency.id,
                             normalizedSourceUrl,
                             refreshWindowHours,
+                            // Smart invalidation: skip cache if it has fewer pages than admin configured.
+                            configuredMaxPages,
                         ).catch(() => null);
                         if (cached) {
                             websiteIntelligence = cached;
@@ -8720,14 +8723,16 @@ export async function generateBlogStudioDraftImpl(
                 }
 
                 // Step 2: if still no cache (precache slow/missed), do short emergency crawl
+                // Use half the configured pages to save time under the 25s budget.
                 if (!websiteIntelligence) {
-                    console.warn(`[WORKER] Precache miss after ${POLL_MAX_WAIT_MS / 1000}s — attempting emergency crawl (${FALLBACK_CRAWL_MS / 1000}s timeout)`);
+                    const emergencyMaxPages = Math.max(Math.ceil(configuredMaxPages / 2), 2);
+                    console.warn(`[WORKER] Precache miss after ${POLL_MAX_WAIT_MS / 1000}s — attempting emergency crawl (${FALLBACK_CRAWL_MS / 1000}s timeout, ${emergencyMaxPages} pages)`);
                     websiteIntelligence = await Promise.race([
                         getAIBloggerWebsiteIntelligence(brief.sourceValue || "", {
                             agencyId: agency.id,
                             enabled: crawlConfig?.enabled ?? true,
-                            maxPages: Math.min(crawlConfig?.maxPages ?? 4, 4), // cap at 4 for emergency
-                            timeoutMs: Math.min(crawlConfig?.timeoutMs ?? 8000, 8000),
+                            maxPages: emergencyMaxPages,
+                            timeoutMs: Math.min(crawlConfig?.timeoutMs ?? 8000, 10000),
                             refreshWindowHours,
                             allowedPaths: crawlConfig?.allowedPaths,
                             blockedPaths: crawlConfig?.blockedPaths,

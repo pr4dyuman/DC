@@ -4,6 +4,7 @@ import { BlogStudioPostModel, connectDB } from "./mongodb";
 import dbConnect from "./marketing-db";
 import MarketingBlog from "../models/marketing/Blog";
 import { getAIBloggerWebsiteIntelligence } from "./ai-blogger-website-intelligence";
+import { normalizeMarketingSiteOrigin } from "./marketing-blog-utils";
 import { normalizeInternalLinkHref } from "./ai-blogger-internal-link-utils";
 import type {
     BlogStudioInternalLinkHealth,
@@ -374,7 +375,27 @@ function scoreCandidate(post: BlogStudioPost, candidate: LinkCandidate) {
 }
 
 async function getPublishedBlogCandidates(siteUrl?: string) {
-    // Removed company-specific check - now works for ALL websites
+    // The MarketingBlog table is DC's own marketing site blog archive.
+    // Only include these candidates when the post targets DC's own website.
+    // For external client websites, these blogs are irrelevant.
+    const marketingOrigin = normalizeMarketingSiteOrigin();
+    if (!marketingOrigin) {
+        return [];
+    }
+
+    // If a siteUrl is provided, check that it matches the marketing domain
+    if (siteUrl) {
+        try {
+            const targetHost = new URL(siteUrl).hostname.replace(/^www\./, "").toLowerCase();
+            const marketingHost = new URL(marketingOrigin).hostname.replace(/^www\./, "").toLowerCase();
+            if (targetHost !== marketingHost) {
+                return [];
+            }
+        } catch {
+            return [];
+        }
+    }
+
     try {
         await dbConnect();
 

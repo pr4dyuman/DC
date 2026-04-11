@@ -153,7 +153,7 @@ export function getDefaultAIBloggerWebsiteCrawlConfig(): AIBloggerWebsiteCrawlCo
     return {
         enabled: true,
         provider: "basic-fetch",
-        maxPages: 4,
+        maxPages: 8,
         timeoutMs: 8000,
         refreshWindowHours: 24,
         allowedPaths: [],

@@ -568,7 +568,7 @@ export async function updateAgencyAIBloggerConfigSuperAdmin(agencyId: string, co
         return {
             enabled: Boolean(nextConfig.enabled),
             provider: nextConfig.provider,
-            maxPages: Math.min(6, Math.max(1, Math.round(nextConfig.maxPages || 4))),
+            maxPages: Math.min(50, Math.max(1, Math.round(nextConfig.maxPages || 8))),
             timeoutMs: Math.min(15000, Math.max(2000, Math.round(nextConfig.timeoutMs || 8000))),
             refreshWindowHours: Math.min(24 * 30, Math.max(1, Math.round(nextConfig.refreshWindowHours || 24))),
             allowedPaths: sanitizePathList(nextConfig.allowedPaths),
