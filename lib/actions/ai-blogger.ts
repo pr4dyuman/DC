@@ -8706,8 +8706,9 @@ export async function generateBlogStudioDraftImpl(
         }
     };
 
-        /** Emit SSE step-start event (UI will highlight this step as "active"). */
+        /** Emit SSE step-start event (UI will highlight this step as "active") and log to console. */
     const emitStepStart = (step: string, label: string) => {
+        blogLogStep("PIPELINE", `▶ ${label} started`, { step });
         if (jobId) {
             void emitPipelineEvent(jobId, { type: "step-start", step, label });
         }
