@@ -256,6 +256,7 @@ async function fetchKeywordTrendResult(
             {
                 engine: "google_trends",
                 q: keyword,
+                // Empty string = Global — SerpAPI omits the geo param automatically via fetchSerpApiJson
                 geo: location.toUpperCase(),
                 data_type: "RELATED_QUERIES",
             },
@@ -303,10 +304,12 @@ export async function fetchAIBloggerTrendSignals(input: FetchTrendSignalsInput):
     const location = sanitizeLocation(input.location, input.config.defaultLocation || "us");
 
     if (input.sourceMode === "trending") {
+        // google_trends_trending_now requires a specific country — fall back to "us" if Global is selected
+        const trendingGeo = location || "us";
         const { data, usedFallbackKey } = await fetchSerpApiJson<unknown>(
             {
                 engine: "google_trends_trending_now",
-                geo: location.toUpperCase(),
+                geo: trendingGeo.toUpperCase(),
             },
             input.config,
         );

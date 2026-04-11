@@ -102,8 +102,17 @@ export function normalizeQuery(query: string): string {
 }
 
 /**
- * Sanitizes location strings for search queries
+ * Sanitizes location strings for search queries.
+ * Empty string is valid and means "Global (Worldwide)" — SerpAPI omits geo/gl when empty.
+ * Only undefined/null trigger the fallback.
  */
 export function sanitizeLocation(value: string | undefined, fallback = "us"): string {
+    if (value === undefined || value === null) {
+        return fallback;
+    }
+    // Empty string = Global — preserve it as-is
+    if (value === "") {
+        return "";
+    }
     return (sanitizeText(value, 12, fallback, true) || fallback).toLowerCase();
 }

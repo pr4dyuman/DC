@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { SERPAPI_GEO_COUNTRIES, type ConfigSectionProps } from "./shared";
+import { SERPAPI_GEO_COUNTRIES, locationToSelectValue, locationFromSelectValue, type ConfigSectionProps } from "./shared";
 
 export default function TrendSettings({ config, setConfig, visibleKeys, toggleKeyVisibility }: ConfigSectionProps) {
     return (
@@ -34,7 +34,7 @@ export default function TrendSettings({ config, setConfig, visibleKeys, toggleKe
 
                 <div className="flex flex-wrap items-center gap-3">
                     <span className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground">
-                        {SERPAPI_GEO_COUNTRIES.find((c) => c.code === config.trends.defaultLocation)?.name || config.trends.defaultLocation.toUpperCase()}
+                        {SERPAPI_GEO_COUNTRIES.find((c) => c.code === locationToSelectValue(config.trends.defaultLocation))?.name || config.trends.defaultLocation.toUpperCase()}
                     </span>
                     <span
                         className={`rounded-full border px-3 py-1 text-xs font-medium ${
@@ -79,13 +79,13 @@ export default function TrendSettings({ config, setConfig, visibleKeys, toggleKe
                 <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground">Default Location</Label>
                     <Select
-                        value={config.trends.defaultLocation}
+                        value={locationToSelectValue(config.trends.defaultLocation)}
                         onValueChange={(value) =>
                             setConfig((current) => ({
                                 ...current,
                                 trends: {
                                     ...current.trends,
-                                    defaultLocation: value,
+                                    defaultLocation: locationFromSelectValue(value),
                                 },
                             }))
                         }
@@ -96,7 +96,9 @@ export default function TrendSettings({ config, setConfig, visibleKeys, toggleKe
                         <SelectContent className="max-h-64">
                             {SERPAPI_GEO_COUNTRIES.map((country) => (
                                 <SelectItem key={country.code} value={country.code}>
-                                    {country.name} ({country.code.toUpperCase()})
+                                    {country.code === "__global__"
+                                        ? country.name
+                                        : `${country.name} (${country.code.toUpperCase()})`}
                                 </SelectItem>
                             ))}
                         </SelectContent>

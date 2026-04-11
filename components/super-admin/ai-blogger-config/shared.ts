@@ -86,8 +86,10 @@ export const STAGE_VISUALS: Record<
 
 export const RESET_PROMPT_LABEL = "Reset to default";
 
-/** ISO 3166-1 alpha-2 codes supported by SerpAPI's `geo` parameter. */
+/** ISO 3166-1 alpha-2 codes supported by SerpAPI's `geo` parameter.
+ * Use code "__global__" in the UI — it maps to empty string for the API (worldwide results). */
 export const SERPAPI_GEO_COUNTRIES: { code: string; name: string }[] = [
+    { code: "__global__", name: "🌐 Global (Worldwide)" },
     { code: "af", name: "Afghanistan" },
     { code: "al", name: "Albania" },
     { code: "dz", name: "Algeria" },
@@ -214,6 +216,16 @@ export const SERPAPI_GEO_COUNTRIES: { code: string; name: string }[] = [
     { code: "zm", name: "Zambia" },
     { code: "zw", name: "Zimbabwe" },
 ];
+
+/** Convert a stored API location value ("" or country code) to a Select item value. */
+export function locationToSelectValue(location: string): string {
+    return location === "" ? "__global__" : location;
+}
+
+/** Convert a Select item value back to an API location value ("" for global, code otherwise). */
+export function locationFromSelectValue(value: string): string {
+    return value === "__global__" ? "" : value;
+}
 
 export const AI_BLOGGER_PRESET_META: Record<
     AIBloggerPresetKey,
