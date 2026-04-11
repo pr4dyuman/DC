@@ -1107,6 +1107,7 @@ function sanitizeNumber(value: number | undefined, fallback: number, min: number
 function countWords(value: string | undefined) {
     if (!value) return 0;
     return value
+        .replace(/<[^>]+>/g, " ")
         .trim()
         .split(/\s+/)
         .filter(Boolean)
@@ -2816,6 +2817,7 @@ function buildAIBloggerFinalCheckerPrompt(input: {
     performanceInsightsPromptBlock?: string;
     websitePromptBlock?: string;
     serpPromptBlock?: string;
+    trendsContextBlock?: string;
 }) {
     const aiReviewPolicy = input.publishRules.aiReviewPolicy;
     const detectedStyleFlags = detectAIBloggerStyleRedFlags(input.draft.content || "");
@@ -2861,6 +2863,7 @@ ${input.performanceInsightsPromptBlock ? `\n${input.performanceInsightsPromptBlo
 ${input.groundedResearchPromptBlock ? `\n${input.groundedResearchPromptBlock}` : ""}
 ${input.internalLinksPromptBlock ? `\n${input.internalLinksPromptBlock}` : ""}
 ${input.serpPromptBlock ? `\n${input.serpPromptBlock}` : ""}
+${input.trendsContextBlock ? `\n${input.trendsContextBlock}` : ""}
 ${input.websitePromptBlock ? `\n${input.websitePromptBlock}` : ""}
 
 Current content:
@@ -3015,6 +3018,7 @@ function formatSerpAnalysisForPrompt(analysis: AIBloggerSerpAnalysis | null) {
 - Heading patterns: ${analysis.headingPatterns.slice(0, 6).join(" | ") || "none"}
 - Coverage gaps: ${analysis.contentGaps.slice(0, 5).join(" | ") || "none"}
 - Section gap analysis: ${analysis.sectionGapAnalysis?.slice(0, 4).join(" | ") || "none"}
+- Title angle patterns: ${analysis.titleAnglePatterns?.slice(0, 5).join(" | ") || "none"}
 
 ${analysis.summary}`;
 }
@@ -3696,6 +3700,41 @@ ${liveTrends.keywordResults
             `${index + 1}. Keyword: ${result.keyword} | Topic: ${result.trendingTopic} | Score: ${result.score} | Related: ${result.relatedQueries.join(", ") || "none"}`,
     )
     .join("\n")}`;
+}
+
+/**
+ * Formats a compact trends context block for downstream prompts (Keywords, Writer, etc.).
+ * This is NOT the full live-trends format used for topic discovery — it's a distilled
+ * summary that provides related queries and interest signals to inform keyword and content strategy.
+ */
+function formatTrendsContextForPrompt(trendSignals: AIBloggerTrendSignals | null) {
+    if (!trendSignals) {
+        return "";
+    }
+
+    const parts: string[] = [`Google Trends context (${trendSignals.location.toUpperCase()}):`];
+
+    if (trendSignals.keywordResults.length > 0) {
+        const topResults = trendSignals.keywordResults.slice(0, 5);
+        parts.push(
+            `- Keyword interest: ${topResults.map((r) => `${r.keyword} (score: ${r.score})`).join(", ")}`,
+        );
+    }
+
+    const allRelated = trendSignals.relatedQueries.length > 0
+        ? trendSignals.relatedQueries
+        : trendSignals.keywordResults.flatMap((r) => r.relatedQueries);
+    const uniqueRelated = Array.from(new Set(allRelated)).slice(0, 8);
+
+    if (uniqueRelated.length > 0) {
+        parts.push(`- Trending related queries: ${uniqueRelated.join(", ")}`);
+    }
+
+    if (trendSignals.candidateTopics.length > 0 && trendSignals.mode === "live-topics") {
+        parts.push(`- Live trending topics: ${trendSignals.candidateTopics.slice(0, 6).join(", ")}`);
+    }
+
+    return parts.length > 1 ? parts.join("\n") : "";
 }
 
 function getLiveTrendsTopicDiscoveryPrompt(
@@ -8873,6 +8912,7 @@ export async function generateBlogStudioDraftImpl(
         let discoveryStage: AIBloggerStageRunResult;
         let discoverySummary = "AI-only topic discovery used.";
         let liveTrendsUsedFallbackKey = false;
+        let capturedTrendSignals: AIBloggerTrendSignals | null = null;
 
         emitStepStart("fetch-trends", "Fetch Trends");
 
@@ -8888,6 +8928,7 @@ export async function generateBlogStudioDraftImpl(
                     fallbackCandidates,
                 });
                 liveTrendsUsedFallbackKey = liveTrends.usedFallbackKey;
+                capturedTrendSignals = liveTrends;
                 discoverySummary = liveTrends.summary;
                 fetchTrendsSource = liveTrendsUsedFallbackKey
                     ? "live-google-trends-fallback-key"
@@ -9103,6 +9144,7 @@ export async function generateBlogStudioDraftImpl(
         }
 
         const serpPromptBlock = formatSerpAnalysisForPrompt(serpAnalysis);
+        const trendsContextBlock = formatTrendsContextForPrompt(capturedTrendSignals);
         let groundedResearch: AIBloggerGroundedResearch | null = null;
         let groundedResearchStepStatus: "completed" | "failed" | "skipped" = "skipped";
         let groundedResearchError: string | undefined;
@@ -9426,6 +9468,7 @@ Location: ${brief.location || settings.seo.defaultLocation}
 Word target: ${requestedWordCount}
 ${websitePromptBlock ? `\n${websitePromptBlock}` : ""}
 ${serpPromptBlock ? `\n${serpPromptBlock}` : ""}
+${trendsContextBlock ? `\n${trendsContextBlock}` : ""}
 ${groundedResearchPromptBlock ? `\n${groundedResearchPromptBlock}` : ""}
 ${performanceInsightsPromptBlock ? `\n${performanceInsightsPromptBlock}` : ""}
 Research insights:
@@ -9904,6 +9947,10 @@ Trend focus: ${enrichedBrief.trendFocus || "not provided"}
 Title direction: ${advancedBrief.titleDirection || "not specified"}
 Metadata direction: ${advancedBrief.metadataDirection || "not specified"}
 Word target: ${effectiveWordTarget}
+Competitor titles from SERP:
+${serpAnalysis?.topResultTitles?.length ? serpAnalysis.topResultTitles.slice(0, 5).map((t) => `- ${t}`).join("\n") : "- none"}
+Featured snippet style: ${serpAnalysis?.featuredSnippetStyle || "not assessed"}
+Title angle patterns: ${serpAnalysis?.titleAnglePatterns?.slice(0, 4).join(", ") || "none"}
 ${groundedResearchPromptBlock ? `\n${groundedResearchPromptBlock}` : ""}
 ${performanceInsightsPromptBlock ? `\n${performanceInsightsPromptBlock}` : ""}
 
@@ -10256,6 +10303,7 @@ ${performanceInsightsPromptBlock ? `\n${performanceInsightsPromptBlock}` : ""}
 ${groundedResearchPromptBlock ? `\n${groundedResearchPromptBlock}` : ""}${noGroundedSourcesWarning}
 ${internalLinksPromptBlock ? `\n${internalLinksPromptBlock}` : ""}
 ${serpPromptBlock ? `\n${serpPromptBlock}` : ""}
+${trendsContextBlock ? `\n${trendsContextBlock}` : ""}
 ${websitePromptBlock ? `\n${websitePromptBlock}` : ""}
 
 Rules:
@@ -10316,7 +10364,7 @@ Rules:
             outline: baseGeneratedOutline,
             internalLinks: baseGeneratedInternalLinks,
             featuredImageAlt: generated.featuredImageAlt || metadataPack.title || title,
-            wordCount: generated.wordCount ?? effectiveWordTarget,
+            wordCount: countWords(generated.content) || generated.wordCount || effectiveWordTarget,
             seoScore:
                 typeof generated.seoScore === "number"
                     ? generated.seoScore
@@ -10410,6 +10458,7 @@ Rules:
                     performanceInsightsPromptBlock,
                     websitePromptBlock,
                     serpPromptBlock,
+                    trendsContextBlock,
                 });
                 blogLogInput("FINAL-AI-CHECKER", finalCheckerPrompt);
                 const finalCheckerRuntimeConfig = resolveAIBloggerFinalCheckerRuntimeConfig(aiConfig, aiBloggerConfig);
@@ -10449,7 +10498,7 @@ Rules:
                         draftSiteUrl,
                     ),
                     featuredImageAlt: checkedDraft.featuredImageAlt || finalDraft.featuredImageAlt,
-                    wordCount: checkedDraft.wordCount ?? resolveDraftWordCount(finalDraft.wordCount, checkedDraft.content || finalDraft.content, settings),
+                    wordCount: countWords(checkedDraft.content || finalDraft.content) || checkedDraft.wordCount || resolveDraftWordCount(finalDraft.wordCount, checkedDraft.content || finalDraft.content, settings),
                     seoScore: checkedDraft.seoScore ?? finalDraft.seoScore,
                 };
                 const checkedAuditDraft: BlogStudioPost = {

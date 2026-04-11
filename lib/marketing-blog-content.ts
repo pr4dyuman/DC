@@ -251,6 +251,16 @@ function convertMarkdownLikeContentToHtml(content: string) {
             continue;
         }
 
+        // Handle deeper headings (H4–H6) before H3/H2 since the patterns overlap
+        const h456Match = line.match(/^(#{4,6})\s+(.+)$/);
+        if (h456Match) {
+            flushParagraph();
+            flushList();
+            const level = Math.min(h456Match[1].length, 6);
+            blocks.push(`<h${level}>${renderInlineContent(h456Match[2])}</h${level}>`);
+            continue;
+        }
+
         const h3Match = line.match(/^###\s+(.+)$/);
         if (h3Match) {
             flushParagraph();

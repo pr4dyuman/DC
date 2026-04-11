@@ -54,7 +54,11 @@ function countWords(value?: string) {
         return 0;
     }
 
-    return normalized.split(/\s+/).filter(Boolean).length;
+    return normalized
+        .replace(/<[^>]+>/g, " ")
+        .split(/\s+/)
+        .filter(Boolean)
+        .length;
 }
 
 // countInternalLinks and hasInternalLinks imported from ai-blogger-internal-link-utils
@@ -733,7 +737,7 @@ export function getBlogStudioSeoAudit(
         {
             key: "business-fit",
             label: "Business fit is strong enough",
-            passed: hasBusinessFitScore ? businessFitScore >= 60 : false,
+            passed: hasBusinessFitScore ? businessFitScore >= 60 : true,
             severity:
                 businessFitBlocked
                     ? businessFitCritical || !aiReviewPolicy.flagWeakBusinessFit
