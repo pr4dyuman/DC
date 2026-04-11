@@ -104,6 +104,72 @@ function buildPublishedBlogHref(siteUrl: string | undefined, slug: string) {
         : blogPath;
 }
 
+/**
+ * Resolves the best available href for a published blog post.
+ * Priority: canonicalUrl (set by publishing webhook response) > /blog/publishedEntrySlug > /blog/slug
+ */
+function resolvePublishedBlogHref(siteUrl: string | undefined, slug: string, publishedEntrySlug?: string, canonicalUrl?: string): string {
+    const resolvedSiteUrl = resolveSiteOrigin(siteUrl);
+
+    // Use canonicalUrl when it's an absolute URL on the same domain
+    if (canonicalUrl?.trim()) {
+        try {
+            const canonical = new URL(canonicalUrl.trim());
+            if (!resolvedSiteUrl || canonical.origin === resolveSiteOrigin(resolvedSiteUrl)) {
+                canonical.hash = "";
+                if (canonical.pathname !== "/" && canonical.pathname.endsWith("/")) {
+                    canonical.pathname = canonical.pathname.slice(0, -1);
+                }
+                return canonical.toString();
+            }
+        } catch {
+            // fall through
+        }
+    }
+
+    return buildPublishedBlogHref(siteUrl, publishedEntrySlug || slug);
+}
+
+/**
+ * Converts a full page title into a short, natural anchor (3-4 words max).
+ * E.g. "How to Manage Your Company Using AI in 2026" → "manage company with ai"
+ */
+function toNaturalAnchor(title: string): string {
+    const words = title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
+    return words.slice(0, 4).join(" ") || title.toLowerCase().slice(0, 30);
+}
+
+/**
+ * Fires parallel HEAD requests against blog link candidates and removes any that return 404.
+ * Silently skips on network error (keeps the link) — only hard 404s are filtered.
+ */
+async function validateBlogHrefs(candidates: LinkCandidate[]): Promise<LinkCandidate[]> {
+    const results = await Promise.allSettled(
+        candidates.map(async (candidate) => {
+            try {
+                const response = await fetch(candidate.href, {
+                    method: "HEAD",
+                    redirect: "follow",
+                    signal: AbortSignal.timeout(6_000),
+                });
+                return { ok: response.status !== 404, candidate };
+            } catch {
+                // Network error → keep the candidate (don't penalise for flaky network)
+                return { ok: true, candidate };
+            }
+        }),
+    );
+
+    return results
+        .map((result) => (result.status === "fulfilled" ? result.value : null))
+        .filter((entry): entry is { ok: boolean; candidate: LinkCandidate } => entry !== null && entry.ok)
+        .map((entry) => entry.candidate);
+}
+
 function humanizePathSegment(pathname: string) {
     if (pathname === "/" || !pathname) {
         return "Home";
@@ -405,13 +471,13 @@ async function getPublishedBlogCandidates(siteUrl?: string) {
             .limit(18)
             .lean();
 
-        return blogs.map((blog) => ({
+        const candidates = blogs.map((blog) => ({
             id: `blog-${blog._id.toString()}`,
             title: blog.title,
             href: buildPublishedBlogHref(siteUrl, blog.slug),
             source: "blog" as const,
             description: blog.shortDescription || `${blog.category || "Blog"} article on the blog archive.`,
-            suggestedAnchor: blog.title,
+            suggestedAnchor: toNaturalAnchor(blog.title),
             keywords: [
                 blog.title,
                 blog.category,
@@ -419,6 +485,8 @@ async function getPublishedBlogCandidates(siteUrl?: string) {
                 blog.shortDescription,
             ].filter(Boolean) as string[],
         }));
+
+        return await validateBlogHrefs(candidates);
     } catch (error) {
         console.error("[AI-BLOGGER] Failed to fetch published blog candidates:", error instanceof Error ? error.message : error);
         return [];
@@ -435,18 +503,23 @@ async function getPublishedAIBloggerCandidates(post: BlogStudioPost, siteUrl?: s
             status: "Published",
             publishedEntrySlug: { $exists: true, $ne: "" },
         })
-            .select("id slug title excerpt brief tags contentClusterId parentTopicSlug publishedEntrySlug")
+            .select("id slug title excerpt brief tags contentClusterId parentTopicSlug publishedEntrySlug canonicalUrl")
             .sort({ publishedAt: -1, updatedAt: -1 })
             .limit(24)
             .lean();
 
-        return posts.map((candidatePost) => ({
+        const candidates = posts.map((candidatePost) => ({
             id: `ai-blogger-${candidatePost.id || candidatePost.slug}`,
             title: candidatePost.title,
-            href: buildPublishedBlogHref(siteUrl, candidatePost.publishedEntrySlug || candidatePost.slug),
+            href: resolvePublishedBlogHref(
+                siteUrl,
+                candidatePost.slug,
+                candidatePost.publishedEntrySlug,
+                candidatePost.canonicalUrl,
+            ),
             source: "blog" as const,
             description: candidatePost.excerpt || "Published AI Blogger article on the blog archive.",
-            suggestedAnchor: candidatePost.title,
+            suggestedAnchor: toNaturalAnchor(candidatePost.title),
             keywords: [
                 candidatePost.title,
                 candidatePost.excerpt,
@@ -457,6 +530,8 @@ async function getPublishedAIBloggerCandidates(post: BlogStudioPost, siteUrl?: s
             targetClusterId: candidatePost.contentClusterId,
             targetParentTopicSlug: candidatePost.parentTopicSlug,
         }));
+
+        return await validateBlogHrefs(candidates);
     } catch (error) {
         console.error("[AI-BLOGGER] Failed to fetch AI Blogger internal link candidates:", error instanceof Error ? error.message : error);
         return [];
