@@ -813,6 +813,13 @@ export type BlogStudioGenerationStepInsight = {
     notes?: string;
 };
 
+export type BlogStudioGenerationKeywordPlan = {
+    primaryKeyword?: string;
+    secondaryKeywords: string[];
+    metaKeywords: string[];
+    sectionAngles: string[];
+};
+
 export type BlogStudioGenerationDiagnostics = {
     selectedTopic?: string;
     fetchTrendsSource: BlogStudioFetchTrendsSource;
@@ -821,6 +828,7 @@ export type BlogStudioGenerationDiagnostics = {
     businessFitSummary?: string;
     businessFitScore?: number;
     businessFitWarnings: string[];
+    keywordPlan?: BlogStudioGenerationKeywordPlan;
     scorecard?: BlogStudioGenerationScorecard;
     sourceUsage?: BlogStudioGenerationSourceUsage;
     steps: BlogStudioGenerationStepInsight[];

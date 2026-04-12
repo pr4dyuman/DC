@@ -103,6 +103,79 @@ function uniqueStrings(values: string[], maxItems: number, maxLength: number) {
     ).slice(0, maxItems);
 }
 
+const BOILERPLATE_SNIPPET_PATTERNS = [
+    /\bloading testimonials\b/i,
+    /\ball rights reserved\b/i,
+    /\bprivacy policy\b/i,
+    /\bcookie policy\b/i,
+    /\bterms(?: of service)?\b/i,
+    /\baccept cookies\b/i,
+    /\bfollow us\b/i,
+    /\bskip to content\b/i,
+];
+
+function getUppercaseRatio(value: string) {
+    const letters = value.replace(/[^A-Za-z]/g, "");
+    if (!letters) {
+        return 0;
+    }
+
+    const uppercaseLetters = letters.replace(/[^A-Z]/g, "");
+    return uppercaseLetters.length / letters.length;
+}
+
+function looksLikeNavigationCluster(value: string) {
+    const cleaned = cleanText(value, 220);
+    if (!cleaned) {
+        return true;
+    }
+
+    const lower = cleaned.toLowerCase();
+    const words = lower.split(/\s+/).filter(Boolean);
+    const navKeywordCount = words.filter((word) =>
+        [
+            "home",
+            "services",
+            "service",
+            "about",
+            "contact",
+            "blog",
+            "pricing",
+            "seo",
+            "marketing",
+            "development",
+            "design",
+            "video",
+            "ppc",
+            "team",
+        ].includes(word),
+    ).length;
+
+    if (BOILERPLATE_SNIPPET_PATTERNS.some((pattern) => pattern.test(lower))) {
+        return true;
+    }
+
+    if (getUppercaseRatio(cleaned) >= 0.7 && words.length >= 4 && !/[.!?]/.test(cleaned)) {
+        return true;
+    }
+
+    return navKeywordCount >= 4 && words.length >= 6 && !/[.!?]/.test(cleaned);
+}
+
+function isMeaningfulTopicHint(value: string) {
+    const cleaned = cleanText(value, 180);
+    if (!cleaned) {
+        return false;
+    }
+
+    const words = cleaned.split(/\s+/).filter(Boolean);
+    if (words.length < 4 || cleaned.length < 24) {
+        return false;
+    }
+
+    return !looksLikeNavigationCluster(cleaned);
+}
+
 function fallbackPageTitle(pathname: string) {
     if (!pathname || pathname === "/") {
         return "Home";
@@ -278,7 +351,8 @@ function extractServiceSignals(html: string) {
         .filter((text) => {
             const lower = text.toLowerCase();
             return SERVICE_KEYWORDS.some((keyword) => lower.includes(keyword));
-        });
+        })
+        .filter((text) => !looksLikeNavigationCluster(text));
 
     candidates.push(...serviceHeadings);
 
@@ -291,7 +365,8 @@ function extractServiceSignals(html: string) {
             const lower = text.toLowerCase();
             return text.length >= 12 && text.length <= 140
                 && SERVICE_KEYWORDS.some((keyword) => lower.includes(keyword));
-        });
+        })
+        .filter((text) => !looksLikeNavigationCluster(text));
 
     candidates.push(...listItems);
 
@@ -344,7 +419,7 @@ function extractProofSignals(html: string) {
         .filter((text) => text.length >= 8);
 
     for (const text of allTextBlocks) {
-        if (PROOF_PATTERNS.some((pattern) => pattern.test(text))) {
+        if (!looksLikeNavigationCluster(text) && PROOF_PATTERNS.some((pattern) => pattern.test(text))) {
             candidates.push(text);
         }
     }
@@ -748,7 +823,8 @@ function extractContentHighlights(html: string) {
         ),
     ]
         .map((text) => cleanText(text, 220))
-        .filter((text) => text.length >= 35 && /[a-z]{3}/i.test(text));
+        .filter((text) => text.length >= 35 && /[a-z]{3}/i.test(text))
+        .filter((text) => !looksLikeNavigationCluster(text));
 
     return uniqueStrings(candidates, 8, 220);
 }
@@ -927,7 +1003,7 @@ function buildTopicHints(pages: CrawledPage[]) {
             page.description,
             ...page.headings,
             ...page.contentHighlights,
-        ]),
+        ]).filter((value) => isMeaningfulTopicHint(value)),
         40,
         120,
     );
@@ -937,14 +1013,14 @@ function buildSummary(sourceUrl: URL, pages: CrawledPage[], requestedMaxPages: n
     const rankedPages = sortPagesByScore(pages);
     const topPages = rankedPages.slice(0, 4);
     const pageTitles = uniqueStrings(rankedPages.map((page) => page.title), 6, 160);
-    const descriptions = uniqueStrings(topPages.map((page) => page.description), 4, 220);
-    const headings = uniqueStrings(topPages.flatMap((page) => page.headings), 10, 140);
+    const descriptions = uniqueStrings(topPages.map((page) => page.description).filter((value) => isMeaningfulTopicHint(value)), 4, 220);
+    const headings = uniqueStrings(topPages.flatMap((page) => page.headings).filter((value) => isMeaningfulTopicHint(value)), 10, 140);
     const faqQuestions = uniqueStrings(rankedPages.flatMap((page) => page.faqQuestions), 6, 160);
     const excerpts = uniqueStrings(topPages.map((page) => page.excerpt), 3, 220);
-    const highlights = uniqueStrings(topPages.flatMap((page) => page.contentHighlights), 6, 180);
-    const services = uniqueStrings(rankedPages.flatMap((page) => page.serviceSignals), 8, 140);
+    const highlights = uniqueStrings(topPages.flatMap((page) => page.contentHighlights).filter((value) => isMeaningfulTopicHint(value)), 6, 180);
+    const services = uniqueStrings(rankedPages.flatMap((page) => page.serviceSignals).filter((value) => !looksLikeNavigationCluster(value)), 8, 140);
     const ctas = uniqueStrings(rankedPages.flatMap((page) => page.ctaPatterns), 6, 140);
-    const proof = uniqueStrings(rankedPages.flatMap((page) => page.proofSignals), 6, 160);
+    const proof = uniqueStrings(rankedPages.flatMap((page) => page.proofSignals).filter((value) => !looksLikeNavigationCluster(value)), 6, 160);
     const topPathSummaries = uniqueStrings(
         topPages.map((page) => {
             const path = new URL(page.url).pathname || "/";

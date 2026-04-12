@@ -4,7 +4,7 @@ import { ArrowLeft, Calendar, User, Clock, ChevronDown, Share2 } from "lucide-re
 import dbConnect from "@/lib/marketing-db";
 import Blog from "@/models/marketing/Blog";
 import { checkAuth } from "@/lib/authMiddleware";
-import { buildMarketingBlogHtml } from "@/lib/marketing-blog-content";
+import { buildMarketingBlogHtml, stripStandaloneFaqSection } from "@/lib/marketing-blog-content";
 import {
   isRemoteMarketingImageSrc,
   isSvgMarketingImageSrc,
@@ -458,13 +458,16 @@ export default async function BlogPost({ params }) {
     internalLinks: post.internalLinks,
     siteUrl: SITE_URL,
   });
-  const headings = extractHeadingsFromHtml(renderedContent);
+  const contentWithoutInlineFaq = faqItems.length > 0
+    ? stripStandaloneFaqSection(renderedContent)
+    : renderedContent;
+  const headings = extractHeadingsFromHtml(contentWithoutInlineFaq);
   const shouldShowToc = headings.length >= 2;
   const contentWithHeadingIds = shouldShowToc
-    ? addHeadingIdsToHtml(renderedContent, headings)
-    : renderedContent;
+    ? addHeadingIdsToHtml(contentWithoutInlineFaq, headings)
+    : contentWithoutInlineFaq;
   const sanitizedContent = serverSanitizeHtml(contentWithHeadingIds);
-  const readTime = getReadTimeLabel(renderedContent || post.content);
+  const readTime = getReadTimeLabel(contentWithoutInlineFaq || post.content);
 
   const heroImageSrc = normalizeMarketingImageSrc(post.image);
   const isDefaultImage = heroImageSrc?.includes("ai-blogger.svg");

@@ -144,6 +144,16 @@ const BlogStudioGenerationSourceUsageSchema = new Schema(
     { _id: false }
 );
 
+const BlogStudioGenerationKeywordPlanSchema = new Schema(
+    {
+        primaryKeyword: { type: String },
+        secondaryKeywords: [{ type: String }],
+        metaKeywords: [{ type: String }],
+        sectionAngles: [{ type: String }],
+    },
+    { _id: false }
+);
+
 const BlogStudioGenerationStepSchema = new Schema(
     {
         key: { type: String, required: true },
@@ -176,6 +186,7 @@ const BlogStudioGenerationDiagnosticsSchema = new Schema(
         businessFitSummary: { type: String },
         businessFitScore: { type: Number },
         businessFitWarnings: [{ type: String }],
+        keywordPlan: { type: BlogStudioGenerationKeywordPlanSchema },
         scorecard: { type: BlogStudioGenerationScorecardSchema },
         sourceUsage: { type: BlogStudioGenerationSourceUsageSchema },
         steps: { type: [BlogStudioGenerationStepSchema], default: [] },

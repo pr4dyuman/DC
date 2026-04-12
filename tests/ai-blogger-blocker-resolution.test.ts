@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { buildBlogStudioBlockerResolutionPreview } from "../lib/ai-blogger-blocker-resolution";
+import { getBlogStudioSeoAudit } from "../lib/ai-blogger-seo-audit";
 import type {
     BlogStudioCannibalizationReport,
     BlogStudioPost,
@@ -234,6 +235,140 @@ test("classifies metadata, content, internal-link, and image blockers as ai-fixa
     );
     assert.equal(preview.humanRequiredCount, 0);
     assert.equal(preview.systemRequiredCount, 0);
+});
+
+function buildSeoAuditPost(overrides?: Partial<BlogStudioPost>): BlogStudioPost {
+    return {
+        ...basePost,
+        title: "Using AI to Optimize Influencer Marketing ROI: A 2026 Strategy",
+        excerpt: "Learn how agencies can use AI-driven influencer discovery and analytics to improve campaign ROI in 2026.",
+        metaTitle: "Using AI to Optimize Influencer Marketing ROI (2026 Guide)",
+        metaDescription: "Learn how using AI to optimize influencer marketing ROI improves discovery, analytics, and campaign efficiency for agencies in 2026.",
+        canonicalUrl: "https://example.com/blog/using-ai-to-optimize-influencer-marketing-roi",
+        schemaMarkup: "{\"@context\":\"https://schema.org\"}",
+        featuredImageAlt: "AI dashboard for influencer marketing ROI analysis",
+        content: [
+            "## From Guesswork to Data-Driven Precision",
+            "Using AI to optimize influencer marketing ROI helps agencies replace manual guesswork with faster analysis and better decision-making. For example, teams can identify content gaps in 30 days and benchmark performance in 2026. [1]",
+            "",
+            "## Precision Matching With Smarter Discovery",
+            "AI-driven influencer discovery tools help teams shortlist partners faster and reduce wasted outreach. Predictive analytics for influencer campaigns can highlight fit before budget is committed.",
+            "",
+            "## Protecting Campaign Quality",
+            "Influencer audience authenticity checks help agencies spot suspicious signals before launch. Data-driven influencer campaign strategy also improves reporting quality and post-campaign learning.",
+            "",
+            "## Scaling Content Workflows",
+            "Teams can use AI for marketing task automation to manage approvals, reporting, and optimization without losing editorial control.",
+            "",
+            "## Sources",
+            "1. Coursera - AI for influencer marketing",
+            "",
+            "Ready to improve campaign performance? Book a call with our team to plan your next move.",
+        ].join("\n"),
+        outline: [
+            "From Guesswork to Data-Driven Precision",
+            "Precision Matching With Smarter Discovery",
+            "Protecting Campaign Quality",
+            "Scaling Content Workflows",
+        ],
+        faqItems: [
+            {
+                question: "What is AI for influencer marketing?",
+                answer: "AI helps agencies automate discovery, validation, and campaign analysis.",
+            },
+        ],
+        searchIntent: "informational",
+        contentType: "how-to",
+        internalLinks: [
+            {
+                href: "https://example.com/services/influencer-marketing",
+                title: "Influencer marketing services",
+                source: "service",
+                anchorText: "influencer marketing services",
+                relationType: "service-authority",
+                score: 0.94,
+                matchReason: "Targets a core service page aligned with the article topic.",
+                clusterAligned: true,
+                suggestedSectionHeading: "Scaling Content Workflows",
+                placement: "body",
+            },
+        ],
+        externalSources: [
+            {
+                id: "source-1",
+                title: "AI for influencer marketing",
+                url: "https://www.coursera.org/articles/ai-for-influencer-marketing",
+                domain: "coursera.org",
+                summary: "Overview of AI use cases in influencer marketing.",
+                type: "education",
+                freshness: "recent",
+                trustLevel: "high",
+                publishedAt: "2025-11-01T00:00:00.000Z",
+                keyClaims: ["AI improves influencer discovery and campaign monitoring."],
+                citationBlock: "Coursera, AI for influencer marketing",
+            },
+        ],
+        generationDiagnostics: {
+            fetchTrendsSource: "live-google-trends",
+            fetchTrendsLabel: "Google Trends",
+            fetchTrendsNotes: "Live trends used for topic discovery.",
+            selectedTopic: "Leveraging AI News and Trends to Optimize Influencer Marketing ROI",
+            businessFitWarnings: [],
+            keywordPlan: {
+                primaryKeyword: "using AI to optimize influencer marketing ROI",
+                secondaryKeywords: [
+                    "AI-driven influencer discovery tools",
+                    "predictive analytics for influencer campaigns",
+                    "influencer audience authenticity checks",
+                    "data-driven influencer campaign strategy",
+                    "AI for marketing task automation",
+                ],
+                metaKeywords: ["AI influencer marketing", "marketing ROI"],
+                sectionAngles: [
+                    "From Guesswork to Data-Driven Precision",
+                    "Precision Matching With Smarter Discovery",
+                    "Protecting Campaign Quality",
+                    "Scaling Content Workflows",
+                ],
+            },
+            steps: [],
+        },
+        ...overrides,
+    };
+}
+
+function getAuditCheck(post: BlogStudioPost, key: string) {
+    const audit = getBlogStudioSeoAudit(post, baseSettings, basePublishRules as Parameters<typeof getBlogStudioSeoAudit>[2]);
+    const check = audit.checks.find((item) => item.key === key);
+    assert.ok(check, `Expected check ${key} to exist.`);
+    return check;
+}
+
+test("seo audit passes outline fidelity, keyword coverage, and citation traceability when draft structure is preserved", () => {
+    const post = buildSeoAuditPost();
+
+    assert.equal(getAuditCheck(post, "outline-fidelity").passed, true);
+    assert.equal(getAuditCheck(post, "secondary-keyword-coverage").passed, true);
+    assert.equal(getAuditCheck(post, "citation-traceability").passed, true);
+    assert.equal(getAuditCheck(post, "claims-grounding").passed, true);
+});
+
+test("seo audit flags missing outline coverage, weak keyword usage, and untraceable citations", () => {
+    const post = buildSeoAuditPost({
+        content: [
+            "## A Better Way to Run Campaigns",
+            "Agencies can improve results with smarter planning, faster execution, and better reporting. Research shows the right workflow improves outcomes in 2026. [1]",
+            "",
+            "## Operational Improvements",
+            "Teams can automate approvals and build better reports without the manual overhead that slows campaign delivery.",
+            "",
+            "Ready to improve campaign performance? Book a call with our team to plan your next move.",
+        ].join("\n"),
+    });
+
+    assert.equal(getAuditCheck(post, "outline-fidelity").passed, false);
+    assert.equal(getAuditCheck(post, "secondary-keyword-coverage").passed, false);
+    assert.equal(getAuditCheck(post, "citation-traceability").passed, false);
 });
 
 test("classifies manual approval, webhook config, and workflow blockers as human or system required", () => {

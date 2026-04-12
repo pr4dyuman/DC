@@ -14,6 +14,15 @@ type BuildMarketingBlogHtmlOptions = {
 
 const HTML_BLOCK_TAG_PATTERN = /<(?:article|aside|blockquote|br|code|div|figure|figcaption|h[1-6]|hr|img|li|ol|p|pre|section|table|tbody|td|th|thead|tr|ul)\b/i;
 const HTML_INLINE_TAG_PATTERN = /<\/?[a-z][^>]*>/i;
+const FAQ_HEADING_PATTERN = String.raw`(?:faq|faqs|frequently asked questions?)`;
+const FAQ_HTML_SECTION_PATTERN = new RegExp(
+    String.raw`\s*<h([23])[^>]*>\s*${FAQ_HEADING_PATTERN}\s*<\/h\1>[\s\S]*?(?=\s*<h[23][^>]*>|\s*$)`,
+    "gi",
+);
+const FAQ_MARKDOWN_SECTION_PATTERN = new RegExp(
+    String.raw`(?:^|\n)#{2,3}\s*${FAQ_HEADING_PATTERN}\s*$[\s\S]*?(?=(?:\n#{2,3}\s+)|\s*$)`,
+    "gim",
+);
 
 function escapeHtml(value: string) {
     return value
@@ -30,6 +39,39 @@ function escapeRegex(value: string) {
 
 function normalizeNewlines(value: string) {
     return value.replace(/\r\n?/g, "\n");
+}
+
+function collapseFaqSectionSpacing(value: string) {
+    return normalizeNewlines(value)
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+}
+
+export function stripStandaloneFaqSection(content?: string) {
+    const rawContent = normalizeNewlines(content?.trim() || "");
+    if (!rawContent) {
+        return "";
+    }
+
+    const stripped = contentLooksLikeHtml(rawContent)
+        ? rawContent.replace(FAQ_HTML_SECTION_PATTERN, "")
+        : rawContent.replace(FAQ_MARKDOWN_SECTION_PATTERN, "");
+
+    return collapseFaqSectionSpacing(stripped);
+}
+
+export function contentHasStandaloneFaqSection(content?: string) {
+    const rawContent = normalizeNewlines(content?.trim() || "");
+    if (!rawContent) {
+        return false;
+    }
+
+    const pattern = contentLooksLikeHtml(rawContent)
+        ? new RegExp(FAQ_HTML_SECTION_PATTERN.source, "i")
+        : new RegExp(FAQ_MARKDOWN_SECTION_PATTERN.source, "im");
+
+    return pattern.test(rawContent);
 }
 
 function isSafeHref(value: string) {

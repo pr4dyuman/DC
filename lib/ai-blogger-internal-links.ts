@@ -194,6 +194,63 @@ function toNaturalAnchor(title: string): string {
  * Fires parallel HEAD requests against blog link candidates and removes any that return 404.
  * Silently skips on network error (keeps the link) — only hard 404s are filtered.
  */
+function toPreferredAnchor(title: string): string {
+    const cleaned = title
+        .toLowerCase()
+        .replace(/\b20\d{2}\b/g, "")
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const normalized = cleaned
+        .replace(/^(how|why|what|when|where)\s+to\s+/g, "")
+        .replace(/\b(complete|ultimate|practical|modern|future|latest|best)\b/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const anchorStopWords = new Set([
+        "about", "after", "also", "and", "are", "best", "build",
+        "from", "into", "that", "the", "this", "your",
+        "how", "what", "why", "when", "where", "which",
+        "can", "get", "use", "using", "used", "will", "would",
+        "our", "they", "their", "you", "its", "complete", "ultimate",
+        "practical", "modern", "future", "latest",
+    ]);
+
+    const words = normalized
+        .split(/\s+/)
+        .filter((word) => word.length > 1 && !anchorStopWords.has(word));
+
+    const suffixPatterns = [
+        "case study",
+        "workflow",
+        "playbook",
+        "strategy",
+        "guide",
+        "checklist",
+        "roadmap",
+        "platform",
+    ];
+
+    for (const suffix of suffixPatterns) {
+        const suffixTokens = suffix.split(" ");
+        if (!normalized.includes(suffix)) {
+            continue;
+        }
+
+        const coreWords = words.filter((word) => !suffixTokens.includes(word));
+        if (coreWords.length === 0) {
+            break;
+        }
+
+        return [...coreWords.slice(0, Math.max(1, 4 - suffixTokens.length)), ...suffixTokens]
+            .slice(0, 4)
+            .join(" ");
+    }
+
+    return words.slice(0, 4).join(" ") || normalized.slice(0, 30);
+}
+
 async function validateBlogHrefs(candidates: LinkCandidate[]): Promise<LinkCandidate[]> {
     const results = await Promise.allSettled(
         candidates.map(async (candidate) => {
@@ -376,6 +433,42 @@ function getWebsiteCategoryWeight(category?: BlogStudioSitePriorityPageCategory)
     }
 }
 
+function buildWebsiteCandidateAnchor(
+    pathname: string,
+    category: BlogStudioSitePriorityPageCategory | undefined,
+    title: string,
+    description = "",
+) {
+    const humanLabel = humanizePathSegment(pathname).toLowerCase();
+    const combined = `${title} ${description}`.toLowerCase();
+
+    switch (category) {
+        case "service":
+            if (/\b(platform|workflow|software|tool|system)\b/.test(combined)) {
+                return /\b(platform|workflow|software|tool|system)\b/.test(humanLabel)
+                    ? humanLabel
+                    : `${humanLabel} platform`;
+            }
+            return /\bservice|services\b/.test(humanLabel) ? humanLabel : `${humanLabel} services`;
+        case "solution":
+            return /\b(solution|platform|workflow|software|tool|system)\b/.test(humanLabel)
+                ? humanLabel
+                : `${humanLabel} solution`;
+        case "pricing":
+            return /\b(pricing|plans?|cost|quote)\b/.test(humanLabel) ? humanLabel : `${humanLabel} pricing`;
+        case "case-study":
+            return /\b(case study|results|success story)\b/.test(humanLabel) ? humanLabel : `${humanLabel} case study`;
+        case "home":
+            return "our services";
+        case "about":
+            return "about our team";
+        case "contact":
+            return "contact our team";
+        default:
+            return toPreferredAnchor(title || humanLabel);
+    }
+}
+
 function buildWebsitePriorityPageCandidates(siteUrl: string, pages: BlogStudioSitePriorityPage[]) {
     return pages.map((page, index) => {
         const pathname = page.path.trim() || "/";
@@ -405,7 +498,7 @@ function buildWebsitePriorityPageCandidates(siteUrl: string, pages: BlogStudioSi
             href: buildAbsoluteSiteHref(siteUrl, page.url || pathname),
             source,
             description: description || `${title} ${categoryLabel} page discovered on the target website.`,
-            suggestedAnchor: toNaturalAnchor(title),
+            suggestedAnchor: buildWebsiteCandidateAnchor(pathname, page.pageCategory, title, description),
             keywords,
             websiteCategory: page.pageCategory,
             priorityScore: page.pageScore,
@@ -433,7 +526,7 @@ function buildWebsitePathCandidates(siteUrl: string, paths: string[]) {
                     pathname === "/"
                         ? `Homepage for ${hostname}.`
                         : `${humanLabel} ${categoryLabel} page discovered on the target website.`,
-                suggestedAnchor: pathname === "/" ? hostname : humanLabel.toLowerCase(),
+                suggestedAnchor: buildWebsiteCandidateAnchor(pathname, websiteCategory, humanLabel, categoryLabel),
                 keywords: [humanLabel, pathname.replace(/[\/-]+/g, " "), hostname],
                 websiteCategory,
             } satisfies LinkCandidate;
@@ -629,6 +722,18 @@ function scoreCandidate(post: BlogStudioPost, candidate: LinkCandidate) {
         score += 2;
     }
 
+    if (post.brief?.sourceMode === "website" && candidate.source === "service") {
+        score += 5;
+    }
+
+    if (post.brief?.sourceMode === "website" && candidate.websiteCategory === "case-study") {
+        score += 3;
+    }
+
+    if (post.target.type === "webhook" && candidate.source === "blog" && !clusterAligned) {
+        score -= 3;
+    }
+
     if (relationType === "cluster-parent") {
         score += 18;
     } else if (relationType === "pillar-parent") {
@@ -711,7 +816,7 @@ async function getPublishedBlogCandidates(siteUrl?: string) {
             href: buildPublishedBlogHref(siteUrl, blog.slug),
             source: "blog" as const,
             description: blog.shortDescription || `${blog.category || "Blog"} article on the blog archive.`,
-            suggestedAnchor: toNaturalAnchor(blog.title),
+            suggestedAnchor: toPreferredAnchor(blog.title),
             keywords: [
                 blog.title,
                 blog.category,
@@ -753,7 +858,7 @@ async function getPublishedAIBloggerCandidates(post: BlogStudioPost, siteUrl?: s
             ),
             source: "blog" as const,
             description: candidatePost.excerpt || "Published AI Blogger article on the blog archive.",
-            suggestedAnchor: toNaturalAnchor(candidatePost.title),
+            suggestedAnchor: toPreferredAnchor(candidatePost.title),
             keywords: [
                 candidatePost.title,
                 candidatePost.excerpt,
@@ -1116,7 +1221,11 @@ export async function getBlogStudioInternalLinkSuggestions(
             return left.candidate.title.localeCompare(right.candidate.title);
         });
 
-    const selectedCandidates = selectSuggestionMix(ranked, limit);
+    const rankingPool = ranked.filter((entry) => !isLowValueWebsiteCategory(entry.candidate.websiteCategory)).length >= Math.max(3, Math.min(limit, 4))
+        ? ranked.filter((entry) => !isLowValueWebsiteCategory(entry.candidate.websiteCategory))
+        : ranked;
+
+    const selectedCandidates = selectSuggestionMix(rankingPool, limit);
     const suggestions = dedupeSuggestions(
         selectedCandidates.map(({ candidate, score, matchReason, relationType, clusterAligned, suggestedSectionHeading }) =>
             toStructuredInternalLinkSuggestion(

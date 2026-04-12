@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 import dbConnect from "@/lib/marketing-db";
+import { stripStandaloneFaqSection } from "@/lib/marketing-blog-content";
 import { normalizeMarketingCanonicalUrl, normalizeMarketingImageSrc } from "@/lib/marketing-blog-utils";
 import { decryptApiKey } from "@/lib/mongodb";
 import Blog from "@/models/marketing/Blog";
@@ -356,6 +357,10 @@ export async function POST(request: NextRequest) {
         const normalizedSourcePostId = hasNonEmptyString(payload.blog.id)
             ? payload.blog.id.trim()
             : "";
+        const normalizedContent =
+            normalizedFaqItems.length > 0
+                ? stripStandaloneFaqSection(payload.blog.content)
+                : payload.blog.content;
 
         const existingBlog =
             (normalizedSourcePostId
@@ -369,7 +374,7 @@ export async function POST(request: NextRequest) {
             sourcePostId: normalizedSourcePostId || undefined,
             title: payload.blog.title,
             slug: payload.blog.slug,
-            content: payload.blog.content,
+            content: normalizedContent,
             image: normalizedImage,
             imageAlt: payload.blog.imageAlt || payload.blog.title,
             shortDescription: payload.blog.excerpt,

@@ -2,6 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { sendWebhookToAgency, type WebhookPayload } from "../lib/ai-blogger-webhook";
+import {
+    contentHasStandaloneFaqSection,
+    stripStandaloneFaqSection,
+} from "../lib/marketing-blog-content";
 import type { BlogStudioWebhookConfig } from "../lib/types-ai-blogger";
 
 const webhookConfig: BlogStudioWebhookConfig = {
@@ -138,4 +142,50 @@ test("sendWebhookToAgency retries request timeouts", async () => {
             globalThis.fetch = originalFetch;
         }
     });
+});
+
+test("stripStandaloneFaqSection removes markdown FAQ blocks but preserves later sections", () => {
+    const content = [
+        "## Overview",
+        "A short introduction.",
+        "",
+        "## FAQ",
+        "### What does this do?",
+        "It answers common questions.",
+        "",
+        "## Sources",
+        "1. Example source",
+    ].join("\n");
+
+    const stripped = stripStandaloneFaqSection(content);
+
+    assert.equal(contentHasStandaloneFaqSection(content), true);
+    assert.match(stripped, /## Overview/);
+    assert.doesNotMatch(stripped, /## FAQ/i);
+    assert.match(stripped, /## Sources/);
+});
+
+test("stripStandaloneFaqSection removes html FAQ blocks but keeps trailing sources", () => {
+    const content = [
+        "<h2>Overview</h2>",
+        "<p>A short introduction.</p>",
+        "<h2>Frequently Asked Questions</h2>",
+        "<p>What does this do?</p>",
+        "<h2>Sources</h2>",
+        "<p>Example source</p>",
+    ].join("");
+
+    const stripped = stripStandaloneFaqSection(content);
+
+    assert.equal(contentHasStandaloneFaqSection(content), true);
+    assert.match(stripped, /<h2>Overview<\/h2>/i);
+    assert.doesNotMatch(stripped, /Frequently Asked Questions/i);
+    assert.match(stripped, /<h2>Sources<\/h2>/i);
+});
+
+test("stripStandaloneFaqSection leaves content unchanged when no faq block exists", () => {
+    const content = "## Overview\nA short introduction.\n\n## Sources\n1. Example source";
+
+    assert.equal(contentHasStandaloneFaqSection(content), false);
+    assert.equal(stripStandaloneFaqSection(content), content);
 });

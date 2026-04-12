@@ -109,6 +109,57 @@ function extractHeadings(content?: string) {
     return headings;
 }
 
+function tokenizeComparableText(value?: string) {
+    return normalizeComparableText(value)
+        .split(/\s+/)
+        .filter((token) => token.length > 2);
+}
+
+function headingsLikelyMatch(plannedHeading: string, actualHeading: string) {
+    const planned = normalizeComparableText(plannedHeading);
+    const actual = normalizeComparableText(actualHeading);
+
+    if (!planned || !actual) {
+        return false;
+    }
+
+    if (planned === actual || planned.includes(actual) || actual.includes(planned)) {
+        return true;
+    }
+
+    const plannedTokens = tokenizeComparableText(plannedHeading);
+    const actualTokens = new Set(tokenizeComparableText(actualHeading));
+    const sharedCount = plannedTokens.filter((token) => actualTokens.has(token)).length;
+
+    return plannedTokens.length >= 3 && sharedCount >= Math.ceil(plannedTokens.length * 0.7);
+}
+
+function getOutlineCoverage(
+    plannedOutline: string[],
+    headings: Array<{ level: number; text: string }>,
+) {
+    const planned = plannedOutline
+        .map((heading) => heading?.trim())
+        .filter(Boolean) as string[];
+    const actualHeadings = headings
+        .map((heading) => heading.text?.trim())
+        .filter(Boolean) as string[];
+
+    if (planned.length === 0) {
+        return {
+            plannedCount: 0,
+            matchedCount: 0,
+        };
+    }
+
+    return {
+        plannedCount: planned.length,
+        matchedCount: planned.filter((heading) =>
+            actualHeadings.some((candidate) => headingsLikelyMatch(heading, candidate)),
+        ).length,
+    };
+}
+
 function extractContentSections(content?: string) {
     const normalized = normalizeText(content);
     if (!normalized) {
@@ -299,6 +350,44 @@ function countHighRiskClaimSignals(content: string) {
     return patterns.reduce((count, pattern) => count + (content.match(pattern)?.length || 0), 0);
 }
 
+function extractCitationMarkers(content?: string) {
+    if (!content) {
+        return [] as number[];
+    }
+
+    return Array.from(
+        new Set(
+            Array.from(content.matchAll(/\[(\d+)\]/g), (match) => Number(match[1]))
+                .filter((value) => Number.isInteger(value) && value > 0),
+        ),
+    );
+}
+
+function hasSourcesSection(content?: string) {
+    if (!content) {
+        return false;
+    }
+
+    return /^\s{0,3}#{2,6}\s+(sources|references|citations)\s*$/im.test(content)
+        || /<h[2-6][^>]*>\s*(sources|references|citations)\s*<\/h[2-6]>/i.test(content);
+}
+
+function getSecondaryKeywordCoverage(content: string, secondaryKeywords: string[]) {
+    const normalizedContent = normalizeComparableText(content);
+    const reviewKeywords = Array.from(
+        new Set(
+            secondaryKeywords
+                .map((keyword) => normalizeComparableText(keyword))
+                .filter((keyword) => keyword.length >= 4),
+        ),
+    ).slice(0, 6);
+
+    return {
+        reviewedCount: reviewKeywords.length,
+        matchedCount: reviewKeywords.filter((keyword) => normalizedContent.includes(keyword)).length,
+    };
+}
+
 function includesKeyword(text: string, keyword: string) {
     if (!text || !keyword) {
         return false;
@@ -432,12 +521,24 @@ function buildSuggestions(
         suggestions.push("Expand the body structure so the draft covers the planned sections with clearer H2 headings.");
     }
 
+    if (failed.has("outline-fidelity")) {
+        suggestions.push("Bring more of the planned outline headings into the body so the draft matches the promised structure.");
+    }
+
     if (failed.has("heading-depth")) {
         suggestions.push("Add at least one supporting subheading so longer sections are broken into clearer topic layers.");
     }
 
     if (failed.has("concrete-specifics")) {
         suggestions.push("Replace generic advice with examples, scenarios, timeframes, or grounded proof points across the main sections.");
+    }
+
+    if (failed.has("secondary-keyword-coverage")) {
+        suggestions.push("Work the strongest secondary keywords into headings, body copy, or FAQs where they fit naturally.");
+    }
+
+    if (failed.has("citation-traceability")) {
+        suggestions.push("When you use inline [1], [2] citations, add a short Sources or References section so the support is visible to editors and readers.");
     }
 
     if (failed.has("excerpt")) {
@@ -506,7 +607,10 @@ export function getBlogStudioSeoAudit(
     const headings = extractHeadings(content);
     const sectionHeadingCount = headings.length;
     const subheadingCount = headings.filter((heading) => heading.level >= 3).length;
+    const outlineCoverage = getOutlineCoverage(post.outline || [], headings);
     const concreteSpecificsCoverage = getConcreteSpecificsCoverage(content);
+    const plannedSecondaryKeywords = post.generationDiagnostics?.keywordPlan?.secondaryKeywords || [];
+    const secondaryKeywordCoverage = getSecondaryKeywordCoverage(content, plannedSecondaryKeywords);
     const minimumSectionCount = content
         ? Math.max(
             wordCount >= 1800 ? 4 : wordCount >= 1000 ? 3 : wordCount >= 600 ? 2 : 1,
@@ -516,6 +620,12 @@ export function getBlogStudioSeoAudit(
         )
         : 0;
     const sectionCoverageAligned = content ? sectionHeadingCount >= minimumSectionCount : false;
+    const minimumOutlineMatches = outlineCoverage.plannedCount > 0
+        ? Math.max(1, Math.min(outlineCoverage.plannedCount, Math.ceil(outlineCoverage.plannedCount * 0.7)))
+        : 0;
+    const outlineFidelityAligned = outlineCoverage.plannedCount === 0
+        ? true
+        : outlineCoverage.matchedCount >= minimumOutlineMatches;
     const requiresHeadingDepth = wordCount >= 1400 || post.outline.length >= 6;
     const headingDepthAligned = content
         ? requiresHeadingDepth
@@ -525,6 +635,16 @@ export function getBlogStudioSeoAudit(
     const concreteSpecificsAligned = content
         ? concreteSpecificsCoverage.specificSections >= Math.max(1, Math.ceil(concreteSpecificsCoverage.sectionCount * 0.5))
         : false;
+    const minimumSecondaryKeywordMatches = secondaryKeywordCoverage.reviewedCount >= 5
+        ? 3
+        : secondaryKeywordCoverage.reviewedCount >= 3
+            ? 2
+            : secondaryKeywordCoverage.reviewedCount >= 1
+                ? 1
+                : 0;
+    const secondaryKeywordCoverageAligned = secondaryKeywordCoverage.reviewedCount === 0
+        ? true
+        : secondaryKeywordCoverage.matchedCount >= minimumSecondaryKeywordMatches;
     const titleLengthAligned = title.length >= 35 && title.length <= 70;
     const titleWordCount = countMeaningfulWords(title);
     const titleQualityAligned =
@@ -570,14 +690,25 @@ export function getBlogStudioSeoAudit(
     const highTrustGroundedSources = groundedSources.filter((source) => source.trustLevel === "high").length;
     const claimSignalCount = countClaimSignals(content);
     const highRiskClaimSignalCount = countHighRiskClaimSignals(content);
+    const citationMarkers = extractCitationMarkers(content);
+    const citationsAreResolvable = citationMarkers.every(
+        (marker) => marker >= 1 && marker <= groundedSources.length,
+    );
+    const sourcesSectionPresent = hasSourcesSection(content);
     const claimsNeedSupport = aiReviewPolicy.enableFinalChecker && aiReviewPolicy.requireGroundedSourcesForClaims && claimSignalCount > 0;
-    const claimsSupported = !claimsNeedSupport || groundedSources.length > 0;
+    const claimsSupported = !claimsNeedSupport
+        || (
+            groundedSources.length > 0
+            && citationMarkers.length > 0
+            && citationsAreResolvable
+        );
     const claimsSeverity =
         highRiskClaimSignalCount > 0 && aiReviewPolicy.requireHumanReviewForHighRiskClaims
             ? "required"
             : aiReviewPolicy.softenQuestionableClaims
                 ? "recommended"
                 : "required";
+    const citationTraceabilityAligned = citationMarkers.length === 0 || sourcesSectionPresent;
     const matchedBannedTerms = getMatchedBannedTerms(content, settings.brandVoice.bannedTerms || []);
     const toneMismatchDetected = aiReviewPolicy.enableFinalChecker && matchedBannedTerms.length > 0;
     const toneSeverity = aiReviewPolicy.autoFixToneMismatch ? "recommended" : "required";
@@ -688,6 +819,15 @@ export function getBlogStudioSeoAudit(
             detail: `Detected ${sectionHeadingCount} section heading${sectionHeadingCount === 1 ? "" : "s"} against a target of at least ${minimumSectionCount || 1}.`,
         },
         {
+            key: "outline-fidelity",
+            label: "Planned outline reflected in body",
+            passed: outlineFidelityAligned,
+            severity: "recommended",
+            detail: outlineCoverage.plannedCount > 0
+                ? `Matched ${outlineCoverage.matchedCount} of ${outlineCoverage.plannedCount} planned outline heading${outlineCoverage.plannedCount === 1 ? "" : "s"} in the body.`
+                : "No stored outline was available to compare against the body headings.",
+        },
+        {
             key: "heading-depth",
             label: "Heading depth aligned",
             passed: headingsPresent && headingDepthAligned,
@@ -702,6 +842,15 @@ export function getBlogStudioSeoAudit(
             passed: concreteSpecificsAligned,
             severity: "recommended",
             detail: `Detected specificity signals in ${concreteSpecificsCoverage.specificSections} of ${Math.max(concreteSpecificsCoverage.sectionCount, 1)} reviewed section${Math.max(concreteSpecificsCoverage.sectionCount, 1) === 1 ? "" : "s"}. Add examples, scenarios, timeframes, or grounded details to more sections if the draft feels generic.`,
+        },
+        {
+            key: "secondary-keyword-coverage",
+            label: "Secondary keyword coverage aligned",
+            passed: secondaryKeywordCoverageAligned,
+            severity: "recommended",
+            detail: secondaryKeywordCoverage.reviewedCount > 0
+                ? `Matched ${secondaryKeywordCoverage.matchedCount} of ${secondaryKeywordCoverage.reviewedCount} stored secondary keyword phrase${secondaryKeywordCoverage.reviewedCount === 1 ? "" : "s"} in the draft body.`
+                : "No stored secondary keyword plan was available for this draft.",
         },
         {
             key: "featured-image-alt",
@@ -766,9 +915,24 @@ export function getBlogStudioSeoAudit(
             severity: claimsNeedSupport ? claimsSeverity : "recommended",
             detail: claimsNeedSupport
                 ? groundedSources.length > 0
-                    ? `Grounded sources available (${groundedSources.length} total, ${highTrustGroundedSources} high-trust) for ${claimSignalCount} detected claim signal${claimSignalCount === 1 ? "" : "s"}.`
+                    ? citationMarkers.length > 0
+                        ? citationsAreResolvable
+                            ? `Grounded sources available (${groundedSources.length} total, ${highTrustGroundedSources} high-trust) for ${claimSignalCount} detected claim signal${claimSignalCount === 1 ? "" : "s"}. Inline citations reference stored sources.`
+                            : `Grounded sources are stored, but some inline citation markers do not map to the available source list (${groundedSources.length} source${groundedSources.length === 1 ? "" : "s"}).`
+                        : `Grounded sources available (${groundedSources.length} total, ${highTrustGroundedSources} high-trust), but no inline [1], [2] citations were found for ${claimSignalCount} detected claim signal${claimSignalCount === 1 ? "" : "s"}.`
                     : `Detected ${claimSignalCount} factual claim signal${claimSignalCount === 1 ? "" : "s"} but no grounded sources are stored for support.`
                 : "No extra claim-support review was triggered for this draft.",
+        },
+        {
+            key: "citation-traceability",
+            label: "Citations are traceable",
+            passed: citationTraceabilityAligned,
+            severity: "recommended",
+            detail: citationMarkers.length > 0
+                ? sourcesSectionPresent
+                    ? `Inline citations [${citationMarkers.join(", ")}] are paired with a Sources or References section.`
+                    : `Inline citations [${citationMarkers.join(", ")}] are present, but the draft does not include a Sources or References section.`
+                : "No inline citation markers were detected in the draft.",
         },
         {
             key: "tone-alignment",
