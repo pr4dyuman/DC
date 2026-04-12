@@ -111,6 +111,15 @@ export default async function AIBloggerPostDetailPage({
         notFound();
     }
 
+    const postCrawlSiteUrl = post.brief.sourceMode === "website"
+        ? post.brief.sourceValue
+        : post.brief.targetWebsiteUrl;
+    const configuredSiteUrl =
+        aiBloggerConfig?.entityModeling?.organizationUrl ||
+        aiBloggerConfig?.author?.url ||
+        postCrawlSiteUrl ||
+        "";
+
     /* ── Parallel data fetches ────────────────────────────────── */
 
     const serpQuery = post.brief.primaryKeyword || post.title;
@@ -124,16 +133,21 @@ export default async function AIBloggerPostDetailPage({
         relatedClusterPosts,
     ] = await Promise.all([
         getBlogStudioInternalLinkSuggestions(post, 6, {
-            siteUrl:
-                aiBloggerConfig?.entityModeling?.organizationUrl ||
-                aiBloggerConfig?.author?.url ||
-                (post.brief.sourceMode === "website" ? post.brief.sourceValue : ""),
+            siteUrl: configuredSiteUrl,
+            crawlConfig: {
+                enabled: aiBloggerConfig?.crawl?.enabled ?? true,
+                maxPages: aiBloggerConfig?.crawl?.maxPages,
+                timeoutMs: aiBloggerConfig?.crawl?.timeoutMs,
+                refreshWindowHours: aiBloggerConfig?.crawl?.refreshWindowHours,
+                allowedPaths: aiBloggerConfig?.crawl?.allowedPaths,
+                blockedPaths: aiBloggerConfig?.crawl?.blockedPaths,
+            },
         }),
         getBlogStudioPostInternalLinkHealthImpl(agency.id, post.slug),
         getBlogStudioCannibalizationReportImpl(agency.id, post),
         getBlogStudioPostPerformanceReportImpl(agency.id, post.slug),
-        post.brief.sourceMode === "website"
-            ? getAIBloggerWebsiteIntelligence(post.brief.sourceValue || "", {
+        postCrawlSiteUrl
+            ? getAIBloggerWebsiteIntelligence(postCrawlSiteUrl, {
                 agencyId: agency.id,
                 enabled: aiBloggerConfig?.crawl?.enabled ?? true,
                 maxPages: aiBloggerConfig?.crawl?.maxPages,
@@ -141,6 +155,7 @@ export default async function AIBloggerPostDetailPage({
                 refreshWindowHours: aiBloggerConfig?.crawl?.refreshWindowHours,
                 allowedPaths: aiBloggerConfig?.crawl?.allowedPaths,
                 blockedPaths: aiBloggerConfig?.crawl?.blockedPaths,
+                totalBudgetMs: 18_000,
             })
             : Promise.resolve(null),
         getAIBloggerSerpAnalysis(serpQuery, {
@@ -227,10 +242,7 @@ export default async function AIBloggerPostDetailPage({
         : internalLinkHealth?.status === "weak"
             ? "amber"
             : "destructive";
-    const blockerResolutionSiteUrl =
-        aiBloggerConfig?.entityModeling?.organizationUrl ||
-        aiBloggerConfig?.author?.url ||
-        (post.brief.sourceMode === "website" ? post.brief.sourceValue : "");
+    const blockerResolutionSiteUrl = configuredSiteUrl;
     const publishValidation = validateBlogStudioPublishPackage(
         post,
         settings,
@@ -254,10 +266,7 @@ export default async function AIBloggerPostDetailPage({
     const schemaJsonLd = buildBlogStudioArticleJsonLd(post, {
         author: aiBloggerConfig?.author,
         entityModeling: aiBloggerConfig?.entityModeling,
-        siteUrl:
-            aiBloggerConfig?.entityModeling?.organizationUrl ||
-            aiBloggerConfig?.author?.url ||
-            (post.brief.sourceMode === "website" ? post.brief.sourceValue : ""),
+        siteUrl: configuredSiteUrl,
     });
 
     const briefItems = [

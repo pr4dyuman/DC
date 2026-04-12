@@ -234,6 +234,18 @@ export type BlogStudioRunStep = {
     notes?: string;
     startedAt?: string;
     completedAt?: string;
+    input?: Record<string, unknown>;
+    process?: {
+        durationMs?: number;
+        details?: Record<string, unknown>;
+    };
+    output?: {
+        summary?: string;
+        data?: unknown;
+        metrics?: Record<string, unknown>;
+        rawText?: string;
+    };
+    errors?: string[];
 };
 
 export type BlogStudioRun = {
@@ -543,6 +555,33 @@ export type BlogStudioSchedule = {
     updatedAt: string;
 };
 
+export type BlogStudioSitePriorityPageCategory =
+    | "service"
+    | "solution"
+    | "case-study"
+    | "pricing"
+    | "industry"
+    | "blog"
+    | "faq"
+    | "about"
+    | "contact"
+    | "home"
+    | "general";
+
+export type BlogStudioSitePriorityPage = {
+    path: string;
+    url: string;
+    title: string;
+    description: string;
+    excerpt: string;
+    highlights: string[];
+    serviceSignals: string[];
+    proofSignals: string[];
+    ctaPatterns: string[];
+    pageCategory: BlogStudioSitePriorityPageCategory;
+    pageScore: number;
+};
+
 export type BlogStudioSiteSnapshot = {
     id: string;
     agencyId: string;
@@ -553,6 +592,7 @@ export type BlogStudioSiteSnapshot = {
     topicHints: string[];
     faqQuestions: string[];
     priorityPaths: string[];
+    priorityPages?: BlogStudioSitePriorityPage[];
     serviceSignals: string[];
     ctaPatterns: string[];
     proofSignals: string[];

@@ -11,6 +11,7 @@ import type {
     BlogStudioSchedule,
     BlogStudioExternalSource,
     BlogStudioSerpSnapshot,
+    BlogStudioSitePriorityPage,
     BlogStudioSiteSnapshot,
     BlogStudioSettings,
 } from "./types-ai-blogger";
@@ -46,6 +47,7 @@ const BlogStudioBriefSchema = new Schema(
             required: true,
         },
         sourceValue: { type: String },
+        targetWebsiteUrl: { type: String },
         trendFocus: { type: String },
         audience: { type: String },
         tone: { type: String },
@@ -340,6 +342,18 @@ const BlogStudioRunStepSchema = new Schema(
         notes: { type: String },
         startedAt: { type: String },
         completedAt: { type: String },
+        input: { type: Schema.Types.Mixed },
+        process: {
+            durationMs: { type: Number },
+            details: { type: Schema.Types.Mixed },
+        },
+        output: {
+            summary: { type: String },
+            data: { type: Schema.Types.Mixed },
+            metrics: { type: Schema.Types.Mixed },
+            rawText: { type: String },
+        },
+        errors: [{ type: String }],
     },
     { _id: false }
 );
@@ -513,6 +527,26 @@ const BlogStudioSiteSnapshotSchema = new Schema<BlogStudioSiteSnapshot>(
         topicHints: [{ type: String }],
         faqQuestions: [{ type: String }],
         priorityPaths: [{ type: String }],
+        priorityPages: { type: [new Schema<BlogStudioSitePriorityPage>(
+            {
+                path: { type: String, required: true },
+                url: { type: String, required: true },
+                title: { type: String, default: "" },
+                description: { type: String, default: "" },
+                excerpt: { type: String, default: "" },
+                highlights: [{ type: String }],
+                serviceSignals: [{ type: String }],
+                proofSignals: [{ type: String }],
+                ctaPatterns: [{ type: String }],
+                pageCategory: {
+                    type: String,
+                    enum: ["service", "solution", "case-study", "pricing", "industry", "blog", "faq", "about", "contact", "home", "general"],
+                    default: "general",
+                },
+                pageScore: { type: Number, default: 0 },
+            },
+            { _id: false }
+        )], default: [] },
         serviceSignals: [{ type: String }],
         ctaPatterns: [{ type: String }],
         proofSignals: [{ type: String }],
@@ -723,6 +757,7 @@ const BlogStudioWebhookDeliveryLogSchema = new Schema(
                         slug: { type: String, required: true },
                         content: { type: String, required: true },
                         excerpt: { type: String, required: true },
+                        metaKeywords: { type: String },
                         metaTitle: { type: String, required: true },
                         metaDescription: { type: String, required: true },
                         canonicalUrl: { type: String, required: true },
@@ -730,6 +765,13 @@ const BlogStudioWebhookDeliveryLogSchema = new Schema(
                         imageAlt: { type: String, required: true },
                         schemaMarkup: { type: String },
                         category: { type: String },
+                        faqItems: [
+                            {
+                                question: { type: String },
+                                answer: { type: String },
+                            },
+                        ],
+                        peopleAlsoAsk: [{ type: String }],
                         internalLinks: [
                             {
                                 href: { type: String },

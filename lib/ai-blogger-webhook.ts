@@ -60,6 +60,7 @@ export type WebhookDeliveryResult = {
     error?: string;
     timestamp: string;
     attempt: number;
+    attempts?: WebhookDeliveryResult[];
 };
 
 /**
@@ -94,6 +95,21 @@ function buildWebhookRequestHeaders(event: string, webhookSecret: string, extras
     };
 }
 
+function isRetryableStatusCode(statusCode: number): boolean {
+    return (
+        statusCode === 408 ||
+        statusCode === 409 ||
+        statusCode === 425 ||
+        statusCode === 429 ||
+        statusCode >= 500
+    );
+}
+
+function toWebhookAttempt(result: WebhookDeliveryResult): WebhookDeliveryResult {
+    const { attempts: _attempts, ...attempt } = result;
+    return attempt;
+}
+
 /**
  * Sends blog data to webhook endpoint with retry logic
  * @param webhookConfig Webhook configuration (URL, retries, timeout)
@@ -105,6 +121,7 @@ export async function sendWebhookToAgency(
     webhookConfig: BlogStudioWebhookConfig,
     payload: WebhookPayload,
     retryCount: number = 0,
+    previousAttempts: WebhookDeliveryResult[] = [],
 ): Promise<WebhookDeliveryResult> {
     const startTime = Date.now();
     const maxAttempts = webhookConfig.retryAttempts || 3;
@@ -140,17 +157,19 @@ export async function sendWebhookToAgency(
 
             // 2xx status codes are success
             if (response.ok) {
-                return {
+                const result: WebhookDeliveryResult = {
                     success: true,
                     statusCode: response.status,
                     responseTime,
                     timestamp: new Date().toISOString(),
                     attempt: retryCount + 1,
                 };
+                result.attempts = [...previousAttempts, toWebhookAttempt(result)];
+                return result;
             }
 
             // Non-2xx responses may be retryable
-            return {
+            const failedAttempt: WebhookDeliveryResult = {
                 success: false,
                 statusCode: response.status,
                 responseTime,
@@ -158,18 +177,46 @@ export async function sendWebhookToAgency(
                 timestamp: new Date().toISOString(),
                 attempt: retryCount + 1,
             };
+
+            if (retryCount < maxAttempts - 1 && isRetryableStatusCode(response.status)) {
+                const delay = getExponentialBackoffDelay(retryCount);
+                console.log(`[AI-Blogger Webhook] Retry attempt ${retryCount + 2} in ${delay}ms`, {
+                    url: webhookConfig.url,
+                    statusCode: response.status,
+                });
+
+                await new Promise((resolve) => setTimeout(resolve, delay));
+                return sendWebhookToAgency(webhookConfig, payload, retryCount + 1, [...previousAttempts, toWebhookAttempt(failedAttempt)]);
+            }
+
+            failedAttempt.attempts = [...previousAttempts, toWebhookAttempt(failedAttempt)];
+            return failedAttempt;
         } catch (fetchError) {
             clearTimeout(timeoutId);
             const responseTime = Date.now() - startTime;
 
             if (fetchError instanceof Error && fetchError.name === "AbortError") {
-                return {
+                const timeoutAttempt: WebhookDeliveryResult = {
                     success: false,
                     responseTime,
-                    error: `Request timeout after ${webhookConfig.timeout}s`,
+                    error: `Request timeout after ${timeoutMs / 1000}s`,
                     timestamp: new Date().toISOString(),
                     attempt: retryCount + 1,
                 };
+
+                if (retryCount < maxAttempts - 1) {
+                    const delay = getExponentialBackoffDelay(retryCount);
+                    console.log(`[AI-Blogger Webhook] Retry attempt ${retryCount + 2} in ${delay}ms`, {
+                        url: webhookConfig.url,
+                        error: "Request timeout",
+                    });
+
+                    await new Promise((resolve) => setTimeout(resolve, delay));
+                    return sendWebhookToAgency(webhookConfig, payload, retryCount + 1, [...previousAttempts, toWebhookAttempt(timeoutAttempt)]);
+                }
+
+                timeoutAttempt.attempts = [...previousAttempts, toWebhookAttempt(timeoutAttempt)];
+                return timeoutAttempt;
             }
 
             throw fetchError;
@@ -195,9 +242,10 @@ export async function sendWebhookToAgency(
             });
 
             await new Promise((resolve) => setTimeout(resolve, delay));
-            return sendWebhookToAgency(webhookConfig, payload, retryCount + 1);
+            return sendWebhookToAgency(webhookConfig, payload, retryCount + 1, [...previousAttempts, toWebhookAttempt(result)]);
         }
 
+        result.attempts = [...previousAttempts, toWebhookAttempt(result)];
         return result;
     }
 }
@@ -412,7 +460,7 @@ export async function logWebhookDelivery(
             postSlug,
             event: payload.event,
             finalStatus,
-            totalAttempts: results.length,
+            totalAttempts: Math.max(...results.map((result) => result.attempt)),
             totalResponseTime: results.reduce((sum, r) => sum + r.responseTime, 0),
         });
     } catch (logError) {

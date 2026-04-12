@@ -1,7 +1,11 @@
 import "server-only";
 
 import { BlogStudioSiteSnapshotModel, connectDB } from "./mongodb";
-import type { BlogStudioSiteSnapshot } from "./types-ai-blogger";
+import type {
+    BlogStudioSitePriorityPage,
+    BlogStudioSitePriorityPageCategory,
+    BlogStudioSiteSnapshot,
+} from "./types-ai-blogger";
 import {
     cleanText,
 } from "./ai-blogger-text-utils";
@@ -14,9 +18,11 @@ type CrawledPage = {
     faqQuestions: string[];
     internalLinks: string[];
     excerpt: string;
+    contentHighlights: string[];
     serviceSignals: string[];
     ctaPatterns: string[];
     proofSignals: string[];
+    pageScore: number;
 };
 
 export type AIBloggerWebsiteIntelligence = {
@@ -27,6 +33,7 @@ export type AIBloggerWebsiteIntelligence = {
     topicHints: string[];
     faqQuestions: string[];
     priorityPaths: string[];
+    priorityPages: BlogStudioSitePriorityPage[];
     serviceSignals: string[];
     ctaPatterns: string[];
     proofSignals: string[];
@@ -37,7 +44,15 @@ export type AIBloggerWebsiteIntelligence = {
 
 const DEFAULT_MAX_PAGES = 8;
 const DEFAULT_TIMEOUT_MS = 8000;
-const DEFAULT_REFRESH_WINDOW_HOURS = 6;  // Re-crawl if cache is older than 6h (was 24h)
+export const DEFAULT_REFRESH_WINDOW_HOURS = 6;  // Re-crawl if cache is older than 6h (was 24h)
+const DEFAULT_TOTAL_CRAWL_BUDGET_MS = 30_000;
+const MIN_TOTAL_CRAWL_BUDGET_MS = 10_000;
+const MAX_TOTAL_CRAWL_BUDGET_MS = 75_000;
+const DEFAULT_CRAWL_CONCURRENCY = 3;
+const MAX_CRAWL_CONCURRENCY = 4;
+const MIN_TIME_SLICE_MS = 1200;
+const REQUEST_BUFFER_MS = 750;
+const RETRY_DELAY_MS = 750;
 const MAX_INTERNAL_LINKS_PER_PAGE = 40;
 const MAX_SITEMAP_URLS = 100;
 const MAX_NESTED_SITEMAPS = 4;
@@ -60,6 +75,23 @@ const PRIORITY_SEGMENTS = [
     "pricing",
     "faq",
 ];
+const AUTO_BLOCKED_SEGMENTS = [
+    "privacy",
+    "terms",
+    "term",
+    "cookie",
+    "cookies",
+    "author",
+    "feed",
+    "wp-admin",
+    "wp-login",
+    "login",
+    "signin",
+    "sign-in",
+    "checkout",
+    "cart",
+    "cdn-cgi",
+];
 
 function uniqueStrings(values: string[], maxItems: number, maxLength: number) {
     return Array.from(
@@ -69,6 +101,95 @@ function uniqueStrings(values: string[], maxItems: number, maxLength: number) {
                 .filter(Boolean),
         ),
     ).slice(0, maxItems);
+}
+
+function fallbackPageTitle(pathname: string) {
+    if (!pathname || pathname === "/") {
+        return "Home";
+    }
+
+    const segments = pathname
+        .replace(/^\/+|\/+$/g, "")
+        .split("/")
+        .filter(Boolean);
+
+    if (segments.length === 0) {
+        return "Home";
+    }
+
+    return segments[segments.length - 1]
+        .replace(/[-_]+/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function containsAnyKeyword(values: string[], keywords: string[]) {
+    const haystack = ` ${values
+        .filter(Boolean)
+        .join(" ")
+        .replace(/[^a-z0-9]+/gi, " ")
+        .toLowerCase()} `;
+
+    return keywords.some((keyword) =>
+        haystack.includes(` ${keyword.toLowerCase().replace(/[^a-z0-9]+/g, " ")} `),
+    );
+}
+
+function classifyPriorityPageCategory(page: CrawledPage): BlogStudioSitePriorityPageCategory {
+    const pathname = new URL(page.url).pathname.toLowerCase() || "/";
+    const signals = [
+        pathname,
+        page.title,
+        page.description,
+        page.excerpt,
+        ...page.serviceSignals,
+        ...page.ctaPatterns,
+        ...page.proofSignals,
+    ];
+
+    if (pathname === "/") {
+        return "home";
+    }
+
+    if (containsAnyKeyword(signals, ["pricing", "plan", "plans", "package", "packages", "cost", "costs", "quote"])) {
+        return "pricing";
+    }
+
+    if (containsAnyKeyword(signals, ["case-study", "case studies", "customer story", "customer stories", "success story", "success stories", "portfolio", "results", "our work"])) {
+        return "case-study";
+    }
+
+    if (containsAnyKeyword(signals, ["industry", "industries", "sector", "sectors", "vertical", "verticals"])) {
+        return "industry";
+    }
+
+    if (containsAnyKeyword(signals, ["blog", "blogs", "article", "articles", "news", "resource", "resources", "insights"])) {
+        return "blog";
+    }
+
+    if (containsAnyKeyword(signals, ["faq", "faqs", "frequently asked", "questions", "help center"])) {
+        return "faq";
+    }
+
+    if (containsAnyKeyword(signals, ["about", "company", "team", "who we are"])) {
+        return "about";
+    }
+
+    if (containsAnyKeyword(signals, ["contact", "book a call", "schedule a call", "request a demo", "request a quote", "get in touch"])) {
+        return "contact";
+    }
+
+    if (containsAnyKeyword(signals, ["solution", "solutions", "platform", "workflow"])) {
+        return "solution";
+    }
+
+    if (
+        page.serviceSignals.length > 0
+        || containsAnyKeyword(signals, ["service", "services", "offering", "offerings", "consulting", "implementation"])
+    ) {
+        return "service";
+    }
+
+    return "general";
 }
 
 export function normalizeUrl(rawUrl: string) {
@@ -88,6 +209,7 @@ export function normalizeUrl(rawUrl: string) {
         }
 
         url.hash = "";
+        url.search = "";
 
         if (url.pathname !== "/" && url.pathname.endsWith("/")) {
             url.pathname = url.pathname.slice(0, -1);
@@ -255,6 +377,7 @@ function resolveInternalLink(rawHref: string, baseUrl: URL) {
             return null;
         }
 
+        nextUrl.search = "";
         nextUrl.hash = "";
 
         if (nextUrl.pathname !== "/" && nextUrl.pathname.endsWith("/")) {
@@ -293,10 +416,50 @@ function matchesPathRule(pathname: string, rules: string[]) {
     });
 }
 
+function getPathSegments(pathname: string) {
+    return pathname
+        .split("/")
+        .filter(Boolean)
+        .map((segment) => segment.toLowerCase());
+}
+
+function isAutoBlockedPath(pathname: string) {
+    const segments = getPathSegments(pathname);
+    return segments.some((segment) => AUTO_BLOCKED_SEGMENTS.includes(segment));
+}
+
+function getRemainingBudgetMs(deadlineMs: number) {
+    return deadlineMs - Date.now();
+}
+
+function hasBudgetRemaining(deadlineMs: number, minimumMs = MIN_TIME_SLICE_MS) {
+    return getRemainingBudgetMs(deadlineMs) > minimumMs;
+}
+
+function getEffectiveRequestTimeout(timeoutMs: number, deadlineMs: number) {
+    const remainingMs = getRemainingBudgetMs(deadlineMs) - REQUEST_BUFFER_MS;
+
+    if (remainingMs < MIN_TIME_SLICE_MS) {
+        return 0;
+    }
+
+    return Math.min(timeoutMs, remainingMs);
+}
+
+function wait(ms: number) {
+    return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
 function scoreInternalLink(link: string) {
     const url = new URL(link);
     const pathname = url.pathname.toLowerCase();
-    let score = pathname === "/" ? 1 : 2;
+    const segments = getPathSegments(pathname);
+
+    if (isAutoBlockedPath(pathname)) {
+        return -50;
+    }
+
+    let score = pathname === "/" ? 18 : 4;
 
     for (const segment of PRIORITY_SEGMENTS) {
         if (pathname.includes(segment)) {
@@ -304,7 +467,15 @@ function scoreInternalLink(link: string) {
         }
     }
 
-    score -= pathname.split("/").filter(Boolean).length;
+    if (pathname.includes("/blog/")) {
+        score += 2;
+    }
+
+    if (segments.some((segment) => /^\d{4}$/.test(segment) || segment.length > 48)) {
+        score -= 3;
+    }
+
+    score -= Math.max(0, segments.length - 1);
 
     return score;
 }
@@ -362,10 +533,20 @@ function isAllowedCrawlPath(pathname: string, allowedPaths: string[], blockedPat
         return false;
     }
 
+    if (allowedPaths.length === 0 && isAutoBlockedPath(pathname)) {
+        return false;
+    }
+
     return true;
 }
 
-async function fetchTextResource(url: URL, timeoutMs: number, accept: string) {
+async function fetchTextResource(url: URL, timeoutMs: number, accept: string, deadlineMs: number) {
+    const effectiveTimeoutMs = getEffectiveRequestTimeout(timeoutMs, deadlineMs);
+
+    if (effectiveTimeoutMs <= 0) {
+        return "";
+    }
+
     try {
         const response = await fetch(url.toString(), {
             headers: {
@@ -374,7 +555,7 @@ async function fetchTextResource(url: URL, timeoutMs: number, accept: string) {
             },
             redirect: "follow",
             cache: "no-store",
-            signal: AbortSignal.timeout(timeoutMs),
+            signal: AbortSignal.timeout(effectiveTimeoutMs),
         });
 
         if (!response.ok) {
@@ -391,15 +572,25 @@ async function fetchSitemapLinksFromUrl(
     sitemapUrl: URL,
     baseUrl: URL,
     timeoutMs: number,
+    deadlineMs: number,
     seenSitemaps: Set<string>,
     depth = 0,
 ): Promise<string[]> {
-    if (depth > MAX_NESTED_SITEMAPS || seenSitemaps.has(sitemapUrl.toString())) {
+    if (
+        depth > MAX_NESTED_SITEMAPS
+        || seenSitemaps.has(sitemapUrl.toString())
+        || !hasBudgetRemaining(deadlineMs)
+    ) {
         return [];
     }
 
     seenSitemaps.add(sitemapUrl.toString());
-    const xml = await fetchTextResource(sitemapUrl, timeoutMs, "application/xml,text/xml,text/plain,*/*");
+    const xml = await fetchTextResource(
+        sitemapUrl,
+        timeoutMs,
+        "application/xml,text/xml,text/plain,*/*",
+        deadlineMs,
+    );
 
     if (!xml) {
         return [];
@@ -427,6 +618,7 @@ async function fetchSitemapLinksFromUrl(
                         nestedUrl,
                         baseUrl,
                         timeoutMs,
+                        deadlineMs,
                         seenSitemaps,
                         depth + 1,
                     )),
@@ -452,7 +644,11 @@ async function fetchSitemapLinksFromUrl(
     ).slice(0, MAX_SITEMAP_URLS);
 }
 
-async function getSitemapCandidates(baseUrl: URL, timeoutMs: number) {
+async function getSitemapCandidates(baseUrl: URL, timeoutMs: number, deadlineMs: number) {
+    if (!hasBudgetRemaining(deadlineMs)) {
+        return [];
+    }
+
     // Start with common sitemap locations that various CMS platforms use.
     const sitemapCandidates = new Set<string>([
         new URL("/sitemap.xml", baseUrl).toString(),
@@ -461,7 +657,12 @@ async function getSitemapCandidates(baseUrl: URL, timeoutMs: number) {
     ]);
 
     // Try to discover more from robots.txt
-    const robotsTxt = await fetchTextResource(new URL("/robots.txt", baseUrl), timeoutMs, "text/plain,*/*");
+    const robotsTxt = await fetchTextResource(
+        new URL("/robots.txt", baseUrl),
+        timeoutMs,
+        "text/plain,*/*",
+        deadlineMs,
+    );
 
     if (robotsTxt) {
         parseRobotsTxtSitemaps(robotsTxt).forEach((rawSitemapUrl) => {
@@ -492,6 +693,7 @@ async function getSitemapCandidates(baseUrl: URL, timeoutMs: number) {
                     new URL(sitemapCandidate),
                     baseUrl,
                     timeoutMs,
+                    deadlineMs,
                     seenSitemaps,
                 )),
             );
@@ -507,6 +709,48 @@ async function getSitemapCandidates(baseUrl: URL, timeoutMs: number) {
     return Array.from(new Set(discoveredLinks))
         .sort((left, right) => scoreInternalLink(right) - scoreInternalLink(left))
         .slice(0, MAX_SITEMAP_URLS);
+}
+
+function extractPrimaryContentHtml(html: string) {
+    const candidates = [
+        html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)?.[1],
+        html.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i)?.[1],
+        html.match(
+            /<(?:div|section)[^>]+(?:id|class|role)=["'][^"']*(?:main|content|primary|article)[^"']*["'][^>]*>([\s\S]*?)<\/(?:div|section)>/i,
+        )?.[1],
+        html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1],
+    ];
+
+    return candidates.find(Boolean) || html;
+}
+
+function stripBoilerplateHtml(html: string) {
+    return html
+        .replace(/<!--[\s\S]*?-->/g, " ")
+        .replace(/<(?:script|style|noscript|svg)[^>]*>[\s\S]*?<\/(?:script|style|noscript|svg)>/gi, " ")
+        .replace(/<(?:nav|footer|header|aside|form)[^>]*>[\s\S]*?<\/(?:nav|footer|header|aside|form)>/gi, " ")
+        .replace(
+            /<(?:div|section)[^>]+(?:id|class)=["'][^"']*(?:cookie|newsletter|subscribe|social|share|breadcrumb|modal|popup|banner)[^"']*["'][^>]*>[\s\S]*?<\/(?:div|section)>/gi,
+            " ",
+        );
+}
+
+function extractContentHighlights(html: string) {
+    const contentHtml = stripBoilerplateHtml(extractPrimaryContentHtml(html));
+    const candidates = [
+        ...Array.from(
+            contentHtml.matchAll(/<(?:p|li|blockquote)[^>]*>([\s\S]*?)<\/(?:p|li|blockquote)>/gi),
+            (match) => match[1],
+        ),
+        ...Array.from(
+            contentHtml.matchAll(/<h[2-4][^>]*>([\s\S]*?)<\/h[2-4]>/gi),
+            (match) => match[1],
+        ),
+    ]
+        .map((text) => cleanText(text, 220))
+        .filter((text) => text.length >= 35 && /[a-z]{3}/i.test(text));
+
+    return uniqueStrings(candidates, 8, 220);
 }
 
 function enqueueCrawlUrl(
@@ -534,8 +778,47 @@ function enqueueCrawlUrl(
     }
 }
 
-async function fetchPage(url: URL, timeoutMs: number): Promise<CrawledPage | null> {
+function scoreCrawledPage(page: Omit<CrawledPage, "pageScore">) {
+    let score = scoreInternalLink(page.url);
+
+    if (page.title) {
+        score += 8;
+    }
+
+    if (page.description) {
+        score += 6;
+    }
+
+    score += Math.min(page.headings.length, 4) * 2;
+    score += Math.min(page.contentHighlights.length, 4) * 2;
+    score += Math.min(page.serviceSignals.length, 3) * 4;
+    score += Math.min(page.proofSignals.length, 2) * 5;
+    score += Math.min(page.ctaPatterns.length, 2) * 3;
+    score += Math.min(page.faqQuestions.length, 2) * 2;
+
+    if (page.excerpt.length >= 120) {
+        score += 4;
+    }
+
+    return score;
+}
+
+function sortPagesByScore(pages: CrawledPage[]) {
+    return [...pages].sort(
+        (left, right) =>
+            right.pageScore - left.pageScore
+            || scoreInternalLink(right.url) - scoreInternalLink(left.url),
+    );
+}
+
+async function fetchPage(url: URL, timeoutMs: number, deadlineMs: number): Promise<CrawledPage | null> {
     for (let attempt = 0; attempt < 2; attempt++) {
+        const effectiveTimeoutMs = getEffectiveRequestTimeout(timeoutMs, deadlineMs);
+
+        if (effectiveTimeoutMs <= 0) {
+            return null;
+        }
+
         try {
             const response = await fetch(url.toString(), {
                 headers: {
@@ -544,13 +827,13 @@ async function fetchPage(url: URL, timeoutMs: number): Promise<CrawledPage | nul
                 },
                 redirect: "follow",
                 cache: "no-store",
-                signal: AbortSignal.timeout(timeoutMs),
+                signal: AbortSignal.timeout(effectiveTimeoutMs),
             });
 
             if (!response.ok) {
                 // Retry on server errors (502, 503, 504), not on client errors (404, 403)
-                if (attempt === 0 && response.status >= 500) {
-                    await new Promise((resolve) => setTimeout(resolve, 2000));
+                if (attempt === 0 && response.status >= 500 && hasBudgetRemaining(deadlineMs, RETRY_DELAY_MS + MIN_TIME_SLICE_MS)) {
+                    await wait(RETRY_DELAY_MS);
                     continue;
                 }
                 return null;
@@ -562,23 +845,29 @@ async function fetchPage(url: URL, timeoutMs: number): Promise<CrawledPage | nul
             }
 
             const html = await response.text();
-
-            return {
+            const contentHighlights = extractContentHighlights(html);
+            const pageWithoutScore: Omit<CrawledPage, "pageScore"> = {
                 url: url.toString(),
                 title: extractTitle(html),
                 description: extractDescription(html),
                 headings: extractHeadings(html),
                 faqQuestions: extractFaqQuestions(html),
                 internalLinks: extractInternalLinks(html, url),
-                excerpt: extractBodyExcerpt(html),
+                excerpt: extractBodyExcerpt(contentHighlights.join(" ") || html),
+                contentHighlights,
                 serviceSignals: extractServiceSignals(html),
                 ctaPatterns: extractCtaPatterns(html),
                 proofSignals: extractProofSignals(html),
             };
+
+            return {
+                ...pageWithoutScore,
+                pageScore: scoreCrawledPage(pageWithoutScore),
+            };
         } catch (error) {
-            if (attempt === 0) {
+            if (attempt === 0 && hasBudgetRemaining(deadlineMs, RETRY_DELAY_MS + MIN_TIME_SLICE_MS)) {
                 console.warn("[AI-BLOGGER] Retrying page fetch:", url.toString(), error instanceof Error ? error.message : error);
-                await new Promise((resolve) => setTimeout(resolve, 2000));
+                await wait(RETRY_DELAY_MS);
                 continue;
             }
             console.error("[AI-BLOGGER] Failed to fetch page:", url.toString(), error instanceof Error ? error.message : error);
@@ -591,7 +880,7 @@ async function fetchPage(url: URL, timeoutMs: number): Promise<CrawledPage | nul
 
 function buildPriorityPaths(pages: CrawledPage[]) {
     return uniqueStrings(
-        pages.map((page) => {
+        sortPagesByScore(pages).map((page) => {
             const url = new URL(page.url);
             return url.pathname || "/";
         }),
@@ -600,33 +889,93 @@ function buildPriorityPaths(pages: CrawledPage[]) {
     );
 }
 
+function buildPriorityPages(pages: CrawledPage[]): BlogStudioSitePriorityPage[] {
+    const seenPaths = new Set<string>();
+
+    return sortPagesByScore(pages)
+        .flatMap((page) => {
+            const url = new URL(page.url);
+            const path = url.pathname || "/";
+
+            if (seenPaths.has(path)) {
+                return [];
+            }
+
+            seenPaths.add(path);
+
+            return [{
+                path,
+                url: url.toString(),
+                title: page.title || fallbackPageTitle(path),
+                description: cleanText(page.description || page.contentHighlights[0] || page.excerpt, 220),
+                excerpt: cleanText(page.excerpt || page.contentHighlights.join(" "), 260),
+                highlights: uniqueStrings(page.contentHighlights, 4, 160),
+                serviceSignals: uniqueStrings(page.serviceSignals, 4, 140),
+                proofSignals: uniqueStrings(page.proofSignals, 3, 160),
+                ctaPatterns: uniqueStrings(page.ctaPatterns, 3, 140),
+                pageCategory: classifyPriorityPageCategory(page),
+                pageScore: page.pageScore,
+            }];
+        })
+        .slice(0, 12);
+}
+
 function buildTopicHints(pages: CrawledPage[]) {
     return uniqueStrings(
-        pages.flatMap((page) => [page.title, page.description, ...page.headings]),
+        sortPagesByScore(pages).flatMap((page) => [
+            page.title,
+            page.description,
+            ...page.headings,
+            ...page.contentHighlights,
+        ]),
         40,
         120,
     );
 }
 
-function buildSummary(sourceUrl: URL, pages: CrawledPage[]) {
-    const pageTitles = uniqueStrings(pages.map((page) => page.title), 6, 160);
-    const descriptions = uniqueStrings(pages.map((page) => page.description), 4, 220);
-    const headings = uniqueStrings(pages.flatMap((page) => page.headings), 10, 140);
-    const faqQuestions = uniqueStrings(pages.flatMap((page) => page.faqQuestions), 6, 160);
-    const excerpts = uniqueStrings(pages.map((page) => page.excerpt), 3, 220);
-    const services = uniqueStrings(pages.flatMap((page) => page.serviceSignals), 8, 140);
-    const ctas = uniqueStrings(pages.flatMap((page) => page.ctaPatterns), 6, 140);
-    const proof = uniqueStrings(pages.flatMap((page) => page.proofSignals), 6, 160);
+function buildSummary(sourceUrl: URL, pages: CrawledPage[], requestedMaxPages: number) {
+    const rankedPages = sortPagesByScore(pages);
+    const topPages = rankedPages.slice(0, 4);
+    const pageTitles = uniqueStrings(rankedPages.map((page) => page.title), 6, 160);
+    const descriptions = uniqueStrings(topPages.map((page) => page.description), 4, 220);
+    const headings = uniqueStrings(topPages.flatMap((page) => page.headings), 10, 140);
+    const faqQuestions = uniqueStrings(rankedPages.flatMap((page) => page.faqQuestions), 6, 160);
+    const excerpts = uniqueStrings(topPages.map((page) => page.excerpt), 3, 220);
+    const highlights = uniqueStrings(topPages.flatMap((page) => page.contentHighlights), 6, 180);
+    const services = uniqueStrings(rankedPages.flatMap((page) => page.serviceSignals), 8, 140);
+    const ctas = uniqueStrings(rankedPages.flatMap((page) => page.ctaPatterns), 6, 140);
+    const proof = uniqueStrings(rankedPages.flatMap((page) => page.proofSignals), 6, 160);
+    const topPathSummaries = uniqueStrings(
+        topPages.map((page) => {
+            const path = new URL(page.url).pathname || "/";
+            const focus = cleanText(
+                [
+                    page.title,
+                    page.description,
+                    page.contentHighlights[0] || page.excerpt,
+                ]
+                    .filter(Boolean)
+                    .join(" | "),
+                180,
+            );
+            return `${path}: ${focus}`;
+        }),
+        4,
+        220,
+    );
 
     return [
         `Website: ${sourceUrl.toString()}`,
+        `Coverage: ${pages.length} of ${requestedMaxPages} requested pages captured.`,
         pageTitles.length > 0 ? `Page titles: ${pageTitles.join(" | ")}` : "",
         descriptions.length > 0 ? `Meta descriptions: ${descriptions.join(" | ")}` : "",
         headings.length > 0 ? `Headings: ${headings.join(" | ")}` : "",
+        topPathSummaries.length > 0 ? `High-value path focus: ${topPathSummaries.join(" | ")}` : "",
         services.length > 0 ? `Service/offer signals: ${services.join(" | ")}` : "",
         ctas.length > 0 ? `CTA patterns: ${ctas.join(" | ")}` : "",
         proof.length > 0 ? `Trust/proof signals: ${proof.join(" | ")}` : "",
         faqQuestions.length > 0 ? `FAQ signals: ${faqQuestions.join(" | ")}` : "",
+        highlights.length > 0 ? `Content highlights: ${highlights.join(" | ")}` : "",
         excerpts.length > 0 ? `Business summary: ${excerpts.join(" | ")}` : "",
     ]
         .filter(Boolean)
@@ -643,6 +992,7 @@ function toWebsiteIntelligence(snapshot: Pick<
     | "topicHints"
     | "faqQuestions"
     | "priorityPaths"
+    | "priorityPages"
     | "serviceSignals"
     | "ctaPatterns"
     | "proofSignals"
@@ -657,6 +1007,7 @@ function toWebsiteIntelligence(snapshot: Pick<
         topicHints: snapshot.topicHints,
         faqQuestions: snapshot.faqQuestions,
         priorityPaths: snapshot.priorityPaths,
+        priorityPages: snapshot.priorityPages || [],
         serviceSignals: snapshot.serviceSignals || [],
         ctaPatterns: snapshot.ctaPatterns || [],
         proofSignals: snapshot.proofSignals || [],
@@ -727,6 +1078,7 @@ async function storeWebsiteIntelligenceSnapshot(
                 topicHints: intelligence.topicHints,
                 faqQuestions: intelligence.faqQuestions,
                 priorityPaths: intelligence.priorityPaths,
+                priorityPages: intelligence.priorityPages,
                 serviceSignals: intelligence.serviceSignals,
                 ctaPatterns: intelligence.ctaPatterns,
                 proofSignals: intelligence.proofSignals,
@@ -757,6 +1109,10 @@ export async function getAIBloggerWebsiteIntelligence(
         blockedPaths?: string[];
         /** When true, skip the cache entirely and force a fresh live crawl. */
         forceRefresh?: boolean;
+        /** Hard stop for the full crawl so live fetches stay comfortably under Vercel limits. */
+        totalBudgetMs?: number;
+        /** Small concurrency boost for faster, still-safe crawling. */
+        maxConcurrency?: number;
     },
 ): Promise<AIBloggerWebsiteIntelligence | null> {
     const sourceUrl = normalizeUrl(rawUrl);
@@ -776,8 +1132,28 @@ export async function getAIBloggerWebsiteIntelligence(
         Math.max(options?.refreshWindowHours || DEFAULT_REFRESH_WINDOW_HOURS, 1),
         24 * 30,
     );
+    const inferredBudgetMs = Math.min(
+        Math.max(
+            maxPages * Math.min(timeoutMs, 3500) + 10_000,
+            DEFAULT_TOTAL_CRAWL_BUDGET_MS,
+        ),
+        MAX_TOTAL_CRAWL_BUDGET_MS,
+    );
+    const totalBudgetMs = Math.min(
+        Math.max(options?.totalBudgetMs ?? inferredBudgetMs, MIN_TOTAL_CRAWL_BUDGET_MS),
+        MAX_TOTAL_CRAWL_BUDGET_MS,
+    );
+    const maxConcurrency = Math.min(
+        Math.max(
+            options?.maxConcurrency
+            ?? Math.min(DEFAULT_CRAWL_CONCURRENCY, Math.max(2, Math.ceil(maxPages / 3))),
+            1,
+        ),
+        MAX_CRAWL_CONCURRENCY,
+    );
     const allowedPaths = (options?.allowedPaths || []).map(normalizePathRule).filter(Boolean);
     const blockedPaths = (options?.blockedPaths || []).map(normalizePathRule).filter(Boolean);
+    const deadlineMs = Date.now() + totalBudgetMs;
 
     if (options?.agencyId && !options?.forceRefresh) {
         const cached = await getCachedWebsiteIntelligence(
@@ -796,7 +1172,7 @@ export async function getAIBloggerWebsiteIntelligence(
     const fetchedPages: CrawledPage[] = [];
     const visited = new Set<string>();
 
-    const primaryPage = await fetchPage(sourceUrl, timeoutMs);
+    const primaryPage = await fetchPage(sourceUrl, timeoutMs, deadlineMs);
 
     if (!primaryPage) {
         return null;
@@ -807,46 +1183,81 @@ export async function getAIBloggerWebsiteIntelligence(
 
     const crawlQueue: string[] = [];
     const queued = new Set<string>();
-    const sitemapCandidates = maxPages > 1 ? await getSitemapCandidates(sourceUrl, timeoutMs) : [];
+    const sitemapCandidates =
+        maxPages > 1 && hasBudgetRemaining(deadlineMs, MIN_TIME_SLICE_MS * 2)
+            ? await getSitemapCandidates(sourceUrl, timeoutMs, deadlineMs)
+            : [];
 
     for (const link of [...primaryPage.internalLinks, ...sitemapCandidates]) {
         enqueueCrawlUrl(crawlQueue, queued, visited, link, allowedPaths, blockedPaths);
     }
 
-    while (fetchedPages.length < maxPages && crawlQueue.length > 0) {
-        const nextLink = crawlQueue.shift();
-        if (!nextLink) {
+    while (
+        fetchedPages.length < maxPages
+        && crawlQueue.length > 0
+        && hasBudgetRemaining(deadlineMs)
+    ) {
+        const batchSize = Math.min(
+            maxPages - fetchedPages.length,
+            maxConcurrency,
+            crawlQueue.length,
+        );
+        const batchLinks: string[] = [];
+
+        while (batchLinks.length < batchSize) {
+            const nextLink = crawlQueue.shift();
+
+            if (!nextLink) {
+                break;
+            }
+
+            queued.delete(nextLink);
+            visited.add(nextLink);
+            batchLinks.push(nextLink);
+        }
+
+        if (batchLinks.length === 0) {
             break;
         }
 
-        queued.delete(nextLink);
-        visited.add(nextLink);
+        const nextPages = await Promise.all(
+            batchLinks.map((link) => fetchPage(new URL(link), timeoutMs, deadlineMs)),
+        );
 
-        const nextPage = await fetchPage(new URL(nextLink), timeoutMs);
+        for (const nextPage of nextPages) {
+            if (!nextPage) {
+                continue;
+            }
 
-        if (!nextPage) {
-            continue;
-        }
+            fetchedPages.push(nextPage);
 
-        fetchedPages.push(nextPage);
-
-        for (const discoveredLink of nextPage.internalLinks) {
-            enqueueCrawlUrl(crawlQueue, queued, visited, discoveredLink, allowedPaths, blockedPaths);
+            for (const discoveredLink of nextPage.internalLinks) {
+                enqueueCrawlUrl(crawlQueue, queued, visited, discoveredLink, allowedPaths, blockedPaths);
+            }
         }
     }
+
+    if (fetchedPages.length < maxPages && crawlQueue.length > 0 && !hasBudgetRemaining(deadlineMs)) {
+        console.info(
+            `[AI-BLOGGER] Website crawl budget reached for ${sourceUrl.toString()} after ${fetchedPages.length}/${maxPages} pages`,
+        );
+    }
+
+    const rankedPages = sortPagesByScore(fetchedPages);
 
     const intelligence: AIBloggerWebsiteIntelligence = {
         sourceUrl: rawUrl.trim(),
         normalizedUrl: sourceUrl.toString(),
-        pageCount: fetchedPages.length,
-        pageTitles: uniqueStrings(fetchedPages.map((page) => page.title), 50, 160),
-        topicHints: buildTopicHints(fetchedPages),
-        faqQuestions: uniqueStrings(fetchedPages.flatMap((page) => page.faqQuestions), 20, 180),
-        priorityPaths: buildPriorityPaths(fetchedPages),
-        serviceSignals: uniqueStrings(fetchedPages.flatMap((page) => page.serviceSignals), 20, 140),
-        ctaPatterns: uniqueStrings(fetchedPages.flatMap((page) => page.ctaPatterns), 16, 140),
-        proofSignals: uniqueStrings(fetchedPages.flatMap((page) => page.proofSignals), 16, 160),
-        summary: buildSummary(sourceUrl, fetchedPages),
+        pageCount: rankedPages.length,
+        pageTitles: uniqueStrings(rankedPages.map((page) => page.title), 50, 160),
+        topicHints: buildTopicHints(rankedPages),
+        faqQuestions: uniqueStrings(rankedPages.flatMap((page) => page.faqQuestions), 20, 180),
+        priorityPaths: buildPriorityPaths(rankedPages),
+        priorityPages: buildPriorityPages(rankedPages),
+        serviceSignals: uniqueStrings(rankedPages.flatMap((page) => page.serviceSignals), 20, 140),
+        ctaPatterns: uniqueStrings(rankedPages.flatMap((page) => page.ctaPatterns), 16, 140),
+        proofSignals: uniqueStrings(rankedPages.flatMap((page) => page.proofSignals), 16, 160),
+        summary: buildSummary(sourceUrl, rankedPages, maxPages),
         cacheStatus: "live",
         refreshedAt: new Date().toISOString(),
     };

@@ -76,6 +76,22 @@ const BlogPublishingAuditSchema = new mongoose.Schema({
     metaKeywordsCount: Number,
   },
 
+  // Full sanitized webhook input/output audit trail.
+  webhookRequestSnapshot: {
+    method: String,
+    path: String,
+    agencyId: String,
+    contentLength: String,
+    userAgent: String,
+    receivedAt: Date,
+  },
+  webhookPayloadSnapshot: {
+    type: mongoose.Schema.Types.Mixed,
+  },
+  storageResultSnapshot: {
+    type: mongoose.Schema.Types.Mixed,
+  },
+
   // Status tracking
   status: {
     type: String,

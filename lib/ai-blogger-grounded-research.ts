@@ -816,6 +816,7 @@ export async function getAIBloggerGroundedResearch(
         agencyId?: string;
         location?: string;
         refreshWindowHours?: number;
+        bypassCache?: boolean;
         sourceUrls?: string[];
         groundedResearchConfig?: Pick<
             AIBloggerConfig["groundedResearch"],
@@ -849,7 +850,7 @@ export async function getAIBloggerGroundedResearch(
     const location = sanitizeLocation(options.location);
     const refreshWindowHours = Math.min(Math.max(options.refreshWindowHours || 24, 1), 24 * 30);
 
-    if (options.agencyId) {
+    if (options.agencyId && !options.bypassCache) {
         const cached = await getCachedGroundedResearch(
             options.agencyId,
             normalizedQuery,
@@ -870,20 +871,29 @@ export async function getAIBloggerGroundedResearch(
         .map((result) => result.source)
         .filter((source): source is BlogStudioExternalSource => Boolean(source));
 
-    const sources = applyGroundedResearchFilters(fetchedSources, {
-        allowedSourceTypes:
-            groundedResearchConfig?.allowedSourceTypes || [
-                "government",
-                "education",
-                "official",
-                "industry",
-                "reference",
-                "news",
-            ],
+    const resolvedAllowedSourceTypes: BlogStudioExternalSourceType[] =
+        (groundedResearchConfig?.allowedSourceTypes?.length ?? 0) > 0
+            ? groundedResearchConfig!.allowedSourceTypes!
+            : ["government", "education", "official", "industry", "reference", "news"];
+
+    const filterConfig = {
+        allowedSourceTypes: resolvedAllowedSourceTypes,
         trustPreference: groundedResearchConfig?.trustPreference || "balanced",
         freshnessPreference: groundedResearchConfig?.freshnessPreference || "balanced",
         maxSources: groundedResearchConfig?.maxSources || 5,
-    });
+    };
+
+    let sources = applyGroundedResearchFilters(fetchedSources, filterConfig);
+
+    // Fallback pass: if ALL successfully-fetched sources were filtered out, retry
+    // with relaxed freshness. This handles authority sites (EY, PwC, McKinsey etc.)
+    // that have no publish-date metadata and fall into freshness=\"unknown\".
+    if (sources.length === 0 && fetchedSources.length > 0) {
+        sources = applyGroundedResearchFilters(fetchedSources, {
+            ...filterConfig,
+            freshnessPreference: "balanced", // \"balanced\" = no freshness filter
+        });
+    }
 
     if (sources.length === 0) {
         return { result: null, fetchDiagnostics };

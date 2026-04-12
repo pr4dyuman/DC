@@ -66,7 +66,9 @@ import {
     deleteBlogStudioScheduleImpl,
     generateBlogStudioDraftImpl,
     generateBlogStudioFeaturedImageImpl,
+    refreshBlogStudioPostGroundedResearchImpl,
     refreshBlogStudioPostFromPerformanceImpl,
+    type RefreshBlogStudioGroundedResearchResult,
     resolveBlogStudioPostBlockersWithAIImpl,
     runBlogStudioScheduleNowImpl,
     runBlogStudioPerformanceSyncImpl,
@@ -760,6 +762,25 @@ export async function refreshBlogStudioPostFromPerformance(slug: string) {
         featureEnabled: agency.features?.aiBlogger,
     });
     return refreshBlogStudioPostFromPerformanceImpl(
+        agency.id,
+        toActionActor(currentUser),
+        sanitizeMongoInput(slug),
+    );
+}
+
+export async function refreshBlogStudioPostGroundedResearch(
+    slug: string,
+): Promise<RefreshBlogStudioGroundedResearchResult> {
+    const currentUser = await requireRole('admin');
+    const agency = await getCurrentAgency();
+    if (!agency) throw new Error("Unauthorized");
+    assertAIBloggerServerAccess({
+        role: currentUser.role,
+        plan: agency.plan,
+        status: agency.status,
+        featureEnabled: agency.features?.aiBlogger,
+    });
+    return refreshBlogStudioPostGroundedResearchImpl(
         agency.id,
         toActionActor(currentUser),
         sanitizeMongoInput(slug),

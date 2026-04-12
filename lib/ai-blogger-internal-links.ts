@@ -11,6 +11,8 @@ import type {
     BlogStudioInternalLinkRelationType,
     BlogStudioInternalLinkSuggestion,
     BlogStudioPost,
+    BlogStudioSitePriorityPage,
+    BlogStudioSitePriorityPageCategory,
 } from "./types-ai-blogger";
 
 type LinkCandidate = {
@@ -24,6 +26,17 @@ type LinkCandidate = {
     targetPostSlug?: string;
     targetClusterId?: string;
     targetParentTopicSlug?: string;
+    websiteCategory?: BlogStudioSitePriorityPageCategory;
+    priorityScore?: number;
+};
+
+type RankedLinkCandidate = {
+    candidate: LinkCandidate;
+    score: number;
+    matchReason: string;
+    relationType: BlogStudioInternalLinkRelationType;
+    clusterAligned: boolean;
+    suggestedSectionHeading?: string;
 };
 
 type InternalLinkNetworkPost = Pick<
@@ -49,6 +62,20 @@ const STOP_WORDS = new Set([
     "your",
 ]);
 
+const COMMERCIAL_WEBSITE_CATEGORIES = new Set<BlogStudioSitePriorityPageCategory>([
+    "service",
+    "solution",
+    "case-study",
+    "pricing",
+    "industry",
+]);
+
+const LOW_VALUE_WEBSITE_CATEGORIES = new Set<BlogStudioSitePriorityPageCategory>([
+    "home",
+    "about",
+    "contact",
+]);
+
 function resolveSiteOrigin(value?: string) {
     const rawValue = value?.trim();
 
@@ -68,7 +95,7 @@ function resolvePostSiteUrl(post: BlogStudioPost, siteUrl?: string) {
     return (
         resolveSiteOrigin(siteUrl) ||
         resolveSiteOrigin(post.canonicalUrl) ||
-        resolveSiteOrigin(brief?.sourceMode === "website" ? brief.sourceValue : "")
+        resolveSiteOrigin(brief?.sourceMode === "website" ? brief.sourceValue : brief?.targetWebsiteUrl)
     );
 }
 
@@ -76,7 +103,7 @@ function resolveNetworkPostSiteUrl(post: InternalLinkNetworkPost) {
     const brief = post.brief;
     return (
         resolveSiteOrigin(post.canonicalUrl) ||
-        resolveSiteOrigin(brief?.sourceMode === "website" ? brief.sourceValue : "")
+        resolveSiteOrigin(brief?.sourceMode === "website" ? brief.sourceValue : brief?.targetWebsiteUrl)
     );
 }
 
@@ -132,15 +159,35 @@ function resolvePublishedBlogHref(siteUrl: string | undefined, slug: string, pub
 
 /**
  * Converts a full page title into a short, natural anchor (3-4 words max).
+ * Preserves connecting words (with, for, in, on, of) to keep the phrase readable.
  * E.g. "How to Manage Your Company Using AI in 2026" → "manage company with ai"
  */
 function toNaturalAnchor(title: string): string {
-    const words = title
+    // Strip year tokens and special chars first
+    const cleaned = title
         .toLowerCase()
+        .replace(/\b20\d{2}\b/g, "") // strip years
         .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const HARD_STOP_WORDS = new Set([
+        "about", "after", "also", "and", "are", "best", "build",
+        "from", "into", "that", "the", "this", "your",
+        "how", "what", "why", "when", "where", "which",
+        "can", "get", "use", "using", "used", "will", "would",
+        "our", "they", "their", "you", "its",
+    ]);
+
+    const words = cleaned
         .split(/\s+/)
-        .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
-    return words.slice(0, 4).join(" ") || title.toLowerCase().slice(0, 30);
+        .filter((w) => w.length > 1 && !HARD_STOP_WORDS.has(w));
+
+    // Take up to 5 words then slice to 4 — preserving short connectives (with/for/in)
+    const phrase = words.slice(0, 5).join(" ");
+
+    // Final trim to 4 words
+    return phrase.split(/\s+/).slice(0, 4).join(" ") || title.toLowerCase().slice(0, 30);
 }
 
 /**
@@ -189,8 +236,181 @@ function humanizePathSegment(pathname: string) {
         .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function inferGenericCandidateSource(pathname: string): LinkCandidate["source"] {
-    return /^\/(?:services?|solutions?|products?|offers?)\b/i.test(pathname) ? "service" : "page";
+function uniqueCandidateStrings(values: Array<string | undefined>, limit = 10) {
+    const seen = new Set<string>();
+    const results: string[] = [];
+
+    for (const value of values) {
+        const trimmed = value?.trim();
+
+        if (!trimmed) {
+            continue;
+        }
+
+        const key = trimmed.toLowerCase();
+        if (seen.has(key)) {
+            continue;
+        }
+
+        seen.add(key);
+        results.push(trimmed);
+
+        if (results.length >= limit) {
+            break;
+        }
+    }
+
+    return results;
+}
+
+function getWebsiteCategoryLabel(category?: BlogStudioSitePriorityPageCategory) {
+    switch (category) {
+        case "service":
+            return "service";
+        case "solution":
+            return "solution";
+        case "case-study":
+            return "case study";
+        case "pricing":
+            return "pricing";
+        case "industry":
+            return "industry";
+        case "blog":
+            return "blog";
+        case "faq":
+            return "FAQ";
+        case "about":
+            return "about";
+        case "contact":
+            return "contact";
+        case "home":
+            return "homepage";
+        default:
+            return "website";
+    }
+}
+
+function getWebsiteCategoryFromPath(pathname: string): BlogStudioSitePriorityPageCategory {
+    const normalizedPath = pathname.toLowerCase();
+
+    if (normalizedPath === "/") {
+        return "home";
+    }
+
+    if (/(^|\/)(pricing|plans?|packages?|costs?|quotes?)(\/|$)/.test(normalizedPath)) {
+        return "pricing";
+    }
+
+    if (/(^|\/)(case-studies?|work|portfolio|results|customer-stories?)(\/|$)/.test(normalizedPath)) {
+        return "case-study";
+    }
+
+    if (/(^|\/)(industr(y|ies)|sectors?|verticals?)(\/|$)/.test(normalizedPath)) {
+        return "industry";
+    }
+
+    if (/(^|\/)(blog|blogs|articles?|resources?|news|insights)(\/|$)/.test(normalizedPath)) {
+        return "blog";
+    }
+
+    if (/(^|\/)(faq|faqs|help|questions)(\/|$)/.test(normalizedPath)) {
+        return "faq";
+    }
+
+    if (/(^|\/)(about|company|team)(\/|$)/.test(normalizedPath)) {
+        return "about";
+    }
+
+    if (/(^|\/)(contact|book|demo|consultation|schedule)(\/|$)/.test(normalizedPath)) {
+        return "contact";
+    }
+
+    if (/(^|\/)(solutions?)(\/|$)/.test(normalizedPath)) {
+        return "solution";
+    }
+
+    if (/(^|\/)(services?|products?|offers?)(\/|$)/.test(normalizedPath)) {
+        return "service";
+    }
+
+    return "general";
+}
+
+function getCandidateSourceForWebsiteCategory(category?: BlogStudioSitePriorityPageCategory): LinkCandidate["source"] {
+    return category && COMMERCIAL_WEBSITE_CATEGORIES.has(category) ? "service" : "page";
+}
+
+function isCommercialCandidate(candidate: Pick<LinkCandidate, "source" | "websiteCategory">) {
+    return candidate.source === "service"
+        || Boolean(candidate.websiteCategory && COMMERCIAL_WEBSITE_CATEGORIES.has(candidate.websiteCategory));
+}
+
+function isLowValueWebsiteCategory(category?: BlogStudioSitePriorityPageCategory) {
+    return Boolean(category && LOW_VALUE_WEBSITE_CATEGORIES.has(category));
+}
+
+function getWebsiteCategoryWeight(category?: BlogStudioSitePriorityPageCategory) {
+    switch (category) {
+        case "service":
+            return 14;
+        case "solution":
+            return 13;
+        case "pricing":
+            return 12;
+        case "case-study":
+            return 11;
+        case "industry":
+            return 10;
+        case "faq":
+            return 3;
+        case "blog":
+            return 1;
+        case "home":
+            return -4;
+        case "about":
+            return -7;
+        case "contact":
+            return -8;
+        default:
+            return 0;
+    }
+}
+
+function buildWebsitePriorityPageCandidates(siteUrl: string, pages: BlogStudioSitePriorityPage[]) {
+    return pages.map((page, index) => {
+        const pathname = page.path.trim() || "/";
+        const title = page.title.trim() || humanizePathSegment(pathname);
+        const source = getCandidateSourceForWebsiteCategory(page.pageCategory);
+        const categoryLabel = getWebsiteCategoryLabel(page.pageCategory);
+        const description = uniqueCandidateStrings([
+            page.description,
+            page.excerpt,
+            page.highlights[0],
+            page.proofSignals[0],
+        ], 3).join(" | ");
+        const keywords = uniqueCandidateStrings([
+            title,
+            page.description,
+            page.excerpt,
+            ...page.highlights,
+            ...page.serviceSignals,
+            ...page.proofSignals,
+            ...page.ctaPatterns,
+            pathname.replace(/[\/-]+/g, " "),
+        ], 12);
+
+        return {
+            id: `site-page-${index}-${pathname}`,
+            title,
+            href: buildAbsoluteSiteHref(siteUrl, page.url || pathname),
+            source,
+            description: description || `${title} ${categoryLabel} page discovered on the target website.`,
+            suggestedAnchor: toNaturalAnchor(title),
+            keywords,
+            websiteCategory: page.pageCategory,
+            priorityScore: page.pageScore,
+        } satisfies LinkCandidate;
+    });
 }
 
 function buildWebsitePathCandidates(siteUrl: string, paths: string[]) {
@@ -199,8 +419,10 @@ function buildWebsitePathCandidates(siteUrl: string, paths: string[]) {
     return paths
         .map((path, index) => {
             const pathname = path.trim() || "/";
-            const source = inferGenericCandidateSource(pathname);
+            const websiteCategory = getWebsiteCategoryFromPath(pathname);
+            const source = getCandidateSourceForWebsiteCategory(websiteCategory);
             const humanLabel = humanizePathSegment(pathname);
+            const categoryLabel = getWebsiteCategoryLabel(websiteCategory);
 
             return {
                 id: `site-path-${index}-${pathname}`,
@@ -210,9 +432,10 @@ function buildWebsitePathCandidates(siteUrl: string, paths: string[]) {
                 description:
                     pathname === "/"
                         ? `Homepage for ${hostname}.`
-                        : `${humanLabel} page discovered on the target website.`,
+                        : `${humanLabel} ${categoryLabel} page discovered on the target website.`,
                 suggestedAnchor: pathname === "/" ? hostname : humanLabel.toLowerCase(),
                 keywords: [humanLabel, pathname.replace(/[\/-]+/g, " "), hostname],
+                websiteCategory,
             } satisfies LinkCandidate;
         });
 }
@@ -342,7 +565,7 @@ function getBestSectionHeading(post: BlogStudioPost, candidate: LinkCandidate) {
             }
         }
 
-        if (candidate.source === "service" && /(next step|why|strategy|services?|support|partner|help)/i.test(heading)) {
+        if (isCommercialCandidate(candidate) && /(next step|why|strategy|services?|support|partner|help)/i.test(heading)) {
             headingScore += 3;
         }
 
@@ -356,7 +579,7 @@ function getBestSectionHeading(post: BlogStudioPost, candidate: LinkCandidate) {
         return bestHeading;
     }
 
-    if (candidate.source === "service") {
+    if (isCommercialCandidate(candidate)) {
         return context.sectionHeadings.find((heading) => /(next step|conclusion|cta|services?|help)/i.test(heading)) ?? undefined;
     }
 
@@ -377,6 +600,12 @@ function scoreCandidate(post: BlogStudioPost, candidate: LinkCandidate) {
     let score = candidate.source === "service" ? 8 : candidate.source === "page" ? 4 : 3;
     let overlapCount = 0;
 
+    score += getWebsiteCategoryWeight(candidate.websiteCategory);
+
+    if (typeof candidate.priorityScore === "number" && candidate.priorityScore > 0) {
+        score += Math.min(12, Math.round(candidate.priorityScore / 6));
+    }
+
     for (const token of context.tokens) {
         if (candidateTokens.includes(token)) {
             score += 4;
@@ -396,7 +625,7 @@ function scoreCandidate(post: BlogStudioPost, candidate: LinkCandidate) {
         score += 5;
     }
 
-    if (post.target.type === "webhook" && candidate.source === "service") {
+    if (post.target.type === "webhook" && isCommercialCandidate(candidate)) {
         score += 2;
     }
 
@@ -410,7 +639,12 @@ function scoreCandidate(post: BlogStudioPost, candidate: LinkCandidate) {
         score += 10;
     }
 
+    if (isLowValueWebsiteCategory(candidate.websiteCategory) && overlapCount === 0 && !clusterAligned) {
+        score -= 4;
+    }
+
     const suggestedSectionHeading = getBestSectionHeading(post, candidate);
+    const websiteCategoryLabel = getWebsiteCategoryLabel(candidate.websiteCategory);
 
     const matchReason =
         relationType === "cluster-parent"
@@ -425,8 +659,8 @@ function scoreCandidate(post: BlogStudioPost, candidate: LinkCandidate) {
             ? `Matches the primary keyword "${context.primaryKeyword}".`
             : overlapCount > 0
                 ? `Overlaps with the article topic across ${overlapCount} shared term${overlapCount === 1 ? "" : "s"}.`
-                : candidate.source === "service"
-                    ? "Strong supporting service page for internal link authority."
+                : isCommercialCandidate(candidate)
+                    ? `High-value ${websiteCategoryLabel} page for commercial context and internal authority.`
                     : candidate.source === "blog"
                         ? "Related reading from the archive."
                         : "Relevant supporting page on the connected website.";
@@ -538,7 +772,18 @@ async function getPublishedAIBloggerCandidates(post: BlogStudioPost, siteUrl?: s
     }
 }
 
-async function getWebsiteCandidates(post: BlogStudioPost, siteUrl?: string): Promise<LinkCandidate[]> {
+async function getWebsiteCandidates(
+    post: BlogStudioPost,
+    siteUrl?: string,
+    crawlConfig?: {
+        enabled?: boolean;
+        maxPages?: number;
+        timeoutMs?: number;
+        refreshWindowHours?: number;
+        allowedPaths?: string[];
+        blockedPaths?: string[];
+    },
+): Promise<LinkCandidate[]> {
     const resolvedSiteUrl = resolvePostSiteUrl(post, siteUrl);
 
     if (!resolvedSiteUrl) {
@@ -546,19 +791,44 @@ async function getWebsiteCandidates(post: BlogStudioPost, siteUrl?: string): Pro
     }
 
     // Use website intelligence discovery for ALL websites (generic, not company-specific)
-    const crawlUrl = (post.brief?.sourceMode === "website" ? post.brief.sourceValue : "") || resolvedSiteUrl;
+    const crawlUrl =
+        (post.brief?.sourceMode === "website" ? post.brief.sourceValue : post.brief?.targetWebsiteUrl) ||
+        resolvedSiteUrl;
     const websiteIntelligence = await getAIBloggerWebsiteIntelligence(crawlUrl, {
         agencyId: post.agencyId,
+        enabled: crawlConfig?.enabled ?? true,
+        maxPages: crawlConfig?.maxPages,
+        timeoutMs: crawlConfig?.timeoutMs,
+        refreshWindowHours: crawlConfig?.refreshWindowHours,
+        allowedPaths: crawlConfig?.allowedPaths,
+        blockedPaths: crawlConfig?.blockedPaths,
+        totalBudgetMs: 15_000,
     }).catch(() => null);
 
-    const candidates = buildWebsitePathCandidates(
-        resolvedSiteUrl,
-        websiteIntelligence?.priorityPaths?.length
-            ? websiteIntelligence.priorityPaths
-            : ["/", "/services", "/about", "/contact", "/blog"],
-    );
+    const candidates = [
+        ...(websiteIntelligence?.priorityPages?.length
+            ? buildWebsitePriorityPageCandidates(resolvedSiteUrl, websiteIntelligence.priorityPages)
+            : []),
+        ...buildWebsitePathCandidates(
+            resolvedSiteUrl,
+            websiteIntelligence?.priorityPaths?.length
+                ? websiteIntelligence.priorityPaths
+                : ["/", "/services", "/pricing", "/case-studies", "/about", "/contact", "/blog"],
+        ),
+    ];
 
-    return candidates.filter((candidate) => Boolean(normalizeInternalLinkHref(candidate.href, resolvedSiteUrl)));
+    const seen = new Set<string>();
+
+    return candidates.filter((candidate) => {
+        const normalizedHref = normalizeInternalLinkHref(candidate.href, resolvedSiteUrl);
+
+        if (!normalizedHref || seen.has(normalizedHref)) {
+            return false;
+        }
+
+        seen.add(normalizedHref);
+        return true;
+    });
 }
 
 function toStructuredInternalLinkSuggestion(
@@ -585,6 +855,75 @@ function toStructuredInternalLinkSuggestion(
         targetClusterId: candidate.targetClusterId,
         targetParentTopicSlug: candidate.targetParentTopicSlug,
     };
+}
+
+function selectSuggestionMix(ranked: RankedLinkCandidate[], limit: number) {
+    const targetCount = Math.max(limit, 8);
+    const selected: RankedLinkCandidate[] = [];
+    const seenHrefs = new Set<string>();
+    const hasCommercialCandidates = ranked.some((entry) => isCommercialCandidate(entry.candidate));
+    const maxBlogCount = hasCommercialCandidates ? Math.max(1, Math.floor(targetCount / 3)) : targetCount;
+
+    const addEntry = (entry?: RankedLinkCandidate) => {
+        if (!entry || seenHrefs.has(entry.candidate.href)) {
+            return;
+        }
+
+        selected.push(entry);
+        seenHrefs.add(entry.candidate.href);
+    };
+
+    if (hasCommercialCandidates) {
+        addEntry(ranked.find((entry) => isCommercialCandidate(entry.candidate)));
+    }
+
+    addEntry(ranked.find((entry) => entry.relationType === "cluster-parent" || entry.relationType === "pillar-parent"));
+    addEntry(ranked.find((entry) => entry.relationType === "cluster-supporting" || entry.relationType === "pillar-supporting"));
+
+    let blogCount = selected.filter((entry) => entry.candidate.source === "blog").length;
+    let lowValueCount = selected.filter((entry) => isLowValueWebsiteCategory(entry.candidate.websiteCategory)).length;
+
+    for (const entry of ranked) {
+        if (selected.length >= targetCount) {
+            break;
+        }
+
+        if (seenHrefs.has(entry.candidate.href)) {
+            continue;
+        }
+
+        if (hasCommercialCandidates && entry.candidate.source === "blog" && blogCount >= maxBlogCount) {
+            continue;
+        }
+
+        if (isLowValueWebsiteCategory(entry.candidate.websiteCategory) && lowValueCount >= 1) {
+            continue;
+        }
+
+        addEntry(entry);
+
+        if (entry.candidate.source === "blog") {
+            blogCount += 1;
+        }
+
+        if (isLowValueWebsiteCategory(entry.candidate.websiteCategory)) {
+            lowValueCount += 1;
+        }
+    }
+
+    if (selected.length >= targetCount) {
+        return selected;
+    }
+
+    for (const entry of ranked) {
+        if (selected.length >= targetCount) {
+            break;
+        }
+
+        addEntry(entry);
+    }
+
+    return selected;
 }
 
 function getKnownPostHrefs(post: InternalLinkNetworkPost, siteUrl?: string) {
@@ -714,11 +1053,19 @@ export async function getBlogStudioInternalLinkSuggestions(
     limit = 6,
     options?: {
         siteUrl?: string;
+        crawlConfig?: {
+            enabled?: boolean;
+            maxPages?: number;
+            timeoutMs?: number;
+            refreshWindowHours?: number;
+            allowedPaths?: string[];
+            blockedPaths?: string[];
+        };
     },
 ): Promise<BlogStudioInternalLinkSuggestion[]> {
     const resolvedSiteUrl = resolvePostSiteUrl(post, options?.siteUrl);
     const [siteCandidates, blogCandidates, aiBloggerCandidates] = await Promise.all([
-        getWebsiteCandidates(post, resolvedSiteUrl),
+        getWebsiteCandidates(post, resolvedSiteUrl, options?.crawlConfig),
         getPublishedBlogCandidates(resolvedSiteUrl),
         getPublishedAIBloggerCandidates(post, resolvedSiteUrl),
     ]);
@@ -754,6 +1101,13 @@ export async function getBlogStudioInternalLinkSuggestions(
                 return right.score - left.score;
             }
 
+            const categoryWeightDelta =
+                getWebsiteCategoryWeight(right.candidate.websiteCategory) -
+                getWebsiteCategoryWeight(left.candidate.websiteCategory);
+            if (categoryWeightDelta !== 0) {
+                return categoryWeightDelta;
+            }
+
             if (left.candidate.source !== right.candidate.source) {
                 const sourceWeight = { service: 3, page: 2, blog: 1 };
                 return sourceWeight[right.candidate.source] - sourceWeight[left.candidate.source];
@@ -762,8 +1116,9 @@ export async function getBlogStudioInternalLinkSuggestions(
             return left.candidate.title.localeCompare(right.candidate.title);
         });
 
+    const selectedCandidates = selectSuggestionMix(ranked, limit);
     const suggestions = dedupeSuggestions(
-        ranked.slice(0, Math.max(limit, 8)).map(({ candidate, score, matchReason, relationType, clusterAligned, suggestedSectionHeading }) =>
+        selectedCandidates.map(({ candidate, score, matchReason, relationType, clusterAligned, suggestedSectionHeading }) =>
             toStructuredInternalLinkSuggestion(
                 candidate,
                 score,
@@ -784,9 +1139,13 @@ export async function getBlogStudioInternalLinkSuggestions(
             ...siteCandidates.map((candidate) =>
                 toStructuredInternalLinkSuggestion(
                     candidate,
-                    candidate.source === "service" ? 12 : 6,
                     candidate.source === "service"
-                        ? "Useful service page for internal link support."
+                        ? Math.max(18, Math.min(26, Math.round((candidate.priorityScore || 0) / 5) + 12))
+                        : isLowValueWebsiteCategory(candidate.websiteCategory)
+                            ? 5
+                            : 8,
+                    candidate.source === "service"
+                        ? `Useful ${getWebsiteCategoryLabel(candidate.websiteCategory)} page for internal link support.`
                         : "Useful supporting page on the target website.",
                     candidate.source === "service" ? "service-authority" : "site-supporting",
                     false,

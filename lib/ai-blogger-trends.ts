@@ -303,8 +303,9 @@ async function fetchKeywordTrendResult(
 export async function fetchAIBloggerTrendSignals(input: FetchTrendSignalsInput): Promise<AIBloggerTrendSignals> {
     const location = sanitizeLocation(input.location, input.config.defaultLocation || "us");
 
-    if (input.sourceMode === "trending") {
-        // google_trends_trending_now requires a specific country — fall back to "us" if Global is selected
+    if (input.sourceMode !== "website") {
+        // Non-website drafts start from live viral topics instead of stale keyword-only expansion.
+        // google_trends_trending_now requires a specific country, so fall back to "us" if Global is selected.
         const trendingGeo = location || "us";
         const { data, usedFallbackKey } = await fetchSerpApiJson<unknown>(
             {
@@ -321,7 +322,9 @@ export async function fetchAIBloggerTrendSignals(input: FetchTrendSignalsInput):
 
         const prioritizedTopics = prioritizeTopicsByHint(trendingTopics, [
             input.sourceValue,
+            input.trendFocus || "",
             input.primaryKeyword || "",
+            ...(input.fallbackCandidates || []),
         ]);
         const candidateTopics = sanitizeStringArray(prioritizedTopics, 12, 140);
 

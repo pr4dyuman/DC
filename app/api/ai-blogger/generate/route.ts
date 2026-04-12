@@ -7,6 +7,7 @@ import { getAIBloggerAccessState } from "@/lib/ai-blogger-access";
 import { generateBlogStudioDraftImpl } from "@/lib/actions/ai-blogger";
 import { createPipelineJob, emitPipelineEvent, releaseLocalPipelineJob } from "@/lib/ai-blogger-pipeline-events";
 import type { BlogStudioBrief, BlogStudioTarget } from "@/lib/types-ai-blogger";
+import { getAgencyAIBloggerConfigServer } from "@/lib/utils-server";
 
 /**
  * Resolve the base URL for internal API calls.
@@ -152,6 +153,8 @@ export async function POST(request: Request) {
 
         const actor = toActionActor(currentUser);
         const pipelineInput = { title: title || "", brief, target, wordCount };
+        const aiBloggerConfig = await getAgencyAIBloggerConfigServer();
+        const crawlConfig = aiBloggerConfig?.crawl;
 
         // Prefer the dedicated worker endpoint when the secret is configured.
         // Falls back to the original in-process execution if not.
@@ -168,7 +171,7 @@ export async function POST(request: Request) {
             // AI budget waiting for a page crawl. The worker polls MongoDB for
             // the result. On Vercel, this is a completely separate serverless
             // invocation with an independent execution budget.
-            if (brief.sourceMode === "website" && brief.sourceValue?.trim()) {
+            if (brief.sourceMode === "website" && brief.sourceValue?.trim() && crawlConfig?.enabled !== false) {
                 const precacheUrl = `${baseUrl}/api/ai-blogger/generate/precache`;
                 console.log(`[GENERATE-ROUTE] Dispatching precache for: ${brief.sourceValue}`);
                 fetch(precacheUrl, {
@@ -178,6 +181,14 @@ export async function POST(request: Request) {
                         jobId,
                         agencyId: agency.id,
                         sourceUrl: brief.sourceValue,
+                        crawlConfig: {
+                            enabled: crawlConfig?.enabled ?? true,
+                            maxPages: crawlConfig?.maxPages,
+                            timeoutMs: crawlConfig?.timeoutMs,
+                            refreshWindowHours: crawlConfig?.refreshWindowHours,
+                            allowedPaths: crawlConfig?.allowedPaths,
+                            blockedPaths: crawlConfig?.blockedPaths,
+                        },
                     }),
                 }).catch((err) => {
                     const msg = err instanceof Error ? err.message : "Precache dispatch failed";

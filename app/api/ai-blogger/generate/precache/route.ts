@@ -82,6 +82,12 @@ export async function POST(request: Request) {
             refreshWindowHours: crawlConfig?.refreshWindowHours,
             allowedPaths: crawlConfig?.allowedPaths,
             blockedPaths: crawlConfig?.blockedPaths,
+            totalBudgetMs: 55_000,
+            maxConcurrency: 3,
+            // Always do a fresh crawl — the precache's job is to write a new snapshot
+            // for the worker to pick up. If we return a cached hit here, the worker
+            // also gets that same stale cache and never recrawls.
+            forceRefresh: true,
         });
 
         if (intel) {

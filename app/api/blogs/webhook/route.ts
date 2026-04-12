@@ -435,6 +435,26 @@ export async function POST(request: NextRequest) {
                     hasSchemaMarkup: !!payload.blog.schemaMarkup,
                     metaKeywordsCount: payload.blog.metaKeywords?.split(',').length || 0,
                 },
+                webhookRequestSnapshot: {
+                    method: request.method,
+                    path: request.nextUrl.pathname,
+                    agencyId: payload.source?.agencyId || getWebhookAgencyId(request, payload) || "unknown",
+                    contentLength: request.headers.get("content-length") || "",
+                    userAgent: request.headers.get("user-agent") || "",
+                    receivedAt: new Date(),
+                },
+                webhookPayloadSnapshot: payload,
+                storageResultSnapshot: {
+                    operation: isUpdate ? "update" : "create",
+                    blogId: savedBlog._id?.toString(),
+                    slug: savedBlog.slug,
+                    previousSlug,
+                    normalizedCanonicalUrl,
+                    normalizedImage,
+                    faqItemCount: normalizedFaqItems.length,
+                    peopleAlsoAskCount: normalizedPeopleAlsoAsk.length,
+                    internalLinkCount: payload.blog.internalLinks?.length || 0,
+                },
                 status: "published",
             };
 

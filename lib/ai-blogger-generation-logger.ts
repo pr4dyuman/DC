@@ -235,6 +235,28 @@ export class AIBloggerGenerationLogger {
     };
   }
 
+  getBlogStudioRunSteps() {
+    if (!this.currentRun?.steps?.length) {
+      return [];
+    }
+
+    return this.currentRun.steps.map((step) => ({
+      key: `generation-${step.stepNumber}-${this.slugify(step.stepName)}`,
+      label: step.stepName,
+      status: this.toBlogStudioStepStatus(step.status),
+      notes: step.output.summary,
+      startedAt: step.process.startedAt,
+      completedAt: step.process.completedAt,
+      input: step.input,
+      process: {
+        durationMs: step.process.durationMs,
+        details: step.process.details,
+      },
+      output: step.output,
+      errors: step.errors,
+    }));
+  }
+
   async finalize(status: "completed" | "failed") {
     this.currentRun.completedAt = new Date().toISOString();
     this.currentRun.status = status;
@@ -497,6 +519,23 @@ export class AIBloggerGenerationLogger {
       return value;
     }
     return `${value.slice(0, maxLength)}...`;
+  }
+
+  private slugify(value: string): string {
+    return value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48) || "step";
+  }
+
+  private toBlogStudioStepStatus(status: StepStatus) {
+    if (status === "in-progress") {
+      return "running";
+    }
+
+    return status;
   }
 
   private appendKeyValueLines(lines: string[], key: string, value: unknown) {

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import {
     publishBlogStudioPost,
     deleteBlogStudioPost,
+    refreshBlogStudioPostGroundedResearch,
     resolveBlogStudioPostBlockersWithAI,
     updateBlogStudioPostStatus,
 } from "@/lib/actions";
@@ -94,6 +95,25 @@ function getBlockerResolutionStorageKey(slug: string) {
     return `${BLOCKER_RESOLUTION_STORAGE_PREFIX}${slug}`;
 }
 
+function getBlockerPreviewSignature(preview?: BlogStudioBlockerResolutionPreview | null) {
+    if (!preview) {
+        return "none";
+    }
+
+    const serialize = (items: BlogStudioResolvedBlocker[]) =>
+        items
+            .map((item) => `${item.key}:${item.resolutionKind}:${item.category}:${item.source}`)
+            .sort()
+            .join("|");
+
+    return [
+        `blocking:${preview.hasBlockingIssues ? "1" : "0"}`,
+        `ai:${serialize(preview.aiFixable || [])}`,
+        `human:${serialize(preview.humanRequired || [])}`,
+        `system:${serialize(preview.systemRequired || [])}`,
+    ].join("::");
+}
+
 function BlockerResolutionList({
     title,
     blockers,
@@ -160,9 +180,13 @@ export function AIBloggerPostStatusControls({
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [deleteWithPublished, setDeleteWithPublished] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [activeAction, setActiveAction] = useState<"advance" | "fix-blockers" | null>(null);
+    const [activeAction, setActiveAction] = useState<"advance" | "fix-blockers" | "refresh-research" | null>(null);
     const [blockerResolutionResult, setBlockerResolutionResult] = useState<BlockerResolutionClientResult | null>(null);
     const blockerResolutionStorageKey = getBlockerResolutionStorageKey(slug);
+    const liveBlockerPreviewSignature = useMemo(
+        () => getBlockerPreviewSignature(blockerResolutionPreview),
+        [blockerResolutionPreview],
+    );
 
     const workflowSettings = publishingSettings ? { publishing: publishingSettings } : undefined;
     const draftOnlyMode = isBlogStudioDraftOnlyMode(workflowSettings);
@@ -179,12 +203,16 @@ export function AIBloggerPostStatusControls({
     const publishBlocked = publishesToWebhook && publishValidation && !publishValidation.canPublish;
     const aiFixableBlockers = blockerResolutionPreview?.aiFixable || [];
     const hasAiFixableBlockers = status !== "Published" && Boolean(blockerResolutionPreview?.hasAiFixable);
+    const claimsGroundingCheck = audit?.checks.find((check) => check.key === "claims-grounding" && !check.passed) ?? null;
+    const canRefreshGroundedResearch = status !== "Published" && Boolean(claimsGroundingCheck);
     const needsHumanOrSystemFixesOnly =
         status !== "Published" &&
         Boolean(blockerResolutionPreview?.hasBlockingIssues) &&
-        !Boolean(blockerResolutionPreview?.hasAiFixable);
+        !Boolean(blockerResolutionPreview?.hasAiFixable) &&
+        !canRefreshGroundedResearch;
     const isAdvancing = isPending && activeAction === "advance";
     const isResolvingBlockers = isPending && activeAction === "fix-blockers";
+    const isRefreshingGroundedResearch = isPending && activeAction === "refresh-research";
     const wordRangeWarning = audit?.checks.find((check) => check.key === "word-range" && !check.passed) ?? null;
     const publishWarnings = publishesToWebhook ? (publishValidation?.warnings || []) : [];
     const publishedHref = useMemo(() => {
@@ -269,6 +297,28 @@ export function AIBloggerPostStatusControls({
         window.sessionStorage.removeItem(blockerResolutionStorageKey);
     }, [blockerResolutionStorageKey]);
 
+    useEffect(() => {
+        if (!blockerResolutionResult || typeof window === "undefined") {
+            return;
+        }
+
+        const resultSignature = getBlockerPreviewSignature(blockerResolutionResult.blockersAfter);
+        if (resultSignature === liveBlockerPreviewSignature) {
+            return;
+        }
+
+        setBlockerResolutionResult(null);
+        window.sessionStorage.removeItem(blockerResolutionStorageKey);
+    }, [blockerResolutionResult, blockerResolutionStorageKey, liveBlockerPreviewSignature]);
+
+    const clearBlockerResolutionResult = () => {
+        setBlockerResolutionResult(null);
+
+        if (typeof window !== "undefined") {
+            window.sessionStorage.removeItem(blockerResolutionStorageKey);
+        }
+    };
+
     const handleAdvance = () => {
         if (!nextStatus || !actionLabel) {
             return;
@@ -328,7 +378,7 @@ export function AIBloggerPostStatusControls({
         }
 
         setError("");
-        setBlockerResolutionResult(null);
+        clearBlockerResolutionResult();
 
         startTransition(async () => {
             setActiveAction("fix-blockers");
@@ -358,6 +408,31 @@ export function AIBloggerPostStatusControls({
                 router.refresh();
             } catch (resolveError: unknown) {
                 const message = resolveError instanceof Error ? resolveError.message : "Failed to resolve blockers with AI";
+                setError(message);
+                toast.error(message);
+            } finally {
+                setActiveAction(null);
+            }
+        });
+    };
+
+    const handleRefreshGroundedResearch = () => {
+        if (!canRefreshGroundedResearch) {
+            toast.error("This draft does not need a grounded-research refresh right now.");
+            return;
+        }
+
+        setError("");
+        clearBlockerResolutionResult();
+
+        startTransition(async () => {
+            setActiveAction("refresh-research");
+            try {
+                const result = await refreshBlogStudioPostGroundedResearch(slug);
+                toast.success(result.summary);
+                router.refresh();
+            } catch (refreshError: unknown) {
+                const message = refreshError instanceof Error ? refreshError.message : "Failed to rerun grounded research";
                 setError(message);
                 toast.error(message);
             } finally {
@@ -619,6 +694,22 @@ export function AIBloggerPostStatusControls({
                     </div>
                 ) : null}
 
+                {canRefreshGroundedResearch ? (
+                    <div className="rounded-[24px] border border-primary/20 bg-primary/5 px-4 py-4 text-sm">
+                        <div className="flex items-start gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+                                <Sparkles className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="font-medium text-foreground">Rerun grounded research</p>
+                                <p className="mt-1.5 leading-6 text-muted-foreground">
+                                    This draft is missing a usable grounded source pack. Refreshing research will fetch a fresh source set from the current SERP results and re-run the claim-support check.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
                 {isResolvingBlockers ? (
                     <div className="rounded-[24px] border border-primary/25 bg-primary/[0.06] px-4 py-4 text-sm">
                         <div className="flex items-start gap-3">
@@ -632,6 +723,25 @@ export function AIBloggerPostStatusControls({
                                 </p>
                                 <p className="mt-2 text-xs leading-5 text-primary">
                                     The post editor will refresh automatically with the updated draft when this finishes.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                {isRefreshingGroundedResearch ? (
+                    <div className="rounded-[24px] border border-primary/25 bg-primary/[0.06] px-4 py-4 text-sm">
+                        <div className="flex items-start gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="font-medium text-foreground">Refreshing grounded research now</p>
+                                <p className="mt-1.5 leading-6 text-muted-foreground">
+                                    Pulling fresh SERP source URLs, rebuilding the grounded source pack, and re-running the claim-support audit.
+                                </p>
+                                <p className="mt-2 text-xs leading-5 text-primary">
+                                    The editor will refresh automatically when the updated sources are stored.
                                 </p>
                             </div>
                         </div>
@@ -683,6 +793,22 @@ export function AIBloggerPostStatusControls({
                                 {draftOnlyStopsWorkflow ? "Draft Only Mode" : readyForManualExport ? "Ready For Manual Export" : "Workflow Complete"}
                             </div>
                         )}
+
+                        {canRefreshGroundedResearch ? (
+                            <AIBloggerGradientButton type="button" variant="outline" onClick={handleRefreshGroundedResearch} disabled={isPending}>
+                                {isRefreshingGroundedResearch ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Refreshing Research
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="h-4 w-4" />
+                                        Rerun Grounded Research
+                                    </>
+                                )}
+                            </AIBloggerGradientButton>
+                        ) : null}
 
                         {hasAiFixableBlockers ? (
                             <AIBloggerGradientButton type="button" variant="outline" onClick={handleFixBlockers} disabled={isPending}>

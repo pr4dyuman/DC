@@ -79,7 +79,7 @@ function humanizeInternalLinkRelation(value: string) {
 function resolveEditorSiteUrl(post: BlogStudioPost) {
     const candidates = [
         post.canonicalUrl,
-        post.brief.sourceMode === "website" ? post.brief.sourceValue : "",
+        post.brief.sourceMode === "website" ? post.brief.sourceValue : post.brief.targetWebsiteUrl,
     ];
 
     for (const candidate of candidates) {
@@ -385,6 +385,7 @@ export function AIBloggerPostEditorForm({
                     brief: {
                         sourceMode: post.brief.sourceMode,
                         sourceValue: post.brief.sourceValue,
+                        targetWebsiteUrl: post.brief.targetWebsiteUrl,
                         trendFocus,
                         primaryKeyword,
                         audience,

@@ -173,82 +173,82 @@ type PipelineStepDefinition = {
 const AI_PIPELINE_STEPS: PipelineStepDefinition[] = [
     {
         key: "website-intelligence",
-        label: "Website Intelligence",
+        label: "Website Scan",
         icon: Globe,
     },
     {
         key: "fetch-trends",
-        label: "Fetch Trends",
+        label: "Trend Discovery",
         icon: Globe,
     },
     {
         key: "serp-analysis",
-        label: "SERP Analysis",
+        label: "Search Landscape",
         icon: Search,
     },
     {
         key: "grounded-research",
-        label: "Grounded Research",
+        label: "Source Verification",
         icon: Search,
     },
     {
         key: "performance-feedback",
-        label: "Performance Feedback",
+        label: "Performance Context",
         icon: CalendarClock,
     },
     {
         key: "deep-research",
-        label: "Deep Research",
+        label: "Research Strategy",
         icon: Brain,
     },
     {
         key: "keywords",
-        label: "Keywords",
+        label: "Keyword Map",
         icon: KeyRound,
     },
     {
         key: "seo-analysis",
-        label: "SEO Analysis",
+        label: "SEO Plan",
         icon: BarChart3,
     },
     {
         key: "brief-pack",
-        label: "Brief Pack",
+        label: "Content Brief",
         icon: Brain,
     },
     {
         key: "outline-pack",
-        label: "Outline Pack",
+        label: "Article Outline",
         icon: FilePenLine,
     },
     {
         key: "metadata-pack",
-        label: "Metadata Pack",
+        label: "Metadata Draft",
         icon: Tags,
     },
     {
         key: "faq-pack",
-        label: "FAQ Pack",
+        label: "FAQ Plan",
         icon: Search,
     },
     {
         key: "internal-links",
-        label: "Internal Links",
+        label: "Internal Link Plan",
         icon: Link2,
     },
     {
         key: "write-blog",
-        label: "Write Blog",
+        label: "Draft Writing",
         icon: FilePenLine,
     },
     {
         key: "final-ai-checker",
-        label: "Final AI Checker",
+        label: "Quality Review",
         icon: ShieldCheck,
     },
     {
         key: "generate-image",
-        label: "Generate Image",
+        label: "Image Direction",
         icon: ImageIcon,
     },
 ];
@@ -268,6 +268,255 @@ type PipelineLogEntry = {
     message: string;
     timestamp: string;
 };
+
+type PipelineStageCopy = {
+    title: string;
+    pending: string;
+    active: string;
+    completed: string;
+    skipped: string;
+    failed: string;
+    legacyLabels?: string[];
+};
+
+const PIPELINE_STAGE_COPY: Record<string, PipelineStageCopy> = {
+    "website-intelligence": {
+        title: "Website Scan",
+        pending: "Waiting to collect site context for services, offers, pages, and proof points.",
+        active: "Scanning site pages for services, offers, proof points, FAQs, and link targets.",
+        completed: "Website context is ready for topic selection, internal links, and brand fit.",
+        skipped: "No website scan was needed for this input.",
+        failed: "The website scan needs attention before it can provide site context.",
+        legacyLabels: ["Website Intelligence", "Website Intelligence (target site)"],
+    },
+    "fetch-trends": {
+        title: "Trend Discovery",
+        pending: "Waiting to identify timely topic angles.",
+        active: "Finding timely topics and demand signals that fit the business.",
+        completed: "A timely topic angle is selected for the draft.",
+        skipped: "Trend discovery was skipped for this run.",
+        failed: "Trend discovery needs attention before topic selection can continue.",
+        legacyLabels: ["Fetch Trends"],
+    },
+    "serp-analysis": {
+        title: "Search Landscape",
+        pending: "Waiting to review ranking intent and competitor patterns.",
+        active: "Reviewing search results, competitor angles, and People Also Ask patterns.",
+        completed: "Search intent and competitor patterns are ready for the plan.",
+        skipped: "Search landscape review was skipped because it is disabled or not needed.",
+        failed: "Search landscape review needs attention.",
+        legacyLabels: ["SERP Analysis"],
+    },
+    "grounded-research": {
+        title: "Source Verification",
+        pending: "Waiting to collect trusted external support.",
+        active: "Collecting trusted sources so claims can be supported or softened.",
+        completed: "Grounded source support is ready for the writer.",
+        skipped: "Source verification was skipped because trusted source collection is disabled or unavailable.",
+        failed: "Source verification needs attention before stronger claims are safe to publish.",
+        legacyLabels: ["Grounded Research"],
+    },
+    "performance-feedback": {
+        title: "Performance Context",
+        pending: "Waiting to check existing content signals.",
+        active: "Checking previous performance data for useful search opportunities.",
+        completed: "Performance context is ready for topic and keyword decisions.",
+        skipped: "Performance context was skipped because no usable data is connected.",
+        failed: "Performance context needs attention.",
+        legacyLabels: ["Performance Feedback"],
+    },
+    "deep-research": {
+        title: "Research Strategy",
+        pending: "Waiting to combine website, trend, search, and source signals.",
+        active: "Combining research signals into a practical content strategy.",
+        completed: "The research strategy is ready.",
+        skipped: "Research strategy was skipped for this run.",
+        failed: "Research strategy needs attention.",
+        legacyLabels: ["Deep Research"],
+    },
+    keywords: {
+        title: "Keyword Map",
+        pending: "Waiting to map primary and supporting keywords.",
+        active: "Mapping primary keywords, supporting terms, and audience intent.",
+        completed: "Keyword targets are ready.",
+        skipped: "Keyword mapping was skipped.",
+        failed: "Keyword mapping needs attention.",
+        legacyLabels: ["Keywords"],
+    },
+    "seo-analysis": {
+        title: "SEO Plan",
+        pending: "Waiting to convert research into an SEO plan.",
+        active: "Building the SEO plan from search intent, entities, and ranking gaps.",
+        completed: "The SEO plan is ready.",
+        skipped: "SEO planning was skipped.",
+        failed: "SEO planning needs attention.",
+        legacyLabels: ["SEO Analysis"],
+    },
+    "brief-pack": {
+        title: "Content Brief",
+        pending: "Waiting to create the content brief.",
+        active: "Creating the content brief, audience angle, and business-fit guidance.",
+        completed: "The content brief is ready.",
+        skipped: "The content brief was skipped.",
+        failed: "The content brief needs attention.",
+        legacyLabels: ["Brief Pack"],
+    },
+    "outline-pack": {
+        title: "Article Outline",
+        pending: "Waiting to structure the article.",
+        active: "Structuring headings, flow, and section intent before writing.",
+        completed: "The article outline is ready.",
+        skipped: "The article outline was skipped.",
+        failed: "The article outline needs attention.",
+        legacyLabels: ["Outline Pack"],
+    },
+    "metadata-pack": {
+        title: "Metadata Draft",
+        pending: "Waiting to draft search snippets.",
+        active: "Drafting meta title, description, excerpt, slug, and social preview copy.",
+        completed: "Metadata is ready for review.",
+        skipped: "Metadata drafting was skipped.",
+        failed: "Metadata drafting needs attention.",
+        legacyLabels: ["Metadata Pack"],
+    },
+    "faq-pack": {
+        title: "FAQ Plan",
+        pending: "Waiting to identify useful questions.",
+        active: "Building useful FAQ questions and answers from search intent.",
+        completed: "FAQ ideas are ready.",
+        skipped: "FAQ planning was skipped.",
+        failed: "FAQ planning needs attention.",
+        legacyLabels: ["FAQ Pack"],
+    },
+    "internal-links": {
+        title: "Internal Link Plan",
+        pending: "Waiting to select relevant site links.",
+        active: "Selecting relevant service, offer, and blog links for natural placements.",
+        completed: "Internal link targets are ready.",
+        skipped: "Internal link planning was skipped because no useful targets were available.",
+        failed: "Internal link planning needs attention.",
+        legacyLabels: ["Internal Links"],
+    },
+    "write-blog": {
+        title: "Draft Writing",
+        pending: "Waiting for the research and plan to finish.",
+        active: "Writing the article with the approved research, links, FAQs, and SEO plan.",
+        completed: "The article draft is saved in the review queue.",
+        skipped: "Draft writing was skipped.",
+        failed: "Draft writing needs attention.",
+        legacyLabels: ["Write Blog"],
+    },
+    "final-ai-checker": {
+        title: "Quality Review",
+        pending: "Waiting to check the finished draft.",
+        active: "Reviewing SEO score, publishing blockers, claims, links, and quality signals.",
+        completed: "Quality checks are complete.",
+        skipped: "Quality review was skipped.",
+        failed: "Quality review needs attention.",
+        legacyLabels: ["Final AI Checker"],
+    },
+    "generate-image": {
+        title: "Image Direction",
+        pending: "Waiting to prepare image direction.",
+        active: "Creating or preparing featured image direction and alt text.",
+        completed: "Image direction is ready.",
+        skipped: "Image generation was skipped.",
+        failed: "Image direction needs attention.",
+        legacyLabels: ["Generate Image"],
+    },
+    pipeline: {
+        title: "Workflow",
+        pending: "Waiting for the workflow to begin.",
+        active: "Running the AI Blogger workflow.",
+        completed: "The workflow completed successfully.",
+        skipped: "The workflow step was skipped.",
+        failed: "The workflow needs attention.",
+        legacyLabels: ["Pipeline"],
+    },
+};
+
+function getFallbackStageTitle(value?: string) {
+    const normalized = value?.trim();
+    if (!normalized) return "Workflow";
+
+    return normalized
+        .replace(/[-_]+/g, " ")
+        .replace(/\s+/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function getPipelineStageCopy(step?: string, fallbackLabel?: string): PipelineStageCopy {
+    if (step && PIPELINE_STAGE_COPY[step]) {
+        return PIPELINE_STAGE_COPY[step];
+    }
+
+    const title = getFallbackStageTitle(fallbackLabel || step);
+    return {
+        title,
+        pending: "Waiting for this workflow step.",
+        active: `Running ${title.toLowerCase()}.`,
+        completed: `${title} completed.`,
+        skipped: `${title} was skipped.`,
+        failed: `${title} needs attention.`,
+    };
+}
+
+function formatPipelineNoteForDisplay(step: string | undefined, note: string | undefined) {
+    const raw = note?.trim();
+    if (!raw) return "";
+
+    let display = raw
+        .replace(/\s*\|\s*/g, " - ")
+        .replace(/\s*\u2022\s*/g, " - ")
+        .replace(/\s*\u2014\s*/g, " - ")
+        .replace(/\bSERP\b/g, "search results")
+        .replace(/\bAI-only discovery\b/g, "AI topic discovery")
+        .replace(/\bFallback key\b/g, "backup AI key");
+
+    if (step === "website-intelligence") {
+        display = display
+            .replace(/^Cache hit - Pages:/i, "Using cached website scan. Pages analyzed:")
+            .replace(/^Fresh crawl - Pages:/i, "Fresh website scan complete. Pages analyzed:");
+    }
+
+    return display;
+}
+
+function getPipelineStepStatusText(step: string, state: PipelineStepState, note?: string) {
+    const formattedNote = formatPipelineNoteForDisplay(step, note);
+    if (formattedNote) return formattedNote;
+
+    const copy = getPipelineStageCopy(step);
+    if (state === "active") return copy.active;
+    if (state === "completed") return copy.completed;
+    if (state === "failed") return copy.failed;
+    return copy.pending;
+}
+
+function getPipelineLogMessage(
+    event: { step?: string; label?: string; notes?: string; message?: string },
+    status: "active" | "completed" | "skipped" | "failed",
+) {
+    const copy = getPipelineStageCopy(event.step, event.label);
+    const note = formatPipelineNoteForDisplay(event.step, event.notes || event.message);
+    if (note) return note;
+    return copy[status];
+}
+
+function getPipelineSecondaryLabel(step: string, label?: string) {
+    const normalizedLabel = label?.trim();
+    if (!normalizedLabel) return "";
+    const displayLabel = formatPipelineNoteForDisplay(step, normalizedLabel);
+
+    const copy = getPipelineStageCopy(step, displayLabel);
+    const hiddenLabels = [copy.title, ...(copy.legacyLabels || [])].map((value) => value.toLowerCase());
+    if (hiddenLabels.includes(displayLabel.toLowerCase())) {
+        return "";
+    }
+
+    return displayLabel;
+}
+
 type AIBloggerTrendPlan = {
     liveTrendsEnabled: boolean;
     fallbackToAi: boolean;
@@ -365,7 +614,7 @@ function getErrorSuggestion(errorType: "validation" | "api-limit" | "timeout" | 
         case "validation":
             return "Check your brief inputs: ensure the source detail is complete and valid.";
         default:
-            return "Check the log above for diagnostic details. Try again or contact support if the issue persists.";
+            return "Check the workflow timeline above for diagnostic details. Try again or contact support if the issue persists.";
     }
 }
 
@@ -398,7 +647,7 @@ function estimateRemainingTime(
 }
 
 function getPlannedFetchTrendsLabel(plan: AIBloggerTrendPlan) {
-    return plan.liveTrendsEnabled ? "Live Google Trends" : "AI-only discovery";
+    return plan.liveTrendsEnabled ? "Live Google Trends" : "AI topic discovery";
 }
 
 function getPlannedFetchTrendsNote(
@@ -422,15 +671,15 @@ function getPlannedFetchTrendsNote(
             : modeText;
     }
 
-    return "Live trends is off for this workspace, so AI-only discovery will choose the topic angle.";
+    return "Live trends is off for this workspace, so AI topic discovery will choose the topic angle.";
 }
 
 function getPlannedSerpAnalysisNote(plan: AIBloggerSerpPlan) {
     if (plan.enabled) {
-        return `The pipeline will snapshot Google results for ${plan.defaultLocation.toUpperCase()} on ${plan.device} to capture search intent, competitors, and People Also Ask patterns.`;
+        return `The workflow will review Google results for ${plan.defaultLocation.toUpperCase()} on ${plan.device} to capture search intent, competitors, and People Also Ask patterns.`;
     }
 
-    return "SERP analysis is skipped unless it is enabled in AI Blogger admin.";
+    return "Search landscape review is skipped unless it is enabled in AI Blogger admin.";
 }
 
 function getPlannedGroundedResearchNote(
@@ -438,14 +687,14 @@ function getPlannedGroundedResearchNote(
     groundedResearchPlan: AIBloggerGroundedResearchPlan,
 ) {
     if (!serpPlan.enabled) {
-        return "Grounded research depends on SERP source pages, so it is skipped when SERP analysis is off.";
+        return "Source verification depends on ranking source pages, so it is skipped when search landscape review is off.";
     }
 
     if (!groundedResearchPlan.enabled) {
-        return "Grounded research is turned off in AI Blogger admin, so AI will rely on prompt context and SERP patterns only.";
+        return "Source verification is turned off in AI Blogger admin, so AI will rely on prompt context and search result patterns only.";
     }
 
-    return "The pipeline will fetch a small trusted source pack from the ranking pages so research and writing stay grounded in real external evidence.";
+    return "The workflow will fetch a trusted source set from ranking pages so research and writing stay grounded in real external evidence.";
 }
 
 function getStrategySourceSummary(sourceMode: BlogStudioInputMode, sourceValue: string, trendFocus: string) {
@@ -479,17 +728,17 @@ function getStrategyResearchStack(
     groundedResearchPlan: AIBloggerGroundedResearchPlan,
 ) {
     return [
-        sourceMode === "website" ? "Website intelligence" : null,
+        sourceMode === "website" ? "Website scan" : null,
         trendPlan.liveTrendsEnabled ? "Live trends" : "AI topic discovery",
-        serpPlan.enabled ? `SERP analysis (${serpPlan.device})` : null,
+        serpPlan.enabled ? `Search landscape (${serpPlan.device})` : null,
         serpPlan.enabled && groundedResearchPlan.enabled
-            ? `Grounded research (${groundedResearchPlan.trustPreference === "high-only" ? "high trust" : "balanced"})`
+            ? `Source verification (${groundedResearchPlan.trustPreference === "high-only" ? "high trust" : "balanced"})`
             : null,
-        "Brief pack",
-        "Outline pack",
-        "Metadata pack",
-        "FAQ pack",
-        "Internal links",
+        "Content brief",
+        "Article outline",
+        "Metadata draft",
+        "FAQ plan",
+        "Internal link plan",
     ].filter(Boolean) as string[];
 }
 
@@ -512,7 +761,7 @@ function getStrategySeoSummary(
 function buildPipelineStepNotes(steps: BlogStudioGenerationStepInsight[]): PipelineStepNotesMap {
     return steps.reduce<PipelineStepNotesMap>((acc, step) => {
         if (step.notes?.trim()) {
-            acc[step.key] = step.notes.trim();
+            acc[step.key] = formatPipelineNoteForDisplay(step.key, step.notes);
         }
         return acc;
     }, {});
@@ -661,21 +910,33 @@ export function AIBloggerDraftBuilder({
                 if (data.type === "connected") {
                     if (streamReconnectNoticeRef.current) {
                         streamReconnectNoticeRef.current = false;
-                        pushPipelineLog("Pipeline", "Live connection restored.", "success");
+                        pushPipelineLog("Workflow", "Live progress connection restored.", "success");
                     }
                     return;
                 }
 
                 if (data.type === "step-start" && data.step) {
+                    const copy = getPipelineStageCopy(data.step, data.label);
                     setPipelineSteps((current) => ({
                         ...current,
                         [data.step!]: "active",
                     }));
-                    pushPipelineLog(data.label || data.step, "Running…", "info");
+                    const secondaryLabel = getPipelineSecondaryLabel(data.step, data.label);
+                    setPipelineStepLabels((current) => {
+                        const next = { ...current };
+                        if (secondaryLabel) {
+                            next[data.step!] = secondaryLabel;
+                        } else {
+                            delete next[data.step!];
+                        }
+                        return next;
+                    });
+                    pushPipelineLog(copy.title, getPipelineLogMessage(data, "active"), "info");
                     return;
                 }
 
                 if (data.type === "step-complete" && data.step) {
+                    const copy = getPipelineStageCopy(data.step, data.label);
                     setPipelineSteps((current) => ({
                         ...current,
                         [data.step!]: "completed",
@@ -683,24 +944,31 @@ export function AIBloggerDraftBuilder({
                     if (data.notes) {
                         setPipelineStepNotes((current) => ({
                             ...current,
-                            [data.step!]: data.notes!,
+                            [data.step!]: formatPipelineNoteForDisplay(data.step, data.notes),
                         }));
                     }
                     if (data.label) {
-                        setPipelineStepLabels((current) => ({
-                            ...current,
-                            [data.step!]: data.label!,
-                        }));
+                        const secondaryLabel = getPipelineSecondaryLabel(data.step, data.label);
+                        setPipelineStepLabels((current) => {
+                            const next = { ...current };
+                            if (secondaryLabel) {
+                                next[data.step!] = secondaryLabel;
+                            } else {
+                                delete next[data.step!];
+                            }
+                            return next;
+                        });
                     }
                     pushPipelineLog(
-                        data.label || data.step,
-                        data.notes || "Completed.",
+                        copy.title,
+                        getPipelineLogMessage(data, "completed"),
                         "output",
                     );
                     return;
                 }
 
                 if (data.type === "step-fail" && data.step) {
+                    const copy = getPipelineStageCopy(data.step, data.label);
                     setPipelineSteps((current) => ({
                         ...current,
                         [data.step!]: "failed",
@@ -708,12 +976,12 @@ export function AIBloggerDraftBuilder({
                     if (data.notes) {
                         setPipelineStepNotes((current) => ({
                             ...current,
-                            [data.step!]: data.notes!,
+                            [data.step!]: formatPipelineNoteForDisplay(data.step, data.notes),
                         }));
                     }
                     pushPipelineLog(
-                        data.label || data.step,
-                        data.notes || "Failed.",
+                        copy.title,
+                        getPipelineLogMessage(data, "failed"),
                         "error",
                     );
                     // Store failed step for potential retry
@@ -722,6 +990,7 @@ export function AIBloggerDraftBuilder({
                 }
 
                 if (data.type === "step-skip" && data.step) {
+                    const copy = getPipelineStageCopy(data.step, data.label);
                     setPipelineSteps((current) => ({
                         ...current,
                         [data.step!]: "completed",
@@ -729,19 +998,19 @@ export function AIBloggerDraftBuilder({
                     if (data.notes) {
                         setPipelineStepNotes((current) => ({
                             ...current,
-                            [data.step!]: data.notes!,
+                            [data.step!]: formatPipelineNoteForDisplay(data.step, data.notes),
                         }));
                     }
                     pushPipelineLog(
-                        data.label || data.step,
-                        data.notes || "Skipped.",
+                        copy.title,
+                        getPipelineLogMessage(data, "skipped"),
                         "warn",
                     );
                     return;
                 }
 
                 if (data.type === "log" && data.message) {
-                    pushPipelineLog("Pipeline", data.message, "info");
+                    pushPipelineLog("Workflow", formatPipelineNoteForDisplay(undefined, data.message), "info");
                     return;
                 }
 
@@ -768,21 +1037,25 @@ export function AIBloggerDraftBuilder({
                         }));
                         setPipelineStepNotes(buildPipelineStepNotes(result.diagnostics.steps));
                         setPipelineCompletionMessage("Draft generated. Opening the draft...");
-                        pushPipelineLog("Fetch Trends", `Source: ${result.diagnostics.fetchTrendsLabel} — ${result.diagnostics.fetchTrendsNotes}`, "output");
+                        pushPipelineLog(
+                            getPipelineStageCopy("fetch-trends").title,
+                            `Source: ${result.diagnostics.fetchTrendsLabel} - ${formatPipelineNoteForDisplay("fetch-trends", result.diagnostics.fetchTrendsNotes)}`,
+                            "output",
+                        );
                         if (typeof result.diagnostics.businessFitScore === "number") {
-                            pushPipelineLog("Business Fit", `Score: ${result.diagnostics.businessFitScore}/100${result.diagnostics.businessFitSummary ? ` — ${result.diagnostics.businessFitSummary}` : ""}`, "success");
+                            pushPipelineLog("Topic Fit", `Score: ${result.diagnostics.businessFitScore}/100${result.diagnostics.businessFitSummary ? ` - ${result.diagnostics.businessFitSummary}` : ""}`, "success");
                         }
                         result.diagnostics.businessFitWarnings.forEach((w) =>
-                            pushPipelineLog("Business Fit", `⚠ ${w}`, "warn"),
+                            pushPipelineLog("Topic Fit", `Warning: ${w}`, "warn"),
                         );
-                        pushPipelineLog("Pipeline", "Draft generated and sent to the queue.", "success");
+                        pushPipelineLog("Workflow", "Draft generated and sent to the review queue.", "success");
                         toast.success("AI Blogger draft generated");
 
                         // Set slug to navigate to - will be handled in useEffect with cleanup
                         setPostSlugToNavigate(result.post.slug);
                     } else {
                         setPipelineStatus("success");
-                        setPipelineCompletionMessage("Pipeline complete.");
+                        setPipelineCompletionMessage("Workflow complete.");
                     }
                     return;
                 }
@@ -808,7 +1081,7 @@ export function AIBloggerDraftBuilder({
                     setCanRetry(isTransient);
 
                     const activeStep = AI_PIPELINE_STEPS.find((s) => pipelineSteps[s.key] === "active");
-                    const stepLabel = activeStep?.label || "Unknown Step";
+                    const stepLabel = activeStep?.label || "Workflow";
 
                     const suggestion = getErrorSuggestion(errType);
                     const icon = getErrorIcon(errType);
@@ -823,15 +1096,15 @@ export function AIBloggerDraftBuilder({
                         }
                         return next;
                     });
-                    pushPipelineLog("Pipeline Error", `${stepLabel}: ${message}`, "error");
-                    pushPipelineLog("Suggestion", suggestion, "warn");
+                    pushPipelineLog("Workflow", `${stepLabel}: ${message}`, "error");
+                    pushPipelineLog("Recommended Next Step", suggestion, "warn");
                     setError(`${errorSummary}: ${message}`);
                     toast.error(`Generation failed at ${stepLabel}`);
                     return;
                 }
             } catch (eventHandlingError) {
                 console.error("[AI-BLOGGER] [DRAFT-BUILDER] Error handling pipeline event:", eventHandlingError);
-                setError("An error occurred while processing the pipeline. Please check the browser console.");
+                setError("An error occurred while processing the workflow. Please check the browser console.");
                 setPipelineStatus("failed");
             }
         },
@@ -844,8 +1117,8 @@ export function AIBloggerDraftBuilder({
         if (pipelineStatusRef.current === "running" && !streamReconnectNoticeRef.current) {
             streamReconnectNoticeRef.current = true;
             pushPipelineLog(
-                "Pipeline",
-                "Connection interrupted. Waiting for the live stream to reconnect...",
+                "Workflow",
+                "Live progress paused. Reconnecting to the saved run...",
                 "warn",
             );
         }
@@ -872,7 +1145,7 @@ export function AIBloggerDraftBuilder({
                     } else if (json.status === "failed") {
                         handlePipelineEvent({
                             type: "error",
-                            message: json.error || "Pipeline failed (detected via status polling).",
+                            message: json.error || "Workflow failed while checking saved status.",
                         });
                         if (statusPollIntervalRef.current) {
                             clearInterval(statusPollIntervalRef.current);
@@ -980,8 +1253,8 @@ export function AIBloggerDraftBuilder({
                         `[AI-BLOGGER] [SSE] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) exhausted, falling back to status polling`,
                     );
                     pushPipelineLog(
-                        "Pipeline",
-                        "Live stream unavailable. Checking status in the background…",
+                        "Workflow",
+                        "Live progress stream unavailable. Checking the saved run status in the background...",
                         "warn",
                     );
                     // eslint-disable-next-line react-hooks/rules-of-hooks -- called from EventSource callback, not during render
@@ -1093,7 +1366,7 @@ export function AIBloggerDraftBuilder({
                         elapsedTimeIntervalRef.current = setInterval(() => {
                             setPipelineElapsedTime(Math.max(0, Date.now() - ts));
                         }, 1000);
-                        setPipelineLogs([{ id: "reconnect", level: "info", label: "Pipeline", message: "Reconnecting to active pipeline...", timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) }]);
+                        setPipelineLogs([{ id: "reconnect", level: "info", label: "Workflow", message: "Reconnecting to the active generation workflow...", timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) }]);
                         connectSSE(jobId);
                     }, 0);
                 } else if (jobId) {
@@ -1309,7 +1582,7 @@ export function AIBloggerDraftBuilder({
             setPipelineVisible(true);
             setPipelineStatus("running");
             setPipelineSteps(getInitialPipelineSteps());
-            setPipelineLogs([{ id: "start", level: "info", label: "Pipeline", message: "Generation started.", timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) }]);
+            setPipelineLogs([{ id: "start", level: "info", label: "Workflow", message: "Generation workflow started.", timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) }]);
             setPipelineStepNotes({});
             setPipelineStepLabels({});
             setPipelineCompletionMessage("");
@@ -1361,7 +1634,7 @@ export function AIBloggerDraftBuilder({
                     const msg = json.error || "Failed to start generation.";
                     setError(msg);
                     setPipelineStatus("failed");
-                    pushPipelineLog("Pipeline", `Failed to start: ${msg}`, "error");
+                    pushPipelineLog("Workflow", `Could not start generation: ${msg}`, "error");
                     toast.error(msg);
                     if (elapsedTimeIntervalRef.current) {
                         clearInterval(elapsedTimeIntervalRef.current);
@@ -1379,7 +1652,7 @@ export function AIBloggerDraftBuilder({
                 const msg = fetchError instanceof Error ? fetchError.message : "Network error";
                 setError(msg);
                 setPipelineStatus("failed");
-                pushPipelineLog("Pipeline", `Failed to start: ${msg}`, "error");
+                pushPipelineLog("Workflow", `Could not start generation: ${msg}`, "error");
                 toast.error(msg);
                 if (elapsedTimeIntervalRef.current) {
                     clearInterval(elapsedTimeIntervalRef.current);
@@ -1929,19 +2202,19 @@ export function AIBloggerDraftBuilder({
                 </AIBloggerGlassCard>
             </form>
 
-            {/* Pipeline progress — full-width card that slides in when pipeline starts */}
+            {/* Workflow progress - full-width card that slides in when generation starts */}
             {pipelineVisible && formMode === "ai" ? (
                 <AIBloggerGlassCard className="overflow-hidden p-4 sm:p-6">
                     <div className="space-y-4">
                         <div className="flex items-start justify-between gap-3">
                             <div>
-                                <p className="text-base font-semibold">Generation Progress</p>
+                                <p className="text-base font-semibold">Generation Workflow</p>
                                 <p className="mt-0.5 text-sm leading-6 text-muted-foreground">
                                     {pipelineStatus === "running"
-                                        ? `${Object.values(pipelineSteps).filter((s) => s === "completed").length} of ${AI_PIPELINE_STEPS.length} steps completed`
+                                        ? `${Object.values(pipelineSteps).filter((s) => s === "completed").length} of ${AI_PIPELINE_STEPS.length} stages completed`
                                         : pipelineStatus === "success"
-                                            ? pipelineCompletionMessage || "All steps completed."
-                                            : "Generation stopped before completion."}
+                                            ? pipelineCompletionMessage || "All stages completed."
+                                            : "Workflow stopped before the draft was completed."}
                                 </p>
                             </div>
                             <div className="flex items-center gap-2">
@@ -1967,7 +2240,7 @@ export function AIBloggerDraftBuilder({
                         {/* Show brief summary when running/failed */}
                         {(pipelineStatus === "running" || pipelineStatus === "failed") && (
                             <div className="rounded-xl border border-border/60 bg-background/40 p-3">
-                                <p className="text-xs font-semibold text-muted-foreground mb-2">Your Setup</p>
+                                <p className="text-xs font-semibold text-muted-foreground mb-2">Run Setup</p>
                                 <div className="space-y-1.5 text-xs text-muted-foreground">
                                     <div><span className="font-medium text-foreground">Source:</span> {sourceMode === "website" ? "Website" : sourceMode === "trending" ? "Trending Topic" : "Keywords"} | {sourceValue.substring(0, 40)}{sourceValue.length > 40 ? "..." : ""}</div>
                                     <div><span className="font-medium text-foreground">Word target:</span> {selectedWordTarget} words {primaryKeyword && `| Keyword: ${primaryKeyword.substring(0, 30)}${primaryKeyword.length > 30 ? "..." : ""}`}</div>
@@ -1983,7 +2256,7 @@ export function AIBloggerDraftBuilder({
                         >
                             {pipelineStatus === "running" && "Generation in progress. This may take several minutes. Do not close the page."}
                             {pipelineStatus === "success" && "Generation complete! Your draft is ready to review."}
-                            {pipelineStatus === "failed" && `Generation failed. ${pipelineLogs.find((l) => l.level === "error")?.message || "Check the log for details."}`}
+                            {pipelineStatus === "failed" && `Generation failed. ${pipelineLogs.find((l) => l.level === "error")?.message || "Check the workflow timeline for details."}`}
                         </div>
 
                         {/* Progress Bar and Time Display */}
@@ -2028,7 +2301,7 @@ export function AIBloggerDraftBuilder({
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="font-semibold text-destructive">
-                                                {errorType ? `${errorType.charAt(0).toUpperCase() + errorType.slice(1).replace(/-/g, " ")} Error` : "Generation Failed"}
+                                                {errorType ? `${errorType.charAt(0).toUpperCase() + errorType.slice(1).replace(/-/g, " ")} Error` : "Workflow Failed"}
                                             </p>
                                             <p className="mt-1 text-sm leading-6 text-foreground">
                                                 {pipelineLogs.find((l) => l.level === "error")?.message || "An unexpected error occurred."}
@@ -2076,6 +2349,7 @@ export function AIBloggerDraftBuilder({
                                 const state = pipelineSteps[step.key];
                                 const classes = getStepClasses(state);
                                 const isFailed = state === "failed";
+                                const statusText = getPipelineStepStatusText(step.key, state, pipelineStepNotes[step.key]);
                                 return (
                                     <div
                                         key={step.key}
@@ -2109,11 +2383,9 @@ export function AIBloggerDraftBuilder({
                                                     {pipelineStepLabels[step.key]}
                                                 </p>
                                             ) : null}
-                                            {pipelineStepNotes[step.key] ? (
-                                                <p className={`mt-0.5 text-xs leading-5 ${isFailed ? "text-destructive/60 font-medium" : "text-muted-foreground"}`}>
-                                                    {pipelineStepNotes[step.key]}
-                                                </p>
-                                            ) : null}
+                                            <p className={`mt-0.5 text-xs leading-5 ${isFailed ? "text-destructive/60 font-medium" : "text-muted-foreground"}`}>
+                                                {statusText}
+                                            </p>
                                         </div>
                                     </div>
                                 );
@@ -2124,25 +2396,25 @@ export function AIBloggerDraftBuilder({
                             <div className="rounded-2xl border border-border/60 bg-background/65 p-4">
                                 <div className="mb-3 flex items-center justify-between gap-2">
                                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                                        Live Log ({pipelineLogs.length} entries)
+                                        Workflow Timeline ({pipelineLogs.length} updates)
                                     </p>
                                     <button
                                         onClick={() => {
                                             const logText = pipelineLogs
                                                 .map((l) => `[${l.timestamp}] ${l.label}: ${l.message}`)
                                                 .join("\n");
-                                            navigator.clipboard.writeText(logText);
-                                            toast.success("Log copied to clipboard");
+                                            navigator.clipboard.writeText(`AI Blogger Workflow Timeline\n${logText}`);
+                                            toast.success("Workflow timeline copied");
                                         }}
                                         className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                                        title="Copy full log"
+                                        title="Copy workflow timeline"
                                     >
-                                        📋 Copy
+                                        Copy timeline
                                     </button>
                                 </div>
                                 <div
                                     ref={logScrollRef}
-                                    className="max-h-72 space-y-1.5 overflow-y-auto pr-1 font-mono text-[11px]"
+                                    className="max-h-72 space-y-1.5 overflow-y-auto pr-1 text-xs"
                                 >
                                     {pipelineLogs.map((entry) => (
                                         <div
@@ -2185,7 +2457,7 @@ export function AIBloggerDraftBuilder({
                                                     </span>
                                                 </div>
                                                 <p className={[
-                                                    "text-[10px] leading-normal text-muted-foreground mt-0.5",
+                                                    "mt-0.5 text-xs leading-5 text-muted-foreground",
                                                     entry.level === "output" || entry.level === "error" ? "font-medium" : "",
                                                     entry.level === "error" ? "text-destructive/70" : "",
                                                 ].join(" ")}>
