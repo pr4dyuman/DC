@@ -703,7 +703,7 @@ export function AIBloggerPostStatusControls({
                             <div className="min-w-0">
                                 <p className="font-medium text-foreground">Rerun grounded research</p>
                                 <p className="mt-1.5 leading-6 text-muted-foreground">
-                                    This draft is missing a usable grounded source pack. Refreshing research will fetch a fresh source set from the current SERP results and re-run the claim-support check.
+                                    This draft is missing usable claim support. Refreshing research will fetch a fresh source set from the current SERP results, reapply it to the saved draft, and rerun the claim-support check.
                                 </p>
                             </div>
                         </div>
@@ -738,10 +738,10 @@ export function AIBloggerPostStatusControls({
                             <div className="min-w-0">
                                 <p className="font-medium text-foreground">Refreshing grounded research now</p>
                                 <p className="mt-1.5 leading-6 text-muted-foreground">
-                                    Pulling fresh SERP source URLs, rebuilding the grounded source pack, and re-running the claim-support audit.
+                                    Pulling fresh SERP source URLs, rebuilding the grounded source pack, applying it to the current draft, and rerunning the claim-support audit.
                                 </p>
                                 <p className="mt-2 text-xs leading-5 text-primary">
-                                    The editor will refresh automatically when the updated sources are stored.
+                                    The editor will refresh automatically when the updated draft and sources are stored.
                                 </p>
                             </div>
                         </div>

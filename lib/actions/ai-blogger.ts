@@ -589,6 +589,8 @@ export type RefreshBlogStudioGroundedResearchResult = {
     highTrustSourceCount: number;
     cacheStatus: AIBloggerGroundedResearch["cacheStatus"];
     claimsGroundingCleared: boolean;
+    draftUpdated: boolean;
+    changedFields: string[];
     summary: string;
 };
 
@@ -2947,6 +2949,100 @@ CRITICAL RULES:
 - JSON only, no markdown code fences, no commentary.`;
 }
 
+function buildAIBloggerGroundedResearchRefreshPrompt(input: {
+    agencyName?: string;
+    draft: BlogStudioPost;
+    settings: BlogStudioSettings;
+    publishRules: AIBloggerConfig["publishRules"];
+    audit: BlogStudioSeoAudit;
+    groundedResearchPromptBlock: string;
+    internalLinksPromptBlock?: string;
+}) {
+    const aiReviewPolicy = input.publishRules.aiReviewPolicy;
+    const detectedStyleFlags = detectAIBloggerStyleRedFlags(input.draft.content || "");
+
+    return `Run the "Grounded Research Refresh" stage for an AI Blogger draft.
+
+Goal:
+- Apply the refreshed grounded source pack to the current draft.
+- Keep the topic, title direction, outline, CTA path, FAQ pack, and internal links stable unless a claim-support fix requires a small edit.
+- Save the improved draft only. Never publish, schedule, or advance workflow state.
+
+Agency: ${getPromptAgencyName(input.agencyName)}
+Title: ${input.draft.title}
+Primary keyword: ${input.draft.brief.primaryKeyword || "not provided"}
+Audience: ${getContextInferredAudience(input.draft.brief.audience, input.draft.draftBrief?.targetAudience)}
+Tone: ${getContextInferredTone(input.draft.brief.tone, input.draft.draftBrief?.toneDirection)}
+CTA goal: ${getContextInferredCta(input.draft.brief.cta, input.draft.draftBrief?.ctaGoal)}
+Search intent: ${input.draft.searchIntent || "not specified"}
+Content type: ${input.draft.contentType || "not specified"}
+Current SEO score: ${input.audit.score}
+Current blockers: ${input.audit.blockers.join(" | ") || "none"}
+Current word count: ${input.draft.wordCount ?? countWords(input.draft.content)}
+Target word range: ${input.settings.seo.minWords}-${input.settings.seo.maxWords}
+AI-style red flags: ${detectedStyleFlags.join(" | ") || "none detected"}
+Soften questionable claims: ${aiReviewPolicy.softenQuestionableClaims ? "yes" : "no"}
+Require grounded support for claims: ${aiReviewPolicy.requireGroundedSourcesForClaims ? "yes" : "no"}
+
+Current metadata:
+- Meta title: ${input.draft.metaTitle || input.draft.title}
+- Meta description: ${input.draft.metaDescription || input.draft.excerpt}
+- Excerpt: ${input.draft.excerpt || "not provided"}
+
+Current outline:
+${input.draft.outline.length > 0 ? input.draft.outline.map((item) => `- ${item}`).join("\n") : "- Use the existing body structure"}
+
+Current FAQ pack:
+${input.draft.faqItems?.length ? input.draft.faqItems.map((item, index) => `${index + 1}. ${item.question} - ${item.answer}`).join("\n") : "No FAQ items are currently stored"}
+
+${input.draft.generationDiagnostics?.keywordPlan
+        ? `Keyword plan:\n${formatKeywordPlanForPrompt(input.draft.generationDiagnostics.keywordPlan)}`
+        : ""}
+
+${input.groundedResearchPromptBlock}
+${input.internalLinksPromptBlock ? `\n\n${input.internalLinksPromptBlock}` : ""}
+
+Current content:
+${sanitizeText(input.draft.content, 35000)}
+
+Return JSON only with this exact shape:
+{
+  "title": "string",
+  "primaryKeyword": "string",
+  "metaTitle": "string",
+  "metaDescription": "string",
+  "excerpt": "string",
+  "content": "string",
+  "outline": ["string"],
+  "tags": ["string"],
+  "metaKeywords": ["string"],
+  "featuredImageAlt": "string",
+  "faqItems": [
+    {
+      "question": "string",
+      "answer": "string"
+    }
+  ],
+  "seoScore": 0,
+  "wordCount": 0
+}
+
+CRITICAL RULES:
+- Treat this as a focused grounding pass, not a net-new rewrite.
+- Keep the same topic, title intent, audience, CTA path, and overall structure unless a small edit is required to fix a factual claim safely.
+- Preserve existing internal links when they still fit. Keep them inline as [anchor text](/path) syntax.
+- Preserve the FAQ pack unless a grounded source forces a small wording correction.
+- When grounded sources are present above, add or preserve inline [1], [2] citations for concrete claims they support.
+- Every statistic, date, study finding, regulation, or quoted claim must map cleanly to the grounded source list.
+- If a precise claim is not supported by the refreshed sources, soften or remove it instead of inventing certainty.
+- If inline [1], [2] citations remain in the content, add a short ## Sources or ## References section at the end so the support is traceable.
+- Keep one blank line between paragraphs.
+- Do not pivot the primary keyword, do not remove useful headings, and do not strip strong metadata just to vary the copy.
+- Use ## for section headings and ### for sub-headings only. Never use # inside the body.
+- Never use em-dashes, double hyphens, or AI filler phrases like "In today's digital landscape".
+- JSON only, no markdown code fences, no commentary.`;
+}
+
 function buildAIBloggerFinalCheckerPrompt(input: {
     agencyName?: string;
     draft: BlogStudioPost;
@@ -3376,8 +3472,11 @@ function buildGroundedResearchRefreshSummary(input: {
     sourceCount: number;
     highTrustSourceCount: number;
     claimsGroundingCleared: boolean;
+    claimsGroundingStillNeedsReview: boolean;
     seoScoreBefore: number;
     seoScoreAfter: number;
+    draftUpdated: boolean;
+    changedFieldsCount: number;
 }) {
     const scoreDelta = input.seoScoreAfter - input.seoScoreBefore;
     const scoreNote =
@@ -3386,12 +3485,18 @@ function buildGroundedResearchRefreshSummary(input: {
             : scoreDelta < 0
                 ? ` SEO score changed by ${scoreDelta} point${scoreDelta === -1 ? "" : "s"}.`
                 : "";
+    const draftNote = input.draftUpdated
+        ? ` Draft updated to apply the refreshed sources${input.changedFieldsCount > 0 ? ` across ${input.changedFieldsCount} field${input.changedFieldsCount === 1 ? "" : "s"}` : ""}.`
+        : "";
+    const unresolvedNote = input.claimsGroundingStillNeedsReview
+        ? " Claim-support still needs review."
+        : "";
 
     if (input.claimsGroundingCleared) {
-        return `Grounded research refreshed with ${input.sourceCount} source${input.sourceCount === 1 ? "" : "s"} (${input.highTrustSourceCount} high-trust). Claim-support blocker cleared.${scoreNote}`;
+        return `Grounded research refreshed with ${input.sourceCount} source${input.sourceCount === 1 ? "" : "s"} (${input.highTrustSourceCount} high-trust).${draftNote} Claim-support blocker cleared.${scoreNote}`;
     }
 
-    return `Grounded research refreshed with ${input.sourceCount} source${input.sourceCount === 1 ? "" : "s"} (${input.highTrustSourceCount} high-trust).${scoreNote}`;
+    return `Grounded research refreshed with ${input.sourceCount} source${input.sourceCount === 1 ? "" : "s"} (${input.highTrustSourceCount} high-trust).${draftNote}${unresolvedNote}${scoreNote}`;
 }
 
 function formatInternalLinkSuggestionsForPrompt(
@@ -9544,6 +9649,13 @@ export async function refreshBlogStudioPostGroundedResearchImpl(
     const aiBloggerConfig = executionContext.aiBloggerConfig;
     const mergedConfig = getAgencyMergedAIBloggerConfig(aiConfig, aiBloggerConfig);
     const publishRules = mergedConfig.publishRules;
+    const currentSiteUrl =
+        resolveBlogStudioSiteUrl({
+            canonicalUrl: currentPost.canonicalUrl,
+            brief: currentPost.brief,
+            author: aiBloggerConfig?.author,
+            entityModeling: aiBloggerConfig?.entityModeling,
+        }) || undefined;
     const startedAt = new Date().toISOString();
     const runSteps: BlogStudioRunStep[] = [];
     const recordGroundedResearchRun = async (status: BlogStudioRunStatus, summary: string) => {
@@ -9719,7 +9831,7 @@ export async function refreshBlogStudioPostGroundedResearchImpl(
         })
         : undefined;
     const now = new Date().toISOString();
-    const nextDraft: BlogStudioPost = {
+    let nextDraft: BlogStudioPost = {
         ...currentPost,
         externalSources: groundedResearch.sources,
         researchNotes: nextResearchNotes.length > 0
@@ -9729,16 +9841,209 @@ export async function refreshBlogStudioPostGroundedResearchImpl(
         updatedAt: now,
         updatedBy: actor.id,
     };
-    const nextAudit = getBlogStudioSeoAudit(nextDraft, settings, publishRules);
+    let nextAudit = getBlogStudioSeoAudit(nextDraft, settings, publishRules);
+    const sourceOnlyClaimsGroundingPassed =
+        nextAudit.checks.find((check) => check.key === "claims-grounding")?.passed ?? true;
+    const sourceOnlySeoScore = nextAudit.score;
+    const sourceOnlyBlockersCount = nextAudit.blockers.length;
+    const sourceOnlyWordCount = nextDraft.wordCount ?? countWords(nextDraft.content);
+    const highTrustSourceCount = groundedResearch.sources.filter((source) => source.trustLevel === "high").length;
+    let draftUpdated = false;
+    let changedFields: string[] = [];
+
+    if (currentPost.content?.trim()) {
+        const groundedDraftRefreshStartedAt = new Date().toISOString();
+        const storedInternalLinkSuggestions = mergeBlockerResolverInternalLinkSuggestions(
+            currentPost,
+            [],
+            currentSiteUrl,
+        );
+        const groundedResearchPromptBlock = formatGroundedResearchForPrompt({
+            query,
+            normalizedQuery: normalizeCannibalizationPhrase(query),
+            location: currentPost.brief.location || settings.seo.defaultLocation,
+            sources: groundedResearch.sources,
+            summary: `Refreshed source pack for ${currentPost.title}`,
+            cacheStatus: groundedResearch.cacheStatus,
+            refreshedAt: groundedResearch.refreshedAt,
+        });
+        const internalLinksPromptBlock = formatInternalLinkSuggestionsForPrompt(
+            storedInternalLinkSuggestions,
+        );
+
+        try {
+            const refreshRuntimeConfig = resolveAIBloggerFinalCheckerRuntimeConfig(
+                aiConfig,
+                aiBloggerConfig,
+            );
+            const refreshPrompt = buildAIBloggerGroundedResearchRefreshPrompt({
+                agencyName: executionContext.name,
+                draft: nextDraft,
+                settings,
+                publishRules,
+                audit: nextAudit,
+                groundedResearchPromptBlock,
+                internalLinksPromptBlock,
+            });
+            const refreshStage = await runAIBloggerRuntimeConfig(
+                refreshRuntimeConfig,
+                refreshPrompt,
+                Boolean(aiBloggerConfig?.fallbackEnabled),
+            );
+            const parsed = parseBlockerResolverResponse(refreshStage.text, currentPost);
+            const refreshedContent = normalizeDraftContentForStoredFaq(
+                parsed.content,
+                currentPost.faqItems,
+                currentPost.content || "",
+            );
+            const refreshedExcerpt = buildExcerpt(
+                parsed.excerpt || currentPost.excerpt,
+                refreshedContent,
+                currentPost.title,
+            );
+            const refreshedMetaTitle = buildMetaTitle(
+                parsed.metaTitle || currentPost.metaTitle || currentPost.title,
+                currentPost.title,
+            );
+            const refreshedMetaDescription = buildMetaDescription(
+                parsed.metaDescription || currentPost.metaDescription,
+                refreshedExcerpt,
+                refreshedContent,
+                currentPost.title,
+            );
+            const refreshedWordCount = resolveDraftWordCount(
+                parsed.wordCount ?? currentPost.wordCount,
+                refreshedContent,
+                settings,
+            );
+            const refreshedInternalLinks = buildTrackedInternalLinksFromContent(
+                refreshedContent,
+                storedInternalLinkSuggestions,
+                currentSiteUrl,
+            );
+            const refreshedDraft: BlogStudioPost = {
+                ...nextDraft,
+                excerpt: refreshedExcerpt,
+                metaTitle: refreshedMetaTitle,
+                metaDescription: refreshedMetaDescription,
+                content: refreshedContent,
+                internalLinks: refreshedInternalLinks,
+                featuredImageAlt: sanitizeText(
+                    parsed.featuredImageAlt,
+                    200,
+                    currentPost.featuredImageAlt || currentPost.title,
+                ),
+                wordCount: refreshedWordCount,
+                updatedAt: now,
+                updatedBy: actor.id,
+            };
+            const refreshedAudit = getBlogStudioSeoAudit(
+                refreshedDraft,
+                settings,
+                publishRules,
+            );
+            const refreshedClaimsGroundingPassed =
+                refreshedAudit.checks.find((check) => check.key === "claims-grounding")?.passed ?? true;
+            const acceptedRefresh =
+                (!sourceOnlyClaimsGroundingPassed && refreshedClaimsGroundingPassed)
+                || shouldUseFinalCheckerRevision(
+                    nextDraft,
+                    refreshedDraft,
+                    settings,
+                    publishRules,
+                    nextAudit,
+                    refreshedAudit,
+                );
+            const refreshNote = buildFinalCheckerStepNote({
+                accepted: acceptedRefresh,
+                scoreBefore: sourceOnlySeoScore,
+                scoreAfter: refreshedAudit.score,
+                blockersBefore: sourceOnlyBlockersCount,
+                blockersAfter: refreshedAudit.blockers.length,
+                wordCountBefore: sourceOnlyWordCount,
+                wordCountAfter: refreshedDraft.wordCount ?? countWords(refreshedDraft.content),
+                usedFallback: refreshStage.usedFallback,
+            });
+
+            if (acceptedRefresh) {
+                changedFields = buildBlockerResolutionChangedFields(nextDraft, {
+                    ...refreshedDraft,
+                    seoScore: refreshedAudit.score,
+                });
+                nextDraft = {
+                    ...refreshedDraft,
+                    seoScore: refreshedAudit.score,
+                };
+                nextAudit = refreshedAudit;
+                draftUpdated = true;
+            }
+
+            runSteps.push(buildDetailedRunStep({
+                key: "grounded-draft-refresh",
+                label: "Grounded Draft Refresh",
+                status: acceptedRefresh ? "completed" : "skipped",
+                notes: refreshNote,
+                startedAt: groundedDraftRefreshStartedAt,
+                input: {
+                    sourceCount: groundedResearch.sources.length,
+                    seoScoreBefore: sourceOnlySeoScore,
+                    claimsGroundingPassedBefore: sourceOnlyClaimsGroundingPassed,
+                    storedInternalLinks: currentPost.internalLinks?.length || 0,
+                },
+                output: {
+                    summary: refreshNote,
+                    data: {
+                        accepted: acceptedRefresh,
+                        changedFields: acceptedRefresh ? changedFields : [],
+                        claimsGroundingPassedAfter: refreshedClaimsGroundingPassed,
+                        seoScoreAfter: refreshedAudit.score,
+                    },
+                },
+            }));
+        } catch (error) {
+            runSteps.push(buildDetailedRunStep({
+                key: "grounded-draft-refresh",
+                label: "Grounded Draft Refresh",
+                status: "failed",
+                notes: `Grounded draft refresh failed: ${getErrorMessage(error)}`,
+                startedAt: groundedDraftRefreshStartedAt,
+                input: {
+                    sourceCount: groundedResearch.sources.length,
+                    claimsGroundingPassedBefore: sourceOnlyClaimsGroundingPassed,
+                },
+                output: {
+                    summary: "Stored the refreshed source pack, but kept the existing draft copy.",
+                },
+                errors: [getErrorMessage(error)],
+            }));
+        }
+    } else {
+        runSteps.push(buildDetailedRunStep({
+            key: "grounded-draft-refresh",
+            label: "Grounded Draft Refresh",
+            status: "skipped",
+            notes: "Skipped because the current draft content is empty.",
+            startedAt: now,
+            input: {
+                sourceCount: groundedResearch.sources.length,
+            },
+            output: {
+                summary: "Stored the refreshed source pack without changing the draft body.",
+            },
+        }));
+    }
+
     const afterClaimsGroundingPassed =
         nextAudit.checks.find((check) => check.key === "claims-grounding")?.passed ?? true;
-    const highTrustSourceCount = groundedResearch.sources.filter((source) => source.trustLevel === "high").length;
     const summary = buildGroundedResearchRefreshSummary({
         sourceCount: groundedResearch.sources.length,
         highTrustSourceCount,
         claimsGroundingCleared: !beforeClaimsGroundingPassed && afterClaimsGroundingPassed,
+        claimsGroundingStillNeedsReview: !afterClaimsGroundingPassed,
         seoScoreBefore: beforeAudit.score,
         seoScoreAfter: nextAudit.score,
+        draftUpdated,
+        changedFieldsCount: changedFields.length,
     });
 
     const updated = await BlogStudioPostModel.findOneAndUpdate(
@@ -9752,6 +10057,17 @@ export async function refreshBlogStudioPostGroundedResearchImpl(
                     220,
                 ),
                 generationDiagnostics: nextGenerationDiagnostics,
+                ...(draftUpdated
+                    ? {
+                        excerpt: nextDraft.excerpt,
+                        metaTitle: nextDraft.metaTitle,
+                        metaDescription: nextDraft.metaDescription,
+                        content: nextDraft.content,
+                        internalLinks: nextDraft.internalLinks,
+                        featuredImageAlt: nextDraft.featuredImageAlt,
+                        wordCount: nextDraft.wordCount,
+                    }
+                    : {}),
                 seoScore: nextAudit.score,
                 updatedAt: now,
                 updatedBy: actor.id,
@@ -9783,6 +10099,8 @@ export async function refreshBlogStudioPostGroundedResearchImpl(
                 cacheStatus: groundedResearch.cacheStatus,
                 seoScoreAfter: nextAudit.score,
                 claimsGroundingPassedAfter: afterClaimsGroundingPassed,
+                draftUpdated,
+                changedFields,
                 researchNotes: nextResearchNotes,
             },
         },
@@ -9791,7 +10109,9 @@ export async function refreshBlogStudioPostGroundedResearchImpl(
     await recordBlogStudioActivity(
         agencyId,
         actor,
-        "Refreshed grounded research for AI Blogger draft",
+        draftUpdated
+            ? "Refreshed grounded research and updated the AI Blogger draft"
+            : "Refreshed grounded research for AI Blogger draft",
         currentPost.title,
         currentPost.id,
     );
@@ -9814,6 +10134,8 @@ export async function refreshBlogStudioPostGroundedResearchImpl(
         highTrustSourceCount,
         cacheStatus: groundedResearch.cacheStatus,
         claimsGroundingCleared: !beforeClaimsGroundingPassed && afterClaimsGroundingPassed,
+        draftUpdated,
+        changedFields,
         summary,
     };
 }
