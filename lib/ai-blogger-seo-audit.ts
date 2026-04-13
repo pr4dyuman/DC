@@ -446,7 +446,7 @@ function buildSuggestions(
     }
 
     if (failed.has("internal-links")) {
-        suggestions.push("Add 2-3 internal links to relevant services, case studies, or supporting articles.");
+        suggestions.push("Add 2-3 internal links to relevant services, products, collections, case studies, or supporting articles.");
     }
 
     if (failed.has("cta-presence")) {

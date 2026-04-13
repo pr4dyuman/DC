@@ -551,7 +551,7 @@ const BlogStudioSiteSnapshotSchema = new Schema<BlogStudioSiteSnapshot>(
                 ctaPatterns: [{ type: String }],
                 pageCategory: {
                     type: String,
-                    enum: ["service", "solution", "case-study", "pricing", "industry", "blog", "faq", "about", "contact", "home", "general"],
+                    enum: ["service", "product", "collection", "category", "brand", "solution", "case-study", "pricing", "industry", "blog", "faq", "about", "contact", "home", "general"],
                     default: "general",
                 },
                 pageScore: { type: Number, default: 0 },

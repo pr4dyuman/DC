@@ -557,6 +557,10 @@ export type BlogStudioSchedule = {
 
 export type BlogStudioSitePriorityPageCategory =
     | "service"
+    | "product"
+    | "collection"
+    | "category"
+    | "brand"
     | "solution"
     | "case-study"
     | "pricing"

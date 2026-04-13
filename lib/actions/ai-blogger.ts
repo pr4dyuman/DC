@@ -952,8 +952,8 @@ function inferInternalLinkSource(
         return "blog";
     }
 
-    // Generic check for service/product pages (works for any website structure)
-    if (/^\/(?:services?|solutions?|products?|offers?)\b/i.test(normalizedHref)) {
+    // Generic check for commercial pages (services, products, collections, brands, etc.)
+    if (/^\/(?:services?|solutions?|products?|offers?|collections?|categories?|brands?|shop|store)\b/i.test(normalizedHref)) {
         return "service";
     }
 
@@ -3140,7 +3140,7 @@ function formatWebsiteIntelligenceForPrompt(
 - Crawled pages: ${intelligence.pageCount}
 - Priority paths: ${intelligence.priorityPaths.join(", ") || "none"}
 - Priority page targets: ${intelligence.priorityPages.slice(0, 5).map((page) => `${page.title} (${page.pageCategory})`).join(" | ") || "none"}
-- Service signals: ${intelligence.serviceSignals.slice(0, 6).join(" | ") || "none"}
+- Commercial/service signals: ${intelligence.serviceSignals.slice(0, 6).join(" | ") || "none"}
 - CTA patterns: ${intelligence.ctaPatterns.slice(0, 5).join(" | ") || "none"}
 - Proof signals: ${intelligence.proofSignals.slice(0, 5).join(" | ") || "none"}
 - Topic hints: ${intelligence.topicHints.slice(0, 10).join(" | ") || "none"}
@@ -3424,7 +3424,7 @@ Rules:
 - Include 2 to 4 internal links in the article body when they fit naturally.
 - Distribute links across DIFFERENT sections — never cluster multiple links in the same paragraph or section.
 - When a suggested section heading is provided (e.g. "Section: ..."), place the link in or near that section.
-- Prefer service, solution, pricing, industry, or case-study pages for commercial context. Use blog pages as supporting education, not the whole strategy.
+- Prefer service, product, collection, category, brand, solution, pricing, industry, or case-study pages for commercial context. Use blog pages as supporting education, not the whole strategy.
 - CRITICAL: Use SHORT, NATURAL anchor text (2–4 words only). NEVER paste the full page title as anchor text. Bad: "How to Manage Your Company Using AI-Powered Tools: 2026 Strategy". Good: "our AI tools guide", "this workflow overview", "manage with AI".
 - Insert links inline as [anchor text](href). Do not paste bare URLs into the body.
 - Prioritize links with higher relevance scores.`;
@@ -4039,6 +4039,10 @@ function buildWebsiteCommercialTopicHints(websiteIntelligence: AIBloggerWebsiteI
             ...websiteIntelligence.priorityPages
                 .filter((page) =>
                     page.pageCategory === "service"
+                    || page.pageCategory === "product"
+                    || page.pageCategory === "collection"
+                    || page.pageCategory === "category"
+                    || page.pageCategory === "brand"
                     || page.pageCategory === "solution"
                     || page.pageCategory === "pricing"
                     || page.pageCategory === "case-study"

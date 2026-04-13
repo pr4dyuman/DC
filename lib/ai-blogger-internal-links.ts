@@ -64,6 +64,10 @@ const STOP_WORDS = new Set([
 
 const COMMERCIAL_WEBSITE_CATEGORIES = new Set<BlogStudioSitePriorityPageCategory>([
     "service",
+    "product",
+    "collection",
+    "category",
+    "brand",
     "solution",
     "case-study",
     "pricing",
@@ -324,6 +328,14 @@ function getWebsiteCategoryLabel(category?: BlogStudioSitePriorityPageCategory) 
     switch (category) {
         case "service":
             return "service";
+        case "product":
+            return "product";
+        case "collection":
+            return "collection";
+        case "category":
+            return "category";
+        case "brand":
+            return "brand";
         case "solution":
             return "solution";
         case "case-study":
@@ -352,6 +364,22 @@ function getWebsiteCategoryFromPath(pathname: string): BlogStudioSitePriorityPag
 
     if (normalizedPath === "/") {
         return "home";
+    }
+
+    if (/(^|\/)(products?|items?|sku)(\/|$)/.test(normalizedPath)) {
+        return "product";
+    }
+
+    if (/(^|\/)(collections?|catalog|catalogue|shop|store)(\/|$)/.test(normalizedPath)) {
+        return "collection";
+    }
+
+    if (/(^|\/)(categories?|departments?)(\/|$)/.test(normalizedPath)) {
+        return "category";
+    }
+
+    if (/(^|\/)(brands?|manufacturers?|makers?)(\/|$)/.test(normalizedPath)) {
+        return "brand";
     }
 
     if (/(^|\/)(pricing|plans?|packages?|costs?|quotes?)(\/|$)/.test(normalizedPath)) {
@@ -386,7 +414,7 @@ function getWebsiteCategoryFromPath(pathname: string): BlogStudioSitePriorityPag
         return "solution";
     }
 
-    if (/(^|\/)(services?|products?|offers?)(\/|$)/.test(normalizedPath)) {
+    if (/(^|\/)(services?|offers?)(\/|$)/.test(normalizedPath)) {
         return "service";
     }
 
@@ -408,14 +436,22 @@ function isLowValueWebsiteCategory(category?: BlogStudioSitePriorityPageCategory
 
 function getWebsiteCategoryWeight(category?: BlogStudioSitePriorityPageCategory) {
     switch (category) {
+        case "collection":
+            return 15;
         case "service":
             return 14;
+        case "category":
+            return 14;
         case "solution":
+            return 13;
+        case "product":
             return 13;
         case "pricing":
             return 12;
         case "case-study":
             return 11;
+        case "brand":
+            return 10;
         case "industry":
             return 10;
         case "faq":
@@ -450,6 +486,18 @@ function buildWebsiteCandidateAnchor(
                     : `${humanLabel} platform`;
             }
             return /\bservice|services\b/.test(humanLabel) ? humanLabel : `${humanLabel} services`;
+        case "product":
+            return toPreferredAnchor(title || humanLabel);
+        case "collection":
+            return /\b(collection|catalog|shop|store)\b/.test(humanLabel)
+                ? humanLabel
+                : `${humanLabel} collection`;
+        case "category":
+            return /\b(category|department|shop|store)\b/.test(humanLabel)
+                ? humanLabel
+                : `${humanLabel} category`;
+        case "brand":
+            return toPreferredAnchor(title || humanLabel);
         case "solution":
             return /\b(solution|platform|workflow|software|tool|system)\b/.test(humanLabel)
                 ? humanLabel
@@ -658,7 +706,7 @@ function getBestSectionHeading(post: BlogStudioPost, candidate: LinkCandidate) {
             }
         }
 
-        if (isCommercialCandidate(candidate) && /(next step|why|strategy|services?|support|partner|help)/i.test(heading)) {
+        if (isCommercialCandidate(candidate) && /(next step|why|strategy|services?|products?|shop|support|partner|help)/i.test(heading)) {
             headingScore += 3;
         }
 
@@ -673,7 +721,7 @@ function getBestSectionHeading(post: BlogStudioPost, candidate: LinkCandidate) {
     }
 
     if (isCommercialCandidate(candidate)) {
-        return context.sectionHeadings.find((heading) => /(next step|conclusion|cta|services?|help)/i.test(heading)) ?? undefined;
+        return context.sectionHeadings.find((heading) => /(next step|conclusion|cta|services?|products?|shop|help)/i.test(heading)) ?? undefined;
     }
 
     return context.sectionHeadings[0] ?? undefined;
@@ -726,6 +774,25 @@ function scoreCandidate(post: BlogStudioPost, candidate: LinkCandidate) {
         score += 5;
     }
 
+    if (
+        (post.searchIntent === "commercial" || post.searchIntent === "transactional")
+        && (
+            candidate.websiteCategory === "product"
+            || candidate.websiteCategory === "collection"
+            || candidate.websiteCategory === "category"
+            || candidate.websiteCategory === "brand"
+        )
+    ) {
+        score += 4;
+    }
+
+    if (
+        post.searchIntent === "informational"
+        && (candidate.websiteCategory === "collection" || candidate.websiteCategory === "category")
+    ) {
+        score += 2;
+    }
+
     if (post.brief?.sourceMode === "website" && candidate.websiteCategory === "case-study") {
         score += 3;
     }
@@ -765,7 +832,7 @@ function scoreCandidate(post: BlogStudioPost, candidate: LinkCandidate) {
             : overlapCount > 0
                 ? `Overlaps with the article topic across ${overlapCount} shared term${overlapCount === 1 ? "" : "s"}.`
                 : isCommercialCandidate(candidate)
-                    ? `High-value ${websiteCategoryLabel} page for commercial context and internal authority.`
+                    ? `High-value ${websiteCategoryLabel} page for commercial or ecommerce context and internal authority.`
                     : candidate.source === "blog"
                         ? "Related reading from the archive."
                         : "Relevant supporting page on the connected website.";
@@ -918,7 +985,7 @@ async function getWebsiteCandidates(
             resolvedSiteUrl,
             websiteIntelligence?.priorityPaths?.length
                 ? websiteIntelligence.priorityPaths
-                : ["/", "/services", "/pricing", "/case-studies", "/about", "/contact", "/blog"],
+                : ["/", "/services", "/products", "/shop", "/collections", "/pricing", "/case-studies", "/about", "/contact", "/blog"],
         ),
     ];
 

@@ -20,6 +20,7 @@ type CrawledPage = {
     excerpt: string;
     contentHighlights: string[];
     serviceSignals: string[];
+    schemaTypes: string[];
     ctaPatterns: string[];
     proofSignals: string[];
     pageScore: number;
@@ -63,6 +64,16 @@ const SKIPPED_FILE_PATTERN =
 const PRIORITY_SEGMENTS = [
     "service",
     "services",
+    "product",
+    "products",
+    "collection",
+    "collections",
+    "category",
+    "categories",
+    "brand",
+    "brands",
+    "shop",
+    "store",
     "solution",
     "solutions",
     "about",
@@ -207,6 +218,32 @@ function containsAnyKeyword(values: string[], keywords: string[]) {
     );
 }
 
+function hasAnySchemaType(page: Pick<CrawledPage, "schemaTypes">, types: string[]) {
+    const schemaTypes = new Set(
+        (page.schemaTypes || [])
+            .map((value) => value.trim().toLowerCase())
+            .filter(Boolean),
+    );
+
+    return types.some((type) => schemaTypes.has(type.toLowerCase()));
+}
+
+function isProductPath(pathname: string) {
+    return /(^|\/)(products?|items?|sku)(\/|$)/.test(pathname);
+}
+
+function isCollectionPath(pathname: string) {
+    return /(^|\/)(collections?|catalog|catalogue|shop|store)(\/|$)/.test(pathname);
+}
+
+function isCategoryPath(pathname: string) {
+    return /(^|\/)(categories?|departments?)(\/|$)/.test(pathname);
+}
+
+function isBrandPath(pathname: string) {
+    return /(^|\/)(brands?|manufacturers?|makers?)(\/|$)/.test(pathname);
+}
+
 function classifyPriorityPageCategory(page: CrawledPage): BlogStudioSitePriorityPageCategory {
     const pathname = new URL(page.url).pathname.toLowerCase() || "/";
     const signals = [
@@ -221,6 +258,30 @@ function classifyPriorityPageCategory(page: CrawledPage): BlogStudioSitePriority
 
     if (pathname === "/") {
         return "home";
+    }
+
+    if (isProductPath(pathname)) {
+        return "product";
+    }
+
+    if (isCollectionPath(pathname)) {
+        return "collection";
+    }
+
+    if (isCategoryPath(pathname)) {
+        return "category";
+    }
+
+    if (isBrandPath(pathname)) {
+        return "brand";
+    }
+
+    if (hasAnySchemaType(page, ["product"])) {
+        return "product";
+    }
+
+    if (hasAnySchemaType(page, ["collectionpage"])) {
+        return "collection";
     }
 
     if (containsAnyKeyword(signals, ["pricing", "plan", "plans", "package", "packages", "cost", "costs", "quote"])) {
@@ -249,6 +310,22 @@ function classifyPriorityPageCategory(page: CrawledPage): BlogStudioSitePriority
 
     if (containsAnyKeyword(signals, ["contact", "book a call", "schedule a call", "request a demo", "request a quote", "get in touch"])) {
         return "contact";
+    }
+
+    if (containsAnyKeyword(signals, ["product", "products", "sku", "model", "variant", "variants"])) {
+        return "product";
+    }
+
+    if (containsAnyKeyword(signals, ["collection", "collections", "catalog", "catalogue", "shop", "store"])) {
+        return "collection";
+    }
+
+    if (containsAnyKeyword(signals, ["category", "categories", "department", "departments"])) {
+        return "category";
+    }
+
+    if (containsAnyKeyword(signals, ["brand", "brands", "manufacturer", "manufacturers"])) {
+        return "brand";
     }
 
     if (containsAnyKeyword(signals, ["solution", "solutions", "platform", "workflow"])) {
@@ -338,7 +415,102 @@ const SERVICE_KEYWORDS = [
     "consulting", "development", "design", "marketing", "management",
     "strategy", "implementation", "integration", "support", "maintenance",
     "optimization", "audit", "training", "workshop",
+    "product", "products", "collection", "collections", "category", "categories",
+    "brand", "brands", "bundle", "bundles", "variant", "variants", "sku",
 ];
+
+function extractStructuredDataEntities(html: string) {
+    const rawBlocks = Array.from(
+        html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi),
+        (match) => match[1]?.trim() || "",
+    ).filter(Boolean);
+
+    const entities: Array<Record<string, unknown>> = [];
+
+    const visitNode = (value: unknown) => {
+        if (!value) {
+            return;
+        }
+
+        if (Array.isArray(value)) {
+            value.forEach(visitNode);
+            return;
+        }
+
+        if (typeof value !== "object") {
+            return;
+        }
+
+        const node = value as Record<string, unknown>;
+        entities.push(node);
+
+        if (Array.isArray(node["@graph"])) {
+            node["@graph"].forEach(visitNode);
+        }
+    };
+
+    for (const block of rawBlocks) {
+        try {
+            visitNode(JSON.parse(block));
+        } catch {
+            // Ignore invalid or non-JSON payloads quietly.
+        }
+    }
+
+    return entities;
+}
+
+function extractStructuredDataTypes(html: string) {
+    const types = extractStructuredDataEntities(html).flatMap((entity) => {
+        const rawType = entity["@type"];
+
+        if (typeof rawType === "string") {
+            return [rawType];
+        }
+
+        if (Array.isArray(rawType)) {
+            return rawType.filter((value): value is string => typeof value === "string");
+        }
+
+        return [];
+    });
+
+    return uniqueStrings(types, 12, 80).map((value) => value.toLowerCase());
+}
+
+function extractStructuredDataCommercialSignals(html: string) {
+    const signals: string[] = [];
+
+    for (const entity of extractStructuredDataEntities(html)) {
+        const rawType = entity["@type"];
+        const types = Array.isArray(rawType)
+            ? rawType.filter((value): value is string => typeof value === "string").map((value) => value.toLowerCase())
+            : typeof rawType === "string"
+                ? [rawType.toLowerCase()]
+                : [];
+
+        if (!types.some((type) => ["product", "collectionpage", "brand"].includes(type))) {
+            continue;
+        }
+
+        if (typeof entity.name === "string") {
+            signals.push(entity.name);
+        }
+
+        if (typeof entity.category === "string") {
+            signals.push(entity.category);
+        }
+
+        const brandValue = entity.brand;
+        if (typeof brandValue === "string") {
+            signals.push(brandValue);
+        } else if (brandValue && typeof brandValue === "object" && typeof (brandValue as { name?: unknown }).name === "string") {
+            signals.push((brandValue as { name: string }).name);
+        }
+    }
+
+    return uniqueStrings(signals, 10, 140);
+}
 
 function extractServiceSignals(html: string) {
     const candidates: string[] = [];
@@ -871,6 +1043,7 @@ function scoreCrawledPage(page: Omit<CrawledPage, "pageScore">) {
     score += Math.min(page.proofSignals.length, 2) * 5;
     score += Math.min(page.ctaPatterns.length, 2) * 3;
     score += Math.min(page.faqQuestions.length, 2) * 2;
+    score += Math.min(page.schemaTypes.length, 2) * 4;
 
     if (page.excerpt.length >= 120) {
         score += 4;
@@ -922,6 +1095,8 @@ async function fetchPage(url: URL, timeoutMs: number, deadlineMs: number): Promi
 
             const html = await response.text();
             const contentHighlights = extractContentHighlights(html);
+            const structuredDataTypes = extractStructuredDataTypes(html);
+            const structuredDataSignals = extractStructuredDataCommercialSignals(html);
             const pageWithoutScore: Omit<CrawledPage, "pageScore"> = {
                 url: url.toString(),
                 title: extractTitle(html),
@@ -931,7 +1106,12 @@ async function fetchPage(url: URL, timeoutMs: number, deadlineMs: number): Promi
                 internalLinks: extractInternalLinks(html, url),
                 excerpt: extractBodyExcerpt(contentHighlights.join(" ") || html),
                 contentHighlights,
-                serviceSignals: extractServiceSignals(html),
+                serviceSignals: uniqueStrings(
+                    [...extractServiceSignals(html), ...structuredDataSignals],
+                    12,
+                    140,
+                ),
+                schemaTypes: structuredDataTypes,
                 ctaPatterns: extractCtaPatterns(html),
                 proofSignals: extractProofSignals(html),
             };
@@ -1047,7 +1227,7 @@ function buildSummary(sourceUrl: URL, pages: CrawledPage[], requestedMaxPages: n
         descriptions.length > 0 ? `Meta descriptions: ${descriptions.join(" | ")}` : "",
         headings.length > 0 ? `Headings: ${headings.join(" | ")}` : "",
         topPathSummaries.length > 0 ? `High-value path focus: ${topPathSummaries.join(" | ")}` : "",
-        services.length > 0 ? `Service/offer signals: ${services.join(" | ")}` : "",
+        services.length > 0 ? `Commercial/service signals: ${services.join(" | ")}` : "",
         ctas.length > 0 ? `CTA patterns: ${ctas.join(" | ")}` : "",
         proof.length > 0 ? `Trust/proof signals: ${proof.join(" | ")}` : "",
         faqQuestions.length > 0 ? `FAQ signals: ${faqQuestions.join(" | ")}` : "",
