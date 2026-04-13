@@ -5631,7 +5631,7 @@ function buildDraftCanonicalUrl(
     return "";
 }
 
-function shouldUseFinalCheckerRevision(
+function passesAIBloggerDraftGuardrails(
     currentDraft: Pick<
         BlogStudioPost,
         "title" | "metaTitle" | "metaDescription" | "excerpt" | "featuredImageAlt" | "outline" | "internalLinks" | "content" | "wordCount"
@@ -5729,6 +5729,34 @@ function shouldUseFinalCheckerRevision(
         }
     }
 
+    return true;
+}
+
+function shouldUseFinalCheckerRevision(
+    currentDraft: Pick<
+        BlogStudioPost,
+        "title" | "metaTitle" | "metaDescription" | "excerpt" | "featuredImageAlt" | "outline" | "internalLinks" | "content" | "wordCount"
+    >,
+    nextDraft: Pick<
+        BlogStudioPost,
+        "title" | "metaTitle" | "metaDescription" | "excerpt" | "featuredImageAlt" | "outline" | "internalLinks" | "content" | "wordCount"
+    >,
+    settings: Pick<BlogStudioSettings, "seo">,
+    publishRules: AIBloggerConfig["publishRules"],
+    currentAudit: ReturnType<typeof getBlogStudioSeoAudit>,
+    nextAudit: ReturnType<typeof getBlogStudioSeoAudit>,
+) {
+    if (!passesAIBloggerDraftGuardrails(
+        currentDraft,
+        nextDraft,
+        settings,
+        publishRules,
+        currentAudit,
+        nextAudit,
+    )) {
+        return false;
+    }
+
     if (nextAudit.requiredChecksPassed && !currentAudit.requiredChecksPassed) {
         return true;
     }
@@ -5742,6 +5770,41 @@ function shouldUseFinalCheckerRevision(
     }
 
     return false;
+}
+
+function shouldUseGroundedResearchRefreshRevision(
+    currentDraft: Pick<
+        BlogStudioPost,
+        "title" | "metaTitle" | "metaDescription" | "excerpt" | "featuredImageAlt" | "outline" | "internalLinks" | "content" | "wordCount"
+    >,
+    nextDraft: Pick<
+        BlogStudioPost,
+        "title" | "metaTitle" | "metaDescription" | "excerpt" | "featuredImageAlt" | "outline" | "internalLinks" | "content" | "wordCount"
+    >,
+    settings: Pick<BlogStudioSettings, "seo">,
+    publishRules: AIBloggerConfig["publishRules"],
+    currentAudit: ReturnType<typeof getBlogStudioSeoAudit>,
+    nextAudit: ReturnType<typeof getBlogStudioSeoAudit>,
+) {
+    if (!passesAIBloggerDraftGuardrails(
+        currentDraft,
+        nextDraft,
+        settings,
+        publishRules,
+        currentAudit,
+        nextAudit,
+    )) {
+        return false;
+    }
+
+    return (
+        (currentDraft.content || "") !== (nextDraft.content || "")
+        || (currentDraft.metaTitle || "") !== (nextDraft.metaTitle || "")
+        || (currentDraft.metaDescription || "") !== (nextDraft.metaDescription || "")
+        || (currentDraft.excerpt || "") !== (nextDraft.excerpt || "")
+        || JSON.stringify(currentDraft.internalLinks || []) !== JSON.stringify(nextDraft.internalLinks || [])
+        || (currentDraft.wordCount ?? null) !== (nextDraft.wordCount ?? null)
+    );
 }
 
 function buildFinalCheckerStepNote(input: {
@@ -9947,6 +10010,14 @@ export async function refreshBlogStudioPostGroundedResearchImpl(
             const acceptedRefresh =
                 (!sourceOnlyClaimsGroundingPassed && refreshedClaimsGroundingPassed)
                 || shouldUseFinalCheckerRevision(
+                    nextDraft,
+                    refreshedDraft,
+                    settings,
+                    publishRules,
+                    nextAudit,
+                    refreshedAudit,
+                )
+                || shouldUseGroundedResearchRefreshRevision(
                     nextDraft,
                     refreshedDraft,
                     settings,

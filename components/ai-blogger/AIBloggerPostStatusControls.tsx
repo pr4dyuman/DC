@@ -210,9 +210,10 @@ export function AIBloggerPostStatusControls({
         Boolean(blockerResolutionPreview?.hasBlockingIssues) &&
         !Boolean(blockerResolutionPreview?.hasAiFixable) &&
         !canRefreshGroundedResearch;
-    const isAdvancing = isPending && activeAction === "advance";
-    const isResolvingBlockers = isPending && activeAction === "fix-blockers";
-    const isRefreshingGroundedResearch = isPending && activeAction === "refresh-research";
+    const hasActiveAction = activeAction !== null;
+    const isAdvancing = activeAction === "advance";
+    const isResolvingBlockers = activeAction === "fix-blockers";
+    const isRefreshingGroundedResearch = activeAction === "refresh-research";
     const wordRangeWarning = audit?.checks.find((check) => check.key === "word-range" && !check.passed) ?? null;
     const publishWarnings = publishesToWebhook ? (publishValidation?.warnings || []) : [];
     const publishedHref = useMemo(() => {
@@ -341,8 +342,8 @@ export function AIBloggerPostStatusControls({
 
         setError("");
 
+        setActiveAction("advance");
         startTransition(async () => {
-            setActiveAction("advance");
             try {
                 if (publishesToWebhook) {
                     await publishBlogStudioPost(slug);
@@ -380,8 +381,8 @@ export function AIBloggerPostStatusControls({
         setError("");
         clearBlockerResolutionResult();
 
+        setActiveAction("fix-blockers");
         startTransition(async () => {
-            setActiveAction("fix-blockers");
             try {
                 const result = await resolveBlogStudioPostBlockersWithAI(slug);
                 const nextResult: BlockerResolutionClientResult = {
@@ -425,11 +426,17 @@ export function AIBloggerPostStatusControls({
         setError("");
         clearBlockerResolutionResult();
 
+        setActiveAction("refresh-research");
         startTransition(async () => {
-            setActiveAction("refresh-research");
             try {
                 const result = await refreshBlogStudioPostGroundedResearch(slug);
-                toast.success(result.summary);
+                if (result.claimsGroundingCleared) {
+                    toast.success(result.summary);
+                } else if (result.draftUpdated) {
+                    toast(result.summary);
+                } else {
+                    toast.error(result.summary);
+                }
                 router.refresh();
             } catch (refreshError: unknown) {
                 const message = refreshError instanceof Error ? refreshError.message : "Failed to rerun grounded research";
@@ -483,7 +490,7 @@ export function AIBloggerPostStatusControls({
             );
         }
 
-        const isDisabled = isPending || (blockingStatuses && readinessBlockers.length > 0) || publishBlocked;
+        const isDisabled = hasActiveAction || (blockingStatuses && readinessBlockers.length > 0) || publishBlocked;
 
         return (
             <div className="flex flex-col gap-2">
@@ -775,7 +782,7 @@ export function AIBloggerPostStatusControls({
                     </p>
                     <div className="flex flex-wrap items-center gap-3">
                         {!workflowComplete && nextStatus && actionLabel ? (
-                            <AIBloggerGradientButton type="button" onClick={handleAdvance} disabled={isPending || (blockingStatuses && readinessBlockers.length > 0) || publishBlocked}>
+                            <AIBloggerGradientButton type="button" onClick={handleAdvance} disabled={hasActiveAction || (blockingStatuses && readinessBlockers.length > 0) || publishBlocked}>
                                 {isAdvancing ? (
                                     <>
                                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -795,7 +802,7 @@ export function AIBloggerPostStatusControls({
                         )}
 
                         {canRefreshGroundedResearch ? (
-                            <AIBloggerGradientButton type="button" variant="outline" onClick={handleRefreshGroundedResearch} disabled={isPending}>
+                            <AIBloggerGradientButton type="button" variant="outline" onClick={handleRefreshGroundedResearch} disabled={hasActiveAction}>
                                 {isRefreshingGroundedResearch ? (
                                     <>
                                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -811,7 +818,7 @@ export function AIBloggerPostStatusControls({
                         ) : null}
 
                         {hasAiFixableBlockers ? (
-                            <AIBloggerGradientButton type="button" variant="outline" onClick={handleFixBlockers} disabled={isPending}>
+                            <AIBloggerGradientButton type="button" variant="outline" onClick={handleFixBlockers} disabled={hasActiveAction}>
                                 {isResolvingBlockers ? (
                                     <>
                                         <Loader2 className="h-4 w-4 animate-spin" />
