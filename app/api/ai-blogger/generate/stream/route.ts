@@ -10,7 +10,12 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const jobId = url.searchParams.get("jobId") || "";
     const cursorParam = url.searchParams.get("cursor");
-    const cursor = cursorParam ? Math.max(0, Math.floor(Number(cursorParam)) || 0) : 0;
+    const headerLastEventId = request.headers.get("last-event-id");
+    const cursorFromQuery = cursorParam ? Math.max(0, Math.floor(Number(cursorParam)) || 0) : 0;
+    const cursorFromLastEventId = headerLastEventId
+        ? Math.max(0, Math.floor(Number(headerLastEventId)) + 1 || 0)
+        : 0;
+    const cursor = Math.max(cursorFromQuery, cursorFromLastEventId);
 
     if (!jobId) {
         return new Response("Missing jobId", { status: 400 });
@@ -37,7 +42,9 @@ export async function GET(request: Request) {
         return new Response("Job not found", { status: 404 });
     }
 
-    console.log(`[SSE] Initial snapshot: status=${initialSnapshot.status}, events=${initialSnapshot.events.length}, cursor=${cursor}, jobId=${jobId}`);
+    console.log(
+        `[SSE] Initial snapshot: status=${initialSnapshot.status}, events=${initialSnapshot.events.length}, cursor=${cursor}, queryCursor=${cursorFromQuery}, lastEventId=${headerLastEventId || "none"}, jobId=${jobId}`,
+    );
 
     const encoder = new TextEncoder();
 
