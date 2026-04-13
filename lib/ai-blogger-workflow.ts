@@ -199,3 +199,28 @@ export function canTransitionBlogStudioStatus(
 ) {
     return NEXT_STATUS_MAP[currentStatus] === nextStatus;
 }
+
+export function shouldTreatBlogStudioStatusTransitionAsNoop(
+    currentStatus: BlogStudioPostStatus,
+    requestedStatus: BlogStudioPostStatus,
+    expectedCurrentStatus?: BlogStudioPostStatus,
+) {
+    const isStaleSameStatusRequest = Boolean(
+        expectedCurrentStatus &&
+        expectedCurrentStatus !== currentStatus &&
+        currentStatus === requestedStatus,
+    );
+
+    if (isStaleSameStatusRequest) {
+        return true;
+    }
+
+    const currentIndex = BLOG_STUDIO_POST_STATUS_ORDER.indexOf(currentStatus);
+    const requestedIndex = BLOG_STUDIO_POST_STATUS_ORDER.indexOf(requestedStatus);
+
+    if (currentIndex === -1 || requestedIndex === -1) {
+        return false;
+    }
+
+    return currentIndex > requestedIndex;
+}

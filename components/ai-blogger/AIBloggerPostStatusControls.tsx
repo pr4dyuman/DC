@@ -355,6 +355,7 @@ export function AIBloggerPostStatusControls({
                     await updateBlogStudioPostStatus(slug, {
                         status: nextStatus,
                         scheduledFor: nextStatus === "Scheduled" && scheduledValue ? new Date(scheduledValue).toISOString() : undefined,
+                        expectedCurrentStatus: status,
                     });
                     toast.success(`${nextStatus} status saved`);
                     if (nextStatus === "Approved" && wordRangeWarning) {
@@ -364,8 +365,17 @@ export function AIBloggerPostStatusControls({
                 router.refresh();
             } catch (submitError: unknown) {
                 const message = submitError instanceof Error ? submitError.message : "Failed to update post status";
-                setError(message);
-                toast.error(message);
+                const shouldRefreshAfterError =
+                    message.includes("Server Components render") ||
+                    message.includes("Cannot move a");
+                const surfacedMessage = message.includes("Server Components render")
+                    ? "The editor hit a temporary refresh issue. Reloading the latest draft state."
+                    : message;
+                setError(surfacedMessage);
+                toast.error(surfacedMessage);
+                if (shouldRefreshAfterError) {
+                    router.refresh();
+                }
             } finally {
                 setActiveAction(null);
             }

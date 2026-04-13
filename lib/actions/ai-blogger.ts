@@ -128,7 +128,11 @@ import type {
     BlogStudioPerformanceSyncTrigger,
 } from "../types-ai-blogger";
 import type { AIBloggerConfig, AIBloggerStageConfig, AIBloggerStageKey, AIConfig } from "../types";
-import { BLOG_STUDIO_POST_STATUS_ORDER, canTransitionBlogStudioStatus } from "../ai-blogger-workflow";
+import {
+    BLOG_STUDIO_POST_STATUS_ORDER,
+    canTransitionBlogStudioStatus,
+    shouldTreatBlogStudioStatusTransitionAsNoop,
+} from "../ai-blogger-workflow";
 import { getAgencyAIBloggerConfigServer } from "../utils-server";
 import type { ActionActor } from "./access";
 import { getErrorMessage, sanitizeDoc } from "./shared";
@@ -508,6 +512,7 @@ export type CreateBlogStudioDraftInput = {
 export type UpdateBlogStudioPostStatusInput = {
     status: BlogStudioPostStatus;
     scheduledFor?: string;
+    expectedCurrentStatus?: BlogStudioPostStatus;
 };
 
 export type GenerateBlogStudioDraftInput = {
@@ -10373,6 +10378,7 @@ export async function updateBlogStudioPostStatusImpl(
 
     const currentPost = toBlogStudioPost(post);
     const nextStatus = input.status;
+    const expectedCurrentStatus = input.expectedCurrentStatus;
     blogLogStep("STATUS-CHANGE", `Transition ${currentPost.status} → ${nextStatus}`);
     const settings = await getBlogStudioSettingsImpl(agencyId);
     const aiBloggerConfig = await getAgencyAIBloggerRuntimeConfig(agencyId);
@@ -10391,6 +10397,41 @@ export async function updateBlogStudioPostStatusImpl(
         });
     };
 
+    if (shouldTreatBlogStudioStatusTransitionAsNoop(
+        currentPost.status,
+        nextStatus,
+        expectedCurrentStatus,
+    )) {
+        const message =
+            expectedCurrentStatus && expectedCurrentStatus !== currentPost.status
+                ? `This draft already moved to ${currentPost.status}. Refreshed the latest workflow state.`
+                : `This draft is already at ${currentPost.status}. Refreshed the latest workflow state.`;
+        runSteps.push(buildDetailedRunStep({
+            key: "workflow-sync",
+            label: "Workflow Sync",
+            status: "completed",
+            notes: message,
+            startedAt,
+            input: {
+                slug,
+                expectedCurrentStatus,
+                requestedStatus: nextStatus,
+                currentStatus: currentPost.status,
+            },
+            output: {
+                summary: message,
+                data: {
+                    synced: true,
+                    expectedCurrentStatus,
+                    requestedStatus: nextStatus,
+                    currentStatus: currentPost.status,
+                },
+            },
+        }));
+        await recordStatusRun("completed", message);
+        return currentPost;
+    }
+
     if (!canTransitionBlogStudioStatus(currentPost.status, nextStatus)) {
         const message = `Cannot move a ${currentPost.status} post directly to ${nextStatus}.`;
         runSteps.push(buildDetailedRunStep({
@@ -10399,7 +10440,7 @@ export async function updateBlogStudioPostStatusImpl(
             status: "failed",
             notes: message,
             startedAt,
-            input: { slug, fromStatus: currentPost.status, toStatus: nextStatus },
+            input: { slug, fromStatus: currentPost.status, toStatus: nextStatus, expectedCurrentStatus },
             output: { summary: message, data: { allowed: false } },
             errors: [message],
         }));
@@ -10424,7 +10465,7 @@ export async function updateBlogStudioPostStatusImpl(
             status: "failed",
             notes: message,
             startedAt,
-            input: { slug, fromStatus: currentPost.status, toStatus: nextStatus },
+            input: { slug, fromStatus: currentPost.status, toStatus: nextStatus, expectedCurrentStatus },
             output: { summary: message, data: validation },
             errors: validation.errors,
         }));
