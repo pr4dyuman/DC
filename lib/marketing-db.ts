@@ -8,6 +8,7 @@
  */
 
 import mongoose from "mongoose";
+import { shouldUseConservativeMongoPoolProfile } from "./mongodb-connection";
 
 const MARKETING_DB_URI = process.env.MARKETING_DB_URI || process.env.MONGODB_URI;
 
@@ -26,20 +27,24 @@ function createMarketingConnection() {
         );
     }
 
+    const conservativePoolProfile = shouldUseConservativeMongoPoolProfile();
+
     return mongoose.createConnection(MARKETING_DB_URI, {
         dbName: "marketing-blog",
         // Connection options for production stability
-        serverSelectionTimeoutMS: 10000,
+        serverSelectionTimeoutMS: conservativePoolProfile ? 5000 : 10000,
         socketTimeoutMS: 45000,
+        connectTimeoutMS: conservativePoolProfile ? 8000 : 10000,
         // TLS/SSL configuration for MongoDB Atlas
         tls: true,
         tlsInsecure: false, // Validate certificates properly
         // Retry configuration for transient failures
         retryWrites: true,
         // Connection pool configuration
-        maxPoolSize: 10,
-        minPoolSize: 2,
-        maxIdleTimeMS: 60000,
+        maxPoolSize: conservativePoolProfile ? 3 : 10,
+        minPoolSize: 0,
+        maxIdleTimeMS: conservativePoolProfile ? 30000 : 60000,
+        maxConnecting: conservativePoolProfile ? 2 : 4,
     });
 }
 
@@ -49,7 +54,7 @@ function createMarketingConnection() {
  * before a route explicitly awaits the connection.
  */
 export function getMarketingDbConnectionHandle(): mongoose.Connection {
-    if (cachedConnection) {
+    if (cachedConnection && cachedConnection.readyState !== 0 && cachedConnection.readyState !== 3) {
         return cachedConnection;
     }
 
@@ -65,6 +70,16 @@ export function getMarketingDbConnectionHandle(): mongoose.Connection {
 export default async function dbConnect(): Promise<mongoose.Connection> {
     if (cachedConnection && cachedConnection.readyState === 1) {
         return cachedConnection;
+    }
+
+    if (cachedConnection && cachedConnection.readyState === 2 && cachedConnectionPromise) {
+        cachedConnection = await cachedConnectionPromise;
+        return cachedConnection;
+    }
+
+    if (cachedConnection && (cachedConnection.readyState === 0 || cachedConnection.readyState === 3)) {
+        cachedConnection = null;
+        cachedConnectionPromise = null;
     }
 
     try {

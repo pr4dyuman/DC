@@ -11,6 +11,8 @@ export default function DashboardError({
   reset: () => void;
 }) {
   const router = useRouter();
+  const errorMessage = error?.message || "";
+  const isDatabaseConnectionIssue = /mongodb|mongoose|serverselectionerror|replicasetnoprimary|ssl3_read_bytes|tlsv1 alert internal error/i.test(errorMessage);
 
   useEffect(() => {
     console.error('Dashboard error:', error);
@@ -19,9 +21,13 @@ export default function DashboardError({
   return (
     <div className="flex min-h-[60vh] items-center justify-center p-4">
       <div className="text-center space-y-4 max-w-md">
-        <h2 className="text-2xl font-bold text-foreground">Something went wrong</h2>
+        <h2 className="text-2xl font-bold text-foreground">
+          {isDatabaseConnectionIssue ? "Database connection issue" : "Something went wrong"}
+        </h2>
         <p className="text-muted-foreground">
-          An error occurred while loading this page. Please try again.
+          {isDatabaseConnectionIssue
+            ? "The dashboard couldn't reach MongoDB for this refresh. Please try again in a moment."
+            : "An error occurred while loading this page. Please try again."}
         </p>
         <div className="flex gap-2 justify-center">
           <button

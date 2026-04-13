@@ -24,24 +24,39 @@ if (!global.mongoose) {
 }
 
 export async function connectMongo() {
-    if (cached.conn) {
+    const readyState = mongoose.connection.readyState;
+
+    if (cached.conn && readyState === 1) {
         return cached.conn;
     }
 
+    if (readyState === 2 && cached.promise) {
+        cached.conn = await cached.promise;
+        return cached.conn;
+    }
+
+    if (readyState === 0 || readyState === 3) {
+        cached.conn = null;
+        cached.promise = null;
+    }
+
     if (!cached.promise) {
+        const conservativePoolProfile = shouldUseConservativeMongoPoolProfile();
         const opts = {
             bufferCommands: false,
-            serverSelectionTimeoutMS: 10000,
+            serverSelectionTimeoutMS: conservativePoolProfile ? 5000 : 10000,
             socketTimeoutMS: 45000,
+            connectTimeoutMS: conservativePoolProfile ? 8000 : 10000,
             // TLS/SSL configuration for MongoDB Atlas
             tls: true,
             tlsInsecure: false, // Validate certificates properly
             // Retry configuration for transient failures
             retryWrites: true,
             // Connection pool configuration
-            maxPoolSize: 10,
-            minPoolSize: 2,
-            maxIdleTimeMS: 60000,
+            maxPoolSize: conservativePoolProfile ? 3 : 10,
+            minPoolSize: 0,
+            maxIdleTimeMS: conservativePoolProfile ? 30000 : 60000,
+            maxConnecting: conservativePoolProfile ? 2 : 4,
         };
 
         console.log("Attempting to connect to MongoDB...");
@@ -110,9 +125,13 @@ export function isTransientMongoConnectionError(error: unknown): boolean {
         "enotfound",
         "buffering timed out",
         "server selection timed out",
+        "server selection error",
         "topology was destroyed",
         "connection pool",
         "network error",
+        "replicasetnoprimary",
+        "tlsv1 alert internal error",
+        "ssl alert number 80",
     ];
 
     return transientPatterns.some((pattern) => message.includes(pattern));
