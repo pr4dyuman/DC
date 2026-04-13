@@ -1,4 +1,4 @@
-import type { Contact, Message } from "@/lib/chat";
+import type { Contact, Message } from "@/lib/chat-types";
 import { cn } from "@/lib/utils";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { Check, CheckCheck, User, Image as ImageIcon, Trash2, X, Loader2 } from "lucide-react";

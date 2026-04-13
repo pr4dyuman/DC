@@ -1,30 +1,12 @@
 "use server";
 
-import type { Message } from "./db";
+import type { Contact, Message } from "./chat-types";
 import { revalidatePath } from "next/cache";
 import { getCurrentAgency } from "./agency-context";
 import { generateId } from "./utils-server";
 import { UserModel, ClientModel, MessageModel, connectDB } from "./mongodb";
 import { sanitizeString } from "./validation";
 import { getSessionUser } from "./auth";
-
-export type { Message };
-
-export type Contact = {
-    id: string;
-    username?: string;
-    name: string;
-    email: string;
-    companyName?: string;
-    avatar?: string;
-    role: string;
-    jobTitle?: string;
-    type: 'user' | 'client';
-    lastMessage?: Message;
-    unreadCount: number;
-    isOnline: boolean;
-    lastActiveAt?: string;
-};
 
 // Threshold for "Online" status (1 minute)
 const ONLINE_THRESHOLD_MS = 60 * 1000;

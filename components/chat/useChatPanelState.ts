@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import type { Contact, Message } from "@/lib/chat";
+import type { Contact, Message } from "@/lib/chat-types";
 import { deleteConversation, getContacts, getMessages, markAsRead, sendMessage } from "@/lib/chat";
 import { useActivePolling } from "@/hooks/use-active-polling";
 import { toast } from "sonner";
