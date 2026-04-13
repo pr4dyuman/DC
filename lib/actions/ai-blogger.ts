@@ -10189,6 +10189,7 @@ export async function generateBlogStudioDraftImpl(
     input: GenerateBlogStudioDraftInput,
     jobId?: string,
 ): Promise<BlogStudioGenerateDraftResult> {
+    const executeGeneration = async (): Promise<BlogStudioGenerateDraftResult> => {
     const _startMs = Date.now();
     blogLog("GENERATE-DRAFT", "Starting", { agency: blogShortId(agency.id), title: input.title });
     await connectDB();
@@ -12882,6 +12883,11 @@ Rules:
 
         throw new Error(message);
     }
+    };
+
+    return jobId
+        ? await generationLogger.runWithJob(jobId, executeGeneration)
+        : await executeGeneration();
 }
 
 type BlogStudioDraftResearchState = {
@@ -13114,6 +13120,7 @@ export async function runBlogStudioDraftResearchPhase(
     input: GenerateBlogStudioDraftInput,
     jobId?: string,
 ): Promise<BlogStudioDraftResearchState> {
+    const executePhase = async (): Promise<BlogStudioDraftResearchState> => {
     const runtime = await initializeBlogStudioDraftPhaseRuntime(agency, actor, input, jobId);
     const {
         settings,
@@ -14707,6 +14714,11 @@ Rules:
 
         throw new Error(message);
     }
+    };
+
+    return jobId
+        ? await generationLogger.runWithJob(jobId, executePhase)
+        : await executePhase();
 }
 
 export async function runBlogStudioDraftPlanningPhase(
@@ -14716,6 +14728,7 @@ export async function runBlogStudioDraftPlanningPhase(
     phaseState: unknown,
     jobId?: string,
 ): Promise<BlogStudioDraftPlanningState> {
+    const executePhase = async (): Promise<BlogStudioDraftPlanningState> => {
     if (!isBlogStudioDraftResearchState(phaseState)) {
         throw new Error("The planning phase could not start because the research context is invalid.");
     }
@@ -15502,6 +15515,11 @@ Rules:
 
         throw new Error(message);
     }
+    };
+
+    return jobId
+        ? await generationLogger.runWithJob(jobId, executePhase)
+        : await executePhase();
 }
 
 export async function runBlogStudioDraftWritingPhase(
@@ -15511,6 +15529,7 @@ export async function runBlogStudioDraftWritingPhase(
     phaseState: unknown,
     jobId?: string,
 ): Promise<BlogStudioGenerateDraftResult> {
+    const executePhase = async (): Promise<BlogStudioGenerateDraftResult> => {
     if (!isBlogStudioDraftPlanningState(phaseState)) {
         throw new Error("The writing phase could not start because the planning context is invalid.");
     }
@@ -16461,6 +16480,11 @@ Return JSON only with this shape:
 
         throw new Error(message);
     }
+    };
+
+    return jobId
+        ? await generationLogger.runWithJob(jobId, executePhase)
+        : await executePhase();
 }
 
 export async function publishBlogStudioPostImpl(

@@ -84,7 +84,20 @@ export class AIBloggerGenerationLogger {
   }
 
   private resolveJobId(jobId?: string): string | null {
-    return jobId || this.runContext.getStore()?.jobId || null;
+    const explicitJobId = jobId || this.runContext.getStore()?.jobId;
+    if (explicitJobId) {
+      return explicitJobId;
+    }
+
+    if (this.runs.size === 1) {
+      return this.runs.keys().next().value ?? null;
+    }
+
+    return null;
+  }
+
+  runWithJob<T>(jobId: string, work: () => Promise<T> | T): Promise<T> | T {
+    return this.runContext.run({ jobId }, work);
   }
 
   private getRunState(jobId?: string): GenerationRunState {
