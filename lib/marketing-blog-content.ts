@@ -84,6 +84,101 @@ function linkifyReferenceLine(line: string, explicitUrl?: string) {
     return buildReferenceMarkdownLink(label, resolvedUrl);
 }
 
+function splitInlineReferenceEntries(value: string) {
+    const normalized = value.replace(/\s+/g, " ").trim();
+    if (!normalized) {
+        return [];
+    }
+
+    const matches = normalized.match(
+        /(?:\[\d+\]|\d+\.)\s*.+?(?=(?:\s+(?:\[\d+\]|\d+\.)\s)|$)/g,
+    );
+
+    if (matches && matches.length > 0) {
+        return matches.map((entry) => entry.trim()).filter(Boolean);
+    }
+
+    return [normalized];
+}
+
+function normalizeReferenceSectionBodyLines(lines: string[]) {
+    const nonEmptyLines = lines
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+    if (nonEmptyLines.length === 0) {
+        return [] as string[];
+    }
+
+    const alreadyStructured = nonEmptyLines.some((line) => /^([-*]|\d+\.)\s+/.test(line));
+    if (alreadyStructured) {
+        return lines;
+    }
+
+    const combinedEntries = splitInlineReferenceEntries(nonEmptyLines.join(" "));
+    if (combinedEntries.length > 1) {
+        return combinedEntries.map((entry) => `- ${entry}`);
+    }
+
+    if (nonEmptyLines.length === 1) {
+        return [`- ${nonEmptyLines[0]}`];
+    }
+
+    return nonEmptyLines.map((line) => `- ${line}`);
+}
+
+export function normalizeReferenceSectionFormatting(content?: string) {
+    const rawContent = normalizeNewlines(content?.trim() || "");
+    if (!rawContent) {
+        return "";
+    }
+
+    const lines = rawContent.split("\n");
+    const normalizedLines: string[] = [];
+    let inReferencesSection = false;
+    let referenceSectionBody: string[] = [];
+
+    const flushReferenceSection = () => {
+        if (referenceSectionBody.length === 0) {
+            return;
+        }
+
+        normalizedLines.push(...normalizeReferenceSectionBodyLines(referenceSectionBody));
+        referenceSectionBody = [];
+    };
+
+    for (const rawLine of lines) {
+        const line = rawLine.trim();
+
+        if (REFERENCES_MARKDOWN_HEADING_PATTERN.test(line)) {
+            if (inReferencesSection) {
+                flushReferenceSection();
+            }
+            inReferencesSection = true;
+            normalizedLines.push(rawLine);
+            continue;
+        }
+
+        if (inReferencesSection && MARKDOWN_HEADING_PATTERN.test(line) && !REFERENCES_MARKDOWN_HEADING_PATTERN.test(line)) {
+            flushReferenceSection();
+            inReferencesSection = false;
+            normalizedLines.push(rawLine);
+            continue;
+        }
+
+        if (inReferencesSection) {
+            referenceSectionBody.push(rawLine);
+            continue;
+        }
+
+        normalizedLines.push(rawLine);
+    }
+
+    flushReferenceSection();
+
+    return collapseFaqSectionSpacing(normalizedLines.join("\n"));
+}
+
 function normalizeReferenceSectionLinks(content: string) {
     const lines = normalizeNewlines(content).split("\n");
     const normalizedLines: string[] = [];
@@ -469,7 +564,7 @@ export function buildMarketingBlogHtml(
 
     // ── Markdown/Plain Text Path ───────────────────────────────────────────────
     const contentWithInlineLinks = injectTrackedInternalLinks(
-        normalizeReferenceSectionLinks(rawContent),
+        normalizeReferenceSectionLinks(normalizeReferenceSectionFormatting(rawContent)),
         options?.internalLinks,
         options?.siteUrl,
     );

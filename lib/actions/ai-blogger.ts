@@ -70,7 +70,11 @@ import {
     normalizeMarketingSiteOrigin,
     toAbsoluteMarketingImageUrl,
 } from "../marketing-blog-utils";
-import { buildMarketingBlogHtml, stripStandaloneFaqSection } from "../marketing-blog-content";
+import {
+    buildMarketingBlogHtml,
+    normalizeReferenceSectionFormatting,
+    stripStandaloneFaqSection,
+} from "../marketing-blog-content";
 import {
     getAIBloggerWebsiteIntelligence,
     getCachedWebsiteIntelligence,
@@ -1109,7 +1113,9 @@ function normalizeDraftContentForStoredFaq(
     }
 
     return sanitizeText(
-        stripStandaloneFaqSection(sanitizedContent),
+        normalizeReferenceSectionFormatting(
+            stripStandaloneFaqSection(sanitizedContent),
+        ),
         50000,
         sanitizedContent || fallback,
     );

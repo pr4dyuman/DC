@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import {
-    runBlogStudioDraftResearchPhase,
     runBlogStudioDraftPlanningPhase,
+    runBlogStudioDraftResearchPhase,
     runBlogStudioDraftWritingPhase,
 } from "@/lib/actions/ai-blogger";
 import {
@@ -15,7 +15,7 @@ import {
 import type { BlogStudioBrief, BlogStudioTarget } from "@/lib/types-ai-blogger";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300; // Full 300s budget — each worker phase stays within this limit.
+export const maxDuration = 300; // Full 300s budget - each worker phase stays within this limit.
 
 type WorkerExecutionRequest = {
     agency: { id: string; name?: string };
@@ -87,6 +87,188 @@ async function readDispatchFailureMessage(label: string, response: Response): Pr
         : `${label} returned ${response.status} ${response.statusText}`;
 }
 
+async function executeWorkerPhase(
+    requestBody: WorkerRequestBody,
+    workerSecret: string,
+    baseUrl: string,
+) {
+    const { jobId } = requestBody;
+    let snapshot: Awaited<ReturnType<typeof getPipelineJobSnapshot>> | null = null;
+
+    try {
+        snapshot = await getPipelineJobSnapshot(jobId);
+        if (!snapshot.exists) {
+            console.warn(`[WORKER] Job ${jobId} not found. Possibly expired.`);
+            return;
+        }
+        if (snapshot.status !== "running") {
+            console.warn(`[WORKER] Job ${jobId} is already ${snapshot.status}. Skipping.`);
+            return;
+        }
+    } catch (snapshotError) {
+        console.warn(`[WORKER] Could not verify job ${jobId}:`, snapshotError);
+    }
+
+    const storedPhase = snapshot?.execution?.phase;
+    const currentPhase =
+        storedPhase === "writing"
+            ? "writing"
+            : storedPhase === "planning" && snapshot?.execution?.context !== undefined
+                ? "planning"
+                : "research";
+    const phaseClaim = await claimPipelineJobPhase(jobId, currentPhase);
+    if (!phaseClaim.ok) {
+        const claimExecutionPhase = phaseClaim.execution?.phase || "unknown";
+        if (phaseClaim.reason === "already-claimed") {
+            console.warn(`[WORKER] Job ${jobId} phase ${currentPhase} is already claimed. Skipping duplicate worker.`);
+            return;
+        }
+        if (phaseClaim.reason === "phase-mismatch") {
+            console.warn(`[WORKER] Job ${jobId} phase moved from ${currentPhase} to ${claimExecutionPhase}. Skipping stale worker.`);
+            return;
+        }
+        if (phaseClaim.reason === "not-running") {
+            console.warn(`[WORKER] Job ${jobId} is already ${phaseClaim.status}. Skipping.`);
+            return;
+        }
+
+        console.warn(`[WORKER] Job ${jobId} could not be claimed because it no longer exists.`);
+        return;
+    }
+
+    snapshot = await getPipelineJobSnapshot(jobId);
+    if (!snapshot.exists || snapshot.status !== "running") {
+        console.warn(`[WORKER] Job ${jobId} became unavailable after claiming ${currentPhase}.`);
+        return;
+    }
+
+    const storedRequest = snapshot.execution?.request;
+    const inlineRequest = requestBody.agency && requestBody.actor && requestBody.input
+        ? { agency: requestBody.agency, actor: requestBody.actor, input: requestBody.input }
+        : undefined;
+    const executionRequest = isWorkerExecutionRequest(storedRequest)
+        ? storedRequest
+        : isWorkerExecutionRequest(inlineRequest)
+            ? inlineRequest
+            : null;
+
+    if (!executionRequest) {
+        console.warn(`[WORKER] Worker request context is missing for job ${jobId}.`);
+        return;
+    }
+
+    console.log(`[WORKER] Starting ${currentPhase} phase for job ${jobId}`);
+
+    const dispatchNextPhase = async (nextPhase: "planning" | "writing") => {
+        const workerUrl = `${baseUrl}/api/ai-blogger/generate/worker`;
+
+        try {
+            const response = await fetch(workerUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-worker-secret": workerSecret,
+                },
+                body: JSON.stringify({ jobId }),
+            });
+
+            if (response.ok) {
+                return;
+            }
+
+            const message = await readDispatchFailureMessage(`${nextPhase} phase dispatch`, response);
+            console.warn(`[WORKER] ${message}`);
+            if (response.status < 500) {
+                await emitPipelineEvent(jobId, { type: "error", message });
+                await awaitPipelineJobPersistence(jobId);
+            }
+        } catch (dispatchError) {
+            const message = dispatchError instanceof Error ? dispatchError.message : "Unknown dispatch error";
+            console.warn(`[WORKER] ${nextPhase} phase dispatch warning for job ${jobId}: ${message}`);
+        }
+    };
+
+    try {
+        if (currentPhase === "research") {
+            const researchState = await runBlogStudioDraftResearchPhase(
+                executionRequest.agency,
+                executionRequest.actor,
+                executionRequest.input,
+                jobId,
+            );
+
+            await updatePipelineJobExecution(jobId, {
+                phase: "planning",
+                request: executionRequest,
+                context: researchState,
+                clearClaim: true,
+            });
+            await awaitPipelineJobPersistence(jobId);
+            await dispatchNextPhase("planning");
+
+            console.log(`[WORKER] Research phase completed for job ${jobId}; planning phase dispatched.`);
+            return;
+        }
+
+        if (currentPhase === "planning") {
+            if (snapshot.execution?.context === undefined) {
+                throw new Error("The planning phase could not start because the research context is missing.");
+            }
+
+            const planningState = await runBlogStudioDraftPlanningPhase(
+                executionRequest.agency,
+                executionRequest.actor,
+                executionRequest.input,
+                snapshot.execution.context,
+                jobId,
+            );
+
+            await updatePipelineJobExecution(jobId, {
+                phase: "writing",
+                request: executionRequest,
+                context: planningState,
+                clearClaim: true,
+            });
+            await awaitPipelineJobPersistence(jobId);
+            await dispatchNextPhase("writing");
+
+            console.log(`[WORKER] Planning phase completed for job ${jobId}; writing phase dispatched.`);
+            return;
+        }
+
+        if (snapshot.execution?.context === undefined) {
+            throw new Error("The writing phase could not start because the planning context is missing.");
+        }
+
+        await runBlogStudioDraftWritingPhase(
+            executionRequest.agency,
+            executionRequest.actor,
+            executionRequest.input,
+            snapshot.execution.context,
+            jobId,
+        );
+
+        await updatePipelineJobExecution(jobId, {
+            phase: "",
+            clearContext: true,
+            clearRequest: true,
+            clearClaim: true,
+        });
+        console.log(`[WORKER] Pipeline completed for job ${jobId}`);
+        await awaitPipelineJobPersistence(jobId);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown pipeline error";
+        console.error(`[WORKER] ${currentPhase} phase fatal error for job ${jobId}:`, message);
+
+        try {
+            await emitPipelineEvent(jobId, { type: "error", message });
+            await awaitPipelineJobPersistence(jobId);
+        } catch (emitError) {
+            console.error(`[WORKER] Failed to emit error event for job ${jobId}:`, emitError);
+        }
+    }
+}
+
 export async function POST(request: Request) {
     const workerSecret = process.env.AI_BLOGGER_WORKER_SECRET;
     if (!workerSecret) {
@@ -122,184 +304,27 @@ export async function POST(request: Request) {
         );
     }
 
-    const { jobId } = body;
-    let snapshot: Awaited<ReturnType<typeof getPipelineJobSnapshot>> | null = null;
+    const requestBody = body;
+    const baseUrl = getAppBaseUrl(request);
 
-    try {
-        snapshot = await getPipelineJobSnapshot(jobId);
-        if (!snapshot.exists) {
-            console.warn(`[WORKER] Job ${jobId} not found. Possibly expired.`);
-            return NextResponse.json(
-                { ok: false, error: "Job not found." },
-                { status: 404 },
-            );
-        }
-        if (snapshot.status !== "running") {
-            console.warn(`[WORKER] Job ${jobId} is already ${snapshot.status}. Skipping.`);
-            return NextResponse.json({ ok: true, skipped: true });
-        }
-    } catch (snapshotError) {
-        console.warn(`[WORKER] Could not verify job ${jobId}:`, snapshotError);
-    }
-
-    const storedPhase = snapshot?.execution?.phase;
-    const currentPhase =
-        storedPhase === "writing"
-            ? "writing"
-            : storedPhase === "planning" && snapshot?.execution?.context !== undefined
-                ? "planning"
-                : "research";
-    const phaseClaim = await claimPipelineJobPhase(jobId, currentPhase);
-    if (!phaseClaim.ok) {
-        const claimExecutionPhase = phaseClaim.execution?.phase || "unknown";
-        if (phaseClaim.reason === "already-claimed") {
-            console.warn(`[WORKER] Job ${jobId} phase ${currentPhase} is already claimed. Skipping duplicate worker.`);
-            return NextResponse.json({ ok: true, skipped: true, reason: phaseClaim.reason });
-        }
-        if (phaseClaim.reason === "phase-mismatch") {
-            console.warn(`[WORKER] Job ${jobId} phase moved from ${currentPhase} to ${claimExecutionPhase}. Skipping stale worker.`);
-            return NextResponse.json({ ok: true, skipped: true, reason: phaseClaim.reason });
-        }
-        if (phaseClaim.reason === "not-running") {
-            console.warn(`[WORKER] Job ${jobId} is already ${phaseClaim.status}. Skipping.`);
-            return NextResponse.json({ ok: true, skipped: true, reason: phaseClaim.reason });
-        }
-        return NextResponse.json(
-            { ok: false, error: "Job not found." },
-            { status: 404 },
-        );
-    }
-
-    snapshot = await getPipelineJobSnapshot(jobId);
-    if (!snapshot.exists || snapshot.status !== "running") {
-        console.warn(`[WORKER] Job ${jobId} became unavailable after claiming ${currentPhase}.`);
-        return NextResponse.json({ ok: true, skipped: true, reason: "job-unavailable" });
-    }
-    const storedRequest = snapshot.execution?.request;
-    const inlineRequest = body.agency && body.actor && body.input
-        ? { agency: body.agency, actor: body.actor, input: body.input }
-        : undefined;
-    const executionRequest = isWorkerExecutionRequest(storedRequest)
-        ? storedRequest
-        : isWorkerExecutionRequest(inlineRequest)
-            ? inlineRequest
-            : null;
-
-    if (!executionRequest) {
-        return NextResponse.json(
-            { ok: false, error: "Worker request context is missing." },
-            { status: 400 },
-        );
-    }
-
-    console.log(`[WORKER] Starting ${currentPhase} phase for job ${jobId}`);
-
-    const dispatchNextPhase = (nextPhase: "planning" | "writing") => {
-        const workerUrl = `${getAppBaseUrl(request)}/api/ai-blogger/generate/worker`;
-        fetch(workerUrl, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-worker-secret": workerSecret,
-            },
-            body: JSON.stringify({ jobId }),
-        }).then(async (response) => {
-            if (response.ok) {
-                return;
-            }
-
-            const message = await readDispatchFailureMessage(`${nextPhase} phase dispatch`, response);
-            console.warn(`[WORKER] ${message}`);
-            if (response.status < 500) {
-                await emitPipelineEvent(jobId, { type: "error", message });
-                await awaitPipelineJobPersistence(jobId);
-            }
-        }).catch((dispatchError) => {
-            const message = dispatchError instanceof Error ? dispatchError.message : "Unknown dispatch error";
-            console.warn(`[WORKER] ${nextPhase} phase dispatch warning for job ${jobId}: ${message}`);
-        });
-    };
-
-    try {
-        if (currentPhase === "research") {
-            const researchState = await runBlogStudioDraftResearchPhase(
-                executionRequest.agency,
-                executionRequest.actor,
-                executionRequest.input,
-                jobId,
-            );
-
-            await updatePipelineJobExecution(jobId, {
-                phase: "planning",
-                request: executionRequest,
-                context: researchState,
-                clearClaim: true,
-            });
-            await awaitPipelineJobPersistence(jobId);
-            dispatchNextPhase("planning");
-
-            console.log(`[WORKER] Research phase completed for job ${jobId}; planning phase dispatched.`);
-            return NextResponse.json({ ok: true, phase: "research", continued: true });
-        }
-
-        if (currentPhase === "planning") {
-            if (snapshot?.execution?.context === undefined) {
-                throw new Error("The planning phase could not start because the research context is missing.");
-            }
-
-            const planningState = await runBlogStudioDraftPlanningPhase(
-                executionRequest.agency,
-                executionRequest.actor,
-                executionRequest.input,
-                snapshot.execution.context,
-                jobId,
-            );
-
-            await updatePipelineJobExecution(jobId, {
-                phase: "writing",
-                request: executionRequest,
-                context: planningState,
-                clearClaim: true,
-            });
-            await awaitPipelineJobPersistence(jobId);
-            dispatchNextPhase("writing");
-
-            console.log(`[WORKER] Planning phase completed for job ${jobId}; writing phase dispatched.`);
-            return NextResponse.json({ ok: true, phase: "planning", continued: true });
-        }
-
-        if (snapshot?.execution?.context === undefined) {
-            throw new Error("The writing phase could not start because the planning context is missing.");
-        }
-
-        await runBlogStudioDraftWritingPhase(
-            executionRequest.agency,
-            executionRequest.actor,
-            executionRequest.input,
-            snapshot.execution.context,
-            jobId,
-        );
-
-        await updatePipelineJobExecution(jobId, {
-            phase: "",
-            clearContext: true,
-            clearRequest: true,
-            clearClaim: true,
-        });
-        console.log(`[WORKER] Pipeline completed for job ${jobId}`);
-        await awaitPipelineJobPersistence(jobId);
-        return NextResponse.json({ ok: true, phase: "writing" });
-    } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown pipeline error";
-        console.error(`[WORKER] ${currentPhase} phase fatal error for job ${jobId}:`, message);
-
+    after(async () => {
         try {
-            await emitPipelineEvent(jobId, { type: "error", message });
-            await awaitPipelineJobPersistence(jobId);
-        } catch (emitError) {
-            console.error(`[WORKER] Failed to emit error event for job ${jobId}:`, emitError);
-        }
+            await executeWorkerPhase(requestBody, workerSecret, baseUrl);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Unknown background worker error";
+            console.error(`[WORKER] Background execution failed for job ${requestBody.jobId}:`, message);
 
-        return NextResponse.json({ ok: false, error: message }, { status: 500 });
-    }
+            try {
+                await emitPipelineEvent(requestBody.jobId, { type: "error", message });
+                await awaitPipelineJobPersistence(requestBody.jobId);
+            } catch (emitError) {
+                console.error(`[WORKER] Failed to persist background error for job ${requestBody.jobId}:`, emitError);
+            }
+        }
+    });
+
+    return NextResponse.json(
+        { ok: true, accepted: true, jobId: requestBody.jobId },
+        { status: 202 },
+    );
 }

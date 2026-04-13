@@ -245,27 +245,27 @@ export async function POST(request: Request) {
             // ── 2. Main worker — AI pipeline, polls MongoDB for website cache ──
             const workerUrl = `${baseUrl}/api/ai-blogger/generate/worker`;
             console.log(`[GENERATE-ROUTE] Dispatching worker: ${workerUrl}`);
-            fetch(workerUrl, {
-                method: "POST",
-                headers: authHeaders,
-                body: JSON.stringify({
-                    jobId,
-                }),
-            }).then(async (response) => {
-                if (response.ok) {
-                    return;
-                }
+            try {
+                const workerResponse = await fetch(workerUrl, {
+                    method: "POST",
+                    headers: authHeaders,
+                    body: JSON.stringify({
+                        jobId,
+                    }),
+                });
 
-                const message = await readDispatchFailureMessage("Worker dispatch", response);
-                console.warn(`[GENERATE-ROUTE] ${message}`);
-                if (response.status < 500) {
-                    await emitPipelineEvent(jobId, { type: "error", message });
-                    await awaitPipelineJobPersistence(jobId);
+                if (!workerResponse.ok) {
+                    const message = await readDispatchFailureMessage("Worker dispatch", workerResponse);
+                    console.warn(`[GENERATE-ROUTE] ${message}`);
+                    if (workerResponse.status < 500) {
+                        await emitPipelineEvent(jobId, { type: "error", message });
+                        await awaitPipelineJobPersistence(jobId);
+                    }
                 }
-            }).catch((fetchError) => {
+            } catch (fetchError) {
                 const msg = fetchError instanceof Error ? fetchError.message : "Worker dispatch failed";
                 console.warn(`[GENERATE-ROUTE] Worker dispatch error (non-fatal): ${msg}`);
-            });
+            }
 
             // In production (Vercel), remove the in-memory job so the SSE stream
             // falls back to MongoDB polling — the worker runs on a separate serverless
