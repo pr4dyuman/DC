@@ -9,6 +9,7 @@ import {
     publishBlogStudioPost,
     deleteBlogStudioPost,
     refreshBlogStudioPostGroundedResearch,
+    retargetBlogStudioPostCannibalizationWithAI,
     resolveBlogStudioPostBlockersWithAI,
     updateBlogStudioPostStatus,
 } from "@/lib/actions";
@@ -180,7 +181,7 @@ export function AIBloggerPostStatusControls({
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [deleteWithPublished, setDeleteWithPublished] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [activeAction, setActiveAction] = useState<"advance" | "fix-blockers" | "refresh-research" | null>(null);
+    const [activeAction, setActiveAction] = useState<"advance" | "fix-blockers" | "refresh-research" | "retarget-cannibalization" | null>(null);
     const [blockerResolutionResult, setBlockerResolutionResult] = useState<BlockerResolutionClientResult | null>(null);
     const blockerResolutionStorageKey = getBlockerResolutionStorageKey(slug);
     const liveBlockerPreviewSignature = useMemo(
@@ -203,17 +204,24 @@ export function AIBloggerPostStatusControls({
     const publishBlocked = publishesToWebhook && publishValidation && !publishValidation.canPublish;
     const aiFixableBlockers = blockerResolutionPreview?.aiFixable || [];
     const hasAiFixableBlockers = status !== "Published" && Boolean(blockerResolutionPreview?.hasAiFixable);
+    const cannibalizationRetargetBlocker =
+        status !== "Published"
+            ? blockerResolutionPreview?.humanRequired.find((blocker) => blocker.key === "cannibalization-risk") ?? null
+            : null;
     const claimsGroundingCheck = audit?.checks.find((check) => check.key === "claims-grounding" && !check.passed) ?? null;
     const canRefreshGroundedResearch = status !== "Published" && Boolean(claimsGroundingCheck);
+    const canRetargetCannibalization = Boolean(cannibalizationRetargetBlocker);
     const needsHumanOrSystemFixesOnly =
         status !== "Published" &&
         Boolean(blockerResolutionPreview?.hasBlockingIssues) &&
         !Boolean(blockerResolutionPreview?.hasAiFixable) &&
-        !canRefreshGroundedResearch;
+        !canRefreshGroundedResearch &&
+        !canRetargetCannibalization;
     const hasActiveAction = activeAction !== null;
     const isAdvancing = activeAction === "advance";
     const isResolvingBlockers = activeAction === "fix-blockers";
     const isRefreshingGroundedResearch = activeAction === "refresh-research";
+    const isRetargetingCannibalization = activeAction === "retarget-cannibalization";
     const wordRangeWarning = audit?.checks.find((check) => check.key === "word-range" && !check.passed) ?? null;
     const publishWarnings = publishesToWebhook ? (publishValidation?.warnings || []) : [];
     const publishedHref = useMemo(() => {
@@ -450,6 +458,51 @@ export function AIBloggerPostStatusControls({
                 router.refresh();
             } catch (refreshError: unknown) {
                 const message = refreshError instanceof Error ? refreshError.message : "Failed to rerun grounded research";
+                setError(message);
+                toast.error(message);
+            } finally {
+                setActiveAction(null);
+            }
+        });
+    };
+
+    const handleRetargetCannibalization = () => {
+        if (!canRetargetCannibalization) {
+            toast.error("This draft does not currently need AI cannibalization retargeting.");
+            return;
+        }
+
+        setError("");
+        clearBlockerResolutionResult();
+
+        setActiveAction("retarget-cannibalization");
+        startTransition(async () => {
+            try {
+                const result = await retargetBlogStudioPostCannibalizationWithAI(slug);
+                const nextResult: BlockerResolutionClientResult = {
+                    changedFields: result.changedFields,
+                    blockersAfter: result.blockersAfter,
+                    aiFixed: result.aiFixed,
+                    remainingHuman: result.remainingHuman,
+                    remainingSystem: result.remainingSystem,
+                    summary: result.summary,
+                };
+
+                setBlockerResolutionResult(nextResult);
+
+                if (typeof window !== "undefined") {
+                    window.sessionStorage.setItem(blockerResolutionStorageKey, JSON.stringify(nextResult));
+                }
+
+                if (result.aiFixed.length > 0) {
+                    toast.success(result.summary);
+                } else {
+                    toast(result.summary);
+                }
+
+                router.refresh();
+            } catch (retargetError: unknown) {
+                const message = retargetError instanceof Error ? retargetError.message : "Failed to retarget cannibalization with AI";
                 setError(message);
                 toast.error(message);
             } finally {
@@ -727,6 +780,22 @@ export function AIBloggerPostStatusControls({
                     </div>
                 ) : null}
 
+                {canRetargetCannibalization ? (
+                    <div className="rounded-[24px] border border-primary/20 bg-primary/5 px-4 py-4 text-sm">
+                        <div className="flex items-start gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+                                <Sparkles className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="font-medium text-foreground">Retarget overlap with AI</p>
+                                <p className="mt-1.5 leading-6 text-muted-foreground">
+                                    AI will compare this draft with the conflicting post, choose a more distinct keyword and angle, then rewrite the title, metadata, outline, and body to reduce self-competition before re-running the cannibalization check.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
                 {isResolvingBlockers ? (
                     <div className="rounded-[24px] border border-primary/25 bg-primary/[0.06] px-4 py-4 text-sm">
                         <div className="flex items-start gap-3">
@@ -759,6 +828,25 @@ export function AIBloggerPostStatusControls({
                                 </p>
                                 <p className="mt-2 text-xs leading-5 text-primary">
                                     The editor will refresh automatically when the updated draft and sources are stored.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                {isRetargetingCannibalization ? (
+                    <div className="rounded-[24px] border border-primary/25 bg-primary/[0.06] px-4 py-4 text-sm">
+                        <div className="flex items-start gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="font-medium text-foreground">Retargeting overlap now</p>
+                                <p className="mt-1.5 leading-6 text-muted-foreground">
+                                    Comparing the conflicting post, selecting a more distinct keyword path, rewriting the angle and structure, then rerunning the cannibalization audit.
+                                </p>
+                                <p className="mt-2 text-xs leading-5 text-primary">
+                                    The editor will refresh automatically when the retargeted draft is saved.
                                 </p>
                             </div>
                         </div>
@@ -822,6 +910,22 @@ export function AIBloggerPostStatusControls({
                                     <>
                                         <Sparkles className="h-4 w-4" />
                                         Rerun Grounded Research
+                                    </>
+                                )}
+                            </AIBloggerGradientButton>
+                        ) : null}
+
+                        {canRetargetCannibalization ? (
+                            <AIBloggerGradientButton type="button" variant="outline" onClick={handleRetargetCannibalization} disabled={hasActiveAction}>
+                                {isRetargetingCannibalization ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Retargeting
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="h-4 w-4" />
+                                        Retarget With AI
                                     </>
                                 )}
                             </AIBloggerGradientButton>

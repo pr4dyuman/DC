@@ -2954,6 +2954,104 @@ CRITICAL RULES:
 - JSON only, no markdown code fences, no commentary.`;
 }
 
+function buildAIBloggerCannibalizationRetargetPrompt(input: {
+    agencyName?: string;
+    draft: BlogStudioPost;
+    settings: BlogStudioSettings;
+    publishRules: AIBloggerConfig["publishRules"];
+    audit: BlogStudioSeoAudit;
+    publishValidation: BlogStudioPublishValidation;
+    blockerPreview: BlogStudioBlockerResolutionPreview;
+    cannibalization: BlogStudioCannibalizationReport;
+    internalLinksPromptBlock?: string;
+    groundedResearchPromptBlock?: string;
+    websitePromptBlock?: string;
+    serpPromptBlock?: string;
+}) {
+    const detectedStyleFlags = detectAIBloggerStyleRedFlags(input.draft.content || "");
+
+    return `Run the "AI Cannibalization Retarget" stage for an AI Blogger draft.
+
+Goal:
+- Retarget this draft so it no longer competes with an existing connected post on the same topic.
+- Change the keyword target, angle, title, metadata, and section framing enough to create a distinct search asset.
+- Save the improved draft only. Never publish, schedule, or advance workflow state.
+- Keep the article commercially relevant to the same business and website context.
+
+Agency: ${getPromptAgencyName(input.agencyName)}
+Current title: ${input.draft.title}
+Current primary keyword: ${input.draft.brief.primaryKeyword || "not provided"}
+Audience: ${getContextInferredAudience(input.draft.brief.audience, input.draft.draftBrief?.targetAudience)}
+Tone: ${getContextInferredTone(input.draft.brief.tone, input.draft.draftBrief?.toneDirection)}
+CTA goal: ${getContextInferredCta(input.draft.brief.cta, input.draft.draftBrief?.ctaGoal)}
+Search intent: ${input.draft.searchIntent || "not specified"}
+Content type: ${input.draft.contentType || "not specified"}
+Current SEO score: ${input.audit.score}
+Current publish blockers: ${input.publishValidation.blockers.map((blocker) => blocker.message).join(" | ") || "none"}
+Current word count: ${input.draft.wordCount ?? countWords(input.draft.content)}
+Target word range: ${input.settings.seo.minWords}-${input.settings.seo.maxWords}
+AI-style red flags: ${detectedStyleFlags.join(" | ") || "none detected"}
+
+Current metadata:
+- Meta title: ${input.draft.metaTitle || input.draft.title}
+- Meta description: ${input.draft.metaDescription || input.draft.excerpt}
+- Excerpt: ${input.draft.excerpt || "not provided"}
+- Featured image alt: ${input.draft.featuredImageAlt || input.draft.title}
+
+Current outline:
+${input.draft.outline.length > 0 ? input.draft.outline.map((item) => `- ${item}`).join("\n") : "- Use the existing body structure"}
+
+Current FAQ pack:
+${input.draft.faqItems?.length ? input.draft.faqItems.map((item, index) => `${index + 1}. ${item.question} - ${item.answer}`).join("\n") : "No FAQ items are currently stored"}
+
+Current blocker view:
+${formatBlockerResolutionPreviewForPrompt(input.blockerPreview)}
+
+${formatCannibalizationForPrompt(input.cannibalization)}
+${input.groundedResearchPromptBlock ? `\n\n${input.groundedResearchPromptBlock}` : ""}
+${input.internalLinksPromptBlock ? `\n\n${input.internalLinksPromptBlock}` : ""}
+${input.serpPromptBlock ? `\n\n${input.serpPromptBlock}` : ""}
+${input.websitePromptBlock ? `\n\n${input.websitePromptBlock}` : ""}
+
+Current content:
+${sanitizeText(input.draft.content, 35000)}
+
+Return JSON only with this exact shape:
+{
+  "title": "string",
+  "primaryKeyword": "string",
+  "metaTitle": "string",
+  "metaDescription": "string",
+  "excerpt": "string",
+  "content": "string",
+  "outline": ["string"],
+  "tags": ["string"],
+  "metaKeywords": ["string"],
+  "featuredImageAlt": "string",
+  "faqItems": [
+    {
+      "question": "string",
+      "answer": "string"
+    }
+  ],
+  "seoScore": 0,
+  "wordCount": 0
+}
+
+CRITICAL RULES:
+- Pick a new primary keyword that is still relevant to the business but clearly different from the overlapping post.
+- Rewrite the title and meta title so the search promise is distinct, not just lightly reworded.
+- Change the angle and section framing enough that a reader and a search engine would see this as a different asset.
+- Keep the same audience and business fit unless they are part of the overlap problem.
+- Preserve strong grounded sources, FAQs, internal links, and brand tone when they still fit the new angle.
+- Do not invent claims or remove needed metadata.
+- If you cannot safely reduce overlap, still propose the strongest distinct retarget you can while keeping the draft useful.
+- Use ## for section headings and ### for sub-headings only. Never use # inside the body.
+- Keep internal links inline as [anchor text](/path) syntax. Do not paste raw URLs into sentences.
+- Keep FAQ answers in the structured FAQ pack. Do not add a standalone FAQ section to the article body.
+- JSON only, no markdown code fences, no commentary.`;
+}
+
 function buildAIBloggerGroundedResearchRefreshPrompt(input: {
     agencyName?: string;
     draft: BlogStudioPost;
@@ -3919,6 +4017,148 @@ function buildBlockerResolutionSummary(input: {
     return remainingParts.length > 0
         ? `${fixedPart} ${changedPart}. Remaining: ${remainingParts.join(", ")}.`
         : `${fixedPart} ${changedPart}. No blockers remain.`;
+}
+
+function getCannibalizationRiskRank(risk?: BlogStudioCannibalizationReport["risk"] | null) {
+    if (risk === "high") {
+        return 3;
+    }
+
+    if (risk === "medium") {
+        return 2;
+    }
+
+    return 1;
+}
+
+function shouldUseCannibalizationRetargetRevision(
+    currentDraft: Pick<
+        BlogStudioPost,
+        | "title"
+        | "metaTitle"
+        | "metaDescription"
+        | "excerpt"
+        | "featuredImageAlt"
+        | "outline"
+        | "internalLinks"
+        | "content"
+        | "wordCount"
+        | "brief"
+    >,
+    nextDraft: Pick<
+        BlogStudioPost,
+        | "title"
+        | "metaTitle"
+        | "metaDescription"
+        | "excerpt"
+        | "featuredImageAlt"
+        | "outline"
+        | "internalLinks"
+        | "content"
+        | "wordCount"
+        | "brief"
+    >,
+    settings: Pick<BlogStudioSettings, "seo">,
+    publishRules: AIBloggerConfig["publishRules"],
+    currentAudit: ReturnType<typeof getBlogStudioSeoAudit>,
+    nextAudit: ReturnType<typeof getBlogStudioSeoAudit>,
+    currentPublishValidation: BlogStudioPublishValidation,
+    nextPublishValidation: BlogStudioPublishValidation,
+    currentBlockerPreview: BlogStudioBlockerResolutionPreview,
+    nextBlockerPreview: BlogStudioBlockerResolutionPreview,
+    currentCannibalization: BlogStudioCannibalizationReport | null,
+    nextCannibalization: BlogStudioCannibalizationReport | null,
+) {
+    if (!passesAIBloggerDraftGuardrails(
+        currentDraft,
+        nextDraft,
+        settings,
+        publishRules,
+        currentAudit,
+        nextAudit,
+    )) {
+        return false;
+    }
+
+    if (nextBlockerPreview.humanRequiredCount > currentBlockerPreview.humanRequiredCount) {
+        return false;
+    }
+
+    if (nextBlockerPreview.systemRequiredCount > currentBlockerPreview.systemRequiredCount) {
+        return false;
+    }
+
+    if (nextPublishValidation.blockersCount > currentPublishValidation.blockersCount) {
+        return false;
+    }
+
+    const changedKeyword =
+        normalizeCannibalizationPhrase(currentDraft.brief.primaryKeyword || "") !==
+        normalizeCannibalizationPhrase(nextDraft.brief.primaryKeyword || "");
+    const changedTitle =
+        normalizeCannibalizationPhrase(currentDraft.title || "") !==
+        normalizeCannibalizationPhrase(nextDraft.title || "");
+
+    if (!changedKeyword && !changedTitle) {
+        return false;
+    }
+
+    const currentRiskRank = getCannibalizationRiskRank(currentCannibalization?.risk);
+    const nextRiskRank = getCannibalizationRiskRank(nextCannibalization?.risk);
+    const currentScore = currentCannibalization?.score || 0;
+    const nextScore = nextCannibalization?.score || 0;
+
+    if (nextRiskRank < currentRiskRank) {
+        return true;
+    }
+
+    if (nextBlockerPreview.humanRequiredCount < currentBlockerPreview.humanRequiredCount) {
+        return true;
+    }
+
+    if (currentRiskRank === nextRiskRank && nextScore > 0 && nextScore <= Math.max(currentScore - 15, 45)) {
+        return true;
+    }
+
+    if (nextAudit.score > currentAudit.score) {
+        return true;
+    }
+
+    if (nextAudit.score === currentAudit.score && nextAudit.blockers.length < currentAudit.blockers.length) {
+        return true;
+    }
+
+    return false;
+}
+
+function buildCannibalizationRetargetSummary(input: {
+    changedFieldsCount: number;
+    clearedCannibalizationBlocker: boolean;
+    currentCannibalization: BlogStudioCannibalizationReport | null;
+    nextCannibalization: BlogStudioCannibalizationReport | null;
+    remainingHumanCount: number;
+    remainingSystemCount: number;
+}) {
+    const beforeRisk = input.currentCannibalization?.risk || "low";
+    const afterRisk = input.nextCannibalization?.risk || "low";
+    const beforeScore = input.currentCannibalization?.score || 0;
+    const afterScore = input.nextCannibalization?.score || 0;
+    const changedPart = input.changedFieldsCount > 0
+        ? `updated ${input.changedFieldsCount} field${input.changedFieldsCount === 1 ? "" : "s"}`
+        : "kept the saved fields unchanged";
+
+    if (input.clearedCannibalizationBlocker) {
+        return `AI retargeted the draft, ${changedPart}, and cleared the cannibalization blocker. Overlap moved from ${beforeRisk} (${beforeScore}/100) to ${afterRisk} (${afterScore}/100).`;
+    }
+
+    const remainingParts = [
+        input.remainingHumanCount > 0 ? `${input.remainingHumanCount} human-review blocker${input.remainingHumanCount === 1 ? "" : "s"} remain` : "",
+        input.remainingSystemCount > 0 ? `${input.remainingSystemCount} settings blocker${input.remainingSystemCount === 1 ? "" : "s"} remain` : "",
+    ].filter(Boolean);
+
+    return remainingParts.length > 0
+        ? `AI retargeted the draft, ${changedPart}, and reduced overlap from ${beforeRisk} (${beforeScore}/100) to ${afterRisk} (${afterScore}/100). Remaining: ${remainingParts.join(", ")}.`
+        : `AI retargeted the draft, ${changedPart}, and reduced overlap from ${beforeRisk} (${beforeScore}/100) to ${afterRisk} (${afterScore}/100).`;
 }
 
 type TopicDiscoveryResult = {
@@ -9682,6 +9922,606 @@ export async function resolveBlogStudioPostBlockersWithAIImpl(
     });
 
     await recordBlockerResolverRun("completed", result.summary);
+
+    revalidateAIBloggerRoute();
+    revalidateAIBloggerRoute("/posts");
+    revalidateAIBloggerRoute(`/posts/${slug}`);
+
+    return result;
+}
+
+export async function retargetBlogStudioPostCannibalizationWithAIImpl(
+    agencyId: string,
+    actor: ActionActor,
+    slug: string,
+): Promise<BlogStudioBlockerResolutionResult> {
+    await connectDB();
+
+    const startedMs = Date.now();
+    const now = new Date().toISOString();
+    const postDoc = await BlogStudioPostModel.findOne({ agencyId, slug }).lean();
+
+    if (!postDoc) {
+        throw new Error("AI Blogger post not found.");
+    }
+
+    const currentPost = toBlogStudioPost(postDoc);
+    if (currentPost.status === "Published") {
+        throw new Error("Published posts cannot use AI cannibalization retargeting.");
+    }
+
+    const [settings, executionContext] = await Promise.all([
+        getBlogStudioRuntimeSettingsImpl(agencyId),
+        getAgencyAIBloggerExecutionContext(agencyId),
+    ]);
+    const aiConfig = executionContext.aiConfig;
+    const aiBloggerConfig = executionContext.aiBloggerConfig;
+    const mergedConfig = getAgencyMergedAIBloggerConfig(aiConfig, aiBloggerConfig);
+    const publishRules = mergedConfig.publishRules;
+    const currentSiteUrl =
+        resolveBlogStudioSiteUrl({
+            canonicalUrl: currentPost.canonicalUrl,
+            brief: currentPost.brief,
+            author: aiBloggerConfig?.author,
+            entityModeling: aiBloggerConfig?.entityModeling,
+        }) || undefined;
+    const serpQuery =
+        sanitizeText(currentPost.brief.primaryKeyword, 160, currentPost.title) ||
+        currentPost.title;
+    const runSteps: BlogStudioRunStep[] = [];
+    const recordRetargetRun = async (status: BlogStudioRunStatus, summary: string) => {
+        await recordBlogStudioRunImpl(agencyId, actor, {
+            postId: currentPost.id,
+            sourceMode: currentPost.brief.sourceMode || "website",
+            status,
+            selectedTopic: currentPost.brief.primaryKeyword || currentPost.title,
+            summary,
+            startedAt: now,
+            completedAt: new Date().toISOString(),
+            steps: runSteps,
+        });
+    };
+
+    const [
+        currentCannibalization,
+        internalLinkSuggestions,
+        serpAnalysis,
+        websiteIntelligence,
+    ] = await Promise.all([
+        getBlogStudioCannibalizationReportImpl(agencyId, currentPost),
+        getBlogStudioInternalLinkSuggestions(currentPost, 6, {
+            siteUrl: currentSiteUrl,
+            crawlConfig: {
+                enabled: aiBloggerConfig?.crawl?.enabled ?? true,
+                maxPages: aiBloggerConfig?.crawl?.maxPages,
+                timeoutMs: aiBloggerConfig?.crawl?.timeoutMs,
+                refreshWindowHours: aiBloggerConfig?.crawl?.refreshWindowHours,
+                allowedPaths: aiBloggerConfig?.crawl?.allowedPaths,
+                blockedPaths: aiBloggerConfig?.crawl?.blockedPaths,
+            },
+        }),
+        serpQuery
+            ? getAIBloggerSerpAnalysis(serpQuery, {
+                agencyId,
+                enabled: aiBloggerConfig?.serp?.enabled ?? false,
+                apiKey: aiBloggerConfig?.serp?.apiKey,
+                fallbackApiKey: aiBloggerConfig?.serp?.fallbackApiKey,
+                fallbackEnabled: aiBloggerConfig?.serp?.fallbackEnabled ?? true,
+                location:
+                    currentPost.brief.location ||
+                    aiBloggerConfig?.serp?.defaultLocation ||
+                    settings.seo.defaultLocation,
+                device: aiBloggerConfig?.serp?.device,
+                maxCompetitors: aiBloggerConfig?.serp?.maxCompetitors,
+                refreshWindowHours: aiBloggerConfig?.serp?.refreshWindowHours,
+                trendsApiKey: aiBloggerConfig?.trends?.apiKey,
+                trendsFallbackApiKey: aiBloggerConfig?.trends?.fallbackApiKey,
+                trendsFallbackEnabled: aiBloggerConfig?.trends?.fallbackEnabled,
+            }).catch((error) => {
+                blogLogError("CANNIBALIZATION-RETARGET", "SERP analysis failed (non-fatal)", error);
+                return null;
+            })
+            : Promise.resolve(null),
+        currentPost.brief.sourceMode === "website" && currentPost.brief.sourceValue?.trim()
+            ? getAIBloggerWebsiteIntelligence(currentPost.brief.sourceValue, {
+                agencyId,
+                enabled: aiBloggerConfig?.crawl?.enabled ?? true,
+                maxPages: aiBloggerConfig?.crawl?.maxPages,
+                timeoutMs: aiBloggerConfig?.crawl?.timeoutMs,
+                refreshWindowHours: aiBloggerConfig?.crawl?.refreshWindowHours,
+                allowedPaths: aiBloggerConfig?.crawl?.allowedPaths,
+                blockedPaths: aiBloggerConfig?.crawl?.blockedPaths,
+                totalBudgetMs: 18_000,
+            }).catch((error) => {
+                blogLogError("CANNIBALIZATION-RETARGET", "Website intelligence failed (non-fatal)", error);
+                return null;
+            })
+            : Promise.resolve(null),
+    ]);
+
+    runSteps.push(buildDetailedRunStep({
+        key: "retarget-context",
+        label: "Retarget Context",
+        status: "completed",
+        notes: "Collected overlap context for AI cannibalization retargeting.",
+        startedAt: now,
+        input: {
+            slug,
+            status: currentPost.status,
+            title: currentPost.title,
+            sourceMode: currentPost.brief.sourceMode,
+            serpQuery,
+            siteUrl: currentSiteUrl,
+        },
+        output: {
+            summary: "Collected overlap context for AI cannibalization retargeting.",
+            data: {
+                cannibalizationRisk: currentCannibalization.risk,
+                cannibalizationScore: currentCannibalization.score,
+                internalLinkSuggestionCount: internalLinkSuggestions.length,
+                serpIntent: serpAnalysis?.intent,
+                websitePageCount: websiteIntelligence?.pageCount,
+            },
+        },
+    }));
+
+    const currentAudit = getBlogStudioSeoAudit(currentPost, settings, publishRules, {
+        cannibalization: currentCannibalization,
+    });
+    const currentPublishValidation = validateBlogStudioPublishPackage(
+        currentPost,
+        settings,
+        publishRules,
+        undefined,
+        undefined,
+        currentAudit.score,
+        {
+            audit: currentAudit,
+            cannibalization: currentCannibalization,
+        },
+    );
+    const blockersBefore = buildBlogStudioBlockerResolutionPreview({
+        post: currentPost,
+        settings,
+        publishRules,
+        audit: currentAudit,
+        publishValidation: currentPublishValidation,
+        siteUrl: currentSiteUrl,
+    });
+    const cannibalizationBlocker = blockersBefore.humanRequired.find(
+        (blocker) => blocker.key === "cannibalization-risk",
+    );
+
+    if (!cannibalizationBlocker || currentCannibalization.risk !== "high") {
+        const summary = "This draft does not currently need AI cannibalization retargeting.";
+        runSteps.push(buildDetailedRunStep({
+            key: "retarget-preview",
+            label: "Retarget Preview",
+            status: "skipped",
+            notes: summary,
+            startedAt: now,
+            input: {
+                seoScore: currentAudit.score,
+                cannibalizationRisk: currentCannibalization.risk,
+                blockerCount: currentPublishValidation.blockersCount,
+            },
+            output: { summary, data: blockersBefore },
+        }));
+        await recordRetargetRun("completed", summary);
+        return {
+            post: currentPost,
+            changedFields: [],
+            blockersBefore,
+            blockersAfter: blockersBefore,
+            aiFixed: [],
+            remainingHuman: blockersBefore.humanRequired,
+            remainingSystem: blockersBefore.systemRequired,
+            summary,
+        };
+    }
+
+    const mergedInternalLinkSuggestions = mergeBlockerResolverInternalLinkSuggestions(
+        currentPost,
+        internalLinkSuggestions,
+        currentSiteUrl,
+    );
+    const prompt = buildAIBloggerCannibalizationRetargetPrompt({
+        agencyName: executionContext.name,
+        draft: currentPost,
+        settings,
+        publishRules,
+        audit: currentAudit,
+        publishValidation: currentPublishValidation,
+        blockerPreview: blockersBefore,
+        cannibalization: currentCannibalization,
+        internalLinksPromptBlock: formatInternalLinkSuggestionsForPrompt(mergedInternalLinkSuggestions),
+        groundedResearchPromptBlock: currentPost.externalSources?.length
+            ? formatGroundedResearchForPrompt({
+                query: serpQuery,
+                normalizedQuery: normalizeCannibalizationPhrase(serpQuery),
+                location: currentPost.brief.location || settings.seo.defaultLocation,
+                sources: currentPost.externalSources,
+                summary: `Stored source pack for ${currentPost.title}`,
+                cacheStatus: "cached",
+                refreshedAt: currentPost.updatedAt,
+            })
+            : "",
+        websitePromptBlock: formatWebsiteIntelligenceForPrompt(websiteIntelligence),
+        serpPromptBlock: formatSerpAnalysisForPrompt(serpAnalysis),
+    });
+    const runtimeConfig = resolveAIBloggerFinalCheckerRuntimeConfig(aiConfig, aiBloggerConfig);
+    blogLogInput("CANNIBALIZATION-RETARGET", prompt);
+    const retargetStepStartedAt = new Date().toISOString();
+    let retargetStage: AIBloggerStageRunResult;
+    try {
+        retargetStage = await runAIBloggerRuntimeConfig(
+            runtimeConfig,
+            prompt,
+            Boolean(aiBloggerConfig?.fallbackEnabled),
+        );
+    } catch (error) {
+        const message = getErrorMessage(error);
+        runSteps.push(buildDetailedRunStep({
+            key: "ai-cannibalization-retarget",
+            label: "AI Cannibalization Retarget",
+            status: "failed",
+            notes: message,
+            startedAt: retargetStepStartedAt,
+            input: {
+                prompt,
+                model: getResolvedAIBloggerModel(runtimeConfig),
+                provider: runtimeConfig.provider,
+                blockersBefore,
+            },
+            output: { summary: message },
+            errors: [message],
+        }));
+        await recordRetargetRun("failed", `AI cannibalization retarget failed for ${currentPost.slug}: ${message}`);
+        throw error;
+    }
+    blogLogOutput("CANNIBALIZATION-RETARGET", retargetStage.text, {
+        tokens: retargetStage.tokens,
+        usedFallback: retargetStage.usedFallback,
+    });
+    runSteps.push(buildDetailedRunStep({
+        key: "ai-cannibalization-retarget",
+        label: "AI Cannibalization Retarget",
+        status: "completed",
+        notes: `AI retarget returned a revision${retargetStage.usedFallback ? " with fallback key" : ""}.`,
+        startedAt: retargetStepStartedAt,
+        input: {
+            prompt,
+            model: getResolvedAIBloggerModel(retargetStage.runtimeConfig),
+            provider: retargetStage.runtimeConfig.provider,
+            blockersBefore,
+        },
+        process: {
+            details: {
+                fallbackUsed: retargetStage.usedFallback,
+                runtimeConfig: retargetStage.runtimeConfig,
+            },
+        },
+        output: {
+            summary: "AI retarget returned a draft revision.",
+            rawText: retargetStage.text,
+            metrics: {
+                tokensIn: retargetStage.tokens?.inputTokens ?? 0,
+                tokensOut: retargetStage.tokens?.outputTokens ?? 0,
+            },
+        },
+    }));
+
+    const parsed = parseBlockerResolverResponse(retargetStage.text, currentPost);
+    const nextTitle = sanitizeText(parsed.title, 180, currentPost.title);
+    const nextBrief = sanitizeBrief(
+        {
+            ...currentPost.brief,
+            primaryKeyword: parsed.primaryKeyword || currentPost.brief.primaryKeyword,
+        },
+        currentPost.brief,
+    );
+    const nextTags = sanitizeStringArray(
+        [
+            ...parsed.tags,
+            ...currentPost.tags,
+            nextBrief.primaryKeyword || "",
+        ],
+        12,
+        40,
+    );
+    const nextOutline = parsed.outline.length > 0 ? parsed.outline : currentPost.outline;
+    const nextFaqItems = parsed.faqItems.length > 0
+        ? parsed.faqItems
+        : sanitizeFaqItems(currentPost.faqItems, MAX_FAQ_ITEMS);
+    const nextContent = normalizeDraftContentForStoredFaq(
+        parsed.content,
+        nextFaqItems,
+        currentPost.content || "",
+    );
+    const nextExcerpt = buildExcerpt(parsed.excerpt, nextContent, nextTitle);
+    const nextMetaTitle = buildMetaTitle(parsed.metaTitle, nextTitle);
+    const nextMetaDescription = buildMetaDescription(parsed.metaDescription, nextExcerpt, nextContent, nextTitle);
+    const nextFeaturedImageAlt = sanitizeText(
+        parsed.featuredImageAlt,
+        200,
+        currentPost.featuredImageAlt || nextTitle,
+    );
+    const nextWordCount = resolveDraftWordCount(
+        parsed.wordCount ?? currentPost.wordCount,
+        nextContent,
+        settings,
+    );
+    const nextSiteUrl = normalizeMarketingSiteOrigin(
+        resolveBlogStudioSiteUrl({
+            canonicalUrl: currentPost.canonicalUrl,
+            brief: nextBrief,
+            author: aiBloggerConfig?.author,
+            entityModeling: aiBloggerConfig?.entityModeling,
+        }) || currentSiteUrl || "",
+    );
+    const nextInternalLinks = buildTrackedInternalLinksFromContent(
+        nextContent,
+        mergeBlockerResolverInternalLinkSuggestions(
+            currentPost,
+            mergedInternalLinkSuggestions,
+            nextSiteUrl || currentSiteUrl,
+        ),
+        nextSiteUrl || currentSiteUrl,
+    );
+    const canonicalCandidate =
+        currentPost.canonicalUrl?.trim() ||
+        (nextSiteUrl ? buildDraftCanonicalUrl(currentPost.slug, nextSiteUrl) : "");
+    const nextCanonicalUrl = canonicalCandidate
+        ? normalizeMarketingCanonicalUrl(canonicalCandidate, currentPost.slug)
+        : "";
+    let nextDraft: BlogStudioPost = {
+        ...currentPost,
+        title: nextTitle,
+        excerpt: nextExcerpt,
+        metaTitle: nextMetaTitle,
+        metaDescription: nextMetaDescription,
+        canonicalUrl: nextCanonicalUrl || currentPost.canonicalUrl,
+        featuredImageAlt: nextFeaturedImageAlt,
+        content: nextContent,
+        tags: nextTags,
+        outline: nextOutline,
+        brief: nextBrief,
+        faqItems: nextFaqItems,
+        internalLinks: nextInternalLinks,
+        wordCount: nextWordCount,
+        seoScore: currentPost.seoScore,
+        updatedAt: now,
+        updatedBy: actor.id,
+    };
+
+    if (
+        nextSiteUrl &&
+        nextDraft.canonicalUrl?.trim() &&
+        (
+            publishRules.requireSchemaMarkup ||
+            !nextDraft.schemaMarkup?.trim() ||
+            blockersBefore.aiFixable.some((blocker) => blocker.key === "schema-markup")
+        )
+    ) {
+        nextDraft = {
+            ...nextDraft,
+            schemaMarkup: buildMarketingBlogSchemaMarkup({
+                slug: nextDraft.slug,
+                title: nextDraft.metaTitle?.trim() || nextDraft.title,
+                description: nextDraft.metaDescription?.trim() || nextDraft.excerpt,
+                canonicalUrl: nextDraft.canonicalUrl,
+                siteUrl: nextSiteUrl,
+                organizationName:
+                    sanitizeText(
+                        aiBloggerConfig?.entityModeling?.organizationName,
+                        160,
+                        currentPost.target.label || executionContext.name || "Publishing Target",
+                    ) || "Publishing Target",
+                imageUrl: toAbsoluteMarketingImageUrl(
+                    currentPost.featuredImageUrl?.trim() ||
+                    `${MARKETING_SITE_URL.replace(/\/+$/, "")}/ai-blogger.svg`,
+                ) || undefined,
+                imageAlt: nextFeaturedImageAlt,
+                organizationLogoUrl: aiBloggerConfig?.entityModeling?.organizationLogoUrl,
+                category: getMarketingCategory({
+                    ...nextDraft,
+                    tags: nextTags,
+                }),
+                keywords: getMarketingMetaKeywords({
+                    ...nextDraft,
+                    tags: nextTags,
+                    brief: nextBrief,
+                }),
+                publishedAt: currentPost.publishedAt,
+                updatedAt: now,
+                faqItems: nextFaqItems,
+            }),
+        };
+    }
+
+    const nextCannibalization = await getBlogStudioCannibalizationReportImpl(agencyId, nextDraft);
+    const nextAudit = getBlogStudioSeoAudit(nextDraft, settings, publishRules, {
+        cannibalization: nextCannibalization,
+    });
+    nextDraft = {
+        ...nextDraft,
+        seoScore: nextAudit.score,
+    };
+    const nextPublishValidation = validateBlogStudioPublishPackage(
+        nextDraft,
+        settings,
+        publishRules,
+        undefined,
+        undefined,
+        nextAudit.score,
+        {
+            audit: nextAudit,
+            cannibalization: nextCannibalization,
+        },
+    );
+    const blockersAfter = buildBlogStudioBlockerResolutionPreview({
+        post: nextDraft,
+        settings,
+        publishRules,
+        audit: nextAudit,
+        publishValidation: nextPublishValidation,
+        siteUrl: nextSiteUrl || currentSiteUrl,
+    });
+
+    if (!shouldUseCannibalizationRetargetRevision(
+        currentPost,
+        nextDraft,
+        settings,
+        publishRules,
+        currentAudit,
+        nextAudit,
+        currentPublishValidation,
+        nextPublishValidation,
+        blockersBefore,
+        blockersAfter,
+        currentCannibalization,
+        nextCannibalization,
+    )) {
+        const summary = `AI could not safely reduce overlap enough to save a retarget. Cannibalization stayed at ${nextCannibalization.risk} (${nextCannibalization.score}/100).`;
+        runSteps.push(buildDetailedRunStep({
+            key: "retarget-acceptance",
+            label: "Retarget Acceptance",
+            status: "skipped",
+            notes: "AI retarget revision was not accepted because it did not reduce overlap safely.",
+            startedAt: retargetStepStartedAt,
+            input: {
+                currentCannibalization,
+                nextCannibalization,
+                currentSeoScore: currentAudit.score,
+                nextSeoScore: nextAudit.score,
+            },
+            output: {
+                summary,
+                data: {
+                    accepted: false,
+                    blockersBefore,
+                    blockersAfter,
+                },
+            },
+        }));
+        await recordRetargetRun("completed", summary);
+
+        return {
+            post: currentPost,
+            changedFields: [],
+            blockersBefore,
+            blockersAfter: blockersBefore,
+            aiFixed: [],
+            remainingHuman: blockersBefore.humanRequired,
+            remainingSystem: blockersBefore.systemRequired,
+            summary,
+        };
+    }
+
+    const updated = await BlogStudioPostModel.findOneAndUpdate(
+        { agencyId, slug },
+        {
+            $set: {
+                title: nextDraft.title,
+                excerpt: nextDraft.excerpt,
+                metaTitle: nextDraft.metaTitle,
+                metaDescription: nextDraft.metaDescription,
+                canonicalUrl: nextDraft.canonicalUrl,
+                schemaMarkup: nextDraft.schemaMarkup,
+                featuredImageAlt: nextDraft.featuredImageAlt,
+                content: nextDraft.content,
+                tags: nextDraft.tags,
+                outline: nextDraft.outline,
+                brief: nextDraft.brief,
+                faqItems: nextDraft.faqItems,
+                internalLinks: nextDraft.internalLinks,
+                seoScore: nextAudit.score,
+                wordCount: nextDraft.wordCount,
+                updatedAt: now,
+                updatedBy: actor.id,
+            },
+        },
+        { returnDocument: "after" },
+    ).lean();
+
+    if (!updated) {
+        throw new Error("Failed to save the AI cannibalization retarget changes.");
+    }
+
+    const updatedPost = toBlogStudioPost(updated);
+    const changedFields = buildBlockerResolutionChangedFields(currentPost, nextDraft);
+    const aiFixed = blockersBefore.blockers.filter(
+        (blocker) =>
+            blocker.key === "cannibalization-risk"
+            && !blockersAfter.blockers.some((afterBlocker) => afterBlocker.key === blocker.key),
+    );
+    const result: BlogStudioBlockerResolutionResult = {
+        post: updatedPost,
+        changedFields,
+        blockersBefore,
+        blockersAfter,
+        aiFixed,
+        remainingHuman: blockersAfter.humanRequired,
+        remainingSystem: blockersAfter.systemRequired,
+        summary: buildCannibalizationRetargetSummary({
+            changedFieldsCount: changedFields.length,
+            clearedCannibalizationBlocker: aiFixed.length > 0,
+            currentCannibalization,
+            nextCannibalization,
+            remainingHumanCount: blockersAfter.humanRequiredCount,
+            remainingSystemCount: blockersAfter.systemRequiredCount,
+        }),
+    };
+
+    runSteps.push(buildDetailedRunStep({
+        key: "retarget-persistence",
+        label: "Retarget Persistence",
+        status: "completed",
+        notes: result.summary,
+        startedAt: retargetStepStartedAt,
+        input: {
+            changedFields,
+            cannibalizationBefore: currentCannibalization,
+            cannibalizationAfter: nextCannibalization,
+            seoScoreBefore: currentAudit.score,
+            seoScoreAfter: nextAudit.score,
+        },
+        output: {
+            summary: result.summary,
+            data: {
+                changedFields,
+                aiFixed,
+                blockersAfter,
+                updatedPost: {
+                    id: updatedPost.id,
+                    slug: updatedPost.slug,
+                    title: updatedPost.title,
+                    seoScore: updatedPost.seoScore,
+                    wordCount: updatedPost.wordCount,
+                },
+            },
+        },
+    }));
+
+    await recordBlogStudioActivity(
+        agencyId,
+        actor,
+        "Retargeted AI Blogger draft to reduce cannibalization",
+        updatedPost.title,
+        updatedPost.id,
+    );
+
+    await logAIUsage({
+        agencyId,
+        userId: actor.id,
+        feature: "ai-blogger",
+        model: `${retargetStage.runtimeConfig.provider}:${getResolvedAIBloggerModel(retargetStage.runtimeConfig)}`,
+        provider: retargetStage.runtimeConfig.provider,
+        durationMs: Date.now() - startedMs,
+        ...retargetStage.tokens,
+    });
+
+    await recordRetargetRun("completed", result.summary);
 
     revalidateAIBloggerRoute();
     revalidateAIBloggerRoute("/posts");

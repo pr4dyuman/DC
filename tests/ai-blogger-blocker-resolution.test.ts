@@ -496,3 +496,35 @@ test("keeps high-risk claims and cannibalization human-gated when rules require 
     assert.ok(preview.humanRequired.some((blocker) => blocker.key === "cannibalization-risk"));
     assert.equal(preview.aiFixable.some((blocker) => blocker.key === "claims-grounding"), false);
 });
+
+test("does not keep medium cannibalization overlap as a blocking issue", () => {
+    const preview = makePreview({
+        checks: [
+            { key: "cannibalization-risk", label: "Cannibalization Risk", passed: false, severity: "recommended", detail: "Risk is medium." },
+        ],
+        cannibalization: {
+            risk: "medium",
+            shouldBlock: false,
+            score: 58,
+            summary: "Partial overlap detected with one connected post.",
+            matches: [
+                {
+                    source: "ai-blogger",
+                    slug: "existing-page",
+                    title: "Existing Page",
+                    href: "https://example.com/blog/existing-page",
+                    statusLabel: "Published",
+                    reason: "Moderate title/theme overlap.",
+                    similarityScore: 58,
+                    primaryKeyword: "related keyword",
+                    searchIntent: "informational",
+                    publishedAt: now,
+                },
+            ],
+        },
+    });
+
+    assert.equal(preview.humanRequired.some((blocker) => blocker.key === "cannibalization-risk"), false);
+    assert.equal(preview.aiFixable.some((blocker) => blocker.key === "cannibalization-risk"), false);
+    assert.equal(preview.blockers.some((blocker) => blocker.key === "cannibalization-risk"), false);
+});
