@@ -5,7 +5,7 @@ import { requireRole, toActionActor } from "@/lib/actions/access";
 import { getCurrentAgency } from "@/lib/agency-context";
 import { getAIBloggerAccessState } from "@/lib/ai-blogger-access";
 import { generateBlogStudioDraftImpl } from "@/lib/actions/ai-blogger";
-import { createPipelineJob, emitPipelineEvent, releaseLocalPipelineJob } from "@/lib/ai-blogger-pipeline-events";
+import { createPipelineJob, emitPipelineEvent, releaseLocalPipelineJob, updatePipelineJobExecution } from "@/lib/ai-blogger-pipeline-events";
 import type { BlogStudioBrief, BlogStudioTarget } from "@/lib/types-ai-blogger";
 import { getAgencyAIBloggerConfigServer } from "@/lib/utils-server";
 
@@ -160,6 +160,16 @@ export async function POST(request: Request) {
         // Falls back to the original in-process execution if not.
         const workerSecret = process.env.AI_BLOGGER_WORKER_SECRET;
         if (workerSecret) {
+            await updatePipelineJobExecution(jobId, {
+                phase: "research",
+                request: {
+                    agency: { id: agency.id, name: agency.name },
+                    actor,
+                    input: pipelineInput,
+                },
+                clearContext: true,
+            });
+
             const baseUrl = getAppBaseUrl();
             const authHeaders = {
                 "Content-Type": "application/json",
@@ -204,14 +214,10 @@ export async function POST(request: Request) {
                 headers: authHeaders,
                 body: JSON.stringify({
                     jobId,
-                    agency: { id: agency.id, name: agency.name },
-                    actor,
-                    input: pipelineInput,
                 }),
             }).catch((fetchError) => {
                 const msg = fetchError instanceof Error ? fetchError.message : "Worker dispatch failed";
-                console.error(`[GENERATE-ROUTE] Worker dispatch error: ${msg}`);
-                emitPipelineEvent(jobId, { type: "error", message: `Worker dispatch failed: ${msg}` });
+                console.warn(`[GENERATE-ROUTE] Worker dispatch error (non-fatal): ${msg}`);
             });
 
             // In production (Vercel), remove the in-memory job so the SSE stream

@@ -77,6 +77,189 @@ export class AIBloggerGenerationLogger {
     this.enableFileLogging = enableFileLogging;
   }
 
+  private createEmptyRun(
+    jobId: string,
+    agencyId: string,
+    agencyName: string,
+    createdBy: string,
+    input: {
+      mode: string;
+      sourceValue: string;
+      wordCount: number;
+      title?: string;
+    }
+  ): GenerationRunLog {
+    return {
+      jobId,
+      agencyId,
+      agencyName,
+      createdBy,
+      startedAt: new Date().toISOString(),
+      status: "running",
+      input,
+      steps: [],
+      metrics: {
+        totalDurationMs: 0,
+        totalTokensIn: 0,
+        totalTokensOut: 0,
+        stepsCompleted: 0,
+        stepsFailed: 0,
+        stepsPending: 0,
+        fallbacksUsed: 0,
+      },
+    };
+  }
+
+  private recalculateMetrics(run: GenerationRunLog) {
+    const nextMetrics = {
+      totalDurationMs: 0,
+      totalTokensIn: 0,
+      totalTokensOut: 0,
+      stepsCompleted: 0,
+      stepsFailed: 0,
+      stepsPending: 0,
+      fallbacksUsed: 0,
+    };
+
+    for (const step of run.steps) {
+      nextMetrics.totalTokensIn += step.output.metrics?.tokensIn ?? 0;
+      nextMetrics.totalTokensOut += step.output.metrics?.tokensOut ?? 0;
+
+      switch (step.status) {
+        case "completed":
+          nextMetrics.stepsCompleted += 1;
+          break;
+        case "failed":
+          nextMetrics.stepsFailed += 1;
+          break;
+        case "skipped":
+          nextMetrics.stepsPending += 1;
+          break;
+      }
+
+      if (step.process.details?.fallbackUsed) {
+        nextMetrics.fallbacksUsed += 1;
+      }
+    }
+
+    const startedMs = new Date(run.startedAt).getTime();
+    const latestCompletedMs = run.steps.reduce((latest, step) => {
+      const completedMs = step.process.completedAt
+        ? new Date(step.process.completedAt).getTime()
+        : Number.NaN;
+      return Number.isFinite(completedMs) ? Math.max(latest, completedMs) : latest;
+    }, -Infinity);
+    const runCompletedMs = run.completedAt ? new Date(run.completedAt).getTime() : Number.NaN;
+    const totalEndMs = Number.isFinite(runCompletedMs)
+      ? runCompletedMs
+      : latestCompletedMs;
+    if (Number.isFinite(startedMs) && Number.isFinite(totalEndMs)) {
+      nextMetrics.totalDurationMs = Math.max(0, totalEndMs - startedMs);
+    }
+
+    run.metrics = nextMetrics;
+  }
+
+  private async loadExistingRun(
+    jobId: string,
+    agencyId: string,
+    agencyName: string,
+    createdBy: string,
+    input: {
+      mode: string;
+      sourceValue: string;
+      wordCount: number;
+      title?: string;
+    }
+  ): Promise<GenerationRunLog | null> {
+    if (!this.enableFileLogging) {
+      return null;
+    }
+
+    try {
+      const raw = await fs.readFile(path.join(this.logsDir, "run.json"), "utf8");
+      const parsed = JSON.parse(raw) as Partial<GenerationRunLog>;
+
+      if (!parsed || parsed.jobId !== jobId) {
+        return null;
+      }
+
+      const resumedRun: GenerationRunLog = {
+        ...this.createEmptyRun(jobId, agencyId, agencyName, createdBy, input),
+        ...parsed,
+        agencyId,
+        agencyName,
+        createdBy,
+        status: "running",
+        completedAt: undefined,
+        failure: undefined,
+        input: {
+          mode: parsed.input?.mode || input.mode,
+          sourceValue: parsed.input?.sourceValue || input.sourceValue,
+          wordCount:
+            typeof parsed.input?.wordCount === "number"
+              ? parsed.input.wordCount
+              : input.wordCount,
+          title: parsed.input?.title || input.title,
+        },
+        steps: Array.isArray(parsed.steps) ? parsed.steps : [],
+      };
+
+      this.recalculateMetrics(resumedRun);
+      return resumedRun;
+    } catch (err) {
+      const code =
+        typeof err === "object" && err && "code" in err ? String((err as { code?: string }).code) : "";
+      if (code !== "ENOENT") {
+        console.warn("[LOGGER] Could not resume existing generation log:", err);
+      }
+      return null;
+    }
+  }
+
+  private async persistCurrentRun() {
+    if (!this.enableFileLogging) {
+      return;
+    }
+
+    try {
+      await fs.mkdir(this.logsDir, { recursive: true });
+      await fs.writeFile(
+        path.join(this.logsDir, "run.json"),
+        JSON.stringify(this.currentRun, null, 2)
+      );
+
+      const txtContent = this.generateTxtReport();
+      await fs.writeFile(path.join(this.logsDir, "run.txt"), txtContent);
+
+      const timelineContent = this.generateTimeline();
+      await fs.writeFile(path.join(this.logsDir, "timeline.txt"), timelineContent);
+
+      if (this.currentRun.status === "failed") {
+        const diagnostics = {
+          generationJobId: this.currentRun.jobId,
+          agencyId: this.currentRun.agencyId,
+          status: this.currentRun.status,
+          failure: this.currentRun.failure,
+          failedSteps: this.currentRun.steps
+            .filter((step) => step.status === "failed")
+            .map((step) => ({
+              step: step.stepNumber,
+              name: step.stepName,
+              errors: step.errors,
+              timestamp: step.process.completedAt,
+            })),
+        };
+        await fs.writeFile(
+          path.join(this.logsDir, "diagnostics.json"),
+          JSON.stringify(diagnostics, null, 2)
+        );
+      }
+    } catch (err) {
+      console.error("[GENERATION-LOG] Error saving log files:", err);
+    }
+  }
+
   async startRun(
     jobId: string,
     agencyId: string,
@@ -99,30 +282,44 @@ export class AIBloggerGenerationLogger {
       }
     }
 
-    this.currentRun = {
-      jobId,
-      agencyId,
-      agencyName,
-      createdBy,
-      startedAt: new Date().toISOString(),
-      status: "running",
-      input,
-      steps: [],
-      metrics: {
-        totalDurationMs: 0,
-        totalTokensIn: 0,
-        totalTokensOut: 0,
-        stepsCompleted: 0,
-        stepsFailed: 0,
-        stepsPending: 0,
-        fallbacksUsed: 0,
-      },
-    };
+    const inMemoryRun =
+      this.currentRun?.jobId === jobId
+        ? {
+            ...this.currentRun,
+            agencyId,
+            agencyName,
+            createdBy,
+            status: "running" as const,
+            completedAt: undefined,
+            failure: undefined,
+            input: {
+              mode: this.currentRun.input?.mode || input.mode,
+              sourceValue: this.currentRun.input?.sourceValue || input.sourceValue,
+              wordCount:
+                typeof this.currentRun.input?.wordCount === "number"
+                  ? this.currentRun.input.wordCount
+                  : input.wordCount,
+              title: this.currentRun.input?.title || input.title,
+            },
+          }
+        : null;
 
-    console.log(`\n[GENERATION-LOG] Starting generation run: ${jobId}`);
+    this.currentRun =
+      inMemoryRun ||
+      (await this.loadExistingRun(jobId, agencyId, agencyName, createdBy, input)) ||
+      this.createEmptyRun(jobId, agencyId, agencyName, createdBy, input);
+
+    this.recalculateMetrics(this.currentRun);
+    await this.persistCurrentRun();
+
+    const isResumedRun = this.currentRun.steps.length > 0;
+    console.log(`\n[GENERATION-LOG] ${isResumedRun ? "Resuming" : "Starting"} generation run: ${jobId}`);
     console.log(`[GENERATION-LOG] Agency: ${agencyName} (${agencyId})`);
     console.log(`[GENERATION-LOG] Mode: ${input.mode} | Source: ${input.sourceValue}`);
     console.log(`[GENERATION-LOG] Word target: ${input.wordCount}`);
+    if (isResumedRun) {
+      console.log(`[GENERATION-LOG] Loaded ${this.currentRun.steps.length} existing step logs`);
+    }
   }
 
   async logStep(
@@ -167,30 +364,19 @@ export class AIBloggerGenerationLogger {
       errors,
     };
 
-    this.currentRun.steps.push(step);
+    const existingIndex = this.currentRun.steps.findIndex(
+      (existingStep) =>
+        existingStep.stepNumber === stepNumber && existingStep.stepName === stepName
+    );
 
-    if (output.metrics?.tokensIn) {
-      this.currentRun.metrics.totalTokensIn += output.metrics.tokensIn;
-    }
-    if (output.metrics?.tokensOut) {
-      this.currentRun.metrics.totalTokensOut += output.metrics.tokensOut;
-    }
-
-    switch (status) {
-      case "completed":
-        this.currentRun.metrics.stepsCompleted++;
-        break;
-      case "failed":
-        this.currentRun.metrics.stepsFailed++;
-        break;
-      case "skipped":
-        this.currentRun.metrics.stepsPending++;
-        break;
+    if (existingIndex >= 0) {
+      this.currentRun.steps[existingIndex] = step;
+    } else {
+      this.currentRun.steps.push(step);
     }
 
-    if (process.details?.fallbackUsed) {
-      this.currentRun.metrics.fallbacksUsed++;
-    }
+    this.currentRun.steps.sort((left, right) => left.stepNumber - right.stepNumber);
+    this.recalculateMetrics(this.currentRun);
 
     const statusLabel =
       status === "completed"
@@ -212,6 +398,8 @@ export class AIBloggerGenerationLogger {
     if (errors?.length) {
       console.log(`  ERRORS: ${errors.join(" | ")}`);
     }
+
+    await this.persistCurrentRun();
   }
 
   setFinalDraft(data: {
@@ -294,44 +482,8 @@ export class AIBloggerGenerationLogger {
     console.log("=".repeat(80) + "\n");
 
     if (this.enableFileLogging) {
-      try {
-        await fs.mkdir(this.logsDir, { recursive: true });
-        await fs.writeFile(
-          path.join(this.logsDir, "run.json"),
-          JSON.stringify(this.currentRun, null, 2)
-        );
-
-        const txtContent = this.generateTxtReport();
-        await fs.writeFile(path.join(this.logsDir, "run.txt"), txtContent);
-
-        const timelineContent = this.generateTimeline();
-        await fs.writeFile(path.join(this.logsDir, "timeline.txt"), timelineContent);
-
-        if (this.currentRun.status === "failed") {
-          const diagnostics = {
-            generationJobId: this.currentRun.jobId,
-            agencyId: this.currentRun.agencyId,
-            status: this.currentRun.status,
-            failure: this.currentRun.failure,
-            failedSteps: this.currentRun.steps
-              .filter((step) => step.status === "failed")
-              .map((step) => ({
-                step: step.stepNumber,
-                name: step.stepName,
-                errors: step.errors,
-                timestamp: step.process.completedAt,
-              })),
-          };
-          await fs.writeFile(
-            path.join(this.logsDir, "diagnostics.json"),
-            JSON.stringify(diagnostics, null, 2)
-          );
-        }
-
-        console.log(`[GENERATION-LOG] Logs saved to: ${this.logsDir}`);
-      } catch (err) {
-        console.error("[GENERATION-LOG] Error saving log files:", err);
-      }
+      await this.persistCurrentRun();
+      console.log(`[GENERATION-LOG] Logs saved to: ${this.logsDir}`);
     }
 
     console.log(`[GENERATION-LOG] Generation run completed (${this.currentRun.jobId})`);

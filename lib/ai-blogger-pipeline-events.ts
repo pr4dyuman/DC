@@ -33,13 +33,22 @@ type PipelinePersistedEvent = Omit<PipelineEvent, "result">;
 
 type PipelineJobStatus = "running" | "complete" | "error";
 
+type PipelineExecutionState = {
+    phase?: string;
+    request?: unknown;
+    context?: unknown;
+    updatedAt?: string;
+};
+
 type PipelineJob = {
     agencyId?: string;
     createdBy?: string;
     events: PipelineEvent[];
     emitter: EventEmitter;
+    execution?: PipelineExecutionState;
     status: PipelineJobStatus;
     createdAt: number;
+    updatedAt: number;
     completedAt?: number;
 };
 
@@ -51,7 +60,9 @@ type PipelineJobSnapshot = {
     status?: PipelineJobStatus;
     events: PipelineEvent[];
     createdAt?: string;
+    updatedAt?: string;
     completedAt?: string;
+    execution?: PipelineExecutionState;
 };
 
 type PipelineJobOwner = {
@@ -162,6 +173,7 @@ function ensureMemoryJob(jobId: string, owner?: Partial<PipelineJobOwner>) {
         emitter,
         status: "running",
         createdAt: Date.now(),
+        updatedAt: Date.now(),
     };
 
     jobs.set(jobId, job);
@@ -230,6 +242,30 @@ function normalizePipelineEvent(value: unknown, result?: unknown): PipelineEvent
     return event;
 }
 
+function normalizeExecutionState(value: unknown): PipelineExecutionState | undefined {
+    if (!value || typeof value !== "object") {
+        return undefined;
+    }
+
+    const raw = value as Record<string, unknown>;
+    const execution: PipelineExecutionState = {};
+
+    if (typeof raw.phase === "string" && raw.phase.trim()) {
+        execution.phase = raw.phase;
+    }
+    if ("request" in raw) {
+        execution.request = raw.request;
+    }
+    if ("context" in raw) {
+        execution.context = raw.context;
+    }
+    if (typeof raw.updatedAt === "string") {
+        execution.updatedAt = raw.updatedAt;
+    }
+
+    return Object.keys(execution).length > 0 ? execution : undefined;
+}
+
 async function readPersistedJob(jobId: string): Promise<PipelineJobSnapshot> {
     await connectDB();
 
@@ -252,6 +288,7 @@ async function readPersistedJob(jobId: string): Promise<PipelineJobSnapshot> {
     const createdAt = typeof docRecord.createdAt === "string" ? docRecord.createdAt : undefined;
     const result = docRecord.result;
     const errorMessage = typeof docRecord.errorMessage === "string" ? docRecord.errorMessage : undefined;
+    const execution = normalizeExecutionState(docRecord.execution);
 
     if (status === "complete" && result !== undefined) {
         const completeIndex = [...events].reverse().findIndex((event) => event.type === "complete");
@@ -287,13 +324,16 @@ async function readPersistedJob(jobId: string): Promise<PipelineJobSnapshot> {
         status,
         events,
         createdAt,
+        updatedAt,
         completedAt,
+        execution,
     };
 }
 
 export async function createPipelineJob(jobId: string, owner: PipelineJobOwner): Promise<void> {
     const now = new Date().toISOString();
-    ensureMemoryJob(jobId, owner);
+    const job = ensureMemoryJob(jobId, owner);
+    job.updatedAt = Date.now();
 
     await queuePersistence(jobId, async () => {
         await connectDB();
@@ -316,6 +356,93 @@ export async function createPipelineJob(jobId: string, owner: PipelineJobOwner):
             },
             { upsert: true },
         );
+    });
+}
+
+type PipelineExecutionUpdate = {
+    phase?: string;
+    request?: unknown;
+    context?: unknown;
+    clearRequest?: boolean;
+    clearContext?: boolean;
+};
+
+export async function updatePipelineJobExecution(jobId: string, update: PipelineExecutionUpdate): Promise<void> {
+    const now = new Date().toISOString();
+    const job = ensureMemoryJob(jobId);
+    const nextExecution: PipelineExecutionState = {
+        ...(job.execution || {}),
+        updatedAt: now,
+    };
+
+    if (update.phase !== undefined) {
+        if (update.phase.trim()) {
+            nextExecution.phase = update.phase;
+        } else {
+            delete nextExecution.phase;
+        }
+    }
+    if ("request" in update) {
+        nextExecution.request = update.request;
+    }
+    if ("context" in update) {
+        nextExecution.context = update.context;
+    }
+    if (update.clearRequest) {
+        delete nextExecution.request;
+    }
+    if (update.clearContext) {
+        delete nextExecution.context;
+    }
+
+    job.execution = nextExecution;
+    job.updatedAt = Date.now();
+
+    await queuePersistence(jobId, async () => {
+        await connectDB();
+
+        const setPayload: Record<string, unknown> = {
+            updatedAt: now,
+            expiresAt: new Date(Date.now() + JOB_RETENTION_MS),
+            "execution.updatedAt": now,
+        };
+        const unsetPayload: Record<string, number> = {};
+
+        if (update.phase !== undefined) {
+            if (update.phase.trim()) {
+                setPayload["execution.phase"] = update.phase;
+            } else {
+                unsetPayload["execution.phase"] = 1;
+            }
+        }
+        if ("request" in update) {
+            setPayload["execution.request"] = update.request;
+        }
+        if ("context" in update) {
+            setPayload["execution.context"] = update.context;
+        }
+        if (update.clearRequest) {
+            unsetPayload["execution.request"] = 1;
+        }
+        if (update.clearContext) {
+            unsetPayload["execution.context"] = 1;
+        }
+
+        const updateDoc: Record<string, unknown> = {
+            $set: setPayload,
+            $setOnInsert: {
+                id: jobId,
+                agencyId: job.agencyId || "unknown",
+                createdBy: job.createdBy,
+                createdAt: new Date(job.createdAt).toISOString(),
+                events: [],
+            },
+        };
+        if (Object.keys(unsetPayload).length > 0) {
+            updateDoc.$unset = unsetPayload;
+        }
+
+        await BlogStudioPipelineJobModel.updateOne({ id: jobId }, updateDoc, { upsert: true });
     });
 }
 
@@ -349,6 +476,7 @@ export function emitPipelineEvent(jobId: string, event: Omit<PipelineEvent, "tim
     if (job.events.length < MAX_EVENTS_PER_JOB) {
         job.events.push(fullEvent);
     }
+    job.updatedAt = Date.now();
 
     if (fullEvent.type === "complete") {
         job.status = "complete";
@@ -448,7 +576,9 @@ export async function getPipelineJobSnapshot(jobId: string): Promise<PipelineJob
             status: memoryJob.status,
             events: [...memoryJob.events],
             createdAt: new Date(memoryJob.createdAt).toISOString(),
+            updatedAt: new Date(memoryJob.updatedAt).toISOString(),
             completedAt: memoryJob.completedAt ? new Date(memoryJob.completedAt).toISOString() : undefined,
+            execution: memoryJob.execution ? { ...memoryJob.execution } : undefined,
         };
     }
 

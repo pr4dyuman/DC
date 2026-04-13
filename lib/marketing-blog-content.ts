@@ -23,6 +23,9 @@ const FAQ_MARKDOWN_SECTION_PATTERN = new RegExp(
     String.raw`(?:^|\n)#{2,3}\s*${FAQ_HEADING_PATTERN}\s*$[\s\S]*?(?=(?:\n#{2,3}\s+)|\s*$)`,
     "gim",
 );
+const REFERENCES_MARKDOWN_HEADING_PATTERN = /^#{2,3}\s*(sources?|references)\s*$/i;
+const MARKDOWN_HEADING_PATTERN = /^#{2,6}\s+/;
+const BARE_URL_LINE_PATTERN = /^https?:\/\/\S+$/i;
 
 function escapeHtml(value: string) {
     return value
@@ -39,6 +42,83 @@ function escapeRegex(value: string) {
 
 function normalizeNewlines(value: string) {
     return value.replace(/\r\n?/g, "\n");
+}
+
+function cleanReferenceLabel(value: string) {
+    return value
+        .replace(/\[([^\]]+)\]/g, "($1)")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/[.,;:]+$/g, "");
+}
+
+function buildReferenceMarkdownLink(label: string, url: string) {
+    const trimmedUrl = url.trim();
+    const prefixMatch = label.trim().match(/^(\[\d+\]|\d+\.)\s*(.+)$/);
+    const prefix = prefixMatch?.[1] ? `${prefixMatch[1]} ` : "";
+    const rawLabel = prefixMatch?.[2] || label;
+    const cleanedLabel = cleanReferenceLabel(rawLabel) || trimmedUrl;
+
+    return `${prefix}[${cleanedLabel}](${trimmedUrl})`;
+}
+
+function linkifyReferenceLine(line: string, explicitUrl?: string) {
+    const existingMarkdownLink = /\[[^\]]+\]\((\/(?!\/)[^) \t]+|https?:\/\/[^) \t]+|mailto:[^) \t]+|tel:[^) \t]+)\)/i;
+    if (existingMarkdownLink.test(line)) {
+        return line;
+    }
+
+    const resolvedUrl = explicitUrl?.trim() || line.match(/https?:\/\/\S+\s*$/i)?.[0]?.trim() || "";
+    if (!resolvedUrl) {
+        return line;
+    }
+
+    const label = explicitUrl
+        ? line.trim()
+        : line.replace(new RegExp(`${escapeRegex(resolvedUrl)}\\s*$`, "i"), "").trim();
+
+    if (!label) {
+        return `[${resolvedUrl}](${resolvedUrl})`;
+    }
+
+    return buildReferenceMarkdownLink(label, resolvedUrl);
+}
+
+function normalizeReferenceSectionLinks(content: string) {
+    const lines = normalizeNewlines(content).split("\n");
+    const normalizedLines: string[] = [];
+    let inReferencesSection = false;
+
+    for (const rawLine of lines) {
+        const line = rawLine.trim();
+
+        if (REFERENCES_MARKDOWN_HEADING_PATTERN.test(line)) {
+            inReferencesSection = true;
+            normalizedLines.push(rawLine);
+            continue;
+        }
+
+        if (inReferencesSection && MARKDOWN_HEADING_PATTERN.test(line) && !REFERENCES_MARKDOWN_HEADING_PATTERN.test(line)) {
+            inReferencesSection = false;
+        }
+
+        if (!inReferencesSection) {
+            normalizedLines.push(rawLine);
+            continue;
+        }
+
+        if (BARE_URL_LINE_PATTERN.test(line) && normalizedLines.length > 0) {
+            const previousLine = normalizedLines[normalizedLines.length - 1];
+            if (previousLine.trim() && !REFERENCES_MARKDOWN_HEADING_PATTERN.test(previousLine.trim())) {
+                normalizedLines[normalizedLines.length - 1] = linkifyReferenceLine(previousLine, line);
+                continue;
+            }
+        }
+
+        normalizedLines.push(linkifyReferenceLine(rawLine));
+    }
+
+    return normalizedLines.join("\n");
 }
 
 function collapseFaqSectionSpacing(value: string) {
@@ -389,7 +469,7 @@ export function buildMarketingBlogHtml(
 
     // ── Markdown/Plain Text Path ───────────────────────────────────────────────
     const contentWithInlineLinks = injectTrackedInternalLinks(
-        rawContent,
+        normalizeReferenceSectionLinks(rawContent),
         options?.internalLinks,
         options?.siteUrl,
     );

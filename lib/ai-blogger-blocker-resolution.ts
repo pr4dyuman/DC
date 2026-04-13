@@ -112,6 +112,10 @@ function buildResolvedBlocker(
     };
 }
 
+function isAdvisoryAiFixableAuditCheck(check: BlogStudioSeoAuditCheck) {
+    return !check.passed && check.severity === "recommended" && check.key === "keyword-in-title";
+}
+
 function classifyAuditCheck(
     check: BlogStudioSeoAuditCheck,
     input: BuildBlogStudioBlockerResolutionPreviewInput,
@@ -155,6 +159,15 @@ function classifyAuditCheck(
                 "ai-fixable",
                 "Primary keyword is missing.",
                 "Let AI infer and set a primary keyword from the current title, brief, and content.",
+            );
+        case "keyword-in-title":
+            return buildResolvedBlocker(
+                "keyword-in-title",
+                "metadata",
+                "seo-audit",
+                "ai-fixable",
+                "Primary keyword is not in the title yet.",
+                "Let AI revise the title so it includes the primary keyword naturally.",
             );
         case "meta-description":
             return buildResolvedBlocker(
@@ -466,7 +479,7 @@ export function buildBlogStudioBlockerResolutionPreview(
     input: BuildBlogStudioBlockerResolutionPreviewInput,
 ): BlogStudioBlockerResolutionPreview {
     const seoBlockers = input.audit.checks
-        .filter((check) => !check.passed && check.severity === "required")
+        .filter((check) => (!check.passed && check.severity === "required") || isAdvisoryAiFixableAuditCheck(check))
         .map((check) => classifyAuditCheck(check, input));
     const publishBlockers = input.publishValidation.blockers.map((blocker) => classifyPublishBlocker(blocker, input));
     const workflowBlockers = buildWorkflowBlockers(input);

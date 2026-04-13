@@ -434,6 +434,30 @@ function isLowValueWebsiteCategory(category?: BlogStudioSitePriorityPageCategory
     return Boolean(category && LOW_VALUE_WEBSITE_CATEGORIES.has(category));
 }
 
+function getCandidatePathname(candidate: Pick<LinkCandidate, "href">) {
+    try {
+        const url = new URL(candidate.href, "https://example.com");
+        const pathname = url.pathname.replace(/\/+$/, "");
+        return pathname || "/";
+    } catch {
+        return "";
+    }
+}
+
+function isBlogArchiveCandidate(candidate: Pick<LinkCandidate, "href" | "source" | "websiteCategory">) {
+    if (candidate.source !== "page" || candidate.websiteCategory !== "blog") {
+        return false;
+    }
+
+    const pathname = getCandidatePathname(candidate).toLowerCase();
+    return pathname === "/blog"
+        || pathname === "/blogs"
+        || pathname === "/articles"
+        || pathname === "/resources"
+        || pathname === "/news"
+        || pathname === "/insights";
+}
+
 function getWebsiteCategoryWeight(category?: BlogStudioSitePriorityPageCategory) {
     switch (category) {
         case "collection":
@@ -801,6 +825,10 @@ function scoreCandidate(post: BlogStudioPost, candidate: LinkCandidate) {
         score -= 3;
     }
 
+    if (isBlogArchiveCandidate(candidate) && !clusterAligned) {
+        score -= 8;
+    }
+
     if (relationType === "cluster-parent") {
         score += 18;
     } else if (relationType === "pillar-parent") {
@@ -1030,11 +1058,11 @@ function toStructuredInternalLinkSuggestion(
 }
 
 function selectSuggestionMix(ranked: RankedLinkCandidate[], limit: number) {
-    const targetCount = Math.max(limit, 8);
+    const targetCount = Math.max(1, limit);
     const selected: RankedLinkCandidate[] = [];
     const seenHrefs = new Set<string>();
     const hasCommercialCandidates = ranked.some((entry) => isCommercialCandidate(entry.candidate));
-    const maxBlogCount = hasCommercialCandidates ? Math.max(1, Math.floor(targetCount / 3)) : targetCount;
+    const maxBlogCount = hasCommercialCandidates ? Math.max(1, Math.min(2, Math.ceil(targetCount / 3))) : targetCount;
 
     const addEntry = (entry?: RankedLinkCandidate) => {
         if (!entry || seenHrefs.has(entry.candidate.href)) {
@@ -1046,7 +1074,15 @@ function selectSuggestionMix(ranked: RankedLinkCandidate[], limit: number) {
     };
 
     if (hasCommercialCandidates) {
-        addEntry(ranked.find((entry) => isCommercialCandidate(entry.candidate)));
+        for (const entry of ranked) {
+            if (selected.filter((selectedEntry) => isCommercialCandidate(selectedEntry.candidate)).length >= Math.min(2, targetCount)) {
+                break;
+            }
+
+            if (isCommercialCandidate(entry.candidate)) {
+                addEntry(entry);
+            }
+        }
     }
 
     addEntry(ranked.find((entry) => entry.relationType === "cluster-parent" || entry.relationType === "pillar-parent"));
@@ -1070,6 +1106,19 @@ function selectSuggestionMix(ranked: RankedLinkCandidate[], limit: number) {
 
         if (isLowValueWebsiteCategory(entry.candidate.websiteCategory) && lowValueCount >= 1) {
             continue;
+        }
+
+        if (isBlogArchiveCandidate(entry.candidate)) {
+            const hasAlternativeCandidate = ranked.some((alternative) =>
+                !seenHrefs.has(alternative.candidate.href)
+                && alternative.candidate.href !== entry.candidate.href
+                && !isLowValueWebsiteCategory(alternative.candidate.websiteCategory)
+                && !isBlogArchiveCandidate(alternative.candidate),
+            );
+
+            if (hasAlternativeCandidate) {
+                continue;
+            }
         }
 
         addEntry(entry);

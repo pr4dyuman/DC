@@ -454,9 +454,15 @@ export function PostGroundedResearchCard({
                             >
                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                     <div className="space-y-2">
-                                        <p className="text-sm font-medium text-foreground">
+                                        <Link
+                                            href={source.url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex items-center gap-1 text-sm font-medium text-foreground transition-colors hover:text-primary"
+                                        >
                                             {source.title}
-                                        </p>
+                                            <ExternalLink className="h-3.5 w-3.5" />
+                                        </Link>
                                         <div className="flex flex-wrap gap-2">
                                             <Badge variant="outline" className="rounded-full capitalize">
                                                 {source.type}
@@ -472,6 +478,7 @@ export function PostGroundedResearchCard({
                                     <Link
                                         href={source.url}
                                         target="_blank"
+                                        rel="noreferrer"
                                         className="inline-flex items-center gap-1 text-xs font-medium text-primary"
                                     >
                                         Open
@@ -482,7 +489,14 @@ export function PostGroundedResearchCard({
                                     {source.summary}
                                 </p>
                                 <p className="mt-2 text-xs text-muted-foreground">
-                                    {source.domain}
+                                    <Link
+                                        href={source.url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="transition-colors hover:text-foreground hover:underline"
+                                    >
+                                        {source.domain}
+                                    </Link>
                                     {source.publishedAt
                                         ? ` • ${new Date(source.publishedAt).toLocaleDateString()}`
                                         : ""}

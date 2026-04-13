@@ -237,6 +237,61 @@ test("classifies metadata, content, internal-link, and image blockers as ai-fixa
     assert.equal(preview.systemRequiredCount, 0);
 });
 
+test("surfaces keyword-in-title as a narrow ai-fixable advisory check", () => {
+    const preview = makePreview({
+        checks: [
+            {
+                key: "keyword-in-title",
+                label: "Primary keyword in title",
+                passed: false,
+                severity: "recommended",
+                detail: "Helpful when it still sounds natural.",
+            },
+        ],
+        postOverrides: {
+            title: "How Agencies Plan Stronger Campaigns",
+            target: {
+                ...basePost.target,
+                type: "manual-export",
+            },
+            brief: {
+                ...basePost.brief,
+                primaryKeyword: "influencer marketing strategy",
+            },
+        },
+    });
+
+    assert.ok(preview.aiFixable.some((blocker) => blocker.key === "keyword-in-title"));
+    assert.ok(preview.blockers.some((blocker) => blocker.key === "keyword-in-title"));
+    assert.equal(preview.humanRequiredCount, 0);
+    assert.equal(preview.systemRequiredCount, 0);
+});
+
+test("does not promote unrelated recommended checks into blocker resolution", () => {
+    const preview = makePreview({
+        checks: [
+            {
+                key: "keyword-in-body",
+                label: "Primary keyword in body",
+                passed: false,
+                severity: "recommended",
+                detail: "Helpful when it still sounds natural.",
+            },
+        ],
+        postOverrides: {
+            target: {
+                ...basePost.target,
+                type: "manual-export",
+            },
+        },
+    });
+
+    assert.equal(preview.aiFixable.length, 0);
+    assert.equal(preview.blockers.length, 0);
+    assert.equal(preview.hasAiFixable, false);
+    assert.equal(preview.hasBlockingIssues, false);
+});
+
 function buildSeoAuditPost(overrides?: Partial<BlogStudioPost>): BlogStudioPost {
     return {
         ...basePost,

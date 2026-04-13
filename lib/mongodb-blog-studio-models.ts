@@ -833,12 +833,20 @@ type BlogStudioPipelineJobEvent = {
     timestamp: string;
 };
 
+type BlogStudioPipelineJobExecution = {
+    phase?: string;
+    request?: unknown;
+    context?: unknown;
+    updatedAt?: string;
+};
+
 type BlogStudioPipelineJob = {
     id: string;
     agencyId: string;
     createdBy?: string;
     status: BlogStudioPipelineJobStatus;
     events: BlogStudioPipelineJobEvent[];
+    execution?: BlogStudioPipelineJobExecution;
     result?: unknown;
     errorMessage?: string;
     createdAt: string;
@@ -863,6 +871,16 @@ const BlogStudioPipelineJobEventSchema = new Schema<BlogStudioPipelineJobEvent>(
     { _id: false }
 );
 
+const BlogStudioPipelineJobExecutionSchema = new Schema<BlogStudioPipelineJobExecution>(
+    {
+        phase: { type: String },
+        request: { type: Schema.Types.Mixed },
+        context: { type: Schema.Types.Mixed },
+        updatedAt: { type: String },
+    },
+    { _id: false }
+);
+
 const BlogStudioPipelineJobSchema = new Schema<BlogStudioPipelineJob>(
     {
         id: { type: String, required: true, unique: true },
@@ -870,6 +888,7 @@ const BlogStudioPipelineJobSchema = new Schema<BlogStudioPipelineJob>(
         createdBy: { type: String },
         status: { type: String, enum: ["running", "complete", "error"], required: true, default: "running" },
         events: { type: [BlogStudioPipelineJobEventSchema], default: [] },
+        execution: { type: BlogStudioPipelineJobExecutionSchema },
         result: { type: Schema.Types.Mixed },
         errorMessage: { type: String },
         createdAt: { type: String, required: true },

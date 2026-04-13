@@ -1,24 +1,22 @@
 import { NextResponse } from "next/server";
 
-import { generateBlogStudioDraftImpl } from "@/lib/actions/ai-blogger";
-import { emitPipelineEvent, getPipelineJobSnapshot, awaitPipelineJobPersistence } from "@/lib/ai-blogger-pipeline-events";
+import {
+    runBlogStudioDraftResearchPhase,
+    runBlogStudioDraftPlanningPhase,
+    runBlogStudioDraftWritingPhase,
+} from "@/lib/actions/ai-blogger";
+import {
+    awaitPipelineJobPersistence,
+    emitPipelineEvent,
+    getPipelineJobSnapshot,
+    updatePipelineJobExecution,
+} from "@/lib/ai-blogger-pipeline-events";
 import type { BlogStudioBrief, BlogStudioTarget } from "@/lib/types-ai-blogger";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300; // Full 300s budget — this is where the pipeline actually runs.
+export const maxDuration = 300; // Full 300s budget — each worker phase stays within this limit.
 
-/**
- * POST /api/ai-blogger/generate/worker
- *
- * Internal-only endpoint that runs the generateBlogStudioDraftImpl pipeline
- * inside a dedicated serverless invocation with its own 300s execution budget.
- *
- * This is called internally by the /api/ai-blogger/generate route via fetch().
- * It is NOT meant to be called by the browser. Protected by a shared secret.
- */
-
-type WorkerRequestBody = {
-    jobId: string;
+type WorkerExecutionRequest = {
     agency: { id: string; name?: string };
     actor: { id: string; name: string; role: string; timezone?: string };
     input: {
@@ -29,18 +27,43 @@ type WorkerRequestBody = {
     };
 };
 
+type WorkerRequestBody = {
+    jobId: string;
+    agency?: WorkerExecutionRequest["agency"];
+    actor?: WorkerExecutionRequest["actor"];
+    input?: WorkerExecutionRequest["input"];
+};
+
 function isWorkerRequestBody(value: unknown): value is WorkerRequestBody {
     if (!value || typeof value !== "object") return false;
     const body = value as Record<string, unknown>;
-    if (typeof body.jobId !== "string" || !body.jobId) return false;
+    return typeof body.jobId === "string" && Boolean(body.jobId);
+}
+
+function isWorkerExecutionRequest(value: unknown): value is WorkerExecutionRequest {
+    if (!value || typeof value !== "object") return false;
+    const body = value as Record<string, unknown>;
     if (!body.agency || typeof body.agency !== "object") return false;
     if (!body.actor || typeof body.actor !== "object") return false;
     if (!body.input || typeof body.input !== "object") return false;
     return true;
 }
 
+function getAppBaseUrl(): string {
+    if (process.env.NODE_ENV === "development") {
+        const port = process.env.PORT || "3000";
+        return `http://localhost:${port}`;
+    }
+    if (process.env.NEXT_PUBLIC_APP_URL) {
+        return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+    }
+    if (process.env.VERCEL_URL) {
+        return `https://${process.env.VERCEL_URL}`;
+    }
+    return "http://localhost:3000";
+}
+
 export async function POST(request: Request) {
-    // ── Auth: shared secret ────────────────────────────────────────────
     const workerSecret = process.env.AI_BLOGGER_WORKER_SECRET;
     if (!workerSecret) {
         console.error("[WORKER] AI_BLOGGER_WORKER_SECRET is not configured.");
@@ -58,7 +81,6 @@ export async function POST(request: Request) {
         );
     }
 
-    // ── Parse request body ─────────────────────────────────────────────
     let body: unknown;
     try {
         body = await request.json();
@@ -76,11 +98,11 @@ export async function POST(request: Request) {
         );
     }
 
-    const { jobId, agency, actor, input } = body;
+    const { jobId } = body;
+    let snapshot: Awaited<ReturnType<typeof getPipelineJobSnapshot>> | null = null;
 
-    // ── Guard: make sure the job still exists and is running ───────────
     try {
-        const snapshot = await getPipelineJobSnapshot(jobId);
+        snapshot = await getPipelineJobSnapshot(jobId);
         if (!snapshot.exists) {
             console.warn(`[WORKER] Job ${jobId} not found. Possibly expired.`);
             return NextResponse.json(
@@ -93,49 +115,122 @@ export async function POST(request: Request) {
             return NextResponse.json({ ok: true, skipped: true });
         }
     } catch (snapshotError) {
-        // Non-fatal: proceed anyway — the pipeline will handle missing jobs.
         console.warn(`[WORKER] Could not verify job ${jobId}:`, snapshotError);
     }
 
-    // ── Run the pipeline ───────────────────────────────────────────────
-    console.log(`[WORKER] Starting pipeline for job ${jobId}`);
+    const storedRequest = snapshot?.execution?.request;
+    const inlineRequest = body.agency && body.actor && body.input
+        ? { agency: body.agency, actor: body.actor, input: body.input }
+        : undefined;
+    const executionRequest = isWorkerExecutionRequest(storedRequest)
+        ? storedRequest
+        : isWorkerExecutionRequest(inlineRequest)
+            ? inlineRequest
+            : null;
+
+    if (!executionRequest) {
+        return NextResponse.json(
+            { ok: false, error: "Worker request context is missing." },
+            { status: 400 },
+        );
+    }
+
+    const storedPhase = snapshot?.execution?.phase;
+    const currentPhase =
+        storedPhase === "writing"
+            ? "writing"
+            : storedPhase === "planning" && snapshot?.execution?.context !== undefined
+                ? "planning"
+                : "research";
+    console.log(`[WORKER] Starting ${currentPhase} phase for job ${jobId}`);
+
+    const dispatchNextPhase = (nextPhase: "planning" | "writing") => {
+        const workerUrl = `${getAppBaseUrl()}/api/ai-blogger/generate/worker`;
+        fetch(workerUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-worker-secret": workerSecret,
+            },
+            body: JSON.stringify({ jobId }),
+        }).catch((dispatchError) => {
+            const message = dispatchError instanceof Error ? dispatchError.message : "Unknown dispatch error";
+            console.warn(`[WORKER] ${nextPhase} phase dispatch warning for job ${jobId}: ${message}`);
+        });
+    };
+
     try {
-        // Race the pipeline against a 260-second soft timeout.
-        // Vercel hard-kills this serverless function at 300s with no cleanup,
-        // leaving the MongoDB job permanently stuck at status="running".
-        // Firing 40s early lets us write a proper error event to MongoDB
-        // so the client sees "timed out" instead of spinning forever.
-        const WORKER_SOFT_TIMEOUT_MS = 260_000;
-        await Promise.race([
-            generateBlogStudioDraftImpl(agency, actor, input, jobId),
-            new Promise<never>((_, reject) =>
-                setTimeout(
-                    () =>
-                        reject(
-                            new Error(
-                                "The AI generation pipeline exceeded the 260-second server time limit. " +
-                                "Website data is now cached so the next run will be significantly faster. " +
-                                "Try again — it should complete in time.",
-                            ),
-                        ),
-                    WORKER_SOFT_TIMEOUT_MS,
-                ),
-            ),
-        ]);
+        if (currentPhase === "research") {
+            const researchState = await runBlogStudioDraftResearchPhase(
+                executionRequest.agency,
+                executionRequest.actor,
+                executionRequest.input,
+                jobId,
+            );
+
+            await updatePipelineJobExecution(jobId, {
+                phase: "planning",
+                request: executionRequest,
+                context: researchState,
+            });
+            await awaitPipelineJobPersistence(jobId);
+            dispatchNextPhase("planning");
+
+            console.log(`[WORKER] Research phase completed for job ${jobId}; planning phase dispatched.`);
+            return NextResponse.json({ ok: true, phase: "research", continued: true });
+        }
+
+        if (currentPhase === "planning") {
+            if (snapshot?.execution?.context === undefined) {
+                throw new Error("The planning phase could not start because the research context is missing.");
+            }
+
+            const planningState = await runBlogStudioDraftPlanningPhase(
+                executionRequest.agency,
+                executionRequest.actor,
+                executionRequest.input,
+                snapshot.execution.context,
+                jobId,
+            );
+
+            await updatePipelineJobExecution(jobId, {
+                phase: "writing",
+                request: executionRequest,
+                context: planningState,
+            });
+            await awaitPipelineJobPersistence(jobId);
+            dispatchNextPhase("writing");
+
+            console.log(`[WORKER] Planning phase completed for job ${jobId}; writing phase dispatched.`);
+            return NextResponse.json({ ok: true, phase: "planning", continued: true });
+        }
+
+        if (snapshot?.execution?.context === undefined) {
+            throw new Error("The writing phase could not start because the planning context is missing.");
+        }
+
+        await runBlogStudioDraftWritingPhase(
+            executionRequest.agency,
+            executionRequest.actor,
+            executionRequest.input,
+            snapshot.execution.context,
+            jobId,
+        );
+
+        await updatePipelineJobExecution(jobId, {
+            phase: "",
+            clearContext: true,
+            clearRequest: true,
+        });
         console.log(`[WORKER] Pipeline completed for job ${jobId}`);
-        // BUG-01: flush the final 'complete' event write to MongoDB before Vercel
-        // kills the serverless function. Without this, the job can stay stuck at
-        // status="running" forever if the process exits before the queued write settles.
         await awaitPipelineJobPersistence(jobId);
-        return NextResponse.json({ ok: true });
+        return NextResponse.json({ ok: true, phase: "writing" });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown pipeline error";
-        console.error(`[WORKER] Pipeline fatal error for job ${jobId}:`, message);
+        console.error(`[WORKER] ${currentPhase} phase fatal error for job ${jobId}:`, message);
 
-        // Emit the error event so the SSE stream / status polling can deliver it to the client.
         try {
             await emitPipelineEvent(jobId, { type: "error", message });
-            // BUG-01: flush the error event to MongoDB before the function exits.
             await awaitPipelineJobPersistence(jobId);
         } catch (emitError) {
             console.error(`[WORKER] Failed to emit error event for job ${jobId}:`, emitError);

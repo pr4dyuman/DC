@@ -596,8 +596,19 @@ function getStepClasses(state: PipelineStepState) {
 
 function getErrorType(message: string): "validation" | "api-limit" | "timeout" | "network" | "unknown" {
     const lower = message.toLowerCase();
-    if (lower.includes("quota") || lower.includes("limit") || lower.includes("exceeded")) return "api-limit";
-    if (lower.includes("timeout") || lower.includes("timed out")) return "timeout";
+    if (
+        lower.includes("timeout") ||
+        lower.includes("timed out") ||
+        lower.includes("server time limit") ||
+        lower.includes("request took too long")
+    ) return "timeout";
+    if (
+        lower.includes("quota") ||
+        lower.includes("rate limit") ||
+        lower.includes("too many requests") ||
+        lower.includes("payment required") ||
+        lower.includes("credits")
+    ) return "api-limit";
     if (lower.includes("network") || lower.includes("fetch") || lower.includes("connection")) return "network";
     if (lower.includes("validation") || lower.includes("invalid") || lower.includes("required")) return "validation";
     return "unknown";
@@ -608,7 +619,7 @@ function getErrorSuggestion(errorType: "validation" | "api-limit" | "timeout" | 
         case "api-limit":
             return "An external API quota was exceeded. Wait a few minutes and try again. Try with a simpler topic or fewer features enabled.";
         case "timeout":
-            return "The request took too long. Try with a simpler topic, shorter word count, or disable some research features in AI Blogger settings.";
+            return "The pipeline hit the server time limit. The draft may still finish in the background, so check the posts list in a minute. If it does not, retry with a simpler topic, shorter word count, or fewer research features.";
         case "network":
             return "A network error occurred. Check your connection and try again. This is usually temporary.";
         case "validation":

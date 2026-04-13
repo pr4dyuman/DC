@@ -116,22 +116,12 @@ export async function GET(request: Request) {
                 }
 
                 idleTimeout = setTimeout(() => {
-                    try {
-                        controller.enqueue(
-                            encoder.encode(`data: ${JSON.stringify({
-                                type: "error",
-                                message: "The generation job stopped reporting progress. Please retry if it does not complete.",
-                            })}\n\n`),
-                        );
-                    } catch {
-                        // Ignore enqueue failures on close.
-                    }
+                    console.log(`[SSE] Idle timeout reached for ${jobId}; closing stream so the client can reconnect`);
                     closeStream();
-                // BUG-10: 90s idle timeout is enough to catch a genuinely stalled pipeline
-                // while still giving long steps like Fetch Trends adequate time.
-                // The old 300s matched maxDuration exactly, so it fired silently with no
-                // cleanup when Vercel hard-killed the function.
-                }, 90_000);
+                // Long AI stages like live trend discovery and deep research can exceed
+                // 90s without emitting intermediate step events. Closing quietly lets the
+                // client reconnect without surfacing a false workflow error.
+                }, 210_000);
             };
 
             const sendEvent = (event: PipelineEvent) => {
