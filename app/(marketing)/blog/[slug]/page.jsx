@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Calendar, User, Clock, ChevronDown, Share2 } from "lucide-react";
 import dbConnect from "@/lib/marketing-db";
+import { BlogStudioPostModel, connectDB as connectPrimaryDb } from "@/lib/mongodb";
 import Blog from "@/models/marketing/Blog";
 import { checkAuth } from "@/lib/authMiddleware";
 import { buildMarketingBlogHtml, stripStandaloneFaqSection } from "@/lib/marketing-blog-content";
@@ -355,6 +356,19 @@ async function getBlog(slug) {
       return null;
     }
 
+    let resolvedExternalSources = Array.isArray(blog.externalSources) ? blog.externalSources : [];
+    if (resolvedExternalSources.length === 0 && typeof blog.sourcePostId === "string" && blog.sourcePostId.trim()) {
+      try {
+        await connectPrimaryDb();
+        const sourcePost = await BlogStudioPostModel.findOne({ id: blog.sourcePostId.trim() })
+          .select("externalSources")
+          .lean();
+        resolvedExternalSources = Array.isArray(sourcePost?.externalSources) ? sourcePost.externalSources : [];
+      } catch (sourceError) {
+        console.warn("[Blog Page] Failed to hydrate external sources from AI Blogger post:", blog.sourcePostId, sourceError);
+      }
+    }
+
     // Serialize MongoDB ObjectId fields to plain strings to prevent
     // React Server Component serialization failures in production.
     const serializeInternalLinks = (links) => {
@@ -362,6 +376,14 @@ async function getBlog(slug) {
       return links.map((link) => ({
         ...link,
         _id: link._id ? link._id.toString() : undefined,
+      }));
+    };
+
+    const serializeExternalSources = (sources) => {
+      if (!Array.isArray(sources)) return [];
+      return sources.map((source) => ({
+        ...source,
+        _id: source._id ? source._id.toString() : undefined,
       }));
     };
 
@@ -374,6 +396,7 @@ async function getBlog(slug) {
       createdAt: toIsoDate(blog.createdAt) || new Date().toISOString(),
       updatedAt: toIsoDate(blog.updatedAt, blog.createdAt) || new Date().toISOString(),
       internalLinks: serializeInternalLinks(blog.internalLinks),
+      externalSources: serializeExternalSources(resolvedExternalSources),
       faqItems: Array.isArray(blog.faqItems)
         ? blog.faqItems.map((item) => ({ ...item, _id: item._id ? item._id.toString() : undefined }))
         : [],
@@ -457,6 +480,7 @@ export default async function BlogPost({ params }) {
   const renderedContent = buildMarketingBlogHtml(post.content, {
     internalLinks: post.internalLinks,
     siteUrl: SITE_URL,
+    externalSources: post.externalSources,
   });
   const contentWithoutInlineFaq = faqItems.length > 0
     ? stripStandaloneFaqSection(renderedContent)

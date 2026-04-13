@@ -10,6 +10,15 @@ type MarketingBlogInternalLink = {
 type BuildMarketingBlogHtmlOptions = {
     internalLinks?: MarketingBlogInternalLink[];
     siteUrl?: string;
+    externalSources?: MarketingBlogExternalSource[];
+};
+
+type MarketingBlogExternalSource = {
+    title?: string;
+    url?: string;
+    domain?: string;
+    publishedAt?: string;
+    citationBlock?: string;
 };
 
 const HTML_BLOCK_TAG_PATTERN = /<(?:article|aside|blockquote|br|code|div|figure|figcaption|h[1-6]|hr|img|li|ol|p|pre|section|table|tbody|td|th|thead|tr|ul)\b/i;
@@ -62,7 +71,15 @@ function buildReferenceMarkdownLink(label: string, url: string) {
     return `${prefix}[${cleanedLabel}](${trimmedUrl})`;
 }
 
-function linkifyReferenceLine(line: string, explicitUrl?: string) {
+function splitMarkdownListPrefix(line: string) {
+    const match = line.match(/^(\s*(?:[-*]|\d+\.)\s+)(.+)$/);
+    return {
+        prefix: match?.[1] || "",
+        content: match?.[2] || line.trim(),
+    };
+}
+
+function buildLinkedReferenceEntry(line: string, explicitUrl?: string) {
     const existingMarkdownLink = /\[[^\]]+\]\((\/(?!\/)[^) \t]+|https?:\/\/[^) \t]+|mailto:[^) \t]+|tel:[^) \t]+)\)/i;
     if (existingMarkdownLink.test(line)) {
         return line;
@@ -84,6 +101,12 @@ function linkifyReferenceLine(line: string, explicitUrl?: string) {
     return buildReferenceMarkdownLink(label, resolvedUrl);
 }
 
+function linkifyReferenceLine(line: string, explicitUrl?: string) {
+    const { prefix, content } = splitMarkdownListPrefix(line);
+    const linkedEntry = buildLinkedReferenceEntry(content, explicitUrl);
+    return `${prefix}${linkedEntry}`;
+}
+
 function splitInlineReferenceEntries(value: string) {
     const normalized = value.replace(/\s+/g, " ").trim();
     if (!normalized) {
@@ -99,6 +122,55 @@ function splitInlineReferenceEntries(value: string) {
     }
 
     return [normalized];
+}
+
+function normalizeSourceMatchText(value?: string) {
+    return (value || "")
+        .toLowerCase()
+        .replace(/https?:\/\/\S+/g, " ")
+        .replace(/\[[^\]]+\]/g, " ")
+        .replace(/[|]/g, " ")
+        .replace(/[—–-]+/g, " ")
+        .replace(/[^a-z0-9]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function resolveStoredSourceForReferenceLine(
+    line: string,
+    entryIndex: number,
+    sources: MarketingBlogExternalSource[],
+) {
+    if (sources.length === 0) {
+        return null;
+    }
+
+    const markerMatch = line.match(/(?:^|[\s-])\[(\d+)\]|(?:^|[\s-])(\d+)\./);
+    const markerIndex = Number.parseInt(markerMatch?.[1] || markerMatch?.[2] || "", 10);
+    if (Number.isFinite(markerIndex) && markerIndex >= 1 && markerIndex <= sources.length) {
+        return sources[markerIndex - 1];
+    }
+
+    const normalizedLine = normalizeSourceMatchText(line);
+    if (normalizedLine) {
+        const matchedSource = sources.find((source) => {
+            const sourceText = normalizeSourceMatchText(
+                [source.title, source.domain, source.citationBlock, source.publishedAt]
+                    .filter(Boolean)
+                    .join(" "),
+            );
+            return sourceText && (
+                sourceText.includes(normalizedLine) ||
+                normalizedLine.includes(sourceText)
+            );
+        });
+
+        if (matchedSource) {
+            return matchedSource;
+        }
+    }
+
+    return sources[entryIndex] || null;
 }
 
 function normalizeReferenceSectionBodyLines(lines: string[]) {
@@ -124,7 +196,115 @@ function normalizeReferenceSectionBodyLines(lines: string[]) {
         return [`- ${nonEmptyLines[0]}`];
     }
 
-    return nonEmptyLines.map((line) => `- ${line}`);
+    return nonEmptyLines.map((line, index) => (
+        BARE_URL_LINE_PATTERN.test(line) && index > 0
+            ? line
+            : `- ${line}`
+    ));
+}
+
+function enrichMarkdownReferenceSectionFromStoredSources(
+    content: string,
+    sources?: MarketingBlogExternalSource[],
+) {
+    const usableSources = (sources || []).filter((source) => Boolean(source?.url?.trim()));
+    if (usableSources.length === 0) {
+        return content;
+    }
+
+    const lines = normalizeNewlines(content).split("\n");
+    const enrichedLines: string[] = [];
+    let inReferencesSection = false;
+    let referenceEntryIndex = 0;
+
+    for (const rawLine of lines) {
+        const line = rawLine.trim();
+
+        if (REFERENCES_MARKDOWN_HEADING_PATTERN.test(line)) {
+            inReferencesSection = true;
+            referenceEntryIndex = 0;
+            enrichedLines.push(rawLine);
+            continue;
+        }
+
+        if (inReferencesSection && MARKDOWN_HEADING_PATTERN.test(line) && !REFERENCES_MARKDOWN_HEADING_PATTERN.test(line)) {
+            inReferencesSection = false;
+            enrichedLines.push(rawLine);
+            continue;
+        }
+
+        if (!inReferencesSection || !line || BARE_URL_LINE_PATTERN.test(line)) {
+            enrichedLines.push(rawLine);
+            continue;
+        }
+
+        const matchedSource = resolveStoredSourceForReferenceLine(line, referenceEntryIndex, usableSources);
+        enrichedLines.push(
+            matchedSource?.url?.trim()
+                ? linkifyReferenceLine(rawLine, matchedSource.url)
+                : rawLine,
+        );
+        referenceEntryIndex += 1;
+    }
+
+    return enrichedLines.join("\n");
+}
+
+function stripHtmlTags(value: string) {
+    return value
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function enrichHtmlReferenceSectionFromStoredSources(
+    content: string,
+    sources?: MarketingBlogExternalSource[],
+) {
+    const usableSources = (sources || []).filter((source) => Boolean(source?.url?.trim()));
+    if (usableSources.length === 0) {
+        return content;
+    }
+
+    return content.replace(
+        /(<h([23])[^>]*>\s*(?:sources?|references)\s*<\/h\2>)([\s\S]*?)(?=<h[23][^>]*>|$)/gi,
+        (match, headingHtml: string, _level: string, sectionBody: string) => {
+            if (/<a\b/i.test(sectionBody)) {
+                return match;
+            }
+
+            const listItemMatches = Array.from(sectionBody.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi));
+            const paragraphMatches = Array.from(sectionBody.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi));
+
+            let entries: string[] = [];
+            if (listItemMatches.length > 0) {
+                entries = listItemMatches.map((item) => stripHtmlTags(item[1])).filter(Boolean);
+            } else if (paragraphMatches.length > 0) {
+                entries = paragraphMatches
+                    .flatMap((item) => splitInlineReferenceEntries(stripHtmlTags(item[1])))
+                    .filter(Boolean);
+            } else {
+                entries = splitInlineReferenceEntries(stripHtmlTags(sectionBody));
+            }
+
+            if (entries.length === 0) {
+                return match;
+            }
+
+            const rebuiltItems = entries.map((entry, entryIndex) => {
+                const matchedSource = resolveStoredSourceForReferenceLine(entry, entryIndex, usableSources);
+                const linkedEntry = matchedSource?.url?.trim()
+                    ? buildLinkedReferenceEntry(entry, matchedSource.url)
+                    : entry;
+                return `<li>${renderInlineContent(linkedEntry)}</li>`;
+            });
+
+            return `${headingHtml}\n<ul>${rebuiltItems.join("")}</ul>`;
+        },
+    );
 }
 
 export function normalizeReferenceSectionFormatting(content?: string) {
@@ -555,8 +735,13 @@ export function buildMarketingBlogHtml(
     // The AI pipeline emits HTML directly. In this case we skip the markdown
     // converter but still inject internal links using the HTML-aware injector.
     if (contentLooksLikeHtml(rawContent)) {
-        return injectInternalLinksIntoHtml(
+        const contentWithStoredSourceLinks = enrichHtmlReferenceSectionFromStoredSources(
             rawContent,
+            options?.externalSources,
+        );
+
+        return injectInternalLinksIntoHtml(
+            contentWithStoredSourceLinks,
             options?.internalLinks,
             options?.siteUrl,
         );
@@ -564,7 +749,12 @@ export function buildMarketingBlogHtml(
 
     // ── Markdown/Plain Text Path ───────────────────────────────────────────────
     const contentWithInlineLinks = injectTrackedInternalLinks(
-        normalizeReferenceSectionLinks(normalizeReferenceSectionFormatting(rawContent)),
+        normalizeReferenceSectionLinks(
+            enrichMarkdownReferenceSectionFromStoredSources(
+                normalizeReferenceSectionFormatting(rawContent),
+                options?.externalSources,
+            ),
+        ),
         options?.internalLinks,
         options?.siteUrl,
     );

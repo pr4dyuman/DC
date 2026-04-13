@@ -30,6 +30,19 @@ export type WebhookPayload = {
             question: string;
             answer: string;
         }>;
+        externalSources?: Array<{
+            id?: string;
+            title?: string;
+            url: string;
+            domain?: string;
+            summary?: string;
+            type?: string;
+            freshness?: string;
+            trustLevel?: string;
+            publishedAt?: string;
+            keyClaims?: string[];
+            citationBlock?: string;
+        }>;
         peopleAlsoAsk?: string[];
         internalLinks: Array<{
             href: string;
@@ -383,6 +396,7 @@ export function buildWebhookPayload(
     const resolvedContent = buildMarketingBlogHtml(options?.content || post.content || "", {
         internalLinks: resolvedInternalLinks,
         siteUrl: options?.siteUrl,
+        externalSources: post.externalSources,
     });
 
     return {
@@ -406,6 +420,21 @@ export function buildWebhookPayload(
                 .map((item) => ({
                     question: item.question.trim(),
                     answer: item.answer.trim(),
+                })),
+            externalSources: (post.externalSources || [])
+                .filter((source) => Boolean(source?.url?.trim()))
+                .map((source) => ({
+                    id: source.id,
+                    title: source.title,
+                    url: source.url,
+                    domain: source.domain,
+                    summary: source.summary,
+                    type: source.type,
+                    freshness: source.freshness,
+                    trustLevel: source.trustLevel,
+                    publishedAt: source.publishedAt,
+                    keyClaims: source.keyClaims,
+                    citationBlock: source.citationBlock,
                 })),
             peopleAlsoAsk: (options?.peopleAlsoAsk || [])
                 .map((item) => item?.trim() || "")

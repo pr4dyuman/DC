@@ -1,6 +1,6 @@
 "use server";
 
-import { Message } from "./db";
+import type { Message } from "./db";
 import { revalidatePath } from "next/cache";
 import { getCurrentAgency } from "./agency-context";
 import { generateId } from "./utils-server";

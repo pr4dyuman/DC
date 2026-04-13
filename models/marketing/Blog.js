@@ -71,6 +71,56 @@ const BlogSchema = new mongoose.Schema({
       },
     },
   ],
+  externalSources: [
+    {
+      id: {
+        type: String,
+        trim: true,
+      },
+      title: {
+        type: String,
+        trim: true,
+      },
+      url: {
+        type: String,
+        trim: true,
+      },
+      domain: {
+        type: String,
+        trim: true,
+      },
+      summary: {
+        type: String,
+        trim: true,
+      },
+      type: {
+        type: String,
+        trim: true,
+      },
+      freshness: {
+        type: String,
+        trim: true,
+      },
+      trustLevel: {
+        type: String,
+        trim: true,
+      },
+      publishedAt: {
+        type: String,
+        trim: true,
+      },
+      keyClaims: [
+        {
+          type: String,
+          trim: true,
+        },
+      ],
+      citationBlock: {
+        type: String,
+        trim: true,
+      },
+    },
+  ],
   peopleAlsoAsk: [
     {
       type: String,

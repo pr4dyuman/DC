@@ -17981,6 +17981,7 @@ export async function publishBlogStudioPostImpl(
     const renderedPublishedContent = buildMarketingBlogHtml(publishBodyContent, {
         internalLinks: currentPost.internalLinks,
         siteUrl: resolvedSiteUrl,
+        externalSources: currentPost.externalSources,
     });
     const trackedPublishLinkSuggestions: BlogStudioInternalLinkSuggestion[] = (currentPost.internalLinks || []).map(
         (link, index) => ({

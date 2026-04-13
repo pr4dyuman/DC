@@ -37,6 +37,19 @@ type IncomingWebhookPayload = {
             question?: string;
             answer?: string;
         }>;
+        externalSources?: Array<{
+            id?: string;
+            title?: string;
+            url?: string;
+            domain?: string;
+            summary?: string;
+            type?: string;
+            freshness?: string;
+            trustLevel?: string;
+            publishedAt?: string;
+            keyClaims?: string[];
+            citationBlock?: string;
+        }>;
         peopleAlsoAsk?: string[];
         internalLinks?: Array<{
             href: string;
@@ -90,6 +103,46 @@ function normalizeQuestionList(items?: string[]) {
         .filter((item) => hasNonEmptyString(item))
         .map((item) => item.trim())
         .filter(Boolean);
+}
+
+function normalizeExternalSources(
+    items?: IncomingWebhookPayload["blog"]["externalSources"],
+) {
+    if (!Array.isArray(items)) {
+        return [];
+    }
+
+    const seenUrls = new Set<string>();
+
+    return items
+        .map((item) => {
+            const url = hasNonEmptyString(item?.url) ? item.url.trim() : "";
+            if (!url || seenUrls.has(url)) {
+                return null;
+            }
+
+            seenUrls.add(url);
+
+            return {
+                id: hasNonEmptyString(item?.id) ? item.id.trim() : undefined,
+                title: hasNonEmptyString(item?.title) ? item.title.trim() : url,
+                url,
+                domain: hasNonEmptyString(item?.domain) ? item.domain.trim() : "",
+                summary: hasNonEmptyString(item?.summary) ? item.summary.trim() : "",
+                type: hasNonEmptyString(item?.type) ? item.type.trim() : "",
+                freshness: hasNonEmptyString(item?.freshness) ? item.freshness.trim() : "",
+                trustLevel: hasNonEmptyString(item?.trustLevel) ? item.trustLevel.trim() : "",
+                publishedAt: hasNonEmptyString(item?.publishedAt) ? item.publishedAt.trim() : "",
+                keyClaims: Array.isArray(item?.keyClaims)
+                    ? item.keyClaims
+                        .filter((claim) => hasNonEmptyString(claim))
+                        .map((claim) => claim.trim())
+                        .slice(0, 5)
+                    : [],
+                citationBlock: hasNonEmptyString(item?.citationBlock) ? item.citationBlock.trim() : "",
+            };
+        })
+        .filter((item) => item !== null);
 }
 
 let cachedMainMongoClientPromise: Promise<MongoClient> | null = null;
@@ -333,6 +386,8 @@ export async function POST(request: NextRequest) {
             dataCheck: {
                 hasFaqItems: (payload.blog.faqItems?.length || 0) > 0,
                 faqCount: payload.blog.faqItems?.length || 0,
+                hasExternalSources: (payload.blog.externalSources?.length || 0) > 0,
+                externalSourceCount: payload.blog.externalSources?.length || 0,
                 hasPeopleAlsoAsk: (payload.blog.peopleAlsoAsk?.length || 0) > 0,
                 paaCount: payload.blog.peopleAlsoAsk?.length || 0,
                 hasInternalLinks: (payload.blog.internalLinks?.length || 0) > 0,
@@ -353,6 +408,7 @@ export async function POST(request: NextRequest) {
             payload.blog.slug,
         );
         const normalizedFaqItems = normalizeFaqItems(payload.blog.faqItems);
+        const normalizedExternalSources = normalizeExternalSources(payload.blog.externalSources);
         const normalizedPeopleAlsoAsk = normalizeQuestionList(payload.blog.peopleAlsoAsk);
         const normalizedSourcePostId = hasNonEmptyString(payload.blog.id)
             ? payload.blog.id.trim()
@@ -386,6 +442,7 @@ export async function POST(request: NextRequest) {
             canonicalUrl: normalizedCanonicalUrl,
             schemaMarkup: payload.blog.schemaMarkup,
             faqItems: normalizedFaqItems,
+            externalSources: normalizedExternalSources,
             peopleAlsoAsk: normalizedPeopleAlsoAsk,
             internalLinks: payload.blog.internalLinks || [],
             contentClusterId: payload.blog.contentClusterId,
@@ -437,6 +494,8 @@ export async function POST(request: NextRequest) {
                     internalLinkCount: payload.blog.internalLinks?.length || 0,
                     hasFaqItems: (payload.blog.faqItems?.length || 0) > 0,
                     faqItemCount: payload.blog.faqItems?.length || 0,
+                    hasExternalSources: normalizedExternalSources.length > 0,
+                    externalSourceCount: normalizedExternalSources.length,
                     hasSchemaMarkup: !!payload.blog.schemaMarkup,
                     metaKeywordsCount: payload.blog.metaKeywords?.split(',').length || 0,
                 },
@@ -457,6 +516,7 @@ export async function POST(request: NextRequest) {
                     normalizedCanonicalUrl,
                     normalizedImage,
                     faqItemCount: normalizedFaqItems.length,
+                    externalSourceCount: normalizedExternalSources.length,
                     peopleAlsoAskCount: normalizedPeopleAlsoAsk.length,
                     internalLinkCount: payload.blog.internalLinks?.length || 0,
                 },

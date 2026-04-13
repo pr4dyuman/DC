@@ -72,6 +72,8 @@ const BlogPublishingAuditSchema = new mongoose.Schema({
     internalLinkCount: Number,
     hasFaqItems: Boolean,
     faqItemCount: Number,
+    hasExternalSources: Boolean,
+    externalSourceCount: Number,
     hasSchemaMarkup: Boolean,
     metaKeywordsCount: Number,
   },
