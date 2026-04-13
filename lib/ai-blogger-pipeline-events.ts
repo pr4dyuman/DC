@@ -6,6 +6,7 @@
  * replay the full pipeline history.
  */
 
+import crypto from "crypto";
 import { EventEmitter } from "events";
 
 import { BlogStudioPipelineJobModel, connectDB } from "./mongodb";
@@ -37,6 +38,9 @@ type PipelineExecutionState = {
     phase?: string;
     request?: unknown;
     context?: unknown;
+    claimedPhase?: string;
+    claimId?: string;
+    claimExpiresAt?: string;
     updatedAt?: string;
 };
 
@@ -80,6 +84,7 @@ type PipelineGlobalStore = typeof globalThis & {
 const EVENT_TTL_MS = 5 * 60 * 1000;
 const JOB_RETENTION_MS = 24 * 60 * 60 * 1000;
 const MAX_EVENTS_PER_JOB = 200;
+const PHASE_CLAIM_LEASE_MS = 10 * 60 * 1000;
 
 const pipelineGlobal = globalThis as PipelineGlobalStore;
 const jobs = pipelineGlobal.__aiBloggerPipelineJobs ?? (pipelineGlobal.__aiBloggerPipelineJobs = new Map<string, PipelineJob>());
@@ -259,11 +264,38 @@ function normalizeExecutionState(value: unknown): PipelineExecutionState | undef
     if ("context" in raw) {
         execution.context = raw.context;
     }
+    if (typeof raw.claimedPhase === "string" && raw.claimedPhase.trim()) {
+        execution.claimedPhase = raw.claimedPhase;
+    }
+    if (typeof raw.claimId === "string" && raw.claimId.trim()) {
+        execution.claimId = raw.claimId;
+    }
+    if (typeof raw.claimExpiresAt === "string") {
+        execution.claimExpiresAt = raw.claimExpiresAt;
+    }
     if (typeof raw.updatedAt === "string") {
         execution.updatedAt = raw.updatedAt;
     }
 
     return Object.keys(execution).length > 0 ? execution : undefined;
+}
+
+function applySnapshotToMemoryJob(jobId: string, snapshot: PipelineJobSnapshot): void {
+    if (!snapshot.exists) {
+        return;
+    }
+
+    const job = ensureMemoryJob(jobId, {
+        agencyId: snapshot.agencyId,
+        createdBy: snapshot.createdBy,
+    });
+
+    job.status = snapshot.status || "running";
+    job.events = [...snapshot.events];
+    job.execution = snapshot.execution ? { ...snapshot.execution } : undefined;
+    job.createdAt = snapshot.createdAt ? new Date(snapshot.createdAt).getTime() : job.createdAt;
+    job.updatedAt = snapshot.updatedAt ? new Date(snapshot.updatedAt).getTime() : job.updatedAt;
+    job.completedAt = snapshot.completedAt ? new Date(snapshot.completedAt).getTime() : undefined;
 }
 
 async function readPersistedJob(jobId: string): Promise<PipelineJobSnapshot> {
@@ -365,6 +397,7 @@ type PipelineExecutionUpdate = {
     context?: unknown;
     clearRequest?: boolean;
     clearContext?: boolean;
+    clearClaim?: boolean;
 };
 
 export async function updatePipelineJobExecution(jobId: string, update: PipelineExecutionUpdate): Promise<void> {
@@ -393,6 +426,11 @@ export async function updatePipelineJobExecution(jobId: string, update: Pipeline
     }
     if (update.clearContext) {
         delete nextExecution.context;
+    }
+    if (update.clearClaim) {
+        delete nextExecution.claimedPhase;
+        delete nextExecution.claimId;
+        delete nextExecution.claimExpiresAt;
     }
 
     job.execution = nextExecution;
@@ -427,6 +465,11 @@ export async function updatePipelineJobExecution(jobId: string, update: Pipeline
         if (update.clearContext) {
             unsetPayload["execution.context"] = 1;
         }
+        if (update.clearClaim) {
+            unsetPayload["execution.claimedPhase"] = 1;
+            unsetPayload["execution.claimId"] = 1;
+            unsetPayload["execution.claimExpiresAt"] = 1;
+        }
 
         const updateDoc: Record<string, unknown> = {
             $set: setPayload,
@@ -444,6 +487,117 @@ export async function updatePipelineJobExecution(jobId: string, update: Pipeline
 
         await BlogStudioPipelineJobModel.updateOne({ id: jobId }, updateDoc, { upsert: true });
     });
+}
+
+type PipelineJobPhaseClaimResult =
+    | {
+        ok: true;
+        claimId: string;
+        phase: string;
+        claimExpiresAt: string;
+    }
+    | {
+        ok: false;
+        reason: "not-found" | "not-running" | "phase-mismatch" | "already-claimed";
+        status?: PipelineJobStatus;
+        execution?: PipelineExecutionState;
+    };
+
+export async function claimPipelineJobPhase(
+    jobId: string,
+    phase: string,
+): Promise<PipelineJobPhaseClaimResult> {
+    const trimmedPhase = phase.trim();
+    if (!trimmedPhase) {
+        return { ok: false, reason: "phase-mismatch" };
+    }
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const claimExpiresAt = new Date(now.getTime() + PHASE_CLAIM_LEASE_MS).toISOString();
+    const claimId = crypto.randomUUID();
+
+    await connectDB();
+
+    const claimedDoc = await BlogStudioPipelineJobModel.findOneAndUpdate(
+        {
+            id: jobId,
+            status: "running",
+            "execution.phase": trimmedPhase,
+            $or: [
+                { "execution.claimId": { $exists: false } },
+                { "execution.claimId": null },
+                { "execution.claimExpiresAt": { $lte: nowIso } },
+            ],
+        },
+        {
+            $set: {
+                updatedAt: nowIso,
+                expiresAt: new Date(Date.now() + JOB_RETENTION_MS),
+                "execution.updatedAt": nowIso,
+                "execution.claimedPhase": trimmedPhase,
+                "execution.claimId": claimId,
+                "execution.claimExpiresAt": claimExpiresAt,
+            },
+        },
+        { new: true },
+    ).lean();
+
+    if (claimedDoc) {
+        const execution = normalizeExecutionState((claimedDoc as Record<string, unknown>).execution);
+        applySnapshotToMemoryJob(jobId, {
+            exists: true,
+            jobId,
+            agencyId: typeof (claimedDoc as Record<string, unknown>).agencyId === "string"
+                ? ((claimedDoc as Record<string, unknown>).agencyId as string)
+                : undefined,
+            createdBy: typeof (claimedDoc as Record<string, unknown>).createdBy === "string"
+                ? ((claimedDoc as Record<string, unknown>).createdBy as string)
+                : undefined,
+            status: (typeof (claimedDoc as Record<string, unknown>).status === "string"
+                ? (claimedDoc as Record<string, unknown>).status
+                : "running") as PipelineJobStatus,
+            events: Array.isArray((claimedDoc as { events?: unknown[] }).events)
+                ? (((claimedDoc as { events?: unknown[] }).events ?? [])
+                    .map((event) => normalizePipelineEvent(event))
+                    .filter((event): event is PipelineEvent => Boolean(event)))
+                : [],
+            createdAt: typeof (claimedDoc as Record<string, unknown>).createdAt === "string"
+                ? ((claimedDoc as Record<string, unknown>).createdAt as string)
+                : undefined,
+            updatedAt: typeof (claimedDoc as Record<string, unknown>).updatedAt === "string"
+                ? ((claimedDoc as Record<string, unknown>).updatedAt as string)
+                : nowIso,
+            completedAt: typeof (claimedDoc as Record<string, unknown>).completedAt === "string"
+                ? ((claimedDoc as Record<string, unknown>).completedAt as string)
+                : undefined,
+            execution,
+        });
+
+        return {
+            ok: true,
+            claimId,
+            phase: trimmedPhase,
+            claimExpiresAt,
+        };
+    }
+
+    const snapshot = await readPersistedJob(jobId);
+    applySnapshotToMemoryJob(jobId, snapshot);
+
+    if (!snapshot.exists) {
+        return { ok: false, reason: "not-found" };
+    }
+
+    if (snapshot.status !== "running") {
+        return { ok: false, reason: "not-running", status: snapshot.status, execution: snapshot.execution };
+    }
+
+    if ((snapshot.execution?.phase || "") !== trimmedPhase) {
+        return { ok: false, reason: "phase-mismatch", status: snapshot.status, execution: snapshot.execution };
+    }
+
+    return { ok: false, reason: "already-claimed", status: snapshot.status, execution: snapshot.execution };
 }
 
 /**
@@ -481,9 +635,19 @@ export function emitPipelineEvent(jobId: string, event: Omit<PipelineEvent, "tim
     if (fullEvent.type === "complete") {
         job.status = "complete";
         job.completedAt = Date.now();
+        if (job.execution) {
+            delete job.execution.claimedPhase;
+            delete job.execution.claimId;
+            delete job.execution.claimExpiresAt;
+        }
     } else if (fullEvent.type === "error") {
         job.status = "error";
         job.completedAt = Date.now();
+        if (job.execution) {
+            delete job.execution.claimedPhase;
+            delete job.execution.claimId;
+            delete job.execution.claimExpiresAt;
+        }
     }
 
     job.emitter.emit("event", fullEvent);
@@ -505,10 +669,16 @@ export function emitPipelineEvent(jobId: string, event: Omit<PipelineEvent, "tim
             setPayload.completedAt = fullEvent.timestamp;
             setPayload.result = fullEvent.result;
             unsetPayload.errorMessage = 1; // properly clear any previous error
+            unsetPayload["execution.claimedPhase"] = 1;
+            unsetPayload["execution.claimId"] = 1;
+            unsetPayload["execution.claimExpiresAt"] = 1;
         } else if (fullEvent.type === "error") {
             setPayload.status = "error";
             setPayload.completedAt = fullEvent.timestamp;
             setPayload.errorMessage = fullEvent.message || "Pipeline failed.";
+            unsetPayload["execution.claimedPhase"] = 1;
+            unsetPayload["execution.claimId"] = 1;
+            unsetPayload["execution.claimExpiresAt"] = 1;
         }
 
         // BUG-09: updateOne is sufficient — we never used the returned document.

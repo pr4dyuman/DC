@@ -5,7 +5,13 @@ import { requireRole, toActionActor } from "@/lib/actions/access";
 import { getCurrentAgency } from "@/lib/agency-context";
 import { getAIBloggerAccessState } from "@/lib/ai-blogger-access";
 import { generateBlogStudioDraftImpl } from "@/lib/actions/ai-blogger";
-import { createPipelineJob, emitPipelineEvent, releaseLocalPipelineJob, updatePipelineJobExecution } from "@/lib/ai-blogger-pipeline-events";
+import {
+    awaitPipelineJobPersistence,
+    createPipelineJob,
+    emitPipelineEvent,
+    releaseLocalPipelineJob,
+    updatePipelineJobExecution,
+} from "@/lib/ai-blogger-pipeline-events";
 import type { BlogStudioBrief, BlogStudioTarget } from "@/lib/types-ai-blogger";
 import { getAgencyAIBloggerConfigServer } from "@/lib/utils-server";
 
@@ -14,7 +20,14 @@ import { getAgencyAIBloggerConfigServer } from "@/lib/utils-server";
  * In development, always use localhost so the worker runs in the same dev server.
  * In production: NEXT_PUBLIC_APP_URL (explicit) → VERCEL_URL (auto) → localhost fallback.
  */
-function getAppBaseUrl(): string {
+function getAppBaseUrl(request?: Request): string {
+    if (request) {
+        try {
+            return new URL(request.url).origin.replace(/\/$/, "");
+        } catch {
+            // Fall through to env-based resolution.
+        }
+    }
     if (process.env.NODE_ENV === "development") {
         const port = process.env.PORT || "3000";
         return `http://localhost:${port}`;
@@ -26,6 +39,22 @@ function getAppBaseUrl(): string {
         return `https://${process.env.VERCEL_URL}`;
     }
     return "http://localhost:3000";
+}
+
+async function readDispatchFailureMessage(label: string, response: Response): Promise<string> {
+    let detail = "";
+    try {
+        const text = (await response.text()).trim();
+        if (text) {
+            detail = text.length > 240 ? `${text.slice(0, 240)}...` : text;
+        }
+    } catch {
+        // Ignore response body read errors.
+    }
+
+    return detail
+        ? `${label} returned ${response.status} ${response.statusText}: ${detail}`
+        : `${label} returned ${response.status} ${response.statusText}`;
 }
 
 type GenerateDraftRequestBody = {
@@ -168,9 +197,10 @@ export async function POST(request: Request) {
                     input: pipelineInput,
                 },
                 clearContext: true,
+                clearClaim: true,
             });
 
-            const baseUrl = getAppBaseUrl();
+            const baseUrl = getAppBaseUrl(request);
             const authHeaders = {
                 "Content-Type": "application/json",
                 "x-worker-secret": workerSecret,
@@ -200,6 +230,12 @@ export async function POST(request: Request) {
                             blockedPaths: crawlConfig?.blockedPaths,
                         },
                     }),
+                }).then(async (response) => {
+                    if (response.ok) {
+                        return;
+                    }
+                    const message = await readDispatchFailureMessage("Precache dispatch", response);
+                    console.warn(`[GENERATE-ROUTE] ${message}`);
                 }).catch((err) => {
                     const msg = err instanceof Error ? err.message : "Precache dispatch failed";
                     console.warn(`[GENERATE-ROUTE] Precache dispatch error (non-fatal): ${msg}`);
@@ -215,6 +251,17 @@ export async function POST(request: Request) {
                 body: JSON.stringify({
                     jobId,
                 }),
+            }).then(async (response) => {
+                if (response.ok) {
+                    return;
+                }
+
+                const message = await readDispatchFailureMessage("Worker dispatch", response);
+                console.warn(`[GENERATE-ROUTE] ${message}`);
+                if (response.status < 500) {
+                    await emitPipelineEvent(jobId, { type: "error", message });
+                    await awaitPipelineJobPersistence(jobId);
+                }
             }).catch((fetchError) => {
                 const msg = fetchError instanceof Error ? fetchError.message : "Worker dispatch failed";
                 console.warn(`[GENERATE-ROUTE] Worker dispatch error (non-fatal): ${msg}`);

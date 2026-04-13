@@ -837,6 +837,9 @@ type BlogStudioPipelineJobExecution = {
     phase?: string;
     request?: unknown;
     context?: unknown;
+    claimedPhase?: string;
+    claimId?: string;
+    claimExpiresAt?: string;
     updatedAt?: string;
 };
 
@@ -876,6 +879,9 @@ const BlogStudioPipelineJobExecutionSchema = new Schema<BlogStudioPipelineJobExe
         phase: { type: String },
         request: { type: Schema.Types.Mixed },
         context: { type: Schema.Types.Mixed },
+        claimedPhase: { type: String },
+        claimId: { type: String },
+        claimExpiresAt: { type: String },
         updatedAt: { type: String },
     },
     { _id: false }

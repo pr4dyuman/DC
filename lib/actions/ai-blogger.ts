@@ -766,7 +766,7 @@ function getGenerationRunStepsForPersistence(fallbackSteps: BlogStudioRunStep[],
         return fallbackSteps;
     }
 
-    const detailedSteps = generationLogger.getBlogStudioRunSteps() as BlogStudioRunStep[];
+    const detailedSteps = generationLogger.getBlogStudioRunSteps(jobId) as BlogStudioRunStep[];
     return detailedSteps.length >= fallbackSteps.length ? detailedSteps : fallbackSteps;
 }
 
@@ -12249,13 +12249,6 @@ Rules:
             );
         }
 
-        addRunStep(
-            "write-blog",
-            "Write Blog",
-            "completed",
-            `Content: ${finalDraft.wordCount} words | Sections: ${finalDraft.outline.length} | Internal links: ${finalDraft.internalLinks?.length ?? 0}${draftStage.usedFallback ? " | Fallback key used" : ""}`,
-            step10StartedAt,
-        );
         const finalCheckerStepStartedAt = getNowIso();
 
         if (resolvedPublishRules.aiReviewPolicy.enableFinalChecker && finalDraft.content.trim()) {
@@ -15961,14 +15954,6 @@ Rules:
             ...finalAuditDraft,
             seoScore: finalSeoAudit.score,
         };
-
-        addRunStep(
-            "write-blog",
-            "Write Blog",
-            "completed",
-            `Content: ${finalDraft.wordCount} words | Sections: ${finalDraft.outline.length} | Internal links: ${finalDraft.internalLinks?.length ?? 0}${draftStage.usedFallback ? " | Fallback key used" : ""}`,
-            writeBlogStartedAt,
-        );
 
         if (jobId) {
             const writeBlogEndTime = getNowIso();

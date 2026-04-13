@@ -7,6 +7,7 @@ import {
 } from "@/lib/actions/ai-blogger";
 import {
     awaitPipelineJobPersistence,
+    claimPipelineJobPhase,
     emitPipelineEvent,
     getPipelineJobSnapshot,
     updatePipelineJobExecution,
@@ -49,7 +50,14 @@ function isWorkerExecutionRequest(value: unknown): value is WorkerExecutionReque
     return true;
 }
 
-function getAppBaseUrl(): string {
+function getAppBaseUrl(request?: Request): string {
+    if (request) {
+        try {
+            return new URL(request.url).origin.replace(/\/$/, "");
+        } catch {
+            // Fall through to env-based resolution.
+        }
+    }
     if (process.env.NODE_ENV === "development") {
         const port = process.env.PORT || "3000";
         return `http://localhost:${port}`;
@@ -61,6 +69,22 @@ function getAppBaseUrl(): string {
         return `https://${process.env.VERCEL_URL}`;
     }
     return "http://localhost:3000";
+}
+
+async function readDispatchFailureMessage(label: string, response: Response): Promise<string> {
+    let detail = "";
+    try {
+        const text = (await response.text()).trim();
+        if (text) {
+            detail = text.length > 240 ? `${text.slice(0, 240)}...` : text;
+        }
+    } catch {
+        // Ignore response body read errors.
+    }
+
+    return detail
+        ? `${label} returned ${response.status} ${response.statusText}: ${detail}`
+        : `${label} returned ${response.status} ${response.statusText}`;
 }
 
 export async function POST(request: Request) {
@@ -118,7 +142,40 @@ export async function POST(request: Request) {
         console.warn(`[WORKER] Could not verify job ${jobId}:`, snapshotError);
     }
 
-    const storedRequest = snapshot?.execution?.request;
+    const storedPhase = snapshot?.execution?.phase;
+    const currentPhase =
+        storedPhase === "writing"
+            ? "writing"
+            : storedPhase === "planning" && snapshot?.execution?.context !== undefined
+                ? "planning"
+                : "research";
+    const phaseClaim = await claimPipelineJobPhase(jobId, currentPhase);
+    if (!phaseClaim.ok) {
+        const claimExecutionPhase = phaseClaim.execution?.phase || "unknown";
+        if (phaseClaim.reason === "already-claimed") {
+            console.warn(`[WORKER] Job ${jobId} phase ${currentPhase} is already claimed. Skipping duplicate worker.`);
+            return NextResponse.json({ ok: true, skipped: true, reason: phaseClaim.reason });
+        }
+        if (phaseClaim.reason === "phase-mismatch") {
+            console.warn(`[WORKER] Job ${jobId} phase moved from ${currentPhase} to ${claimExecutionPhase}. Skipping stale worker.`);
+            return NextResponse.json({ ok: true, skipped: true, reason: phaseClaim.reason });
+        }
+        if (phaseClaim.reason === "not-running") {
+            console.warn(`[WORKER] Job ${jobId} is already ${phaseClaim.status}. Skipping.`);
+            return NextResponse.json({ ok: true, skipped: true, reason: phaseClaim.reason });
+        }
+        return NextResponse.json(
+            { ok: false, error: "Job not found." },
+            { status: 404 },
+        );
+    }
+
+    snapshot = await getPipelineJobSnapshot(jobId);
+    if (!snapshot.exists || snapshot.status !== "running") {
+        console.warn(`[WORKER] Job ${jobId} became unavailable after claiming ${currentPhase}.`);
+        return NextResponse.json({ ok: true, skipped: true, reason: "job-unavailable" });
+    }
+    const storedRequest = snapshot.execution?.request;
     const inlineRequest = body.agency && body.actor && body.input
         ? { agency: body.agency, actor: body.actor, input: body.input }
         : undefined;
@@ -135,17 +192,10 @@ export async function POST(request: Request) {
         );
     }
 
-    const storedPhase = snapshot?.execution?.phase;
-    const currentPhase =
-        storedPhase === "writing"
-            ? "writing"
-            : storedPhase === "planning" && snapshot?.execution?.context !== undefined
-                ? "planning"
-                : "research";
     console.log(`[WORKER] Starting ${currentPhase} phase for job ${jobId}`);
 
     const dispatchNextPhase = (nextPhase: "planning" | "writing") => {
-        const workerUrl = `${getAppBaseUrl()}/api/ai-blogger/generate/worker`;
+        const workerUrl = `${getAppBaseUrl(request)}/api/ai-blogger/generate/worker`;
         fetch(workerUrl, {
             method: "POST",
             headers: {
@@ -153,6 +203,17 @@ export async function POST(request: Request) {
                 "x-worker-secret": workerSecret,
             },
             body: JSON.stringify({ jobId }),
+        }).then(async (response) => {
+            if (response.ok) {
+                return;
+            }
+
+            const message = await readDispatchFailureMessage(`${nextPhase} phase dispatch`, response);
+            console.warn(`[WORKER] ${message}`);
+            if (response.status < 500) {
+                await emitPipelineEvent(jobId, { type: "error", message });
+                await awaitPipelineJobPersistence(jobId);
+            }
         }).catch((dispatchError) => {
             const message = dispatchError instanceof Error ? dispatchError.message : "Unknown dispatch error";
             console.warn(`[WORKER] ${nextPhase} phase dispatch warning for job ${jobId}: ${message}`);
@@ -172,6 +233,7 @@ export async function POST(request: Request) {
                 phase: "planning",
                 request: executionRequest,
                 context: researchState,
+                clearClaim: true,
             });
             await awaitPipelineJobPersistence(jobId);
             dispatchNextPhase("planning");
@@ -197,6 +259,7 @@ export async function POST(request: Request) {
                 phase: "writing",
                 request: executionRequest,
                 context: planningState,
+                clearClaim: true,
             });
             await awaitPipelineJobPersistence(jobId);
             dispatchNextPhase("writing");
@@ -221,6 +284,7 @@ export async function POST(request: Request) {
             phase: "",
             clearContext: true,
             clearRequest: true,
+            clearClaim: true,
         });
         console.log(`[WORKER] Pipeline completed for job ${jobId}`);
         await awaitPipelineJobPersistence(jobId);
