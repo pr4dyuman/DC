@@ -204,6 +204,12 @@ export function AIBloggerPostStatusControls({
     const publishBlocked = publishesToWebhook && publishValidation && !publishValidation.canPublish;
     const aiFixableBlockers = blockerResolutionPreview?.aiFixable || [];
     const hasAiFixableBlockers = status !== "Published" && Boolean(blockerResolutionPreview?.hasAiFixable);
+    const currentHumanReviewBlockers = status !== "Published"
+        ? blockerResolutionPreview?.humanRequired || []
+        : [];
+    const currentSettingsBlockers = status !== "Published"
+        ? blockerResolutionPreview?.systemRequired || []
+        : [];
     const cannibalizationRetargetBlocker =
         status !== "Published"
             ? blockerResolutionPreview?.humanRequired.find((blocker) => blocker.key === "cannibalization-risk") ?? null
@@ -850,6 +856,21 @@ export function AIBloggerPostStatusControls({
                                 </p>
                             </div>
                         </div>
+                    </div>
+                ) : null}
+
+                {!blockerResolutionResult && (currentHumanReviewBlockers.length > 0 || currentSettingsBlockers.length > 0) ? (
+                    <div className="space-y-3">
+                        <BlockerResolutionList
+                            title="Needs Human Review"
+                            blockers={currentHumanReviewBlockers}
+                            tone="amber"
+                        />
+                        <BlockerResolutionList
+                            title="Needs Settings Fix"
+                            blockers={currentSettingsBlockers}
+                            tone="destructive"
+                        />
                     </div>
                 ) : null}
 
