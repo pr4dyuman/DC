@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/marketing-db";
 import Blog from "@/models/marketing/Blog";
 import { verifySuperAdmin } from "@/lib/actions/super-admin-shared";
+import { normalizeMarketingCanonicalUrl } from "@/lib/marketing-blog-utils";
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,6 +10,10 @@ export async function POST(request: NextRequest) {
     await dbConnect();
 
     const body = await request.json();
+    const normalizedCanonicalUrl = normalizeMarketingCanonicalUrl(
+      body.canonicalUrl || "",
+      body.slug || undefined,
+    );
 
     // Validate required fields
     const required = ["title", "slug", "content", "image", "imageAlt", "shortDescription", "category"];
@@ -17,6 +22,26 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: `Missing required field: ${field}` },
           { status: 400 }
+        );
+      }
+    }
+
+    const existingSlug = await Blog.findOne({ slug: body.slug }).select("slug").lean();
+    if (existingSlug) {
+      return NextResponse.json(
+        { error: "Slug already exists" },
+        { status: 409 }
+      );
+    }
+
+    if (normalizedCanonicalUrl) {
+      const existingCanonical = await Blog.findOne({ canonicalUrl: normalizedCanonicalUrl })
+        .select("slug")
+        .lean();
+      if (existingCanonical) {
+        return NextResponse.json(
+          { error: `Canonical URL already exists on blog "${existingCanonical.slug}"` },
+          { status: 409 }
         );
       }
     }
@@ -34,7 +59,7 @@ export async function POST(request: NextRequest) {
       metaTitle: body.metaTitle || "",
       metaDescription: body.metaDescription || "",
       metaKeywords: body.metaKeywords || "",
-      canonicalUrl: body.canonicalUrl || "",
+      canonicalUrl: normalizedCanonicalUrl || undefined,
       schemaMarkup: body.schemaMarkup || "",
       faqItems: body.faqItems || [],
       contentClusterId: body.contentClusterId || "",
@@ -54,9 +79,13 @@ export async function POST(request: NextRequest) {
     console.error("Error creating blog:", error);
 
     if (error instanceof Error && "code" in error && error.code === 11000) {
+      const duplicateField =
+        typeof (error as { keyPattern?: Record<string, unknown>; keyValue?: Record<string, unknown> }).keyPattern === "object"
+          ? Object.keys((error as { keyPattern?: Record<string, unknown> }).keyPattern || {})[0]
+          : Object.keys((error as { keyValue?: Record<string, unknown> }).keyValue || {})[0];
       return NextResponse.json(
-        { error: "Slug already exists" },
-        { status: 400 }
+        { error: duplicateField === "canonicalUrl" ? "Canonical URL already exists" : "Slug already exists" },
+        { status: 409 }
       );
     }
 

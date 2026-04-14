@@ -330,10 +330,19 @@ const BlogStudioPostSchema = new Schema<BlogStudioPost>(
         createdAt: { type: String, required: true },
         updatedAt: { type: String, required: true },
     },
-    { timestamps: true }
+    { timestamps: false }
 );
 
 BlogStudioPostSchema.index({ agencyId: 1, slug: 1 }, { unique: true });
+BlogStudioPostSchema.index(
+    { agencyId: 1, canonicalUrl: 1 },
+    {
+        unique: true,
+        partialFilterExpression: {
+            canonicalUrl: { $exists: true, $gt: "" },
+        },
+    },
+);
 BlogStudioPostSchema.index({ agencyId: 1, status: 1 });
 BlogStudioPostSchema.index({ agencyId: 1, contentClusterId: 1, updatedAt: -1 });
 BlogStudioPostSchema.index({ agencyId: 1, parentTopicSlug: 1, updatedAt: -1 });
@@ -395,7 +404,7 @@ const BlogStudioRunSchema = new Schema<BlogStudioRun>(
         createdAt: { type: String, required: true },
         updatedAt: { type: String, required: true },
     },
-    { timestamps: true }
+    { timestamps: false }
 );
 
 BlogStudioRunSchema.index({ agencyId: 1, createdAt: -1 });
@@ -483,7 +492,7 @@ const BlogStudioSettingsSchema = new Schema<BlogStudioSettings>(
         createdAt: { type: String, required: true },
         updatedAt: { type: String, required: true },
     },
-    { timestamps: true }
+    { timestamps: false }
 );
 
 const BlogStudioScheduleSchema = new Schema<BlogStudioSchedule>(
@@ -519,7 +528,7 @@ const BlogStudioScheduleSchema = new Schema<BlogStudioSchedule>(
         createdAt: { type: String, required: true },
         updatedAt: { type: String, required: true },
     },
-    { timestamps: true }
+    { timestamps: false }
 );
 
 BlogStudioScheduleSchema.index({ agencyId: 1, status: 1 });
@@ -566,7 +575,7 @@ const BlogStudioSiteSnapshotSchema = new Schema<BlogStudioSiteSnapshot>(
         createdAt: { type: String, required: true },
         updatedAt: { type: String, required: true },
     },
-    { timestamps: true }
+    { timestamps: false }
 );
 
 BlogStudioSiteSnapshotSchema.index({ agencyId: 1, normalizedUrl: 1 }, { unique: true });
@@ -615,7 +624,7 @@ const BlogStudioSerpSnapshotSchema = new Schema<BlogStudioSerpSnapshot>(
         createdAt: { type: String, required: true },
         updatedAt: { type: String, required: true },
     },
-    { timestamps: true }
+    { timestamps: false }
 );
 
 BlogStudioSerpSnapshotSchema.index(
@@ -638,7 +647,7 @@ const BlogStudioGroundedResearchSnapshotSchema = new Schema<BlogStudioGroundedRe
         createdAt: { type: String, required: true },
         updatedAt: { type: String, required: true },
     },
-    { timestamps: true }
+    { timestamps: false }
 );
 
 BlogStudioGroundedResearchSnapshotSchema.index(
@@ -696,7 +705,7 @@ const BlogStudioPerformanceSnapshotSchema = new Schema<BlogStudioPerformanceSnap
         createdAt: { type: String, required: true },
         updatedAt: { type: String, required: true },
     },
-    { timestamps: true }
+    { timestamps: false }
 );
 
 BlogStudioPerformanceSnapshotSchema.index(
@@ -730,7 +739,7 @@ const BlogStudioPerformanceSyncRunSchema = new Schema<BlogStudioPerformanceSyncR
         createdAt: { type: String, required: true },
         updatedAt: { type: String, required: true },
     },
-    { timestamps: true }
+    { timestamps: false }
 );
 
 BlogStudioPerformanceSyncRunSchema.index({ agencyId: 1, completedAt: -1 });
@@ -814,7 +823,7 @@ const BlogStudioWebhookDeliveryLogSchema = new Schema(
         createdAt: { type: String, required: true },
         updatedAt: { type: String, required: true },
     },
-    { timestamps: true }
+    { timestamps: false }
 );
 
 BlogStudioWebhookDeliveryLogSchema.index({ agencyId: 1, createdAt: -1 });
@@ -902,7 +911,7 @@ const BlogStudioPipelineJobSchema = new Schema<BlogStudioPipelineJob>(
         completedAt: { type: String },
         expiresAt: { type: Date, required: true },
     },
-    { timestamps: true }
+    { timestamps: false }
 );
 
 BlogStudioPipelineJobSchema.index({ agencyId: 1, createdAt: -1 });

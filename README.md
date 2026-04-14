@@ -872,8 +872,13 @@ Built with full multi-tenancy from the ground up:
 | `MONGODB_URI` | MongoDB Atlas connection string | ✅ |
 | `JWT_SECRET` | Secret key for JWT token signing (HMAC-SHA256) | ✅ |
 | `BREVO_API_KEY` | Brevo (Sendinblue) API key for transactional emails | ✅ |
-| `BREVO_SENDER_EMAIL` | Sender email address for notifications | ✅ |
+| `BREVO_SENDER_EMAIL` | Default sender email for Agency OS notifications, signup OTPs, and password-reset OTPs | ✅ |
 | `BREVO_SENDER_NAME` | Sender display name | ✅ |
+| `DC_CONTACT_SENDER_EMAIL` | Sender email for the DC website contact form auto-reply and admin lead email | Optional |
+| `DC_CONTACT_SENDER_NAME` | Sender display name for DC website contact form emails | Optional |
+| `DC_CONTACT_ADMIN_EMAIL` | Inbox that receives DC website contact form submissions | Optional |
+| `DC_CONTACT_REPLY_TO_EMAIL` | Reply-to address for the DC website contact form auto-reply | Optional |
+| `DC_CONTACT_REPLY_TO_NAME` | Reply-to display name for the DC website contact form auto-reply | Optional |
 | `AI_ENCRYPT_KEY` | AES-256-GCM key for encrypting AI API keys in DB (32-byte hex) | ✅ |
 
 ---

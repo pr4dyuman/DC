@@ -207,6 +207,11 @@ const BlogSchema = new mongoose.Schema({
 
 // Simple slug generator pre-save with duplicate handling
 BlogSchema.pre('save', async function() {
+  if (typeof this.canonicalUrl === 'string') {
+    const normalizedCanonicalUrl = this.canonicalUrl.trim();
+    this.canonicalUrl = normalizedCanonicalUrl || undefined;
+  }
+
   this.updatedAt = new Date();
   if (this.title && !this.slug) {
     const BlogModel = this.constructor;
@@ -234,6 +239,15 @@ BlogSchema.index({ status: 1 }); // For filtering by status
 BlogSchema.index({ category: 1 }); // For filtering by category
 BlogSchema.index({ contentClusterId: 1, createdAt: -1 }); // For sorted cluster queries
 BlogSchema.index({ sourcePostId: 1 }, { unique: true, sparse: true }); // Stable webhook upserts
+BlogSchema.index(
+  { canonicalUrl: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      canonicalUrl: { $exists: true, $gt: '' },
+    },
+  }
+);
 
 const marketingConnection = getMarketingDbConnectionHandle();
 

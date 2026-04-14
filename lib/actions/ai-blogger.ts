@@ -177,6 +177,38 @@ function buildPipelineCompletionResult(
     };
 }
 
+function buildGenerateDraftResult(input: {
+    post: BlogStudioPost;
+    fetchTrendsSource: BlogStudioFetchTrendsSource;
+    fetchTrendsLabel: string;
+    fetchTrendsNotes: string;
+    businessFitSummary?: string;
+    businessFitScore?: number;
+    businessFitWarnings: string[];
+    runSteps: BlogStudioRunStep[];
+}): BlogStudioGenerateDraftResult {
+    return {
+        post: input.post,
+        diagnostics: {
+            selectedTopic: input.post.generationDiagnostics?.selectedTopic,
+            fetchTrendsSource: input.fetchTrendsSource,
+            fetchTrendsLabel: input.fetchTrendsLabel,
+            fetchTrendsNotes: input.fetchTrendsNotes,
+            businessFitSummary: input.businessFitSummary,
+            businessFitScore: input.businessFitScore,
+            businessFitWarnings: input.businessFitWarnings,
+            scorecard: input.post.generationDiagnostics?.scorecard,
+            sourceUsage: input.post.generationDiagnostics?.sourceUsage,
+            steps: input.runSteps.map((step) => ({
+                key: step.key,
+                label: step.label,
+                status: step.status,
+                notes: step.notes,
+            })),
+        },
+    };
+}
+
 export type BlogStudioOverviewMetrics = {
     draftsInQueue: number;
     readyToReview: number;
@@ -2588,6 +2620,97 @@ async function ensureUniquePostSlug(agencyId: string, baseTitle: string) {
     return candidate;
 }
 
+function isMongoDuplicateKeyError(error: unknown): error is {
+    code?: number;
+    keyPattern?: Record<string, unknown>;
+    keyValue?: Record<string, unknown>;
+} {
+    return Boolean(
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        (error as { code?: unknown }).code === 11000,
+    );
+}
+
+function getMongoDuplicateKeyField(error: unknown): string | null {
+    if (!isMongoDuplicateKeyError(error)) {
+        return null;
+    }
+
+    const keyPattern = error.keyPattern && typeof error.keyPattern === "object"
+        ? Object.keys(error.keyPattern)
+        : [];
+    if (keyPattern.length > 0) {
+        return keyPattern[0] || null;
+    }
+
+    const keyValue = error.keyValue && typeof error.keyValue === "object"
+        ? Object.keys(error.keyValue)
+        : [];
+    return keyValue[0] || null;
+}
+
+function getBlogStudioPostDuplicateConstraintMessage(error: unknown): string | null {
+    const duplicateField = getMongoDuplicateKeyField(error);
+    if (!duplicateField) {
+        return null;
+    }
+
+    if (duplicateField === "canonicalUrl") {
+        return "Another AI Blogger post in this workspace already uses this canonical URL.";
+    }
+
+    if (duplicateField === "slug") {
+        return "Another AI Blogger post in this workspace already uses this slug. Please retry.";
+    }
+
+    if (duplicateField === "id") {
+        return "A duplicate AI Blogger draft id was generated. Please retry.";
+    }
+
+    return "A duplicate AI Blogger post already exists with one of these values.";
+}
+
+async function findBlogStudioCanonicalConflict(
+    agencyId: string,
+    canonicalUrl?: string,
+    excludeSlug?: string,
+) {
+    const normalizedCanonicalUrl = canonicalUrl?.trim() || "";
+    if (!normalizedCanonicalUrl) {
+        return null;
+    }
+
+    const query: Record<string, unknown> = {
+        agencyId,
+        canonicalUrl: normalizedCanonicalUrl,
+    };
+
+    if (excludeSlug) {
+        query.slug = { $ne: excludeSlug };
+    }
+
+    return BlogStudioPostModel.findOne(query)
+        .select("id slug title canonicalUrl")
+        .lean();
+}
+
+async function assertBlogStudioCanonicalUrlAvailable(
+    agencyId: string,
+    canonicalUrl?: string,
+    excludeSlug?: string,
+): Promise<void> {
+    const conflict = await findBlogStudioCanonicalConflict(agencyId, canonicalUrl, excludeSlug);
+    if (!conflict) {
+        return;
+    }
+
+    throw new Error(
+        `Another AI Blogger post in this workspace already uses canonical URL ${conflict.canonicalUrl}.`,
+    );
+}
+
 function sanitizeClusterSlug(value: string | undefined, fallback = "") {
     const normalized = slugify(sanitizeText(value, 120, fallback));
     return normalized || undefined;
@@ -3913,6 +4036,248 @@ function buildBlockerResolutionChangedFields(
     pushIfChanged("wordCount", currentPost.wordCount ?? null, nextPost.wordCount ?? null);
 
     return changedFields;
+}
+
+async function buildBlogStudioDraftRevisionArtifacts(input: {
+    agencyId: string;
+    actorId: string;
+    now: string;
+    currentPost: BlogStudioPost;
+    parsed: ReturnType<typeof parseBlockerResolverResponse>;
+    settings: BlogStudioSettings;
+    publishRules: AIBloggerConfig["publishRules"];
+    aiBloggerConfig?: AIBloggerConfig | null;
+    currentSiteUrl?: string;
+    mergedInternalLinkSuggestions: BlogStudioInternalLinkSuggestion[];
+    blockersBefore: BlogStudioBlockerResolutionPreview;
+    executionContextName?: string;
+}) {
+    const nextTitle = sanitizeText(input.parsed.title, 180, input.currentPost.title);
+    const nextBrief = sanitizeBrief(
+        {
+            ...input.currentPost.brief,
+            primaryKeyword: input.parsed.primaryKeyword || input.currentPost.brief.primaryKeyword,
+        },
+        input.currentPost.brief,
+    );
+    const nextTags = sanitizeStringArray(
+        [
+            ...input.parsed.tags,
+            ...input.currentPost.tags,
+            nextBrief.primaryKeyword || "",
+        ],
+        12,
+        40,
+    );
+    const nextOutline = input.parsed.outline.length > 0 ? input.parsed.outline : input.currentPost.outline;
+    const nextFaqItems = input.parsed.faqItems.length > 0
+        ? input.parsed.faqItems
+        : sanitizeFaqItems(input.currentPost.faqItems, MAX_FAQ_ITEMS);
+    const nextContent = normalizeDraftContentForStoredFaq(
+        input.parsed.content,
+        nextFaqItems,
+        input.currentPost.content || "",
+    );
+    const nextExcerpt = buildExcerpt(input.parsed.excerpt, nextContent, nextTitle);
+    const nextMetaTitle = buildMetaTitle(input.parsed.metaTitle, nextTitle);
+    const nextMetaDescription = buildMetaDescription(
+        input.parsed.metaDescription,
+        nextExcerpt,
+        nextContent,
+        nextTitle,
+    );
+    const nextFeaturedImageAlt = sanitizeText(
+        input.parsed.featuredImageAlt,
+        200,
+        input.currentPost.featuredImageAlt || nextTitle,
+    );
+    const nextWordCount = resolveDraftWordCount(
+        input.parsed.wordCount ?? input.currentPost.wordCount,
+        nextContent,
+        input.settings,
+    );
+    const nextSiteUrl = normalizeMarketingSiteOrigin(
+        resolveBlogStudioSiteUrl({
+            canonicalUrl: input.currentPost.canonicalUrl,
+            brief: nextBrief,
+            author: input.aiBloggerConfig?.author,
+            entityModeling: input.aiBloggerConfig?.entityModeling,
+        }) || input.currentSiteUrl || "",
+    );
+    const nextInternalLinks = buildTrackedInternalLinksFromContent(
+        nextContent,
+        mergeBlockerResolverInternalLinkSuggestions(
+            input.currentPost,
+            input.mergedInternalLinkSuggestions,
+            nextSiteUrl || input.currentSiteUrl,
+        ),
+        nextSiteUrl || input.currentSiteUrl,
+    );
+    const canonicalCandidate =
+        input.currentPost.canonicalUrl?.trim() ||
+        (nextSiteUrl ? buildDraftCanonicalUrl(input.currentPost.slug, nextSiteUrl) : "");
+    const nextCanonicalUrl = canonicalCandidate
+        ? normalizeMarketingCanonicalUrl(canonicalCandidate, input.currentPost.slug)
+        : "";
+    let nextDraft: BlogStudioPost = {
+        ...input.currentPost,
+        title: nextTitle,
+        excerpt: nextExcerpt,
+        metaTitle: nextMetaTitle,
+        metaDescription: nextMetaDescription,
+        canonicalUrl: nextCanonicalUrl || input.currentPost.canonicalUrl,
+        featuredImageAlt: nextFeaturedImageAlt,
+        content: nextContent,
+        tags: nextTags,
+        outline: nextOutline,
+        brief: nextBrief,
+        faqItems: nextFaqItems,
+        internalLinks: nextInternalLinks,
+        wordCount: nextWordCount,
+        seoScore: input.currentPost.seoScore,
+        updatedAt: input.now,
+        updatedBy: input.actorId,
+    };
+
+    if (
+        nextSiteUrl &&
+        nextDraft.canonicalUrl?.trim() &&
+        (
+            input.publishRules.requireSchemaMarkup ||
+            !nextDraft.schemaMarkup?.trim() ||
+            input.blockersBefore.aiFixable.some((blocker) => blocker.key === "schema-markup")
+        )
+    ) {
+        nextDraft = {
+            ...nextDraft,
+            schemaMarkup: buildMarketingBlogSchemaMarkup({
+                slug: nextDraft.slug,
+                title: nextDraft.metaTitle?.trim() || nextDraft.title,
+                description: nextDraft.metaDescription?.trim() || nextDraft.excerpt,
+                canonicalUrl: nextDraft.canonicalUrl,
+                siteUrl: nextSiteUrl,
+                organizationName:
+                    sanitizeText(
+                        input.aiBloggerConfig?.entityModeling?.organizationName,
+                        160,
+                        input.currentPost.target.label || input.executionContextName || "Publishing Target",
+                    ) || "Publishing Target",
+                imageUrl: toAbsoluteMarketingImageUrl(
+                    input.currentPost.featuredImageUrl?.trim() ||
+                    `${MARKETING_SITE_URL.replace(/\/+$/, "")}/ai-blogger.svg`,
+                ) || undefined,
+                imageAlt: nextFeaturedImageAlt,
+                organizationLogoUrl: input.aiBloggerConfig?.entityModeling?.organizationLogoUrl,
+                category: getMarketingCategory({
+                    ...nextDraft,
+                    tags: nextTags,
+                }),
+                keywords: getMarketingMetaKeywords({
+                    ...nextDraft,
+                    tags: nextTags,
+                    brief: nextBrief,
+                }),
+                publishedAt: input.currentPost.publishedAt,
+                updatedAt: input.now,
+                faqItems: nextFaqItems,
+            }),
+        };
+    }
+
+    const nextCannibalization = await getBlogStudioCannibalizationReportImpl(input.agencyId, nextDraft);
+    const nextAudit = getBlogStudioSeoAudit(nextDraft, input.settings, input.publishRules, {
+        cannibalization: nextCannibalization,
+    });
+    nextDraft = {
+        ...nextDraft,
+        seoScore: nextAudit.score,
+    };
+    const nextPublishValidation = validateBlogStudioPublishPackage(
+        nextDraft,
+        input.settings,
+        input.publishRules,
+        undefined,
+        undefined,
+        nextAudit.score,
+        {
+            audit: nextAudit,
+            cannibalization: nextCannibalization,
+        },
+    );
+    const blockersAfter = buildBlogStudioBlockerResolutionPreview({
+        post: nextDraft,
+        settings: input.settings,
+        publishRules: input.publishRules,
+        audit: nextAudit,
+        publishValidation: nextPublishValidation,
+        siteUrl: nextSiteUrl || input.currentSiteUrl,
+    });
+
+    return {
+        nextDraft,
+        nextAudit,
+        nextCannibalization,
+        nextPublishValidation,
+        blockersAfter,
+        nextSiteUrl,
+    };
+}
+
+async function saveBlogStudioPostRevision(input: {
+    agencyId: string;
+    slug: string;
+    actorId: string;
+    now: string;
+    nextDraft: BlogStudioPost;
+    nextAuditScore: number;
+    failureMessage: string;
+}): Promise<BlogStudioPost> {
+    await assertBlogStudioCanonicalUrlAvailable(
+        input.agencyId,
+        input.nextDraft.canonicalUrl,
+        input.slug,
+    );
+
+    try {
+        const updated = await BlogStudioPostModel.findOneAndUpdate(
+            { agencyId: input.agencyId, slug: input.slug },
+            {
+                $set: {
+                    title: input.nextDraft.title,
+                    excerpt: input.nextDraft.excerpt,
+                    metaTitle: input.nextDraft.metaTitle,
+                    metaDescription: input.nextDraft.metaDescription,
+                    canonicalUrl: input.nextDraft.canonicalUrl,
+                    schemaMarkup: input.nextDraft.schemaMarkup,
+                    featuredImageAlt: input.nextDraft.featuredImageAlt,
+                    content: input.nextDraft.content,
+                    tags: input.nextDraft.tags,
+                    outline: input.nextDraft.outline,
+                    brief: input.nextDraft.brief,
+                    faqItems: input.nextDraft.faqItems,
+                    internalLinks: input.nextDraft.internalLinks,
+                    seoScore: input.nextAuditScore,
+                    wordCount: input.nextDraft.wordCount,
+                    updatedAt: input.now,
+                    updatedBy: input.actorId,
+                },
+            },
+            { returnDocument: "after" },
+        ).lean();
+
+        if (!updated) {
+            throw new Error(input.failureMessage);
+        }
+
+        return toBlogStudioPost(updated);
+    } catch (error) {
+        const duplicateMessage = getBlogStudioPostDuplicateConstraintMessage(error);
+        if (duplicateMessage) {
+            throw new Error(duplicateMessage);
+        }
+
+        throw error;
+    }
 }
 
 function shouldUseBlockerResolverRevision(
@@ -8343,7 +8708,6 @@ export async function createBlogStudioDraftImpl(
         throw new Error("Schedule date is required when saving a scheduled AI Blogger post.");
     }
 
-    const slug = await ensureUniquePostSlug(agency.id, title);
     const storedAIBloggerConfig = await getAgencyMergedAIBloggerConfigForStorage(agency.id);
     const internalLinks = sanitizePostInternalLinks(input.internalLinks, 8);
     const derivedSiteUrl = resolveBlogStudioSiteUrl({
@@ -8352,9 +8716,6 @@ export async function createBlogStudioDraftImpl(
         author: storedAIBloggerConfig.author,
         entityModeling: storedAIBloggerConfig.entityModeling,
     });
-    const canonicalUrl = normalizeCanonicalUrl(
-        input.canonicalUrl || buildDraftCanonicalUrl(slug, derivedSiteUrl),
-    );
     const clusterFields = resolveBlogStudioClusterFields({
         title,
         brief,
@@ -8362,56 +8723,113 @@ export async function createBlogStudioDraftImpl(
         parentTopicSlug: input.parentTopicSlug,
     });
 
-    const draft: BlogStudioPost = {
-        id: crypto.randomUUID(),
-        agencyId: agency.id,
-        slug,
-        title,
-        excerpt,
-        metaTitle,
-        metaDescription,
-        canonicalUrl: canonicalUrl || undefined,
-        featuredImageAlt,
-        featuredImageUrl: featuredImageUrl || undefined,
-        featuredImageSource: featuredImageUrl ? featuredImageSource : undefined,
-        content,
-        status: input.status || "Draft",
-        target,
-        tags: sanitizeStringArray(input.tags, 12, 40),
-        outline: sanitizeStringArray(input.outline, 12, 180),
-        brief,
-        draftBrief: sanitizeDraftBrief(input.draftBrief),
-        faqItems: sanitizeFaqItems(input.faqItems, MAX_FAQ_ITEMS),
-        searchIntent: sanitizeSearchIntent(input.searchIntent),
-        contentType: sanitizeContentType(input.contentType),
-        contentClusterId: clusterFields.contentClusterId,
-        parentTopicSlug: clusterFields.parentTopicSlug,
-        internalLinks,
-        featuredImagePrompt: sanitizeText(input.featuredImagePrompt, 320),
-        researchNotes: sanitizeStringArray(input.researchNotes, 8, 220),
-        externalSources: sanitizeExternalSources(input.externalSources, 6),
-        generationDiagnostics: sanitizeGenerationDiagnostics(input.generationDiagnostics),
-        seoScore: typeof input.seoScore === "number" ? input.seoScore : undefined,
-        wordCount: resolveDraftWordCount(input.wordCount, content, settings),
-        createdBy: actor.id,
-        updatedBy: actor.id,
-        scheduledFor: scheduledFor || undefined,
-        createdAt: now,
-        updatedAt: now,
-    };
-    draft.seoScore = getBlogStudioSeoAudit(draft, settings, storedAIBloggerConfig.publishRules).score;
+    const explicitCanonicalUrl = normalizeCanonicalUrl(input.canonicalUrl);
+    const draftTags = sanitizeStringArray(input.tags, 12, 40);
+    const draftOutline = sanitizeStringArray(input.outline, 12, 180);
+    const draftFaqItems = sanitizeFaqItems(input.faqItems, MAX_FAQ_ITEMS);
+    const draftResearchNotes = sanitizeStringArray(input.researchNotes, 8, 220);
+    const draftExternalSources = sanitizeExternalSources(input.externalSources, 6);
+    const draftGenerationDiagnostics = sanitizeGenerationDiagnostics(input.generationDiagnostics);
+    const draftWordCount = resolveDraftWordCount(input.wordCount, content, settings);
 
-    const created = await BlogStudioPostModel.create(draft);
-    blogLogStep("CREATE-DRAFT", "Saved to DB", { slug, id: blogShortId(draft.id) });
-    await recordBlogStudioActivity(agency.id, actor, "Created AI Blogger draft", title, draft.id);
+    let createdDraft: BlogStudioPost | null = null;
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        const slug = await ensureUniquePostSlug(agency.id, title);
+        const canonicalUrl = normalizeCanonicalUrl(
+            explicitCanonicalUrl || buildDraftCanonicalUrl(slug, derivedSiteUrl),
+        );
+
+        const canonicalConflict = await findBlogStudioCanonicalConflict(
+            agency.id,
+            canonicalUrl || undefined,
+        );
+        if (canonicalConflict) {
+            if (explicitCanonicalUrl) {
+                throw new Error(
+                    `Another AI Blogger post in this workspace already uses canonical URL ${canonicalConflict.canonicalUrl}.`,
+                );
+            }
+            continue;
+        }
+
+        const draft: BlogStudioPost = {
+            id: crypto.randomUUID(),
+            agencyId: agency.id,
+            slug,
+            title,
+            excerpt,
+            metaTitle,
+            metaDescription,
+            canonicalUrl: canonicalUrl || undefined,
+            featuredImageAlt,
+            featuredImageUrl: featuredImageUrl || undefined,
+            featuredImageSource: featuredImageUrl ? featuredImageSource : undefined,
+            content,
+            status: input.status || "Draft",
+            target,
+            tags: draftTags,
+            outline: draftOutline,
+            brief,
+            draftBrief: sanitizeDraftBrief(input.draftBrief),
+            faqItems: draftFaqItems,
+            searchIntent: sanitizeSearchIntent(input.searchIntent),
+            contentType: sanitizeContentType(input.contentType),
+            contentClusterId: clusterFields.contentClusterId,
+            parentTopicSlug: clusterFields.parentTopicSlug,
+            internalLinks,
+            featuredImagePrompt: sanitizeText(input.featuredImagePrompt, 320),
+            researchNotes: draftResearchNotes,
+            externalSources: draftExternalSources,
+            generationDiagnostics: draftGenerationDiagnostics,
+            seoScore: typeof input.seoScore === "number" ? input.seoScore : undefined,
+            wordCount: draftWordCount,
+            createdBy: actor.id,
+            updatedBy: actor.id,
+            scheduledFor: scheduledFor || undefined,
+            createdAt: now,
+            updatedAt: now,
+        };
+        draft.seoScore = getBlogStudioSeoAudit(draft, settings, storedAIBloggerConfig.publishRules).score;
+
+        try {
+            const created = await BlogStudioPostModel.create(draft);
+            createdDraft = toBlogStudioPost(created.toObject());
+            blogLogStep("CREATE-DRAFT", "Saved to DB", { slug, id: blogShortId(draft.id) });
+            await recordBlogStudioActivity(agency.id, actor, "Created AI Blogger draft", title, draft.id);
+            break;
+        } catch (error) {
+            const duplicateField = getMongoDuplicateKeyField(error);
+            if (
+                attempt < 2 &&
+                (
+                    duplicateField === "slug" ||
+                    (duplicateField === "canonicalUrl" && !explicitCanonicalUrl)
+                )
+            ) {
+                continue;
+            }
+
+            const duplicateMessage = getBlogStudioPostDuplicateConstraintMessage(error);
+            if (duplicateMessage) {
+                throw new Error(duplicateMessage);
+            }
+
+            throw error;
+        }
+    }
+
+    if (!createdDraft) {
+        throw new Error("Failed to save the AI Blogger draft after retrying slug generation.");
+    }
 
     revalidateAIBloggerRoute();
     revalidateAIBloggerRoute("/generate");
     revalidateAIBloggerRoute("/posts");
-    revalidateAIBloggerRoute(`/posts/${slug}`);
+    revalidateAIBloggerRoute(`/posts/${createdDraft.slug}`);
 
-    blogLogDone("CREATE-DRAFT", _startMs, { slug });
-    return toBlogStudioPost(created.toObject());
+    blogLogDone("CREATE-DRAFT", _startMs, { slug: createdDraft.slug });
+    return createdDraft;
 }
 
 export async function updateBlogStudioPostImpl(
@@ -8546,6 +8964,13 @@ export async function updateBlogStudioPostImpl(
         storedAIBloggerConfig.publishRules,
     ).score;
 
+    if (
+        canonicalUrl &&
+        canonicalUrl !== (currentPost.canonicalUrl || "")
+    ) {
+        await assertBlogStudioCanonicalUrlAvailable(agencyId, canonicalUrl, slug);
+    }
+
     // ─── Image history tracking ──────────────────────────────────
     const imageChanged =
         input.featuredImageUrl !== undefined &&
@@ -8575,11 +9000,21 @@ export async function updateBlogStudioPostImpl(
         };
     }
 
-    const updated = await BlogStudioPostModel.findOneAndUpdate(
-        { agencyId, slug },
-        updateOp,
-        { returnDocument: 'after' },
-    ).lean();
+    let updated: Awaited<ReturnType<typeof BlogStudioPostModel.findOneAndUpdate>>;
+    try {
+        updated = await BlogStudioPostModel.findOneAndUpdate(
+            { agencyId, slug },
+            updateOp,
+            { returnDocument: 'after' },
+        ).lean();
+    } catch (error) {
+        const duplicateMessage = getBlogStudioPostDuplicateConstraintMessage(error);
+        if (duplicateMessage) {
+            throw new Error(duplicateMessage);
+        }
+
+        throw error;
+    }
 
     if (!updated) {
         throw new Error("Failed to save the blog draft.");
@@ -9620,160 +10055,25 @@ export async function resolveBlogStudioPostBlockersWithAIImpl(
         },
     }));
     const parsed = parseBlockerResolverResponse(blockerResolutionStage.text, currentPost);
-    const nextTitle = sanitizeText(parsed.title, 180, currentPost.title);
-    const nextBrief = sanitizeBrief(
-        {
-            ...currentPost.brief,
-            primaryKeyword: parsed.primaryKeyword || currentPost.brief.primaryKeyword,
-        },
-        currentPost.brief,
-    );
-    const nextTags = sanitizeStringArray(
-        [
-            ...parsed.tags,
-            ...currentPost.tags,
-            nextBrief.primaryKeyword || "",
-        ],
-        12,
-        40,
-    );
-    const nextOutline = parsed.outline.length > 0 ? parsed.outline : currentPost.outline;
-    const nextFaqItems = parsed.faqItems.length > 0
-        ? parsed.faqItems
-        : sanitizeFaqItems(currentPost.faqItems, MAX_FAQ_ITEMS);
-    const nextContent = normalizeDraftContentForStoredFaq(
-        parsed.content,
-        nextFaqItems,
-        currentPost.content || "",
-    );
-    const nextExcerpt = buildExcerpt(parsed.excerpt, nextContent, nextTitle);
-    const nextMetaTitle = buildMetaTitle(parsed.metaTitle, nextTitle);
-    const nextMetaDescription = buildMetaDescription(parsed.metaDescription, nextExcerpt, nextContent, nextTitle);
-    const nextFeaturedImageAlt = sanitizeText(
-        parsed.featuredImageAlt,
-        200,
-        currentPost.featuredImageAlt || nextTitle,
-    );
-    const nextWordCount = resolveDraftWordCount(
-        parsed.wordCount ?? currentPost.wordCount,
-        nextContent,
-        settings,
-    );
-    const nextSiteUrl = normalizeMarketingSiteOrigin(
-        resolveBlogStudioSiteUrl({
-            canonicalUrl: currentPost.canonicalUrl,
-            brief: nextBrief,
-            author: aiBloggerConfig?.author,
-            entityModeling: aiBloggerConfig?.entityModeling,
-        }) || currentSiteUrl || "",
-    );
-    const nextInternalLinks = buildTrackedInternalLinksFromContent(
-        nextContent,
-        mergeBlockerResolverInternalLinkSuggestions(
-            currentPost,
-            mergedInternalLinkSuggestions,
-            nextSiteUrl || currentSiteUrl,
-        ),
-        nextSiteUrl || currentSiteUrl,
-    );
-    const canonicalCandidate =
-        currentPost.canonicalUrl?.trim() ||
-        (nextSiteUrl ? buildDraftCanonicalUrl(currentPost.slug, nextSiteUrl) : "");
-    const nextCanonicalUrl = canonicalCandidate
-        ? normalizeMarketingCanonicalUrl(canonicalCandidate, currentPost.slug)
-        : "";
-    let nextDraft: BlogStudioPost = {
-        ...currentPost,
-        title: nextTitle,
-        excerpt: nextExcerpt,
-        metaTitle: nextMetaTitle,
-        metaDescription: nextMetaDescription,
-        canonicalUrl: nextCanonicalUrl || currentPost.canonicalUrl,
-        featuredImageAlt: nextFeaturedImageAlt,
-        content: nextContent,
-        tags: nextTags,
-        outline: nextOutline,
-        brief: nextBrief,
-        faqItems: nextFaqItems,
-        internalLinks: nextInternalLinks,
-        wordCount: nextWordCount,
-        seoScore: currentPost.seoScore,
-        updatedAt: now,
-        updatedBy: actor.id,
-    };
-
-    if (
-        nextSiteUrl &&
-        nextDraft.canonicalUrl?.trim() &&
-        (
-            publishRules.requireSchemaMarkup ||
-            !nextDraft.schemaMarkup?.trim() ||
-            blockersBefore.aiFixable.some((blocker) => blocker.key === "schema-markup")
-        )
-    ) {
-        nextDraft = {
-            ...nextDraft,
-            schemaMarkup: buildMarketingBlogSchemaMarkup({
-                slug: nextDraft.slug,
-                title: nextDraft.metaTitle?.trim() || nextDraft.title,
-                description: nextDraft.metaDescription?.trim() || nextDraft.excerpt,
-                canonicalUrl: nextDraft.canonicalUrl,
-                siteUrl: nextSiteUrl,
-                organizationName:
-                    sanitizeText(
-                        aiBloggerConfig?.entityModeling?.organizationName,
-                        160,
-                        currentPost.target.label || executionContext.name || "Publishing Target",
-                    ) || "Publishing Target",
-                imageUrl: toAbsoluteMarketingImageUrl(
-                    currentPost.featuredImageUrl?.trim() ||
-                    `${MARKETING_SITE_URL.replace(/\/+$/, "")}/ai-blogger.svg`,
-                ) || undefined,
-                imageAlt: nextFeaturedImageAlt,
-                organizationLogoUrl: aiBloggerConfig?.entityModeling?.organizationLogoUrl,
-                category: getMarketingCategory({
-                    ...nextDraft,
-                    tags: nextTags,
-                }),
-                keywords: getMarketingMetaKeywords({
-                    ...nextDraft,
-                    tags: nextTags,
-                    brief: nextBrief,
-                }),
-                publishedAt: currentPost.publishedAt,
-                updatedAt: now,
-                faqItems: nextFaqItems,
-            }),
-        };
-    }
-
-    const nextCannibalization = await getBlogStudioCannibalizationReportImpl(agencyId, nextDraft);
-    const nextAudit = getBlogStudioSeoAudit(nextDraft, settings, publishRules, {
-        cannibalization: nextCannibalization,
-    });
-    nextDraft = {
-        ...nextDraft,
-        seoScore: nextAudit.score,
-    };
-    const nextPublishValidation = validateBlogStudioPublishPackage(
+    const {
         nextDraft,
+        nextAudit,
+        nextCannibalization,
+        nextPublishValidation,
+        blockersAfter,
+    } = await buildBlogStudioDraftRevisionArtifacts({
+        agencyId,
+        actorId: actor.id,
+        now,
+        currentPost,
+        parsed,
         settings,
         publishRules,
-        undefined,
-        undefined,
-        nextAudit.score,
-        {
-            audit: nextAudit,
-            cannibalization: nextCannibalization,
-        },
-    );
-    const blockersAfter = buildBlogStudioBlockerResolutionPreview({
-        post: nextDraft,
-        settings,
-        publishRules,
-        audit: nextAudit,
-        publishValidation: nextPublishValidation,
-        siteUrl: nextSiteUrl || currentSiteUrl,
+        aiBloggerConfig,
+        currentSiteUrl,
+        mergedInternalLinkSuggestions,
+        blockersBefore,
+        executionContextName: executionContext.name,
     });
 
     if (!shouldUseBlockerResolverRevision(
@@ -9847,37 +10147,15 @@ export async function resolveBlogStudioPostBlockersWithAIImpl(
         };
     }
 
-    const updated = await BlogStudioPostModel.findOneAndUpdate(
-        { agencyId, slug },
-        {
-            $set: {
-                title: nextDraft.title,
-                excerpt: nextDraft.excerpt,
-                metaTitle: nextDraft.metaTitle,
-                metaDescription: nextDraft.metaDescription,
-                canonicalUrl: nextDraft.canonicalUrl,
-                schemaMarkup: nextDraft.schemaMarkup,
-                featuredImageAlt: nextDraft.featuredImageAlt,
-                content: nextDraft.content,
-                tags: nextDraft.tags,
-                outline: nextDraft.outline,
-                brief: nextDraft.brief,
-                faqItems: nextDraft.faqItems,
-                internalLinks: nextDraft.internalLinks,
-                seoScore: nextAudit.score,
-                wordCount: nextDraft.wordCount,
-                updatedAt: now,
-                updatedBy: actor.id,
-            },
-        },
-        { returnDocument: "after" },
-    ).lean();
-
-    if (!updated) {
-        throw new Error("Failed to save the AI blocker resolver changes.");
-    }
-
-    const updatedPost = toBlogStudioPost(updated);
+    const updatedPost = await saveBlogStudioPostRevision({
+        agencyId,
+        slug,
+        actorId: actor.id,
+        now,
+        nextDraft,
+        nextAuditScore: nextAudit.score,
+        failureMessage: "Failed to save the AI blocker resolver changes.",
+    });
     const changedFields = buildBlockerResolutionChangedFields(currentPost, nextDraft);
     const aiFixed = blockersBefore.aiFixable.filter(
         (blocker) => !blockersAfter.blockers.some((afterBlocker) => afterBlocker.key === blocker.key),
@@ -10236,160 +10514,25 @@ export async function retargetBlogStudioPostCannibalizationWithAIImpl(
     }));
 
     const parsed = parseBlockerResolverResponse(retargetStage.text, currentPost);
-    const nextTitle = sanitizeText(parsed.title, 180, currentPost.title);
-    const nextBrief = sanitizeBrief(
-        {
-            ...currentPost.brief,
-            primaryKeyword: parsed.primaryKeyword || currentPost.brief.primaryKeyword,
-        },
-        currentPost.brief,
-    );
-    const nextTags = sanitizeStringArray(
-        [
-            ...parsed.tags,
-            ...currentPost.tags,
-            nextBrief.primaryKeyword || "",
-        ],
-        12,
-        40,
-    );
-    const nextOutline = parsed.outline.length > 0 ? parsed.outline : currentPost.outline;
-    const nextFaqItems = parsed.faqItems.length > 0
-        ? parsed.faqItems
-        : sanitizeFaqItems(currentPost.faqItems, MAX_FAQ_ITEMS);
-    const nextContent = normalizeDraftContentForStoredFaq(
-        parsed.content,
-        nextFaqItems,
-        currentPost.content || "",
-    );
-    const nextExcerpt = buildExcerpt(parsed.excerpt, nextContent, nextTitle);
-    const nextMetaTitle = buildMetaTitle(parsed.metaTitle, nextTitle);
-    const nextMetaDescription = buildMetaDescription(parsed.metaDescription, nextExcerpt, nextContent, nextTitle);
-    const nextFeaturedImageAlt = sanitizeText(
-        parsed.featuredImageAlt,
-        200,
-        currentPost.featuredImageAlt || nextTitle,
-    );
-    const nextWordCount = resolveDraftWordCount(
-        parsed.wordCount ?? currentPost.wordCount,
-        nextContent,
-        settings,
-    );
-    const nextSiteUrl = normalizeMarketingSiteOrigin(
-        resolveBlogStudioSiteUrl({
-            canonicalUrl: currentPost.canonicalUrl,
-            brief: nextBrief,
-            author: aiBloggerConfig?.author,
-            entityModeling: aiBloggerConfig?.entityModeling,
-        }) || currentSiteUrl || "",
-    );
-    const nextInternalLinks = buildTrackedInternalLinksFromContent(
-        nextContent,
-        mergeBlockerResolverInternalLinkSuggestions(
-            currentPost,
-            mergedInternalLinkSuggestions,
-            nextSiteUrl || currentSiteUrl,
-        ),
-        nextSiteUrl || currentSiteUrl,
-    );
-    const canonicalCandidate =
-        currentPost.canonicalUrl?.trim() ||
-        (nextSiteUrl ? buildDraftCanonicalUrl(currentPost.slug, nextSiteUrl) : "");
-    const nextCanonicalUrl = canonicalCandidate
-        ? normalizeMarketingCanonicalUrl(canonicalCandidate, currentPost.slug)
-        : "";
-    let nextDraft: BlogStudioPost = {
-        ...currentPost,
-        title: nextTitle,
-        excerpt: nextExcerpt,
-        metaTitle: nextMetaTitle,
-        metaDescription: nextMetaDescription,
-        canonicalUrl: nextCanonicalUrl || currentPost.canonicalUrl,
-        featuredImageAlt: nextFeaturedImageAlt,
-        content: nextContent,
-        tags: nextTags,
-        outline: nextOutline,
-        brief: nextBrief,
-        faqItems: nextFaqItems,
-        internalLinks: nextInternalLinks,
-        wordCount: nextWordCount,
-        seoScore: currentPost.seoScore,
-        updatedAt: now,
-        updatedBy: actor.id,
-    };
-
-    if (
-        nextSiteUrl &&
-        nextDraft.canonicalUrl?.trim() &&
-        (
-            publishRules.requireSchemaMarkup ||
-            !nextDraft.schemaMarkup?.trim() ||
-            blockersBefore.aiFixable.some((blocker) => blocker.key === "schema-markup")
-        )
-    ) {
-        nextDraft = {
-            ...nextDraft,
-            schemaMarkup: buildMarketingBlogSchemaMarkup({
-                slug: nextDraft.slug,
-                title: nextDraft.metaTitle?.trim() || nextDraft.title,
-                description: nextDraft.metaDescription?.trim() || nextDraft.excerpt,
-                canonicalUrl: nextDraft.canonicalUrl,
-                siteUrl: nextSiteUrl,
-                organizationName:
-                    sanitizeText(
-                        aiBloggerConfig?.entityModeling?.organizationName,
-                        160,
-                        currentPost.target.label || executionContext.name || "Publishing Target",
-                    ) || "Publishing Target",
-                imageUrl: toAbsoluteMarketingImageUrl(
-                    currentPost.featuredImageUrl?.trim() ||
-                    `${MARKETING_SITE_URL.replace(/\/+$/, "")}/ai-blogger.svg`,
-                ) || undefined,
-                imageAlt: nextFeaturedImageAlt,
-                organizationLogoUrl: aiBloggerConfig?.entityModeling?.organizationLogoUrl,
-                category: getMarketingCategory({
-                    ...nextDraft,
-                    tags: nextTags,
-                }),
-                keywords: getMarketingMetaKeywords({
-                    ...nextDraft,
-                    tags: nextTags,
-                    brief: nextBrief,
-                }),
-                publishedAt: currentPost.publishedAt,
-                updatedAt: now,
-                faqItems: nextFaqItems,
-            }),
-        };
-    }
-
-    const nextCannibalization = await getBlogStudioCannibalizationReportImpl(agencyId, nextDraft);
-    const nextAudit = getBlogStudioSeoAudit(nextDraft, settings, publishRules, {
-        cannibalization: nextCannibalization,
-    });
-    nextDraft = {
-        ...nextDraft,
-        seoScore: nextAudit.score,
-    };
-    const nextPublishValidation = validateBlogStudioPublishPackage(
+    const {
         nextDraft,
+        nextAudit,
+        nextCannibalization,
+        nextPublishValidation,
+        blockersAfter,
+    } = await buildBlogStudioDraftRevisionArtifacts({
+        agencyId,
+        actorId: actor.id,
+        now,
+        currentPost,
+        parsed,
         settings,
         publishRules,
-        undefined,
-        undefined,
-        nextAudit.score,
-        {
-            audit: nextAudit,
-            cannibalization: nextCannibalization,
-        },
-    );
-    const blockersAfter = buildBlogStudioBlockerResolutionPreview({
-        post: nextDraft,
-        settings,
-        publishRules,
-        audit: nextAudit,
-        publishValidation: nextPublishValidation,
-        siteUrl: nextSiteUrl || currentSiteUrl,
+        aiBloggerConfig,
+        currentSiteUrl,
+        mergedInternalLinkSuggestions,
+        blockersBefore,
+        executionContextName: executionContext.name,
     });
 
     if (!shouldUseCannibalizationRetargetRevision(
@@ -10442,37 +10585,15 @@ export async function retargetBlogStudioPostCannibalizationWithAIImpl(
         };
     }
 
-    const updated = await BlogStudioPostModel.findOneAndUpdate(
-        { agencyId, slug },
-        {
-            $set: {
-                title: nextDraft.title,
-                excerpt: nextDraft.excerpt,
-                metaTitle: nextDraft.metaTitle,
-                metaDescription: nextDraft.metaDescription,
-                canonicalUrl: nextDraft.canonicalUrl,
-                schemaMarkup: nextDraft.schemaMarkup,
-                featuredImageAlt: nextDraft.featuredImageAlt,
-                content: nextDraft.content,
-                tags: nextDraft.tags,
-                outline: nextDraft.outline,
-                brief: nextDraft.brief,
-                faqItems: nextDraft.faqItems,
-                internalLinks: nextDraft.internalLinks,
-                seoScore: nextAudit.score,
-                wordCount: nextDraft.wordCount,
-                updatedAt: now,
-                updatedBy: actor.id,
-            },
-        },
-        { returnDocument: "after" },
-    ).lean();
-
-    if (!updated) {
-        throw new Error("Failed to save the AI cannibalization retarget changes.");
-    }
-
-    const updatedPost = toBlogStudioPost(updated);
+    const updatedPost = await saveBlogStudioPostRevision({
+        agencyId,
+        slug,
+        actorId: actor.id,
+        now,
+        nextDraft,
+        nextAuditScore: nextAudit.score,
+        failureMessage: "Failed to save the AI cannibalization retarget changes.",
+    });
     const changedFields = buildBlockerResolutionChangedFields(currentPost, nextDraft);
     const aiFixed = blockersBefore.blockers.filter(
         (blocker) =>
@@ -14105,26 +14226,16 @@ Rules:
 
         blogLogDone("GENERATE-DRAFT", _startMs, { title: created.title, wordCount: created.wordCount, steps: runSteps.length });
 
-        const result: BlogStudioGenerateDraftResult = {
+        const result = buildGenerateDraftResult({
             post: created,
-            diagnostics: {
-                selectedTopic: created.generationDiagnostics?.selectedTopic,
-                fetchTrendsSource,
-                fetchTrendsLabel,
-                fetchTrendsNotes: discoveryNotes,
-                businessFitSummary: advancedBrief.businessFitSummary,
-                businessFitScore: advancedBrief.businessFitScore,
-                businessFitWarnings: advancedBrief.businessFitWarnings,
-                scorecard: created.generationDiagnostics?.scorecard,
-                sourceUsage: created.generationDiagnostics?.sourceUsage,
-                steps: runSteps.map((step) => ({
-                    key: step.key,
-                    label: step.label,
-                    status: step.status,
-                    notes: step.notes,
-                })),
-            },
-        };
+            fetchTrendsSource,
+            fetchTrendsLabel,
+            fetchTrendsNotes: discoveryNotes,
+            businessFitSummary: advancedBrief.businessFitSummary,
+            businessFitScore: advancedBrief.businessFitScore,
+            businessFitWarnings: advancedBrief.businessFitWarnings,
+            runSteps,
+        });
 
         // Log final draft statistics
         if (jobId) {
@@ -17717,26 +17828,16 @@ Return JSON only with this shape:
             ...tokenTotals,
         });
 
-        const result: BlogStudioGenerateDraftResult = {
+        const result = buildGenerateDraftResult({
             post: created,
-            diagnostics: {
-                selectedTopic: created.generationDiagnostics?.selectedTopic,
-                fetchTrendsSource,
-                fetchTrendsLabel: created.generationDiagnostics?.fetchTrendsLabel || "AI-only discovery",
-                fetchTrendsNotes: discoveryNotes,
-                businessFitSummary: advancedBrief.businessFitSummary,
-                businessFitScore: advancedBrief.businessFitScore,
-                businessFitWarnings: advancedBrief.businessFitWarnings,
-                scorecard: created.generationDiagnostics?.scorecard,
-                sourceUsage: created.generationDiagnostics?.sourceUsage,
-                steps: runSteps.map((step) => ({
-                    key: step.key,
-                    label: step.label,
-                    status: step.status,
-                    notes: step.notes,
-                })),
-            },
-        };
+            fetchTrendsSource,
+            fetchTrendsLabel: created.generationDiagnostics?.fetchTrendsLabel || "AI-only discovery",
+            fetchTrendsNotes: discoveryNotes,
+            businessFitSummary: advancedBrief.businessFitSummary,
+            businessFitScore: advancedBrief.businessFitScore,
+            businessFitWarnings: advancedBrief.businessFitWarnings,
+            runSteps,
+        });
 
         if (jobId) {
             await generationLogger.setFinalDraft({
@@ -18082,6 +18183,7 @@ export async function publishBlogStudioPostImpl(
         `${resolvedSiteUrl.replace(/\/+$/, "")}/blog/${publishedSlug}`,
         publishedSlug,
     );
+    await assertBlogStudioCanonicalUrlAvailable(agencyId, resolvedCanonicalUrl, slug);
     const schemaMarkup = buildMarketingBlogSchemaMarkup({
         slug: publishedSlug,
         title: resolvedMetaTitle,

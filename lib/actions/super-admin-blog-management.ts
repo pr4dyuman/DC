@@ -4,6 +4,7 @@ import dbConnect from "@/lib/marketing-db";
 import Blog from "@/models/marketing/Blog";
 import mongoose from "mongoose";
 import { logBlogAuditChange } from "@/lib/blog-audit-log";
+import { normalizeMarketingCanonicalUrl } from "@/lib/marketing-blog-utils";
 import { verifySuperAdmin } from "./super-admin-shared";
 
 /**
@@ -324,6 +325,11 @@ export async function updateBlog(
       throw new Error("Invalid blog ID");
     }
 
+    const currentBlog = await Blog.findById(id).select("slug canonicalUrl").lean().exec();
+    if (!currentBlog) {
+      throw new Error("Blog not found");
+    }
+
     // Validate slug uniqueness if slug is being updated
     if (updates.slug) {
       const existingBlog = await Blog.findOne({
@@ -334,6 +340,25 @@ export async function updateBlog(
       if (existingBlog) {
         throw new Error("Slug already exists");
       }
+    }
+
+    if (updates.canonicalUrl !== undefined) {
+      const normalizedCanonicalUrl = normalizeMarketingCanonicalUrl(
+        updates.canonicalUrl,
+        updates.slug || currentBlog.slug,
+      );
+      if (normalizedCanonicalUrl) {
+        const existingCanonicalBlog = await Blog.findOne({
+          canonicalUrl: normalizedCanonicalUrl,
+          _id: { $ne: id },
+        }).select("slug").lean().exec();
+
+        if (existingCanonicalBlog) {
+          throw new Error("Canonical URL already exists");
+        }
+      }
+
+      updates.canonicalUrl = normalizedCanonicalUrl || undefined;
     }
 
     // Set publishedAt based on status
@@ -373,6 +398,13 @@ export async function updateBlog(
     return serializeBlogDocument(blog);
   } catch (error) {
     console.error("Error updating blog:", error);
+    if (error && typeof error === "object" && "code" in error && error.code === 11000) {
+      const duplicateField =
+        typeof (error as { keyPattern?: Record<string, unknown>; keyValue?: Record<string, unknown> }).keyPattern === "object"
+          ? Object.keys((error as { keyPattern?: Record<string, unknown> }).keyPattern || {})[0]
+          : Object.keys((error as { keyValue?: Record<string, unknown> }).keyValue || {})[0];
+      throw new Error(duplicateField === "canonicalUrl" ? "Canonical URL already exists" : "Slug already exists");
+    }
     throw error;
   }
 }

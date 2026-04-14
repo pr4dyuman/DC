@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { getMarketingDbConnectionHandle } from '@/lib/marketing-db';
 
 const TestimonialSchema = new mongoose.Schema({
   text: {
@@ -45,4 +46,6 @@ TestimonialSchema.index({ status: 1 });
 TestimonialSchema.index({ order: 1 });
 TestimonialSchema.index({ createdAt: -1 });
 
-export default mongoose.models.Testimonial || mongoose.model('Testimonial', TestimonialSchema);
+const marketingConnection = getMarketingDbConnectionHandle();
+
+export default marketingConnection.models.Testimonial || marketingConnection.model('Testimonial', TestimonialSchema);

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { getMarketingDbConnectionHandle } from '@/lib/marketing-db';
 
 const AdminSchema = new mongoose.Schema({
   email: {
@@ -26,4 +27,6 @@ AdminSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
-export default mongoose.models.Admin || mongoose.model('Admin', AdminSchema);
+const marketingConnection = getMarketingDbConnectionHandle();
+
+export default marketingConnection.models.Admin || marketingConnection.model('Admin', AdminSchema);

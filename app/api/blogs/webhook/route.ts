@@ -20,7 +20,7 @@ import BlogPublishingAudit from "@/models/marketing/BlogPublishingAudit";
 type IncomingWebhookPayload = {
     event: string;
     blog: {
-        id?: string;
+        id: string;
         title: string;
         slug: string;
         content: string;
@@ -332,7 +332,18 @@ function validateWebhookPayload(payload: unknown): payload is IncomingWebhookPay
     const blog = p.blog as Record<string, unknown>;
 
     // Check required blog fields
-    const requiredStringFields = ["title", "slug", "content", "excerpt", "metaTitle", "metaDescription", "image", "publishedAt"];
+    const requiredStringFields = [
+        "id",
+        "title",
+        "slug",
+        "content",
+        "excerpt",
+        "metaTitle",
+        "metaDescription",
+        "canonicalUrl",
+        "image",
+        "publishedAt",
+    ];
     if (!requiredStringFields.every((field) => hasNonEmptyString(blog[field]))) {
         return false;
     }
@@ -347,6 +358,86 @@ function validateWebhookPayload(payload: unknown): payload is IncomingWebhookPay
     }
 
     return true;
+}
+
+function isMongoDuplicateKeyError(error: unknown): error is {
+    code?: number;
+    keyPattern?: Record<string, unknown>;
+    keyValue?: Record<string, unknown>;
+} {
+    return Boolean(
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        (error as { code?: unknown }).code === 11000,
+    );
+}
+
+function getDuplicateKeyField(error: unknown): string | null {
+    if (!isMongoDuplicateKeyError(error)) {
+        return null;
+    }
+
+    const keyPattern = error.keyPattern && typeof error.keyPattern === "object"
+        ? Object.keys(error.keyPattern)
+        : [];
+    if (keyPattern.length > 0) {
+        return keyPattern[0] || null;
+    }
+
+    const keyValue = error.keyValue && typeof error.keyValue === "object"
+        ? Object.keys(error.keyValue)
+        : [];
+    return keyValue[0] || null;
+}
+
+async function resolveExistingWebhookBlog(input: {
+    sourcePostId: string;
+    slug: string;
+    canonicalUrl?: string;
+}) {
+    const existingBySourcePostId = await Blog.findOne({ sourcePostId: input.sourcePostId });
+    if (existingBySourcePostId) {
+        return {
+            existingBlog: existingBySourcePostId,
+            matchedBy: "sourcePostId" as const,
+        };
+    }
+
+    const slugBackfillMatch = await Blog.findOne({
+        slug: input.slug,
+        $or: [
+            { sourcePostId: { $exists: false } },
+            { sourcePostId: null },
+            { sourcePostId: "" },
+        ],
+    });
+
+    if (!slugBackfillMatch) {
+        return {
+            existingBlog: null,
+            matchedBy: null,
+        };
+    }
+
+    const existingCanonicalUrl = normalizeMarketingCanonicalUrl(
+        slugBackfillMatch.canonicalUrl,
+        slugBackfillMatch.slug,
+    );
+    if (
+        input.canonicalUrl &&
+        existingCanonicalUrl &&
+        existingCanonicalUrl !== input.canonicalUrl
+    ) {
+        throw new Error(
+            `Slug ${input.slug} is already attached to a different canonical URL.`,
+        );
+    }
+
+    return {
+        existingBlog: slugBackfillMatch,
+        matchedBy: "slug-backfill" as const,
+    };
 }
 
 /**
@@ -418,13 +509,50 @@ export async function POST(request: NextRequest) {
                 ? stripStandaloneFaqSection(payload.blog.content)
                 : payload.blog.content;
 
-        const existingBlog =
-            (normalizedSourcePostId
-                ? await Blog.findOne({ sourcePostId: normalizedSourcePostId })
-                : null) ||
-            await Blog.findOne({ slug: payload.blog.slug });
+        const { existingBlog, matchedBy } = await resolveExistingWebhookBlog({
+            sourcePostId: normalizedSourcePostId,
+            slug: payload.blog.slug,
+            canonicalUrl: normalizedCanonicalUrl || undefined,
+        });
         const isUpdate = !!existingBlog;
         const previousSlug = existingBlog?.slug || "";
+
+        if (normalizedCanonicalUrl) {
+            const canonicalConflict = await Blog.findOne({
+                canonicalUrl: normalizedCanonicalUrl,
+                ...(existingBlog ? { _id: { $ne: existingBlog._id } } : {}),
+            })
+                .select("_id slug sourcePostId canonicalUrl")
+                .lean();
+
+            if (canonicalConflict) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "Canonical URL already exists",
+                        details: `Marketing blog "${canonicalConflict.slug}" already uses ${normalizedCanonicalUrl}.`,
+                    },
+                    { status: 409 },
+                );
+            }
+        }
+
+        if (!existingBlog) {
+            const slugConflict = await Blog.findOne({ slug: payload.blog.slug })
+                .select("_id slug sourcePostId canonicalUrl")
+                .lean();
+
+            if (slugConflict) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: "Slug already exists",
+                        details: `Marketing blog "${slugConflict.slug}" is already linked to ${slugConflict.sourcePostId || "another source"}.`,
+                    },
+                    { status: 409 },
+                );
+            }
+        }
 
         const blogData = {
             sourcePostId: normalizedSourcePostId || undefined,
@@ -439,7 +567,7 @@ export async function POST(request: NextRequest) {
             metaKeywords: hasNonEmptyString(payload.blog.metaKeywords) ? payload.blog.metaKeywords.trim() : "",
             metaTitle: payload.blog.metaTitle,
             metaDescription: payload.blog.metaDescription,
-            canonicalUrl: normalizedCanonicalUrl,
+            canonicalUrl: normalizedCanonicalUrl || undefined,
             schemaMarkup: payload.blog.schemaMarkup,
             faqItems: normalizedFaqItems,
             externalSources: normalizedExternalSources,
@@ -464,6 +592,7 @@ export async function POST(request: NextRequest) {
                 slug: payload.blog.slug,
                 duration: `${Date.now() - startTime}ms`,
                 sourcePostId: normalizedSourcePostId || "missing",
+                matchedBy,
             });
         } else {
             // Create new blog
@@ -472,6 +601,7 @@ export async function POST(request: NextRequest) {
                 slug: payload.blog.slug,
                 duration: `${Date.now() - startTime}ms`,
                 sourcePostId: normalizedSourcePostId || "missing",
+                matchedBy: "create",
             });
         }
 
@@ -568,6 +698,27 @@ export async function POST(request: NextRequest) {
         console.error("[Webhook] Error processing webhook", error);
 
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
+        if (isMongoDuplicateKeyError(error)) {
+            const duplicateField = getDuplicateKeyField(error);
+            const details =
+                duplicateField === "canonicalUrl"
+                    ? "Another marketing blog already uses this canonical URL."
+                    : duplicateField === "slug"
+                      ? "Another marketing blog already uses this slug."
+                      : duplicateField === "sourcePostId"
+                        ? "This AI Blogger post is already linked to a different marketing blog."
+                        : errorMessage;
+
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: "Conflicting blog data",
+                    details,
+                },
+                { status: 409 },
+            );
+        }
 
         return NextResponse.json(
             {

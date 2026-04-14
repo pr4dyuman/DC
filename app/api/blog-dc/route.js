@@ -4,6 +4,7 @@ import Blog from '@/models/marketing/Blog';
 import { checkAuth } from '@/lib/authMiddleware';
 import DOMPurify from 'isomorphic-dompurify';
 import { sanitizeName, sanitizeString, validateCsrfOrigin } from '@/lib/validation';
+import { normalizeMarketingCanonicalUrl } from '@/lib/marketing-blog-utils';
 
 // Cache for 60 seconds - public blog list doesn't need real-time updates
 export const revalidate = 60;
@@ -62,6 +63,9 @@ export async function POST(req) {
 
     const body = await req.json();
     // Whitelist fields and sanitize
+    const normalizedCanonicalUrl = body.canonicalUrl
+      ? normalizeMarketingCanonicalUrl(String(body.canonicalUrl), body.slug ? sanitizeName(body.slug, 500) : undefined)
+      : '';
     const blogData = {
       title: body.title ? sanitizeName(body.title, 500) : undefined,
       shortDescription: body.shortDescription ? sanitizeString(body.shortDescription, 1000) : undefined,
@@ -70,17 +74,39 @@ export async function POST(req) {
       status: body.status === 'published' || body.status === 'draft' ? body.status : 'draft',
       image: body.image ? sanitizeString(body.image, 2000) : undefined,
       slug: body.slug ? sanitizeName(body.slug, 500) : undefined,
+      canonicalUrl: normalizedCanonicalUrl || undefined,
     };
     // Remove undefined fields
     Object.keys(blogData).forEach(k => blogData[k] === undefined && delete blogData[k]);
     if (!blogData.title) {
       return NextResponse.json({ success: false, error: 'Title is required' }, { status: 400 });
     }
+
+    if (blogData.canonicalUrl) {
+      const canonicalConflict = await Blog.findOne({ canonicalUrl: blogData.canonicalUrl }).select('slug').lean();
+      if (canonicalConflict) {
+        return NextResponse.json(
+          { success: false, error: `Canonical URL already exists on blog "${canonicalConflict.slug}"` },
+          { status: 409 }
+        );
+      }
+    }
+
     const blog = await Blog.create(blogData);
 
     return NextResponse.json({ success: true, data: blog }, { status: 201 });
   } catch (error) {
     console.error('Error creating blog:', error);
+    if (error && typeof error === 'object' && error.code === 11000) {
+      const duplicateField = Object.keys(error.keyPattern || error.keyValue || {})[0] || '';
+      const duplicateMessage = duplicateField === 'canonicalUrl'
+        ? 'Canonical URL already exists'
+        : duplicateField === 'slug'
+          ? 'Slug already exists'
+          : 'Duplicate blog value already exists';
+      return NextResponse.json({ success: false, error: duplicateMessage }, { status: 409 });
+    }
+
     return NextResponse.json({ success: false, error: 'Server Error' }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { getMarketingDbConnectionHandle } from '@/lib/marketing-db';
 
 const ContactSchema = new mongoose.Schema({
   fullName: {
@@ -32,4 +33,6 @@ const ContactSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-export default mongoose.models.Contact || mongoose.model('Contact', ContactSchema);
+const marketingConnection = getMarketingDbConnectionHandle();
+
+export default marketingConnection.models.Contact || marketingConnection.model('Contact', ContactSchema);
