@@ -31,6 +31,8 @@ function createMarketingConnection() {
 
     return mongoose.createConnection(MARKETING_DB_URI, {
         dbName: "marketing-blog",
+        // Fail fast instead of buffering queries on a half-open connection.
+        bufferCommands: false,
         // Connection options for production stability
         serverSelectionTimeoutMS: conservativePoolProfile ? 5000 : 10000,
         socketTimeoutMS: 45000,
@@ -48,19 +50,47 @@ function createMarketingConnection() {
     });
 }
 
+function createMarketingConnectionPromise(connection: mongoose.Connection): Promise<mongoose.Connection> {
+    const promise = connection.asPromise().then(() => {
+        console.debug("[Marketing DB] Connected to marketing blog database");
+        return connection;
+    }).catch((error) => {
+        if (cachedConnection === connection) {
+            cachedConnection = null;
+        }
+        if (cachedConnectionPromise === promise) {
+            cachedConnectionPromise = null;
+        }
+        console.error("[Marketing DB] Connection failed:", error);
+        throw new Error(
+            `Failed to connect to marketing blog database: ${error instanceof Error ? error.message : String(error)}`
+        );
+    });
+
+    return promise;
+}
+
+function ensureMarketingConnectionStarted(): mongoose.Connection {
+    if (cachedConnection && cachedConnection.readyState !== 0 && cachedConnection.readyState !== 3) {
+        if (cachedConnection.readyState === 2 && !cachedConnectionPromise) {
+            cachedConnectionPromise = createMarketingConnectionPromise(cachedConnection);
+        }
+        return cachedConnection;
+    }
+
+    const connection = createMarketingConnection();
+    cachedConnection = connection;
+    cachedConnectionPromise = createMarketingConnectionPromise(connection);
+    return connection;
+}
+
 /**
  * Returns the shared marketing DB connection handle synchronously.
  * This is used by models so they bind to the correct database even
  * before a route explicitly awaits the connection.
  */
 export function getMarketingDbConnectionHandle(): mongoose.Connection {
-    if (cachedConnection && cachedConnection.readyState !== 0 && cachedConnection.readyState !== 3) {
-        return cachedConnection;
-    }
-
-    const connection = createMarketingConnection();
-    cachedConnection = connection;
-    return connection;
+    return ensureMarketingConnectionStarted();
 }
 
 /**
@@ -72,11 +102,6 @@ export default async function dbConnect(): Promise<mongoose.Connection> {
         return cachedConnection;
     }
 
-    if (cachedConnection && cachedConnection.readyState === 2 && cachedConnectionPromise) {
-        cachedConnection = await cachedConnectionPromise;
-        return cachedConnection;
-    }
-
     if (cachedConnection && (cachedConnection.readyState === 0 || cachedConnection.readyState === 3)) {
         cachedConnection = null;
         cachedConnectionPromise = null;
@@ -84,18 +109,8 @@ export default async function dbConnect(): Promise<mongoose.Connection> {
 
     try {
         if (!cachedConnectionPromise) {
-            const connection = getMarketingDbConnectionHandle();
-            cachedConnectionPromise = connection.asPromise().then(() => {
-                console.debug("[Marketing DB] Connected to marketing blog database");
-                return connection;
-            }).catch((error) => {
-                cachedConnectionPromise = null;
-                cachedConnection = null;
-                console.error("[Marketing DB] Connection failed:", error);
-                throw new Error(
-                    `Failed to connect to marketing blog database: ${error instanceof Error ? error.message : String(error)}`
-                );
-            });
+            const connection = ensureMarketingConnectionStarted();
+            cachedConnectionPromise = createMarketingConnectionPromise(connection);
         }
 
         cachedConnection = await cachedConnectionPromise;

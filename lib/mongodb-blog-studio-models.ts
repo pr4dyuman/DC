@@ -366,7 +366,7 @@ const BlogStudioRunStepSchema = new Schema(
         },
         errors: [{ type: String }],
     },
-    { _id: false }
+    { _id: false, suppressReservedKeysWarning: true }
 );
 
 const BlogStudioRunSchema = new Schema<BlogStudioRun>(

@@ -54,6 +54,7 @@ export async function GET(request: Request) {
             let emittedCount = cursor;
             let cleanup: (() => void) | null = null;
             let closeTimeout: ReturnType<typeof setTimeout> | null = null;
+            let maxStreamLifetimeTimeout: ReturnType<typeof setTimeout> | null = null;
             let pollInterval: ReturnType<typeof setInterval> | null = null;
             let idleTimeout: ReturnType<typeof setTimeout> | null = null;
             let keepAliveInterval: ReturnType<typeof setInterval> | null = null;
@@ -66,6 +67,10 @@ export async function GET(request: Request) {
                 if (closeTimeout) {
                     clearTimeout(closeTimeout);
                     closeTimeout = null;
+                }
+                if (maxStreamLifetimeTimeout) {
+                    clearTimeout(maxStreamLifetimeTimeout);
+                    maxStreamLifetimeTimeout = null;
                 }
                 if (pollInterval) {
                     clearInterval(pollInterval);
@@ -171,6 +176,12 @@ export async function GET(request: Request) {
             }
 
             resetIdleTimeout();
+            maxStreamLifetimeTimeout = setTimeout(() => {
+                console.log(
+                    `[SSE] Max stream lifetime reached for ${jobId}; closing stream so the client can reconnect before Vercel times out`,
+                );
+                closeStream();
+            }, 270_000);
 
             // BUG-17: 15s keep-alive is more than sufficient to satisfy any proxy or
             // browser timeout. The old 300ms generated ~600 writes per 3-minute run.
