@@ -110,6 +110,7 @@ import type {
     BlogStudioPostStatus,
     BlogStudioPerformanceSyncStatus,
     BlogStudioPerformanceSnapshot,
+    BlogStudioPipelineCompletionResult,
     BlogStudioPostsPage,
     BlogStudioPublishingSettings,
     BlogStudioPublishBlocker,
@@ -158,6 +159,23 @@ type StoredAgencyAIBloggerContext = {
     aiConfig?: unknown;
     aiBloggerConfig?: unknown;
 };
+
+function buildPipelineCompletionResult(
+    post: BlogStudioPost,
+    diagnostics: BlogStudioGenerateDraftResult["diagnostics"],
+): BlogStudioPipelineCompletionResult {
+    return {
+        post: {
+            id: post.id,
+            slug: post.slug,
+            title: post.title,
+            status: post.status,
+            wordCount: post.wordCount,
+            seoScore: post.seoScore,
+        },
+        diagnostics,
+    };
+}
 
 export type BlogStudioOverviewMetrics = {
     draftsInQueue: number;
@@ -10584,6 +10602,28 @@ export async function refreshBlogStudioPostGroundedResearchImpl(
             steps: runSteps,
         });
     };
+    const returnGroundedResearchRefreshFailure = async (
+        message: string,
+        details?: Record<string, unknown>,
+    ): Promise<RefreshBlogStudioGroundedResearchResult> => {
+        await recordGroundedResearchRun("failed", message);
+        blogLogStep("REFRESH-GROUNDED-RESEARCH", message, {
+            slug,
+            draftUpdated: false,
+            claimsGroundingCleared: false,
+            ...details,
+        });
+        return {
+            post: currentPost,
+            sourceCount: 0,
+            highTrustSourceCount: 0,
+            cacheStatus: "live",
+            claimsGroundingCleared: false,
+            draftUpdated: false,
+            changedFields: [],
+            summary: message,
+        };
+    };
 
     if (aiBloggerConfig?.groundedResearch?.enabled === false) {
         const message = "Grounded research is disabled in AI Blogger settings.";
@@ -10658,8 +10698,10 @@ export async function refreshBlogStudioPostGroundedResearchImpl(
             aiBloggerConfig?.serp?.enabled === false
                 ? "Grounded research needs SERP enabled so AI Blogger can collect fresh source URLs for this draft."
                 : "No SERP source URLs were available to rebuild grounded research for this draft.";
-        await recordGroundedResearchRun("failed", message);
-        throw new Error(message);
+        return returnGroundedResearchRefreshFailure(message, {
+            sourceUrls: 0,
+            serpEnabled: aiBloggerConfig?.serp?.enabled ?? false,
+        });
     }
 
     const beforeAudit = getBlogStudioSeoAudit(currentPost, settings, publishRules);
@@ -10702,8 +10744,10 @@ export async function refreshBlogStudioPostGroundedResearchImpl(
             },
             errors: [message],
         }));
-        await recordGroundedResearchRun("failed", message);
-        throw new Error(message);
+        return returnGroundedResearchRefreshFailure(message, {
+            sourceUrls: serpAnalysis.topResultUrls.length,
+            failedSourceUrls: failedCount,
+        });
     }
     const groundedResearchSourceLabel = describeGroundedResearchSource(groundedResearch, groundedStepStartedAt);
     runSteps.push(buildDetailedRunStep({
@@ -14095,12 +14139,12 @@ Rules:
             await generationLogger.finalize("completed");
         }
 
-        // Emit SSE completion event with the full result.
+        // Emit the compact completion payload that the client actually needs.
         if (jobId) {
             await emitPipelineEvent(jobId, {
                 type: "complete",
                 message: `Draft generated: ${created.title}`,
-                result,
+                result: buildPipelineCompletionResult(created, result.diagnostics),
             });
         }
 
@@ -17706,7 +17750,7 @@ Return JSON only with this shape:
             await emitPipelineEvent(jobId, {
                 type: "complete",
                 message: `Draft generated: ${created.title}`,
-                result,
+                result: buildPipelineCompletionResult(created, result.diagnostics),
             });
         }
 

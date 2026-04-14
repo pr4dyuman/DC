@@ -843,6 +843,11 @@ export type BlogStudioGenerateDraftResult = {
     diagnostics: BlogStudioGenerationDiagnostics;
 };
 
+export type BlogStudioPipelineCompletionResult = {
+    post: Pick<BlogStudioPost, "id" | "slug" | "title" | "status" | "wordCount" | "seoScore">;
+    diagnostics: BlogStudioGenerationDiagnostics;
+};
+
 export type BlogStudioOverviewMetrics = {
     draftsInQueue: number;
     readyToReview: number;

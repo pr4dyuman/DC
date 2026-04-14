@@ -47,7 +47,7 @@ const ContactPage = () => {
 
   const onSubmit = async (data) => {
     try {
-      const response = await fetch('/api/contact', {
+      const response = await fetch('/api/contact-dc', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -61,7 +61,7 @@ const ContactPage = () => {
         throw new Error(result.error || 'Something went wrong')
       }
 
-      showToast("Your message has been sent successfully!", true)
+      showToast(result.message || "Your message has been sent successfully!", true)
       reset()
     } catch (error) {
       console.error('Submission error:', error)

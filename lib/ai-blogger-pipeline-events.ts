@@ -74,6 +74,14 @@ type PipelineJobOwner = {
     createdBy?: string;
 };
 
+function hasMeaningfulExecutionState(execution: PipelineExecutionState | undefined): execution is PipelineExecutionState {
+    if (!execution) {
+        return false;
+    }
+
+    return Object.keys(execution).some((key) => key !== "updatedAt");
+}
+
 type PipelineGlobalStore = typeof globalThis & {
     __aiBloggerPipelineJobs?: Map<string, PipelineJob>;
     __aiBloggerPipelineCleanup?: ReturnType<typeof setInterval> | null;
@@ -405,8 +413,9 @@ export async function updatePipelineJobExecution(jobId: string, update: Pipeline
     const job = ensureMemoryJob(jobId);
     const nextExecution: PipelineExecutionState = {
         ...(job.execution || {}),
-        updatedAt: now,
     };
+
+    delete nextExecution.updatedAt;
 
     if (update.phase !== undefined) {
         if (update.phase.trim()) {
@@ -416,10 +425,18 @@ export async function updatePipelineJobExecution(jobId: string, update: Pipeline
         }
     }
     if ("request" in update) {
-        nextExecution.request = update.request;
+        if (update.request === undefined) {
+            delete nextExecution.request;
+        } else {
+            nextExecution.request = update.request;
+        }
     }
     if ("context" in update) {
-        nextExecution.context = update.context;
+        if (update.context === undefined) {
+            delete nextExecution.context;
+        } else {
+            nextExecution.context = update.context;
+        }
     }
     if (update.clearRequest) {
         delete nextExecution.request;
@@ -433,7 +450,12 @@ export async function updatePipelineJobExecution(jobId: string, update: Pipeline
         delete nextExecution.claimExpiresAt;
     }
 
-    job.execution = nextExecution;
+    if (hasMeaningfulExecutionState(nextExecution)) {
+        nextExecution.updatedAt = now;
+        job.execution = nextExecution;
+    } else {
+        delete job.execution;
+    }
     job.updatedAt = Date.now();
 
     await queuePersistence(jobId, async () => {
@@ -442,33 +464,13 @@ export async function updatePipelineJobExecution(jobId: string, update: Pipeline
         const setPayload: Record<string, unknown> = {
             updatedAt: now,
             expiresAt: new Date(Date.now() + JOB_RETENTION_MS),
-            "execution.updatedAt": now,
         };
         const unsetPayload: Record<string, number> = {};
 
-        if (update.phase !== undefined) {
-            if (update.phase.trim()) {
-                setPayload["execution.phase"] = update.phase;
-            } else {
-                unsetPayload["execution.phase"] = 1;
-            }
-        }
-        if ("request" in update) {
-            setPayload["execution.request"] = update.request;
-        }
-        if ("context" in update) {
-            setPayload["execution.context"] = update.context;
-        }
-        if (update.clearRequest) {
-            unsetPayload["execution.request"] = 1;
-        }
-        if (update.clearContext) {
-            unsetPayload["execution.context"] = 1;
-        }
-        if (update.clearClaim) {
-            unsetPayload["execution.claimedPhase"] = 1;
-            unsetPayload["execution.claimId"] = 1;
-            unsetPayload["execution.claimExpiresAt"] = 1;
+        if (job.execution) {
+            setPayload.execution = job.execution;
+        } else {
+            unsetPayload.execution = 1;
         }
 
         const updateDoc: Record<string, unknown> = {
@@ -635,19 +637,11 @@ export function emitPipelineEvent(jobId: string, event: Omit<PipelineEvent, "tim
     if (fullEvent.type === "complete") {
         job.status = "complete";
         job.completedAt = Date.now();
-        if (job.execution) {
-            delete job.execution.claimedPhase;
-            delete job.execution.claimId;
-            delete job.execution.claimExpiresAt;
-        }
+        delete job.execution;
     } else if (fullEvent.type === "error") {
         job.status = "error";
         job.completedAt = Date.now();
-        if (job.execution) {
-            delete job.execution.claimedPhase;
-            delete job.execution.claimId;
-            delete job.execution.claimExpiresAt;
-        }
+        delete job.execution;
     }
 
     job.emitter.emit("event", fullEvent);
@@ -669,16 +663,13 @@ export function emitPipelineEvent(jobId: string, event: Omit<PipelineEvent, "tim
             setPayload.completedAt = fullEvent.timestamp;
             setPayload.result = fullEvent.result;
             unsetPayload.errorMessage = 1; // properly clear any previous error
-            unsetPayload["execution.claimedPhase"] = 1;
-            unsetPayload["execution.claimId"] = 1;
-            unsetPayload["execution.claimExpiresAt"] = 1;
+            unsetPayload.execution = 1;
         } else if (fullEvent.type === "error") {
             setPayload.status = "error";
             setPayload.completedAt = fullEvent.timestamp;
             setPayload.errorMessage = fullEvent.message || "Pipeline failed.";
-            unsetPayload["execution.claimedPhase"] = 1;
-            unsetPayload["execution.claimId"] = 1;
-            unsetPayload["execution.claimExpiresAt"] = 1;
+            unsetPayload.execution = 1;
+            unsetPayload.result = 1;
         }
 
         // BUG-09: updateOne is sufficient — we never used the returned document.

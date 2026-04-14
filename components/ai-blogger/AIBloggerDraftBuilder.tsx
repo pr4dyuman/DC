@@ -29,15 +29,15 @@ import {
     createBlogStudioDraft,
 } from "@/lib/actions";
 import type {
-    BlogStudioGenerateDraftResult,
     BlogStudioGenerationStepInsight,
     BlogStudioInputMode,
+    BlogStudioPipelineCompletionResult,
     BlogStudioSettings,
     BlogStudioTargetType,
 } from "@/lib/types";
 
 // Type guard for validating pipeline result
-function isBlogStudioGenerateDraftResult(value: unknown): value is BlogStudioGenerateDraftResult {
+function isBlogStudioPipelineCompletionResult(value: unknown): value is BlogStudioPipelineCompletionResult {
     if (!value || typeof value !== "object") return false;
     const obj = value as Record<string, unknown>;
     return (
@@ -915,7 +915,7 @@ export function AIBloggerDraftBuilder({
             label?: string;
             notes?: string;
             message?: string;
-            result?: BlogStudioGenerateDraftResult;
+            result?: BlogStudioPipelineCompletionResult;
         }) => {
             try {
                 if (data.type === "connected") {
@@ -1038,7 +1038,7 @@ export function AIBloggerDraftBuilder({
                     }
 
                     // Validate result type before using it
-                    const result = isBlogStudioGenerateDraftResult(data.result) ? data.result : null;
+                    const result = isBlogStudioPipelineCompletionResult(data.result) ? data.result : null;
                     if (result) {
                         setPipelineStatus("success");
                         setPipelineSteps((current) => buildPipelineStepStates(result.diagnostics.steps, current));
