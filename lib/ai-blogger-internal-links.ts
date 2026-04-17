@@ -903,7 +903,14 @@ async function getPublishedBlogCandidates(siteUrl?: string) {
             .select("title slug category metaKeywords shortDescription")
             .sort({ createdAt: -1 })
             .limit(18)
-            .lean();
+            .lean() as Array<{
+                _id: { toString: () => string };
+                title: string;
+                slug: string;
+                category?: string;
+                metaKeywords?: string;
+                shortDescription?: string;
+            }>;
 
         const candidates = blogs.map((blog) => ({
             id: `blog-${blog._id.toString()}`,

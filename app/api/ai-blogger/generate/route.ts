@@ -12,6 +12,11 @@ import {
     releaseLocalPipelineJob,
     updatePipelineJobExecution,
 } from "@/lib/ai-blogger-pipeline-events";
+import {
+    DEFAULT_REFRESH_WINDOW_HOURS as WEBSITE_CRAWL_DEFAULT_REFRESH_HOURS,
+    getCachedWebsiteIntelligence,
+    normalizeUrl as normalizeWebsiteUrl,
+} from "@/lib/ai-blogger-website-intelligence";
 import type { BlogStudioBrief, BlogStudioTarget } from "@/lib/types-ai-blogger";
 import { getAgencyAIBloggerConfigServer } from "@/lib/utils-server";
 
@@ -133,7 +138,9 @@ export async function POST(request: Request) {
             );
         }
 
-        if (!brief.sourceValue || typeof brief.sourceValue !== "string" || !brief.sourceValue.trim()) {
+        const sourceMode = typeof brief.sourceMode === "string" ? brief.sourceMode : "";
+        const sourceValue = typeof brief.sourceValue === "string" ? brief.sourceValue : "";
+        if (sourceMode !== "trending" && !sourceValue.trim()) {
             return NextResponse.json(
                 { ok: false, error: "Source detail is required." },
                 { status: 400 },
@@ -211,7 +218,33 @@ export async function POST(request: Request) {
             // AI budget waiting for a page crawl. The worker polls MongoDB for
             // the result. On Vercel, this is a completely separate serverless
             // invocation with an independent execution budget.
-            if (brief.sourceMode === "website" && brief.sourceValue?.trim() && crawlConfig?.enabled !== false) {
+            let shouldDispatchPrecache =
+                brief.sourceMode === "website" &&
+                Boolean(brief.sourceValue?.trim()) &&
+                crawlConfig?.enabled !== false;
+
+            if (shouldDispatchPrecache) {
+                const normalizedSourceUrl = normalizeWebsiteUrl(brief.sourceValue || "")?.toString() ?? "";
+                if (normalizedSourceUrl) {
+                    const refreshWindowHours = crawlConfig?.refreshWindowHours ?? WEBSITE_CRAWL_DEFAULT_REFRESH_HOURS;
+                    const configuredMaxPages = crawlConfig?.maxPages ?? 8;
+                    const cached = await getCachedWebsiteIntelligence(
+                        agency.id,
+                        normalizedSourceUrl,
+                        refreshWindowHours,
+                        configuredMaxPages,
+                    ).catch(() => null);
+
+                    if (cached) {
+                        shouldDispatchPrecache = false;
+                        console.log(
+                            `[GENERATE-ROUTE] Skipping precache; fresh website cache (${cached.pageCount} pages, refreshed ${cached.refreshedAt}) for: ${brief.sourceValue}`,
+                        );
+                    }
+                }
+            }
+
+            if (shouldDispatchPrecache) {
                 const precacheUrl = `${baseUrl}/api/ai-blogger/generate/precache`;
                 console.log(`[GENERATE-ROUTE] Dispatching precache for: ${brief.sourceValue}`);
                 fetch(precacheUrl, {

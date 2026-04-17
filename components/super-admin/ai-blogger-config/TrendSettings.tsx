@@ -8,6 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { SERPAPI_GEO_COUNTRIES, locationToSelectValue, locationFromSelectValue, type ConfigSectionProps } from "./shared";
 
+function clampNumberInput(value: string, fallback: number, min: number, max: number) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+        return fallback;
+    }
+
+    return Math.min(max, Math.max(min, Math.round(parsed)));
+}
+
 export default function TrendSettings({ config, setConfig, visibleKeys, toggleKeyVisibility }: ConfigSectionProps) {
     return (
         <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -28,7 +37,7 @@ export default function TrendSettings({ config, setConfig, visibleKeys, toggleKe
                     <div className="rounded-xl border border-border/60 bg-background/70 px-4 py-3 text-sm leading-6 text-muted-foreground">
                         {AI_BLOGGER_TREND_PROVIDER_META[config.trends.provider].description}
                         {` `}
-                        If live fetch is unavailable, AI Blogger can fall back to the AI-only discovery stage.
+                        It uses the SERP Analysis key when that key is newly saved and this field is left unchanged.
                     </div>
                 </div>
 
@@ -224,6 +233,111 @@ export default function TrendSettings({ config, setConfig, visibleKeys, toggleKe
                                     },
                                 }))
                             }
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-border bg-background/60 px-4 py-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                        <p className="text-sm font-medium text-foreground">Trend-first topic lock</p>
+                        <p className="text-xs leading-5 text-muted-foreground">
+                            Scan Google Trends first, lock the best website-matched trend, and use AI only after no acceptable trend is found.
+                        </p>
+                    </div>
+                    <Switch
+                        checked={config.trends.trendFirstMode}
+                        onCheckedChange={(checked) =>
+                            setConfig((current) => ({
+                                ...current,
+                                trends: {
+                                    ...current.trends,
+                                    trendFirstMode: checked,
+                                },
+                            }))
+                        }
+                    />
+                </div>
+
+                <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Max Trend Requests</Label>
+                        <Input
+                            type="number"
+                            min={1}
+                            max={20}
+                            value={config.trends.maxTrendRequestsPerBlog}
+                            onChange={(event) =>
+                                setConfig((current) => ({
+                                    ...current,
+                                    trends: {
+                                        ...current.trends,
+                                        maxTrendRequestsPerBlog: clampNumberInput(event.target.value, 8, 1, 20),
+                                    },
+                                }))
+                            }
+                            className="h-11 rounded-xl border-border bg-background"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Scan Budget Seconds</Label>
+                        <Input
+                            type="number"
+                            min={8}
+                            max={90}
+                            value={Math.round(config.trends.trendScanTimeBudgetMs / 1000)}
+                            onChange={(event) =>
+                                setConfig((current) => ({
+                                    ...current,
+                                    trends: {
+                                        ...current.trends,
+                                        trendScanTimeBudgetMs: clampNumberInput(event.target.value, 45, 8, 90) * 1000,
+                                    },
+                                }))
+                            }
+                            className="h-11 rounded-xl border-border bg-background"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Minimum Site Fit</Label>
+                        <Input
+                            type="number"
+                            min={0}
+                            max={80}
+                            value={config.trends.minimumTrendFitScore}
+                            onChange={(event) =>
+                                setConfig((current) => ({
+                                    ...current,
+                                    trends: {
+                                        ...current.trends,
+                                        minimumTrendFitScore: clampNumberInput(event.target.value, 55, 0, 80),
+                                    },
+                                }))
+                            }
+                            className="h-11 rounded-xl border-border bg-background"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Minimum Trend Score</Label>
+                        <Input
+                            type="number"
+                            min={0}
+                            max={95}
+                            value={config.trends.minimumTrendScore}
+                            onChange={(event) =>
+                                setConfig((current) => ({
+                                    ...current,
+                                    trends: {
+                                        ...current.trends,
+                                        minimumTrendScore: clampNumberInput(event.target.value, 60, 0, 95),
+                                    },
+                                }))
+                            }
+                            className="h-11 rounded-xl border-border bg-background"
                         />
                     </div>
                 </div>

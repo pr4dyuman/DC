@@ -508,7 +508,7 @@ export async function getBlogCategories(): Promise<string[]> {
     await verifySuperAdmin();
     await dbConnect();
 
-    const categories = await Blog.distinct("category").exec();
+    const categories = await Blog.distinct("category").exec() as string[];
     return categories.filter((cat) => cat).sort();
   } catch (error) {
     console.error("Error fetching categories:", error);

@@ -249,6 +249,26 @@ BlogSchema.index(
   }
 );
 
-const marketingConnection = getMarketingDbConnectionHandle();
+export function getMarketingBlogModel() {
+  const marketingConnection = getMarketingDbConnectionHandle();
+  return marketingConnection.models.Blog || marketingConnection.model('Blog', BlogSchema);
+}
 
-export default marketingConnection.models.Blog || marketingConnection.model('Blog', BlogSchema);
+/** @type {any} */
+const MarketingBlogModelProxy = new Proxy(function MarketingBlogModelProxy() {}, {
+  get(_target, prop) {
+    const model = getMarketingBlogModel();
+    const value = model[prop];
+    return typeof value === 'function' ? value.bind(model) : value;
+  },
+  apply(_target, _thisArg, args) {
+    const model = getMarketingBlogModel();
+    return model.apply(model, args);
+  },
+  construct(_target, args) {
+    const model = getMarketingBlogModel();
+    return Reflect.construct(model, args);
+  },
+});
+
+export default MarketingBlogModelProxy;

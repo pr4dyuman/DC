@@ -74,7 +74,7 @@ function splitOutlineList(value: string) {
 
 function getSourcePlaceholder(mode: BlogStudioInputMode) {
     if (mode === "website") return "https://example.com";
-    if (mode === "trending") return "e.g. Google core update impact on local SEO";
+    if (mode === "trending") return "Optional, e.g. Google core update impact on local SEO";
     return "e.g. ai blogging for agencies, content workflow automation";
 }
 
@@ -84,7 +84,7 @@ function getSourceDetailHelpText(mode: BlogStudioInputMode) {
     }
 
     if (mode === "trending") {
-        return "Use a market shift, launch, seasonal event, or timely angle that should shape topic selection.";
+        return "Leave blank to use the top live trend, or add a market shift, launch, seasonal event, or timely angle to steer selection.";
     }
 
     return "Use a keyword cluster, offer theme, or campaign phrase that should anchor the SEO direction.";
@@ -92,7 +92,7 @@ function getSourceDetailHelpText(mode: BlogStudioInputMode) {
 
 function getSourceFieldLabel(mode: BlogStudioInputMode) {
     if (mode === "website") return "Website URL";
-    if (mode === "trending") return "Trend angle";
+    if (mode === "trending") return "Trend angle (optional)";
     return "Keyword cluster";
 }
 
@@ -102,7 +102,7 @@ function getSourceFieldExample(mode: BlogStudioInputMode) {
     }
 
     if (mode === "trending") {
-        return "Best for launches, market shifts, algorithm updates, seasonal demand, or breaking industry topics.";
+        return "Blank means pure trending mode; AI Blogger will choose the strongest live trend instead of filtering by website fit.";
     }
 
     return "Use 1 clear cluster or topic phrase instead of a long list of disconnected keywords.";
@@ -521,6 +521,8 @@ type AIBloggerTrendPlan = {
     liveTrendsEnabled: boolean;
     fallbackToAi: boolean;
     defaultLocation: string;
+    trendFirstMode: boolean;
+    maxTrendRequestsPerBlog: number;
 };
 type AIBloggerSerpPlan = {
     enabled: boolean;
@@ -658,7 +660,7 @@ function estimateRemainingTime(
 }
 
 function getPlannedFetchTrendsLabel(plan: AIBloggerTrendPlan) {
-    return plan.liveTrendsEnabled ? "Live Google Trends" : "AI topic discovery";
+    return plan.liveTrendsEnabled && plan.trendFirstMode ? "Trend-first Google Trends" : plan.liveTrendsEnabled ? "Live Google Trends" : "AI topic discovery";
 }
 
 function getPlannedFetchTrendsNote(
@@ -672,10 +674,10 @@ function getPlannedFetchTrendsNote(
     if (plan.liveTrendsEnabled) {
         const modeText =
             sourceMode === "trending"
-                ? `Pulling live trending topics for ${location}.`
+                ? `Scanning live trending topics for ${location} with a ${plan.maxTrendRequestsPerBlog}-request cap.`
                 : normalizedTrendFocus && sourceMode === "website"
-                    ? `Scoring website topic hints plus the trend angle "${normalizedTrendFocus}" with live Google Trends for ${location}.`
-                    : `Scoring candidate topics with live Google Trends for ${location}.`;
+                    ? `Scanning Google Trends for ${location} until a live topic matches the website and "${normalizedTrendFocus}", capped at ${plan.maxTrendRequestsPerBlog} requests.`
+                    : `Scanning Google Trends for ${location} until a live topic matches the site, capped at ${plan.maxTrendRequestsPerBlog} requests.`;
 
         return plan.fallbackToAi
             ? `${modeText} AI fallback is ready if the live provider fails.`
@@ -1552,7 +1554,7 @@ export function AIBloggerDraftBuilder({
             return;
         }
 
-        if (!sourceValue.trim()) {
+        if (sourceMode !== "trending" && !sourceValue.trim()) {
             setError(`Add the ${sourceFieldLabel.toLowerCase()} before creating or generating a draft.`);
             return;
         }

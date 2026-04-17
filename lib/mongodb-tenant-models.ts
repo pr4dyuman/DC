@@ -103,6 +103,11 @@ const AIBloggerTrendsConfigSchema = new Schema({
     fallbackEnabled: { type: Boolean, default: true },
     fallbackToAi: { type: Boolean, default: true },
     defaultLocation: { type: String, default: "us" },
+    trendFirstMode: { type: Boolean, default: true },
+    maxTrendRequestsPerBlog: { type: Number, default: 8 },
+    trendScanTimeBudgetMs: { type: Number, default: 45000 },
+    minimumTrendFitScore: { type: Number, default: 55 },
+    minimumTrendScore: { type: Number, default: 60 },
 }, { _id: false });
 
 const AIBloggerWebsiteCrawlConfigSchema = new Schema({

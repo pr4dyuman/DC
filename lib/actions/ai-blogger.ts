@@ -63,7 +63,7 @@ import { emitPipelineEvent } from "../ai-blogger-pipeline-events";
 import { notifyScheduleFailed, notifySchedulePaused, notifyWebhookDeliveryFailed } from "../ai-blogger-notifications";
 import { validatePublishedMetadata, formatMetadataValidationResult } from "../ai-blogger-metadata-validation";
 import { sendWebhookToAgency, buildWebhookPayload, logWebhookDelivery, pingWebhookEndpoint } from "../ai-blogger-webhook";
-import { fetchAIBloggerTrendSignals, type AIBloggerTrendSignals } from "../ai-blogger-trends";
+import { fetchAIBloggerTrendSignals, type AIBloggerTrendSignals, type AIBloggerViralTrendSignal } from "../ai-blogger-trends";
 import { isValidUrl } from "../ai-blogger-url-utils";
 import {
     normalizeMarketingCanonicalUrl,
@@ -175,6 +175,60 @@ function buildPipelineCompletionResult(
         },
         diagnostics,
     };
+}
+
+function summarizeGroundedSourceDiagnostics(diagnostics: GroundedSourceFetchDiagnostic[]) {
+    if (diagnostics.length === 0) {
+        return "";
+    }
+
+    const fetchedCount = diagnostics.filter((diagnostic) => diagnostic.finalResult === "ok").length;
+    const failedFetchCount = diagnostics.filter((diagnostic) => diagnostic.finalResult === "failed").length;
+    const acceptedCount = diagnostics.filter((diagnostic) => diagnostic.filterStatus === "accepted").length;
+    const rejectedByFilterCount = diagnostics.filter(
+        (diagnostic) => diagnostic.finalResult === "ok" && diagnostic.filterStatus === "rejected",
+    ).length;
+    const reasonCounts = new Map<string, number>();
+
+    diagnostics
+        .filter((diagnostic) => diagnostic.filterStatus === "rejected")
+        .flatMap((diagnostic) => diagnostic.filterReasons || [])
+        .forEach((reason) => reasonCounts.set(reason, (reasonCounts.get(reason) || 0) + 1));
+
+    const reasonSummary = Array.from(reasonCounts.entries())
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, 2)
+        .map(([reason, count]) => `${reason}${count > 1 ? ` x${count}` : ""}`)
+        .join("; ");
+
+    if (acceptedCount > 0) {
+        return ` Fetch diagnostics: ${acceptedCount}/${fetchedCount} fetched source${fetchedCount === 1 ? "" : "s"} accepted${rejectedByFilterCount > 0 ? `; ${rejectedByFilterCount} rejected by filters` : ""}${failedFetchCount > 0 ? `; ${failedFetchCount} failed fetch` : ""}.`;
+    }
+
+    if (fetchedCount > 0) {
+        return ` Fetch diagnostics: ${fetchedCount}/${diagnostics.length} URL${diagnostics.length === 1 ? "" : "s"} fetched, but ${rejectedByFilterCount || fetchedCount} rejected by filters${reasonSummary ? ` (${reasonSummary})` : ""}${failedFetchCount > 0 ? `; ${failedFetchCount} failed fetch` : ""}.`;
+    }
+
+    return ` Fetch diagnostics: ${failedFetchCount}/${diagnostics.length} URL${diagnostics.length === 1 ? "" : "s"} failed fetch.`;
+}
+
+function serializeGroundedSourceDiagnostics(diagnostics: GroundedSourceFetchDiagnostic[]) {
+    return diagnostics.length > 0
+        ? diagnostics.map((diagnostic) => ({
+            domain: diagnostic.domain,
+            direct: diagnostic.directStatus,
+            mobile: diagnostic.mobileRetryStatus,
+            wayback: diagnostic.waybackStatus,
+            amp: diagnostic.ampCacheStatus,
+            result: diagnostic.finalResult,
+            filter: diagnostic.filterStatus,
+            reasons: diagnostic.filterReasons,
+            type: diagnostic.sourceType,
+            trust: diagnostic.trustLevel,
+            freshness: diagnostic.freshness,
+            title: diagnostic.sourceTitle,
+        }))
+        : undefined;
 }
 
 function buildGenerateDraftResult(input: {
@@ -320,6 +374,13 @@ const CANNIBALIZATION_STOP_WORDS = new Set([
 ]);
 
 const MINIMUM_BUSINESS_FIT_SCORE = 60;
+
+type MarketingCannibalizationPost = {
+    slug?: string;
+    title?: string;
+    metaKeywords?: string;
+    createdAt?: Date | string;
+};
 
 function tokenizeCannibalizationText(value?: string) {
     return Array.from(
@@ -473,7 +534,7 @@ export async function getBlogStudioCannibalizationReportImpl(
         return acc;
     }, []);
 
-    const marketingMatches = marketingPosts.reduce<BlogStudioCannibalizationMatch[]>((acc, candidate) => {
+    const marketingMatches = (marketingPosts as MarketingCannibalizationPost[]).reduce<BlogStudioCannibalizationMatch[]>((acc, candidate) => {
         const candidateKeywordList = (candidate.metaKeywords || "")
             .split(",")
             .map((item: string) => normalizeCannibalizationPhrase(item))
@@ -501,13 +562,13 @@ export async function getBlogStudioCannibalizationReportImpl(
 
         acc.push({
             source: "external-published",
-            slug: candidate.slug,
-            title: candidate.title,
-            href: `/blog/${candidate.slug}`,
+            slug: candidate.slug || "",
+            title: candidate.title || "Untitled published post",
+            href: `/blog/${candidate.slug || ""}`,
             statusLabel: "Published",
             reason,
             similarityScore: exactKeywordMatch ? Math.max(similarityScore, 0.9) : similarityScore,
-            primaryKeyword: candidateKeywordList[0] || candidate.title,
+            primaryKeyword: candidateKeywordList[0] || candidate.title || "",
             publishedAt: candidate.createdAt instanceof Date
                 ? candidate.createdAt.toISOString()
                 : candidate.createdAt,
@@ -2482,12 +2543,10 @@ function sanitizeBrief(brief: Partial<BlogStudioBrief> | undefined, fallback: Bl
 }
 
 function validateBrief(brief: BlogStudioBrief) {
-    if (!brief.sourceValue) {
+    if (!brief.sourceValue && brief.sourceMode !== "trending") {
         const label = brief.sourceMode === "website"
             ? "website source"
-            : brief.sourceMode === "trending"
-                ? "trend source"
-                : "keyword cluster";
+            : "keyword cluster";
 
         throw new Error(`A ${label} is required before creating or generating a draft.`);
     }
@@ -4801,6 +4860,75 @@ function buildWebsiteCommercialTopicHints(websiteIntelligence: AIBloggerWebsiteI
     );
 }
 
+function formatTrendVolume(value?: number) {
+    if (!value || !Number.isFinite(value)) {
+        return "unknown";
+    }
+
+    if (value >= 1_000_000) {
+        return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
+    }
+
+    if (value >= 1_000) {
+        return `${Math.round(value / 1_000)}K`;
+    }
+
+    return `${Math.round(value)}`;
+}
+
+function formatViralTrendForPrompt(trend: AIBloggerViralTrendSignal, index: number) {
+    const details = [
+        `score ${trend.score}`,
+        `viral ${trend.viralScore}`,
+        `site-fit ${trend.fitScore}`,
+        trend.active === true ? "active" : trend.active === false ? "not active" : "",
+        trend.searchVolume ? `volume ${formatTrendVolume(trend.searchVolume)}` : "",
+        trend.increasePercentage ? `growth +${Math.round(trend.increasePercentage)}%` : "",
+        trend.sourceRank ? `source rank #${trend.sourceRank}` : "",
+        trend.sourceHours ? `${trend.sourceHours}h window` : "",
+        trend.acceptedForTrendFirst === true ? "trend-first match" : trend.rejectionReasons?.length ? `rejected: ${trend.rejectionReasons.slice(0, 2).join(", ")}` : "",
+        trend.categories.length ? `categories: ${trend.categories.slice(0, 3).join(", ")}` : "",
+    ].filter(Boolean);
+    const breakdown = trend.trendBreakdown.length
+        ? ` | breakout queries: ${trend.trendBreakdown.slice(0, 4).join(", ")}`
+        : "";
+
+    return `${index + 1}. ${trend.topic} | ${details.join(" | ")}${breakdown}`;
+}
+
+function getMatchingViralTrend(
+    topic: string,
+    trends: AIBloggerViralTrendSignal[] | undefined,
+) {
+    if (!trends?.length) {
+        return null;
+    }
+
+    const normalizedTopic = sanitizeText(topic, 180).toLowerCase();
+    let bestMatch: { trend: AIBloggerViralTrendSignal; overlap: number } | null = null;
+
+    for (const trend of trends) {
+        const directMatch = sanitizeText(trend.topic, 180).toLowerCase() === normalizedTopic;
+        const overlap = directMatch
+            ? 100
+            : Math.max(
+                scoreTopicOverlap(topic, [trend.topic]),
+                scoreTopicOverlap(topic, trend.relatedQueries),
+                scoreTopicOverlap(topic, trend.trendBreakdown),
+            );
+
+        if (overlap < 32) {
+            continue;
+        }
+
+        if (!bestMatch || overlap > bestMatch.overlap || (overlap === bestMatch.overlap && trend.score > bestMatch.trend.score)) {
+            bestMatch = { trend, overlap };
+        }
+    }
+
+    return bestMatch;
+}
+
 function topicLooksTooBroadForWebsite(topic: string) {
     const tokens = tokenizeTopicSelection(topic);
     return tokens.length > 0 && tokens.length <= 3 && !topicHasSpecificityCue(topic);
@@ -4824,6 +4952,11 @@ function rerankDiscoveredTopics(input: {
                 item.trendingTopic,
                 item.keyword,
                 ...item.relatedQueries,
+            ]) || []),
+            ...(input.trendSignals?.viralTrends.flatMap((trend) => [
+                trend.topic,
+                ...trend.relatedQueries,
+                ...trend.trendBreakdown,
             ]) || []),
             ...input.fallbackCandidates,
         ],
@@ -4878,6 +5011,11 @@ function rerankDiscoveredTopics(input: {
                     item.keyword,
                     ...item.relatedQueries,
                 ]),
+                ...input.trendSignals.viralTrends.flatMap((trend) => [
+                    trend.topic,
+                    ...trend.relatedQueries,
+                    ...trend.trendBreakdown,
+                ]),
             ],
             30,
             140,
@@ -4918,6 +5056,21 @@ function rerankDiscoveredTopics(input: {
                 if (trendScore > 0) {
                     score += trendScore;
                     reasons.push(`trend-fit +${trendScore}`);
+                }
+            }
+
+            const viralTrendMatch = getMatchingViralTrend(topic, input.trendSignals?.viralTrends);
+            if (viralTrendMatch) {
+                const overlapMultiplier = viralTrendMatch.overlap >= 100 ? 1 : 0.68 + ((viralTrendMatch.overlap / 100) * 0.32);
+                const viralFitBoost = Math.round((viralTrendMatch.trend.score / 100) * 28 * overlapMultiplier);
+                if (viralFitBoost > 0) {
+                    score += viralFitBoost;
+                    reasons.push(`viral-fit +${viralFitBoost}`);
+                }
+
+                if ((websiteHints.length > 0 || briefHints.length > 0) && viralTrendMatch.trend.fitScore < 10) {
+                    score -= 10;
+                    reasons.push("low-site-trend-fit -10");
                 }
             }
 
@@ -5302,6 +5455,69 @@ function buildGenerationScorecard(input: {
     } satisfies NonNullable<BlogStudioPost["generationDiagnostics"]>["scorecard"];
 }
 
+function formatFetchTrendsDiagnosticsLabel(
+    fetchTrendsSource: BlogStudioFetchTrendsSource,
+    trendSignals?: AIBloggerTrendSignals | null,
+) {
+    const usedTrendFirstLock = Boolean(
+        trendSignals?.mode === "live-topics" &&
+        trendSignals.scanStats?.trendFirstMode &&
+        trendSignals.viralTrends.length > 0,
+    );
+
+    if (fetchTrendsSource === "live-google-trends") {
+        return usedTrendFirstLock ? "Trend-first Google Trends" : "Live Google Trends";
+    }
+
+    if (fetchTrendsSource === "live-google-trends-fallback-key") {
+        return usedTrendFirstLock ? "Trend-first Google Trends - Fallback key" : "Live Google Trends - Fallback key";
+    }
+
+    if (fetchTrendsSource === "ai-fallback-after-live-failure") {
+        return "AI fallback after live trends issue";
+    }
+
+    return "AI-only discovery";
+}
+
+function getTrendDiscoveryLogLabel(trendSignals: AIBloggerTrendSignals) {
+    if (trendSignals.mode === "keyword-analysis" && trendSignals.scanStats?.fallbackUsed) {
+        return "DISCOVERY (trend-scan-fallback)";
+    }
+
+    if (trendSignals.mode === "keyword-analysis") {
+        return "DISCOVERY (keyword-trends)";
+    }
+
+    if (trendSignals.scanStats?.acceptedCount === 0) {
+        return "DISCOVERY (trend-scan-no-match)";
+    }
+
+    return "DISCOVERY (live-trends)";
+}
+
+function getTrendMinerProgressMessage(trendSignals: AIBloggerTrendSignals) {
+    if (!trendSignals.scanStats) {
+        return "";
+    }
+
+    if (trendSignals.mode === "live-topics" && trendSignals.scanStats.acceptedCount > 0) {
+        const selected = trendSignals.selectedViralTrend?.topic || trendSignals.candidateTopics[0] || "selected trend";
+        return `Trend-first scan accepted ${trendSignals.scanStats.acceptedCount} live match(es) after ${trendSignals.scanStats.requestCount}/${trendSignals.scanStats.maxRequests} request(s). Candidate: ${selected}.`;
+    }
+
+    if (trendSignals.mode === "live-topics" && trendSignals.viralTrends.length > 0) {
+        const selected = trendSignals.selectedViralTrend?.topic || trendSignals.candidateTopics[0] || "selected trend";
+        return `Trend-first scan found live Google Trends topics but no threshold-perfect site match after ${trendSignals.scanStats.requestCount}/${trendSignals.scanStats.maxRequests} request(s). Using best available live trend: ${selected}.`;
+    }
+
+    if (trendSignals.scanStats.fallbackUsed) {
+        return `Trend-first scan found no acceptable live match after ${trendSignals.scanStats.requestCount}/${trendSignals.scanStats.maxRequests} request(s); falling back to keyword trend analysis.`;
+    }
+
+    return `Trend-first scan checked ${trendSignals.scanStats.requestCount}/${trendSignals.scanStats.maxRequests} request(s) and found ${trendSignals.scanStats.acceptedCount} accepted match(es).`;
+}
+
 function getAiOnlyTopicDiscoveryPrompt(
     agencyName: string | undefined,
     title: string,
@@ -5345,8 +5561,12 @@ Rules:
 
 function formatLiveTrendsForPrompt(liveTrends: AIBloggerTrendSignals) {
     if (liveTrends.mode === "live-topics") {
-        return `Live Google Trends topics for ${liveTrends.location.toUpperCase()}:
-${liveTrends.candidateTopics.map((topic) => `- ${topic}`).join("\n")}`;
+        const rankedTrends = liveTrends.viralTrends.length > 0
+            ? liveTrends.viralTrends.slice(0, 12).map(formatViralTrendForPrompt).join("\n")
+            : liveTrends.candidateTopics.map((topic, index) => `${index + 1}. ${topic}`).join("\n");
+
+        return `Live Google Trends viral-fit ranking for ${liveTrends.location.toUpperCase()}:
+${rankedTrends}`;
     }
 
     return `Google Trends keyword analysis for ${liveTrends.location.toUpperCase()}:
@@ -5369,6 +5589,19 @@ function formatTrendsContextForPrompt(trendSignals: AIBloggerTrendSignals | null
     }
 
     const parts: string[] = [`Google Trends context (${trendSignals.location.toUpperCase()}):`];
+
+    if (trendSignals.scanStats) {
+        parts.push(
+            `- Trend-first scan: ${trendSignals.scanStats.requestCount}/${trendSignals.scanStats.maxRequests} request(s), ${trendSignals.scanStats.acceptedCount} accepted match(es), ${trendSignals.scanStats.rejectedCount} rejected.`,
+        );
+    }
+
+    if (trendSignals.viralTrends.length > 0) {
+        const leaders = trendSignals.viralTrends.slice(0, 5);
+        parts.push(
+            `- Viral-fit leaders: ${leaders.map((trend) => `${trend.topic} (score ${trend.score}, fit ${trend.fitScore}, viral ${trend.viralScore}${trend.acceptedForTrendFirst ? ", trend-first match" : ""})`).join("; ")}`,
+        );
+    }
 
     if (trendSignals.keywordResults.length > 0) {
         const topResults = trendSignals.keywordResults.slice(0, 5);
@@ -5432,7 +5665,9 @@ Return JSON only with this shape:
 Rules:
 - Provide 5 to 12 candidate topics.
 - selectedTopic must be one of the candidate topics.
-- candidateTopics should stay close to the live trend data above.
+- candidateTopics should stay close to the live trend data above and prioritize the highest combined score, not raw virality alone.
+- If a row is marked "trend-first match", selectedTopic should come from those rows unless every accepted match duplicates a recent post or is impossible to adapt to the site.
+- Do not select a very viral topic when its site-fit score is weak; prefer the strongest viral trend that genuinely matches the website, source value, trend focus, or primary keyword.
 - relatedQueries should contain up to 6 short items, preferably from the live trend context when available.
 - sourceSummary must mention that live Google Trends data was used.
 - CRITICAL: Every candidate topic must be meaningfully distinct from the recently published posts listed above. Avoid near-duplicate titles, synonymous phrasings, or topics that cover the same core subject. Prefer fresh angles from trending signals.
@@ -5469,6 +5704,132 @@ function parseTopicDiscoveryResponse(
         selectedTopic,
         relatedQueries,
         sourceSummary: sanitizeText(parsed?.sourceSummary, 240),
+    };
+}
+
+function buildTrendFirstDiscoveryStage(input: {
+    trendSignals: AIBloggerTrendSignals;
+    runtimeConfig: AIBloggerStageConfig;
+    recentPostTitles?: string[];
+}): { discovery: TopicDiscoveryResult; stage: AIBloggerStageRunResult; summary: string } | null {
+    if (input.trendSignals.mode !== "live-topics") {
+        return null;
+    }
+
+    const trendPool: AIBloggerViralTrendSignal[] = input.trendSignals.viralTrends.length > 0
+        ? input.trendSignals.viralTrends
+        : input.trendSignals.candidateTopics.map((topic, index) => ({
+            topic,
+            score: Math.max(0, 80 - index),
+            viralScore: Math.max(0, 80 - index),
+            fitScore: 0,
+            active: null,
+            categories: [],
+            trendBreakdown: [],
+            relatedQueries: [],
+            reasons: ["live-trend-candidate"],
+            sourceRank: index + 1,
+        } satisfies AIBloggerViralTrendSignal));
+
+    if (!trendPool.length) {
+        return null;
+    }
+
+    const acceptedTrends = trendPool.filter((trend) => trend.acceptedForTrendFirst);
+    const recentPostTitles = input.recentPostTitles || [];
+    const isFreshAgainstRecentPosts = (trend: AIBloggerViralTrendSignal) => {
+        const recentOverlap = Math.max(
+            0,
+            ...recentPostTitles.map((title) => scoreTopicOverlap(trend.topic, [title])),
+        );
+        return recentOverlap < 58;
+    };
+    const rankedTrends = acceptedTrends.length > 0 ? acceptedTrends : trendPool;
+    const selectedTrend =
+        (input.trendSignals.selectedViralTrend?.acceptedForTrendFirst && isFreshAgainstRecentPosts(input.trendSignals.selectedViralTrend)
+            ? input.trendSignals.selectedViralTrend
+            : null)
+        || rankedTrends.find(isFreshAgainstRecentPosts)
+        || rankedTrends[0];
+
+    if (!selectedTrend) {
+        return null;
+    }
+
+    const candidateTopics = sanitizeStringArray(
+        [
+            selectedTrend.topic,
+            ...rankedTrends.map((trend) => trend.topic),
+            ...rankedTrends.flatMap((trend) => trend.trendBreakdown.slice(0, 2)),
+        ],
+        12,
+        140,
+    );
+    const relatedQueries = sanitizeStringArray(
+        [
+            ...selectedTrend.relatedQueries,
+            ...selectedTrend.trendBreakdown,
+            ...rankedTrends.flatMap((trend) => trend.relatedQueries.slice(0, 3)),
+            ...input.trendSignals.relatedQueries,
+        ],
+        10,
+        120,
+    );
+    const sourceRank = selectedTrend.sourceRank ? ` rank #${selectedTrend.sourceRank}` : "";
+    const windowText = selectedTrend.sourceHours ? ` in ${selectedTrend.sourceHours}h trends` : "";
+    const fitText = acceptedTrends.length > 0
+        ? ""
+        : " Best available live trend was below the configured site-fit threshold, so no AI-made topic was substituted.";
+    const summary = sanitizeText(
+        `Trend-first selected "${selectedTrend.topic}" from Google Trends${sourceRank}${windowText}; score ${selectedTrend.score}, fit ${selectedTrend.fitScore}, viral ${selectedTrend.viralScore}.${fitText}`,
+        240,
+    );
+    const discovery: TopicDiscoveryResult = {
+        candidateTopics,
+        selectedTopic: selectedTrend.topic,
+        relatedQueries,
+        sourceSummary: summary,
+    };
+
+    return {
+        discovery,
+        stage: {
+            text: JSON.stringify(discovery, null, 2),
+            usedFallback: false,
+            runtimeConfig: input.runtimeConfig,
+            tokens: {
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
+            },
+        },
+        summary,
+    };
+}
+
+function isPureTrendingTopicRequest(brief: BlogStudioBrief, title: string) {
+    return (
+        brief.sourceMode === "trending" &&
+        !sanitizeText(title, 180) &&
+        !sanitizeText(brief.sourceValue, 300) &&
+        !sanitizeText(brief.trendFocus, 160) &&
+        !sanitizeText(brief.primaryKeyword, 120)
+    );
+}
+
+function buildLockedTrendTopicSelection(discovery: TopicDiscoveryResult): TopicSelectionDecision {
+    const candidateTopics = sanitizeStringArray([discovery.selectedTopic, ...discovery.candidateTopics], 12, 140);
+    const selectedTopic = sanitizeText(discovery.selectedTopic, 180, candidateTopics[0] || "trending topic");
+
+    return {
+        candidateTopics,
+        selectedTopic,
+        selectionSummary: `Trend-first mode locked the Google Trends topic: ${selectedTopic}.`,
+        rankedTopics: candidateTopics.slice(0, 5).map((topic, index) => ({
+            topic,
+            score: Math.max(0, 100 - (index * 6)),
+            reasons: index === 0 ? ["top-live-trend"] : ["live-trend-candidate"],
+        })),
     };
 }
 
@@ -10842,9 +11203,11 @@ export async function refreshBlogStudioPostGroundedResearchImpl(
 
     if (!groundedResearch || groundedResearch.sources.length === 0) {
         const failedCount = groundedResearchResult.fetchDiagnostics.filter((item) => item.finalResult === "failed").length;
-        const diagnosticsNote = groundedResearchResult.fetchDiagnostics.length > 0
-            ? ` ${failedCount}/${groundedResearchResult.fetchDiagnostics.length} candidate URLs failed fetch or filtering.`
-            : "";
+        const fetchedCount = groundedResearchResult.fetchDiagnostics.filter((item) => item.finalResult === "ok").length;
+        const rejectedByFilterCount = groundedResearchResult.fetchDiagnostics.filter((item) =>
+            item.finalResult === "ok" && item.filterStatus === "rejected"
+        ).length;
+        const diagnosticsNote = summarizeGroundedSourceDiagnostics(groundedResearchResult.fetchDiagnostics);
         const message = `Grounded research could not verify a usable source pack for this draft.${diagnosticsNote}`;
         runSteps.push(buildDetailedRunStep({
             key: "grounded-source-fetch",
@@ -10867,7 +11230,10 @@ export async function refreshBlogStudioPostGroundedResearchImpl(
         }));
         return returnGroundedResearchRefreshFailure(message, {
             sourceUrls: serpAnalysis.topResultUrls.length,
+            fetchedSourceUrls: fetchedCount,
             failedSourceUrls: failedCount,
+            rejectedByFilters: rejectedByFilterCount,
+            diagnostics: serializeGroundedSourceDiagnostics(groundedResearchResult.fetchDiagnostics),
         });
     }
     const groundedResearchSourceLabel = describeGroundedResearchSource(groundedResearch, groundedStepStartedAt);
@@ -12051,8 +12417,8 @@ export async function generateBlogStudioDraftImpl(
             [
                 ...buildKeywordCandidatesFromSource(brief.sourceValue || "", 10),
                 brief.trendFocus || "",
-                ...(websiteIntelligence?.serviceSignals || []),
-                ...(websiteIntelligence?.topicHints || []),
+                ...(brief.sourceMode === "trending" ? [] : websiteIntelligence?.serviceSignals || []),
+                ...(brief.sourceMode === "trending" ? [] : websiteIntelligence?.topicHints || []),
                 brief.primaryKeyword || "",
                 title,
             ],
@@ -12098,23 +12464,48 @@ export async function generateBlogStudioDraftImpl(
                 fetchTrendsSource = liveTrendsUsedFallbackKey
                     ? "live-google-trends-fallback-key"
                     : "live-google-trends";
+                const trendMinerMessage = getTrendMinerProgressMessage(liveTrends);
+                if (trendMinerMessage) {
+                    blogLogStep("TREND-MINER", trendMinerMessage, { scanStats: liveTrends.scanStats });
+                    if (jobId) {
+                        void emitPipelineEvent(jobId, {
+                            type: "log",
+                            step: "fetch-trends",
+                            label: "Trend Miner",
+                            message: trendMinerMessage,
+                        });
+                    }
+                }
 
-                const liveTrendsPrompt = [
-                    getLiveTrendsTopicDiscoveryPrompt(agency.name, title, brief, settings, liveTrends, recentPostTitles),
-                    websitePromptBlock,
-                ]
-                    .filter(Boolean)
-                    .join("\n\n");
-                blogLogInput("DISCOVERY (live-trends)", liveTrendsPrompt);
-                discoveryStage = await runAIBloggerStage(
-                    aiConfig,
-                    aiBloggerConfig,
-                    "extractKeywords",
-                    liveTrendsPrompt,
-                );
-                blogLogOutput("DISCOVERY (live-trends)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
+                const trendFirstDiscovery = buildTrendFirstDiscoveryStage({
+                    trendSignals: liveTrends,
+                    runtimeConfig: mergedAIBloggerConfig.extractKeywords,
+                    recentPostTitles,
+                });
+
+                if (trendFirstDiscovery) {
+                    discoveryStage = trendFirstDiscovery.stage;
+                    discoverySummary = trendFirstDiscovery.summary;
+                    blogLogOutput("DISCOVERY (trend-first)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
+                } else {
+                    const discoveryLogLabel = getTrendDiscoveryLogLabel(liveTrends);
+                    const liveTrendsPrompt = [
+                        getLiveTrendsTopicDiscoveryPrompt(agency.name, title, brief, settings, liveTrends, recentPostTitles),
+                        websitePromptBlock,
+                    ]
+                        .filter(Boolean)
+                        .join("\n\n");
+                    blogLogInput(discoveryLogLabel, liveTrendsPrompt);
+                    discoveryStage = await runAIBloggerStage(
+                        aiConfig,
+                        aiBloggerConfig,
+                        "extractKeywords",
+                        liveTrendsPrompt,
+                    );
+                    blogLogOutput(discoveryLogLabel, discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
+                }
             } catch (error) {
-                if (!allowAiDiscoveryFallback) {
+                if ((liveTrendsConfig?.trendFirstMode ?? true) || !allowAiDiscoveryFallback) {
                     throw error;
                 }
 
@@ -12147,24 +12538,34 @@ export async function generateBlogStudioDraftImpl(
         mergeTokenTotals(tokenTotals, discoveryStage.tokens);
 
         const parsedDiscovery = parseTopicDiscoveryResponse(discoveryStage.text, title, fallbackCandidates);
-        const initialTopicSelection = rerankDiscoveredTopics({
-            discovery: parsedDiscovery,
-            trendSignals: capturedTrendSignals,
-            websiteIntelligence,
-            brief,
-            fallbackCandidates,
-            recentPostTitles,
-            fallbackTitle: sanitizeText(title, 180, fallbackCandidates[0] || topicSeed),
-        });
+        const trendFirstLocked = Boolean(
+            capturedTrendSignals?.mode === "live-topics" &&
+            capturedTrendSignals.viralTrends.some((trend) =>
+                sanitizeText(trend.topic, 180).toLowerCase() === sanitizeText(parsedDiscovery.selectedTopic, 180).toLowerCase(),
+            ),
+        );
+        const initialTopicSelection = trendFirstLocked
+            ? buildLockedTrendTopicSelection(parsedDiscovery)
+            : rerankDiscoveredTopics({
+                discovery: parsedDiscovery,
+                trendSignals: capturedTrendSignals,
+                websiteIntelligence,
+                brief,
+                fallbackCandidates: trendFirstLocked ? [] : fallbackCandidates,
+                recentPostTitles,
+                fallbackTitle: sanitizeText(title, 180, fallbackCandidates[0] || topicSeed),
+            });
         const serpConfig = aiBloggerConfig?.serp;
-        const topicSelection = await compareTopicCandidatesWithLightweightSerp({
-            agencyId: agency.id,
-            rankedTopics: initialTopicSelection.rankedTopics,
-            currentSelection: initialTopicSelection,
-            serpConfig,
-            trendsConfig: liveTrendsConfig,
-            location: brief.location || settings.seo.defaultLocation,
-        });
+        const topicSelection = trendFirstLocked
+            ? initialTopicSelection
+            : await compareTopicCandidatesWithLightweightSerp({
+                agencyId: agency.id,
+                rankedTopics: initialTopicSelection.rankedTopics,
+                currentSelection: initialTopicSelection,
+                serpConfig,
+                trendsConfig: liveTrendsConfig,
+                location: brief.location || settings.seo.defaultLocation,
+            });
         const discovery: TopicDiscoveryResult = {
             ...parsedDiscovery,
             candidateTopics: topicSelection.candidateTopics,
@@ -12178,6 +12579,9 @@ export async function generateBlogStudioDraftImpl(
             `Selected: ${selectedTopicForRun}`,
             topicSelection.selectionSummary,
             discovery.relatedQueries.length > 0 ? `Related: ${discovery.relatedQueries.slice(0, 3).join(", ")}` : "",
+            capturedTrendSignals?.scanStats
+                ? `Trend scan: ${capturedTrendSignals.scanStats.requestCount}/${capturedTrendSignals.scanStats.maxRequests} requests, ${capturedTrendSignals.scanStats.acceptedCount} matches`
+                : "",
             liveTrendsUsedFallbackKey ? "Trends fallback key used" : "",
             discoveryStage.usedFallback ? "AI fallback key used" : "",
         ]
@@ -12224,6 +12628,8 @@ export async function generateBlogStudioDraftImpl(
                         rankedTopics: topicSelection.rankedTopics,
                         serpSelectionSummary: topicSelection.serpSelectionSummary,
                         serpRankedTopics: topicSelection.serpRankedTopics,
+                        viralTrends: capturedTrendSignals?.viralTrends.slice(0, 8) || [],
+                        trendScanStats: capturedTrendSignals?.scanStats,
                         trendsSource: fetchTrendsSource,
                     },
                     rawText: discoveryStage.text,
@@ -12382,9 +12788,10 @@ export async function generateBlogStudioDraftImpl(
             emitStepStart("grounded-research", "Grounded Research");
 
             let groundedResearchDiagnostics: GroundedSourceFetchDiagnostic[] = [];
+            let groundedResearchDiagnosticsSummary = "";
 
             try {
-                    const groundedResearchResult = await getAIBloggerGroundedResearch(selectedTopicForRun, {
+                const groundedResearchResult = await getAIBloggerGroundedResearch(selectedTopicForRun, {
                     agencyId: agency.id,
                     location: brief.location || settings.seo.defaultLocation,
                     refreshWindowHours: aiBloggerConfig?.groundedResearch?.refreshWindowHours || 24,
@@ -12413,10 +12820,8 @@ export async function generateBlogStudioDraftImpl(
                     );
                     groundedResearchStepStatus = "completed";
                 } else {
-                    const failedCount = groundedResearchDiagnostics.filter((d) => d.finalResult === "failed").length;
-                    const statusBreakdown = groundedResearchDiagnostics.length > 0
-                        ? ` Fetch diagnostics: ${failedCount}/${groundedResearchDiagnostics.length} URLs failed.`
-                        : "";
+                    const statusBreakdown = summarizeGroundedSourceDiagnostics(groundedResearchDiagnostics);
+                    groundedResearchDiagnosticsSummary = statusBreakdown.trim();
 
                     addRunStep(
                         "grounded-research",
@@ -12464,16 +12869,7 @@ export async function generateBlogStudioDraftImpl(
                             cacheSource: groundedResearchSourceLabel,
                             ...buildCacheTimingDetails(groundedResearch?.refreshedAt, groundedResearchStepStartedAt),
                             attempted: groundedResearchAttempted,
-                            fetchDiagnostics: groundedResearchDiagnostics.length > 0
-                                ? groundedResearchDiagnostics.map((d) => ({
-                                    domain: d.domain,
-                                    direct: d.directStatus,
-                                    mobile: d.mobileRetryStatus,
-                                    wayback: d.waybackStatus,
-                                    amp: d.ampCacheStatus,
-                                    result: d.finalResult,
-                                }))
-                                : undefined,
+                            fetchDiagnostics: serializeGroundedSourceDiagnostics(groundedResearchDiagnostics),
                         },
                     },
                     {
@@ -12482,7 +12878,9 @@ export async function generateBlogStudioDraftImpl(
                             ? `Found ${groundedResearch.sources.length} sources (${highTrustCount} high-trust)`
                             : groundedResearchError
                                 ? `Grounded research failed: ${groundedResearchError}`
-                                : "Grounded research skipped because no qualifying source set was available.",
+                                : groundedResearchDiagnosticsSummary
+                                    ? `Grounded research skipped because no qualifying source set was available. ${groundedResearchDiagnosticsSummary}`
+                                    : "Grounded research skipped because no qualifying source set was available.",
                         data: {
                             sourcesCount: groundedResearch?.sources.length || 0,
                             highTrustCount,
@@ -14142,7 +14540,7 @@ Rules:
                 fetchTrendsSource,
                 fetchTrendsLabel:
                     fetchTrendsSource === "live-google-trends"
-                        ? "Live Google Trends"
+                        ? formatFetchTrendsDiagnosticsLabel(fetchTrendsSource, capturedTrendSignals)
                         : fetchTrendsSource === "live-google-trends-fallback-key"
                             ? "Live Google Trends • Fallback key"
                             : fetchTrendsSource === "ai-fallback-after-live-failure"
@@ -14564,6 +14962,7 @@ export async function runBlogStudioDraftResearchPhase(
         requestedWordCount,
         aiConfig,
         aiBloggerConfig,
+        mergedAIBloggerConfig,
         startedAt,
         startedMs,
         tokenTotals,
@@ -14864,8 +15263,8 @@ export async function runBlogStudioDraftResearchPhase(
             [
                 ...buildKeywordCandidatesFromSource(brief.sourceValue || "", 10),
                 brief.trendFocus || "",
-                ...(websiteIntelligence?.serviceSignals || []),
-                ...(websiteIntelligence?.topicHints || []),
+                ...(brief.sourceMode === "trending" ? [] : websiteIntelligence?.serviceSignals || []),
+                ...(brief.sourceMode === "trending" ? [] : websiteIntelligence?.topicHints || []),
                 brief.primaryKeyword || "",
                 title,
             ],
@@ -14911,23 +15310,48 @@ export async function runBlogStudioDraftResearchPhase(
                 fetchTrendsSource = liveTrendsUsedFallbackKey
                     ? "live-google-trends-fallback-key"
                     : "live-google-trends";
+                const trendMinerMessage = getTrendMinerProgressMessage(liveTrends);
+                if (trendMinerMessage) {
+                    blogLogStep("TREND-MINER", trendMinerMessage, { scanStats: liveTrends.scanStats });
+                    if (jobId) {
+                        void emitPipelineEvent(jobId, {
+                            type: "log",
+                            step: "fetch-trends",
+                            label: "Trend Miner",
+                            message: trendMinerMessage,
+                        });
+                    }
+                }
 
-                const liveTrendsPrompt = [
-                    getLiveTrendsTopicDiscoveryPrompt(agency.name, title, brief, settings, liveTrends, recentPostTitles),
-                    websitePromptBlock,
-                ]
-                    .filter(Boolean)
-                    .join("\n\n");
-                blogLogInput("DISCOVERY (live-trends)", liveTrendsPrompt);
-                discoveryStage = await runAIBloggerStage(
-                    aiConfig,
-                    aiBloggerConfig,
-                    "extractKeywords",
-                    liveTrendsPrompt,
-                );
-                blogLogOutput("DISCOVERY (live-trends)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
+                const trendFirstDiscovery = buildTrendFirstDiscoveryStage({
+                    trendSignals: liveTrends,
+                    runtimeConfig: mergedAIBloggerConfig.extractKeywords,
+                    recentPostTitles,
+                });
+
+                if (trendFirstDiscovery) {
+                    discoveryStage = trendFirstDiscovery.stage;
+                    discoverySummary = trendFirstDiscovery.summary;
+                    blogLogOutput("DISCOVERY (trend-first)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
+                } else {
+                    const discoveryLogLabel = getTrendDiscoveryLogLabel(liveTrends);
+                    const liveTrendsPrompt = [
+                        getLiveTrendsTopicDiscoveryPrompt(agency.name, title, brief, settings, liveTrends, recentPostTitles),
+                        websitePromptBlock,
+                    ]
+                        .filter(Boolean)
+                        .join("\n\n");
+                    blogLogInput(discoveryLogLabel, liveTrendsPrompt);
+                    discoveryStage = await runAIBloggerStage(
+                        aiConfig,
+                        aiBloggerConfig,
+                        "extractKeywords",
+                        liveTrendsPrompt,
+                    );
+                    blogLogOutput(discoveryLogLabel, discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
+                }
             } catch (error) {
-                if (!allowAiDiscoveryFallback) {
+                if ((liveTrendsConfig?.trendFirstMode ?? true) || !allowAiDiscoveryFallback) {
                     throw error;
                 }
 
@@ -14960,24 +15384,34 @@ export async function runBlogStudioDraftResearchPhase(
         mergeTokenTotals(tokenTotals, discoveryStage.tokens);
 
         const parsedDiscovery = parseTopicDiscoveryResponse(discoveryStage.text, title, fallbackCandidates);
-        const initialTopicSelection = rerankDiscoveredTopics({
-            discovery: parsedDiscovery,
-            trendSignals: capturedTrendSignals,
-            websiteIntelligence,
-            brief,
-            fallbackCandidates,
-            recentPostTitles,
-            fallbackTitle: sanitizeText(title, 180, fallbackCandidates[0] || topicSeed),
-        });
+        const trendFirstLocked = Boolean(
+            capturedTrendSignals?.mode === "live-topics" &&
+            capturedTrendSignals.viralTrends.some((trend) =>
+                sanitizeText(trend.topic, 180).toLowerCase() === sanitizeText(parsedDiscovery.selectedTopic, 180).toLowerCase(),
+            ),
+        );
+        const initialTopicSelection = trendFirstLocked
+            ? buildLockedTrendTopicSelection(parsedDiscovery)
+            : rerankDiscoveredTopics({
+                discovery: parsedDiscovery,
+                trendSignals: capturedTrendSignals,
+                websiteIntelligence,
+                brief,
+                fallbackCandidates: trendFirstLocked ? [] : fallbackCandidates,
+                recentPostTitles,
+                fallbackTitle: sanitizeText(title, 180, fallbackCandidates[0] || topicSeed),
+            });
         const serpConfig = aiBloggerConfig?.serp;
-        const topicSelection = await compareTopicCandidatesWithLightweightSerp({
-            agencyId: agency.id,
-            rankedTopics: initialTopicSelection.rankedTopics,
-            currentSelection: initialTopicSelection,
-            serpConfig,
-            trendsConfig: liveTrendsConfig,
-            location: brief.location || settings.seo.defaultLocation,
-        });
+        const topicSelection = trendFirstLocked
+            ? initialTopicSelection
+            : await compareTopicCandidatesWithLightweightSerp({
+                agencyId: agency.id,
+                rankedTopics: initialTopicSelection.rankedTopics,
+                currentSelection: initialTopicSelection,
+                serpConfig,
+                trendsConfig: liveTrendsConfig,
+                location: brief.location || settings.seo.defaultLocation,
+            });
         const discovery: TopicDiscoveryResult = {
             ...parsedDiscovery,
             candidateTopics: topicSelection.candidateTopics,
@@ -14991,6 +15425,9 @@ export async function runBlogStudioDraftResearchPhase(
             `Selected: ${selectedTopicForRun}`,
             topicSelection.selectionSummary,
             discovery.relatedQueries.length > 0 ? `Related: ${discovery.relatedQueries.slice(0, 3).join(", ")}` : "",
+            capturedTrendSignals?.scanStats
+                ? `Trend scan: ${capturedTrendSignals.scanStats.requestCount}/${capturedTrendSignals.scanStats.maxRequests} requests, ${capturedTrendSignals.scanStats.acceptedCount} matches`
+                : "",
             liveTrendsUsedFallbackKey ? "Trends fallback key used" : "",
             discoveryStage.usedFallback ? "AI fallback key used" : "",
         ]
@@ -15036,6 +15473,8 @@ export async function runBlogStudioDraftResearchPhase(
                         rankedTopics: topicSelection.rankedTopics,
                         serpSelectionSummary: topicSelection.serpSelectionSummary,
                         serpRankedTopics: topicSelection.serpRankedTopics,
+                        viralTrends: capturedTrendSignals?.viralTrends.slice(0, 8) || [],
+                        trendScanStats: capturedTrendSignals?.scanStats,
                         trendsSource: fetchTrendsSource,
                     },
                     rawText: discoveryStage.text,
@@ -15192,6 +15631,7 @@ export async function runBlogStudioDraftResearchPhase(
         } else {
             emitStepStart("grounded-research", "Grounded Research");
             let groundedResearchDiagnostics: GroundedSourceFetchDiagnostic[] = [];
+            let groundedResearchDiagnosticsSummary = "";
 
             try {
                 const groundedResearchResult = await getAIBloggerGroundedResearch(selectedTopicForRun, {
@@ -15222,10 +15662,8 @@ export async function runBlogStudioDraftResearchPhase(
                     );
                     groundedResearchStepStatus = "completed";
                 } else {
-                    const failedCount = groundedResearchDiagnostics.filter((diagnostic) => diagnostic.finalResult === "failed").length;
-                    const statusBreakdown = groundedResearchDiagnostics.length > 0
-                        ? ` Fetch diagnostics: ${failedCount}/${groundedResearchDiagnostics.length} URLs failed.`
-                        : "";
+                    const statusBreakdown = summarizeGroundedSourceDiagnostics(groundedResearchDiagnostics);
+                    groundedResearchDiagnosticsSummary = statusBreakdown.trim();
                     addRunStep(
                         "grounded-research",
                         "Grounded Research",
@@ -15270,16 +15708,7 @@ export async function runBlogStudioDraftResearchPhase(
                             cacheSource: groundedResearchSourceLabel,
                             ...buildCacheTimingDetails(groundedResearch?.refreshedAt, groundedResearchStartedAt),
                             attempted: groundedResearchAttempted,
-                            fetchDiagnostics: groundedResearchDiagnostics.length > 0
-                                ? groundedResearchDiagnostics.map((diagnostic) => ({
-                                    domain: diagnostic.domain,
-                                    direct: diagnostic.directStatus,
-                                    mobile: diagnostic.mobileRetryStatus,
-                                    wayback: diagnostic.waybackStatus,
-                                    amp: diagnostic.ampCacheStatus,
-                                    result: diagnostic.finalResult,
-                                }))
-                                : undefined,
+                            fetchDiagnostics: serializeGroundedSourceDiagnostics(groundedResearchDiagnostics),
                         },
                     },
                     {
@@ -15288,7 +15717,9 @@ export async function runBlogStudioDraftResearchPhase(
                             ? `Found ${groundedResearch.sources.length} sources (${highTrustCount} high-trust)`
                             : groundedResearchError
                                 ? `Grounded research failed: ${groundedResearchError}`
-                                : "Grounded research skipped because no qualifying source set was available.",
+                                : groundedResearchDiagnosticsSummary
+                                    ? `Grounded research skipped because no qualifying source set was available. ${groundedResearchDiagnosticsSummary}`
+                                    : "Grounded research skipped because no qualifying source set was available.",
                         data: {
                             sourcesCount: groundedResearch?.sources.length || 0,
                             highTrustCount,
@@ -17749,7 +18180,7 @@ Return JSON only with this shape:
                 fetchTrendsSource,
                 fetchTrendsLabel:
                     fetchTrendsSource === "live-google-trends"
-                        ? "Live Google Trends"
+                        ? formatFetchTrendsDiagnosticsLabel(fetchTrendsSource, trendSignals)
                         : fetchTrendsSource === "live-google-trends-fallback-key"
                             ? "Live Google Trends • Fallback key"
                             : fetchTrendsSource === "ai-fallback-after-live-failure"

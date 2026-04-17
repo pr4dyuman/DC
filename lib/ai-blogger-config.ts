@@ -146,6 +146,11 @@ export function getDefaultAIBloggerTrendsConfig(): AIBloggerTrendsConfig {
         fallbackEnabled: true,
         fallbackToAi: true,
         defaultLocation: "us",
+        trendFirstMode: true,
+        maxTrendRequestsPerBlog: 8,
+        trendScanTimeBudgetMs: 45_000,
+        minimumTrendFitScore: 55,
+        minimumTrendScore: 60,
     };
 }
 
@@ -333,6 +338,23 @@ function mergeTrendsConfig(stored: Partial<AIBloggerTrendsConfig> | undefined): 
             typeof stored?.defaultLocation === "string" && stored.defaultLocation.trim().length > 0
                 ? stored.defaultLocation.trim().toLowerCase()
                 : defaults.defaultLocation,
+        trendFirstMode: stored?.trendFirstMode ?? defaults.trendFirstMode,
+        maxTrendRequestsPerBlog:
+            typeof stored?.maxTrendRequestsPerBlog === "number" && Number.isFinite(stored.maxTrendRequestsPerBlog)
+                ? Math.min(20, Math.max(1, Math.round(stored.maxTrendRequestsPerBlog)))
+                : defaults.maxTrendRequestsPerBlog,
+        trendScanTimeBudgetMs:
+            typeof stored?.trendScanTimeBudgetMs === "number" && Number.isFinite(stored.trendScanTimeBudgetMs)
+                ? Math.min(90_000, Math.max(8_000, Math.round(stored.trendScanTimeBudgetMs)))
+                : defaults.trendScanTimeBudgetMs,
+        minimumTrendFitScore:
+            typeof stored?.minimumTrendFitScore === "number" && Number.isFinite(stored.minimumTrendFitScore)
+                ? Math.min(80, Math.max(0, Math.round(stored.minimumTrendFitScore)))
+                : defaults.minimumTrendFitScore,
+        minimumTrendScore:
+            typeof stored?.minimumTrendScore === "number" && Number.isFinite(stored.minimumTrendScore)
+                ? Math.min(95, Math.max(0, Math.round(stored.minimumTrendScore)))
+                : defaults.minimumTrendScore,
     };
 }
 

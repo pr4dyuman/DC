@@ -290,22 +290,66 @@ export default function AIBloggerAgencyConfigClient({ agencyId }: { agencyId: st
     // Helper to create a "clean" version of config for dirty checking
     // by excluding API key fields that may be masked after server round-trip
     const getCleanConfigForDirtyCheck = (cfg: AIBloggerConfig) => {
+        const cleanSecret = (value?: string) => {
+            const trimmed = value?.trim() || "";
+            if (!trimmed || trimmed.startsWith("****")) {
+                return "";
+            }
+
+            return "__new-secret__";
+        };
+
         return {
             ...cfg,
-            trends: { ...cfg.trends, apiKey: "", fallbackApiKey: "" },
-            serp: { ...cfg.serp, apiKey: "", fallbackApiKey: "" },
-            pagePerformance: { ...cfg.pagePerformance, apiKey: "" },
-            imageGeneration: { ...cfg.imageGeneration, apiKey: "", fallbackApiKey: "" },
+            trends: {
+                ...cfg.trends,
+                apiKey: cleanSecret(cfg.trends.apiKey),
+                fallbackApiKey: cleanSecret(cfg.trends.fallbackApiKey),
+            },
+            serp: {
+                ...cfg.serp,
+                apiKey: cleanSecret(cfg.serp.apiKey),
+                fallbackApiKey: cleanSecret(cfg.serp.fallbackApiKey),
+            },
+            pagePerformance: { ...cfg.pagePerformance, apiKey: cleanSecret(cfg.pagePerformance.apiKey) },
+            imageGeneration: {
+                ...cfg.imageGeneration,
+                apiKey: cleanSecret(cfg.imageGeneration.apiKey),
+                fallbackApiKey: cleanSecret(cfg.imageGeneration.fallbackApiKey),
+            },
             publishRules: {
                 ...cfg.publishRules,
-                aiReviewPolicy: { ...cfg.publishRules.aiReviewPolicy, apiKey: "" },
+                aiReviewPolicy: {
+                    ...cfg.publishRules.aiReviewPolicy,
+                    apiKey: cleanSecret(cfg.publishRules.aiReviewPolicy.apiKey),
+                },
             },
-            searchConsole: { ...cfg.searchConsole, credentialsJson: "" },
-            extractKeywords: { ...cfg.extractKeywords, apiKey: "" },
-            research: { ...cfg.research, apiKey: "" },
-            seoAnalysis: { ...cfg.seoAnalysis, apiKey: "" },
-            writeBlog: { ...cfg.writeBlog, apiKey: "" },
-            generateImage: { ...cfg.generateImage, apiKey: "" },
+            searchConsole: { ...cfg.searchConsole, credentialsJson: cleanSecret(cfg.searchConsole.credentialsJson) },
+            extractKeywords: {
+                ...cfg.extractKeywords,
+                apiKey: cleanSecret(cfg.extractKeywords.apiKey),
+                fallbackApiKey: cleanSecret(cfg.extractKeywords.fallbackApiKey),
+            },
+            research: {
+                ...cfg.research,
+                apiKey: cleanSecret(cfg.research.apiKey),
+                fallbackApiKey: cleanSecret(cfg.research.fallbackApiKey),
+            },
+            seoAnalysis: {
+                ...cfg.seoAnalysis,
+                apiKey: cleanSecret(cfg.seoAnalysis.apiKey),
+                fallbackApiKey: cleanSecret(cfg.seoAnalysis.fallbackApiKey),
+            },
+            writeBlog: {
+                ...cfg.writeBlog,
+                apiKey: cleanSecret(cfg.writeBlog.apiKey),
+                fallbackApiKey: cleanSecret(cfg.writeBlog.fallbackApiKey),
+            },
+            generateImage: {
+                ...cfg.generateImage,
+                apiKey: cleanSecret(cfg.generateImage.apiKey),
+                fallbackApiKey: cleanSecret(cfg.generateImage.fallbackApiKey),
+            },
         };
     };
 
@@ -565,9 +609,16 @@ export default function AIBloggerAgencyConfigClient({ agencyId }: { agencyId: st
 
         try {
             await updateAgencyAIBloggerConfigSuperAdmin(agencyId, config);
+            const [savedConfig, agencyOverview] = await Promise.all([
+                getAgencyAIBloggerConfigSuperAdmin(agencyId),
+                getAgencyAIBloggerOverviewSuperAdmin(agencyId),
+            ]);
+            const mergedSavedConfig = mergeAIBloggerConfig(savedConfig, baseAiConfig);
             setConfigured(true);
-            // Save a clean version for dirty checking (API keys excluded to avoid masking issues)
-            const cleanConfig = getCleanConfigForDirtyCheck(config);
+            setConfig(mergedSavedConfig);
+            setOverview(agencyOverview);
+            // Save a clean version for dirty checking without retaining secret values.
+            const cleanConfig = getCleanConfigForDirtyCheck(mergedSavedConfig);
             savedConfigJson.current = JSON.stringify(cleanConfig);
             setSuccess("AI Blogger configuration saved.");
             // Success message will auto-clear after 3 seconds via useEffect

@@ -465,6 +465,11 @@ export async function updateAgencyAIBloggerConfigSuperAdmin(agencyId: string, co
 
     const mergedConfig = mergeAIBloggerConfig(config, existingAgency.aiConfig);
     const validProviders = ['gemini', 'openai', 'nvidia', 'github', 'groq'];
+    const isMaskedSecret = (value?: string | null) => Boolean(value?.trim().startsWith("****"));
+    const isPlainSecret = (value?: string | null) => {
+        const trimmed = value?.trim() || "";
+        return Boolean(trimmed && !trimmed.startsWith("****"));
+    };
 
     const processStageConfig = (
         stageName: string,
@@ -532,10 +537,6 @@ export async function updateAgencyAIBloggerConfigSuperAdmin(agencyId: string, co
                 : encryptApiKey(fallbackApiKey)
             : "";
 
-        if (nextConfig.enabled && !resolvedPrimaryApiKey) {
-            throw new Error("Live Trends requires a primary API key before it can be enabled.");
-        }
-
         return {
             enabled: Boolean(nextConfig.enabled),
             provider: nextConfig.provider,
@@ -544,6 +545,11 @@ export async function updateAgencyAIBloggerConfigSuperAdmin(agencyId: string, co
             fallbackEnabled: Boolean(nextConfig.fallbackEnabled),
             fallbackToAi: Boolean(nextConfig.fallbackToAi),
             defaultLocation: sanitizeString(nextConfig.defaultLocation || "us", 12).toLowerCase() || "us",
+            trendFirstMode: nextConfig.trendFirstMode ?? true,
+            maxTrendRequestsPerBlog: Math.min(20, Math.max(1, Math.round(nextConfig.maxTrendRequestsPerBlog || 8))),
+            trendScanTimeBudgetMs: Math.min(90_000, Math.max(8_000, Math.round(nextConfig.trendScanTimeBudgetMs || 45_000))),
+            minimumTrendFitScore: Math.min(80, Math.max(0, Math.round(nextConfig.minimumTrendFitScore ?? 55))),
+            minimumTrendScore: Math.min(95, Math.max(0, Math.round(nextConfig.minimumTrendScore ?? 60))),
         };
     };
 
@@ -807,12 +813,47 @@ export async function updateAgencyAIBloggerConfigSuperAdmin(agencyId: string, co
     };
 
     const nextTrendsConfig = processTrendsConfig(mergedConfig.trends, existingAgency.aiBloggerConfig?.trends);
+    const nextSerpConfig = processSerpConfig(mergedConfig.serp, existingAgency.aiBloggerConfig?.serp, nextTrendsConfig);
+
+    const canShareSerpApiKeys =
+        nextTrendsConfig.provider === "serpapi" &&
+        nextSerpConfig.provider === "serpapi";
+    const trendsPrimaryInput = mergedConfig.trends.apiKey?.trim() || "";
+    const trendsFallbackInput = mergedConfig.trends.fallbackApiKey?.trim() || "";
+    const serpPrimaryInput = mergedConfig.serp.apiKey?.trim() || "";
+    const serpFallbackInput = mergedConfig.serp.fallbackApiKey?.trim() || "";
+
+    if (
+        canShareSerpApiKeys &&
+        nextSerpConfig.apiKey &&
+        (
+            !nextTrendsConfig.apiKey ||
+            ((isMaskedSecret(trendsPrimaryInput) || !trendsPrimaryInput) && isPlainSecret(serpPrimaryInput))
+        )
+    ) {
+        nextTrendsConfig.apiKey = nextSerpConfig.apiKey;
+    }
+
+    if (
+        canShareSerpApiKeys &&
+        nextSerpConfig.fallbackApiKey &&
+        (
+            !nextTrendsConfig.fallbackApiKey ||
+            ((isMaskedSecret(trendsFallbackInput) || !trendsFallbackInput) && isPlainSecret(serpFallbackInput))
+        )
+    ) {
+        nextTrendsConfig.fallbackApiKey = nextSerpConfig.fallbackApiKey;
+    }
+
+    if (nextTrendsConfig.enabled && !nextTrendsConfig.apiKey) {
+        throw new Error("Live Trends requires a SerpAPI key before it can be enabled.");
+    }
 
     const nextStoredConfig: AIBloggerConfig = {
         fallbackEnabled: mergedConfig.fallbackEnabled,
         trends: nextTrendsConfig,
         crawl: processCrawlConfig(mergedConfig.crawl),
-        serp: processSerpConfig(mergedConfig.serp, existingAgency.aiBloggerConfig?.serp, nextTrendsConfig),
+        serp: nextSerpConfig,
         groundedResearch: processGroundedResearchConfig(mergedConfig.groundedResearch),
         searchConsole: processSearchConsoleConfig(
             mergedConfig.searchConsole,
@@ -863,6 +904,7 @@ export async function updateAgencyAIBloggerConfigSuperAdmin(agencyId: string, co
         {
             $set: {
                 aiBloggerConfig: nextStoredConfig,
+                "features.aiBlogger": true,
                 updatedAt: new Date().toISOString(),
             },
         },

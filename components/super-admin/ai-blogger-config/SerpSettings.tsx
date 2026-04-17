@@ -8,6 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { SERPAPI_GEO_COUNTRIES, locationToSelectValue, locationFromSelectValue, type ConfigSectionProps } from "./shared";
 
+function shouldMirrorSerpKeyIntoTrends(value?: string) {
+    const trimmed = value?.trim() || "";
+    return !trimmed || trimmed.startsWith("****");
+}
+
 export default function SerpSettings({ config, setConfig, visibleKeys, toggleKeyVisibility }: ConfigSectionProps) {
     return (
         <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -28,7 +33,7 @@ export default function SerpSettings({ config, setConfig, visibleKeys, toggleKey
                     <div className="rounded-xl border border-border/60 bg-background/70 px-4 py-3 text-sm leading-6 text-muted-foreground">
                         {AI_BLOGGER_SERP_PROVIDER_META[config.serp.provider].description}
                         {` `}
-                        If no dedicated SERP key is provided, runtime can reuse the Live Trends SerpAPI key.
+                        Saving a new key here also updates Live Trends when its key field was left unchanged.
                     </div>
                 </div>
 
@@ -206,15 +211,29 @@ export default function SerpSettings({ config, setConfig, visibleKeys, toggleKey
                         <Input
                             type={visibleKeys["serp:primary"] ? "text" : "password"}
                             value={config.serp.apiKey || ""}
-                            onChange={(event) =>
-                                setConfig((current) => ({
-                                    ...current,
-                                    serp: {
-                                        ...current.serp,
-                                        apiKey: event.target.value,
-                                    },
-                                }))
-                            }
+                            onChange={(event) => {
+                                const apiKey = event.target.value;
+                                setConfig((current) => {
+                                    const mirrorToTrends =
+                                        current.serp.provider === "serpapi" &&
+                                        current.trends.provider === "serpapi" &&
+                                        shouldMirrorSerpKeyIntoTrends(current.trends.apiKey);
+
+                                    return {
+                                        ...current,
+                                        serp: {
+                                            ...current.serp,
+                                            apiKey,
+                                        },
+                                        trends: mirrorToTrends
+                                            ? {
+                                                ...current.trends,
+                                                apiKey,
+                                            }
+                                            : current.trends,
+                                    };
+                                });
+                            }}
                             placeholder="Optional dedicated SerpAPI key"
                             className="h-11 rounded-xl border-border bg-background pr-11"
                         />
@@ -234,15 +253,29 @@ export default function SerpSettings({ config, setConfig, visibleKeys, toggleKey
                         <Input
                             type={visibleKeys["serp:fallback"] ? "text" : "password"}
                             value={config.serp.fallbackApiKey || ""}
-                            onChange={(event) =>
-                                setConfig((current) => ({
-                                    ...current,
-                                    serp: {
-                                        ...current.serp,
-                                        fallbackApiKey: event.target.value,
-                                    },
-                                }))
-                            }
+                            onChange={(event) => {
+                                const fallbackApiKey = event.target.value;
+                                setConfig((current) => {
+                                    const mirrorToTrends =
+                                        current.serp.provider === "serpapi" &&
+                                        current.trends.provider === "serpapi" &&
+                                        shouldMirrorSerpKeyIntoTrends(current.trends.fallbackApiKey);
+
+                                    return {
+                                        ...current,
+                                        serp: {
+                                            ...current.serp,
+                                            fallbackApiKey,
+                                        },
+                                        trends: mirrorToTrends
+                                            ? {
+                                                ...current.trends,
+                                                fallbackApiKey,
+                                            }
+                                            : current.trends,
+                                    };
+                                });
+                            }}
                             placeholder="Optional backup SerpAPI key"
                             className="h-11 rounded-xl border-border bg-background pr-11"
                         />

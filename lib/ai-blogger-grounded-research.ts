@@ -41,6 +41,12 @@ export type GroundedSourceFetchDiagnostic = {
     waybackStatus: string;
     ampCacheStatus: string;
     finalResult: "ok" | "failed";
+    filterStatus?: "accepted" | "rejected" | "not-fetched";
+    filterReasons?: string[];
+    sourceTitle?: string;
+    sourceType?: BlogStudioExternalSourceType;
+    trustLevel?: BlogStudioExternalSourceTrustLevel;
+    freshness?: BlogStudioExternalSourceFreshness;
 };
 
 const BOT_BLOCK_SIGNATURES = [
@@ -244,6 +250,13 @@ function extractPublishedAt(html: string, lastModifiedHeader: string | null) {
 
 function getSourceType(domain: string, url: string, title: string, description: string): BlogStudioExternalSourceType {
     const combined = `${domain} ${url} ${title} ${description}`.toLowerCase();
+    const pathname = (() => {
+        try {
+            return new URL(url).pathname.toLowerCase();
+        } catch {
+            return "";
+        }
+    })();
 
     if (domain.endsWith(".gov")) {
         return "government";
@@ -255,6 +268,10 @@ function getSourceType(domain: string, url: string, title: string, description: 
 
     if (/\b(news|press|magazine|journal|daily|times|wire)\b/.test(combined)) {
         return "news";
+    }
+
+    if (/\/(?:event|events|schedule|tickets)(?:\/|$|-)/i.test(pathname)) {
+        return "official";
     }
 
     if (/\b(docs|documentation|guide|support|help center|academy|developers)\b/.test(combined)) {
@@ -766,6 +783,99 @@ function mergeGroundedSources(
         .slice(0, maxSources);
 }
 
+type GroundedResearchFilterConfig = Pick<
+    AIBloggerConfig["groundedResearch"],
+    "allowedSourceTypes" | "trustPreference" | "freshnessPreference" | "maxSources"
+>;
+
+function getGroundedSourceFilterReasons(
+    source: BlogStudioExternalSource,
+    config: GroundedResearchFilterConfig,
+) {
+    const reasons: string[] = [];
+    const allowedSourceTypes = new Set(config.allowedSourceTypes);
+
+    if (!allowedSourceTypes.has(source.type)) {
+        reasons.push(`source type ${source.type} is not allowed`);
+    }
+
+    if (config.trustPreference === "high-only" && source.trustLevel !== "high") {
+        reasons.push(`trust level ${source.trustLevel} is below high-only setting`);
+    }
+
+    if (
+        config.freshnessPreference === "recent-first" &&
+        source.freshness !== "current" &&
+        source.freshness !== "recent"
+    ) {
+        reasons.push(`freshness ${source.freshness} is outside recent-first setting`);
+    }
+
+    if (config.freshnessPreference === "evergreen-ok" && source.freshness === "dated") {
+        reasons.push("freshness dated is blocked by evergreen-ok setting");
+    }
+
+    return reasons;
+}
+
+function applyGroundedResearchAuthorityRecovery(
+    fetchedSources: BlogStudioExternalSource[],
+    config: GroundedResearchFilterConfig,
+) {
+    const allowedSourceTypes = new Set(config.allowedSourceTypes);
+
+    return fetchedSources
+        .filter((source) => allowedSourceTypes.has(source.type))
+        .filter((source) => source.trustLevel !== "low")
+        .filter((source) => source.freshness !== "dated")
+        .sort(compareGroundedSources)
+        .slice(0, config.maxSources);
+}
+
+function attachGroundedFilterDiagnostics(
+    diagnostics: GroundedSourceFetchDiagnostic[],
+    fetchedSources: BlogStudioExternalSource[],
+    acceptedSources: BlogStudioExternalSource[],
+    config: GroundedResearchFilterConfig,
+    recoveryUsed: boolean,
+) {
+    const fetchedByUrl = new Map(fetchedSources.map((source) => [source.url, source]));
+    const acceptedUrls = new Set(acceptedSources.map((source) => source.url));
+
+    return diagnostics.map((diagnostic) => {
+        const source = fetchedByUrl.get(diagnostic.url);
+
+        if (!source) {
+            return {
+                ...diagnostic,
+                filterStatus: diagnostic.finalResult === "failed" ? "not-fetched" as const : "rejected" as const,
+                filterReasons: diagnostic.finalResult === "failed"
+                    ? ["source fetch failed before filters could run"]
+                    : ["source parsed output was empty"],
+            };
+        }
+
+        const accepted = acceptedUrls.has(source.url);
+        const filterReasons = accepted
+            ? recoveryUsed
+                ? ["accepted by authority recovery after strict filters removed every fetched source"]
+                : []
+            : getGroundedSourceFilterReasons(source, config);
+
+        return {
+            ...diagnostic,
+            filterStatus: accepted ? "accepted" as const : "rejected" as const,
+            filterReasons: filterReasons.length > 0
+                ? filterReasons
+                : ["source was lower ranked after maxSources limit"],
+            sourceTitle: source.title,
+            sourceType: source.type,
+            trustLevel: source.trustLevel,
+            freshness: source.freshness,
+        };
+    });
+}
+
 function toGroundedResearch(
     snapshot: Pick<
         BlogStudioGroundedResearchSnapshot,
@@ -922,6 +1032,7 @@ export async function getAIBloggerGroundedResearch(
     };
 
     let sources = applyGroundedResearchFilters(fetchedSources, filterConfig);
+    let recoveryUsed = false;
 
     // Fallback pass: if ALL successfully-fetched sources were filtered out, retry
     // with relaxed freshness. This handles authority sites (EY, PwC, McKinsey etc.)
@@ -931,6 +1042,11 @@ export async function getAIBloggerGroundedResearch(
             ...filterConfig,
             freshnessPreference: "balanced", // \"balanced\" = no freshness filter
         });
+    }
+
+    if (sources.length === 0 && fetchedSources.length > 0 && filterConfig.trustPreference === "high-only") {
+        sources = applyGroundedResearchAuthorityRecovery(fetchedSources, filterConfig);
+        recoveryUsed = sources.length > 0;
     }
 
     const minimumDesiredSources = filterConfig.maxSources >= 2 ? 2 : 1;
@@ -952,8 +1068,16 @@ export async function getAIBloggerGroundedResearch(
         }
     }
 
+    const enrichedDiagnostics = attachGroundedFilterDiagnostics(
+        fetchDiagnostics,
+        fetchedSources,
+        sources,
+        filterConfig,
+        recoveryUsed,
+    );
+
     if (sources.length === 0) {
-        return { result: null, fetchDiagnostics };
+        return { result: null, fetchDiagnostics: enrichedDiagnostics };
     }
 
     const groundedResearch: AIBloggerGroundedResearch = {
@@ -970,5 +1094,5 @@ export async function getAIBloggerGroundedResearch(
         await storeGroundedResearchSnapshot(options.agencyId, groundedResearch);
     }
 
-    return { result: groundedResearch, fetchDiagnostics };
+    return { result: groundedResearch, fetchDiagnostics: enrichedDiagnostics };
 }

@@ -28,6 +28,8 @@ export default async function AIBloggerGeneratePage() {
                     liveTrendsEnabled: aiBloggerConfig?.trends?.enabled ?? false,
                     fallbackToAi: aiBloggerConfig?.trends?.fallbackToAi ?? true,
                     defaultLocation: aiBloggerConfig?.trends?.defaultLocation || settings.seo.defaultLocation,
+                    trendFirstMode: aiBloggerConfig?.trends?.trendFirstMode ?? true,
+                    maxTrendRequestsPerBlog: aiBloggerConfig?.trends?.maxTrendRequestsPerBlog ?? 8,
                 }}
                 serpPlan={{
                     enabled: aiBloggerConfig?.serp?.enabled ?? false,

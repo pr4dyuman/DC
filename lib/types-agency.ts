@@ -76,6 +76,11 @@ export type AIBloggerTrendsConfig = {
     fallbackEnabled: boolean;
     fallbackToAi: boolean;
     defaultLocation: string;
+    trendFirstMode: boolean;
+    maxTrendRequestsPerBlog: number;
+    trendScanTimeBudgetMs: number;
+    minimumTrendFitScore: number;
+    minimumTrendScore: number;
 };
 
 export type AIBloggerWebsiteCrawlConfig = {
