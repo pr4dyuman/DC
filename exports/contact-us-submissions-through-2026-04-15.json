@@ -1,0 +1,43 @@
+{
+  "exportedAtUtc": "2026-04-14T19:22:40.387Z",
+  "exportedAtIst": "2026-04-15 00:52:40 IST",
+  "sourceDatabase": "marketing-blog",
+  "sourceCollection": "contacts",
+  "includedThroughIst": "2026-04-15 23:59:59",
+  "count": 3,
+  "submissions": [
+    {
+      "id": "69de927b43d9e27ec1109ba8",
+      "dateUtc": "2026-04-14T19:16:11.900Z",
+      "dateIst": "2026-04-15 00:46:11 IST",
+      "senderName": "kanak soni",
+      "senderEmail": "kanak7777soni@gmail.com",
+      "phoneNumber": "+919571585802",
+      "companyName": "testomoni",
+      "message": "Test massage",
+      "updatedAtUtc": "2026-04-14T19:16:11.900Z"
+    },
+    {
+      "id": "69de8f61a22c50a36b6e3acc",
+      "dateUtc": "2026-04-14T19:02:57.030Z",
+      "dateIst": "2026-04-15 00:32:57 IST",
+      "senderName": "pmLmpLpySGisOfNNRYXYfUQd",
+      "senderEmail": "mattt.r.en.t.7.9@gmail.com",
+      "phoneNumber": "8319660229",
+      "companyName": "MISoYkLiHEaVfrngSEDqG",
+      "message": "cANBsgvnVFdKddFmCYuBhz",
+      "updatedAtUtc": "2026-04-14T19:02:57.030Z"
+    },
+    {
+      "id": "69de8e2892f5106d1976274b",
+      "dateUtc": "2026-04-14T18:57:44.223Z",
+      "dateIst": "2026-04-15 00:27:44 IST",
+      "senderName": "chandan sharma",
+      "senderEmail": "kanak777soni@gmail.com",
+      "phoneNumber": "+919571585802",
+      "companyName": "testomoni",
+      "message": "Test massage",
+      "updatedAtUtc": "2026-04-14T18:57:44.223Z"
+    }
+  ]
+}

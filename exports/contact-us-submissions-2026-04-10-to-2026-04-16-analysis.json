@@ -1,0 +1,404 @@
+{
+  "exportedAtUtc": "2026-04-16T07:55:47.143Z",
+  "exportedAtIst": "2026-04-16 13:25:47 IST",
+  "sourceDatabase": "marketing-blog",
+  "sourceCollection": "contacts",
+  "includedFromIst": "2026-04-10 00:00:00 IST",
+  "includedThroughIst": "2026-04-16 23:59:59 IST",
+  "count": 13,
+  "summary": {
+    "totalSubmissions": 13,
+    "statusCounts": {
+      "likely_spam_bot": 11,
+      "test_submission": 2
+    },
+    "issueCounts": {
+      "message_has_too_few_readable_words": 11,
+      "likely_random_generated_text": 11
+    }
+  },
+  "submissions": [
+    {
+      "id": "69dfcd38552bda19a8e40c25",
+      "dateUtc": "2026-04-15T17:39:04.156Z",
+      "dateIst": "2026-04-15 23:09:04 IST",
+      "senderName": "QgjTPzItLPQZvvXavLXCJ",
+      "senderEmail": "mrs_rm2@yahoo.com",
+      "phoneNumber": "6427679469",
+      "companyName": "NLeiyJLLbTHEbKQnTmGpUa",
+      "message": "XPgUPmDfMjyFegECApfdvfYO",
+      "updatedAtUtc": "2026-04-15T17:39:04.156Z",
+      "updatedAtIst": "2026-04-15 23:09:04 IST",
+      "analysis": {
+        "status": "likely_spam_bot",
+        "recommendedAction": "ignore_or_delete",
+        "issues": [
+          "message_has_too_few_readable_words",
+          "likely_random_generated_text"
+        ],
+        "notes": [],
+        "metrics": {
+          "messageWordCount": 1,
+          "randomTokenFields": [
+            "senderName",
+            "companyName",
+            "message"
+          ],
+          "phoneDigitCount": 10
+        }
+      }
+    },
+    {
+      "id": "69dfa65346015af50dfedd73",
+      "dateUtc": "2026-04-15T14:53:07.676Z",
+      "dateIst": "2026-04-15 20:23:07 IST",
+      "senderName": "onIFXBRJNbNsksCASTcGQMM",
+      "senderEmail": "h.a.i.l.ey.c0.4.01.04@gmail.com",
+      "phoneNumber": "3061350943",
+      "companyName": "YQVPezPLussUqefdeJ",
+      "message": "kXbBBlllSMymUUci",
+      "updatedAtUtc": "2026-04-15T14:53:07.676Z",
+      "updatedAtIst": "2026-04-15 20:23:07 IST",
+      "analysis": {
+        "status": "likely_spam_bot",
+        "recommendedAction": "ignore_or_delete",
+        "issues": [
+          "message_has_too_few_readable_words",
+          "likely_random_generated_text"
+        ],
+        "notes": [],
+        "metrics": {
+          "messageWordCount": 1,
+          "randomTokenFields": [
+            "senderName",
+            "companyName",
+            "message"
+          ],
+          "phoneDigitCount": 10
+        }
+      }
+    },
+    {
+      "id": "69df8e5ee1b7899947dac3ac",
+      "dateUtc": "2026-04-15T13:10:54.989Z",
+      "dateIst": "2026-04-15 18:40:54 IST",
+      "senderName": "eFBXtpsptPZIlZkYMappPE",
+      "senderEmail": "creatipiero1@g.mail.it",
+      "phoneNumber": "8588885838",
+      "companyName": "ovRgeptclzaBdrMNkd",
+      "message": "snqUPXZTaRceKIABcYWoCs",
+      "updatedAtUtc": "2026-04-15T13:10:54.989Z",
+      "updatedAtIst": "2026-04-15 18:40:54 IST",
+      "analysis": {
+        "status": "likely_spam_bot",
+        "recommendedAction": "ignore_or_delete",
+        "issues": [
+          "message_has_too_few_readable_words",
+          "likely_random_generated_text"
+        ],
+        "notes": [],
+        "metrics": {
+          "messageWordCount": 1,
+          "randomTokenFields": [
+            "senderName",
+            "companyName",
+            "message"
+          ],
+          "phoneDigitCount": 10
+        }
+      }
+    },
+    {
+      "id": "69df7d329df43af4593b404c",
+      "dateUtc": "2026-04-15T11:57:38.975Z",
+      "dateIst": "2026-04-15 17:27:38 IST",
+      "senderName": "peTzEswORupcPipybJwsPepk",
+      "senderEmail": "w.e.v.i.n.az.a26.4@gmail.com",
+      "phoneNumber": "3100134238",
+      "companyName": "GmVHHAJgBCOqMqNbHiuzKRa",
+      "message": "iXhpVgNyjafcAkMLPZ",
+      "updatedAtUtc": "2026-04-15T11:57:38.975Z",
+      "updatedAtIst": "2026-04-15 17:27:38 IST",
+      "analysis": {
+        "status": "likely_spam_bot",
+        "recommendedAction": "ignore_or_delete",
+        "issues": [
+          "message_has_too_few_readable_words",
+          "likely_random_generated_text"
+        ],
+        "notes": [],
+        "metrics": {
+          "messageWordCount": 1,
+          "randomTokenFields": [
+            "senderName",
+            "companyName",
+            "message"
+          ],
+          "phoneDigitCount": 10
+        }
+      }
+    },
+    {
+      "id": "69df7160d47356cd908e9659",
+      "dateUtc": "2026-04-15T11:07:12.387Z",
+      "dateIst": "2026-04-15 16:37:12 IST",
+      "senderName": "KhYItcJsgQfJzdMiaQ",
+      "senderEmail": "au.stinb.eals.3.24@gmail.com",
+      "phoneNumber": "6304851873",
+      "companyName": "QViZLnJuZgtAVLYYucRGhAH",
+      "message": "WZPCGhjtyTyAkHxnPUgilJWg",
+      "updatedAtUtc": "2026-04-15T11:07:12.387Z",
+      "updatedAtIst": "2026-04-15 16:37:12 IST",
+      "analysis": {
+        "status": "likely_spam_bot",
+        "recommendedAction": "ignore_or_delete",
+        "issues": [
+          "message_has_too_few_readable_words",
+          "likely_random_generated_text"
+        ],
+        "notes": [],
+        "metrics": {
+          "messageWordCount": 1,
+          "randomTokenFields": [
+            "senderName",
+            "companyName",
+            "message"
+          ],
+          "phoneDigitCount": 10
+        }
+      }
+    },
+    {
+      "id": "69df542cf04631c1770d98b1",
+      "dateUtc": "2026-04-15T09:02:36.263Z",
+      "dateIst": "2026-04-15 14:32:36 IST",
+      "senderName": "hkvRKlZCNYfOLVYGq",
+      "senderEmail": "mac.i.a.s.j.ill@gmail.com",
+      "phoneNumber": "7698087949",
+      "companyName": "jcKjFkHqOMuTctzwXpDRk",
+      "message": "qHSmTRmvUAKBoPDlv",
+      "updatedAtUtc": "2026-04-15T09:02:36.263Z",
+      "updatedAtIst": "2026-04-15 14:32:36 IST",
+      "analysis": {
+        "status": "likely_spam_bot",
+        "recommendedAction": "ignore_or_delete",
+        "issues": [
+          "message_has_too_few_readable_words",
+          "likely_random_generated_text"
+        ],
+        "notes": [],
+        "metrics": {
+          "messageWordCount": 1,
+          "randomTokenFields": [
+            "senderName",
+            "companyName",
+            "message"
+          ],
+          "phoneDigitCount": 10
+        }
+      }
+    },
+    {
+      "id": "69df1c7d84043fbe65ae83fe",
+      "dateUtc": "2026-04-15T05:05:01.141Z",
+      "dateIst": "2026-04-15 10:35:01 IST",
+      "senderName": "vyfouylbIFFKrhvOGB",
+      "senderEmail": "mrachell2000@yahoo.com",
+      "phoneNumber": "9428380925",
+      "companyName": "IPhWZUFFUeSpxtNefWncK",
+      "message": "pAufTivYYABKHkwEMzCp",
+      "updatedAtUtc": "2026-04-15T05:05:01.141Z",
+      "updatedAtIst": "2026-04-15 10:35:01 IST",
+      "analysis": {
+        "status": "likely_spam_bot",
+        "recommendedAction": "ignore_or_delete",
+        "issues": [
+          "message_has_too_few_readable_words",
+          "likely_random_generated_text"
+        ],
+        "notes": [],
+        "metrics": {
+          "messageWordCount": 1,
+          "randomTokenFields": [
+            "senderName",
+            "companyName",
+            "message"
+          ],
+          "phoneDigitCount": 10
+        }
+      }
+    },
+    {
+      "id": "69dec19bb1ab3527666628f7",
+      "dateUtc": "2026-04-14T22:37:15.663Z",
+      "dateIst": "2026-04-15 04:07:15 IST",
+      "senderName": "ykOMJsoXvECKXwohcOyhOTM",
+      "senderEmail": "j.o.s.j.ea.n.s.m.i.t.h@gmail.com",
+      "phoneNumber": "2994927664",
+      "companyName": "NwAURozwwyxEdfsvD",
+      "message": "pAOUKobMdRPBRCCbQBRp",
+      "updatedAtUtc": "2026-04-14T22:37:15.663Z",
+      "updatedAtIst": "2026-04-15 04:07:15 IST",
+      "analysis": {
+        "status": "likely_spam_bot",
+        "recommendedAction": "ignore_or_delete",
+        "issues": [
+          "message_has_too_few_readable_words",
+          "likely_random_generated_text"
+        ],
+        "notes": [],
+        "metrics": {
+          "messageWordCount": 1,
+          "randomTokenFields": [
+            "senderName",
+            "companyName",
+            "message"
+          ],
+          "phoneDigitCount": 10
+        }
+      }
+    },
+    {
+      "id": "69deab9dc24eadf8f12a1006",
+      "dateUtc": "2026-04-14T21:03:25.110Z",
+      "dateIst": "2026-04-15 02:33:25 IST",
+      "senderName": "JsDIesPLqwLSbwXAJ",
+      "senderEmail": "ri.ta.mc.l.a.rk1962@gmail.com",
+      "phoneNumber": "2347913887",
+      "companyName": "kCeYCrlloffdbWzDlP",
+      "message": "PwlZUSlIQVRpcKxJBxLrOHOw",
+      "updatedAtUtc": "2026-04-14T21:03:25.110Z",
+      "updatedAtIst": "2026-04-15 02:33:25 IST",
+      "analysis": {
+        "status": "likely_spam_bot",
+        "recommendedAction": "ignore_or_delete",
+        "issues": [
+          "message_has_too_few_readable_words",
+          "likely_random_generated_text"
+        ],
+        "notes": [],
+        "metrics": {
+          "messageWordCount": 1,
+          "randomTokenFields": [
+            "senderName",
+            "companyName",
+            "message"
+          ],
+          "phoneDigitCount": 10
+        }
+      }
+    },
+    {
+      "id": "69de9c4e1ea8d3ee67949581",
+      "dateUtc": "2026-04-14T19:58:06.381Z",
+      "dateIst": "2026-04-15 01:28:06 IST",
+      "senderName": "lswwvttDCRWePUUdG",
+      "senderEmail": "j.ab.ab.k.i1@gmail.com",
+      "phoneNumber": "2496947766",
+      "companyName": "CyFHomObaJjwJpXtCNYy",
+      "message": "ZKIbQOHniqGWOVIdpv",
+      "updatedAtUtc": "2026-04-14T19:58:06.381Z",
+      "updatedAtIst": "2026-04-15 01:28:06 IST",
+      "analysis": {
+        "status": "likely_spam_bot",
+        "recommendedAction": "ignore_or_delete",
+        "issues": [
+          "message_has_too_few_readable_words",
+          "likely_random_generated_text"
+        ],
+        "notes": [],
+        "metrics": {
+          "messageWordCount": 1,
+          "randomTokenFields": [
+            "senderName",
+            "companyName",
+            "message"
+          ],
+          "phoneDigitCount": 10
+        }
+      }
+    },
+    {
+      "id": "69de927b43d9e27ec1109ba8",
+      "dateUtc": "2026-04-14T19:16:11.900Z",
+      "dateIst": "2026-04-15 00:46:11 IST",
+      "senderName": "kanak soni",
+      "senderEmail": "kanak7777soni@gmail.com",
+      "phoneNumber": "+919571585802",
+      "companyName": "testomoni",
+      "message": "Test massage",
+      "updatedAtUtc": "2026-04-14T19:16:11.900Z",
+      "updatedAtIst": "2026-04-15 00:46:11 IST",
+      "analysis": {
+        "status": "test_submission",
+        "recommendedAction": "no_client_follow_up_needed",
+        "issues": [],
+        "notes": [
+          "appears_to_be_test_submission",
+          "phone_repeats_in_export_window"
+        ],
+        "metrics": {
+          "messageWordCount": 2,
+          "randomTokenFields": [],
+          "phoneDigitCount": 12
+        }
+      }
+    },
+    {
+      "id": "69de8f61a22c50a36b6e3acc",
+      "dateUtc": "2026-04-14T19:02:57.030Z",
+      "dateIst": "2026-04-15 00:32:57 IST",
+      "senderName": "pmLmpLpySGisOfNNRYXYfUQd",
+      "senderEmail": "mattt.r.en.t.7.9@gmail.com",
+      "phoneNumber": "8319660229",
+      "companyName": "MISoYkLiHEaVfrngSEDqG",
+      "message": "cANBsgvnVFdKddFmCYuBhz",
+      "updatedAtUtc": "2026-04-14T19:02:57.030Z",
+      "updatedAtIst": "2026-04-15 00:32:57 IST",
+      "analysis": {
+        "status": "likely_spam_bot",
+        "recommendedAction": "ignore_or_delete",
+        "issues": [
+          "message_has_too_few_readable_words",
+          "likely_random_generated_text"
+        ],
+        "notes": [],
+        "metrics": {
+          "messageWordCount": 1,
+          "randomTokenFields": [
+            "senderName",
+            "companyName",
+            "message"
+          ],
+          "phoneDigitCount": 10
+        }
+      }
+    },
+    {
+      "id": "69de8e2892f5106d1976274b",
+      "dateUtc": "2026-04-14T18:57:44.223Z",
+      "dateIst": "2026-04-15 00:27:44 IST",
+      "senderName": "chandan sharma",
+      "senderEmail": "kanak777soni@gmail.com",
+      "phoneNumber": "+919571585802",
+      "companyName": "testomoni",
+      "message": "Test massage",
+      "updatedAtUtc": "2026-04-14T18:57:44.223Z",
+      "updatedAtIst": "2026-04-15 00:27:44 IST",
+      "analysis": {
+        "status": "test_submission",
+        "recommendedAction": "no_client_follow_up_needed",
+        "issues": [],
+        "notes": [
+          "appears_to_be_test_submission",
+          "phone_repeats_in_export_window"
+        ],
+        "metrics": {
+          "messageWordCount": 2,
+          "randomTokenFields": [],
+          "phoneDigitCount": 12
+        }
+      }
+    }
+  ]
+}

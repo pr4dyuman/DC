@@ -1,46 +1,174 @@
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import dbConnect from '@/lib/marketing-db';
 import Contact from '@/models/marketing/Contact';
 import { sendUserThankYouEmail, sendAdminNotificationEmail } from '@/lib/email';
 import { sanitizeName, sanitizeString, sanitizePhone, validateEmail, validateCsrfOrigin } from '@/lib/validation';
 import { RateLimitModel, connectDB } from '@/lib/mongodb';
 
-const MAX_CONTACT_REQUESTS = 5;
-const CONTACT_WINDOW = 60 * 60 * 1000; // 1 hour
+const MAX_CONTACT_REQUESTS_PER_DAY = 3;
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const CONTACT_DEVICE_COOKIE = 'dc_contact_device';
+const CONTACT_DEVICE_COOKIE_MAX_AGE = 60 * 60 * 24 * 180; // 180 days
+const CONTACT_SUCCESS_MESSAGE = 'Thank you for contacting us! We will get back to you soon.';
+
+function getIstDayStamp(date) {
+  const shifted = new Date(date.getTime() + IST_OFFSET_MS);
+  const year = shifted.getUTCFullYear();
+  const month = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(shifted.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getNextIstMidnightUtc(date) {
+  const shifted = new Date(date.getTime() + IST_OFFSET_MS);
+  return new Date(
+    Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate() + 1) - IST_OFFSET_MS
+  );
+}
+
+function getRetryAfterSeconds(resetAt, now) {
+  return Math.max(1, Math.ceil((resetAt.getTime() - now.getTime()) / 1000));
+}
+
+function getCookieFromHeader(request, name) {
+  const cookieHeader = request.headers.get('cookie') || '';
+  const cookies = cookieHeader.split(';').map((value) => value.trim());
+  const cookie = cookies.find((value) => value.startsWith(`${name}=`));
+  if (!cookie) return '';
+
+  try {
+    return decodeURIComponent(cookie.slice(name.length + 1));
+  } catch {
+    return '';
+  }
+}
+
+function getContactDevice(request) {
+  const existingDeviceId =
+    request.cookies?.get(CONTACT_DEVICE_COOKIE)?.value ||
+    getCookieFromHeader(request, CONTACT_DEVICE_COOKIE);
+  const hasValidDeviceId = /^[a-f0-9-]{36}$/i.test(existingDeviceId);
+
+  return {
+    deviceId: hasValidDeviceId ? existingDeviceId : randomUUID(),
+    shouldSetCookie: !hasValidDeviceId,
+  };
+}
+
+function createJsonResponse(body, init, device) {
+  const response = NextResponse.json(body, init);
+
+  if (device?.shouldSetCookie) {
+    response.cookies.set(CONTACT_DEVICE_COOKIE, device.deviceId, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: CONTACT_DEVICE_COOKIE_MAX_AGE,
+    });
+  }
+
+  return response;
+}
+
+async function checkContactDailyLimit(key, now, resetAt) {
+  const record = await RateLimitModel.findOne({ key, expiresAt: { $gt: now } }).lean();
+
+  if (record && record.count >= MAX_CONTACT_REQUESTS_PER_DAY) {
+    return {
+      limited: true,
+      retryAfterSeconds: getRetryAfterSeconds(resetAt, now),
+    };
+  }
+
+  if (record) {
+    await RateLimitModel.updateOne({ key }, { $inc: { count: 1 }, $set: { expiresAt: resetAt } });
+  } else {
+    await RateLimitModel.findOneAndUpdate(
+      { key },
+      { count: 1, expiresAt: resetAt },
+      { upsert: true }
+    );
+  }
+
+  return { limited: false, retryAfterSeconds: 0 };
+}
+
+async function enforceContactDailyLimit(scope, value, now, resetAt) {
+  const dayStamp = getIstDayStamp(now);
+  return checkContactDailyLimit(`contact:daily:${scope}:${dayStamp}:${value || 'unknown'}`, now, resetAt);
+}
+
+function getReadableWordCount(value) {
+  return String(value || '').match(/[A-Za-z0-9][A-Za-z0-9'-]{1,}/g)?.length || 0;
+}
+
+function looksLikeRandomToken(value) {
+  const text = String(value || '').trim();
+  return text.length >= 12 && /^[A-Za-z]+$/.test(text) && /[a-z]/.test(text) && /[A-Z]/.test(text);
+}
+
+function hasValidPhoneLength(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length >= 10 && digits.length <= 13;
+}
+
+function looksLikeBotSubmission({ fullName, companyName, message }) {
+  if (getReadableWordCount(message) < 2) return true;
+
+  const randomTokenCount = [fullName, companyName, message].filter(looksLikeRandomToken).length;
+  return randomTokenCount >= 2;
+}
 
 export async function POST(request) {
+  let json = (body, init) => NextResponse.json(body, init);
+
   try {
     const csrf = validateCsrfOrigin(request);
     if (!csrf.valid) return csrf.response;
 
-    // Rate limit by IP
+    const device = getContactDevice(request);
+    json = (body, init) => createJsonResponse(body, init, device);
+
+    // Daily rate limit by IP and browser/device cookie.
     await connectDB();
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
         || request.headers.get('x-real-ip')
         || 'unknown';
     const now = new Date();
-    const rateKey = `contact:ip:${ip}`;
-    const ipRecord = await RateLimitModel.findOne({ key: rateKey, expiresAt: { $gt: now } }).lean();
-    if (ipRecord && ipRecord.count >= MAX_CONTACT_REQUESTS) {
-      return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 });
+    const resetAt = getNextIstMidnightUtc(now);
+    const ipLimit = await enforceContactDailyLimit('ip', ip, now, resetAt);
+    if (ipLimit.limited) {
+      return json(
+        { error: 'Too many contact form submissions today. Please try again tomorrow.' },
+        { status: 429, headers: { 'Retry-After': String(ipLimit.retryAfterSeconds) } }
+      );
     }
-    if (ipRecord) {
-      await RateLimitModel.updateOne({ key: rateKey }, { $inc: { count: 1 } });
-    } else {
-      await RateLimitModel.findOneAndUpdate(
-        { key: rateKey },
-        { count: 1, expiresAt: new Date(now.getTime() + CONTACT_WINDOW) },
-        { upsert: true }
+
+    const deviceLimit = await enforceContactDailyLimit('device', device.deviceId, now, resetAt);
+    if (deviceLimit.limited) {
+      return json(
+        { error: 'Too many contact form submissions from this device today. Please try again tomorrow.' },
+        { status: 429, headers: { 'Retry-After': String(deviceLimit.retryAfterSeconds) } }
       );
     }
 
     // Parse request body
     const body = await request.json();
-    let { fullName, email, phone, companyName, message } = body;
+    let { fullName, email, phone, companyName, message, website } = body;
+
+    // Honeypot field: real users never see or fill this.
+    if (typeof website === 'string' && website.trim()) {
+      return json(
+        { success: true, message: CONTACT_SUCCESS_MESSAGE },
+        { status: 200 }
+      );
+    }
 
     // Validate required fields
     if (!fullName || !email || !phone || !message) {
-      return NextResponse.json(
+      return json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
@@ -50,9 +178,17 @@ export async function POST(request) {
     try {
       email = validateEmail(email);
     } catch {
-      return NextResponse.json(
+      return json(
         { error: 'Invalid email format' },
         { status: 400 }
+      );
+    }
+
+    const emailLimit = await enforceContactDailyLimit('email', email, now, resetAt);
+    if (emailLimit.limited) {
+      return json(
+        { error: 'Too many contact form submissions for this email today. Please try again tomorrow.' },
+        { status: 429, headers: { 'Retry-After': String(emailLimit.retryAfterSeconds) } }
       );
     }
 
@@ -63,14 +199,27 @@ export async function POST(request) {
     message = sanitizeString(message, 5000);
 
     if (!fullName || !message) {
-      return NextResponse.json(
+      return json(
         { error: 'Name and message are required' },
         { status: 400 }
       );
     }
-    if (!phone) {
-      return NextResponse.json(
+    if (!phone || !hasValidPhoneLength(phone)) {
+      return json(
         { error: 'A valid phone number is required' },
+        { status: 400 }
+      );
+    }
+    const phoneLimit = await enforceContactDailyLimit('phone', phone.replace(/\D/g, ''), now, resetAt);
+    if (phoneLimit.limited) {
+      return json(
+        { error: 'Too many contact form submissions for this phone number today. Please try again tomorrow.' },
+        { status: 429, headers: { 'Retry-After': String(phoneLimit.retryAfterSeconds) } }
+      );
+    }
+    if (looksLikeBotSubmission({ fullName, companyName, message })) {
+      return json(
+        { error: 'Please enter a clear message with a few words.' },
         { status: 400 }
       );
     }
@@ -115,7 +264,7 @@ export async function POST(request) {
       if (!atLeastOneEmailSent) {
         // Both emails failed, but contact was saved
         console.error('Both emails failed to send');
-        return NextResponse.json(
+        return json(
           {
             success: true,
             message: 'Contact saved but email notifications failed. We will respond soon.',
@@ -127,10 +276,10 @@ export async function POST(request) {
       }
 
       // Return success response
-      return NextResponse.json(
+      return json(
         {
           success: true,
-          message: 'Thank you for contacting us! We will get back to you soon.',
+          message: CONTACT_SUCCESS_MESSAGE,
           contactId: contact._id,
           emailStatus: {
             userEmail: userEmailResult.status === 'fulfilled' ? 'sent' : 'failed',
@@ -143,7 +292,7 @@ export async function POST(request) {
     } catch (emailError) {
       // Email sending failed, but contact was saved
       console.error('Email error:', emailError);
-      return NextResponse.json(
+      return json(
         {
           success: true,
           message: 'Contact saved but email notifications failed. We will respond soon.',
@@ -160,14 +309,14 @@ export async function POST(request) {
     // Handle validation errors
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => err.message);
-      return NextResponse.json(
+      return json(
         { error: 'Validation failed', details: errors },
         { status: 400 }
       );
     }
 
     // Handle other errors
-    return NextResponse.json(
+    return json(
       { error: 'Failed to process contact form. Please try again later.' },
       { status: 500 }
     );

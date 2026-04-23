@@ -20,6 +20,7 @@ const ContactPage = () => {
       phone: "",
       message: "",
       companyName: "",
+      website: "",
     },
     mode: "onChange",
   })
@@ -138,6 +139,16 @@ const ContactPage = () => {
 
           {/* Contact Form */}
           <form className="mt-16 md:mt-20" id="contact-form" onSubmit={handleSubmit(onSubmit)} noValidate>
+            <div className="hidden" aria-hidden="true">
+              <label htmlFor="contact-website">Website</label>
+              <input
+                id="contact-website"
+                type="text"
+                tabIndex={-1}
+                autoComplete="off"
+                {...register("website")}
+              />
+            </div>
             <div className="grid md:grid-cols-2 gap-x-8 gap-y-10">
               {/* Your Name */}
               <div>
