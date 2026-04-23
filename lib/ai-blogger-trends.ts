@@ -659,6 +659,60 @@ function markTrendFirstEligibility(
     };
 }
 
+function getTrendFirstRescueFitFloor(minimumFitScore: number) {
+    return clampScore(Math.max(34, Math.min(46, minimumFitScore - 18)));
+}
+
+function getTrendFirstRescueScoreFloor(minimumTrendScore: number) {
+    return clampScore(Math.max(45, Math.min(88, minimumTrendScore - 10)));
+}
+
+function selectTrendFirstRescueCandidates(
+    trends: AIBloggerViralTrendSignal[],
+    input: {
+        minimumFitScore: number;
+        minimumTrendScore: number;
+    },
+) {
+    const minimumRescueFitScore = getTrendFirstRescueFitFloor(input.minimumFitScore);
+    const minimumRescueScore = getTrendFirstRescueScoreFloor(input.minimumTrendScore);
+
+    const rankedCandidates = trends
+        .filter((trend) => {
+            if (trend.acceptedForTrendFirst) {
+                return false;
+            }
+
+            if (trend.fitScore < minimumRescueFitScore) {
+                return false;
+            }
+
+            if (trend.score < minimumRescueScore) {
+                return false;
+            }
+
+            if (trend.active === false && (trend.searchVolume || 0) < 10_000) {
+                return false;
+            }
+
+            return true;
+        })
+        .sort((left, right) =>
+            right.fitScore - left.fitScore ||
+            right.score - left.score ||
+            right.viralScore - left.viralScore ||
+            (left.sourceRank || 9999) - (right.sourceRank || 9999) ||
+            left.topic.localeCompare(right.topic),
+        );
+
+    return {
+        candidate: rankedCandidates[0],
+        rankedCandidates,
+        minimumRescueFitScore,
+        minimumRescueScore,
+    };
+}
+
 async function fetchDeepTrendFirstSignals(input: {
     config: AIBloggerTrendsConfig;
     location: string;
@@ -973,6 +1027,8 @@ function buildLiveTrendSummary(
 
 export async function fetchAIBloggerTrendSignals(input: FetchTrendSignalsInput): Promise<AIBloggerTrendSignals> {
     const location = sanitizeLocation(input.location, input.config.defaultLocation || "us");
+    const minimumFitScore = getConfiguredNumber(input.config.minimumTrendFitScore, 55, 0, 80);
+    const minimumTrendScore = getConfiguredNumber(input.config.minimumTrendScore, 60, 0, 95);
     const sourceValueHint = input.sourceMode === "website" && looksLikeUrl(input.sourceValue)
         ? ""
         : input.sourceValue;
@@ -1003,20 +1059,63 @@ export async function fetchAIBloggerTrendSignals(input: FetchTrendSignalsInput):
 
         if (deepScan.viralTrends.length > 0) {
             const acceptedTrends = deepScan.viralTrends.filter((trend) => trend.acceptedForTrendFirst);
+            const rescueSelection = input.sourceMode === "website" && fitHints.length > 0 && acceptedTrends.length === 0
+                ? selectTrendFirstRescueCandidates(deepScan.viralTrends, {
+                    minimumFitScore,
+                    minimumTrendScore,
+                })
+                : {
+                    candidate: undefined,
+                    rankedCandidates: [] as AIBloggerViralTrendSignal[],
+                    minimumRescueFitScore: getTrendFirstRescueFitFloor(minimumFitScore),
+                    minimumRescueScore: getTrendFirstRescueScoreFloor(minimumTrendScore),
+                };
 
-            if (input.sourceMode === "website" && fitHints.length > 0 && acceptedTrends.length === 0) {
+            if (input.sourceMode === "website" && fitHints.length > 0 && acceptedTrends.length === 0 && !rescueSelection.candidate) {
+                const bestLiveMatch = [...deepScan.viralTrends].sort((left, right) =>
+                    right.fitScore - left.fitScore ||
+                    right.score - left.score ||
+                    right.viralScore - left.viralScore ||
+                    (left.sourceRank || 9999) - (right.sourceRank || 9999) ||
+                    left.topic.localeCompare(right.topic),
+                )[0];
+                const bestMatchDetails = bestLiveMatch
+                    ? ` Best live match was "${bestLiveMatch.topic}" (fit ${bestLiveMatch.fitScore}, score ${bestLiveMatch.score}, viral ${bestLiveMatch.viralScore}${bestLiveMatch.sourceRank ? `, rank #${bestLiveMatch.sourceRank}` : ""}).`
+                    : "";
+
                 throw new Error(
                     `Trend-first Google Trends scan found ${deepScan.viralTrends.length} live topic(s), ` +
-                    `but none met the configured site-fit threshold. Strict trend-first mode will not generate an unrelated blog.`,
+                    `but none met the configured site-fit threshold.${bestMatchDetails} Strict trend-first mode will not generate an unrelated blog.`,
                 );
             }
 
-            const orderedTrends = [
-                ...acceptedTrends,
-                ...deepScan.viralTrends.filter((trend) => !trend.acceptedForTrendFirst),
-            ].slice(0, 30);
-            const candidateTrendPool = acceptedTrends.length > 0 ? acceptedTrends : orderedTrends;
-            const selectedViralTrend = acceptedTrends[0] || orderedTrends[0];
+            const rescueTopicKey = rescueSelection.candidate ? sanitizeText(rescueSelection.candidate.topic, 140).toLowerCase() : "";
+            const rescueTopicKeys = new Set(
+                rescueSelection.rankedCandidates
+                    .map((trend) => sanitizeText(trend.topic, 140).toLowerCase())
+                    .filter(Boolean),
+            );
+            const orderedTrends = acceptedTrends.length > 0
+                ? [
+                    ...acceptedTrends,
+                    ...deepScan.viralTrends.filter((trend) => !trend.acceptedForTrendFirst),
+                ].slice(0, 30)
+                : rescueSelection.candidate
+                    ? [
+                        rescueSelection.candidate,
+                        ...rescueSelection.rankedCandidates.filter((trend) => sanitizeText(trend.topic, 140).toLowerCase() !== rescueTopicKey),
+                        ...deepScan.viralTrends.filter((trend) => {
+                            const topicKey = sanitizeText(trend.topic, 140).toLowerCase();
+                            return Boolean(topicKey) && !rescueTopicKeys.has(topicKey);
+                        }),
+                    ].slice(0, 30)
+                    : deepScan.viralTrends.slice(0, 30);
+            const candidateTrendPool = acceptedTrends.length > 0
+                ? acceptedTrends
+                : rescueSelection.rankedCandidates.length > 0
+                    ? rescueSelection.rankedCandidates
+                    : orderedTrends;
+            const selectedViralTrend = acceptedTrends[0] || rescueSelection.candidate || orderedTrends[0];
             const candidateTopics = sanitizeStringArray(
                 [
                     ...(selectedViralTrend ? [selectedViralTrend.topic] : []),

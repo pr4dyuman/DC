@@ -256,6 +256,63 @@ test("website trend-first rejects viral topics that do not meet site fit", async
     }
 });
 
+test("website trend-first can rescue a near-fit live topic without inventing a new topic", async () => {
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async () => {
+        return new Response(
+            JSON.stringify({
+                trending_searches: [
+                    {
+                        query: "irs extension form",
+                        active: true,
+                        search_volume: 900_000,
+                        increase_percentage: 1800,
+                        categories: [{ name: "Finance" }],
+                        trend_breakdown: ["file tax extension online", "tax deadline"],
+                    },
+                    {
+                        query: "brand voice governance",
+                        active: true,
+                        search_volume: 160_000,
+                        increase_percentage: 720,
+                        categories: [{ name: "Business" }, { name: "Technology" }],
+                        trend_breakdown: ["content approval systems", "quality review workflow"],
+                    },
+                ],
+            }),
+            {
+                status: 200,
+                headers: { "content-type": "application/json" },
+            },
+        );
+    }) as typeof fetch;
+
+    try {
+        const signals = await fetchAIBloggerTrendSignals({
+            config: {
+                ...trendsConfig,
+                maxTrendRequestsPerBlog: 1,
+            },
+            sourceMode: "website",
+            sourceValue: "https://example.com",
+            trendFocus: "",
+            primaryKeyword: "",
+            location: "us",
+            fallbackCandidates: ["brand voice insurance", "editorial guardrails", "digital production"],
+        });
+
+        assert.equal(signals.mode, "live-topics");
+        assert.equal(signals.selectedViralTrend?.topic, "brand voice governance");
+        assert.equal(signals.candidateTopics[0], "brand voice governance");
+        assert.equal(signals.scanStats?.acceptedCount, 0);
+        assert.ok((signals.selectedViralTrend?.fitScore || 0) < trendsConfig.minimumTrendFitScore);
+        assert.ok((signals.selectedViralTrend?.fitScore || 0) >= 34);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
 test("trend-first scan can select a lower-ranked website-matched trend", async () => {
     const originalFetch = globalThis.fetch;
     const requests: string[] = [];
