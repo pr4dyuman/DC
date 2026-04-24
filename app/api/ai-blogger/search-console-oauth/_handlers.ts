@@ -75,6 +75,14 @@ function isLocalhostOrigin(origin: string) {
     }
 }
 
+function getOrigin(value: string) {
+    try {
+        return new URL(value).origin;
+    } catch {
+        return null;
+    }
+}
+
 function getRequestOrigin(request: NextRequest) {
     const forwardedHost = request.headers.get("x-forwarded-host")?.trim();
     const forwardedProto = request.headers.get("x-forwarded-proto")?.trim();
@@ -97,6 +105,11 @@ function getGoogleOAuthRedirectUri(request: NextRequest) {
     // In local development, prefer the actual dev server origin so OAuth can
     // work against localhost without editing shared production env files.
     if (process.env.NODE_ENV !== "production" && isLocalhostOrigin(requestOrigin)) {
+        return dynamicRedirectUri;
+    }
+
+    const configuredOrigin = getOrigin(configuredRedirectUri);
+    if (!configuredOrigin || configuredOrigin !== requestOrigin) {
         return dynamicRedirectUri;
     }
 
