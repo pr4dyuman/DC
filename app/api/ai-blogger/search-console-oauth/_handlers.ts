@@ -83,20 +83,44 @@ function getOrigin(value: string) {
     }
 }
 
+function getFirstForwardedValue(value: string | null) {
+    return value?.split(",")[0]?.trim() || "";
+}
+
 function getRequestOrigin(request: NextRequest) {
-    const forwardedHost = request.headers.get("x-forwarded-host")?.trim();
-    const forwardedProto = request.headers.get("x-forwarded-proto")?.trim();
-    if (forwardedHost && forwardedProto) {
-        return `${forwardedProto}://${forwardedHost}`;
+    const forwardedHost = getFirstForwardedValue(request.headers.get("x-forwarded-host"));
+    const forwardedProto = getFirstForwardedValue(request.headers.get("x-forwarded-proto"));
+    const host = forwardedHost || request.nextUrl.host;
+
+    if (host) {
+        const fallbackProtocol = request.nextUrl.protocol.replace(/:$/, "") || "https";
+        const hostOrigin = `${forwardedProto || fallbackProtocol}://${host}`;
+        const protocol = isLocalhostOrigin(hostOrigin) ? (forwardedProto || fallbackProtocol) : "https";
+        return `${protocol}://${host}`;
     }
 
     return request.nextUrl.origin;
 }
 
+function getConfiguredRedirectUri() {
+    const explicitRedirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim();
+    if (explicitRedirectUri) {
+        return explicitRedirectUri;
+    }
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+    if (!appUrl) {
+        return "";
+    }
+
+    const appOrigin = getOrigin(appUrl);
+    return appOrigin ? `${appOrigin}${OAUTH_CALLBACK_PATH}` : "";
+}
+
 function getGoogleOAuthRedirectUri(request: NextRequest) {
     const requestOrigin = getRequestOrigin(request).replace(/\/+$/, "");
     const dynamicRedirectUri = `${requestOrigin}${OAUTH_CALLBACK_PATH}`;
-    const configuredRedirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim() || "";
+    const configuredRedirectUri = getConfiguredRedirectUri();
 
     if (!configuredRedirectUri) {
         return dynamicRedirectUri;
@@ -108,12 +132,27 @@ function getGoogleOAuthRedirectUri(request: NextRequest) {
         return dynamicRedirectUri;
     }
 
-    const configuredOrigin = getOrigin(configuredRedirectUri);
-    if (!configuredOrigin || configuredOrigin !== requestOrigin) {
+    if (!getOrigin(configuredRedirectUri)) {
         return dynamicRedirectUri;
     }
 
     return configuredRedirectUri;
+}
+
+function getOAuthDiagnostics(request: NextRequest) {
+    const configuredRedirectUri = getConfiguredRedirectUri();
+    const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() || "";
+
+    return {
+        callbackPath: OAUTH_CALLBACK_PATH,
+        computedRedirectUri: getGoogleOAuthRedirectUri(request),
+        configuredRedirectUri: configuredRedirectUri || null,
+        hasGoogleClientId: Boolean(googleClientId),
+        googleClientIdSuffix: googleClientId ? googleClientId.slice(-12) : null,
+        nextPublicAppUrl: process.env.NEXT_PUBLIC_APP_URL?.trim() || null,
+        nodeEnv: process.env.NODE_ENV,
+        requestOrigin: getRequestOrigin(request),
+    };
 }
 
 function clearCookie(response: NextResponse, name: string) {
@@ -188,6 +227,8 @@ export async function handleConnect(request: NextRequest) {
                 { status: 500 },
             );
         }
+
+        console.info("[OAuth Connect] Google Search Console redirect URI:", getOAuthDiagnostics(request));
 
         const state = crypto.randomUUID().replace(/-/g, "");
         const stateCookie: OAuthStateCookie = {
@@ -331,6 +372,23 @@ export async function handleCallback(request: NextRequest) {
     } catch (error) {
         console.error("[OAuth Callback] Error:", error);
         return buildRedirect(request, { error: "oauth_error" });
+    }
+}
+
+export async function handleDiagnostics(request: NextRequest) {
+    try {
+        const session = await requireOAuthUser();
+        if (!session) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        return NextResponse.json(getOAuthDiagnostics(request));
+    } catch (error) {
+        console.error("[OAuth Diagnostics] Error:", error);
+        return NextResponse.json(
+            { error: "Failed to load OAuth diagnostics" },
+            { status: 500 },
+        );
     }
 }
 
