@@ -3,6 +3,10 @@ import dbConnect from '@/lib/marketing-db';
 import Blog from '@/models/marketing/Blog';
 import BlogList from '@/components/marketing/BlogList';
 
+// This page depends on MongoDB, so render it at request time instead of
+// requiring a live database during Vercel's static prerender step.
+export const dynamic = 'force-dynamic';
+
 // Cache for 60 seconds
 export const revalidate = 60;
 

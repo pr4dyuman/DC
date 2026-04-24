@@ -15,6 +15,10 @@ import {
 } from "@/lib/marketing-blog-utils";
 import { notFound } from "next/navigation";
 
+// Blog detail pages depend on MongoDB and draft auth checks, so render them at
+// request time instead of during Vercel's static prerender step.
+export const dynamic = "force-dynamic";
+
 
 // ─── Server-safe HTML sanitizer ────────────────────────────────────────────────
 // isomorphic-dompurify is intentionally NOT used here — in Next.js 16 production,

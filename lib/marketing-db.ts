@@ -22,6 +22,27 @@ let lastConnectionFailureAt = 0;
 let lastConnectionFailureMessage = "";
 
 const MARKETING_DB_RETRY_COOLDOWN_MS = 15_000;
+const MARKETING_DB_CONNECT_DEADLINE_MS = 12_000;
+
+function withMarketingConnectionDeadline<T>(promise: Promise<T>): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const timeoutPromise = new Promise<T>((_, reject) => {
+        timer = setTimeout(() => {
+            const timeoutError = new Error(
+                `connection attempt timed out after ${MARKETING_DB_CONNECT_DEADLINE_MS}ms`
+            ) as Error & { code?: string };
+            timeoutError.code = "ETIMEOUT";
+            reject(timeoutError);
+        }, MARKETING_DB_CONNECT_DEADLINE_MS);
+    });
+
+    return Promise.race([promise, timeoutPromise]).finally(() => {
+        if (timer) {
+            clearTimeout(timer);
+        }
+    });
+}
 
 function getMarketingConnectionOptions(): mongoose.ConnectOptions {
     if (!MARKETING_DB_URI) {
@@ -58,8 +79,15 @@ function createMarketingConnectionHandle() {
     return mongoose.createConnection();
 }
 
-function createMarketingConnectionPromise(connection: mongoose.Connection): Promise<mongoose.Connection> {
-    const promise = connection.openUri(MARKETING_DB_URI!, getMarketingConnectionOptions()).then(() => {
+function createMarketingConnectionPromise(
+    connection: mongoose.Connection,
+    options: { startConnection: boolean } = { startConnection: true }
+): Promise<mongoose.Connection> {
+    const connectionAttempt = options.startConnection
+        ? connection.openUri(MARKETING_DB_URI!, getMarketingConnectionOptions())
+        : connection.asPromise();
+
+    const promise = withMarketingConnectionDeadline(connectionAttempt).then(() => {
         lastConnectionFailureAt = 0;
         lastConnectionFailureMessage = "";
         console.debug("[Marketing DB] Connected to marketing blog database");
@@ -82,27 +110,41 @@ function createMarketingConnectionPromise(connection: mongoose.Connection): Prom
     return promise;
 }
 
-function ensureMarketingConnectionStarted(): mongoose.Connection {
+function getOrCreateMarketingConnectionHandle(): mongoose.Connection {
     if (!cachedConnection) {
         cachedConnection = createMarketingConnectionHandle();
     }
 
-    if (cachedConnection.readyState === 2) {
-        if (!cachedConnectionPromise) {
-            cachedConnectionPromise = createMarketingConnectionPromise(cachedConnection);
-        }
-        return cachedConnection;
+    return cachedConnection;
+}
+
+function ensureMarketingConnectionStarted(): Promise<mongoose.Connection> {
+    let connection = getOrCreateMarketingConnectionHandle();
+
+    if (connection.readyState === 3) {
+        cachedConnection = createMarketingConnectionHandle();
+        cachedConnectionPromise = null;
+        connection = cachedConnection;
     }
 
-    if (cachedConnection.readyState === 1) {
-        return cachedConnection;
+    if (connection.readyState === 2) {
+        if (!cachedConnectionPromise) {
+            cachedConnectionPromise = createMarketingConnectionPromise(connection, {
+                startConnection: false,
+            });
+        }
+        return cachedConnectionPromise;
+    }
+
+    if (connection.readyState === 1) {
+        return Promise.resolve(connection);
     }
 
     if (!cachedConnectionPromise) {
-        cachedConnectionPromise = createMarketingConnectionPromise(cachedConnection);
+        cachedConnectionPromise = createMarketingConnectionPromise(connection);
     }
 
-    return cachedConnection;
+    return cachedConnectionPromise;
 }
 
 /**
@@ -111,11 +153,7 @@ function ensureMarketingConnectionStarted(): mongoose.Connection {
  * before a route explicitly awaits the connection.
  */
 export function getMarketingDbConnectionHandle(): mongoose.Connection {
-    if (!cachedConnection) {
-        cachedConnection = createMarketingConnectionHandle();
-    }
-
-    return cachedConnection;
+    return getOrCreateMarketingConnectionHandle();
 }
 
 /**
@@ -142,12 +180,7 @@ export default async function dbConnect(): Promise<mongoose.Connection> {
     }
 
     try {
-        if (!cachedConnectionPromise) {
-            const connection = ensureMarketingConnectionStarted();
-            cachedConnectionPromise = createMarketingConnectionPromise(connection);
-        }
-
-        cachedConnection = await cachedConnectionPromise;
+        cachedConnection = await ensureMarketingConnectionStarted();
         return cachedConnection;
     } catch (error) {
         throw error instanceof Error
