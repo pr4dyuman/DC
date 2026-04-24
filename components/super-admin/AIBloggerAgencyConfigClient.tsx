@@ -667,8 +667,29 @@ export default function AIBloggerAgencyConfigClient({ agencyId }: { agencyId: st
 
     if (loading) {
         return (
-            <div className="flex min-h-[420px] items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="mx-auto max-w-6xl space-y-6" aria-busy="true" aria-label="Loading agency AI Blogger configuration">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                    <div className="space-y-3">
+                        <div className="h-5 w-44 rounded-lg bg-muted" />
+                        <div className="flex items-start gap-3">
+                            <div className="h-12 w-12 rounded-xl bg-muted" />
+                            <div className="space-y-2">
+                                <div className="h-7 w-56 rounded-lg bg-muted" />
+                                <div className="h-4 w-80 max-w-full rounded-lg bg-muted" />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                        <div className="h-10 w-32 rounded-lg bg-muted" />
+                        <div className="h-10 w-36 rounded-lg bg-muted" />
+                    </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                    <div className="h-28 rounded-xl border border-border/60 bg-card" />
+                    <div className="h-28 rounded-xl border border-border/60 bg-card" />
+                    <div className="h-28 rounded-xl border border-border/60 bg-card" />
+                </div>
+                <div className="h-80 rounded-xl border border-border/60 bg-card" />
             </div>
         );
     }

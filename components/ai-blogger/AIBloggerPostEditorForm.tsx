@@ -414,7 +414,7 @@ export function AIBloggerPostEditorForm({
         <form onSubmit={handleSubmit} className="space-y-6">
             {/* Published post warning banner */}
             {isPublished && (
-                <div className="relative overflow-hidden rounded-[24px] border-2 border-amber-500/30 bg-amber-500/8 px-4 py-4">
+                <div className="relative overflow-hidden rounded-xl border-2 border-amber-500/30 bg-amber-500/8 px-4 py-4">
                     <div className="flex items-start gap-3">
                         <AlertCircle className="h-5 w-5 flex-shrink-0 text-amber-600 mt-0.5" />
                         <div>
@@ -459,7 +459,7 @@ export function AIBloggerPostEditorForm({
                                 />
                             </div>
                         </div>
-                        <div className="rounded-[24px] border border-border/60 bg-background/60 px-4 py-4">
+                        <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Live Word Count</p>
                             <p className="mt-3 text-2xl font-semibold">{liveWordCount || 0}</p>
                             <p className="mt-1 text-xs text-muted-foreground">Target: {settings.seo.minWords}–{settings.seo.maxWords}</p>
@@ -478,7 +478,7 @@ export function AIBloggerPostEditorForm({
                             id="ai-blogger-post-content"
                             value={content}
                             onChange={(event) => setContent(event.target.value)}
-                            className="min-h-[640px] rounded-[28px] border-border/60 bg-background/60 px-5 py-5 font-mono text-sm leading-7"
+                            className="min-h-[640px] rounded-xl border-border/60 bg-background/60 px-5 py-5 font-mono text-sm leading-7"
                             disabled={isPending || isPublished}
                         />
                         <div className="flex flex-wrap items-center gap-2 px-1 text-xs text-muted-foreground">
@@ -516,7 +516,7 @@ export function AIBloggerPostEditorForm({
                             id="ai-blogger-post-excerpt"
                             value={excerpt}
                             onChange={(event) => setExcerpt(event.target.value)}
-                            className="min-h-[100px] rounded-[24px] border-border/60 bg-background/60"
+                            className="min-h-[100px] rounded-xl border-border/60 bg-background/60"
                             disabled={isPending || isPublished}
                         />
                         <p className="px-1 text-xs text-muted-foreground">Used in queue previews and as a fallback meta description.</p>
@@ -531,7 +531,7 @@ export function AIBloggerPostEditorForm({
                                 value={tagsText}
                                 onChange={(event) => setTagsText(event.target.value)}
                                 placeholder="SEO, AI Blogging, Content Ops"
-                                className="min-h-[120px] rounded-[24px] border-border/60 bg-background/60"
+                                className="min-h-[120px] rounded-xl border-border/60 bg-background/60"
                                 disabled={isPending || isPublished}
                             />
                             <p className="px-1 text-xs text-muted-foreground">Separate tags with commas.</p>
@@ -543,7 +543,7 @@ export function AIBloggerPostEditorForm({
                                 value={outlineText}
                                 onChange={(event) => setOutlineText(event.target.value)}
                                 placeholder={"Intro\nProblem\nFramework\nExamples\nCTA"}
-                                className="min-h-[120px] rounded-[24px] border-border/60 bg-background/60"
+                                className="min-h-[120px] rounded-xl border-border/60 bg-background/60"
                                 disabled={isPending || isPublished}
                             />
                             <p className="px-1 text-xs text-muted-foreground">One line per section heading.</p>
@@ -594,7 +594,7 @@ export function AIBloggerPostEditorForm({
                             id="ai-blogger-post-meta-description"
                             value={metaDescription}
                             onChange={(event) => setMetaDescription(event.target.value)}
-                            className="min-h-[110px] rounded-[24px] border-border/60 bg-background/60"
+                            className="min-h-[110px] rounded-xl border-border/60 bg-background/60"
                             disabled={isPending || isPublished}
                         />
                         <div className="space-y-1.5 px-1">
@@ -647,7 +647,7 @@ export function AIBloggerPostEditorForm({
                     </div>
 
                     {/* Live SEO guidance */}
-                    <div className="rounded-[24px] border border-border/60 bg-background/50 p-4">
+                    <div className="rounded-xl border border-border/60 bg-background/50 p-4">
                         <div className="mb-4 flex items-center gap-2">
                             <Search className="h-4 w-4 text-primary" />
                             <h3 className="text-sm font-semibold">Live SEO Guidance</h3>
@@ -673,7 +673,7 @@ export function AIBloggerPostEditorForm({
                     </div>
 
                     {/* Internal link suggestions + accepted map */}
-                    <div className="rounded-[24px] border border-border/60 bg-background/50 p-4">
+                    <div className="rounded-xl border border-border/60 bg-background/50 p-4">
                         <div className="mb-4 flex items-center gap-2">
                             <Link2 className="h-4 w-4 text-primary" />
                             <h3 className="text-sm font-semibold">Internal Links</h3>
@@ -825,7 +825,7 @@ export function AIBloggerPostEditorForm({
             {activeTab === "assets" && (
                 <div className="space-y-6">
                     {/* Featured image */}
-                    <div className="rounded-[24px] border border-border/60 bg-background/50 p-4 sm:p-5">
+                    <div className="rounded-xl border border-border/60 bg-background/50 p-4 sm:p-5">
                         <input
                             ref={fileInputRef}
                             type="file"
@@ -896,7 +896,7 @@ export function AIBloggerPostEditorForm({
                     </div>
 
                     {/* AI image prompt */}
-                    <div className="rounded-[24px] border border-border/60 bg-background/50 p-4">
+                    <div className="rounded-xl border border-border/60 bg-background/50 p-4">
                         <p className="mb-3 text-xs uppercase tracking-[0.18em] text-muted-foreground">AI Image Prompt</p>
                         <p className="text-sm leading-6 text-muted-foreground">
                             {featuredImagePrompt || "No image prompt stored for this draft yet."}
@@ -904,7 +904,7 @@ export function AIBloggerPostEditorForm({
                     </div>
 
                     {/* Brief pack */}
-                    <div className="rounded-[24px] border border-border/60 bg-background/50 p-4">
+                    <div className="rounded-xl border border-border/60 bg-background/50 p-4">
                         <p className="mb-4 text-xs uppercase tracking-[0.18em] text-muted-foreground">Brief Pack</p>
                         {draftBrief ? (
                             <div className="space-y-3">
@@ -947,7 +947,7 @@ export function AIBloggerPostEditorForm({
                     </div>
 
                     {/* FAQ pack */}
-                    <div className="rounded-[24px] border border-border/60 bg-background/50 p-4">
+                    <div className="rounded-xl border border-border/60 bg-background/50 p-4">
                         <p className="mb-4 text-xs uppercase tracking-[0.18em] text-muted-foreground">FAQ Pack</p>
                         {faqItems.length > 0 ? (
                             <div className="space-y-4">
@@ -964,7 +964,7 @@ export function AIBloggerPostEditorForm({
                     </div>
 
                     {/* Grounded research */}
-                    <div className="rounded-[24px] border border-border/60 bg-background/50 p-4">
+                    <div className="rounded-xl border border-border/60 bg-background/50 p-4">
                         <div className="mb-4 flex items-center gap-2">
                             <Search className="h-4 w-4 text-primary" />
                             <h3 className="text-sm font-semibold">Grounded Research</h3>
@@ -1015,7 +1015,7 @@ export function AIBloggerPostEditorForm({
             {activeTab === "settings" && (
                 <div className="space-y-6">
                     {/* Publishing target */}
-                    <div className="rounded-[24px] border border-border/60 bg-background/50 p-4">
+                    <div className="rounded-xl border border-border/60 bg-background/50 p-4">
                         <p className="mb-4 text-xs uppercase tracking-[0.18em] text-muted-foreground">Publishing Target</p>
                         <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
@@ -1047,7 +1047,7 @@ export function AIBloggerPostEditorForm({
                     </div>
 
                     {/* Brief overrides — collapsible */}
-                    <div className="rounded-[24px] border border-border/60 bg-background/50">
+                    <div className="rounded-xl border border-border/60 bg-background/50">
                         <button
                             type="button"
                             onClick={() => setShowBriefOverrides((v) => !v)}
@@ -1088,7 +1088,7 @@ export function AIBloggerPostEditorForm({
                     </div>
 
                     {/* Content cluster */}
-                    <div className="rounded-[24px] border border-border/60 bg-background/50 p-4">
+                    <div className="rounded-xl border border-border/60 bg-background/50 p-4">
                         <p className="mb-4 text-xs uppercase tracking-[0.18em] text-muted-foreground">Content Cluster</p>
                         <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
@@ -1122,24 +1122,30 @@ export function AIBloggerPostEditorForm({
 
             {/* ═══════════════ SHARED FOOTER ═══════════════ */}
             {error ? (
-                <div className="rounded-[24px] border border-destructive/30 bg-destructive/5 px-4 py-4 text-sm text-destructive">
+                <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-4 text-sm text-destructive">
                     {error}
                 </div>
             ) : null}
 
-            <div className="flex flex-col gap-3 rounded-[24px] border border-border/60 bg-background/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/50 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm leading-6 text-muted-foreground">
                     {isPublished
-                        ? "Published posts are locked until edit-sync support is added."
+                        ? "Published posts are locked to protect the live version."
                         : "Save changes from any tab before advancing the workflow."}
                 </p>
-                <AIBloggerGradientButton type="submit" disabled={isPending || isPublished}>
-                    {isPending ? (
-                        <><Loader2 className="h-4 w-4 animate-spin" />Saving Changes</>
-                    ) : (
-                        <><Save className="h-4 w-4" />Save Changes</>
-                    )}
-                </AIBloggerGradientButton>
+                {isPublished ? (
+                    <div className="inline-flex h-11 items-center justify-center rounded-lg border border-border/60 bg-muted/40 px-4 text-sm font-medium text-muted-foreground">
+                        View-only published post
+                    </div>
+                ) : (
+                    <AIBloggerGradientButton type="submit" disabled={isPending}>
+                        {isPending ? (
+                            <><Loader2 className="h-4 w-4 animate-spin" />Saving Changes</>
+                        ) : (
+                            <><Save className="h-4 w-4" />Save Changes</>
+                        )}
+                    </AIBloggerGradientButton>
+                )}
             </div>
         </form>
     );

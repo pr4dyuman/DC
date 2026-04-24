@@ -73,7 +73,7 @@ export function PostFeaturedImageCard({
                 {featuredImageUrl ? (
                     <div className="space-y-4">
                         <div
-                            className="aspect-[16/9] rounded-[24px] border border-border/60 bg-cover bg-center bg-no-repeat"
+                            className="aspect-[16/9] rounded-xl border border-border/60 bg-cover bg-center bg-no-repeat"
                             style={{ backgroundImage: `url("${featuredImageUrl.replace(/"/g, "%22")}")` }}
                         />
                         <div className="flex flex-wrap items-center gap-2">
@@ -84,7 +84,7 @@ export function PostFeaturedImageCard({
                                 Alt ready
                             </Badge>
                         </div>
-                        <div className="rounded-[24px] border border-border/60 bg-background/60 px-4 py-4">
+                        <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                             <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                                 Alt Text
                             </p>
@@ -104,19 +104,19 @@ export function PostFeaturedImageCard({
                         {featuredImageMeta && (featuredImageMeta.width || featuredImageMeta.format || featuredImageMeta.fileSizeBytes) ? (
                             <div className="grid gap-3 sm:grid-cols-3">
                                 {featuredImageMeta.width && featuredImageMeta.height ? (
-                                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-3">
+                                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-3">
                                         <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Dimensions</p>
                                         <p className="mt-1.5 text-sm font-medium">{featuredImageMeta.width} × {featuredImageMeta.height}</p>
                                     </div>
                                 ) : null}
                                 {featuredImageMeta.format ? (
-                                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-3">
+                                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-3">
                                         <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Format</p>
                                         <p className="mt-1.5 text-sm font-medium uppercase">{featuredImageMeta.format}</p>
                                     </div>
                                 ) : null}
                                 {featuredImageMeta.fileSizeBytes ? (
-                                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-3">
+                                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-3">
                                         <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">File Size</p>
                                         <p className="mt-1.5 text-sm font-medium">{featuredImageMeta.fileSizeBytes > 1024 ? `${(featuredImageMeta.fileSizeBytes / 1024).toFixed(1)} KB` : `${featuredImageMeta.fileSizeBytes} B`}</p>
                                     </div>
@@ -132,7 +132,7 @@ export function PostFeaturedImageCard({
                                 {imageHistory.slice(0, 5).map((entry, index) => (
                                     <div
                                         key={`img-history-${index}`}
-                                        className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-3"
+                                        className="rounded-xl border border-border/60 bg-background/60 px-4 py-3"
                                     >
                                         <div className="flex flex-wrap items-center gap-2">
                                             <Badge variant="outline" className="rounded-full text-[10px]">
@@ -156,7 +156,7 @@ export function PostFeaturedImageCard({
                         ) : null}
                     </div>
                 ) : (
-                    <div className="rounded-[24px] border border-dashed border-border/60 bg-background/40 px-5 py-6 text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-5 py-6 text-sm text-muted-foreground">
                         This draft does not have a stored featured image yet. Upload one in the editor or generate it from the AI image prompt.
                     </div>
                 )}
@@ -237,7 +237,7 @@ export function PostSeoAuditCard({
                     </div>
                 </div>
 
-                <div className="rounded-[24px] border border-border/60 bg-background/60 px-4 py-4 text-sm text-muted-foreground">
+                <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4 text-sm text-muted-foreground">
                     <p>
                         Rule-based score for approval and publishing.
                         {aiEstimatedSeoScore !== null
@@ -250,7 +250,7 @@ export function PostSeoAuditCard({
                     </p>
                 </div>
 
-                <div className="rounded-[24px] border border-border/60 bg-background/60 px-4 py-4 text-sm text-muted-foreground">
+                <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4 text-sm text-muted-foreground">
                     {seoAudit.requiredChecksPassed
                         ? `All required SEO blockers are clear. ${seoAudit.counts.recommendedPassed}/${seoAudit.counts.recommendedTotal} recommended checks are already passing.`
                         : `${seoAudit.blockers.length} required blocker${seoAudit.blockers.length === 1 ? "" : "s"} still need attention before approval or scheduling.`}
@@ -287,7 +287,7 @@ export function PostSeoAuditCard({
                             {seoAudit.checks.filter(c => c.severity === "required" && !c.passed).map((check) => (
                                 <div
                                     key={check.key}
-                                    className="flex items-start justify-between gap-4 rounded-[22px] border border-amber-500/20 bg-amber-500/5 px-4 py-4"
+                                    className="flex items-start justify-between gap-4 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-4"
                                 >
                                     <div className="space-y-2">
                                         <div className="flex flex-wrap items-center gap-2">
@@ -319,7 +319,7 @@ export function PostSeoAuditCard({
                                 .map((check) => (
                                 <div
                                     key={check.key}
-                                    className={`flex items-start justify-between gap-4 rounded-[22px] border border-border/60 px-4 py-4 ${check.passed ? "bg-background/40" : "bg-background/60"}`}
+                                    className={`flex items-start justify-between gap-4 rounded-xl border border-border/60 px-4 py-4 ${check.passed ? "bg-background/40" : "bg-background/60"}`}
                                 >
                                     <div className="space-y-2">
                                         <div className="flex flex-wrap items-center gap-2">
@@ -377,7 +377,7 @@ export function PostBriefMetaCard({
                     {briefItems.map((item) => (
                         <div
                             key={item.label}
-                            className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4"
+                            className="rounded-xl border border-border/60 bg-background/60 px-4 py-4"
                         >
                             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
                                 {item.label}
@@ -387,7 +387,7 @@ export function PostBriefMetaCard({
                     ))}
                 </div>
 
-                <div className="rounded-[24px] border border-border/60 bg-background/60 px-4 py-4 text-sm leading-6 text-muted-foreground">
+                <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4 text-sm leading-6 text-muted-foreground">
                     {getBlogStudioPostStatusNote(status)}
                 </div>
             </div>
@@ -434,7 +434,7 @@ export function PostOutlineTagsCard({
                         outline.map((item, index) => (
                             <div
                                 key={`${postId}-outline-${index}`}
-                                className="flex gap-4 rounded-[22px] border border-border/60 bg-background/60 px-4 py-4"
+                                className="flex gap-4 rounded-xl border border-border/60 bg-background/60 px-4 py-4"
                             >
                                 <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/12 text-sm font-semibold text-primary">
                                     {index + 1}
@@ -443,7 +443,7 @@ export function PostOutlineTagsCard({
                             </div>
                         ))
                     ) : (
-                        <div className="rounded-[24px] border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
+                        <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
                             No outline has been stored for this draft yet.
                         </div>
                     )}
@@ -463,14 +463,14 @@ export function PostOutlineTagsCard({
                             ))}
                         </div>
                     ) : (
-                        <div className="rounded-[24px] border border-dashed border-border/60 bg-background/40 px-4 py-4 text-sm text-muted-foreground">
+                        <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-4 py-4 text-sm text-muted-foreground">
                             No tags have been attached to this draft yet.
                         </div>
                     )}
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
                             <Link2 className="h-3.5 w-3.5" />
                             Internal Links
@@ -479,7 +479,7 @@ export function PostOutlineTagsCard({
                             {internalLinksPresent ? "Present in body copy" : "Still missing"}
                         </p>
                     </div>
-                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
                             <FileText className="h-3.5 w-3.5" />
                             Word Range

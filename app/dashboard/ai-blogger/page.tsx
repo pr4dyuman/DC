@@ -19,10 +19,12 @@ import {
     AIBloggerGradientButton,
     AIBloggerMetricCard,
 } from "@/components/ai-blogger/AIBloggerPrimitives";
+import { AIBloggerDatabaseUnavailableState } from "@/components/ai-blogger/AIBloggerDatabaseUnavailableState";
 import { Badge } from "@/components/ui/badge";
 import { getBlogStudioOverviewImpl, getAggregatedSearchConsoleAnalyticsImpl } from "@/lib/actions/ai-blogger";
 import { aiBloggerPipelineSteps } from "@/lib/ai-blogger-content";
 import { getAIBloggerDashboardContext } from "@/lib/ai-blogger-dashboard";
+import { isMongoConnectionIssue } from "@/lib/mongodb-connection";
 import {
     formatBlogStudioDate,
     getBlogStudioPublishModeLabel,
@@ -53,58 +55,59 @@ function getRefreshUrgencyClasses(urgency: "critical" | "high" | "medium" | "low
 }
 
 export default async function AIBloggerOverviewPage() {
-    const { access, agency, currentUser } = await getAIBloggerDashboardContext();
+    try {
+        const { access, agency, currentUser } = await getAIBloggerDashboardContext();
 
-    if (!access.canAccess) {
-        return <AIBloggerLockedState access={access} />;
-    }
+        if (!access.canAccess) {
+            return <AIBloggerLockedState access={access} />;
+        }
 
-    const [overview, searchConsoleAnalytics] = await Promise.all([
-        getBlogStudioOverviewImpl(agency.id, agency.name),
-        getAggregatedSearchConsoleAnalyticsImpl(agency.id, 7),
-    ]);
-    const firstName = currentUser.name?.split(" ")[0] || "there";
+        const [overview, searchConsoleAnalytics] = await Promise.all([
+            getBlogStudioOverviewImpl(agency.id, agency.name),
+            getAggregatedSearchConsoleAnalyticsImpl(agency.id, 7),
+        ]);
+        const firstName = currentUser.name?.split(" ")[0] || "there";
 
-    const overviewMetrics = [
-        {
-            label: "Draft Queue",
-            value: overview.metrics.draftsInQueue,
-            note: "Drafts still moving through research, writing, and SEO review.",
-            icon: FilePenLine,
-            tone: "primary" as const,
-        },
-        {
-            label: "Ready To Review",
-            value: overview.metrics.readyToReview,
-            note: "Posts waiting for editorial approval before the next handoff.",
-            icon: Sparkles,
-            tone: "violet" as const,
-        },
-        {
-            label: "Active Schedules",
-            value: overview.metrics.scheduledRuns,
-            note: "Saved automation windows ready to create new drafts for your content plan.",
-            icon: CalendarClock,
-            tone: "blue" as const,
-        },
-        {
-            label: "Published Posts",
-            value: overview.metrics.publishedPosts,
-            note: "Approved posts that already made it through the AI Blogger flow.",
-            icon: CheckCircle2,
-            tone: "emerald" as const,
-        },
-        {
-            label: "Refresh Queue",
-            value: overview.metrics.refreshCandidates,
-            note: "Published posts with live performance signals that suggest a refresh.",
-            icon: TrendingUp,
-            tone: "blue" as const,
-        },
-    ];
+        const overviewMetrics = [
+            {
+                label: "Draft Queue",
+                value: overview.metrics.draftsInQueue,
+                note: "Drafts still moving through research, writing, and SEO review.",
+                icon: FilePenLine,
+                tone: "primary" as const,
+            },
+            {
+                label: "Ready To Review",
+                value: overview.metrics.readyToReview,
+                note: "Posts waiting for editorial approval before the next handoff.",
+                icon: Sparkles,
+                tone: "violet" as const,
+            },
+            {
+                label: "Active Schedules",
+                value: overview.metrics.scheduledRuns,
+                note: "Saved automation windows ready to create new drafts for your content plan.",
+                icon: CalendarClock,
+                tone: "blue" as const,
+            },
+            {
+                label: "Published Posts",
+                value: overview.metrics.publishedPosts,
+                note: "Approved posts that already made it through the AI Blogger flow.",
+                icon: CheckCircle2,
+                tone: "emerald" as const,
+            },
+            {
+                label: "Refresh Queue",
+                value: overview.metrics.refreshCandidates,
+                note: "Published posts with live performance signals that suggest a refresh.",
+                icon: TrendingUp,
+                tone: "blue" as const,
+            },
+        ];
 
-    return (
-        <>
+        return (
+            <>
             <div className="space-y-3">
                 <AIBloggerBreadcrumb items={[{ label: "AI Blogger" }, { label: "Overview" }]} />
                 <div className="space-y-2">
@@ -132,7 +135,7 @@ export default async function AIBloggerOverviewPage() {
 
             <AIBloggerPerformanceSyncCard syncStatus={overview.syncStatus} />
 
-            <SearchConsoleAnalyticsCard initialData={searchConsoleAnalytics} />
+            <SearchConsoleAnalyticsCard initialData={searchConsoleAnalytics} syncStatus={overview.syncStatus} />
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(320px,0.92fr)]">
                 <AIBloggerGlassCard className="p-6">
@@ -463,6 +466,18 @@ export default async function AIBloggerOverviewPage() {
                     </AIBloggerGlassCard>
                 </div>
             </div>
-        </>
-    );
+            </>
+        );
+    } catch (error) {
+        if (!isMongoConnectionIssue(error)) {
+            throw error;
+        }
+
+        return (
+            <AIBloggerDatabaseUnavailableState
+                retryHref="/dashboard/ai-blogger"
+                message="AI Blogger couldn't load the overview because MongoDB is temporarily unavailable."
+            />
+        );
+    }
 }

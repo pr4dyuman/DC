@@ -24,7 +24,7 @@ export function AIBloggerPerformanceBreakdownPanel({
     compact?: boolean;
 }) {
     return (
-        <div className="rounded-[24px] border border-border/60 bg-background/55 p-4">
+        <div className="rounded-xl border border-border/60 bg-background/55 p-4">
             <div className="flex items-center gap-2">
                 <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                     {icon}

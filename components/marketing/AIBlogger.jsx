@@ -59,7 +59,7 @@ const workflowSteps = [
     id: "04",
     title: "Queue For Publishing",
     description:
-      "Save as draft, schedule for later, or prepare the post for DC publishing once the full module is live.",
+      "Save as draft, schedule for later, or prepare the post for review and publishing from one workflow.",
   },
 ];
 
@@ -79,8 +79,6 @@ const useCases = [
 export default function AIBloggerSection() {
   return (
     <section className="relative overflow-hidden bg-black py-16 text-white sm:py-20 lg:py-24">
-      <div className="pointer-events-none absolute left-1/2 top-32 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-[#F5EE30]/10 blur-[140px]"></div>
-
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-6 flex items-center gap-3 sm:mb-8">
           <div className="h-2.5 w-2.5 rounded-sm bg-[#F5EE30]"></div>
@@ -103,10 +101,10 @@ export default function AIBloggerSection() {
             </h1>
 
             <p className="max-w-2xl text-base leading-relaxed text-gray-300 sm:text-lg lg:text-xl">
-              AI Blogger is the next DC service for planning, generating,
+              AI Blogger is the Digital Corvids workflow for planning, generating,
               optimizing, reviewing, and scheduling SEO-focused blog content in
-              one workflow. It is designed to support both Digital Corvids and
-              future agency clients from the same foundation.
+              one place. It supports the DC publishing system and client-ready
+              agency content operations from the same foundation.
             </p>
 
             <div className="flex flex-wrap gap-4 pt-2">
@@ -241,8 +239,7 @@ export default function AIBloggerSection() {
               <p className="text-sm leading-relaxed text-gray-300 sm:text-base">
                 The goal is not just to generate text. The goal is to give DC a
                 production-ready blog workflow that is easier to review, easier
-                to scale, and easier to sell as a service once the full module
-                is live.
+                to scale, and easier to deliver as a repeatable service.
               </p>
             </div>
 

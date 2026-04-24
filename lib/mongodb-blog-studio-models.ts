@@ -128,6 +128,8 @@ const BlogStudioGenerationScorecardSchema = new Schema(
         trendRelevance: { type: Number },
         keywordStrength: { type: Number },
         businessFit: { type: Number },
+        topicIntegrity: { type: Number },
+        websiteTopicAccepted: { type: Boolean },
     },
     { _id: false }
 );
@@ -469,7 +471,7 @@ const SearchConsoleOAuthSchema = new Schema(
         lastTokenRefreshAt: { type: Number },
         authStatus: {
             type: String,
-            enum: ["not-connected", "connected", "token-expired"],
+            enum: ["not-connected", "configured", "connected", "token-expired"],
             required: true,
             default: "not-connected",
         },

@@ -160,6 +160,8 @@ export type BlogStudioGenerationScorecard = {
     trendRelevance?: number;
     keywordStrength?: number;
     businessFit?: number;
+    topicIntegrity?: number;
+    websiteTopicAccepted?: boolean;
 };
 
 export type BlogStudioGenerationSourceUsage = {
@@ -519,7 +521,7 @@ export type BlogStudioSettings = {
         accessToken?: string;
         accessTokenExpiresAt?: number;
         lastTokenRefreshAt?: number;
-        authStatus: "not-connected" | "configured";
+        authStatus: "not-connected" | "configured" | "token-expired";
         authorizedAt?: string;
         oauthProvider: "google";
     };
@@ -710,7 +712,7 @@ export type BlogStudioPerformanceSyncRun = {
 export type BlogStudioPerformanceSyncStatus = {
     enabled: boolean;
     hasValidConfig: boolean;
-    authStatus: "not-connected" | "configured";
+    authStatus: "not-connected" | "configured" | "token-expired";
     propertyUrl: string;
     syncFrequencyHours: number;
     lookbackDays: number;

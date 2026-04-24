@@ -25,6 +25,7 @@ import type {
     BlogStudioPostStatus,
     BlogStudioPublishValidation,
     BlogStudioPublishingSettings,
+    BlogStudioSeoSettings,
     BlogStudioResolvedBlocker,
     BlogStudioSeoAudit,
     BlogStudioTargetType,
@@ -81,6 +82,7 @@ type AIBloggerPostStatusControlsProps = {
     audit?: BlogStudioSeoAudit;
     publishValidation?: BlogStudioPublishValidation;
     publishingSettings?: BlogStudioPublishingSettings;
+    seoSettings?: BlogStudioSeoSettings;
     blockerResolutionPreview?: BlogStudioBlockerResolutionPreview;
     compact?: boolean;
 };
@@ -138,7 +140,7 @@ function BlockerResolutionList({
                     : "border-primary/20 bg-primary/5";
 
     return (
-        <div className={`rounded-[22px] border px-4 py-3 ${toneClasses}`}>
+        <div className={`rounded-xl border px-4 py-3 ${toneClasses}`}>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{title}</p>
             <div className="mt-3 space-y-2">
                 {blockers.map((blocker) => (
@@ -171,6 +173,7 @@ export function AIBloggerPostStatusControls({
     audit,
     publishValidation,
     publishingSettings,
+    seoSettings,
     blockerResolutionPreview,
     compact = false,
 }: AIBloggerPostStatusControlsProps) {
@@ -190,10 +193,11 @@ export function AIBloggerPostStatusControls({
     );
 
     const workflowSettings = publishingSettings ? { publishing: publishingSettings } : undefined;
+    const workflowSeoSettings = seoSettings ? { seo: seoSettings } : undefined;
     const draftOnlyMode = isBlogStudioDraftOnlyMode(workflowSettings);
     const draftOnlyStopsWorkflow = draftOnlyMode && (status === "Approved" || status === "Scheduled");
-    const nextStatus = draftOnlyStopsWorkflow ? null : getNextBlogStudioPostStatus(status);
-    const actionLabel = draftOnlyStopsWorkflow ? null : getBlogStudioStatusTransitionLabel(status);
+    const nextStatus = draftOnlyStopsWorkflow ? null : getNextBlogStudioPostStatus(status, workflowSeoSettings);
+    const actionLabel = draftOnlyStopsWorkflow ? null : getBlogStudioStatusTransitionLabel(status, workflowSeoSettings);
     const autoScheduleEnabled = nextStatus === "Scheduled" && shouldBlogStudioAutoSchedule(workflowSettings);
     const needsScheduleInput = nextStatus === "Scheduled" && !autoScheduleEnabled;
     const publishesToWebhook = nextStatus === "Published" && targetType === "webhook";
@@ -585,7 +589,10 @@ export function AIBloggerPostStatusControls({
                         className="px-1 text-center text-xs font-medium uppercase tracking-[0.1em] text-amber-600"
                         title={`Blockers: ${readinessBlockers.slice(0, 3).join(", ")}${readinessBlockers.length > 3 ? "..." : ""}`}
                     >
-                        ⚠️ {readinessBlockers.length} blocker{readinessBlockers.length === 1 ? "" : "s"} • Complete SEO review below
+                        <span className="inline-flex items-center justify-center gap-1.5">
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            {readinessBlockers.length} blocker{readinessBlockers.length === 1 ? "" : "s"} | Complete SEO review below
+                        </span>
                     </div>
                 )}
             </div>
@@ -604,7 +611,7 @@ export function AIBloggerPostStatusControls({
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-[24px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Current Stage</p>
                         <div className="mt-3">
                             <Badge variant="outline" className="rounded-full">
@@ -612,7 +619,7 @@ export function AIBloggerPostStatusControls({
                             </Badge>
                         </div>
                     </div>
-                    <div className="rounded-[24px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Next Stage</p>
                         <div className="mt-3">
                             <Badge variant="outline" className="rounded-full">
@@ -628,19 +635,19 @@ export function AIBloggerPostStatusControls({
                     </div>
                 </div>
 
-                <div className="rounded-[24px] border border-border/60 bg-background/60 px-4 py-4 text-sm leading-6 text-muted-foreground">
+                <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4 text-sm leading-6 text-muted-foreground">
                     Publish target: <span className="font-medium text-foreground">{targetLabel}</span> via{" "}
                     {getBlogStudioTargetTypeLabel(targetType)}
                 </div>
 
                 {status === "Scheduled" && scheduledFor ? (
-                    <div className="rounded-[24px] border border-border/60 bg-background/60 px-4 py-4 text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4 text-sm text-muted-foreground">
                         Scheduled for {formatBlogStudioDate(scheduledFor, true)}
                     </div>
                 ) : null}
 
                 {status === "Published" && (publishedHref || deliveryStatus === "success") ? (
-                    <div className="rounded-[24px] border border-emerald-500/25 bg-emerald-500/8 px-4 py-4 text-sm text-emerald-600">
+                    <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/8 px-4 py-4 text-sm text-emerald-600">
                         Last webhook delivery succeeded.
                         {publishedHref ? (
                             <>
@@ -660,7 +667,7 @@ export function AIBloggerPostStatusControls({
                 ) : null}
 
                 {deliveryStatus === "failed" && deliveryError ? (
-                    <div className="rounded-[24px] border border-destructive/25 bg-destructive/5 px-4 py-4 text-sm text-destructive">
+                    <div className="rounded-xl border border-destructive/25 bg-destructive/5 px-4 py-4 text-sm text-destructive">
                         <div className="flex items-start gap-3">
                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                             <div>
@@ -693,13 +700,13 @@ export function AIBloggerPostStatusControls({
                 ) : null}
 
                 {error ? (
-                    <div className="rounded-[24px] border border-destructive/30 bg-destructive/5 px-4 py-4 text-sm text-destructive">
+                    <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-4 text-sm text-destructive">
                         {error}
                     </div>
                 ) : null}
 
                 {readinessBlockers.length > 0 ? (
-                    <div className="rounded-[24px] border border-amber-500/30 bg-amber-500/8 px-4 py-4 text-sm text-amber-700 dark:text-amber-300">
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 px-4 py-4 text-sm text-amber-700 dark:text-amber-300">
                         <p className="font-medium text-foreground">Approval blockers</p>
                         <p className="mt-2 leading-6">
                             {readinessBlockers.length === 1
@@ -710,7 +717,7 @@ export function AIBloggerPostStatusControls({
                 ) : null}
 
                 {!publishBlocked && wordRangeWarning ? (
-                    <div className="rounded-[24px] border border-amber-500/20 bg-amber-500/5 px-4 py-4 text-sm text-amber-700 dark:text-amber-300">
+                    <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-4 text-sm text-amber-700 dark:text-amber-300">
                         <p className="font-medium text-foreground">Non-blocking warning</p>
                         <p className="mt-2 leading-6">{wordRangeWarning.detail}</p>
                         <p className="mt-2 text-xs leading-5 text-muted-foreground">
@@ -723,14 +730,14 @@ export function AIBloggerPostStatusControls({
                     <div className="space-y-3">
                         {publishBlocked ? (
                             <>
-                                <div className="rounded-[24px] border border-destructive/30 bg-destructive/5 px-4 py-4 text-sm text-destructive">
+                                <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-4 text-sm text-destructive">
                                     <p className="font-medium text-foreground">Publish Blockers</p>
                                     <p className="mt-2 leading-6">{publishValidation.summary}</p>
                                 </div>
                                 {publishValidation.blockers.slice(0, 5).map((blocker, index) => (
                                     <div
                                         key={`publish-blocker-${index}`}
-                                        className="rounded-[22px] border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm"
+                                        className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm"
                                     >
                                         <div className="flex flex-wrap items-center gap-2">
                                             <Badge variant="outline" className="rounded-full border-destructive/30 text-[10px] uppercase tracking-[0.16em] text-destructive">
@@ -744,7 +751,7 @@ export function AIBloggerPostStatusControls({
                             </>
                         ) : null}
                         {publishWarnings.length > 0 ? (
-                            <div className="rounded-[24px] border border-amber-500/20 bg-amber-500/5 px-4 py-4 text-sm text-amber-700 dark:text-amber-300">
+                            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-4 text-sm text-amber-700 dark:text-amber-300">
                                 <p className="font-medium text-foreground">{publishWarnings.length} warning(s) to review</p>
                                 <p className="mt-2 leading-6">
                                     {publishWarnings.slice(0, 3).map((w) => w.message).join(". ")}
@@ -755,7 +762,7 @@ export function AIBloggerPostStatusControls({
                 ) : null}
 
                 {hasAiFixableBlockers ? (
-                    <div className="rounded-[24px] border border-primary/20 bg-primary/5 px-4 py-4 text-sm">
+                    <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-4 text-sm">
                         <div className="flex items-start gap-3">
                             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
                                 <Sparkles className="h-4 w-4" />
@@ -771,7 +778,7 @@ export function AIBloggerPostStatusControls({
                 ) : null}
 
                 {canRefreshGroundedResearch ? (
-                    <div className="rounded-[24px] border border-primary/20 bg-primary/5 px-4 py-4 text-sm">
+                    <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-4 text-sm">
                         <div className="flex items-start gap-3">
                             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
                                 <Sparkles className="h-4 w-4" />
@@ -787,7 +794,7 @@ export function AIBloggerPostStatusControls({
                 ) : null}
 
                 {canRetargetCannibalization ? (
-                    <div className="rounded-[24px] border border-primary/20 bg-primary/5 px-4 py-4 text-sm">
+                    <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-4 text-sm">
                         <div className="flex items-start gap-3">
                             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
                                 <Sparkles className="h-4 w-4" />
@@ -803,7 +810,7 @@ export function AIBloggerPostStatusControls({
                 ) : null}
 
                 {isResolvingBlockers ? (
-                    <div className="rounded-[24px] border border-primary/25 bg-primary/[0.06] px-4 py-4 text-sm">
+                    <div className="rounded-xl border border-primary/25 bg-primary/[0.06] px-4 py-4 text-sm">
                         <div className="flex items-start gap-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -822,7 +829,7 @@ export function AIBloggerPostStatusControls({
                 ) : null}
 
                 {isRefreshingGroundedResearch ? (
-                    <div className="rounded-[24px] border border-primary/25 bg-primary/[0.06] px-4 py-4 text-sm">
+                    <div className="rounded-xl border border-primary/25 bg-primary/[0.06] px-4 py-4 text-sm">
                         <div className="flex items-start gap-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -841,7 +848,7 @@ export function AIBloggerPostStatusControls({
                 ) : null}
 
                 {isRetargetingCannibalization ? (
-                    <div className="rounded-[24px] border border-primary/25 bg-primary/[0.06] px-4 py-4 text-sm">
+                    <div className="rounded-xl border border-primary/25 bg-primary/[0.06] px-4 py-4 text-sm">
                         <div className="flex items-start gap-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -875,7 +882,7 @@ export function AIBloggerPostStatusControls({
                 ) : null}
 
                 {needsHumanOrSystemFixesOnly ? (
-                    <div className="rounded-[24px] border border-border/60 bg-background/60 px-4 py-4 text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4 text-sm text-muted-foreground">
                         <p className="font-medium text-foreground">Remaining blockers need review outside AI</p>
                         <p className="mt-2 leading-6">
                             {blockerResolutionPreview?.humanRequiredCount || 0} need human review and {blockerResolutionPreview?.systemRequiredCount || 0} need settings or workflow changes.
@@ -970,7 +977,7 @@ export function AIBloggerPostStatusControls({
                     </div>
 
                     {blockerResolutionResult ? (
-                        <div className="w-full rounded-[24px] border border-primary/20 bg-primary/[0.04] px-4 py-4">
+                        <div className="w-full rounded-xl border border-primary/20 bg-primary/[0.04] px-4 py-4">
                             <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="min-w-0">
                                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">AI Blocker Resolver</p>

@@ -1,0 +1,601 @@
+AI BLOGGER PRODUCTION UI/UX REQUIRED CHANGES
+Date: 2026-04-25
+Project: DC AI Blogger
+
+VERDICT
+The AI Blogger UI is feature-rich, but it is not production-level yet.
+
+Current readiness estimate:
+- Agency AI Blogger dashboard: 6/10
+- Super-admin AI Blogger area: 4/10
+- Public AI Blogger service page: 7/10
+
+The product has many useful workflows, but the UI still feels like an internal build in several places. The biggest issues are unfinished super-admin pages, inconsistent layout density, too many nested rounded cards, placeholder-looking content, cramped mobile states, misleading cluster data, and text that exposes implementation decisions instead of speaking to users.
+
+
+IMPLEMENTATION UPDATE - 2026-04-25
+The first production UI/UX pass has been completed.
+
+Completed in this pass:
+- Removed internal super-admin wording such as "not implemented", "scope page", "What Is Missing", and "Phase Decision" from AI Blogger super-admin pages.
+- Hid unsupported super-admin Generate, Posts, and Settings workflow tabs from the super-admin AI Blogger nav while keeping direct routes polished and safe.
+- Fixed cluster analysis so posts without a matching pillar are counted as unclustered instead of appearing as fake "Unnamed Pillar" clusters.
+- Reworked the cluster page copy and empty states to show "Unclustered Posts" with clearer next steps.
+- Added readable labels and aria-current/aria-label support to the AI Blogger subnav.
+- Reduced the shared AI Blogger card radius and compacted metric cards for a more production dashboard feel.
+- Removed extra nested layout padding from the AI Blogger dashboard shell.
+- Improved posts cards by reducing badge clipping, removing decorative gradient placeholder thumbnails, using neutral no-image states, limiting package chips, and adding accessible labels for icon-only actions.
+- Added an actionable Search Console setup state to the dedicated Refresh Queue page.
+- Added an actionable Search Console/analytics setup state to the overview analytics card and removed a link to a missing analytics route.
+- Replaced "AI inferred" copy with "Will be inferred" in the generate workflow.
+- Replaced example-like placeholders such as "https://example.com" and "Highly recommended for SEO" in the generate workflow.
+- Reworked the generate pipeline summary from pipe-separated text into compact chips.
+- Removed mobile sticky behavior that was covering the generate form.
+- Completed a second Generate page layout pass: added a right-side create/summary panel on desktop, clarified the step order, aligned source/keyword/word-target controls, compacted the mobile pipeline preview, and made the AI/manual submit handler follow the selected mode.
+- Hid the misleading disabled "Save Changes" button for published posts and replaced it with a clear view-only state.
+- Replaced broken emoji/status characters with icon/text states in touched AI Blogger surfaces.
+- Replaced public AI Blogger marketing copy that sounded pre-launch with production service copy.
+- Added a skeleton loading state for the super-admin agency AI Blogger configuration page.
+
+Verification completed:
+- `npx tsc --noEmit` passes.
+- Targeted ESLint passes for the files changed in this pass.
+- Browser screenshots were captured for agency overview, generate, posts, refresh queue, clusters, settings, mobile posts, mobile generate, super-admin overview, super-admin generate, public marketing, and mobile marketing.
+- Updated Generate page desktop/mobile screenshots were captured after the second layout pass.
+- Source scan no longer finds the internal AI Blogger phrases listed above.
+- Source scan no longer finds the 22px, 24px, or 28px arbitrary rounded card classes in the AI Blogger component areas targeted by this pass.
+
+Known remaining notes:
+- Full repo `npm run lint` still fails because of pre-existing lint issues outside this UI pass and existing page-level try/catch JSX structure. The changed files pass targeted lint.
+- Posts are cleaner and no longer clip badges, but a future second pass can still convert the card grid into a true dense table/list mode for high-volume editorial operations.
+- The public marketing page still uses the existing AI Blogger illustration. A final launch-quality version should replace or supplement it with a real product screenshot or generated workflow preview.
+
+
+SCOPE CHECKED
+Agency AI Blogger pages:
+- /dashboard/ai-blogger
+- /dashboard/ai-blogger/generate
+- /dashboard/ai-blogger/posts
+- /dashboard/ai-blogger/posts/[slug]
+- /dashboard/ai-blogger/refresh-queue
+- /dashboard/ai-blogger/clusters
+- /dashboard/ai-blogger/settings
+
+Super-admin AI Blogger pages:
+- /super-admin/ai-blogger
+- /super-admin/ai-blogger/agency/[id]
+- /super-admin/ai-blogger/generate
+- /super-admin/ai-blogger/posts
+- /super-admin/ai-blogger/settings
+- /super-admin/ai-blogger/posts/[slug]
+
+Public page:
+- /services/ai-blogger
+
+Checked at:
+- Desktop viewport
+- Mobile viewport around 390px wide
+- Source-level component review
+- Local browser screenshots
+
+Note:
+- The local screenshots showed a dev-only Next.js rendering or compiling overlay. That should not count as a production UI defect, but it should be hidden before stakeholder screenshots or launch QA.
+
+
+P0 PRODUCTION BLOCKERS
+
+1. Super-admin AI Blogger pages expose internal scope text
+Problem:
+- Several super-admin pages say things like "not implemented", "future", "What Is Missing", "Phase Decision", "honest scope", "Queue not implemented", and similar internal planning language.
+- This is not acceptable in production. It makes the product look unfinished and exposes internal roadmap decisions.
+
+Affected areas:
+- /super-admin/ai-blogger/generate
+- /super-admin/ai-blogger/posts
+- /super-admin/ai-blogger/settings
+- /super-admin/ai-blogger/posts/[slug]
+
+Required changes:
+- Remove these nav items until the real workflows exist, or replace them with polished production empty states.
+- Do not show internal terms like "scope page", "future implementation", "phase decision", or "not implemented".
+- If a feature is not ready, use a clean message like: "This workspace is not available for this role yet."
+- Add a clear action: "Open agency workspace", "Select agency", or "View agency configuration".
+- Make the super-admin experience feel intentional, not unfinished.
+
+
+2. Cluster page data is visually and logically misleading
+Problem:
+- The page shows strong summary numbers such as total clusters, high coverage, or zero orphaned posts.
+- The actual cards then show repeated states like "Unnamed Pillar", "Orphaned", and "No cluster assigned".
+- This contradiction makes the page feel broken and damages trust.
+
+Affected area:
+- /dashboard/ai-blogger/clusters
+
+Required changes:
+- Fix the cluster analysis logic so summary metrics match the visible cards.
+- Do not display "Unnamed Pillar" as a final user-facing title.
+- Group truly unclustered posts into one clear "Unclustered posts" section.
+- Use real pillar names, cluster names, or topic group names wherever possible.
+- If no cluster exists, show one focused empty state with a CTA to assign or generate clusters.
+- Replace repeated orphan cards with a compact table or grouped list.
+
+
+3. Posts cards are too dense and visually noisy
+Problem:
+- Cards have too many chips, badges, labels, metadata rows, and decorative thumbnail blocks.
+- The placeholder gradient document image feels fake and not production-quality.
+- Status badges can clip or truncate, especially on smaller widths.
+- The scanning experience is hard because every card competes for attention.
+
+Affected area:
+- /dashboard/ai-blogger/posts
+
+Required changes:
+- Use a cleaner list or table-first layout for production content management.
+- Keep only the top 2 or 3 key signals visible by default: status, keyword, updated date/performance.
+- Move secondary metadata into a details panel, hover state, or expanded card.
+- Replace fake thumbnails with real featured images. If no image exists, use a small neutral icon state, not a large decorative placeholder.
+- Fix badge overflow and truncation.
+- Give titles more room and reduce visual competition from chips.
+- Make bulk actions clearer and easier to reach.
+- On mobile, use compact stacked rows instead of long card blocks.
+
+
+4. Generate page feels too heavy for first-use
+Problem:
+- The draft builder exposes too much configuration at once.
+- Placeholder text looks like real filled data because examples such as "https://example.com" and recommendation text are visually prominent.
+- The pipeline plan uses dense pipe-separated text and feels cramped.
+- The main action is far down the page on mobile.
+
+Affected area:
+- /dashboard/ai-blogger/generate
+
+Required changes:
+- Split the page into clearer steps: Brief, Target, Advanced, Generate.
+- Collapse advanced settings by default.
+- Lower placeholder contrast so examples do not look entered.
+- Replace pipe-separated pipeline text with chips or a vertical stepper.
+- Keep the primary generate action visible or sticky on mobile.
+- Add inline validation and a clear readiness state.
+- Reduce explanatory text inside cards. Use short labels and helpful tooltips.
+- Show a preview summary before generation.
+
+
+5. Overview dashboard is too long and repetitive
+Problem:
+- The dashboard uses large cards for many metrics and sections.
+- Inactive analytics and Search Console areas take too much space even when disabled or empty.
+- Recent drafts duplicate the posts workspace and use placeholder thumbnail visuals.
+- The page requires too much scrolling before the user understands the next best action.
+
+Affected area:
+- /dashboard/ai-blogger
+
+Required changes:
+- Convert the top area into a compact operations dashboard.
+- Use a small metrics strip instead of oversized cards.
+- Show one clear next action: generate draft, review posts, connect data, or refresh content.
+- Hide or collapse inactive analytics behind a setup state.
+- Replace repeated draft cards with a compact recent activity list.
+- Reduce card height and repeated explanatory text.
+- Make the dashboard feel like a command center, not a long report page.
+
+
+6. Post detail page is powerful but overwhelming
+Problem:
+- The post detail page has too many simultaneous panels, audit blocks, sidebar cards, and repeated checklist items.
+- A published or view-only state can still show a "Save Changes" action, which feels incorrect.
+- The editor content is visually dense and not comfortable for writing or reading.
+- The right sidebar tries to show everything at once.
+
+Affected area:
+- /dashboard/ai-blogger/posts/[slug]
+
+Required changes:
+- If the post is published or read-only, hide "Save Changes" or replace it with "Create editable version".
+- Create a clearer layout hierarchy: editor first, audit second, performance third.
+- Collapse long audit checklists by default.
+- Use summary cards for SEO/performance with drill-down details.
+- Improve editor typography for long content.
+- Keep destructive or publishing actions visually separated.
+- Make the sidebar sticky only if it remains readable and does not crowd content.
+- Add a strong status banner near the title: Draft, Review, Scheduled, Published, Needs refresh.
+
+
+7. Refresh Queue empty state is not actionable enough
+Problem:
+- The page can show zero candidates while filters, cards, and metrics remain visible.
+- If Search Console is disabled, the user sees empty data but does not get a strong setup path.
+
+Affected area:
+- /dashboard/ai-blogger/refresh-queue
+
+Required changes:
+- When Search Console is disabled or not configured, show a dedicated setup state first.
+- Hide candidate filters until data exists.
+- Explain clearly why there are no candidates.
+- Add CTA: "Connect Search Console", "Run sync", or "Configure performance source".
+- Show skeletons or progress if data is loading.
+- Keep the empty state compact and confident.
+
+
+8. Mobile navigation and mobile cards need major polish
+Problem:
+- AI Blogger subnav becomes icon-only on mobile.
+- Hidden text labels may not be enough for accessibility if links do not have proper aria labels.
+- Search, filter, and action controls become cramped.
+- Cards become very tall, especially posts and overview sections.
+
+Affected areas:
+- All AI Blogger dashboard pages on mobile
+
+Required changes:
+- Replace the mobile subnav with a labeled dropdown, bottom sheet, or segmented control.
+- Add aria-labels to icon-only links and buttons.
+- Make filters collapsible behind a single filter button.
+- Convert long cards into compact rows.
+- Keep the primary page action sticky or near the top.
+- Avoid two-column desktop assumptions leaking into mobile.
+- Ensure every button label fits without wrapping awkwardly.
+
+
+9. Visual system feels too decorative for an operations dashboard
+Problem:
+- Many cards use large 22px to 28px radii, nested glass effects, shadows, borders, gradients, and all-caps micro labels.
+- The UI reads more like a visual experiment than a production content operations tool.
+- There are too many card-inside-card structures.
+
+Affected areas:
+- Most AI Blogger dashboard components
+
+Required changes:
+- Standardize radius to 8px to 12px for operational panels.
+- Use larger radii only for modals or high-level marketing surfaces.
+- Reduce nested cards.
+- Use clean panels, tables, and lists for dense workflows.
+- Reduce decorative gradients and glass effects.
+- Use color mostly for status, hierarchy, and action.
+- Keep all-caps labels only for small metadata, not every section header.
+- Make spacing consistent across pages.
+
+
+10. Public AI Blogger service page still sounds pre-launch
+Problem:
+- Copy says or implies that the service is future-facing or not fully live.
+- The hero relies on a generic illustration instead of showing the actual product or output.
+- The page is visually stronger than the dashboard, but it does not yet prove the product experience.
+
+Affected area:
+- /services/ai-blogger
+
+Required changes:
+- Replace pre-launch language with confident production copy.
+- Show real AI Blogger dashboard screenshots, generated article examples, or workflow output.
+- Make the offer and outcome obvious in the first viewport.
+- Tighten the lower sections and remove any vague future wording.
+- Add proof: sample posts, workflow steps, content quality, publishing process, or client-ready result.
+
+
+ROUTE-BY-ROUTE REQUIRED CHANGES
+
+Agency overview: /dashboard/ai-blogger
+- Reduce top spacing and oversized dashboard cards.
+- Make the main CTA visually dominant.
+- Add a single "next best action" area.
+- Collapse inactive analytics and Search Console panels.
+- Remove repeated placeholder thumbnail blocks.
+- Make recent drafts a compact table/list.
+- Use more precise copy: avoid vague phrases like "AI inferred" unless the inference has already happened.
+- Add route-level skeletons for slow loading.
+- Ensure zero states always include a next step.
+- Reduce repeated explanatory text.
+
+
+Generate draft: /dashboard/ai-blogger/generate
+- Rework into a step-based flow.
+- Make required fields visually obvious.
+- Reduce default field noise.
+- Make placeholders lighter and shorter.
+- Avoid examples that look like actual saved values.
+- Move advanced settings behind a collapsible section.
+- Use tooltips for advanced SEO or automation settings.
+- Make the generate button sticky on long mobile forms.
+- Add a brief preview/summary before the final submit.
+- Replace pipeline text with a clear visual stepper.
+- Make error messages appear next to the exact field.
+- Add a clean success state after generation.
+
+
+Posts workspace: /dashboard/ai-blogger/posts
+- Prefer a table/list layout for production.
+- Keep cards optional for grid view, not the default dense admin view.
+- Reduce visible badges.
+- Fix badge clipping and truncation.
+- Use real thumbnails or a small neutral no-image state.
+- Make filters collapsible on mobile.
+- Make sort controls clearer.
+- Show empty state by status/filter, not only a generic no-results state.
+- Add bulk action confirmation states.
+- Keep titles, status, keyword, owner, and updated date scannable.
+- Remove visual clutter from repeated chips.
+
+
+Post detail/editor: /dashboard/ai-blogger/posts/[slug]
+- Fix read-only/published action behavior.
+- Improve editor reading width and typography.
+- Split editing, SEO audit, and performance into clearer tabs or panels.
+- Collapse advanced audits by default.
+- Move repeated checklist items into grouped accordions.
+- Add a clear publishing state at the top.
+- Use status color sparingly.
+- Make the primary action match the post state.
+- Ensure sidebar content does not overpower the editor.
+- Add save/dirty-state feedback.
+
+
+Refresh Queue: /dashboard/ai-blogger/refresh-queue
+- Prioritize Search Console setup state when data is unavailable.
+- Hide filters when there are no candidates.
+- Explain why the queue is empty.
+- Use a compact metric strip.
+- Add loading skeletons.
+- Separate "needs refresh", "watch list", and "recently refreshed" states.
+- Make candidate cards less tall.
+- Use real performance deltas only when reliable.
+
+
+Clusters: /dashboard/ai-blogger/clusters
+- Fix contradictory coverage/orphan logic.
+- Remove "Unnamed Pillar" from final UI.
+- Group unassigned posts clearly.
+- Use a compact cluster tree or table.
+- Show parent pillar, child topics, and post count in a scannable structure.
+- Add actions to assign, merge, rename, or regenerate clusters.
+- Use color only for health and priority.
+- Add an empty setup state if clustering has not been run.
+
+
+Settings: /dashboard/ai-blogger/settings
+- Ensure all tabs have consistent layout and save placement.
+- Add dirty-state detection.
+- Add inline validation.
+- Make connected/disconnected integrations visually clear.
+- Use one primary save action per tab.
+- Avoid long explanatory blocks inside every section.
+- Make automation settings feel safe with confirmations and clear defaults.
+- Make mobile tabs scrollable or use a select/dropdown.
+- Keep settings forms narrow enough for comfortable reading.
+
+
+Super-admin overview: /super-admin/ai-blogger
+- Clarify whether this is a global overview or agency selector.
+- Use production labels, not implementation terms.
+- Show cross-agency metrics only if they are real and actionable.
+- If metrics are unavailable, show setup or agency selection first.
+- Keep admin actions separate from agency content actions.
+- Check nav active states so only the current route receives primary emphasis.
+
+
+Super-admin agency page: /super-admin/ai-blogger/agency/[id]
+- Replace full-page spinner with a proper skeleton.
+- Prefetch or server-render the first meaningful agency configuration where possible.
+- Show selected agency identity clearly.
+- Add breadcrumbs or a clear return to agency list.
+- Keep global admin controls visually separate from agency settings.
+- Avoid making the page feel like a duplicate of agency settings unless that is intentional.
+
+
+Super-admin placeholder pages
+- Remove or hide unfinished pages from production navigation.
+- Do not show internal roadmap copy.
+- If the page remains, use polished access or availability states only.
+- Add a route-safe redirect to the correct agency-level workflow when needed.
+
+
+Public service page: /services/ai-blogger
+- Replace future-facing text with live-service language.
+- Add real product screenshots or generated output visuals.
+- Make pricing/contact/CTA behavior clear.
+- Reduce generic illustration reliance.
+- Tighten section spacing.
+- Show concrete results: article quality, SEO checks, refresh loop, publishing support.
+- Make the first viewport clearly about AI Blogger as a real service.
+
+
+TEXT AND COPY CHANGES
+
+Remove or replace these internal phrases:
+- "not implemented"
+- "future"
+- "future scope"
+- "scope page"
+- "honest scope"
+- "phase decision"
+- "config-first"
+- "old route behavior"
+- "redirect loop"
+- "Queue not implemented"
+- "What Is Missing"
+
+Replace placeholder-sounding labels:
+- "Unnamed Pillar" -> "Unclustered posts" or the actual pillar name.
+- "No cluster assigned" -> "Not assigned to a cluster yet" with action.
+- "No image" -> "Add featured image" or a small neutral image icon.
+- "AI inferred" -> "Will be inferred" before generation, or show the actual value after generation.
+
+Make terminology consistent:
+- Pick one label for the creation workflow: "Generate Draft" or "Create Draft".
+- Pick one label for content list: "Posts", "Content Queue", or "Articles".
+- Pick one label for refresh workflow: "Refresh Queue" or "Performance Refresh".
+- Use "Search Console" consistently, not mixed variations.
+- Use action verbs on buttons: "Generate", "Review", "Publish", "Connect", "Sync", "Refresh".
+
+Tone direction:
+- Production copy should be calm, confident, and short.
+- Avoid explaining the system architecture in UI text.
+- Avoid overusing AI language where the user cares about outcome.
+- Say what the user can do next.
+
+
+COLOR REQUIRED CHANGES
+
+Current issue:
+- The UI uses many tinted panels, gradients, colored badges, and decorative accents.
+- This makes the dashboard feel busy and reduces the meaning of status colors.
+
+Required changes:
+- Define a smaller status palette:
+  - Draft: neutral
+  - Review: blue
+  - Scheduled: purple or indigo
+  - Published: green
+  - Error/blocked: red
+  - Needs refresh: amber
+- Reserve strong color for status and primary action.
+- Make background panels mostly neutral.
+- Reduce gradient usage in dashboard pages.
+- Ensure contrast passes accessibility for small labels and muted text.
+- Avoid large one-color page themes.
+- Make disabled states visibly disabled but still readable.
+- Use consistent border colors across all cards and panels.
+
+
+SIZE, SPACING, AND CONTAINER REQUIRED CHANGES
+
+Current issue:
+- Boxes and cards are often too large for the amount of content inside them.
+- Some pages use nested padding from both dashboard layout and AI Blogger layout.
+- Many cards use large rounded corners that feel oversized for admin UI.
+
+Required changes:
+- Create one shared AI Blogger page shell for all dashboard routes.
+- Standardize page max width and horizontal padding.
+- Avoid double padding from nested layouts.
+- Use 8px to 12px radius for normal cards and panels.
+- Use 16px radius only for larger feature panels if necessary.
+- Reduce vertical spacing between related controls.
+- Increase spacing between unrelated sections.
+- Use stable widths for buttons and icon controls.
+- Ensure button text never clips.
+- Ensure badges do not overflow their containers.
+- Keep form fields aligned and grouped.
+- Use tables/lists where many repeated items exist.
+- Avoid nested card structures unless the inner card is a real repeated item.
+
+
+TYPOGRAPHY REQUIRED CHANGES
+
+Current issue:
+- Many sections use small uppercase labels and dense microcopy.
+- Editor content and dense cards are not always comfortable to read.
+- Some headings feel too large for compact admin panels.
+
+Required changes:
+- Use clear hierarchy: page title, section title, field label, helper text.
+- Keep helper text short.
+- Avoid all-caps labels for important information.
+- Increase readability for article/editor body content.
+- Reduce heading size inside compact cards.
+- Keep metadata text readable on mobile.
+- Do not rely on tiny text for important warnings or setup instructions.
+
+
+ACCESSIBILITY REQUIRED CHANGES
+
+Required changes:
+- Add aria-label to every icon-only link and button.
+- Do not rely only on title attributes for tooltips.
+- Ensure keyboard focus states are visible.
+- Make mobile navigation understandable to screen readers.
+- Connect form errors to fields with accessible descriptions.
+- Provide error summaries for long forms.
+- Ensure color is not the only status indicator.
+- Check contrast for muted text, badges, and disabled controls.
+- Ensure loading states announce meaningful progress where needed.
+- Ensure modal, dropdown, and tab interactions are keyboard accessible.
+
+
+EMPTY, LOADING, AND ERROR STATES
+
+Required changes:
+- Use route-specific skeletons instead of generic spinners.
+- Every empty state must answer:
+  - What happened?
+  - Why is this empty?
+  - What can I do next?
+- Search Console disabled state should lead to setup.
+- No posts state should lead to generate draft.
+- No clusters state should lead to generate or assign clusters.
+- No refresh candidates should explain the data requirement.
+- Super-admin unavailable states should be polished and role-aware.
+- Errors should be inline, recoverable, and written in user language.
+
+
+INTERACTION REQUIRED CHANGES
+
+Required changes:
+- Add sticky primary actions on long forms and mobile pages.
+- Add dirty-state handling for settings and editor forms.
+- Add confirmations for destructive actions and publishing actions.
+- Add clear success toasts after save, sync, generate, and publish.
+- Keep hover states subtle and consistent.
+- Avoid layout shifts when filters, badges, or loading text change.
+- Use accordions/tabs for secondary information.
+- Make bulk actions visible only when items are selected.
+
+
+PERFORMANCE AND PERCEIVED SPEED
+
+Current issue:
+- The post detail route can feel slow or heavy because it loads many supporting data sources.
+- Some client-loaded admin pages show a plain spinner before meaningful content.
+
+Required changes:
+- Add progressive skeletons.
+- Defer heavy SEO, SERP, and performance panels until the editor shell is visible.
+- Cache or prefetch supporting data where appropriate.
+- Keep first meaningful paint focused on the page title, status, and primary content.
+- Avoid blocking the whole page for secondary audit data.
+- Profile post detail loading.
+
+
+RECOMMENDED IMPLEMENTATION ORDER
+
+P0:
+1. Hide or rewrite unfinished super-admin scope pages.
+2. Fix cluster summary and orphan/unnamed pillar logic.
+3. Redesign posts cards/list to remove clipping and reduce visual noise.
+4. Fix mobile navigation labels and aria labels.
+5. Replace Search Console disabled/empty states with setup CTAs.
+6. Fix post detail read-only or published action behavior.
+
+P1:
+1. Create a shared AI Blogger page shell.
+2. Standardize card radius, spacing, colors, and typography.
+3. Rework generate page into a step-based flow.
+4. Compact the overview dashboard.
+5. Add route-specific loading skeletons.
+6. Improve settings validation, dirty state, and save placement.
+
+P2:
+1. Add real thumbnails or product-generated visuals.
+2. Polish marketing page with real screenshots and production copy.
+3. Refine animations, hover states, and micro-interactions.
+4. Add stronger keyboard and screen reader QA.
+5. Add visual regression screenshots for desktop and mobile.
+
+
+FINAL PRODUCTION STANDARD
+Before calling AI Blogger production-ready, each page should pass this checklist:
+- No internal roadmap or implementation copy is visible.
+- Every empty state has a clear next action.
+- Mobile navigation is labeled and accessible.
+- Cards, buttons, badges, and form fields do not clip or overflow.
+- Repeated content is shown in compact lists or tables.
+- Colors communicate status instead of decoration.
+- Containers use consistent radius, padding, and max widths.
+- The primary action on every page is obvious.
+- Loading states show the page structure, not just a spinner.
+- The product feels like a reliable content operations tool, not a demo.

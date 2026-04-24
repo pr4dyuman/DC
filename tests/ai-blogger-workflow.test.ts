@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { shouldTreatBlogStudioStatusTransitionAsNoop } from "../lib/ai-blogger-workflow";
+import {
+    canTransitionBlogStudioStatus,
+    getBlogStudioStatusTransitionLabel,
+    getNextBlogStudioPostStatus,
+    shouldTreatBlogStudioStatusTransitionAsNoop,
+} from "../lib/ai-blogger-workflow";
 
 test("treats stale same-status requests as workflow sync no-ops", () => {
     assert.equal(
@@ -29,4 +34,13 @@ test("does not swallow exact same-status requests without a stale hint", () => {
         shouldTreatBlogStudioStatusTransitionAsNoop("SEO Review", "SEO Review", "SEO Review"),
         false,
     );
+});
+
+test("skips SEO Review workflow step when SEO review is optional", () => {
+    const settings = { seo: { requireSeoReview: false } };
+
+    assert.equal(getNextBlogStudioPostStatus("Research", settings), "Approved");
+    assert.equal(getBlogStudioStatusTransitionLabel("Research", settings), "Approve Draft");
+    assert.equal(canTransitionBlogStudioStatus("Research", "Approved", settings), true);
+    assert.equal(canTransitionBlogStudioStatus("Research", "SEO Review", settings), false);
 });

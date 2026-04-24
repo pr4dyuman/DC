@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { AgencyModel, UserModel, ClientModel, SuperAdminModel, connectDB } from "./mongodb";
 import { Agency } from "./types";
 import { getSessionUser } from "./auth";
+import { isMongoConnectionIssue } from "./mongodb-connection";
 
 // Serialize Mongoose lean objects to plain JS objects (strips ObjectId, __v, etc.)
 function serialize<T>(doc: T): T {
@@ -76,6 +77,9 @@ export const getCurrentAgency = cache(async (): Promise<Agency | null> => {
         return null;
 
     } catch (error) {
+        if (isMongoConnectionIssue(error)) {
+            throw error;
+        }
         console.error('Error getting current agency:', error);
         return null;
     }
@@ -92,6 +96,9 @@ export async function getAgencyById(agencyId: string): Promise<Agency | null> {
         const agency = await AgencyModel.findOne({ id: agencyId }).lean();
         return serialize(agency) as Agency | null;
     } catch (error) {
+        if (isMongoConnectionIssue(error)) {
+            throw error;
+        }
         console.error('Error getting agency by ID:', error);
         return null;
     }
@@ -108,6 +115,9 @@ export async function getAgencyBySlug(slug: string): Promise<Agency | null> {
         const agency = await AgencyModel.findOne({ slug }).lean();
         return serialize(agency) as Agency | null;
     } catch (error) {
+        if (isMongoConnectionIssue(error)) {
+            throw error;
+        }
         console.error('Error getting agency by slug:', error);
         return null;
     }

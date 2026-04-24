@@ -19,7 +19,7 @@ export function AIBloggerGlassCard({
     return (
         <div
             className={cn(
-                "relative overflow-hidden rounded-[24px] border border-border/60 bg-card text-card-foreground",
+                "relative overflow-hidden rounded-xl border border-border/60 bg-card text-card-foreground",
                 "shadow-sm",
                 hover && "transition-all duration-300 hover:border-primary/25 hover:shadow-md",
                 glow && "border-primary/30 ring-1 ring-primary/10",
@@ -88,7 +88,7 @@ export function AIBloggerSectionEyebrow({
     return (
         <div
             className={cn(
-                "inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary",
+                "inline-flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary",
                 className
             )}
         >
@@ -120,16 +120,16 @@ export function AIBloggerMetricCard({
     tone = "primary",
 }: AIBloggerMetricCardProps) {
     return (
-        <AIBloggerGlassCard className="p-5 sm:p-6">
+        <AIBloggerGlassCard className="p-4 sm:p-5">
             <div className="flex items-start justify-between gap-4">
                 <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
-                    <p className="font-mono text-3xl font-bold tracking-tight sm:text-4xl">{value}</p>
-                    <p className="max-w-xs text-sm leading-6 text-muted-foreground">{note}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+                    <p className="font-mono text-2xl font-bold tracking-tight sm:text-3xl">{value}</p>
+                    <p className="max-w-xs text-xs leading-5 text-muted-foreground sm:text-sm">{note}</p>
                 </div>
                 <div
                     className={cn(
-                        "flex h-12 w-12 items-center justify-center rounded-2xl border transition-transform duration-300",
+                        "flex h-10 w-10 items-center justify-center rounded-xl border transition-transform duration-300",
                         metricToneMap[tone]
                     )}
                 >

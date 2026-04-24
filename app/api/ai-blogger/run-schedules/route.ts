@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { runDueBlogStudioSchedulesImpl } from "@/lib/actions/ai-blogger";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 function getScheduleRunnerSecret() {
     return process.env.AI_BLOGGER_SCHEDULE_SECRET || process.env.CRON_SECRET || "";
@@ -51,9 +51,9 @@ async function handleScheduleRun(request: Request) {
         }
 
         const url = new URL(request.url);
-        const limitParam = Number.parseInt(url.searchParams.get("limit") || "10", 10);
+        const limitParam = Number.parseInt(url.searchParams.get("limit") || "1", 10);
 
-        // Validate and bound the limit parameter (must be 1-100)
+        // Validate and bound the limit parameter. Each schedule can run a full generation.
         if (!Number.isFinite(limitParam) || limitParam < 1) {
             return NextResponse.json(
                 {
@@ -63,7 +63,7 @@ async function handleScheduleRun(request: Request) {
                 { status: 400 },
             );
         }
-        const limit = Math.min(limitParam, 100); // Cap at 100 to prevent DOS
+        const limit = Math.min(limitParam, 3);
 
         const result = await runDueBlogStudioSchedulesImpl(limit);
 

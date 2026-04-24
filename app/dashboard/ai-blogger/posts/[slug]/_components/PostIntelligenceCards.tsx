@@ -95,7 +95,7 @@ export function PostGenerationStrategyCard({
                             ) : null}
                         </div>
 
-                        <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                        <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                             <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                                 Trend Discovery Notes
                             </p>
@@ -111,7 +111,7 @@ export function PostGenerationStrategyCard({
                                 { label: "Keyword Strength", value: scorecard?.keywordStrength, icon: Search },
                                 { label: "Business Fit", value: scorecard?.businessFit, icon: BarChart3 },
                             ].map((item) => (
-                                <div key={item.label} className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                                <div key={item.label} className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                     <div className="flex items-center justify-between gap-3">
                                         <div>
                                             <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
@@ -130,7 +130,7 @@ export function PostGenerationStrategyCard({
                             ))}
                         </div>
 
-                        <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                        <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                             <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                                 Data Sources Used
                             </p>
@@ -148,7 +148,7 @@ export function PostGenerationStrategyCard({
                         </div>
                     </div>
                 ) : (
-                    <div className="rounded-[24px] border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
                         No stored topic-strategy diagnostics are available for this draft yet.
                     </div>
                 )}
@@ -195,7 +195,7 @@ export function PostWebsiteIntelligenceCard({
                             </Badge>
                         </div>
 
-                        <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                        <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                             <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                                 Crawl Summary
                             </p>
@@ -205,7 +205,7 @@ export function PostWebsiteIntelligenceCard({
                         </div>
 
                         <div className="grid gap-3 md:grid-cols-2">
-                            <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                            <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                 <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                                     Priority Paths
                                 </p>
@@ -220,7 +220,7 @@ export function PostWebsiteIntelligenceCard({
                                 </div>
                             </div>
 
-                            <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                            <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                 <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                                     Topic Hints
                                 </p>
@@ -237,7 +237,7 @@ export function PostWebsiteIntelligenceCard({
                         </div>
 
                         <div className="grid gap-3 md:grid-cols-2">
-                            <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                            <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                 <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                                     Page Titles
                                 </p>
@@ -252,7 +252,7 @@ export function PostWebsiteIntelligenceCard({
                                 </div>
                             </div>
 
-                            <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                            <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                 <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                                     FAQ Signals
                                 </p>
@@ -269,7 +269,7 @@ export function PostWebsiteIntelligenceCard({
                         </div>
                     </div>
                 ) : (
-                    <div className="rounded-[24px] border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
                         {sourceMode === "website"
                             ? "No website intelligence snapshot is available for this draft yet."
                             : "This draft did not start from website mode, so there is no crawl snapshot to show."}
@@ -321,7 +321,7 @@ export function PostSerpSnapshotCard({
                             </Badge>
                         </div>
 
-                        <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                        <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                             <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                                 SERP Summary
                             </p>
@@ -331,7 +331,7 @@ export function PostSerpSnapshotCard({
                         </div>
 
                         <div className="grid gap-3 md:grid-cols-2">
-                            <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                            <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                 <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                                     Competitor Domains
                                 </p>
@@ -346,7 +346,7 @@ export function PostSerpSnapshotCard({
                                 </div>
                             </div>
 
-                            <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                            <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                 <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                                     Featured Snippet Style
                                 </p>
@@ -357,7 +357,7 @@ export function PostSerpSnapshotCard({
                         </div>
 
                         <div className="grid gap-3 md:grid-cols-2">
-                            <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                            <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                 <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                                     People Also Ask
                                 </p>
@@ -372,7 +372,7 @@ export function PostSerpSnapshotCard({
                                 </div>
                             </div>
 
-                            <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                            <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                 <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                                     Content Gaps
                                 </p>
@@ -388,7 +388,7 @@ export function PostSerpSnapshotCard({
                             </div>
                         </div>
 
-                        <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                        <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                             <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                                 Top Ranking Pages
                             </p>
@@ -414,7 +414,7 @@ export function PostSerpSnapshotCard({
                         </div>
                     </div>
                 ) : (
-                    <div className="rounded-[24px] border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
                         {serpEnabled === false
                             ? "SERP analysis is disabled in AI Blogger admin for this workspace."
                             : "No SERP snapshot is available for this draft yet."}

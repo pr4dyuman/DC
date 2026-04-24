@@ -153,7 +153,10 @@ async function executeWorkerPhase(
             : null;
 
     if (!executionRequest) {
-        console.warn(`[WORKER] Worker request context is missing for job ${jobId}.`);
+        const message = `Worker request context is missing for job ${jobId}.`;
+        console.warn(`[WORKER] ${message}`);
+        await emitPipelineEvent(jobId, { type: "error", message });
+        await awaitPipelineJobPersistence(jobId);
         return;
     }
 
@@ -178,13 +181,14 @@ async function executeWorkerPhase(
 
             const message = await readDispatchFailureMessage(`${nextPhase} phase dispatch`, response);
             console.warn(`[WORKER] ${message}`);
-            if (response.status < 500) {
-                await emitPipelineEvent(jobId, { type: "error", message });
-                await awaitPipelineJobPersistence(jobId);
-            }
+            await emitPipelineEvent(jobId, { type: "error", message });
+            await awaitPipelineJobPersistence(jobId);
         } catch (dispatchError) {
             const message = dispatchError instanceof Error ? dispatchError.message : "Unknown dispatch error";
-            console.warn(`[WORKER] ${nextPhase} phase dispatch warning for job ${jobId}: ${message}`);
+            const fullMessage = `${nextPhase} phase dispatch failed for job ${jobId}: ${message}`;
+            console.warn(`[WORKER] ${fullMessage}`);
+            await emitPipelineEvent(jobId, { type: "error", message: fullMessage });
+            await awaitPipelineJobPersistence(jobId);
         }
     };
 

@@ -17,6 +17,7 @@ import type {
     BlogStudioPostStatus,
     BlogStudioPublishValidation,
     BlogStudioPublishingSettings,
+    BlogStudioSeoSettings,
     BlogStudioSeoAudit,
     BlogStudioTargetType,
     BlogStudioWebhookStatus,
@@ -27,6 +28,7 @@ function getNextActionHint(
     blockersCount: number,
     isReady: boolean,
     publishingSettings?: BlogStudioPublishingSettings,
+    seoSettings?: BlogStudioSeoSettings,
 ): { tone: "amber" | "emerald" | "info"; message: string } {
     const workflowSettings = publishingSettings ? { publishing: publishingSettings } : undefined;
 
@@ -62,6 +64,10 @@ function getNextActionHint(
         return { tone: "emerald", message: "All SEO checks passed. Ready to move to Approved." };
     }
 
+    if (status === "Research" && seoSettings?.requireSeoReview === false) {
+        return { tone: "info", message: "SEO review is optional here. Confirm readiness, then approve the draft." };
+    }
+
     if (status === "Research" || status === "Draft") {
         return { tone: "info", message: "Write or refine the content, then run an SEO review." };
     }
@@ -83,6 +89,7 @@ export function PostCommandPanel({
     audit,
     publishValidation,
     publishingSettings,
+    seoSettings,
     blockerResolutionPreview,
     auditScore,
     blockersCount,
@@ -102,6 +109,7 @@ export function PostCommandPanel({
     audit?: BlogStudioSeoAudit;
     publishValidation?: BlogStudioPublishValidation;
     publishingSettings?: BlogStudioPublishingSettings;
+    seoSettings?: BlogStudioSeoSettings;
     blockerResolutionPreview?: BlogStudioBlockerResolutionPreview;
     auditScore: number;
     blockersCount: number;
@@ -109,7 +117,7 @@ export function PostCommandPanel({
     topSuggestions: string[];
 }) {
     const scoreTone = getBlogStudioSeoScoreTone(auditScore);
-    const nextAction = getNextActionHint(status, blockersCount, isReady, publishingSettings);
+    const nextAction = getNextActionHint(status, blockersCount, isReady, publishingSettings, seoSettings);
 
     return (
         <div className="space-y-4">
@@ -161,6 +169,7 @@ export function PostCommandPanel({
                 audit={audit}
                 publishValidation={publishValidation}
                 publishingSettings={publishingSettings}
+                seoSettings={seoSettings}
                 blockerResolutionPreview={blockerResolutionPreview}
             />
 

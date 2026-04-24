@@ -91,6 +91,24 @@ function getPeopleAlsoAskQuestions(blog) {
   return normalizeQuestionList(blog?.peopleAlsoAsk);
 }
 
+function getExternalSourceHref(source) {
+  const rawUrl = typeof source?.url === "string" ? source.url.trim() : "";
+  if (!rawUrl) {
+    return "";
+  }
+
+  try {
+    const parsed = new URL(rawUrl);
+    return ["http:", "https:"].includes(parsed.protocol) ? parsed.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+function contentHasReferenceSection(htmlContent = "") {
+  return /<h[2-3][^>]*>\s*(?:sources?|references)\s*<\/h[2-3]>/i.test(htmlContent);
+}
+
 function buildEmergencyDescription(blog) {
   const plainText = stripHtml(blog.content || "");
   if (!plainText) {
@@ -192,6 +210,29 @@ function serializeJsonLd(value) {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
+function preferBlogPostingSchemaType(value) {
+  if (Array.isArray(value)) {
+    return value.map(preferBlogPostingSchemaType);
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const type = value["@type"];
+  const normalizedType =
+    type === "Article"
+      ? "BlogPosting"
+      : Array.isArray(type)
+        ? type.map((item) => (item === "Article" ? "BlogPosting" : item))
+        : type;
+
+  return {
+    ...value,
+    ...(normalizedType ? { "@type": normalizedType } : {}),
+  };
+}
+
 function buildFallbackSchemaMarkup(blog) {
   const canonicalUrl =
     normalizeMarketingCanonicalUrl(blog.canonicalUrl, blog.slug) || getBlogUrl(blog.slug);
@@ -203,7 +244,7 @@ function buildFallbackSchemaMarkup(blog) {
 
   const articleSchema = {
     "@context": "https://schema.org",
-    "@type": "Article",
+    "@type": "BlogPosting",
     headline: blog.metaTitle || blog.title,
     description,
     image: imageUrl
@@ -281,7 +322,7 @@ function buildFallbackSchemaMarkup(blog) {
 function resolveSchemaMarkup(blog) {
   if (blog.schemaMarkup?.trim()) {
     try {
-      return serializeJsonLd(JSON.parse(blog.schemaMarkup));
+      return serializeJsonLd(preferBlogPostingSchemaType(JSON.parse(blog.schemaMarkup)));
     } catch {
       return buildFallbackSchemaMarkup(blog);
     }
@@ -482,6 +523,16 @@ export default async function BlogPost({ params }) {
     siteUrl: SITE_URL,
     externalSources: post.externalSources,
   });
+  const visibleSources = contentHasReferenceSection(renderedContent)
+    ? []
+    : (post.externalSources || [])
+        .map((source) => ({
+          href: getExternalSourceHref(source),
+          title: source?.title?.trim() || source?.domain?.trim() || "Source",
+          domain: source?.domain?.trim() || "",
+        }))
+        .filter((source) => source.href && source.title)
+        .slice(0, 6);
   const contentWithoutInlineFaq = faqItems.length > 0
     ? stripStandaloneFaqSection(renderedContent)
     : renderedContent;
@@ -704,6 +755,32 @@ export default async function BlogPost({ params }) {
                     dangerouslySetInnerHTML={{ __html: sanitizedContent }}
                   />
                 </div>
+
+                {visibleSources.length > 0 && (
+                  <div className="mb-8 bg-[#0d0d0d] border border-white/[0.07] rounded-xl p-6 md:p-8">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F5EE30] mb-3">
+                      Sources
+                    </p>
+                    <h2 className="font-etna text-2xl text-white mb-5">Research References</h2>
+                    <ol className="space-y-3">
+                      {visibleSources.map((source, index) => (
+                        <li key={`${source.href}-${index}`} className="text-sm leading-relaxed text-gray-300">
+                          <a
+                            href={source.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-200 underline decoration-[#F5EE30]/40 underline-offset-4 hover:text-[#F5EE30]"
+                          >
+                            {source.title}
+                          </a>
+                          {source.domain ? (
+                            <span className="ml-2 text-gray-500">({source.domain})</span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
 
                 {/* FAQ Section */}
                 {faqItems.length > 0 && (

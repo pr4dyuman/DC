@@ -20,6 +20,22 @@ export type MetadataValidationResult = {
     postId: string;
 };
 
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasSchemaContext(node: Record<string, unknown>) {
+    return typeof node["@context"] === "string" && node["@context"].trim().length > 0;
+}
+
+function hasSchemaType(node: Record<string, unknown>) {
+    const type = node["@type"];
+    return (
+        (typeof type === "string" && type.trim().length > 0) ||
+        (Array.isArray(type) && type.some((item) => typeof item === "string" && item.trim().length > 0))
+    );
+}
+
 /**
  * Validates metadata for a published post
  * Checks: title, description, schema markup, canonical URL
@@ -80,25 +96,31 @@ export function validatePublishedMetadata(post: BlogStudioPost): MetadataValidat
     if (post.schemaMarkup) {
         try {
             const parsed = JSON.parse(post.schemaMarkup);
-            if (!parsed || typeof parsed !== "object") {
+            const schemaNodes = Array.isArray(parsed)
+                ? parsed.filter(isJsonObject)
+                : isJsonObject(parsed)
+                  ? [parsed]
+                  : [];
+
+            if (schemaNodes.length === 0) {
                 issues.push({
                     type: "error",
                     code: "INVALID_SCHEMA_MARKUP",
-                    message: "Schema markup is not valid JSON object",
+                    message: "Schema markup is not a valid JSON-LD object or object array",
                     severity: "blocker",
                 });
-            } else if (!parsed["@context"]) {
+            } else if (!schemaNodes.some(hasSchemaContext)) {
                 issues.push({
                     type: "warning",
                     code: "MISSING_SCHEMA_CONTEXT",
                     message: "Schema markup missing @context",
                     severity: "minor",
                 });
-            } else if (!parsed["@type"]) {
+            } else if (!schemaNodes.every(hasSchemaType)) {
                 issues.push({
                     type: "warning",
                     code: "MISSING_SCHEMA_TYPE",
-                    message: "Schema markup missing @type",
+                    message: "One or more schema markup objects are missing @type",
                     severity: "minor",
                 });
             }
@@ -211,11 +233,11 @@ export function validatePublishedMetadata(post: BlogStudioPost): MetadataValidat
  */
 export function formatMetadataValidationResult(result: MetadataValidationResult): string {
     if (result.isValid) {
-        return `✅ Metadata validation passed (${result.issues.length} info items)`;
+        return `Metadata validation passed (${result.issues.length} info items)`;
     }
 
     const blockers = result.issues.filter((i) => i.severity === "blocker");
     const warnings = result.issues.filter((i) => i.severity === "minor");
 
-    return `❌ Metadata validation failed: ${blockers.length} blockers, ${warnings.length} warnings`;
+    return `Metadata validation failed: ${blockers.length} blockers, ${warnings.length} warnings`;
 }

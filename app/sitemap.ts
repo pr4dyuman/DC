@@ -1,0 +1,115 @@
+import type { MetadataRoute } from "next";
+
+import dbConnect from "@/lib/marketing-db";
+import { normalizeMarketingCanonicalUrl, toAbsoluteMarketingImageUrl } from "@/lib/marketing-blog-utils";
+import Blog from "@/models/marketing/Blog";
+
+export const revalidate = 3600;
+
+const SITE_URL = (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://digitalcorvids.com"
+).replace(/\/+$/, "");
+
+type MarketingSitemapBlog = {
+    slug?: string;
+    canonicalUrl?: string;
+    image?: string;
+    updatedAt?: string | Date;
+    publishedAt?: string | Date;
+    createdAt?: string | Date;
+};
+
+function toDate(value?: string | Date) {
+    if (!value) {
+        return undefined;
+    }
+
+    const parsed = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
+function withSiteUrl(path: string) {
+    return `${SITE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+function toSitemapImageUrl(value?: string) {
+    const imageUrl = toAbsoluteMarketingImageUrl(value, "");
+    if (!imageUrl) {
+        return undefined;
+    }
+
+    return /^https?:\/\//i.test(imageUrl) ? imageUrl : withSiteUrl(imageUrl);
+}
+
+function staticEntry(
+    path: string,
+    changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"],
+    priority: number,
+): MetadataRoute.Sitemap[number] {
+    return {
+        url: withSiteUrl(path),
+        lastModified: new Date("2026-01-05"),
+        changeFrequency,
+        priority,
+    };
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+    const staticEntries: MetadataRoute.Sitemap = [
+        staticEntry("/", "weekly", 1),
+        staticEntry("/about", "monthly", 0.8),
+        staticEntry("/services", "monthly", 0.9),
+        staticEntry("/services/seo", "monthly", 0.85),
+        staticEntry("/services/web-development", "monthly", 0.85),
+        staticEntry("/services/ppc", "monthly", 0.8),
+        staticEntry("/services/social-media-marketing", "monthly", 0.8),
+        staticEntry("/services/video-production-ad", "monthly", 0.75),
+        staticEntry("/services/influencer-marketing", "monthly", 0.75),
+        staticEntry("/services/manage-company", "monthly", 0.75),
+        staticEntry("/services/ai-blogger", "monthly", 0.75),
+        staticEntry("/contact", "monthly", 0.7),
+        staticEntry("/get-started", "monthly", 0.7),
+        staticEntry("/blog", "daily", 0.9),
+    ];
+
+    try {
+        await dbConnect();
+
+        const blogs = await Blog.find({ status: "published" })
+            .select("slug canonicalUrl image updatedAt publishedAt createdAt")
+            .sort({ publishedAt: -1, createdAt: -1 })
+            .lean();
+
+        const blogEntries: MetadataRoute.Sitemap = [];
+
+        for (const blog of blogs as MarketingSitemapBlog[]) {
+            const slug = blog.slug?.trim();
+            if (!slug) {
+                continue;
+            }
+
+            const canonicalUrl =
+                normalizeMarketingCanonicalUrl(blog.canonicalUrl, slug) ||
+                withSiteUrl(`/blog/${slug}`);
+            const imageUrl = toSitemapImageUrl(blog.image);
+
+            blogEntries.push({
+                url: canonicalUrl,
+                lastModified:
+                    toDate(blog.updatedAt) ||
+                    toDate(blog.publishedAt) ||
+                    toDate(blog.createdAt),
+                changeFrequency: "weekly",
+                priority: 0.75,
+                images: imageUrl ? [imageUrl] : undefined,
+            });
+        }
+
+        return [...staticEntries, ...blogEntries];
+    } catch (error) {
+        console.warn("[Sitemap] Failed to load published blogs for sitemap.", error);
+        return staticEntries;
+    }
+}

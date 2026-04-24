@@ -69,7 +69,7 @@ export function PostTabNav({
     );
 
     return (
-        <div className="flex overflow-x-auto rounded-[28px] border border-border/60 bg-background/40 p-1.5 gap-1 no-scrollbar">
+        <div className="flex overflow-x-auto rounded-xl border border-border/60 bg-background/40 p-1.5 gap-1 no-scrollbar">
             {TABS.map((tab) => {
                 const isActive = activeTab === tab.key;
                 const dot = healthSignals ? getTabHealthDot(tab.key, healthSignals) : null;
@@ -79,7 +79,7 @@ export function PostTabNav({
                         type="button"
                         onClick={() => setTab(tab.key)}
                         className={cn(
-                            "relative flex items-center gap-2 whitespace-nowrap rounded-[22px] px-4 py-2.5 text-sm font-medium transition-all duration-200",
+                            "relative flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200",
                             isActive
                                 ? "bg-primary text-primary-foreground shadow-sm"
                                 : "text-muted-foreground hover:bg-background/80 hover:text-foreground"

@@ -1,9 +1,11 @@
 import { AIBloggerLockedState } from "@/components/ai-blogger/AIBloggerLockedState";
 import { AIBloggerBreadcrumb } from "@/components/ai-blogger/AIBloggerBreadcrumb";
+import { AIBloggerDatabaseUnavailableState } from "@/components/ai-blogger/AIBloggerDatabaseUnavailableState";
 import { ClusterDashboard } from "@/components/ai-blogger/ClusterDashboard";
 import { BlogStudioPostModel, connectDB } from "@/lib/mongodb";
 import { analyzeBlogStudioClusters } from "@/lib/ai-blogger-cluster-analysis";
 import { getAIBloggerDashboardContext } from "@/lib/ai-blogger-dashboard";
+import { isMongoConnectionIssue } from "@/lib/mongodb-connection";
 
 export const metadata = {
     title: "Content Clusters | AI Blogger",
@@ -11,33 +13,46 @@ export const metadata = {
 };
 
 export default async function ClusterDashboardPage() {
-    const { access, agency } = await getAIBloggerDashboardContext();
+    try {
+        const { access, agency } = await getAIBloggerDashboardContext();
 
-    if (!access.canAccess) {
-        return <AIBloggerLockedState access={access} />;
-    }
+        if (!access.canAccess) {
+            return <AIBloggerLockedState access={access} />;
+        }
 
-    await connectDB();
+        await connectDB();
 
-    // Fetch all published posts with cluster info
-    const posts = await BlogStudioPostModel.find({
-        agencyId: agency.id,
-        status: "Published",
-    })
-        .select(
-            "id slug title status publishedAt publishedEntrySlug wordCount seoScore contentClusterId parentTopicSlug internalLinks"
-        )
-        .lean();
+        // Fetch all published posts with cluster info
+        const posts = await BlogStudioPostModel.find({
+            agencyId: agency.id,
+            status: "Published",
+        })
+            .select(
+                "id slug title status publishedAt publishedEntrySlug wordCount seoScore contentClusterId parentTopicSlug internalLinks"
+            )
+            .lean();
 
-    // Analyze clusters
-    const analysis = analyzeBlogStudioClusters(posts);
+        // Analyze clusters
+        const analysis = analyzeBlogStudioClusters(posts);
 
-    return (
-        <div className="flex flex-col">
-            <div className="px-4 sm:px-6 py-6">
-                <AIBloggerBreadcrumb items={[{ label: "AI Blogger" }, { label: "Clusters" }]} />
+        return (
+            <div className="flex flex-col gap-6">
+                <div>
+                    <AIBloggerBreadcrumb items={[{ label: "AI Blogger" }, { label: "Clusters" }]} />
+                </div>
+                <ClusterDashboard analysis={analysis} />
             </div>
-            <ClusterDashboard analysis={analysis} />
-        </div>
-    );
+        );
+    } catch (error) {
+        if (!isMongoConnectionIssue(error)) {
+            throw error;
+        }
+
+        return (
+            <AIBloggerDatabaseUnavailableState
+                retryHref="/dashboard/ai-blogger/clusters"
+                message="AI Blogger couldn't load cluster analysis because MongoDB is temporarily unavailable."
+            />
+        );
+    }
 }

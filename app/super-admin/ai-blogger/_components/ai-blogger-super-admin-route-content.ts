@@ -28,13 +28,13 @@ function getPrimaryAgencyAction(selectedAgencyId?: string): AIBloggerSuperAdminS
 
 export function getGenerateRouteContent(selectedAgencyId?: string): RouteContent {
     return {
-        title: "Super-admin Generate Scope",
+        title: "Agency Draft Generation",
         description:
-            "This route is now an honest scope page. Cross-agency draft generation is not implemented here yet, so super-admin work stays focused on agency configuration and readiness.",
-        statusLabel: "Config-first",
+            "Draft generation is managed inside each agency workspace so the right brand voice, targets, approval rules, and integrations are applied.",
+        statusLabel: "Agency workspace",
         contextNote: selectedAgencyId
-            ? "A selected agency is available, so the next valid step is to open its AI Blogger config and manage the generation stack there."
-            : "No agency is selected right now. Choose an agency first before making AI Blogger generation decisions.",
+            ? "Open the selected agency to review its AI Blogger setup before starting or adjusting draft creation."
+            : "Choose an agency to review its AI Blogger setup and continue with draft creation from the correct workspace.",
         actions: [
             getPrimaryAgencyAction(selectedAgencyId),
             {
@@ -44,24 +44,24 @@ export function getGenerateRouteContent(selectedAgencyId?: string): RouteContent
         ],
         cards: [
             {
-                title: "What Exists Today",
+                title: "Available Controls",
                 items: [
-                    "Per-agency AI Blogger configuration, readiness checks, provider keys, prompt controls, and refresh queue visibility are already supported.",
-                    "Agency-side editors still use the real generation workflow in the AI Blogger dashboard.",
+                    "Review agency readiness, provider settings, prompt controls, and publishing rules before generation starts.",
+                    "Use the agency workspace for draft creation so generated posts inherit the correct brand and approval settings.",
                 ],
             },
             {
-                title: "What Is Not Here Yet",
+                title: "Recommended Flow",
                 items: [
-                    "There is no cross-agency super-admin draft composer on this route.",
-                    "There is no agency picker plus generation form combo here yet.",
+                    "Select the agency, confirm the content configuration, then open the agency AI Blogger workspace.",
+                    "Keep draft creation tied to one agency at a time for safer publishing and clearer ownership.",
                 ],
             },
             {
-                title: "Phase Decision",
+                title: "Why This Matters",
                 items: [
-                    "Keep this route as a scope page until a true cross-agency generator is designed.",
-                    "If product direction stays config-only, this route can be removed later without touching the agency dashboard workflow.",
+                    "Agency-specific generation prevents drafts from using the wrong target, webhook, brand voice, or approval gate.",
+                    "Super-admin remains focused on configuration quality, readiness, and governance.",
                 ],
             },
         ],
@@ -70,13 +70,13 @@ export function getGenerateRouteContent(selectedAgencyId?: string): RouteContent
 
 export function getPostsRouteContent(selectedAgencyId?: string): RouteContent {
     return {
-        title: "Super-admin Posts Scope",
+        title: "Agency Content Queue",
         description:
-            "This route is now explicit about scope. The platform super-admin area does not yet run a true cross-agency editorial queue, so this page points back to the supported agency-level control surface.",
-        statusLabel: "Queue not implemented",
+            "Post review and publishing decisions belong inside the agency workspace where ownership, status, and publishing settings are clear.",
+        statusLabel: "Agency workspace",
         contextNote: selectedAgencyId
-            ? "A selected agency is available, but post operations still belong to the agency-side AI Blogger flow."
-            : "Select an agency first if you want to review AI Blogger readiness or config before expanding this route.",
+            ? "Open the selected agency to inspect configuration and continue into its content queue."
+            : "Select an agency first to inspect AI Blogger readiness and continue into its content queue.",
         actions: [
             getPrimaryAgencyAction(selectedAgencyId),
             {
@@ -86,24 +86,24 @@ export function getPostsRouteContent(selectedAgencyId?: string): RouteContent {
         ],
         cards: [
             {
-                title: "What Exists Today",
+                title: "Available Controls",
                 items: [
-                    "The super-admin overview already shows agency-level published counts and refresh candidate summaries.",
-                    "The agency config page already shows refresh queue readiness from stored Search Console data.",
+                    "Review agency-level published counts, refresh candidates, Search Console readiness, and configuration health.",
+                    "Open the agency workspace when direct editorial review, status changes, or publishing actions are needed.",
                 ],
             },
             {
-                title: "What Is Missing",
+                title: "Recommended Flow",
                 items: [
-                    "There is no cross-agency posts list, filter set, or bulk operations workflow on this route.",
-                    "There is no super-admin editor handoff for content updates, status changes, or publishing from here.",
+                    "Choose an agency, confirm configuration health, then review the posts from that agency's queue.",
+                    "Keep cross-agency monitoring separate from hands-on editorial actions.",
                 ],
             },
             {
-                title: "Phase Decision",
+                title: "Why This Matters",
                 items: [
-                    "Either build a real cross-agency queue here later or keep post operations on the agency side only.",
-                    "Until then, this page prevents the old redirect-only dead route behavior.",
+                    "Agency-specific queues reduce accidental publishing changes across clients.",
+                    "Super-admin can still govern readiness without mixing editorial ownership between agencies.",
                 ],
             },
         ],
@@ -112,40 +112,40 @@ export function getPostsRouteContent(selectedAgencyId?: string): RouteContent {
 
 export function getPostDetailRouteContent(slug: string, selectedAgencyId?: string): RouteContent {
     return {
-        title: "Super-admin Post Detail Scope",
+        title: "Agency Post Detail",
         description:
-            `The requested post detail route for "${slug}" is not a live cross-agency editor yet. This page keeps the route honest without pretending there is a working super-admin post editor behind it.`,
-        statusLabel: "Editor not implemented",
+            `Post "${slug}" should be opened from its agency workspace so status, publishing target, and audit data stay tied to the correct client.`,
+        statusLabel: "Agency workspace",
         contextNote: selectedAgencyId
-            ? "A selected agency is available, so the real next step is its AI Blogger config screen. Super-admin post editing still needs a dedicated design before it should exist here."
-            : "No agency is selected right now. Cross-agency post detail is still a future scope decision.",
+            ? "Open the selected agency to continue with the correct post workflow."
+            : "Select an agency before opening post-level editorial tools.",
         actions: [
             getPrimaryAgencyAction(selectedAgencyId),
             {
                 href: "/super-admin/ai-blogger/posts",
-                label: "Open Posts Scope",
+                label: "Back to Posts",
             },
         ],
         cards: [
             {
-                title: "What Exists Today",
+                title: "Available Controls",
                 items: [
-                    "Agency-side post detail already covers SEO audit, cannibalization, grounded research, and performance loop workflows.",
-                    "Super-admin currently governs configuration and readiness, not direct editorial operations.",
+                    "Agency post detail includes SEO audit, grounded research, internal links, performance context, and status controls.",
+                    "Super-admin can review agency readiness before handing off to the agency editorial surface.",
                 ],
             },
             {
-                title: "What Is Missing",
+                title: "Recommended Flow",
                 items: [
-                    "There is no secure cross-agency post loader, post editor form, or status controls on this route.",
-                    "There is no super-admin publish or refresh-from-performance workflow here yet.",
+                    "Select the agency that owns this post, then open the post from that agency's AI Blogger queue.",
+                    "Use agency context for editing, approval, refresh, and publishing decisions.",
                 ],
             },
             {
-                title: "Phase Decision",
+                title: "Why This Matters",
                 items: [
-                    "Only implement this route after the product decides that super-admin should operate cross-agency content directly.",
-                    "Until then, this page keeps routing clear and avoids the old redirect loop.",
+                    "Post-level actions depend on agency-specific credentials, rules, and approval gates.",
+                    "Keeping those actions in context prevents cross-client mistakes.",
                 ],
             },
         ],
@@ -154,13 +154,13 @@ export function getPostDetailRouteContent(slug: string, selectedAgencyId?: strin
 
 export function getSettingsRouteContent(selectedAgencyId?: string): RouteContent {
     return {
-        title: "Super-admin Settings Scope",
+        title: "Agency AI Blogger Settings",
         description:
-            "This route is now reserved for a future platform-level AI Blogger settings layer. The live settings workflow today is agency-specific and belongs inside each agency AI Blogger config screen.",
-        statusLabel: "Agency-specific today",
+            "AI Blogger settings are managed per agency so each client can keep its own trends, research, publishing, and automation rules.",
+        statusLabel: "Agency workspace",
         contextNote: selectedAgencyId
-            ? "A selected agency is available, so the supported settings surface is its dedicated AI Blogger config page."
-            : "No agency is selected. Pick an agency first to edit AI Blogger settings that are already live.",
+            ? "Open the selected agency to manage its live AI Blogger configuration."
+            : "Choose an agency to manage its live AI Blogger configuration.",
         actions: [
             getPrimaryAgencyAction(selectedAgencyId),
             {
@@ -170,24 +170,24 @@ export function getSettingsRouteContent(selectedAgencyId?: string): RouteContent
         ],
         cards: [
             {
-                title: "What Exists Today",
+                title: "Available Controls",
                 items: [
-                    "Agency-specific AI Blogger settings already include trends, SERP, grounded research, Search Console, page performance, image generation, prompts, and publish rules.",
-                    "The agency-side settings page already handles editorial defaults and schedule creation.",
+                    "Manage trends, SERP analysis, grounded research, Search Console, page performance, image generation, prompts, and publish rules per agency.",
+                    "Review readiness before teams generate, approve, or publish content.",
                 ],
             },
             {
-                title: "What Is Missing",
+                title: "Recommended Flow",
                 items: [
-                    "There is no separate platform-wide AI Blogger settings model on this route yet.",
-                    "There is no shared inheritance UI for cross-agency AI Blogger settings here yet.",
+                    "Select an agency, review configuration health, then adjust the settings that apply to that agency.",
+                    "Use global reporting for monitoring and agency settings for operational changes.",
                 ],
             },
             {
-                title: "Phase Decision",
+                title: "Why This Matters",
                 items: [
-                    "Build this only if product needs a real platform-wide AI Blogger settings layer.",
-                    "Otherwise, keep settings agency-specific and remove this route in a later cleanup phase.",
+                    "Agency-specific settings keep credentials, defaults, and automation windows isolated.",
+                    "This makes publishing safer while still giving super-admin a clear governance path.",
                 ],
             },
         ],

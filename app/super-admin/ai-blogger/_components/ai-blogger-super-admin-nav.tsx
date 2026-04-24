@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, LayoutDashboard, FileText, Settings2, WandSparkles } from "lucide-react";
+import { Building2, LayoutDashboard } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -27,25 +27,10 @@ export function AIBloggerSuperAdminNav({ selectedAgencyId }: AIBloggerSuperAdmin
                 },
             ]
             : []),
-        {
-            label: "Generate",
-            href: "/super-admin/ai-blogger/generate",
-            icon: WandSparkles,
-        },
-        {
-            label: "Posts",
-            href: "/super-admin/ai-blogger/posts",
-            icon: FileText,
-        },
-        {
-            label: "Settings",
-            href: "/super-admin/ai-blogger/settings",
-            icon: Settings2,
-        },
     ];
 
     return (
-        <div className="overflow-x-auto rounded-2xl border border-border/70 bg-card p-2">
+        <nav className="overflow-x-auto rounded-xl border border-border/70 bg-card p-2" aria-label="Super-admin AI Blogger sections">
             <div className="flex min-w-max gap-2">
                 {navItems.map((item) => {
                     const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -54,8 +39,9 @@ export function AIBloggerSuperAdminNav({ selectedAgencyId }: AIBloggerSuperAdmin
                         <Link
                             key={item.href}
                             href={item.href}
+                            aria-current={active ? "page" : undefined}
                             className={cn(
-                                "inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition",
+                                "inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition",
                                 active
                                     ? "border-primary/30 bg-primary/10 text-primary"
                                     : "border-transparent text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground",
@@ -67,6 +53,6 @@ export function AIBloggerSuperAdminNav({ selectedAgencyId }: AIBloggerSuperAdmin
                     );
                 })}
             </div>
-        </div>
+        </nav>
     );
 }

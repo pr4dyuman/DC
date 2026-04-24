@@ -4,6 +4,8 @@ Allow: /
 
 # Disallow crawling of admin and API routes
 Disallow: /admin
+Disallow: /dashboard
+Disallow: /super-admin
 Disallow: /api/
 
 # Sitemap location

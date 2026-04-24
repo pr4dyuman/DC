@@ -24,13 +24,13 @@ interface RevenueChartProps {
 export function RevenueChart({ data }: RevenueChartProps) {
     const { symbol } = useCurrency();
     return (
-        <Card className="col-span-4">
+        <Card className="col-span-4 min-w-0">
             <CardHeader>
                 <CardTitle>Revenue vs Expenses</CardTitle>
             </CardHeader>
-            <CardContent className="pl-2">
-                <div className="h-[250px] sm:h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
+            <CardContent className="pl-2 min-w-0">
+                <div className="h-[250px] sm:h-[350px] w-full min-w-0">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={250}>
                         <BarChart data={data}>
                             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                             <XAxis
@@ -97,13 +97,13 @@ export function ProjectDistributionChart({ data }: { data: ProjectDistributionPo
     const enriched = data.map((d) => ({ ...d, _total: total }));
 
     return (
-        <Card className="col-span-3">
+        <Card className="col-span-3 min-w-0">
             <CardHeader>
                 <CardTitle>Projects by Status</CardTitle>
             </CardHeader>
-            <CardContent>
-                <div className="h-[250px] sm:h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
+            <CardContent className="min-w-0">
+                <div className="h-[250px] sm:h-[350px] w-full min-w-0">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={250}>
                         <PieChart>
                             <Pie
                                 data={enriched}

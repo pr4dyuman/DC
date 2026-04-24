@@ -315,7 +315,7 @@ export function AIBloggerPostsWorkspace({
                         type="button"
                         onClick={() => pushWithParams({ filter: item.status === "SEO Review" ? "review" : item.status.toLowerCase(), page: "1" })}
                         className="cursor-pointer text-left transition-transform hover:scale-[1.01] active:scale-[0.99]"
-                        title={`Filter by ${item.label}`}
+                        aria-label={`Filter by ${item.label}`}
                     >
                         <AIBloggerMetricCard
                             icon={
@@ -387,7 +387,7 @@ export function AIBloggerPostsWorkspace({
                         onClick={() => setIsRefreshQueueOpen((v) => !v)}
                         className="w-full"
                     >
-                        <div className="rounded-[24px] border border-border/60 bg-background/50 p-4 transition-all hover:bg-background/60">
+                        <div className="rounded-xl border border-border/60 bg-background/50 p-4 transition-all hover:bg-background/60">
                             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                                 <div>
                                     <p className="text-sm font-semibold text-foreground">Refresh Queue</p>
@@ -427,7 +427,7 @@ export function AIBloggerPostsWorkspace({
                     </button>
 
                     {isRefreshQueueOpen && <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.9fr)]">
-                        <div className="rounded-[24px] border border-border/60 bg-background/50 p-4">
+                        <div className="rounded-xl border border-border/60 bg-background/50 p-4">
                             <div className="flex flex-col gap-4 lg:flex-row">
                                 <div className="space-y-2 lg:min-w-[220px]">
                                     <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Refresh Filters</p>
@@ -476,7 +476,7 @@ export function AIBloggerPostsWorkspace({
                             </div>
                         </div>
 
-                        <div className="rounded-[24px] border border-border/60 bg-background/50 p-4">
+                        <div className="rounded-xl border border-border/60 bg-background/50 p-4">
                             <div className="space-y-3">
                                 <div>
                                     <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Outcome Reporting</p>
@@ -524,7 +524,7 @@ export function AIBloggerPostsWorkspace({
                             {postsPage.refreshQueue.items.map((item) => (
                                 <div
                                     key={item.post.id}
-                                    className="rounded-[24px] border border-border/60 bg-background/55 p-5"
+                                    className="rounded-xl border border-border/60 bg-background/55 p-5"
                                 >
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div className="space-y-2">
@@ -642,7 +642,7 @@ export function AIBloggerPostsWorkspace({
                             ))}
                         </div>
                     ) : isRefreshQueueOpen ? (
-                        <div className="rounded-[24px] border border-dashed border-border/60 bg-background/40 px-6 py-8 text-sm text-muted-foreground">
+                        <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-6 py-8 text-sm text-muted-foreground">
                             No published posts match the current refresh queue filter. Try a different signal view or wait for newer Search Console coverage.
                         </div>
                     ) : null}
@@ -832,7 +832,7 @@ export function AIBloggerPostsWorkspace({
                             type="button"
                             onClick={toggleAll}
                             className="flex items-center gap-1.5 rounded-xl border border-border/60 bg-background/60 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-primary/5 hover:text-primary"
-                            title={selectedSlugs.size === postsPage.posts.length ? "Deselect all" : "Select all"}
+                            aria-label={selectedSlugs.size === postsPage.posts.length ? "Deselect all posts" : "Select all posts"}
                         >
                             {selectedSlugs.size === postsPage.posts.length && postsPage.posts.length > 0 ? (
                                 <CheckSquare className="h-3.5 w-3.5 text-primary" />
@@ -869,7 +869,7 @@ export function AIBloggerPostsWorkspace({
                             type="button"
                             onClick={() => pushWithParams({ sortOrder: postsPage.sortOrder === "asc" ? "desc" : "asc", page: "1" })}
                             className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/60 bg-background/60 text-muted-foreground transition-colors hover:bg-primary/5 hover:text-primary"
-                            title={postsPage.sortOrder === "asc" ? "Sort descending" : "Sort ascending"}
+                            aria-label={postsPage.sortOrder === "asc" ? "Sort descending" : "Sort ascending"}
                         >
                             <ArrowUpDown className={`h-3.5 w-3.5 transition-transform ${postsPage.sortOrder === "asc" ? "rotate-180" : ""}`} />
                         </button>
@@ -879,7 +879,7 @@ export function AIBloggerPostsWorkspace({
 
             {/* Sticky pagination header — always visible */}
             {postsPage.posts.length > 0 && (
-                <div className="sticky top-0 z-40 flex flex-col gap-3 rounded-[28px] border border-border/60 bg-background/40 backdrop-blur-sm p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="sticky top-0 z-40 flex flex-col gap-3 rounded-xl border border-border/60 bg-background/40 backdrop-blur-sm p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-col gap-1">
                         <p className="text-sm font-semibold text-foreground">
                             Page {postsPage.page} of {postsPage.totalPages}
@@ -920,7 +920,7 @@ export function AIBloggerPostsWorkspace({
                 </div>
             )}
 
-            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 lg:grid-cols-2">
                 {postsPage.posts.map((post) => {
                     const queueReadiness = post.queueReadiness;
                     const needsAttention = queueReadiness?.needsAttention ?? false;
@@ -959,19 +959,9 @@ export function AIBloggerPostsWorkspace({
                             href={`${basePath}/posts/${post.slug}`}
                             className="group block"
                         >
-                            <AIBloggerGlassCard className={`relative p-5 transition-all group-hover:border-primary/40 group-hover:shadow-[0_8px_32px_rgba(212,160,10,0.08)] cursor-pointer ${needsAttention ? "border-amber-500/30 bg-amber-500/[0.02]" : ""} ${selectedSlugs.has(post.slug) ? "ring-2 ring-primary/40" : ""}`}>
+                            <AIBloggerGlassCard className={`relative p-4 transition-all group-hover:border-primary/40 group-hover:shadow-[0_8px_32px_rgba(212,160,10,0.08)] cursor-pointer ${needsAttention ? "border-amber-500/30 bg-amber-500/[0.02]" : ""} ${selectedSlugs.has(post.slug) ? "ring-2 ring-primary/40" : ""}`}>
                                 <div className="flex h-full flex-col gap-4">
-                                <div className={`relative aspect-[16/9] overflow-hidden rounded-[22px] border ${
-                                    post.status === "Published"
-                                        ? "border-emerald-500/15 bg-[linear-gradient(135deg,rgba(16,185,129,0.12),rgba(255,255,255,0.02))]"
-                                        : post.status === "Approved"
-                                            ? "border-violet-500/15 bg-[linear-gradient(135deg,rgba(139,92,246,0.12),rgba(255,255,255,0.02))]"
-                                            : post.status === "SEO Review"
-                                                ? "border-sky-500/15 bg-[linear-gradient(135deg,rgba(14,165,233,0.12),rgba(255,255,255,0.02))]"
-                                                : post.status === "Scheduled"
-                                                    ? "border-blue-500/15 bg-[linear-gradient(135deg,rgba(59,130,246,0.12),rgba(255,255,255,0.02))]"
-                                                    : "border-primary/10 bg-[linear-gradient(135deg,rgba(212,160,10,0.12),rgba(255,255,255,0.02))]"
-                                }`}>
+                                <div className="relative aspect-[2.4/1] overflow-hidden rounded-xl border border-border/60 bg-muted/20">
                                     {post.featuredImageUrl ? (
                                         <Image
                                             src={post.featuredImageUrl}
@@ -981,16 +971,10 @@ export function AIBloggerPostsWorkspace({
                                             sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
                                         />
                                     ) : (
-                                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-                                            <FileText className={`h-8 w-8 ${
-                                                post.status === "Published" ? "text-emerald-500/50"
-                                                : post.status === "Approved" ? "text-violet-500/50"
-                                                : post.status === "SEO Review" ? "text-sky-500/50"
-                                                : post.status === "Scheduled" ? "text-blue-500/50"
-                                                : "text-primary/50"
-                                            }`} />
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                                            <FileText className="h-7 w-7" />
                                             {post.contentType && (
-                                                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                                                <span className="max-w-[80%] truncate text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                                                     {post.contentType.replace(/-/g, " ")}
                                                 </span>
                                             )}
@@ -1000,9 +984,8 @@ export function AIBloggerPostsWorkspace({
                                     <button
                                         type="button"
                                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSlug(post.slug); }}
-                                        className="absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-xl border-2 border-background/40 bg-background/80 backdrop-blur-sm transition-colors hover:bg-primary/20 hover:border-primary/50 focus:ring-2 focus:ring-primary/50"
+                                        className="absolute left-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 bg-background/90 backdrop-blur-sm transition-colors hover:bg-primary/10 hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                                         aria-label={selectedSlugs.has(post.slug) ? "Deselect post" : "Select post"}
-                                        title={selectedSlugs.has(post.slug) ? "Deselect" : "Select"}
                                     >
                                         {selectedSlugs.has(post.slug) ? (
                                             <CheckSquare className="h-5 w-5 text-primary" />
@@ -1010,8 +993,8 @@ export function AIBloggerPostsWorkspace({
                                             <Square className="h-5 w-5 text-muted-foreground" />
                                         )}
                                     </button>
-                                    <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
-                                        <Badge variant="outline" className={`rounded-full border-none bg-background/80 py-1 text-[10px] font-bold uppercase tracking-wider backdrop-blur-md ${
+                                    <div className="absolute right-3 top-3 flex max-w-[calc(100%-4.5rem)] flex-wrap justify-end gap-1.5">
+                                        <Badge variant="outline" className={`max-w-full rounded-lg border bg-background/90 py-1 text-[10px] font-bold uppercase tracking-[0.1em] backdrop-blur-md ${
                                             post.status === "Published" ? "text-emerald-500" :
                                             post.status === "Scheduled" ? "text-blue-500" :
                                             post.status === "Approved" ? "text-violet-500" :
@@ -1021,7 +1004,7 @@ export function AIBloggerPostsWorkspace({
                                         </Badge>
                                         <Badge
                                             variant="outline"
-                                            className={`rounded-full border-none py-1 text-[10px] font-bold uppercase tracking-wider backdrop-blur-md ${
+                                            className={`max-w-full rounded-lg border py-1 text-[10px] font-bold uppercase tracking-[0.1em] backdrop-blur-md ${
                                                 readinessTone === "emerald"
                                                     ? "bg-emerald-500/90 text-white"
                                                     : readinessTone === "amber"
@@ -1036,14 +1019,14 @@ export function AIBloggerPostsWorkspace({
                                             trendFocus: post.brief.trendFocus,
                                             contentType: post.contentType,
                                         }) ? (
-                                            <Badge variant="outline" className="rounded-full border-none bg-primary/90 py-1 text-[10px] font-bold uppercase tracking-wider text-black backdrop-blur-md">
+                                            <Badge variant="outline" className="max-w-full rounded-lg border-none bg-primary/90 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-black backdrop-blur-md">
                                                 {getBlogStudioTrendBadgeLabel(post.brief, post.contentType)}
                                             </Badge>
                                         ) : null}
                                     </div>
                                     {post.searchIntent && (
-                                        <div className="absolute bottom-3 right-14 flex flex-wrap gap-1.5">
-                                            <Badge variant="outline" className="rounded-full border-none bg-background/60 py-1 text-[10px] font-medium capitalize backdrop-blur-md">
+                                        <div className="absolute bottom-3 right-3 flex max-w-[80%] flex-wrap justify-end gap-1.5">
+                                            <Badge variant="outline" className="rounded-lg border bg-background/80 py-1 text-[10px] font-medium capitalize backdrop-blur-md">
                                                 <Target className="mr-1 h-3 w-3" />
                                                 {post.searchIntent}
                                             </Badge>
@@ -1056,12 +1039,12 @@ export function AIBloggerPostsWorkspace({
                                         <p className="line-clamp-2 text-lg font-semibold transition-colors group-hover:text-primary">
                                             {post.title}
                                         </p>
-                                        <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                                        <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                                             <span className="flex items-center gap-1">
                                                 <Globe className="h-3 w-3" />
                                                 {getBlogStudioSourceLabel(post.brief.sourceMode)}
                                             </span>
-                                            <span>•</span>
+                                            <span className="hidden sm:inline">|</span>
                                             <span className="flex items-center gap-1">
                                                 <Layout className="h-3 w-3" />
                                                 {post.contentType ? humanizeBlogStudioValue(post.contentType) : "Draft"}
@@ -1112,7 +1095,7 @@ export function AIBloggerPostsWorkspace({
                                                 Links
                                             </div>
                                         )}
-                                        {internalLinkHealth ? (
+                                        {internalLinkHealth && blockerCount === 0 ? (
                                             <div className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
                                                 internalLinkHealth.status === "connected"
                                                     ? "border border-emerald-500/10 bg-emerald-500/5 text-emerald-500"
@@ -1124,12 +1107,12 @@ export function AIBloggerPostsWorkspace({
                                                 {internalLinkHealth.label}
                                             </div>
                                         ) : null}
-                                        {canonicalReady && (
+                                        {canonicalReady && !hasFaqPack && !hasInternalLinks ? (
                                             <div className="flex items-center gap-1 rounded-full border border-violet-500/10 bg-violet-500/5 px-2 py-0.5 text-[10px] font-medium text-violet-500" title="Canonical URL Ready">
                                                 <Target className="h-3 w-3" />
                                                 Canonical
                                             </div>
-                                        )}
+                                        ) : null}
                                         {blockerCount > 0 && (
                                             <div className="flex items-center gap-1 rounded-full border border-amber-500/10 bg-amber-500/5 px-2 py-0.5 text-[10px] font-medium text-amber-500" title="Required SEO blockers remaining">
                                                 <AlertCircle className="h-3 w-3" />
@@ -1139,7 +1122,7 @@ export function AIBloggerPostsWorkspace({
                                     </div>
 
                                     <div className="flex flex-wrap gap-2">
-                                        {publishPackageItems.map((item) => (
+                                        {publishPackageItems.slice(0, 3).map((item) => (
                                             <div
                                                 key={`${post.id}-${item.key}`}
                                                 className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${
@@ -1151,6 +1134,11 @@ export function AIBloggerPostsWorkspace({
                                                 {item.label}
                                             </div>
                                         ))}
+                                        {publishPackageItems.length > 3 ? (
+                                            <div className="rounded-full border border-border/60 bg-background/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                                +{publishPackageItems.length - 3} more
+                                            </div>
+                                        ) : null}
                                     </div>
                                 </div>
 
@@ -1215,7 +1203,7 @@ export function AIBloggerPostsWorkspace({
             {postsPage.posts.length === 0 ? (
                 <AIBloggerGlassCard className="p-12 text-center">
                     <div className="mx-auto max-w-md space-y-4">
-                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] bg-primary/12 text-primary">
+                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-primary/12 text-primary">
                             <FileText className="h-8 w-8" />
                         </div>
                         <div className="space-y-2">
@@ -1234,7 +1222,7 @@ export function AIBloggerPostsWorkspace({
             ) : null}
 
             {postsPage.posts.length > 0 ? (
-                <div className="flex flex-col gap-3 rounded-[28px] border border-border/60 bg-background/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/40 p-4 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm text-muted-foreground">
                         {!postsPage.hasPreviousPage && !postsPage.hasNextPage
                             ? "Showing all drafts on one page"
@@ -1299,7 +1287,7 @@ export function AIBloggerPostsWorkspace({
                             type="button"
                             onClick={clearSelection}
                             className="flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                            title="Clear selection"
+                            aria-label="Clear selection"
                         >
                             <X className="h-4 w-4" />
                         </button>

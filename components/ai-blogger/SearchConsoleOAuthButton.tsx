@@ -25,16 +25,13 @@ import { Badge } from "@/components/ui/badge";
 import { AIBloggerGlassCard } from "./AIBloggerPrimitives";
 
 interface SearchConsoleOAuthButtonProps {
-    currentStatus?: "not-connected" | "configured";
+    currentStatus?: "not-connected" | "configured" | "token-expired";
     selectedDomain?: string;
     onConnected?: () => void;
     onDisconnected?: () => void;
 }
 
 interface OAuthSession {
-    refreshToken: string;
-    accessToken: string;
-    expiresAt: number;
     domains: Array<{
         url: string;
         name: string;
@@ -53,34 +50,34 @@ export function SearchConsoleOAuthButton({
     const [oauthSession, setOAuthSession] = useState<OAuthSession | null>(null);
     const [selectedDomainForSave, setSelectedDomainForSave] = useState<string | null>(null);
 
-    // Check for OAuth completion on mount
     useEffect(() => {
-        const checkOAuthCompletion = () => {
+        const checkOAuthCompletion = async () => {
             const params = new URLSearchParams(window.location.search);
             if (params.get("oauth_complete") === "true") {
-                // OAuth callback completed, check for session data
-                const sessionData = document.cookie
-                    .split("; ")
-                    .find((row) => row.startsWith("_oauth_session="))
-                    ?.split("=")[1];
+                try {
+                    const response = await fetch("/api/ai-blogger/search-console-oauth/session", {
+                        cache: "no-store",
+                    });
 
-                if (sessionData) {
-                    try {
-                        const decoded = JSON.parse(decodeURIComponent(sessionData));
-                        setOAuthSession(decoded);
-                        setShowDomainsDialog(true);
-
-                        // Clean up URL
-                        window.history.replaceState({}, "", window.location.pathname);
-                    } catch (e) {
-                        console.error("Failed to parse OAuth session:", e);
-                        toast.error("Failed to parse OAuth data");
+                    if (!response.ok) {
+                        throw new Error("OAuth session expired. Please connect again.");
                     }
+
+                    const sessionData = await response.json();
+                    setOAuthSession({
+                        domains: Array.isArray(sessionData.domains) ? sessionData.domains : [],
+                    });
+                    setShowDomainsDialog(true);
+                } catch (e) {
+                    console.error("Failed to load OAuth session:", e);
+                    toast.error(e instanceof Error ? e.message : "Failed to load OAuth data");
+                } finally {
+                    window.history.replaceState({}, "", window.location.pathname);
                 }
             }
         };
 
-        checkOAuthCompletion();
+        void checkOAuthCompletion();
     }, []);
 
     const handleConnect = async () => {
@@ -118,16 +115,12 @@ export function SearchConsoleOAuthButton({
             setIsLoading(true);
             setSelectedDomainForSave(domain);
 
-            // Save tokens and selected domain
             const saveResponse = await fetch(
                 "/api/ai-blogger/search-console-oauth/save",
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        refreshToken: oauthSession.refreshToken,
-                        accessToken: oauthSession.accessToken,
-                        expiresAt: oauthSession.expiresAt,
                         selectedDomain: domain,
                     }),
                 }
@@ -138,7 +131,7 @@ export function SearchConsoleOAuthButton({
                 throw new Error(error.error || "Failed to save OAuth tokens");
             }
 
-            toast.success(`✓ Connected to ${domain}`);
+            toast.success(`Connected to ${domain}`);
             setShowDomainsDialog(false);
             setOAuthSession(null);
             onConnected?.();
@@ -174,6 +167,8 @@ export function SearchConsoleOAuthButton({
             setIsLoading(false);
         }
     };
+
+    const disconnectedStatusLabel = currentStatus === "token-expired" ? "Reconnect Required" : "Not Connected";
 
     // Render based on status
     if (currentStatus === "configured" && selectedDomain) {
@@ -244,7 +239,7 @@ export function SearchConsoleOAuthButton({
                             Connect to track your blog's Search Console metrics
                         </p>
                     </div>
-                    <Badge variant="outline">Not Connected</Badge>
+                    <Badge variant="outline">{disconnectedStatusLabel}</Badge>
                 </div>
 
                 <Button

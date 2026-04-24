@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, BarChart3, Globe, MonitorSmartphone, Search } from "lucide-react";
-import { AIBloggerGlassCard, AIBloggerSectionEyebrow } from "@/components/ai-blogger/AIBloggerPrimitives";
+import { ArrowUpRight, BarChart3, Globe, MonitorSmartphone, Search, Settings } from "lucide-react";
+import { AIBloggerGlassCard } from "@/components/ai-blogger/AIBloggerPrimitives";
 import { QuerySparkline } from "@/components/ai-blogger/QuerySparkline";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,10 +14,11 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import type { SearchConsoleAnalyticsData } from "@/lib/actions/ai-blogger";
-import type { BlogStudioPerformanceSnapshot } from "@/lib/types-ai-blogger";
+import type { BlogStudioPerformanceSnapshot, BlogStudioPerformanceSyncStatus } from "@/lib/types-ai-blogger";
 
 type SearchConsoleAnalyticsCardProps = {
     initialData: SearchConsoleAnalyticsData;
+    syncStatus?: BlogStudioPerformanceSyncStatus;
     history?: BlogStudioPerformanceSnapshot[];
     onPeriodChange?: (period: 7 | 14 | 28) => void;
 };
@@ -53,8 +54,12 @@ function QueryCard({ query, clicks, impressions, ctr, position, history }: {
             </div>
             <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
                 <span>{formatPerformanceNumber(clicks)} clicks</span>
-                <span>•</span>
+                <span>|</span>
+                <span>{formatPerformanceNumber(impressions)} impr.</span>
+                <span>|</span>
                 <span>{formatPerformancePercent(ctr)} CTR</span>
+                <span>|</span>
+                <span>Avg {position > 0 ? position.toFixed(1) : "-"}</span>
             </div>
         </div>
     );
@@ -78,8 +83,12 @@ function BreakdownItem({
             <p className="text-sm font-medium text-foreground">{label}</p>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span>{formatPerformanceNumber(impressions)} impr.</span>
-                <span>•</span>
+                <span>|</span>
+                <span>{formatPerformanceNumber(clicks)} clicks</span>
+                <span>|</span>
                 <span>{formatPerformancePercent(ctr)} CTR</span>
+                <span>|</span>
+                <span>Avg {position > 0 ? position.toFixed(1) : "-"}</span>
             </div>
         </div>
     );
@@ -87,6 +96,7 @@ function BreakdownItem({
 
 export function SearchConsoleAnalyticsCard({
     initialData,
+    syncStatus,
     history = [],
     onPeriodChange,
 }: SearchConsoleAnalyticsCardProps) {
@@ -94,12 +104,50 @@ export function SearchConsoleAnalyticsCard({
     // In a real implementation, you'd refetch data when period changes
     // For now, showing initial data
     const data = initialData;
+    const needsSetup = Boolean(
+        syncStatus &&
+        (!syncStatus.enabled || !syncStatus.hasValidConfig || syncStatus.authStatus !== "configured")
+    );
+    const hasAnalyticsData = data.summary.totalClicks > 0 ||
+        data.summary.totalImpressions > 0 ||
+        data.topQueries.length > 0 ||
+        data.topCountries.length > 0 ||
+        data.topDevices.length > 0;
 
     const handlePeriodChange = (value: string) => {
         const periodValue = parseInt(value, 10) as 7 | 14 | 28;
         setPeriod(periodValue);
         onPeriodChange?.(periodValue);
     };
+
+    if (needsSetup || !hasAnalyticsData) {
+        return (
+            <AIBloggerGlassCard className="p-5">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex gap-4">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            {needsSetup ? <Settings className="h-5 w-5" /> : <BarChart3 className="h-5 w-5" />}
+                        </div>
+                        <div className="space-y-1.5">
+                            <h3 className="text-lg font-semibold">Search Console Analytics</h3>
+                            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+                                {needsSetup
+                                    ? "Connect Search Console to unlock performance trends, refresh candidates, and query-level insights."
+                                    : "Analytics will appear after published posts receive Search Console snapshots."}
+                            </p>
+                        </div>
+                    </div>
+                    <Link
+                        href={needsSetup ? "/dashboard/ai-blogger/settings" : "/dashboard/ai-blogger/refresh-queue"}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-border/60 bg-background px-4 py-2 text-sm font-medium transition hover:bg-muted"
+                    >
+                        {needsSetup ? "Open Settings" : "View Refresh Queue"}
+                        <ArrowUpRight className="h-4 w-4" />
+                    </Link>
+                </div>
+            </AIBloggerGlassCard>
+        );
+    }
 
     return (
         <AIBloggerGlassCard className="space-y-6 p-6">
@@ -138,19 +186,19 @@ export function SearchConsoleAnalyticsCard({
             {/* Summary metrics */}
             {data.summary && (
                 <div className="grid gap-3 sm:grid-cols-4">
-                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Total Clicks</p>
                         <p className="mt-2 text-2xl font-semibold">{formatPerformanceNumber(data.summary.totalClicks)}</p>
                     </div>
-                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Impressions</p>
                         <p className="mt-2 text-2xl font-semibold">{formatPerformanceNumber(data.summary.totalImpressions)}</p>
                     </div>
-                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Avg CTR</p>
                         <p className="mt-2 text-2xl font-semibold">{formatPerformancePercent(data.summary.avgCTR)}</p>
                     </div>
-                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Avg Position</p>
                         <p className="mt-2 text-2xl font-semibold">
                             {data.summary.avgPosition > 0 ? data.summary.avgPosition.toFixed(1) : "-"}
@@ -250,10 +298,10 @@ export function SearchConsoleAnalyticsCard({
             {/* Footer link to detailed analytics */}
             <div className="border-t border-border/40 pt-4">
                 <Link
-                    href="/dashboard/ai-blogger/search-console-analytics"
+                    href="/dashboard/ai-blogger/refresh-queue"
                     className="inline-flex items-center gap-2 rounded-lg border border-border/40 bg-background/50 px-4 py-2 text-sm font-medium transition-colors hover:bg-background/70"
                 >
-                    View detailed Report
+                    View Refresh Queue
                     <ArrowUpRight className="h-4 w-4" />
                 </Link>
             </div>

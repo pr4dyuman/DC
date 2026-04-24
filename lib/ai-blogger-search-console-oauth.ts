@@ -13,6 +13,19 @@ interface OAuthConfig {
     selectedDomain: string;
 }
 
+function normalizeSearchConsolePropertyUrl(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return "";
+    }
+
+    if (trimmed.startsWith("sc-domain:") || /^https?:\/\//i.test(trimmed)) {
+        return trimmed;
+    }
+
+    return `sc-domain:${trimmed}`;
+}
+
 /**
  * Refresh OAuth access token using refresh token
  * Updates database with new access token and expiry
@@ -81,6 +94,7 @@ export async function refreshGoogleOAuthToken(
                     "searchConsoleOAuth.accessToken": encryptApiKey(data.access_token),
                     "searchConsoleOAuth.accessTokenExpiresAt": expiresAt,
                     "searchConsoleOAuth.lastTokenRefreshAt": Date.now(),
+                    "searchConsoleOAuth.authStatus": "configured",
                     updatedAt: new Date().toISOString(),
                 },
             }
@@ -150,8 +164,11 @@ export async function fetchSearchConsoleData(
     topDevices: Array<{ device: string; clicks: number; impressions: number; ctr: number }>;
 } | null> {
     try {
-        // Ensure domain is prefixed correctly for Search Console API
-        const propertyUrl = domain.startsWith("sc-domain:") ? domain : `sc-domain:${domain}`;
+        const propertyUrl = normalizeSearchConsolePropertyUrl(domain);
+        if (!propertyUrl) {
+            console.error("[Search Console] Missing Search Console property URL");
+            return null;
+        }
 
         const baseUrl = "https://www.googleapis.com/webmasters/v3";
         const encodedUrl = encodeURIComponent(propertyUrl);

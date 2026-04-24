@@ -117,7 +117,7 @@ export function PostPerformanceCard({
                     <AIBloggerPerformanceSyncCard syncStatus={syncStatus} compact />
                 ) : null}
 
-                <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4 text-sm leading-6 text-muted-foreground">
+                <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4 text-sm leading-6 text-muted-foreground">
                     {pagePerformanceNote}
                 </div>
 
@@ -136,7 +136,7 @@ export function PostPerformanceCard({
                         </div>
 
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                            <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                            <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                 <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Clicks</p>
                                 <p className="mt-2 text-2xl font-semibold">{formatPerformanceNumber(latestSnapshot.clicks)}</p>
                                 {previousSnapshot ? (
@@ -145,7 +145,7 @@ export function PostPerformanceCard({
                                     </p>
                                 ) : null}
                             </div>
-                            <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                            <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                 <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Impressions</p>
                                 <p className="mt-2 text-2xl font-semibold">{formatPerformanceNumber(latestSnapshot.impressions)}</p>
                                 {previousSnapshot ? (
@@ -154,7 +154,7 @@ export function PostPerformanceCard({
                                     </p>
                                 ) : null}
                             </div>
-                            <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                            <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                 <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">CTR</p>
                                 <p className="mt-2 text-2xl font-semibold">{formatPerformancePercent(latestSnapshot.ctr)}</p>
                                 {previousSnapshot ? (
@@ -163,7 +163,7 @@ export function PostPerformanceCard({
                                     </p>
                                 ) : null}
                             </div>
-                            <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                            <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                 <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Avg Position</p>
                                 <p className="mt-2 text-2xl font-semibold">
                                     {latestSnapshot.position > 0 ? latestSnapshot.position.toFixed(1) : "-"}
@@ -179,7 +179,7 @@ export function PostPerformanceCard({
                         <AIBloggerPerformanceTrendChart history={history} />
 
                         {refreshOpportunity ? (
-                            <div className={`rounded-[24px] border px-4 py-4 ${getRefreshClasses(refreshOpportunity)}`}>
+                            <div className={`rounded-xl border px-4 py-4 ${getRefreshClasses(refreshOpportunity)}`}>
                                 <div className="flex flex-wrap items-center gap-2">
                                     <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-background/65 text-primary">
                                         <TrendingUp className="h-4 w-4" />
@@ -213,7 +213,7 @@ export function PostPerformanceCard({
                         ) : null}
 
                         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-                            <div className="rounded-[24px] border border-border/60 bg-background/55 p-4">
+                            <div className="rounded-xl border border-border/60 bg-background/55 p-4">
                                 <div className="flex items-center justify-between gap-3">
                                     <div className="flex items-center gap-2">
                                         <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -315,13 +315,13 @@ export function PostPerformanceCard({
                         </div>
                     </div>
                 ) : performanceReport?.isPublished ? (
-                    <div className="rounded-[24px] border border-dashed border-border/60 bg-background/40 px-5 py-6 text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-5 py-6 text-sm text-muted-foreground">
                         {performanceReport.hasSearchConsoleConfig
                             ? "This post is published, but no Search Console snapshot has been stored yet."
                             : "Search Console is not configured for this workspace yet, so post-publish performance tracking is still inactive."}
                     </div>
                 ) : (
-                    <div className="rounded-[24px] border border-dashed border-border/60 bg-background/40 px-5 py-6 text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-5 py-6 text-sm text-muted-foreground">
                         Publish this post first to start the Search Console performance loop.
                     </div>
                 )}

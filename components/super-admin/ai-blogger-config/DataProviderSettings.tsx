@@ -193,7 +193,7 @@ export default function DataProviderSettings({ config, setConfig, visibleKeys, t
                                 <div>
                                 <h2 className="text-lg font-semibold text-foreground">Page Performance Settings</h2>
                                 <p className="text-sm text-muted-foreground">
-                                    Save provider and thresholds for future page-speed-aware audits and reporting.
+                                    Save provider and thresholds for page-speed-aware audits and reporting.
                                 </p>
                                 </div>
                                 <button

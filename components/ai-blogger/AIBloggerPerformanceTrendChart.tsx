@@ -86,7 +86,7 @@ export function AIBloggerPerformanceTrendChart({
 }: AIBloggerPerformanceTrendChartProps) {
     if (history.length === 0) {
         return (
-            <div className={`rounded-[24px] border border-dashed border-border/60 bg-background/40 px-5 py-10 text-sm text-muted-foreground ${className || ""}`.trim()}>
+            <div className={`rounded-xl border border-dashed border-border/60 bg-background/40 px-5 py-10 text-sm text-muted-foreground ${className || ""}`.trim()}>
                 Trend history will appear here after more than one Search Console sync window has been stored.
             </div>
         );
@@ -102,7 +102,7 @@ export function AIBloggerPerformanceTrendChart({
     }));
 
     return (
-        <div className={`rounded-[24px] border border-border/60 bg-background/50 p-4 ${className || ""}`.trim()}>
+        <div className={`rounded-xl border border-border/60 bg-background/50 p-4 ${className || ""}`.trim()}>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <p className="text-sm font-semibold text-foreground">Search Visibility Trend</p>

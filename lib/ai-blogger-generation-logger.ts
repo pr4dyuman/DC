@@ -188,6 +188,12 @@ export class AIBloggerGenerationLogger {
       }
     }
 
+    const summedStepDurationMs = run.steps.reduce((sum, step) => {
+      const durationMs = typeof step.process.durationMs === "number"
+        ? step.process.durationMs
+        : 0;
+      return sum + Math.max(0, durationMs);
+    }, 0);
     const startedMs = new Date(run.startedAt).getTime();
     const latestCompletedMs = run.steps.reduce((latest, step) => {
       const completedMs = step.process.completedAt
@@ -202,6 +208,7 @@ export class AIBloggerGenerationLogger {
     if (Number.isFinite(startedMs) && Number.isFinite(totalEndMs)) {
       nextMetrics.totalDurationMs = Math.max(0, totalEndMs - startedMs);
     }
+    nextMetrics.totalDurationMs = Math.max(nextMetrics.totalDurationMs, summedStepDurationMs);
 
     run.metrics = nextMetrics;
   }
@@ -503,8 +510,7 @@ export class AIBloggerGenerationLogger {
     const { logsDir, currentRun } = this.getRunState();
     currentRun.completedAt = new Date().toISOString();
     currentRun.status = status;
-    currentRun.metrics.totalDurationMs =
-      new Date(currentRun.completedAt).getTime() - new Date(currentRun.startedAt).getTime();
+    this.recalculateMetrics(currentRun);
 
     console.log("\n" + "=".repeat(80));
     console.log("FINAL METRICS");

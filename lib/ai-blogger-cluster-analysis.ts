@@ -69,11 +69,13 @@ export function analyzeBlogStudioClusters(posts: BlogStudioPost[]): ClusterAnaly
         };
     }
 
+    const postsBySlug = new Map(publishedPosts.map((post) => [post.slug, post]));
+
     // Group posts by clusterId
     const clusterMap = new Map<string, BlogStudioPost[]>();
 
     publishedPosts.forEach((post) => {
-        const clusterId = post.contentClusterId || "orphaned";
+        const clusterId = post.contentClusterId?.trim() || "unclustered";
         if (!clusterMap.has(clusterId)) {
             clusterMap.set(clusterId, []);
         }
@@ -85,34 +87,44 @@ export function analyzeBlogStudioClusters(posts: BlogStudioPost[]): ClusterAnaly
     const orphanedPosts: ClusterPost[] = [];
 
     clusterMap.forEach((postsInCluster, clusterId) => {
-        if (clusterId === "orphaned") {
-            // Handle orphaned posts (no contentClusterId)
+        if (clusterId === "unclustered") {
+            // Handle posts with no contentClusterId.
             postsInCluster.forEach((post) => {
                 orphanedPosts.push(buildClusterPost(post));
             });
             return;
         }
 
-        // Find the pillar post (matches parentTopicSlug)
-        const parentTopicSlug = postsInCluster[0]?.parentTopicSlug;
+        // Find the pillar post. Prefer the explicit parentTopicSlug, then a post whose slug matches the cluster id.
+        const parentTopicSlug = postsInCluster.find((post) => post.parentTopicSlug?.trim())?.parentTopicSlug?.trim();
         const pillarPost = parentTopicSlug
-            ? postsInCluster.find((p) => p.slug === parentTopicSlug)
-            : null;
+            ? postsInCluster.find((p) => p.slug === parentTopicSlug) || postsBySlug.get(parentTopicSlug) || null
+            : postsInCluster.find((p) => p.slug === clusterId) || null;
 
-        const supportingPosts = postsInCluster.filter((p) => p.id !== pillarPost?.id);
+        if (!pillarPost) {
+            postsInCluster.forEach((post) => {
+                orphanedPosts.push(buildClusterPost(post));
+            });
+            return;
+        }
+
+        const allPosts = postsInCluster.some((post) => post.id === pillarPost.id)
+            ? postsInCluster
+            : [pillarPost, ...postsInCluster];
+        const supportingPosts = allPosts.filter((p) => p.id !== pillarPost.id);
 
         const clusterMetrics = calculateClusterMetrics(
-            pillarPost || null,
-            postsInCluster,
+            pillarPost,
+            allPosts,
             supportingPosts
         );
 
         clusters.push({
             clusterId,
-            pillarSlug: pillarPost?.slug || parentTopicSlug || "unknown",
-            pillarTitle: pillarPost?.title || "Unnamed Pillar",
-            pillarPost: pillarPost ? buildClusterPost(pillarPost) : undefined,
-            supportingPosts: supportingPosts.map(buildClusterPost),
+            pillarSlug: pillarPost.slug,
+            pillarTitle: pillarPost.title,
+            pillarPost: buildClusterPost(pillarPost, true),
+            supportingPosts: supportingPosts.map((post) => buildClusterPost(post)),
             metrics: clusterMetrics,
         });
     });
@@ -143,7 +155,7 @@ export function analyzeBlogStudioClusters(posts: BlogStudioPost[]): ClusterAnaly
 /**
  * Converts a BlogStudioPost to ClusterPost
  */
-function buildClusterPost(post: BlogStudioPost): ClusterPost {
+function buildClusterPost(post: BlogStudioPost, isParent = false): ClusterPost {
     return {
         id: post.id,
         slug: post.slug,
@@ -154,7 +166,7 @@ function buildClusterPost(post: BlogStudioPost): ClusterPost {
         wordCount: post.wordCount,
         seoScore: post.seoScore,
         internalLinkCount: post.internalLinks?.length || 0,
-        isParent: false,
+        isParent,
     };
 }
 
@@ -232,8 +244,8 @@ export function getClusterHealthLabel(health: ClusterHealth): {
             };
         case "orphaned":
             return {
-                label: "Orphaned",
-                description: "No cluster assigned",
+                label: "Needs Pillar",
+                description: "Assigned posts need a matching pillar post",
                 color: "text-gray-600 dark:text-gray-300 bg-gray-500/10 border-gray-500/20",
             };
     }

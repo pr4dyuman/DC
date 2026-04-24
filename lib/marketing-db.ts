@@ -18,8 +18,12 @@ if (!MARKETING_DB_URI) {
 
 let cachedConnection: mongoose.Connection | null = null;
 let cachedConnectionPromise: Promise<mongoose.Connection> | null = null;
+let lastConnectionFailureAt = 0;
+let lastConnectionFailureMessage = "";
 
-function createMarketingConnection() {
+const MARKETING_DB_RETRY_COOLDOWN_MS = 15_000;
+
+function getMarketingConnectionOptions(): mongoose.ConnectOptions {
     if (!MARKETING_DB_URI) {
         throw new Error(
             "Marketing blog database URI not configured. " +
@@ -29,7 +33,7 @@ function createMarketingConnection() {
 
     const conservativePoolProfile = shouldUseConservativeMongoPoolProfile();
 
-    return mongoose.createConnection(MARKETING_DB_URI, {
+    return {
         dbName: "marketing-blog",
         // Fail fast instead of buffering queries on a half-open connection.
         bufferCommands: false,
@@ -47,11 +51,17 @@ function createMarketingConnection() {
         minPoolSize: 0,
         maxIdleTimeMS: conservativePoolProfile ? 30000 : 60000,
         maxConnecting: conservativePoolProfile ? 2 : 4,
-    });
+    };
+}
+
+function createMarketingConnectionHandle() {
+    return mongoose.createConnection();
 }
 
 function createMarketingConnectionPromise(connection: mongoose.Connection): Promise<mongoose.Connection> {
-    const promise = connection.asPromise().then(() => {
+    const promise = connection.openUri(MARKETING_DB_URI!, getMarketingConnectionOptions()).then(() => {
+        lastConnectionFailureAt = 0;
+        lastConnectionFailureMessage = "";
         console.debug("[Marketing DB] Connected to marketing blog database");
         return connection;
     }).catch((error) => {
@@ -61,7 +71,9 @@ function createMarketingConnectionPromise(connection: mongoose.Connection): Prom
         if (cachedConnectionPromise === promise) {
             cachedConnectionPromise = null;
         }
-        console.error("[Marketing DB] Connection failed:", error);
+        lastConnectionFailureAt = Date.now();
+        lastConnectionFailureMessage = error instanceof Error ? error.message : String(error);
+        console.warn("[Marketing DB] Connection attempt failed:", lastConnectionFailureMessage);
         throw new Error(
             `Failed to connect to marketing blog database: ${error instanceof Error ? error.message : String(error)}`
         );
@@ -71,17 +83,26 @@ function createMarketingConnectionPromise(connection: mongoose.Connection): Prom
 }
 
 function ensureMarketingConnectionStarted(): mongoose.Connection {
-    if (cachedConnection && cachedConnection.readyState !== 0 && cachedConnection.readyState !== 3) {
-        if (cachedConnection.readyState === 2 && !cachedConnectionPromise) {
+    if (!cachedConnection) {
+        cachedConnection = createMarketingConnectionHandle();
+    }
+
+    if (cachedConnection.readyState === 2) {
+        if (!cachedConnectionPromise) {
             cachedConnectionPromise = createMarketingConnectionPromise(cachedConnection);
         }
         return cachedConnection;
     }
 
-    const connection = createMarketingConnection();
-    cachedConnection = connection;
-    cachedConnectionPromise = createMarketingConnectionPromise(connection);
-    return connection;
+    if (cachedConnection.readyState === 1) {
+        return cachedConnection;
+    }
+
+    if (!cachedConnectionPromise) {
+        cachedConnectionPromise = createMarketingConnectionPromise(cachedConnection);
+    }
+
+    return cachedConnection;
 }
 
 /**
@@ -90,7 +111,11 @@ function ensureMarketingConnectionStarted(): mongoose.Connection {
  * before a route explicitly awaits the connection.
  */
 export function getMarketingDbConnectionHandle(): mongoose.Connection {
-    return ensureMarketingConnectionStarted();
+    if (!cachedConnection) {
+        cachedConnection = createMarketingConnectionHandle();
+    }
+
+    return cachedConnection;
 }
 
 /**
@@ -102,9 +127,18 @@ export default async function dbConnect(): Promise<mongoose.Connection> {
         return cachedConnection;
     }
 
-    if (cachedConnection && (cachedConnection.readyState === 0 || cachedConnection.readyState === 3)) {
+    if (cachedConnection && cachedConnection.readyState === 3) {
         cachedConnection = null;
         cachedConnectionPromise = null;
+    }
+
+    if (
+        lastConnectionFailureAt > 0 &&
+        Date.now() - lastConnectionFailureAt < MARKETING_DB_RETRY_COOLDOWN_MS
+    ) {
+        throw new Error(
+            `Failed to connect to marketing blog database: ${lastConnectionFailureMessage || "recent connection attempt failed"}`
+        );
     }
 
     try {

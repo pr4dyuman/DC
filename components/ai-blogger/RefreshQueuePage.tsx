@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, ChevronDown } from "lucide-react";
+import { ArrowUpRight, ChevronDown, Globe, MonitorSmartphone, Search, Settings } from "lucide-react";
 import { AIBloggerGlassCard, AIBloggerGradientButton, AIBloggerSectionEyebrow } from "@/components/ai-blogger/AIBloggerPrimitives";
 import { AIBloggerPerformanceBreakdownPanel } from "@/components/ai-blogger/AIBloggerPerformanceBreakdownPanel";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import type { BlogStudioRefreshQueue } from "@/lib/types-ai-blogger";
+import type { BlogStudioPerformanceSyncStatus, BlogStudioRefreshQueue } from "@/lib/types-ai-blogger";
 import {
     formatBlogStudioDate,
     humanizeBlogStudioValue,
@@ -44,10 +44,11 @@ function getRefreshUrgencyClasses(urgency: "critical" | "high" | "medium" | "low
 
 interface RefreshQueuePageProps {
     refreshQueue: BlogStudioRefreshQueue;
+    syncStatus?: BlogStudioPerformanceSyncStatus;
     onFilterChange?: (filters: { urgency?: string; reason?: string; sort?: string }) => void;
 }
 
-export function RefreshQueuePage({ refreshQueue, onFilterChange }: RefreshQueuePageProps) {
+export function RefreshQueuePage({ refreshQueue, syncStatus, onFilterChange }: RefreshQueuePageProps) {
     const { items, totalCandidates, summary, reporting } = refreshQueue;
     const [filters, setFilters] = useState({
         urgency: "all",
@@ -60,6 +61,10 @@ export function RefreshQueuePage({ refreshQueue, onFilterChange }: RefreshQueueP
         filters.urgency !== "all" ||
         filters.reason !== "all" ||
         filters.sort !== "refresh-score";
+    const needsSearchConsoleSetup = Boolean(
+        syncStatus &&
+        (!syncStatus.enabled || !syncStatus.hasValidConfig || syncStatus.authStatus !== "configured")
+    );
 
     const filteredItems = useMemo(() => {
         const nextItems = items.filter((item) => {
@@ -137,11 +142,52 @@ export function RefreshQueuePage({ refreshQueue, onFilterChange }: RefreshQueueP
                             </p>
                         ) : null}
                     </div>
-                    <Badge variant="outline" className="w-fit rounded-full text-lg">
-                        {totalCandidates} candidate{totalCandidates === 1 ? "" : "s"}
+                    <Badge variant="outline" className="w-fit rounded-lg text-sm">
+                        {needsSearchConsoleSetup
+                            ? "Setup needed"
+                            : `${totalCandidates} candidate${totalCandidates === 1 ? "" : "s"}`}
                     </Badge>
                 </div>
             </div>
+
+            {needsSearchConsoleSetup ? (
+                <AIBloggerGlassCard className="border-amber-500/25 bg-amber-500/5 p-6">
+                    <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex gap-4">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                                <Settings className="h-5 w-5" />
+                            </div>
+                            <div className="space-y-2">
+                                <h2 className="text-lg font-semibold text-foreground">Connect Search Console to build the queue</h2>
+                                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+                                    Refresh candidates appear after Search Console is connected and published posts have performance snapshots.
+                                </p>
+                            </div>
+                        </div>
+                        <AIBloggerGradientButton asChild>
+                            <Link href="/dashboard/ai-blogger/settings">
+                                Open Settings
+                                <ArrowUpRight className="h-4 w-4" />
+                            </Link>
+                        </AIBloggerGradientButton>
+                    </div>
+                </AIBloggerGlassCard>
+            ) : totalCandidates === 0 ? (
+                <AIBloggerGlassCard className="border-dashed border-border/60 bg-background/40 px-6 py-12 text-center">
+                    <div className="mx-auto max-w-md space-y-3">
+                        <p className="text-base font-medium">No refresh candidates yet</p>
+                        <p className="text-sm leading-6 text-muted-foreground">
+                            Published posts will appear here after Search Console data shows CTR gaps, visibility decay, stale content, or ranking opportunities.
+                        </p>
+                        <AIBloggerGradientButton asChild variant="outline">
+                            <Link href="/dashboard/ai-blogger/posts?filter=published">
+                                View Published Posts
+                            </Link>
+                        </AIBloggerGradientButton>
+                    </div>
+                </AIBloggerGlassCard>
+            ) : (
+                <>
 
             {/* Summary Metrics */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -366,10 +412,10 @@ export function RefreshQueuePage({ refreshQueue, onFilterChange }: RefreshQueueP
                                             <div className="space-y-4">
                                                 <div className="grid gap-4 md:grid-cols-3">
                                                     {/* Top Queries preview */}
-                                                    <div className="rounded-[24px] border border-border/60 bg-background/55 p-4">
+                                                    <div className="rounded-xl border border-border/60 bg-background/55 p-4">
                                                         <div className="mb-4 flex items-center gap-2">
-                                                            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                                                                <em className="text-sm">🔍</em>
+                                                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                                                <Search className="h-4 w-4" />
                                                             </div>
                                                             <div>
                                                                 <p className="font-semibold text-foreground">Top Queries</p>
@@ -385,7 +431,7 @@ export function RefreshQueuePage({ refreshQueue, onFilterChange }: RefreshQueueP
                                                                     >
                                                                         <p className="font-medium text-foreground truncate">{query.query}</p>
                                                                         <p className="mt-1 text-muted-foreground">
-                                                                            {formatCompactNumber(query.clicks)} clicks • {(query.ctr * 100).toFixed(1)}% CTR
+                                                                            {formatCompactNumber(query.clicks)} clicks | {(query.ctr * 100).toFixed(1)}% CTR
                                                                         </p>
                                                                     </div>
                                                                 ))
@@ -399,14 +445,14 @@ export function RefreshQueuePage({ refreshQueue, onFilterChange }: RefreshQueueP
 
                                                     {/* Full breakdown panels */}
                                                     <AIBloggerPerformanceBreakdownPanel
-                                                        icon={<span>🌍</span>}
+                                                        icon={<Globe className="h-4 w-4" />}
                                                         title="Top Countries"
                                                         items={item.latestSnapshot.topCountries}
                                                         emptyLabel="No country data"
                                                         compact
                                                     />
                                                     <AIBloggerPerformanceBreakdownPanel
-                                                        icon={<span>📱</span>}
+                                                        icon={<MonitorSmartphone className="h-4 w-4" />}
                                                         title="Top Devices"
                                                         items={item.latestSnapshot.topDevices}
                                                         emptyLabel="No device data"
@@ -422,7 +468,7 @@ export function RefreshQueuePage({ refreshQueue, onFilterChange }: RefreshQueueP
                     })}
                 </div>
             ) : (
-                <AIBloggerGlassCard className="rounded-[24px] border-dashed border-border/60 bg-background/40 px-6 py-12 text-center">
+                <AIBloggerGlassCard className="rounded-xl border-dashed border-border/60 bg-background/40 px-6 py-12 text-center">
                     <div className="space-y-2">
                         <p className="text-base font-medium">
                             {hasActiveFilters ? "No candidates match these filters" : "No refresh candidates"}
@@ -434,6 +480,8 @@ export function RefreshQueuePage({ refreshQueue, onFilterChange }: RefreshQueueP
                         </p>
                     </div>
                 </AIBloggerGlassCard>
+            )}
+                </>
             )}
         </div>
     );

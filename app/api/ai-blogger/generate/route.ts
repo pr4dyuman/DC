@@ -17,6 +17,7 @@ import {
     getCachedWebsiteIntelligence,
     normalizeUrl as normalizeWebsiteUrl,
 } from "@/lib/ai-blogger-website-intelligence";
+import { isMongoConnectionIssue } from "@/lib/mongodb-connection";
 import type { BlogStudioBrief, BlogStudioTarget } from "@/lib/types-ai-blogger";
 import { getAgencyAIBloggerConfigServer } from "@/lib/utils-server";
 
@@ -290,14 +291,23 @@ export async function POST(request: Request) {
                 if (!workerResponse.ok) {
                     const message = await readDispatchFailureMessage("Worker dispatch", workerResponse);
                     console.warn(`[GENERATE-ROUTE] ${message}`);
-                    if (workerResponse.status < 500) {
-                        await emitPipelineEvent(jobId, { type: "error", message });
-                        await awaitPipelineJobPersistence(jobId);
+                    await emitPipelineEvent(jobId, { type: "error", message });
+                    await awaitPipelineJobPersistence(jobId);
+                    if (process.env.NODE_ENV !== "development") {
+                        releaseLocalPipelineJob(jobId);
                     }
+                    return NextResponse.json({ ok: false, error: message, jobId }, { status: 502 });
                 }
             } catch (fetchError) {
                 const msg = fetchError instanceof Error ? fetchError.message : "Worker dispatch failed";
-                console.warn(`[GENERATE-ROUTE] Worker dispatch error (non-fatal): ${msg}`);
+                const message = `Worker dispatch failed: ${msg}`;
+                console.warn(`[GENERATE-ROUTE] ${message}`);
+                await emitPipelineEvent(jobId, { type: "error", message });
+                await awaitPipelineJobPersistence(jobId);
+                if (process.env.NODE_ENV !== "development") {
+                    releaseLocalPipelineJob(jobId);
+                }
+                return NextResponse.json({ ok: false, error: message, jobId }, { status: 502 });
             }
 
             // In production (Vercel), remove the in-memory job so the SSE stream
@@ -327,6 +337,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true, jobId });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Unexpected error";
+        if (isMongoConnectionIssue(error)) {
+            return NextResponse.json(
+                {
+                    ok: false,
+                    error: "AI Blogger could not start because MongoDB is temporarily unavailable. Please try again in a moment.",
+                },
+                { status: 503 },
+            );
+        }
         return NextResponse.json({ ok: false, error: message }, { status: 500 });
     }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertCircle, BookOpen, BarChart, TrendingUp } from "lucide-react";
+import { AlertCircle, BookOpen, BarChart, PlusCircle, TrendingUp } from "lucide-react";
 import { AIBloggerGlassCard, AIBloggerSectionEyebrow } from "@/components/ai-blogger/AIBloggerPrimitives";
 import { Badge } from "@/components/ui/badge";
 import type { ClusterAnalysis, ContentCluster } from "@/lib/ai-blogger-cluster-analysis";
@@ -29,7 +29,7 @@ export function ClusterDashboard({ analysis }: ClusterDashboardProps) {
                 <div>
                     <h1 className="text-3xl font-bold">Cluster Overview</h1>
                     <p className="mt-2 text-muted-foreground">
-                        Pillar posts with supporting content organized by topic clusters for better SEO authority.
+                        Pillar posts and supporting articles grouped into clear topic clusters.
                     </p>
                 </div>
             </div>
@@ -37,16 +37,16 @@ export function ClusterDashboard({ analysis }: ClusterDashboardProps) {
             {/* Summary Metrics */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <AIBloggerGlassCard className="p-5">
-                    <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Total Clusters</p>
-                    <p className="mt-3 text-3xl font-bold">{totalClusters}</p>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Clusters</p>
+                    <p className="mt-3 text-2xl font-bold">{totalClusters}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                         Pillars + supporting posts
                     </p>
                 </AIBloggerGlassCard>
 
                 <AIBloggerGlassCard className="p-5">
-                    <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Coverage</p>
-                    <p className="mt-3 text-3xl font-bold text-emerald-600 dark:text-emerald-300">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Coverage</p>
+                    <p className="mt-3 text-2xl font-bold text-emerald-600 dark:text-emerald-300">
                         {coveragePercentage}%
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
@@ -55,17 +55,17 @@ export function ClusterDashboard({ analysis }: ClusterDashboardProps) {
                 </AIBloggerGlassCard>
 
                 <AIBloggerGlassCard className="p-5">
-                    <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Avg Size</p>
-                    <p className="mt-3 text-3xl font-bold">{averageClusterSize}</p>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Avg Size</p>
+                    <p className="mt-3 text-2xl font-bold">{averageClusterSize}</p>
                     <p className="mt-1 text-xs text-muted-foreground">posts per cluster</p>
                 </AIBloggerGlassCard>
 
                 <AIBloggerGlassCard className="p-5">
-                    <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Orphaned</p>
-                    <p className="mt-3 text-3xl font-bold text-amber-600 dark:text-amber-300">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Unclustered</p>
+                    <p className="mt-3 text-2xl font-bold text-amber-600 dark:text-amber-300">
                         {orphanedPosts.length}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">need clustering</p>
+                    <p className="mt-1 text-xs text-muted-foreground">need a pillar</p>
                 </AIBloggerGlassCard>
             </div>
 
@@ -83,11 +83,14 @@ export function ClusterDashboard({ analysis }: ClusterDashboardProps) {
                     </div>
                 </div>
             ) : (
-                <AIBloggerGlassCard className="rounded-[24px] border-dashed border-border/60 bg-background/40 px-6 py-12 text-center">
-                    <div className="space-y-2">
-                        <p className="text-base font-medium">No clusters yet</p>
+                <AIBloggerGlassCard className="border-dashed border-border/60 bg-background/40 px-6 py-12 text-center">
+                    <div className="mx-auto max-w-md space-y-3">
+                        <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <PlusCircle className="h-5 w-5" />
+                        </div>
+                        <p className="text-base font-medium">No complete clusters yet</p>
                         <p className="text-sm text-muted-foreground">
-                            Create pillar posts and assign related content to contentClusterId to build clusters.
+                            Add a published pillar post and assign related content to the same cluster to start building topic authority.
                         </p>
                     </div>
                 </AIBloggerGlassCard>
@@ -100,10 +103,10 @@ export function ClusterDashboard({ analysis }: ClusterDashboardProps) {
                         <AlertCircle className="mt-1 h-5 w-5 text-amber-600 dark:text-amber-300" />
                         <div className="flex-1">
                             <h3 className="font-semibold text-amber-900 dark:text-amber-100">
-                                {orphanedPosts.length} Orphaned {orphanedPosts.length === 1 ? "Post" : "Posts"}
+                                {orphanedPosts.length} Unclustered {orphanedPosts.length === 1 ? "Post" : "Posts"}
                             </h3>
                             <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
-                                These published posts aren&apos;t assigned to any cluster. Consider grouping them with related content for better SEO authority.
+                                These published posts need a matching pillar and cluster assignment before they count toward coverage.
                             </p>
                             <div className="mt-4 space-y-2">
                                 {orphanedPosts.slice(0, 5).map((post) => (
@@ -118,7 +121,7 @@ export function ClusterDashboard({ analysis }: ClusterDashboardProps) {
                                 ))}
                                 {orphanedPosts.length > 5 && (
                                     <p className="text-xs text-amber-700 dark:text-amber-300">
-                                        +{orphanedPosts.length - 5} more orphaned posts
+                                        +{orphanedPosts.length - 5} more unclustered posts
                                     </p>
                                 )}
                             </div>
@@ -149,13 +152,13 @@ function ClusterCard({ cluster }: ClusterCardProps) {
                         <div className="flex-1">
                             <Link
                                 href={`/dashboard/ai-blogger/posts/${cluster.pillarSlug}`}
-                                className="t text-lg font-semibold transition-colors hover:text-primary"
+                                className="text-lg font-semibold transition-colors hover:text-primary"
                             >
                                 {cluster.pillarTitle}
                             </Link>
                             <p className="mt-1 text-xs text-muted-foreground">Pillar Post</p>
                         </div>
-                        <Badge variant="outline" className={`rounded-full ${healthLabel.color}`}>
+                        <Badge variant="outline" className={`rounded-lg ${healthLabel.color}`}>
                             {healthLabel.label}
                         </Badge>
                     </div>

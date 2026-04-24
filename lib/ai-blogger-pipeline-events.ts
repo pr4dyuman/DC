@@ -693,6 +693,9 @@ export function emitPipelineEvent(jobId: string, event: Omit<PipelineEvent, "tim
         }
 
         await BlogStudioPipelineJobModel.updateOne({ id: jobId }, updateDoc, { upsert: true });
+    }).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[PIPELINE] Failed to persist event for ${jobId}: ${message}`);
     });
 }
 

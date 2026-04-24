@@ -41,7 +41,7 @@ export function PostSeoPrioritiesCard({
                     {suggestions.map((suggestion) => (
                         <div
                             key={suggestion}
-                            className="rounded-[24px] border border-primary/18 bg-primary/6 px-4 py-4 text-sm leading-6 text-foreground"
+                            className="rounded-xl border border-primary/18 bg-primary/6 px-4 py-4 text-sm leading-6 text-foreground"
                         >
                             {suggestion}
                         </div>
@@ -87,7 +87,7 @@ export function PostCannibalizationCard({
                     </div>
                 </div>
 
-                <div className={`rounded-[24px] border px-4 py-4 text-sm leading-6 ${
+                <div className={`rounded-xl border px-4 py-4 text-sm leading-6 ${
                     tone === "destructive"
                         ? "border-destructive/30 bg-destructive/5 text-destructive"
                         : tone === "amber"
@@ -110,7 +110,7 @@ export function PostCannibalizationCard({
                         {report.matches.map((match) => (
                             <div
                                 key={`${match.source}-${match.slug}`}
-                                className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4"
+                                className="rounded-xl border border-border/60 bg-background/60 px-4 py-4"
                             >
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div className="space-y-2">
@@ -145,7 +145,7 @@ export function PostCannibalizationCard({
                         ))}
                     </div>
                 ) : (
-                    <div className="rounded-[24px] border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
                         No overlapping draft or published entry was flagged for this topic.
                     </div>
                 )}
@@ -210,7 +210,7 @@ export function PostInternalLinksCard({
                     </div>
                 </div>
 
-                <div className={`rounded-[24px] border px-4 py-4 text-sm leading-6 ${
+                <div className={`rounded-xl border px-4 py-4 text-sm leading-6 ${
                     healthTone === "emerald"
                         ? "border-emerald-500/25 bg-emerald-500/8 text-emerald-600"
                         : healthTone === "amber"
@@ -236,19 +236,19 @@ export function PostInternalLinksCard({
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-4">
-                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Accepted</p>
                         <p className="mt-2 text-sm font-medium">{acceptedLinks.length}</p>
                     </div>
-                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Cluster-Aligned</p>
                         <p className="mt-2 text-sm font-medium">{health?.clusterAlignedCount || 0}</p>
                     </div>
-                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Inbound</p>
                         <p className="mt-2 text-sm font-medium">{health?.inboundCount || 0}</p>
                     </div>
-                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Related Posts</p>
                         <p className="mt-2 text-sm font-medium">{health?.relatedPostCount || relatedPostCount}</p>
                     </div>
@@ -259,7 +259,7 @@ export function PostInternalLinksCard({
                         {acceptedLinks.map((link) => (
                             <div
                                 key={`${link.href}-${link.anchorText}`}
-                                className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4"
+                                className="rounded-xl border border-border/60 bg-background/60 px-4 py-4"
                             >
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div className="space-y-2">
@@ -295,7 +295,7 @@ export function PostInternalLinksCard({
                         ))}
                     </div>
                 ) : (
-                    <div className="rounded-[24px] border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
                         Accept a few internal link targets in the editor to turn suggestions into a real stored link map.
                     </div>
                 )}
@@ -340,19 +340,19 @@ export function PostClusterContextCard({
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-3">
-                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Cluster ID</p>
                         <p className="mt-2 text-sm font-medium">
                             {contentClusterId ? humanizeBlogStudioValue(contentClusterId) : "Not set yet"}
                         </p>
                     </div>
-                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Parent Topic</p>
                         <p className="mt-2 text-sm font-medium">
                             {parentTopicSlug ? humanizeBlogStudioValue(parentTopicSlug) : "Not set yet"}
                         </p>
                     </div>
-                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Related Drafts</p>
                         <p className="mt-2 text-sm font-medium">
                             {relatedPosts.length} linked post{relatedPosts.length === 1 ? "" : "s"}
@@ -365,7 +365,7 @@ export function PostClusterContextCard({
                         {relatedPosts.map((relatedPost) => (
                             <div
                                 key={relatedPost.id}
-                                className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4"
+                                className="rounded-xl border border-border/60 bg-background/60 px-4 py-4"
                             >
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div className="space-y-2">
@@ -398,7 +398,7 @@ export function PostClusterContextCard({
                         ))}
                     </div>
                 ) : (
-                    <div className="rounded-[24px] border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
                         Save a cluster ID or parent topic on related drafts to build a clearer pillar map for this workspace.
                     </div>
                 )}
@@ -450,7 +450,7 @@ export function PostGroundedResearchCard({
                         externalSources.map((source) => (
                             <div
                                 key={source.id}
-                                className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4"
+                                className="rounded-xl border border-border/60 bg-background/60 px-4 py-4"
                             >
                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                     <div className="space-y-2">
@@ -504,7 +504,7 @@ export function PostGroundedResearchCard({
                             </div>
                         ))
                     ) : (
-                        <div className="rounded-[24px] border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
+                        <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
                             This draft does not have stored grounded research sources yet.
                         </div>
                     )}
@@ -516,13 +516,13 @@ export function PostGroundedResearchCard({
                         researchNotes.map((note, index) => (
                             <div
                                 key={`${postId}-research-note-${index}`}
-                                className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4 text-sm leading-6 text-muted-foreground"
+                                className="rounded-xl border border-border/60 bg-background/60 px-4 py-4 text-sm leading-6 text-muted-foreground"
                             >
                                 {note}
                             </div>
                         ))
                     ) : (
-                        <div className="rounded-[24px] border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
+                        <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-4 py-5 text-sm text-muted-foreground">
                             No grounded source notes were stored for this draft.
                         </div>
                     )}
@@ -578,7 +578,7 @@ export function PostAdvancedDraftPacksCard({
                 </div>
 
                 <div className="grid gap-3">
-                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <div className="flex flex-wrap gap-2">
                             {typeof draftBrief?.businessFitScore === "number" ? (
                                 <Badge variant="outline" className="rounded-full">
@@ -635,7 +635,7 @@ export function PostAdvancedDraftPacksCard({
                         </div>
                     </div>
 
-                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                             Featured Image Prompt
                         </p>
@@ -644,7 +644,7 @@ export function PostAdvancedDraftPacksCard({
                         </p>
                     </div>
 
-                    <div className="rounded-[22px] border border-border/60 bg-background/60 px-4 py-4">
+                    <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                         <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                             FAQ Pack
                         </p>

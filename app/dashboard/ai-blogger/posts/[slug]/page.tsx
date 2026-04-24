@@ -11,6 +11,7 @@ import {
 import { AIBloggerPostActions } from "@/components/ai-blogger/AIBloggerPostActions";
 import { AIBloggerPostEditorForm } from "@/components/ai-blogger/AIBloggerPostEditorForm";
 import { AIBloggerLiveWordCount } from "@/components/ai-blogger/AIBloggerLiveWordCount";
+import { AIBloggerDatabaseUnavailableState } from "@/components/ai-blogger/AIBloggerDatabaseUnavailableState";
 import { AIBloggerLockedState } from "@/components/ai-blogger/AIBloggerLockedState";
 import { AIBloggerBreadcrumb } from "@/components/ai-blogger/AIBloggerBreadcrumb";
 import {
@@ -44,6 +45,7 @@ import {
     isBlogStudioTrendLed,
 } from "@/lib/ai-blogger-presentation";
 import { buildBlogStudioBlockerResolutionPreview } from "@/lib/ai-blogger-blocker-resolution";
+import { isMongoConnectionIssue } from "@/lib/mongodb-connection";
 import { getAgencyAIBloggerConfigServer } from "@/lib/utils-server";
 
 import {
@@ -91,15 +93,16 @@ export default async function AIBloggerPostDetailPage({
     params: Promise<{ slug: string }>;
     searchParams: Promise<Record<string, string>>;
 }) {
-    const { access, agency } = await getAIBloggerDashboardContext();
+    try {
+        const { access, agency } = await getAIBloggerDashboardContext();
 
-    if (!access.canAccess) {
-        return <AIBloggerLockedState access={access} />;
-    }
+        if (!access.canAccess) {
+            return <AIBloggerLockedState access={access} />;
+        }
 
-    const { slug } = await params;
-    const resolvedSearchParams = await searchParams;
-    const activeTab = resolveActiveTab(resolvedSearchParams);
+        const { slug } = await params;
+        const resolvedSearchParams = await searchParams;
+        const activeTab = resolveActiveTab(resolvedSearchParams);
 
     const [post, settings, aiBloggerConfig] = await Promise.all([
         getBlogStudioPostBySlugImpl(agency.id, slug),
@@ -281,8 +284,8 @@ export default async function AIBloggerPostDetailPage({
 
     /* ── Render ────────────────────────────────────────────────── */
 
-    return (
-        <div className="flex flex-col">
+        return (
+            <div className="flex flex-col">
             <div className="px-4 sm:px-6 py-6">
                 <AIBloggerBreadcrumb items={[{ label: "AI Blogger" }, { label: "Posts" }, { label: post.title }]} />
             </div>
@@ -512,6 +515,7 @@ export default async function AIBloggerPostDetailPage({
                             audit={seoAudit}
                             publishValidation={publishValidation}
                             publishingSettings={settings.publishing}
+                            seoSettings={settings.seo}
                             blockerResolutionPreview={blockerResolutionPreview}
                             auditScore={auditScore}
                             blockersCount={blockersCount}
@@ -554,6 +558,18 @@ export default async function AIBloggerPostDetailPage({
                 </div>
             </div>
             </div>
-        </div>
-    );
+            </div>
+        );
+    } catch (error) {
+        if (!isMongoConnectionIssue(error)) {
+            throw error;
+        }
+
+        return (
+            <AIBloggerDatabaseUnavailableState
+                retryHref="/dashboard/ai-blogger/posts"
+                message="AI Blogger couldn't load this post editor because MongoDB is temporarily unavailable."
+            />
+        );
+    }
 }

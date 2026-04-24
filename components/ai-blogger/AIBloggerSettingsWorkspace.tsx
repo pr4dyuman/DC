@@ -124,7 +124,7 @@ function toDateTimeLocalValue(iso?: string | Date) {
 }
 
 function getScheduleSourcePlaceholder(mode: BlogStudioInputMode) {
-    if (mode === "website") return "https://example.com";
+    if (mode === "website") return "Enter website URL";
     if (mode === "trending") return "Trend angle or market shift";
     return "Keyword cluster or campaign phrase";
 }
@@ -784,12 +784,12 @@ export function AIBloggerSettingsWorkspace({
                 </div>
 
                 <Tabs defaultValue="brand" className="space-y-6">
-                    <TabsList className="flex h-auto w-full overflow-x-auto rounded-[28px] border border-border/60 bg-background/40 p-1.5 gap-1 no-scrollbar">
+                    <TabsList className="flex h-auto w-full overflow-x-auto rounded-xl border border-border/60 bg-background/40 p-1.5 gap-1 no-scrollbar">
                         {tabItems.map((item) => (
                             <TabsTrigger
                                 key={item.value}
                                 value={item.value}
-                                className="flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-[22px] px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm data-[state=inactive]:hover:bg-background/80 data-[state=inactive]:hover:text-foreground"
+                                className="flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm data-[state=inactive]:hover:bg-background/80 data-[state=inactive]:hover:text-foreground"
                             >
                                 <item.icon className="h-4 w-4" />
                                 {item.label}
@@ -812,7 +812,7 @@ export function AIBloggerSettingsWorkspace({
                                     </div>
                                 </div>
 
-                                <div className="rounded-[22px] border border-border/60 bg-background/50 px-4 py-4 text-sm leading-6 text-muted-foreground">
+                                <div className="rounded-xl border border-border/60 bg-background/50 px-4 py-4 text-sm leading-6 text-muted-foreground">
                                     Audience, tone, and CTA are inferred inside the existing AI Brief Pack step using website intelligence, SERP intent, grounded research, and business fit.
                                 </div>
 
@@ -823,7 +823,7 @@ export function AIBloggerSettingsWorkspace({
                                         value={bannedTerms}
                                         onChange={(event) => setBannedTerms(event.target.value)}
                                         placeholder="Clickbait, revolutionary, unbeatable"
-                                        className="min-h-[120px] rounded-[24px] border-border/60 bg-background/60"
+                                        className="min-h-[120px] rounded-xl border-border/60 bg-background/60"
                                     />
                                     <p className="text-xs text-muted-foreground">Separate terms with commas.</p>
                                 </div>
@@ -889,7 +889,7 @@ export function AIBloggerSettingsWorkspace({
                                 </div>
 
                                 {defaultTargetType === "webhook" && (
-                                    <div className="space-y-4 rounded-[24px] border border-amber-500/20 bg-amber-500/5 px-4 py-4">
+                                    <div className="space-y-4 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-4">
                                         <div className="flex items-start justify-between gap-4">
                                             <div>
                                                 <h4 className="font-medium text-amber-700 dark:text-amber-300">Webhook Configuration</h4>
@@ -959,7 +959,7 @@ export function AIBloggerSettingsWorkspace({
                                          <div className="grid gap-4 md:grid-cols-2">
                                              <div className="space-y-2">
                                                  <Label htmlFor="ai-blogger-webhook-active">Active</Label>
-                                                <div className="flex items-center justify-between rounded-[24px] border border-border/60 bg-background/60 px-4 py-3">
+                                                <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/60 px-4 py-3">
                                                     <span className="text-sm">Enable webhook delivery</span>
                                                     <Switch checked={webhookActive} onCheckedChange={setWebhookActive} />
                                                 </div>
@@ -992,7 +992,7 @@ export function AIBloggerSettingsWorkspace({
                                         {(savedWebhookStatus || webhookHealthcheck) ? (
                                             <div className="grid gap-3 md:grid-cols-2">
                                                 {savedWebhookStatus ? (
-                                                    <div className={`rounded-[22px] border px-4 py-3 text-sm ${
+                                                    <div className={`rounded-xl border px-4 py-3 text-sm ${
                                                         savedWebhookStatus === "success"
                                                             ? "border-emerald-500/25 bg-emerald-500/8 text-emerald-700 dark:text-emerald-300"
                                                             : savedWebhookStatus === "failed"
@@ -1018,7 +1018,7 @@ export function AIBloggerSettingsWorkspace({
                                                     </div>
                                                 ) : null}
                                                 {webhookHealthcheck ? (
-                                                    <div className={`rounded-[22px] border px-4 py-3 text-sm ${
+                                                    <div className={`rounded-xl border px-4 py-3 text-sm ${
                                                         webhookHealthcheck.success
                                                             ? "border-emerald-500/25 bg-emerald-500/8 text-emerald-700 dark:text-emerald-300"
                                                             : "border-destructive/25 bg-destructive/5 text-destructive"
@@ -1036,14 +1036,14 @@ export function AIBloggerSettingsWorkspace({
                                 )}
 
                                 <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="flex items-center justify-between rounded-[24px] border border-border/60 bg-background/60 px-4 py-4">
+                                    <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                         <div>
                                             <p className="font-medium">Require Approval</p>
                                             <p className="text-sm text-muted-foreground">Keep an approval checkpoint before handoff.</p>
                                         </div>
                                         <Switch checked={requireApproval} onCheckedChange={setRequireApproval} />
                                     </div>
-                                    <div className="flex items-center justify-between rounded-[24px] border border-border/60 bg-background/60 px-4 py-4">
+                                    <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                         <div>
                                             <p className="font-medium">Auto Schedule</p>
                                             <p className="text-sm text-muted-foreground">Allow approved content into the schedule queue when supported.</p>
@@ -1052,7 +1052,7 @@ export function AIBloggerSettingsWorkspace({
                                     </div>
                                 </div>
 
-                                <div className="rounded-[24px] border border-border/60 bg-background/60 px-4 py-4 text-sm leading-6 text-muted-foreground">
+                                <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4 text-sm leading-6 text-muted-foreground">
                                     {defaultTargetType === "webhook"
                                         ? "Published posts will be sent to your webhook URL after publication. Configure the URL, secret, retry, and timeout settings above."
                                         : "Manual Export keeps posts in the queue for review, copy, and markdown export."}
@@ -1112,21 +1112,21 @@ export function AIBloggerSettingsWorkspace({
                                 </div>
 
                                 <div className="grid gap-4 md:grid-cols-3">
-                                    <div className="flex items-center justify-between rounded-[24px] border border-border/60 bg-background/60 px-4 py-4">
+                                    <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                         <div>
                                             <p className="font-medium">Require Internal Links</p>
                                             <p className="text-sm text-muted-foreground">Flag missing links during review.</p>
                                         </div>
                                         <Switch checked={requireInternalLinks} onCheckedChange={setRequireInternalLinks} />
                                     </div>
-                                    <div className="flex items-center justify-between rounded-[24px] border border-border/60 bg-background/60 px-4 py-4">
+                                    <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                         <div>
                                             <p className="font-medium">Require Meta Description</p>
                                             <p className="text-sm text-muted-foreground">Keep excerpt and metadata ready.</p>
                                         </div>
                                         <Switch checked={requireMetaDescription} onCheckedChange={setRequireMetaDescription} />
                                     </div>
-                                    <div className="flex items-center justify-between rounded-[24px] border border-border/60 bg-background/60 px-4 py-4">
+                                    <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                         <div>
                                             <p className="font-medium">Require SEO Review</p>
                                             <p className="text-sm text-muted-foreground">Hold drafts in SEO review before approval.</p>
@@ -1174,7 +1174,7 @@ export function AIBloggerSettingsWorkspace({
                                     currentStatus={settings?.searchConsoleOAuth?.authStatus || "not-connected"}
                                     selectedDomain={settings?.searchConsoleOAuth?.selectedDomain}
                                     onConnected={() => {
-                                        toast.success("✓ Google Search Console connected");
+                                        toast.success("Google Search Console connected");
                                         setOAuthRefreshKey((prev) => prev + 1);
                                         router.refresh();
                                     }}
@@ -1185,9 +1185,9 @@ export function AIBloggerSettingsWorkspace({
                                     }}
                                 />
 
-                                <div className="rounded-[24px] border border-sky-500/30 bg-sky-500/10 p-4">
+                                <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-4">
                                     <p className="text-sm text-sky-900 dark:text-sky-200">
-                                        <strong>How it works:</strong> Click "Connect with Google" and authorize AgencyOS to access your Search Console. Your tokens are encrypted and stored securely.
+                                        <strong>How it works:</strong> Click &quot;Connect with Google&quot; and authorize AgencyOS to access your Search Console. Your tokens are encrypted and stored securely.
                                     </p>
                                 </div>
                             </div>
@@ -1259,7 +1259,7 @@ export function AIBloggerSettingsWorkspace({
                                                     title="Select a future date and time for the next automated generation run"
                                                 />
                                             </div>
-                                            <div className={`flex items-start gap-3 rounded-[24px] border px-4 py-4 text-sm leading-6 ${scheduleFormStateMessage.toneClass} md:col-span-2`}>
+                                            <div className={`flex items-start gap-3 rounded-xl border px-4 py-4 text-sm leading-6 ${scheduleFormStateMessage.toneClass} md:col-span-2`}>
                                                 <scheduleFormStateMessage.icon className="mt-0.5 h-4 w-4 shrink-0" />
                                                 <p>{scheduleFormStateMessage.message}</p>
                                             </div>
@@ -1314,7 +1314,7 @@ export function AIBloggerSettingsWorkspace({
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center justify-between rounded-[24px] border border-border/60 bg-background/60 px-4 py-4">
+                                        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                             <div>
                                                 <p className="font-medium">Create Draft Only</p>
                                                 <p className="text-sm text-muted-foreground">
@@ -1370,7 +1370,7 @@ export function AIBloggerSettingsWorkspace({
                                                 const scheduleBusy = isPending || lockState.isLocked;
 
                                                 return (
-                                                    <div key={schedule.id} className="rounded-[24px] border border-border/60 bg-background/60 px-4 py-4">
+                                                    <div key={schedule.id} className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                                         <div className="space-y-4">
                                                             <div className="flex flex-wrap items-start justify-between gap-3">
                                                                 <div className="space-y-2">
@@ -1499,7 +1499,7 @@ export function AIBloggerSettingsWorkspace({
                                                     </div>
                                                 );
                                             }) : (
-                                                <div className="rounded-[24px] border border-dashed border-border/60 bg-background/40 px-4 py-6 text-sm text-muted-foreground">
+                                                <div className="rounded-xl border border-dashed border-border/60 bg-background/40 px-4 py-6 text-sm text-muted-foreground">
                                                     No schedules have been saved yet.
                                                 </div>
                                             )}

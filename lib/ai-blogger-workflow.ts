@@ -39,6 +39,25 @@ export interface StatusTransitionValidation {
 }
 
 type BlogStudioPublishingConfig = Pick<BlogStudioSettings, "publishing"> | undefined;
+type BlogStudioWorkflowConfig = {
+    publishing?: BlogStudioSettings["publishing"];
+    seo?: Pick<BlogStudioSettings["seo"], "requireSeoReview">;
+} | undefined;
+
+function shouldSkipSeoReview(settings?: BlogStudioWorkflowConfig) {
+    return settings?.seo?.requireSeoReview === false;
+}
+
+function getAllowedNextStatus(
+    currentStatus: BlogStudioPostStatus,
+    settings?: BlogStudioWorkflowConfig,
+): BlogStudioPostStatus | null {
+    if (currentStatus === "Research" && shouldSkipSeoReview(settings)) {
+        return "Approved";
+    }
+
+    return NEXT_STATUS_MAP[currentStatus];
+}
 
 function hasConfiguredWebhookTarget(post: BlogStudioPost, settings?: BlogStudioSettings) {
     const target = post.target?.type ? post.target : settings?.publishing.defaultTarget;
@@ -105,9 +124,9 @@ export function validateStatusTransition(
     const errors: string[] = [];
 
     // Check if transition is allowed
-    if (NEXT_STATUS_MAP[currentStatus] !== nextStatus) {
+    if (getAllowedNextStatus(currentStatus, settings) !== nextStatus) {
         errors.push(
-            `Invalid transition from "${currentStatus}" to "${nextStatus}". Valid transitions: ${NEXT_STATUS_MAP[currentStatus] || "none"}`
+            `Invalid transition from "${currentStatus}" to "${nextStatus}". Valid transitions: ${getAllowedNextStatus(currentStatus, settings) || "none"}`
         );
         return { valid: false, errors };
     }
@@ -185,19 +204,24 @@ export function validateStatusTransition(
     };
 }
 
-export function getNextBlogStudioPostStatus(status: BlogStudioPostStatus) {
-    return NEXT_STATUS_MAP[status];
+export function getNextBlogStudioPostStatus(status: BlogStudioPostStatus, settings?: BlogStudioWorkflowConfig) {
+    return getAllowedNextStatus(status, settings);
 }
 
-export function getBlogStudioStatusTransitionLabel(status: BlogStudioPostStatus) {
+export function getBlogStudioStatusTransitionLabel(status: BlogStudioPostStatus, settings?: BlogStudioWorkflowConfig) {
+    if (status === "Research" && shouldSkipSeoReview(settings)) {
+        return "Approve Draft";
+    }
+
     return TRANSITION_LABELS[status];
 }
 
 export function canTransitionBlogStudioStatus(
     currentStatus: BlogStudioPostStatus,
     nextStatus: BlogStudioPostStatus,
+    settings?: BlogStudioWorkflowConfig,
 ) {
-    return NEXT_STATUS_MAP[currentStatus] === nextStatus;
+    return getAllowedNextStatus(currentStatus, settings) === nextStatus;
 }
 
 export function shouldTreatBlogStudioStatusTransitionAsNoop(

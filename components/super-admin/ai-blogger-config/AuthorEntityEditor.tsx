@@ -43,7 +43,7 @@ export default function AuthorEntityEditor({ config, setConfig, resetSection }: 
                         <div>
                             <p className="text-sm font-medium text-foreground">Enable author attribution</p>
                             <p className="text-xs text-muted-foreground">
-                                Attach author identity to Article schema on published posts.
+                                Attach author identity to BlogPosting schema on published posts.
                             </p>
                         </div>
                         <Switch
@@ -85,7 +85,7 @@ export default function AuthorEntityEditor({ config, setConfig, resetSection }: 
                                     author: { ...current.author, url: event.target.value },
                                 }))
                             }
-                            placeholder="https://example.com/about"
+                            placeholder="Enter author profile URL"
                             className="h-11 rounded-xl border-border bg-background"
                         />
                     </div>
@@ -119,7 +119,7 @@ export default function AuthorEntityEditor({ config, setConfig, resetSection }: 
                                     author: { ...current.author, imageUrl: event.target.value },
                                 }))
                             }
-                            placeholder="https://example.com/author-photo.jpg"
+                            placeholder="Enter author image URL"
                             className="h-11 rounded-xl border-border bg-background"
                         />
                     </div>
@@ -212,7 +212,7 @@ export default function AuthorEntityEditor({ config, setConfig, resetSection }: 
 
                 <div className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
                     {[
-                        ["enableArticleSchema", "Article schema", "Generates Article JSON-LD with author, datePublished, and publisher."],
+                        ["enableArticleSchema", "BlogPosting schema", "Generates BlogPosting JSON-LD with author, datePublished, and publisher."],
                         ["enableOrganizationSchema", "Organization schema", "Adds Organization JSON-LD with name, logo, and URL to post pages."],
                         ["enableFaqSchema", "FAQ schema", "Outputs FAQPage JSON-LD from FAQ pack data for rich results."],
                         ["enableBreadcrumbSchema", "Breadcrumb schema", "Adds BreadcrumbList JSON-LD for navigation trails in SERPs."],

@@ -195,7 +195,7 @@ export function AIBloggerPerformanceSyncCard({
                 </Badge>
             </div>
 
-            <div className="rounded-[22px] border border-border/60 bg-background/55 px-4 py-4 text-sm leading-6 text-muted-foreground">
+            <div className="rounded-xl border border-border/60 bg-background/55 px-4 py-4 text-sm leading-6 text-muted-foreground">
                 {summary}
             </div>
 

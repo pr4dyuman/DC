@@ -31,10 +31,10 @@ type AIBloggerSuperAdminScopePageProps = {
 
 function getActionClasses(variant: "primary" | "secondary" = "secondary") {
     if (variant === "primary") {
-        return "inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90";
+        return "inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90";
     }
 
-    return "inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted";
+    return "inline-flex items-center justify-center rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted";
 }
 
 export function AIBloggerSuperAdminScopePage({
@@ -64,15 +64,15 @@ export function AIBloggerSuperAdminScopePage({
                     <CardHeader className="space-y-4">
                         <div className="flex flex-wrap items-start justify-between gap-4">
                             <div className="space-y-3">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                                     <Icon className="h-6 w-6" />
                                 </div>
                                 <div className="space-y-2">
-                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                                         {eyebrow}
                                     </p>
                                     <div>
-                                        <h1 className="text-3xl font-bold text-foreground">{title}</h1>
+                                        <h1 className="text-2xl font-bold text-foreground sm:text-3xl">{title}</h1>
                                         <CardDescription className="mt-2 max-w-3xl text-sm leading-6">
                                             {description}
                                         </CardDescription>
@@ -80,13 +80,13 @@ export function AIBloggerSuperAdminScopePage({
                                 </div>
                             </div>
 
-                            <Badge variant="outline" className="rounded-full px-3 py-1">
+                            <Badge variant="outline" className="rounded-lg px-3 py-1">
                                 {statusLabel}
                             </Badge>
                         </div>
 
                         {contextNote ? (
-                            <div className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-sm leading-6 text-muted-foreground">
+                            <div className="rounded-lg border border-border/70 bg-muted/30 px-4 py-3 text-sm leading-6 text-muted-foreground">
                                 {contextNote}
                             </div>
                         ) : null}
@@ -116,7 +116,7 @@ export function AIBloggerSuperAdminScopePage({
                             {card.items.map((item) => (
                                 <div
                                     key={`${card.title}-${item}`}
-                                    className="rounded-xl border border-border/60 bg-background px-3 py-3 text-sm leading-6 text-muted-foreground"
+                                    className="rounded-lg border border-border/60 bg-background px-3 py-3 text-sm leading-6 text-muted-foreground"
                                 >
                                     {item}
                                 </div>

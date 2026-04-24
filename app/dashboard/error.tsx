@@ -12,7 +12,7 @@ export default function DashboardError({
 }) {
   const router = useRouter();
   const errorMessage = error?.message || "";
-  const isDatabaseConnectionIssue = /mongodb|mongoose|serverselectionerror|replicasetnoprimary|ssl3_read_bytes|tlsv1 alert internal error/i.test(errorMessage);
+  const isDatabaseConnectionIssue = /mongodb|mongoose|serverselectionerror|replicasetnoprimary|ssl3_read_bytes|tlsv1 alert internal error|querysrv|etimedout|dns/i.test(errorMessage);
 
   useEffect(() => {
     console.error('Dashboard error:', error);

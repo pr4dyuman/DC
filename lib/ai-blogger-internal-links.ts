@@ -62,6 +62,10 @@ const STOP_WORDS = new Set([
     "your",
 ]);
 
+function isWeakLinkToken(token: string) {
+    return token.length <= 2 || STOP_WORDS.has(token) || /^20\d{2}$/.test(token) || (/^\d+$/.test(token) && token.length >= 4);
+}
+
 const COMMERCIAL_WEBSITE_CATEGORIES = new Set<BlogStudioSitePriorityPageCategory>([
     "service",
     "product",
@@ -617,7 +621,7 @@ function tokenize(values: Array<string | undefined>) {
                     normalizeText(value)
                         .replace(/[^a-z0-9\s-]/g, " ")
                         .split(/\s+/)
-                        .filter((token) => token.length > 2 && !STOP_WORDS.has(token)),
+                        .filter((token) => !isWeakLinkToken(token)),
                 ),
         ),
     );
@@ -929,7 +933,10 @@ async function getPublishedBlogCandidates(siteUrl?: string) {
 
         return await validateBlogHrefs(candidates);
     } catch (error) {
-        console.error("[AI-BLOGGER] Failed to fetch published blog candidates:", error instanceof Error ? error.message : error);
+        console.warn(
+            "[AI-BLOGGER] Marketing blog candidates unavailable; continuing without published blog suggestions:",
+            error instanceof Error ? error.message : error,
+        );
         return [];
     }
 }
@@ -944,12 +951,34 @@ async function getPublishedAIBloggerCandidates(post: BlogStudioPost, siteUrl?: s
             status: "Published",
             publishedEntrySlug: { $exists: true, $ne: "" },
         })
-            .select("id slug title excerpt brief tags contentClusterId parentTopicSlug publishedEntrySlug canonicalUrl")
+            .select("id slug title excerpt brief tags draftBrief generationDiagnostics contentClusterId parentTopicSlug publishedEntrySlug canonicalUrl")
             .sort({ publishedAt: -1, updatedAt: -1 })
             .limit(24)
             .lean();
 
-        const candidates = posts.map((candidatePost) => ({
+        const filteredPosts = posts.filter((candidatePost) => {
+            const topicIntegrity = candidatePost.generationDiagnostics?.scorecard?.topicIntegrity;
+            const websiteTopicAccepted = candidatePost.generationDiagnostics?.scorecard?.websiteTopicAccepted;
+            const businessFitScore =
+                candidatePost.draftBrief?.businessFitScore ??
+                candidatePost.generationDiagnostics?.businessFitScore;
+
+            if (candidatePost.brief?.sourceMode === "website" && websiteTopicAccepted === false) {
+                return false;
+            }
+
+            if (typeof topicIntegrity === "number" && topicIntegrity < 55) {
+                return false;
+            }
+
+            if (typeof businessFitScore === "number" && businessFitScore < 60) {
+                return false;
+            }
+
+            return true;
+        });
+
+        const candidates = filteredPosts.map((candidatePost) => ({
             id: `ai-blogger-${candidatePost.id || candidatePost.slug}`,
             title: candidatePost.title,
             href: resolvePublishedBlogHref(

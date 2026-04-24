@@ -6,6 +6,36 @@ import BlogList from '@/components/marketing/BlogList';
 // Cache for 60 seconds
 export const revalidate = 60;
 
+const SITE_URL = (
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  'https://digitalcorvids.com'
+).replace(/\/+$/, '');
+
+const BLOG_TITLE = 'Digital Marketing Blog | Digital Corvids';
+const BLOG_DESCRIPTION =
+  'Read practical SEO, web design, paid media, social media, and digital growth insights from the Digital Corvids team.';
+
+export const metadata = {
+  title: BLOG_TITLE,
+  description: BLOG_DESCRIPTION,
+  alternates: {
+    canonical: `${SITE_URL}/blog`,
+  },
+  openGraph: {
+    type: 'website',
+    url: `${SITE_URL}/blog`,
+    title: BLOG_TITLE,
+    description: BLOG_DESCRIPTION,
+    siteName: 'Digital Corvids',
+  },
+  twitter: {
+    card: 'summary',
+    title: BLOG_TITLE,
+    description: BLOG_DESCRIPTION,
+  },
+};
+
 // Helper to truncate text
 function truncate(str, length) {
   if (!str) return '';

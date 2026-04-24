@@ -42,8 +42,8 @@ export function AIBloggerSubNav() {
     };
 
     return (
-        <div className="flex overflow-x-auto border-b border-border/40 bg-background/40 backdrop-blur-sm">
-            <div className="flex gap-1 px-4 sm:px-6">
+        <nav className="flex overflow-x-auto border-b border-border/40 bg-background/70 backdrop-blur-sm" aria-label="AI Blogger sections">
+            <div className="flex gap-1 px-3 sm:px-6">
                 {navItems.map((item) => {
                     const Icon = item.icon;
                     const active = isActive(item.href);
@@ -52,19 +52,21 @@ export function AIBloggerSubNav() {
                         <Link
                             key={item.href}
                             href={item.href}
+                            aria-current={active ? "page" : undefined}
+                            aria-label={item.label}
                             className={cn(
-                                "flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium transition-colors duration-200",
+                                "flex min-w-fit items-center gap-2 whitespace-nowrap border-b-2 px-2.5 py-3 text-xs font-medium transition-colors duration-200 sm:px-3 sm:text-sm",
                                 active
                                     ? "border-primary text-primary"
                                     : "border-transparent text-muted-foreground hover:text-foreground"
                             )}
                         >
                             <Icon className="h-4 w-4" />
-                            <span className="hidden sm:inline">{item.label}</span>
+                            <span>{item.label}</span>
                         </Link>
                     );
                 })}
             </div>
-        </div>
+        </nav>
     );
 }

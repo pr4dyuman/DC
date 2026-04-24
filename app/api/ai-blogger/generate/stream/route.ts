@@ -2,54 +2,56 @@ import { requireRole } from "@/lib/actions/access";
 import { getCurrentAgency } from "@/lib/agency-context";
 import { getAIBloggerAccessState } from "@/lib/ai-blogger-access";
 import { getPipelineJobSnapshot, subscribePipelineEvents, type PipelineEvent } from "@/lib/ai-blogger-pipeline-events";
+import { isMongoConnectionIssue } from "@/lib/mongodb-connection";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 minutes - SSE connections need to stay open
 
 export async function GET(request: Request) {
-    const url = new URL(request.url);
-    const jobId = url.searchParams.get("jobId") || "";
-    const cursorParam = url.searchParams.get("cursor");
-    const headerLastEventId = request.headers.get("last-event-id");
-    const cursorFromQuery = cursorParam ? Math.max(0, Math.floor(Number(cursorParam)) || 0) : 0;
-    const cursorFromLastEventId = headerLastEventId
-        ? Math.max(0, Math.floor(Number(headerLastEventId)) + 1 || 0)
-        : 0;
-    const cursor = Math.max(cursorFromQuery, cursorFromLastEventId);
+    try {
+        const url = new URL(request.url);
+        const jobId = url.searchParams.get("jobId") || "";
+        const cursorParam = url.searchParams.get("cursor");
+        const headerLastEventId = request.headers.get("last-event-id");
+        const cursorFromQuery = cursorParam ? Math.max(0, Math.floor(Number(cursorParam)) || 0) : 0;
+        const cursorFromLastEventId = headerLastEventId
+            ? Math.max(0, Math.floor(Number(headerLastEventId)) + 1 || 0)
+            : 0;
+        const cursor = Math.max(cursorFromQuery, cursorFromLastEventId);
 
-    if (!jobId) {
-        return new Response("Missing jobId", { status: 400 });
-    }
+        if (!jobId) {
+            return new Response("Missing jobId", { status: 400 });
+        }
 
-    const currentUser = await requireRole("admin");
-    const agency = await getCurrentAgency();
-    if (!agency) {
-        return new Response("Unauthorized", { status: 401 });
-    }
+        const currentUser = await requireRole("admin");
+        const agency = await getCurrentAgency();
+        if (!agency) {
+            return new Response("Unauthorized", { status: 401 });
+        }
 
-    const access = getAIBloggerAccessState({
-        role: currentUser.role,
-        plan: agency.plan,
-        status: agency.status,
-        featureEnabled: agency.features?.aiBlogger,
-    });
-    if (!access.canAccess) {
-        return new Response("Forbidden", { status: 403 });
-    }
+        const access = getAIBloggerAccessState({
+            role: currentUser.role,
+            plan: agency.plan,
+            status: agency.status,
+            featureEnabled: agency.features?.aiBlogger,
+        });
+        if (!access.canAccess) {
+            return new Response("Forbidden", { status: 403 });
+        }
 
-    const initialSnapshot = await getPipelineJobSnapshot(jobId);
-    if (!initialSnapshot.exists || initialSnapshot.agencyId !== agency.id) {
-        return new Response("Job not found", { status: 404 });
-    }
+        const initialSnapshot = await getPipelineJobSnapshot(jobId);
+        if (!initialSnapshot.exists || initialSnapshot.agencyId !== agency.id) {
+            return new Response("Job not found", { status: 404 });
+        }
 
-    console.log(
-        `[SSE] Initial snapshot: status=${initialSnapshot.status}, events=${initialSnapshot.events.length}, cursor=${cursor}, queryCursor=${cursorFromQuery}, lastEventId=${headerLastEventId || "none"}, jobId=${jobId}`,
-    );
+        console.log(
+            `[SSE] Initial snapshot: status=${initialSnapshot.status}, events=${initialSnapshot.events.length}, cursor=${cursor}, queryCursor=${cursorFromQuery}, lastEventId=${headerLastEventId || "none"}, jobId=${jobId}`,
+        );
 
-    const encoder = new TextEncoder();
+        const encoder = new TextEncoder();
 
-    const stream = new ReadableStream({
-        start(controller) {
+        const stream = new ReadableStream({
+            start(controller) {
             let closed = false;
             let emittedCount = cursor;
             let cleanup: (() => void) | null = null;
@@ -295,18 +297,30 @@ export async function GET(request: Request) {
             };
             request.signal.addEventListener("abort", abortListener);
             console.log(`[SSE] Stream setup complete for ${jobId}, cleanup=${cleanup ? 'live' : 'polling'}`);
-        },
-        cancel() {
-            // Client disconnected - cleanup will be handled by abort listener or stream close
-        },
-    });
+            },
+            cancel() {
+                // Client disconnected - cleanup will be handled by abort listener or stream close
+            },
+        });
 
-    return new Response(stream, {
-        headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache, no-transform",
-            Connection: "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    });
+        return new Response(stream, {
+            headers: {
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache, no-transform",
+                Connection: "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        });
+    } catch (error) {
+        if (isMongoConnectionIssue(error)) {
+            return new Response("Generation stream temporarily unavailable.", {
+                status: 503,
+                headers: {
+                    "Retry-After": "2",
+                },
+            });
+        }
+
+        throw error;
+    }
 }

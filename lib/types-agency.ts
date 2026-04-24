@@ -62,7 +62,7 @@ export type AIBloggerGroundedResearchSourceType =
     | "reference";
 export type AIBloggerPagePerformanceProvider = "pagespeed";
 export type AIBloggerPagePerformanceStrategy = "mobile" | "desktop" | "both";
-export type AIBloggerSearchConsoleAuthStatus = "not-connected" | "configured";
+export type AIBloggerSearchConsoleAuthStatus = "not-connected" | "configured" | "token-expired";
 export type AIBloggerImageGenerationProvider = "openai" | "gemini";
 export type AIBloggerImageGenerationSize = "1024x1024" | "1792x1024" | "1024x1792";
 export type AIBloggerImageGenerationQuality = "standard" | "hd";
