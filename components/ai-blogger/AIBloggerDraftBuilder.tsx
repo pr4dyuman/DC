@@ -73,9 +73,9 @@ function splitOutlineList(value: string) {
 }
 
 function getSourcePlaceholder(mode: BlogStudioInputMode) {
-    if (mode === "website") return "https://example.com";
-    if (mode === "trending") return "Optional, e.g. Google core update impact on local SEO";
-    return "e.g. ai blogging for agencies, content workflow automation";
+    if (mode === "website") return "Enter the website URL";
+    if (mode === "trending") return "Add a trend angle or leave blank";
+    return "Add one keyword cluster";
 }
 
 function getSourceDetailHelpText(mode: BlogStudioInputMode) {
@@ -125,17 +125,17 @@ const sourceModeCards: Array<{
     badge?: string;
 }> = [
     {
+        value: "trending",
+        title: "Trending Topic",
+        note: "Let AI Blogger choose a timely topic and title from trend discovery.",
+        icon: Sparkles,
+        badge: "Popular",
+    },
+    {
         value: "website",
         title: "Website URL",
         note: "Start from a live website so AI can infer services, offers, and on-site content themes.",
         icon: Globe,
-    },
-    {
-        value: "trending",
-        title: "Trending Topic",
-        note: "Start from a timely market angle or launch.",
-        icon: Sparkles,
-        badge: "Popular",
     },
     {
         value: "keywords",
@@ -633,11 +633,11 @@ function getErrorSuggestion(errorType: "validation" | "api-limit" | "timeout" | 
 
 function getErrorIcon(errorType: "validation" | "api-limit" | "timeout" | "network" | "unknown") {
     switch (errorType) {
-        case "api-limit": return "⏱️";
-        case "timeout": return "⏳";
-        case "network": return "🌐";
-        case "validation": return "⚠️";
-        default: return "❌";
+        case "api-limit": return "API";
+        case "timeout": return "TIME";
+        case "network": return "NET";
+        case "validation": return "!";
+        default: return "ERR";
     }
 }
 
@@ -833,7 +833,7 @@ export function AIBloggerDraftBuilder({
     const [showPipelinePlan, setShowPipelinePlan] = useState(false);
 
     const [title, setTitle] = useState("");
-    const [sourceMode, setSourceMode] = useState<BlogStudioInputMode>("website");
+    const [sourceMode, setSourceMode] = useState<BlogStudioInputMode>("trending");
     const [sourceValue, setSourceValue] = useState("");
     const [targetWebsiteUrl, setTargetWebsiteUrl] = useState("");
     const [trendFocus, setTrendFocus] = useState("");
@@ -869,6 +869,7 @@ export function AIBloggerDraftBuilder({
     const reconnectAttemptRef = useRef<number>(0);
     const pipelineStatusRef = useRef<PipelineStatus>(pipelineStatus);
     const statusPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const isFormLocked = pipelineStatus === "running";
     // BUG-08: prevents a rapid double-click from kicking off two fetches and
     // creating two orphaned pipeline jobs (only one jobId gets saved to localStorage).
     const isSubmittingRef = useRef(false);
@@ -1523,9 +1524,9 @@ export function AIBloggerDraftBuilder({
     );
     const strategySettingBadges = useMemo(
         () => [
-            "Audience: AI inferred",
-            "Tone: AI inferred",
-            "CTA: AI inferred",
+            "Audience: Will be inferred",
+            "Tone: Will be inferred",
+            "CTA: Will be inferred",
             `Target: ${targetLabel}`,
         ],
         [targetLabel],
@@ -1639,7 +1640,7 @@ export function AIBloggerDraftBuilder({
                 const res = await fetch("/api/ai-blogger/generate", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ title, brief, target, wordCount: wordTarget }),
+                    body: JSON.stringify({ brief, target, wordCount: wordTarget }),
                 });
                 const json = await res.json();
 
@@ -1700,7 +1701,7 @@ export function AIBloggerDraftBuilder({
                 const wordTarget = Number.isFinite(normalizedWordCount) ? normalizedWordCount : undefined;
 
                 const created = await createBlogStudioDraft({
-                    title,
+                    title: title.trim(),
                     excerpt,
                     content,
                     tags: splitCommaList(tagsText),
@@ -1724,38 +1725,76 @@ export function AIBloggerDraftBuilder({
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
-        submitDraft("manual");
+        submitDraft(formMode);
     };
+
+    const handleSourceModeSelect = (nextMode: BlogStudioInputMode) => {
+        if (isFormLocked || nextMode === sourceMode) {
+            return;
+        }
+
+        if (sourceMode === "website" && nextMode !== "website" && isValidWebsiteUrl(sourceValue.trim())) {
+            setTargetWebsiteUrl(sourceValue.trim());
+        }
+
+        if (nextMode === "website") {
+            setTargetWebsiteUrl("");
+        }
+
+        setSourceMode(nextMode);
+        setSourceValue("");
+        setTrendFocus("");
+    };
+
+    const selectedSourceModeLabel = sourceModeCards.find((mode) => mode.value === sourceMode)?.title ?? "Source";
+    const selectedSourceSummary = sourceValue.trim() || (sourceMode === "trending" ? "Live trend discovery" : "Waiting for input");
+    const compactSourceSummary = selectedSourceSummary.length > 44
+        ? `${selectedSourceSummary.slice(0, 44)}...`
+        : selectedSourceSummary;
+    const compactPrimaryKeyword = primaryKeyword.trim().length > 34
+        ? `${primaryKeyword.trim().slice(0, 34)}...`
+        : primaryKeyword.trim();
 
     return (
         <div className="w-full space-y-4">
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form
+                onSubmit={handleSubmit}
+                className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start"
+            >
+                <div className="space-y-4">
                 <AIBloggerGlassCard className="p-4 sm:p-5 xl:p-6">
-                    <div className="space-y-4">
-                        <div className="space-y-1.5">
+                    <div className="space-y-6">
+                        <div className="space-y-2">
                             <h2 className="text-2xl font-bold tracking-tight">
                                 Generate a new blog draft
                             </h2>
                             <p className="text-sm leading-6 text-muted-foreground">
-                                Build the brief, set the target, and create the draft from one place.
+                                Work from top to bottom: choose how to create the draft, pick a topic source, set the SEO target, then choose the handoff.
                             </p>
+                            <div className="flex flex-wrap gap-2 pt-1">
+                                <span className="rounded-lg border border-border/60 bg-background/60 px-2.5 py-1 text-xs text-muted-foreground">1. Mode</span>
+                                <span className="rounded-lg border border-border/60 bg-background/60 px-2.5 py-1 text-xs text-muted-foreground">2. Topic source</span>
+                                <span className="rounded-lg border border-border/60 bg-background/60 px-2.5 py-1 text-xs text-muted-foreground">3. SEO target</span>
+                                <span className="rounded-lg border border-border/60 bg-background/60 px-2.5 py-1 text-xs text-muted-foreground">4. Publish</span>
+                            </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label className="text-sm">Draft mode</Label>
+                            <Label className="text-sm">1. Draft mode</Label>
                             <div className="flex flex-wrap gap-2">
                                 <button
                                     type="button"
                                     onClick={() => setFormMode("ai")}
-                                    disabled={pipelineStatus === "running"}
+                                    disabled={isFormLocked}
+                                    aria-pressed={formMode === "ai"}
                                     className={[
                                         "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-all",
-                                        pipelineStatus === "running" && "opacity-50 cursor-not-allowed",
-                                        formMode === "ai" && pipelineStatus !== "running"
+                                        isFormLocked ? "cursor-not-allowed opacity-50" : "",
+                                        formMode === "ai" && !isFormLocked
                                             ? "border-primary/35 bg-primary/12 text-primary"
                                             : "border-border/60 bg-background/60 text-muted-foreground hover:border-primary/20 hover:text-foreground",
                                     ].join(" ")}
-                                    title={pipelineStatus === "running" ? "Cannot change mode during generation" : ""}
+                                    title={isFormLocked ? "Cannot change mode during generation" : ""}
                                 >
                                     <WandSparkles className="h-4 w-4" />
                                     AI Draft
@@ -1763,15 +1802,16 @@ export function AIBloggerDraftBuilder({
                                 <button
                                     type="button"
                                     onClick={() => setFormMode("manual")}
-                                    disabled={pipelineStatus === "running"}
+                                    disabled={isFormLocked}
+                                    aria-pressed={formMode === "manual"}
                                     className={[
                                         "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-all",
-                                        pipelineStatus === "running" && "opacity-50 cursor-not-allowed",
-                                        formMode === "manual" && pipelineStatus !== "running"
+                                        isFormLocked ? "cursor-not-allowed opacity-50" : "",
+                                        formMode === "manual" && !isFormLocked
                                             ? "border-primary/35 bg-primary/12 text-primary"
                                             : "border-border/60 bg-background/60 text-muted-foreground hover:border-primary/20 hover:text-foreground",
                                     ].join(" ")}
-                                    title={pipelineStatus === "running" ? "Cannot change mode during generation" : ""}
+                                    title={isFormLocked ? "Cannot change mode during generation" : ""}
                                 >
                                     <FilePenLine className="h-4 w-4" />
                                     Manual Draft
@@ -1784,71 +1824,66 @@ export function AIBloggerDraftBuilder({
                             </p>
                         </div>
 
-                        <div className="space-y-3">
+                        {formMode === "manual" ? (
                             <div className="space-y-2">
-                                <Label htmlFor="ai-blogger-title">
-                                    {formMode === "ai" ? "Working title" : "Blog title"}
-                                    {formMode === "ai" ? (
-                                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                                            (optional — AI generates from research)
-                                        </span>
-                                    ) : null}
-                                </Label>
+                                <Label htmlFor="ai-blogger-title">Blog title</Label>
                                 <Input
                                     id="ai-blogger-title"
                                     value={title}
                                     onChange={(event) => setTitle(event.target.value)}
-                                    placeholder={formMode === "ai"
-                                        ? "Leave empty for AI to decide, or add a direction hint"
-                                        : "e.g. How agencies can use AI blogging without losing brand voice"}
-                                    className="h-11 rounded-2xl border-border/60 bg-background/60 text-base"
-                                    required={formMode === "manual"}
+                                    placeholder="e.g. How agencies can use AI blogging without losing brand voice"
+                                    className="h-11 rounded-xl border-border/60 bg-background/60 text-base"
+                                    required
+                                    disabled={isFormLocked}
                                 />
                             </div>
+                        ) : null}
 
-                            <div className="space-y-3">
-                                <Label>Choose input method</Label>
-                                <div className="grid gap-3 xl:grid-cols-3">
-                                    {sourceModeCards.map((mode) => (
-                                        <button
-                                            key={mode.value}
-                                            type="button"
-                                            onClick={() => setSourceMode(mode.value)}
-                                            className={[
-                                                "relative rounded-[18px] border p-3.5 text-left transition-all duration-300",
-                                                sourceMode === mode.value
-                                                    ? "border-primary/35 bg-primary/10 shadow-[0_16px_36px_rgba(212,160,10,0.14)] ring-2 ring-primary/20"
-                                                    : "border-border/60 bg-background/45 hover:border-primary/20 hover:bg-background/70",
-                                            ].join(" ")}
-                                        >
-                                            {sourceMode === mode.value && (
-                                                <div className="absolute right-4 top-4 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-black">
-                                                    <Check className="h-3.5 w-3.5" />
-                                                </div>
-                                            )}
-                                            {mode.badge ? (
-                                                <Badge
-                                                    className="absolute right-4 top-4 rounded-full bg-primary text-black hover:bg-primary"
-                                                    title={mode.badge === "Popular" ? "Recommended for quick results and market angles" : ""}
-                                                >
-                                                    {mode.badge}
-                                                </Badge>
-                                            ) : null}
-                                            <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-amber-200/10 text-primary">
-                                                <mode.icon className="h-4 w-4" />
+                        <div className="space-y-3">
+                            <Label>2. Topic source</Label>
+                            <div className="grid gap-3 lg:grid-cols-3">
+                                {sourceModeCards.map((mode) => (
+                                    <button
+                                        key={mode.value}
+                                        type="button"
+                                        onClick={() => handleSourceModeSelect(mode.value)}
+                                        disabled={isFormLocked}
+                                        aria-pressed={sourceMode === mode.value}
+                                        className={[
+                                            "relative min-h-[132px] rounded-xl border p-4 text-left transition-all duration-200",
+                                            isFormLocked ? "cursor-not-allowed opacity-60" : "",
+                                            sourceMode === mode.value
+                                                ? "border-primary/35 bg-primary/10 ring-2 ring-primary/15"
+                                                : "border-border/60 bg-background/45 hover:border-primary/20 hover:bg-background/70",
+                                        ].join(" ")}
+                                    >
+                                        {sourceMode === mode.value && (
+                                            <div className="absolute right-4 top-4 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-black">
+                                                <Check className="h-3.5 w-3.5" />
                                             </div>
-                                            <div className="space-y-1">
-                                                <p className="font-semibold">{mode.title}</p>
-                                                <p className="text-sm leading-5 text-muted-foreground">{mode.note}</p>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
+                                        )}
+                                        {mode.badge && sourceMode !== mode.value ? (
+                                            <Badge
+                                                className="absolute right-4 top-4 rounded-full bg-primary text-black hover:bg-primary"
+                                                title={mode.badge === "Popular" ? "Recommended for quick results and market angles" : ""}
+                                            >
+                                                {mode.badge}
+                                            </Badge>
+                                        ) : null}
+                                        <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-amber-200/10 text-primary">
+                                            <mode.icon className="h-4 w-4" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="font-semibold">{mode.title}</p>
+                                            <p className="text-sm leading-5 text-muted-foreground">{mode.note}</p>
+                                        </div>
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
-                        <div className="grid gap-4 xl:grid-cols-3">
-                            <div className="space-y-2 xl:col-span-2">
+                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(220px,0.7fr)_minmax(160px,0.45fr)]">
+                            <div className="space-y-2">
                                 <Label htmlFor="ai-blogger-source-value">{sourceFieldLabel}</Label>
                                 <Input
                                     id="ai-blogger-source-value"
@@ -1856,7 +1891,8 @@ export function AIBloggerDraftBuilder({
                                     value={sourceValue}
                                     onChange={(event) => setSourceValue(event.target.value)}
                                     placeholder={getSourcePlaceholder(sourceMode)}
-                                    className="h-11 rounded-2xl border-border/60 bg-background/60"
+                                    className="h-11 rounded-xl border-border/60 bg-background/60"
+                                    disabled={isFormLocked}
                                 />
                                 <p className="text-xs leading-5 text-muted-foreground">
                                     {sourceDetailHelpText}
@@ -1872,8 +1908,9 @@ export function AIBloggerDraftBuilder({
                                     id="ai-blogger-primary-keyword"
                                     value={primaryKeyword}
                                     onChange={(event) => setPrimaryKeyword(event.target.value)}
-                                    placeholder="Highly recommended for SEO"
-                                    className="h-11 rounded-2xl border-border/60 bg-background/60"
+                                    placeholder="Add one ranking keyword"
+                                    className="h-11 rounded-xl border-border/60 bg-background/60"
+                                    disabled={isFormLocked}
                                 />
                                 <p className="text-xs leading-5 text-muted-foreground">
                                     Optional, but strongly recommended if you want AI Blogger to anchor the draft around one ranking target.
@@ -1888,7 +1925,8 @@ export function AIBloggerDraftBuilder({
                                     max={settings.seo.maxWords}
                                     value={wordCount}
                                     onChange={(event) => setWordCount(event.target.value)}
-                                    className="h-11 rounded-2xl border-border/60 bg-background/60"
+                                    className="h-11 rounded-xl border-border/60 bg-background/60"
+                                    disabled={isFormLocked}
                                 />
                                 <p className="text-xs leading-5 text-muted-foreground">
                                     Choose a target between {settings.seo.minWords} and {settings.seo.maxWords} words.
@@ -1896,13 +1934,13 @@ export function AIBloggerDraftBuilder({
                             </div>
                         </div>
 
-                        {/* Optional target website for internal links — only shown in non-website modes */}
+                        {/* Optional target website for internal links - only shown in non-website modes */}
                         {sourceMode !== "website" && (
-                            <div className="rounded-[22px] border border-border/60 bg-background/45 p-4">
+                            <div className="rounded-xl border border-border/60 bg-background/45 p-4">
                                 <div className="space-y-3">
                                     <div className="space-y-1">
                                         <Label htmlFor="ai-blogger-target-website">
-                                            Internal links — target website <span className="text-muted-foreground font-normal">(optional)</span>
+                                            Internal links - target website <span className="text-muted-foreground font-normal">(optional)</span>
                                         </Label>
                                         <p className="text-xs leading-5 text-muted-foreground">
                                             Enter your website URL so AI Blogger can crawl your pages and inject real internal links into the blog. Leave blank to skip internal linking.
@@ -1913,8 +1951,9 @@ export function AIBloggerDraftBuilder({
                                         type="url"
                                         value={targetWebsiteUrl}
                                         onChange={(event) => setTargetWebsiteUrl(event.target.value)}
-                                        placeholder="https://your-site.com"
-                                        className="h-11 rounded-2xl border-border/60 bg-background/60"
+                                        placeholder="Enter target website URL"
+                                        className="h-11 rounded-xl border-border/60 bg-background/60"
+                                        disabled={isFormLocked}
                                     />
                                     {targetWebsiteUrl.trim() && !isValidWebsiteUrl(targetWebsiteUrl.trim()) && (
                                         <p className="text-xs text-destructive">
@@ -1926,53 +1965,54 @@ export function AIBloggerDraftBuilder({
                         )}
 
                         {sourceMode === "website" ? (
-                            <div className="rounded-[22px] border border-border/60 bg-background/45 p-4">
-                                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                    <div className="space-y-1.5">
+                            <div className="rounded-xl border border-border/60 bg-background/45 p-4">
+                                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_270px] lg:items-start">
+                                    <div className="space-y-2">
                                         <Label htmlFor="ai-blogger-trend-focus">Trend angle for this website</Label>
                                         <p className="text-xs leading-5 text-muted-foreground">
-                                            Add a timely angle like AI search, seasonal demand, a product launch, or an industry shift. AI Blogger will keep the website context, then use this angle during topic discovery and live Google Trends scoring.
+                                            Add a timely angle only if you want to steer topic discovery. Leave blank for a pure website-led draft.
                                         </p>
+                                        <Input
+                                            id="ai-blogger-trend-focus"
+                                            value={trendFocus}
+                                            onChange={(event) => setTrendFocus(event.target.value)}
+                                            placeholder="Add a timely angle"
+                                            className="h-11 rounded-xl border-border/60 bg-background/60"
+                                            disabled={isFormLocked}
+                                        />
                                     </div>
-                                    <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-background/60 px-4 py-3">
+                                    <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/60 px-4 py-3">
                                         <div className="space-y-1">
                                             <p className="text-sm font-medium">Live trend blend</p>
-                                            <p className="text-xs text-muted-foreground">
+                                            <p className="text-xs leading-5 text-muted-foreground">
                                                 {trendPlan.liveTrendsEnabled
-                                                    ? "Website topics and your trend angle both feed the trends stage."
-                                                    : "Live trends is off in admin, so this field still guides AI discovery only."}
+                                                    ? "Website topics and trend angle both feed discovery."
+                                                    : "Live trends is off; this still guides AI discovery."}
                                             </p>
                                         </div>
                                         <Switch checked={trendPlan.liveTrendsEnabled} disabled />
                                     </div>
-                                </div>
-
-                                <div className="mt-4">
-                                    <Input
-                                        id="ai-blogger-trend-focus"
-                                        value={trendFocus}
-                                        onChange={(event) => setTrendFocus(event.target.value)}
-                                        placeholder="Optional, e.g. AI search, holiday demand, Google core update"
-                                        className="h-11 rounded-2xl border-border/60 bg-background/60"
-                                    />
                                 </div>
                             </div>
                         ) : null}
 
                         <div className="space-y-3">
                             <div className="space-y-2">
-                                <Label>Publishing target</Label>
+                                <Label>4. Publishing target</Label>
 
-                                <div className="grid gap-3 xl:grid-cols-2">
+                                <div className="grid gap-3 sm:grid-cols-2">
                                     {publishingTargetCards.map((option) => (
                                         <button
                                             key={option.value}
                                             type="button"
                                             onClick={() => setTargetType(option.value)}
+                                            disabled={isFormLocked}
+                                            aria-pressed={targetType === option.value}
                                             className={[
-                                                "rounded-[18px] border p-3.5 text-left transition-all duration-300",
+                                                "rounded-xl border p-4 text-left transition-all duration-200",
+                                                isFormLocked ? "cursor-not-allowed opacity-60" : "",
                                                 targetType === option.value
-                                                    ? "border-primary/35 bg-primary/10 shadow-[0_16px_36px_rgba(212,160,10,0.14)]"
+                                                    ? "border-primary/35 bg-primary/10 ring-2 ring-primary/15"
                                                     : "border-border/60 bg-background/45 hover:border-primary/20 hover:bg-background/70",
                                             ].join(" ")}
                                         >
@@ -1996,7 +2036,7 @@ export function AIBloggerDraftBuilder({
 
                             <div
                                 className={[
-                                    "rounded-[22px] border px-4 py-3 text-sm leading-6",
+                                    "rounded-xl border px-4 py-3 text-sm leading-6",
                                     targetType === "webhook" && !workspaceWebhookReady
                                         ? "border-amber-500/25 bg-amber-500/8 text-amber-700 dark:text-amber-300"
                                         : "border-border/60 bg-background/45 text-muted-foreground",
@@ -2005,7 +2045,7 @@ export function AIBloggerDraftBuilder({
                                 {targetConfigurationNote}
                             </div>
 
-                            <div className="rounded-[24px] border border-border/60 bg-background/40 px-4 py-3.5 sm:px-5">
+                            <div className="rounded-xl border border-border/60 bg-background/40 px-4 py-3.5 sm:px-5">
                                 <button
                                     type="button"
                                     onClick={() => setShowEditorialDefaults((current) => !current)}
@@ -2013,9 +2053,9 @@ export function AIBloggerDraftBuilder({
                                 >
                                     <p className="text-sm font-semibold text-foreground">Editorial direction</p>
                                     <div className="flex flex-wrap gap-2">
-                                        <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">Audience: AI inferred</div>
-                                        <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">Tone: AI inferred</div>
-                                        <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">CTA: AI inferred</div>
+                                        <div className="rounded-lg border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">Audience: Will be inferred</div>
+                                        <div className="rounded-lg border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">Tone: Will be inferred</div>
+                                        <div className="rounded-lg border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">CTA: Will be inferred</div>
                                     </div>
                                 </button>
 
@@ -2028,7 +2068,7 @@ export function AIBloggerDraftBuilder({
                         </div>
 
                         {formMode === "ai" ? (
-                            <div className="rounded-[24px] border border-border/60 bg-background/40">
+                            <div className="rounded-xl border border-border/60 bg-background/40">
                                 <button
                                     type="button"
                                     onClick={() => setShowPipelinePlan((v) => !v)}
@@ -2036,9 +2076,13 @@ export function AIBloggerDraftBuilder({
                                 >
                                     <div>
                                         <p className="text-sm font-semibold">Review pipeline plan</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {strategyResearchStack.join(" | ")}
-                                        </p>
+                                        <div className="mt-2 hidden flex-wrap gap-1.5 sm:flex">
+                                            {strategyResearchStack.map((item) => (
+                                                <span key={item} className="rounded-lg border border-border/60 bg-background/70 px-2.5 py-1 text-xs text-muted-foreground">
+                                                    {item}
+                                                </span>
+                                            ))}
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-2 text-muted-foreground">
                                         <Badge className="rounded-full bg-primary/12 text-primary hover:bg-primary/12 text-xs px-2.5 py-1">AI Mode</Badge>
@@ -2056,7 +2100,7 @@ export function AIBloggerDraftBuilder({
                                                         <div
                                                             key={feature.key}
                                                             className={[
-                                                                "rounded-[22px] border p-3.5 transition-all",
+                                                                "rounded-xl border p-3.5 transition-all",
                                                                 feature.active
                                                                     ? "border-primary/20 bg-primary/5"
                                                                     : "border-border/60 bg-background/60",
@@ -2081,7 +2125,7 @@ export function AIBloggerDraftBuilder({
 
                                             <div className="space-y-3">
                                                 <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Draft strategy</p>
-                                                <div className="rounded-[22px] border border-border/60 bg-background/55 p-3.5">
+                                                <div className="rounded-xl border border-border/60 bg-background/55 p-3.5">
                                                     <p className="text-xs font-medium text-muted-foreground">Topic source</p>
                                                     <p className="mt-1 text-sm font-semibold">{strategySourceSummary}</p>
                                                 </div>
@@ -2091,11 +2135,11 @@ export function AIBloggerDraftBuilder({
                                                     ))}
                                                 </div>
                                                 <div className="grid gap-3 sm:grid-cols-2">
-                                                    <div className="rounded-[22px] border border-border/60 bg-background/55 p-3">
+                                                    <div className="rounded-xl border border-border/60 bg-background/55 p-3">
                                                         <div className="flex items-center gap-1.5 text-xs font-semibold"><BarChart3 className="h-3.5 w-3.5 text-primary" />SEO rules</div>
                                                         <p className="mt-1.5 text-xs leading-5 text-muted-foreground">{strategySeoSummary}</p>
                                                     </div>
-                                                    <div className="rounded-[22px] border border-border/60 bg-background/55 p-3">
+                                                    <div className="rounded-xl border border-border/60 bg-background/55 p-3">
                                                         <div className="flex items-center gap-1.5 text-xs font-semibold"><CalendarClock className="h-3.5 w-3.5 text-primary" />Publish flow</div>
                                                         <p className="mt-1.5 text-xs leading-5 text-muted-foreground">{targetPublishSummary}</p>
                                                     </div>
@@ -2108,7 +2152,7 @@ export function AIBloggerDraftBuilder({
                         ) : null}
 
                         {formMode === "manual" ? (
-                            <div className="space-y-4 rounded-[28px] border border-border/60 bg-background/40 p-4 sm:p-5">
+                            <div className="space-y-4 rounded-xl border border-border/60 bg-background/40 p-4 sm:p-5">
                                 <h3 className="text-lg font-semibold">Write the first version</h3>
 
                                 <div className="space-y-2">
@@ -2118,7 +2162,7 @@ export function AIBloggerDraftBuilder({
                                         value={excerpt}
                                         onChange={(event) => setExcerpt(event.target.value)}
                                         placeholder="Short summary for the editorial queue"
-                                        className="min-h-[96px] rounded-[24px] border-border/60 bg-background/60"
+                                        className="min-h-[96px] rounded-xl border-border/60 bg-background/60"
                                     />
                                 </div>
 
@@ -2129,7 +2173,7 @@ export function AIBloggerDraftBuilder({
                                         value={content}
                                         onChange={(event) => setContent(event.target.value)}
                                         placeholder="Write the first pass yourself, then save it into the editorial queue."
-                                        className="min-h-[220px] rounded-[24px] border-border/60 bg-background/60"
+                                        className="min-h-[220px] rounded-xl border-border/60 bg-background/60"
                                     />
                                 </div>
 
@@ -2141,7 +2185,7 @@ export function AIBloggerDraftBuilder({
                                             value={tagsText}
                                             onChange={(event) => setTagsText(event.target.value)}
                                             placeholder="SEO, Automation, Content Ops"
-                                            className="min-h-[120px] rounded-[24px] border-border/60 bg-background/60"
+                                            className="min-h-[120px] rounded-xl border-border/60 bg-background/60"
                                         />
                                         <p className="text-xs text-muted-foreground">Separate tags with commas.</p>
                                     </div>
@@ -2152,7 +2196,7 @@ export function AIBloggerDraftBuilder({
                                             value={outlineText}
                                             onChange={(event) => setOutlineText(event.target.value)}
                                             placeholder={"Intro angle\nKey problem\nFramework or solution\nCTA wrap-up"}
-                                            className="min-h-[120px] rounded-[24px] border-border/60 bg-background/60"
+                                            className="min-h-[120px] rounded-xl border-border/60 bg-background/60"
                                         />
                                         <p className="text-xs text-muted-foreground">Use one line per section.</p>
                                     </div>
@@ -2162,35 +2206,63 @@ export function AIBloggerDraftBuilder({
                     </div>
                 </AIBloggerGlassCard>
 
-                <AIBloggerGlassCard className="overflow-hidden border-primary/20 bg-[linear-gradient(135deg,rgba(212,160,10,0.08),rgba(255,255,255,0.02))] p-4 sm:p-6">
+                </div>
+
+                <AIBloggerGlassCard className="overflow-hidden border-primary/20 bg-card p-4 sm:p-6 xl:sticky xl:top-24">
                     <div className="space-y-4">
                         <div>
                             <h3 className="text-lg font-semibold">Create the draft</h3>
-                            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+                            <p className="mt-1 text-sm leading-6 text-muted-foreground">
                                 {formMode === "ai"
-                                    ? "Generate the first full draft with AI, then refine it in the editorial queue."
-                                    : "Save your manual version now, or switch back to AI mode if you want a first pass generated for you."}
+                                    ? "AI will research, write, and send the draft to review."
+                                    : "Save your manual version into the editorial queue."}
                             </p>
                         </div>
 
+                        <dl className="space-y-3">
+                            <div className="rounded-xl border border-border/60 bg-background/45 p-3">
+                                <dt className="text-xs font-medium text-muted-foreground">Mode</dt>
+                                <dd className="mt-1 text-sm font-semibold">{formMode === "ai" ? "AI draft" : "Manual draft"}</dd>
+                            </div>
+                            <div className="rounded-xl border border-border/60 bg-background/45 p-3">
+                                <dt className="text-xs font-medium text-muted-foreground">{selectedSourceModeLabel}</dt>
+                                <dd className="mt-1 break-words text-sm font-semibold">{selectedSourceSummary}</dd>
+                            </div>
+                            {compactPrimaryKeyword ? (
+                                <div className="rounded-xl border border-border/60 bg-background/45 p-3">
+                                    <dt className="text-xs font-medium text-muted-foreground">Primary keyword</dt>
+                                    <dd className="mt-1 break-words text-sm font-semibold">{compactPrimaryKeyword}</dd>
+                                </div>
+                            ) : null}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="rounded-xl border border-border/60 bg-background/45 p-3">
+                                    <dt className="text-xs font-medium text-muted-foreground">Word target</dt>
+                                    <dd className="mt-1 text-sm font-semibold">{selectedWordTarget} words</dd>
+                                </div>
+                                <div className="rounded-xl border border-border/60 bg-background/45 p-3">
+                                    <dt className="text-xs font-medium text-muted-foreground">Handoff</dt>
+                                    <dd className="mt-1 text-sm font-semibold">{targetType === "webhook" ? "Webhook" : "Manual"}</dd>
+                                </div>
+                            </div>
+                        </dl>
+
                         {error ? (
-                            <div className="rounded-[24px] border border-destructive/30 bg-destructive/5 px-4 py-4 text-sm text-destructive">
+                            <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-4 text-sm text-destructive">
                                 {error}
                             </div>
                         ) : null}
 
                         <AIBloggerGradientButton
-                            type={formMode === "manual" ? "submit" : "button"}
+                            type="submit"
                             size="lg"
                             className="w-full"
-                            onClick={formMode === "ai" ? () => submitDraft("ai") : undefined}
                             disabled={isPending || pipelineStatus === "running"}
                         >
                             {formMode === "manual" ? (
                                 isPending && actionMode === "manual" ? (
                                     <>
                                         <Loader2 className="h-5 w-5 animate-spin" />
-                                        Creating Manual Draft…
+                                        Creating Manual Draft...
                                     </>
                                 ) : (
                                     <>
@@ -2201,7 +2273,7 @@ export function AIBloggerDraftBuilder({
                             ) : pipelineStatus === "running" ? (
                                 <>
                                     <Loader2 className="h-5 w-5 animate-spin" />
-                                    Generating Blog…
+                                    Generating Blog...
                                 </>
                                 ) : (
                                     <>
@@ -2211,6 +2283,10 @@ export function AIBloggerDraftBuilder({
                                     </>
                                 )}
                         </AIBloggerGradientButton>
+
+                        <p className="text-xs leading-5 text-muted-foreground">
+                            The draft opens in the editorial queue after creation so it can be reviewed before publishing.
+                        </p>
                     </div>
                 </AIBloggerGlassCard>
             </form>
@@ -2255,8 +2331,8 @@ export function AIBloggerDraftBuilder({
                             <div className="rounded-xl border border-border/60 bg-background/40 p-3">
                                 <p className="text-xs font-semibold text-muted-foreground mb-2">Run Setup</p>
                                 <div className="space-y-1.5 text-xs text-muted-foreground">
-                                    <div><span className="font-medium text-foreground">Source:</span> {sourceMode === "website" ? "Website" : sourceMode === "trending" ? "Trending Topic" : "Keywords"} | {sourceValue.substring(0, 40)}{sourceValue.length > 40 ? "..." : ""}</div>
-                                    <div><span className="font-medium text-foreground">Word target:</span> {selectedWordTarget} words {primaryKeyword && `| Keyword: ${primaryKeyword.substring(0, 30)}${primaryKeyword.length > 30 ? "..." : ""}`}</div>
+                                    <div><span className="font-medium text-foreground">Source:</span> {sourceMode === "website" ? "Website" : sourceMode === "trending" ? "Trending Topic" : "Keywords"} | {compactSourceSummary}</div>
+                                    <div><span className="font-medium text-foreground">Word target:</span> {selectedWordTarget} words {compactPrimaryKeyword && `| Keyword: ${compactPrimaryKeyword}`}</div>
                                 </div>
                             </div>
                         )}
