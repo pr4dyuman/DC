@@ -74,7 +74,9 @@ export async function suspendAgencyImpl(agencyId: string, password: string, reas
     }
 
     const agency = await AgencyModel.findOne({ id: agencyId }).lean() as Agency | null;
-    await AgencyModel.updateOne(
+    if (!agency) throw new Error("Agency not found");
+
+    const result = await AgencyModel.updateOne(
         { id: agencyId },
         {
             $set: {
@@ -85,6 +87,7 @@ export async function suspendAgencyImpl(agencyId: string, password: string, reas
             },
         },
     );
+    if (result.matchedCount === 0) throw new Error("Agency not found");
 
     await logSystemEventImpl({
         event: "Agency Suspended",
@@ -118,7 +121,9 @@ export async function activateAgencyImpl(agencyId: string) {
     await connectDB();
 
     const agency = await AgencyModel.findOne({ id: agencyId }).lean() as Agency | null;
-    await AgencyModel.updateOne(
+    if (!agency) throw new Error("Agency not found");
+
+    const result = await AgencyModel.updateOne(
         { id: agencyId },
         {
             $set: {
@@ -131,6 +136,7 @@ export async function activateAgencyImpl(agencyId: string) {
             },
         },
     );
+    if (result.matchedCount === 0) throw new Error("Agency not found");
 
     await logSystemEventImpl({
         event: "Agency Activated",
@@ -285,13 +291,14 @@ export async function updateAgencyPlanImpl(
         unsetFields.trialEndsAt = "";
     }
 
-    await AgencyModel.updateOne(
+    const result = await AgencyModel.updateOne(
         { id: agencyId },
         {
             $set: updateFields,
             ...(Object.keys(unsetFields).length > 0 ? { $unset: unsetFields } : {}),
         },
     );
+    if (result.matchedCount === 0) throw new Error("Agency not found");
 
     revalidatePath("/super-admin/agencies");
     revalidatePath(`/super-admin/agencies/${agencyId}`);

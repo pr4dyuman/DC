@@ -829,6 +829,7 @@ export function AIBloggerDraftBuilder({
     const [error, setError] = useState("");
     const [formMode, setFormMode] = useState<"ai" | "manual">("ai");
     const [actionMode, setActionMode] = useState<"manual" | "ai">("ai");
+    const [isManualSubmitting, setIsManualSubmitting] = useState(false);
     const [showEditorialDefaults, setShowEditorialDefaults] = useState(false);
     const [showPipelinePlan, setShowPipelinePlan] = useState(false);
 
@@ -870,6 +871,7 @@ export function AIBloggerDraftBuilder({
     const pipelineStatusRef = useRef<PipelineStatus>(pipelineStatus);
     const statusPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const isFormLocked = pipelineStatus === "running";
+    const submitBusy = isPending || isManualSubmitting || pipelineStatus === "running";
     // BUG-08: prevents a rapid double-click from kicking off two fetches and
     // creating two orphaned pipeline jobs (only one jobId gets saved to localStorage).
     const isSubmittingRef = useRef(false);
@@ -1679,8 +1681,10 @@ export function AIBloggerDraftBuilder({
 
         // --- Manual draft (unchanged) ---
         resetPipeline();
+        setIsManualSubmitting(true);
 
         startTransition(async () => {
+            let navigatingToDraft = false;
             try {
                 const brief = {
                     sourceMode,
@@ -1711,6 +1715,7 @@ export function AIBloggerDraftBuilder({
                     brief,
                 });
                 toast.success("AI Blogger draft created");
+                navigatingToDraft = true;
                 router.push(`/dashboard/ai-blogger/posts/${created.slug}`);
                 router.refresh();
             } catch (submitError: unknown) {
@@ -1718,6 +1723,13 @@ export function AIBloggerDraftBuilder({
                 console.error("[AI-BLOGGER] [GENERATE-UI] Raw error:", message);
                 setError(message);
                 toast.error(message);
+                setIsManualSubmitting(false);
+            } finally {
+                if (navigatingToDraft) {
+                    window.setTimeout(() => setIsManualSubmitting(false), 2500);
+                } else {
+                    setIsManualSubmitting(false);
+                }
             }
         });
     };
@@ -1725,6 +1737,10 @@ export function AIBloggerDraftBuilder({
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
+        if (submitBusy) {
+            return;
+        }
+
         submitDraft(formMode);
     };
 
@@ -2256,10 +2272,10 @@ export function AIBloggerDraftBuilder({
                             type="submit"
                             size="lg"
                             className="w-full"
-                            disabled={isPending || pipelineStatus === "running"}
+                            disabled={submitBusy}
                         >
                             {formMode === "manual" ? (
-                                isPending && actionMode === "manual" ? (
+                                (isManualSubmitting || isPending) && actionMode === "manual" ? (
                                     <>
                                         <Loader2 className="h-5 w-5 animate-spin" />
                                         Creating Manual Draft...

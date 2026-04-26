@@ -317,12 +317,14 @@ const MessageSchema = new Schema<Message>({
     content: { type: String, required: true },
     timestamp: { type: String, required: true },
     read: { type: Boolean, required: true, default: false },
-    type: { type: String, enum: ['text', 'image'], required: true }
+    type: { type: String, enum: ['text', 'image'], required: true },
+    deletedFor: [{ type: String }]
 }, { timestamps: true });
 
 // Note: id already has index from unique constraint
 MessageSchema.index({ senderId: 1, receiverId: 1 }); // Compound for conversation queries
 MessageSchema.index({ agencyId: 1, receiverId: 1 }); // For unread count queries
+MessageSchema.index({ agencyId: 1, deletedFor: 1 });
 
 // Leave Request Schema
 const LeaveRequestSchema = new Schema<LeaveRequest>({

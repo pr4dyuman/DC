@@ -80,6 +80,8 @@ export default function ClientDetailPage({ slug }: { slug: string }) {
     const [allTasks, setAllTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [canManageClients, setCanManageClients] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState(() => {
         if (typeof window !== "undefined") {
             const url = new URL(window.location.href);
@@ -101,6 +103,8 @@ export default function ClientDetailPage({ slug }: { slug: string }) {
         try {
             const requestedClient = decodeURIComponent(slug);
             const currentUser = await getCurrentUser();
+            setCurrentUserId(currentUser?.id || null);
+            setCanManageClients(currentUser?.role === "admin" || currentUser?.role === "manager");
 
             if (currentUser?.role === "client") {
                 const ownIdentifiers = new Set([currentUser.id, currentUser.username].filter(Boolean));
@@ -195,13 +199,13 @@ export default function ClientDetailPage({ slug }: { slug: string }) {
 
     if (!client) {
         return (
-            <div className="p-8 text-center">
-                <h1 className="text-2xl font-bold">Client not found</h1>
-                <Link href="/dashboard/clients" className="text-primary hover:underline mt-4 inline-block">
-                    &larr; Back to Clients
-                </Link>
-            </div>
-        );
+                <div className="p-8 text-center">
+                    <h1 className="text-2xl font-bold">Client not found</h1>
+                    <Link href={canManageClients ? "/dashboard/clients" : "/dashboard"} className="text-primary hover:underline mt-4 inline-block">
+                        &larr; Back
+                    </Link>
+                </div>
+            );
     }
 
     const activeProjects = projects.filter((project) => project.status === "Active").length;
@@ -213,7 +217,7 @@ export default function ClientDetailPage({ slug }: { slug: string }) {
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-10">
             <div className="flex items-center gap-4">
-                <Link href="/dashboard/clients" className="p-2 hover:bg-muted rounded-full transition-colors">
+                <Link href={canManageClients ? "/dashboard/clients" : "/dashboard"} className="p-2 hover:bg-muted rounded-full transition-colors">
                     <ArrowLeft className="h-5 w-5" />
                 </Link>
                 <h1 className="text-2xl font-bold">Client Profile</h1>
@@ -227,29 +231,35 @@ export default function ClientDetailPage({ slug }: { slug: string }) {
                         <Download className="h-4 w-4" />
                         <span className="hidden sm:inline">vCard</span>
                     </button>
-                    <button
-                        onClick={() => openChat(client.id)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-muted hover:bg-accent text-foreground rounded-lg transition-all border border-border"
-                    >
-                        <MessageCircle className="h-4 w-4" />
-                        <span className="hidden sm:inline">Message</span>
-                    </button>
-                    <button
-                        onClick={() => setIsEditDialogOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg shadow-lg transition-all"
-                    >
-                        <Pencil className="h-4 w-4" />
-                        <span className="hidden sm:inline">Edit Client</span>
-                    </button>
+                    {currentUserId !== client.id && (
+                        <button
+                            onClick={() => openChat(client.id)}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-muted hover:bg-accent text-foreground rounded-lg transition-all border border-border"
+                        >
+                            <MessageCircle className="h-4 w-4" />
+                            <span className="hidden sm:inline">Message</span>
+                        </button>
+                    )}
+                    {canManageClients && (
+                        <button
+                            onClick={() => setIsEditDialogOpen(true)}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg shadow-lg transition-all"
+                        >
+                            <Pencil className="h-4 w-4" />
+                            <span className="hidden sm:inline">Edit Client</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
-            <EditClientDialog
-                client={client}
-                open={isEditDialogOpen}
-                onOpenChange={setIsEditDialogOpen}
-                onSuccess={loadData}
-            />
+            {canManageClients && (
+                <EditClientDialog
+                    client={client}
+                    open={isEditDialogOpen}
+                    onOpenChange={setIsEditDialogOpen}
+                    onSuccess={loadData}
+                />
+            )}
 
             <ClientProfileHeaderCard
                 client={client}

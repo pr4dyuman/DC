@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/actions";
+import { isDashboardRouteAllowed } from "@/lib/dashboard-route-access";
 import { redirect } from "next/navigation";
 
 export default async function TeamLayout({
@@ -9,9 +10,7 @@ export default async function TeamLayout({
     const user = await getCurrentUser();
     if (!user) redirect("/login");
 
-    // Admin, manager, and employee can access /dashboard/team
-    // Clients are blocked
-    if (user.role === 'client') {
+    if (!isDashboardRouteAllowed(user.role, "/dashboard/team")) {
         redirect("/dashboard");
     }
 

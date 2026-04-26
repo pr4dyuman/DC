@@ -84,7 +84,7 @@ export function RecentActivityList({ initialActivities }: RecentActivityListProp
     }, [inView]);
 
     return (
-        <Card className="col-span-3 transition-all duration-300 hover:shadow-md">
+        <Card className="min-w-0 transition-all duration-300 hover:shadow-md lg:col-span-3">
             <CardHeader>
                 <CardTitle>Recent Activity</CardTitle>
                 <CardDescription>

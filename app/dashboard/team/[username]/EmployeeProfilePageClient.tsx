@@ -38,7 +38,7 @@ import {
 
 export default function EmployeeProfilePage({ username }: { username: string }) {
     const fmt = useDateFormat();
-    // Tab state â€” read initial tab from URL, then manage locally
+    // Tab state: read initial tab from URL, then manage locally
     const [activeTab, setActiveTab] = useState(() => {
         if (typeof window !== 'undefined') {
             const url = new URL(window.location.href);

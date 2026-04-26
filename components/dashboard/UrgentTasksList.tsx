@@ -64,7 +64,7 @@ export function UrgentTasksList({ initialTasks }: UrgentTasksListProps) {
     const today = toLocalCalendarDay(new Date());
 
     return (
-        <Card className="col-span-4 transition-all duration-300 hover:shadow-md">
+        <Card className="min-w-0 transition-all duration-300 hover:shadow-md lg:col-span-4">
             <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Urgent Tasks</CardTitle>
                 <span className="text-xs text-amber-500 font-medium bg-amber-500/10 px-2 py-1 rounded-full">
@@ -78,7 +78,7 @@ export function UrgentTasksList({ initialTasks }: UrgentTasksListProps) {
                 >
                     <div className="space-y-3">
                         {tasks.length === 0 && (
-                            <p className="text-sm text-muted-foreground text-center py-8">🎉 No urgent tasks right now</p>
+                            <p className="text-sm text-muted-foreground text-center py-8">No urgent tasks right now</p>
                         )}
                         {tasks.map((task) => {
                             const due = toLocalCalendarDay(task.dueDate);

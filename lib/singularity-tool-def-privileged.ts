@@ -1,5 +1,5 @@
 ﻿// =============================================================================
-// TOOL DECLARATIONS â€” Gemini Function Calling Schema
+// TOOL DECLARATIONS - Gemini Function Calling Schema
 // This file has NO server action imports, so Next.js won't treat it as an
 // action boundary. Safe to export consts and sync functions.
 // =============================================================================
@@ -45,7 +45,7 @@ export const SINGULARITY_TOOL_DECLARATIONS_PRIVILEGED = [
     },
     {
         name: "approve_invoice_payment",
-        description: "Approve an invoice payment â€” sets invoice to 'Paid' and creates an income transaction. Requires AI Invoice Management permission.",
+        description: "Approve an invoice payment - sets invoice to 'Paid' and creates an income transaction. Requires AI Invoice Management permission.",
         parameters: {
             type: "OBJECT",
             properties: {
@@ -56,7 +56,7 @@ export const SINGULARITY_TOOL_DECLARATIONS_PRIVILEGED = [
     },
     {
         name: "reject_invoice_payment",
-        description: "Reject an invoice payment â€” sets invoice back to 'Pending'. Requires AI Invoice Management permission.",
+        description: "Reject an invoice payment - sets invoice back to 'Pending'. Requires AI Invoice Management permission.",
         parameters: {
             type: "OBJECT",
             properties: {

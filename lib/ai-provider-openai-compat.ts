@@ -39,7 +39,7 @@ export async function openaiCompatGenerateContent(
     if (!response.ok) {
         const errorBody = await response.text().catch(() => "Unknown error");
         throw new Error(
-            `AI Provider Error (${config.provider}): ${response.status} â€” ${errorBody}`
+            `AI Provider Error (${config.provider}): ${response.status} - ${errorBody}`
         );
     }
 
@@ -90,7 +90,7 @@ export async function openaiCompatChat(
     if (!response.ok) {
         const errorBody = await response.text().catch(() => "Unknown error");
         throw new Error(
-            `AI Provider Error (${config.provider}): ${response.status} â€” ${errorBody}`
+            `AI Provider Error (${config.provider}): ${response.status} - ${errorBody}`
         );
     }
 

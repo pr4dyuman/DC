@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AlertTriangle, Clock3 } from "lucide-react";
 import { Project, Task, User, Transaction, Asset, Service, UserPermissions, getDefaultUserPermissionsForRole } from "@/lib/types";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { useCurrency } from "@/context/CurrencyContext";
@@ -36,7 +37,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
     const matchedCategories = categories.filter(c =>
         c.projectId === project.id && (projectServices.includes(c.id) || projectServices.includes(c.name))
     );
-    // Deduplicate by name (case-insensitive) — keeps first match per name
+    // Deduplicate by name (case-insensitive); keeps first match per name
     const seenNames = new Set<string>();
     const filteredCategories = matchedCategories.filter(c => {
         const key = c.name.toLowerCase();
@@ -48,7 +49,9 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
     const [showTeamHours, setShowTeamHours] = useState(false);
     const effectivePermissions = permissions ?? getDefaultUserPermissionsForRole(currentUser?.role);
 
-    const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager'; // Helper
+    const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager';
+    const canAddAssets = currentUser?.role === 'admin' || currentUser?.role === 'manager' || currentUser?.role === 'employee';
+    const canDeleteAssets = isAdmin;
 
     return (
         <div className="h-[calc(100dvh-4rem)] md:h-[calc(100vh-8rem)] flex flex-col overflow-hidden">
@@ -73,7 +76,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                     </div>
 
                     {/* Tabs + Actions row */}
-                    <div className="flex items-center justify-between gap-2 md:gap-3 shrink-0">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between md:gap-3 md:shrink-0">
                         <TabsList className="h-9">
                             <TabsTrigger value="board">Board</TabsTrigger>
                             {isAdmin && <TabsTrigger value="finance">Finance</TabsTrigger>}
@@ -103,7 +106,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                                 {isAdmin && <AddTransactionModal projectId={project.id} projectName={project.name} users={users} />}
                             </TabsContent>
                             <TabsContent value="assets" className="mt-0">
-                                <AddAssetModal projectId={project.id} />
+                                {canAddAssets && <AddAssetModal projectId={project.id} />}
                             </TabsContent>
                         </div>
                     </div>
@@ -138,7 +141,11 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                                     </span>
                                 )}
                                 <span className="inline-flex items-center gap-2">
+                                    <Clock3 className="h-3.5 w-3.5 text-cyan-500 dark:text-cyan-400" />
+                                    <span className="text-cyan-500 dark:text-cyan-400 font-semibold">{completedHours}/{totalHours}h</span>
+                                    <span className="hidden" aria-hidden="true">
                                     <span className="text-cyan-500 dark:text-cyan-400 font-semibold">⏱ {completedHours}/{totalHours}h</span>
+                                    </span>
                                     {totalHours > 0 && (
                                         <span className="inline-flex items-center gap-1">
                                             <span className="inline-block w-16 h-1.5 rounded-full bg-muted overflow-hidden">
@@ -155,7 +162,15 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                                     </button>
                                 </span>
                                 {project.budget > 0 && <span>Budget: {formatMoney(project.budget)}</span>}
+                                {project.dueDate && (
+                                    <span className={`inline-flex items-center gap-1 ${isDue ? 'text-red-500 font-semibold' : ''}`}>
+                                        Due: {fmt.date(project.dueDate)}
+                                        {isDue ? <AlertTriangle className="h-3.5 w-3.5" /> : null}
+                                    </span>
+                                )}
+                                <span className="hidden" aria-hidden="true">
                                 {project.dueDate && <span className={isDue ? 'text-red-500 font-semibold' : ''}>Due: {fmt.date(project.dueDate)}{isDue ? ' ⚠' : ''}</span>}
+                                </span>
                                 {project.client && <span className="text-muted-foreground/80">Client: {project.client}</span>}
                             </div>
 
@@ -270,7 +285,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
 
                 <TabsContent value="assets" className="flex-1 overflow-auto data-[state=inactive]:hidden no-scrollbar">
                     <div className="space-y-4 p-1">
-                        <AssetList assets={assets} />
+                        <AssetList assets={assets} canDelete={canDeleteAssets} />
                     </div>
                 </TabsContent>
 

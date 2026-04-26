@@ -172,6 +172,16 @@ export async function updateUserPermissionsImpl(
     permissions: Record<string, unknown>
 ) {
     await connectDB();
+    const [targetUser, targetClient] = await Promise.all([
+        UserModel.findOne({ id: targetUserId, agencyId, archived: { $ne: true } }).select("role").lean(),
+        ClientModel.findOne({ id: targetUserId, agencyId, archived: { $ne: true } }).select("id").lean(),
+    ]);
+    if (!targetUser && !targetClient) {
+        throw new Error("Permission subject not found");
+    }
+    if (targetUser?.role === "admin") {
+        throw new Error("Admin permissions cannot be overridden");
+    }
     await SettingsModel.updateOne(
         { agencyId },
         { $set: { [`userPermissions.${targetUserId}`]: permissions } },

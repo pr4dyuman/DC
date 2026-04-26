@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+
 const Module = require("module");
 
 const originalResolveFilename = Module._resolveFilename;

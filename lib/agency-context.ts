@@ -13,6 +13,12 @@ function serialize<T>(doc: T): T {
     return JSON.parse(JSON.stringify(doc));
 }
 
+async function canSessionAccessAgency(agencyId: string): Promise<boolean> {
+    const session = await getSessionUser();
+    if (!session) return false;
+    return session.role === 'superadmin' || session.agencyId === agencyId;
+}
+
 /**
  * Get the current user's agency — memoized per request via React cache().
  * This ensures even if called from 10 different server actions in the same request,
@@ -91,8 +97,7 @@ export const getCurrentAgency = cache(async (): Promise<Agency | null> => {
 export async function getAgencyById(agencyId: string): Promise<Agency | null> {
     try {
         await connectDB();
-        const session = await getSessionUser();
-        if (!session) return null;
+        if (!(await canSessionAccessAgency(agencyId))) return null;
         const agency = await AgencyModel.findOne({ id: agencyId }).lean();
         return serialize(agency) as Agency | null;
     } catch (error) {
@@ -110,9 +115,8 @@ export async function getAgencyById(agencyId: string): Promise<Agency | null> {
 export async function getAgencyBySlug(slug: string): Promise<Agency | null> {
     try {
         await connectDB();
-        const session = await getSessionUser();
-        if (!session) return null;
         const agency = await AgencyModel.findOne({ slug }).lean();
+        if (!agency || !(await canSessionAccessAgency(agency.id))) return null;
         return serialize(agency) as Agency | null;
     } catch (error) {
         if (isMongoConnectionIssue(error)) {
@@ -186,8 +190,7 @@ export async function updateAgencyUsage(
 ): Promise<boolean> {
     try {
         await connectDB();
-        const session = await getSessionUser();
-        if (!session) return false;
+        if (!(await canSessionAccessAgency(agencyId))) return false;
 
         const setUpdates: Record<string, number> = {};
 
@@ -219,8 +222,7 @@ export async function incrementAgencyUsage(
 ): Promise<boolean> {
     try {
         await connectDB();
-        const session = await getSessionUser();
-        if (!session) return false;
+        if (!(await canSessionAccessAgency(agencyId))) return false;
         await AgencyModel.updateOne(
             { id: agencyId },
             { $inc: { [`usage.${field}`]: amount } }
@@ -242,8 +244,7 @@ export async function decrementAgencyUsage(
 ): Promise<boolean> {
     try {
         await connectDB();
-        const session = await getSessionUser();
-        if (!session) return false;
+        if (!(await canSessionAccessAgency(agencyId))) return false;
         await AgencyModel.updateOne(
             { id: agencyId },
             { $inc: { [`usage.${field}`]: -amount } }

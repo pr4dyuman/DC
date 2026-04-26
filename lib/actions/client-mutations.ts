@@ -159,7 +159,7 @@ export async function updateClientImpl(id: string, updates: Partial<Client>, age
         const oldName = oldClient?.name;
         if (oldName && oldName !== updates.name) {
             await ProjectModel.updateMany(
-                { $or: [{ clientId: id }, { clientIds: id }], agencyId },
+                { clientId: id, agencyId },
                 { $set: { client: updates.name } }
             );
         }

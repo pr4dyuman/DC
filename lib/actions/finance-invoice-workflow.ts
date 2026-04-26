@@ -18,6 +18,15 @@ import { getDefaultCurrency } from "./super-admin";
 import { type AgencyContext, type FinanceActor, getClientDoc, getProjectDoc } from "./finance-mutation-shared";
 import { isNotifEnabled, sanitizeDoc } from "./shared";
 
+function getProjectClientIds(project: { clientId?: string; clientIds?: string[] } | null | undefined) {
+    const ids = new Set<string>();
+    if (project?.clientId) ids.add(project.clientId);
+    for (const clientId of project?.clientIds || []) {
+        if (clientId) ids.add(clientId);
+    }
+    return [...ids];
+}
+
 export async function clientMarkInvoiceAsPaidImpl(
     invoiceId: string,
     currentUser: FinanceActor,
@@ -31,7 +40,8 @@ export async function clientMarkInvoiceAsPaidImpl(
     if (!invoice) throw new Error("Invoice not found");
 
     const project = await getProjectDoc(agencyId, invoice.projectId);
-    if (!project || project.clientId !== currentUser.id) {
+    const projectClientIds = getProjectClientIds(project);
+    if (!project || !projectClientIds.includes(currentUser.id)) {
         throw new Error("Unauthorized: This invoice doesn't belong to you");
     }
     if (!["Pending", "Overdue"].includes(invoice.status)) {
@@ -92,7 +102,9 @@ export async function adminApproveInvoicePaymentImpl(invoiceId: string, agencyId
     const totalInstallments = projectInvoices.length;
 
     const project = await getProjectDoc(agencyId, invoice.projectId);
-    const description = `Installment ${installmentNumber}/${totalInstallments} for ${project?.name || "Project"} - ${invoice.date}`;
+    const projectName = project?.name || "Project";
+    const description = `Installment ${installmentNumber}/${totalInstallments} for ${projectName} - ${invoice.date}`;
+    const clientIds = getProjectClientIds(project);
 
     await InvoiceModel.updateOne({ id: invoiceId, agencyId }, { $set: { status: "Paid" } });
     const newTransaction = {
@@ -109,27 +121,28 @@ export async function adminApproveInvoicePaymentImpl(invoiceId: string, agencyId
     };
     await TransactionModel.create(newTransaction);
 
-    if (project?.clientId && await isNotifEnabled("invoice")) {
-        await NotificationModel.create({
+    if (clientIds.length > 0 && await isNotifEnabled("invoice")) {
+        const currency = await getDefaultCurrency();
+        await NotificationModel.insertMany(clientIds.map((clientId) => ({
             id: generateId(),
             agencyId,
-            userId: project.clientId,
-            message: `Payment approved! ${formatCurrency(invoice.amount, await getDefaultCurrency())} received for ${project.name}`,
+            userId: clientId,
+            message: `Payment approved! ${formatCurrency(invoice.amount, currency)} received for ${projectName}`,
             read: false,
             timestamp: new Date().toISOString(),
             link: "/dashboard/finance",
-        });
+        })));
     }
 
     try {
-        if (project?.clientId) {
-            const client = await getClientDoc(agencyId, project.clientId);
+        for (const clientId of clientIds) {
+            const client = await getClientDoc(agencyId, clientId);
             if (client?.email) {
                 await sendPaymentApprovedEmail({
                     clientEmail: client.email,
                     clientName: client.name,
                     amount: invoice.amount,
-                    projectName: project.name,
+                    projectName,
                     financeLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/finance`,
                 });
             }
@@ -152,30 +165,32 @@ export async function adminRejectInvoicePaymentImpl(invoiceId: string, agencyId:
     await InvoiceModel.updateOne({ id: invoiceId, agencyId }, { $set: { status: "Pending" } });
 
     const project = await getProjectDoc(agencyId, invoice.projectId);
-    if (project?.clientId && await isNotifEnabled("invoice")) {
+    const projectName = project?.name || "Project";
+    const clientIds = getProjectClientIds(project);
+    if (clientIds.length > 0 && await isNotifEnabled("invoice")) {
         const message = reason
             ? `Payment rejected: ${reason}. Please mark as paid again.`
             : `Payment rejected for ${formatCurrency(invoice.amount, await getDefaultCurrency())}. Please mark as paid again.`;
-        await NotificationModel.create({
+        await NotificationModel.insertMany(clientIds.map((clientId) => ({
             id: generateId(),
             agencyId,
-            userId: project.clientId,
+            userId: clientId,
             message,
             read: false,
             timestamp: new Date().toISOString(),
             link: "/dashboard/finance",
-        });
+        })));
     }
 
     try {
-        if (project?.clientId) {
-            const client = await getClientDoc(agencyId, project.clientId);
+        for (const clientId of clientIds) {
+            const client = await getClientDoc(agencyId, clientId);
             if (client?.email) {
                 await sendPaymentRejectedEmail({
                     clientEmail: client.email,
                     clientName: client.name,
                     amount: invoice.amount,
-                    projectName: project.name,
+                    projectName,
                     rejectionReason: reason,
                     financeLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/finance`,
                 });
@@ -234,6 +249,7 @@ export async function createInvoiceImpl(
 
     const project = await getProjectDoc(agency.id, invoice.projectId);
     if (!project) throw new Error(`Project with ID ${invoice.projectId} not found`);
+    const clientIds = getProjectClientIds(project);
 
     const newInvoice: Invoice = {
         ...invoice,
@@ -244,21 +260,22 @@ export async function createInvoiceImpl(
     };
     await InvoiceModel.create(newInvoice);
 
-    if (project.clientId && await isNotifEnabled("invoice")) {
-        await NotificationModel.create({
+    if (clientIds.length > 0 && await isNotifEnabled("invoice")) {
+        const currency = await getDefaultCurrency();
+        await NotificationModel.insertMany(clientIds.map((clientId) => ({
             id: generateId(),
             agencyId: agency.id,
-            userId: project.clientId,
-            message: `New Invoice Generated: ${formatCurrency(invoice.amount, await getDefaultCurrency())}`,
+            userId: clientId,
+            message: `New Invoice Generated: ${formatCurrency(invoice.amount, currency)}`,
             read: false,
             timestamp: new Date().toISOString(),
             link: "/dashboard/finance",
-        });
+        })));
     }
 
     try {
-        if (project.clientId) {
-            const client = await getClientDoc(agency.id, project.clientId);
+        for (const clientId of clientIds) {
+            const client = await getClientDoc(agency.id, clientId);
             if (client?.email) {
                 await sendInvoiceCreatedEmail({
                     clientEmail: client.email,

@@ -175,11 +175,28 @@ export async function updateUserImpl(
 ) {
     if (!caller) throw new Error("Unauthorized");
 
-    const isAdmin = caller.role === "admin" || caller.role === "manager";
+    await connectDB();
+    const agencyScope = agency?.id ? { agencyId: agency.id } : {};
+    const targetUser = await UserModel.findOne({ id, ...agencyScope }).select("role").lean() as Pick<User, "role"> | null;
+    const targetClient = targetUser
+        ? null
+        : await ClientModel.findOne({ id, ...agencyScope }).select("role").lean() as Pick<Client, "role"> | null;
+
+    if (!targetUser && !targetClient) {
+        throw new Error("User not found");
+    }
+
+    const targetRole = targetUser?.role || "client";
+    const isAdmin = caller.role === "admin";
+    const isManager = caller.role === "manager";
     const isSelf = caller.id === id;
 
-    if (!isAdmin && !isSelf) {
+    if (!isAdmin && !isManager && !isSelf) {
         throw new Error("Unauthorized: You can only edit your own profile.");
+    }
+
+    if (isManager && targetRole === "admin") {
+        throw new Error("Unauthorized: Managers cannot edit admin accounts.");
     }
 
     if (!isAdmin) {
@@ -201,10 +218,6 @@ export async function updateUserImpl(
         if (!oldPassword) {
             throw new Error("Old password is required to change password");
         }
-
-        await connectDB();
-
-        const agencyScope = agency?.id ? { agencyId: agency.id } : {};
 
         const scopedUser = await UserModel.findOne({ id, ...agencyScope }).select("password").lean() as Pick<User, "password"> | null;
         const scopedClient = scopedUser

@@ -67,11 +67,29 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: getErrorMessage(error, 'Invalid verification code') }, { status: 400 });
         }
 
-        // --- Find user and update password ---
+        // --- Find exactly one account and update password ---
         const hashedPassword = await bcrypt.hash(newPassword, 12);
+        const [superAdmins, users, clients] = await Promise.all([
+            SuperAdminModel.find({ email: validatedEmail }).limit(2).lean(),
+            UserModel.find({ email: validatedEmail }).limit(2).lean(),
+            ClientModel.find({ email: validatedEmail }).limit(2).lean(),
+        ]);
+        const matchingAccountCount = superAdmins.length + users.length + clients.length;
+        if (matchingAccountCount === 0) {
+            return NextResponse.json(
+                { error: 'No account found with this email address.' },
+                { status: 404 }
+            );
+        }
+        if (matchingAccountCount > 1) {
+            return NextResponse.json(
+                { error: 'Multiple accounts found for this email. Please contact support.' },
+                { status: 409 }
+            );
+        }
 
         // Check SuperAdmin first
-        const superAdmin = await SuperAdminModel.findOne({ email: validatedEmail }).lean();
+        const superAdmin = superAdmins[0];
         if (superAdmin) {
             await SuperAdminModel.updateOne(
                 { email: validatedEmail },
@@ -84,7 +102,7 @@ export async function POST(request: Request) {
         }
 
         // Check User
-        const user = await UserModel.findOne({ email: validatedEmail }).lean();
+        const user = users[0];
         if (user) {
             if ((user as ArchivedAccountRecord).archived) {
                 return NextResponse.json(
@@ -103,7 +121,7 @@ export async function POST(request: Request) {
         }
 
         // Check Client
-        const client = await ClientModel.findOne({ email: validatedEmail }).lean();
+        const client = clients[0];
         if (client) {
             if ((client as ArchivedAccountRecord).archived) {
                 return NextResponse.json(

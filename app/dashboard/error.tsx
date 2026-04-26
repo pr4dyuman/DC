@@ -26,7 +26,7 @@ export default function DashboardError({
         </h2>
         <p className="text-muted-foreground">
           {isDatabaseConnectionIssue
-            ? "The dashboard couldn't reach MongoDB for this refresh. Please try again in a moment."
+            ? "The dashboard could not reach MongoDB for this refresh. Please try again in a moment."
             : "An error occurred while loading this page. Please try again."}
         </p>
         <div className="flex gap-2 justify-center">

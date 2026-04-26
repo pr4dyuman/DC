@@ -12,6 +12,10 @@ export type SearchResult = {
 };
 
 type SearchProjectRecord = Project & { description?: string };
+type SearchActor = {
+    id: string;
+    role: string;
+};
 
 function buildScopedProjectFilter(scopedProjectIds: string[] | null) {
     if (scopedProjectIds === null) {
@@ -33,6 +37,7 @@ export async function globalSearchImpl(
     query: string,
     agencyId: string,
     scopedProjectIds: string[] | null = null,
+    actor?: SearchActor,
 ): Promise<SearchResult[]> {
     await connectDB();
 
@@ -40,6 +45,8 @@ export async function globalSearchImpl(
     const agencyFilter = { agencyId };
     const scopedProjectFilter = buildScopedProjectFilter(scopedProjectIds);
     const scopedTaskFilter = buildScopedTaskFilter(scopedProjectIds);
+    const canSearchClients = actor?.role === "admin" || actor?.role === "manager" || actor?.role === "superadmin";
+    const canSearchTeam = canSearchClients || actor?.role === "employee";
 
     const q = query.toLowerCase().trim();
     const isProjectQuery = /^(all\s+)?projects?$|^list\s+projects?$/i.test(q);
@@ -62,7 +69,9 @@ export async function globalSearchImpl(
     }
 
     if (isClientQuery) {
-        const allClients = await ClientModel.find(agencyFilter).sort({ createdAt: -1 }).limit(15).select("-password").lean() as Client[];
+        if (!canSearchClients) return [];
+
+        const allClients = await ClientModel.find({ ...agencyFilter, archived: { $ne: true } }).sort({ createdAt: -1 }).limit(15).select("-password").lean() as Client[];
         for (const client of allClients) {
             results.push({
                 id: client.id,
@@ -90,7 +99,9 @@ export async function globalSearchImpl(
     }
 
     if (isTeamQuery) {
-        const allUsers = await UserModel.find(agencyFilter).sort({ createdAt: -1 }).limit(15).select("-password").lean() as User[];
+        if (!canSearchTeam) return [];
+
+        const allUsers = await UserModel.find({ ...agencyFilter, archived: { $ne: true } }).sort({ createdAt: -1 }).limit(15).select("-password").lean() as User[];
         for (const user of allUsers) {
             results.push({
                 id: user.id,
@@ -126,19 +137,22 @@ export async function globalSearchImpl(
         });
     }
 
-    const clients = await ClientModel.find({
-        ...agencyFilter,
-        $or: [{ name: regex }, { companyName: regex }],
-    }).limit(5).select("-password").lean() as Client[];
+    if (canSearchClients) {
+        const clients = await ClientModel.find({
+            ...agencyFilter,
+            archived: { $ne: true },
+            $or: [{ name: regex }, { companyName: regex }],
+        }).limit(5).select("-password").lean() as Client[];
 
-    for (const client of clients) {
-        results.push({
-            id: client.id,
-            type: "client",
-            title: client.name,
-            subtitle: client.companyName,
-            url: `/dashboard/clients/${client.username || client.id}`,
-        });
+        for (const client of clients) {
+            results.push({
+                id: client.id,
+                type: "client",
+                title: client.name,
+                subtitle: client.companyName,
+                url: `/dashboard/clients/${client.username || client.id}`,
+            });
+        }
     }
 
     const tasks = await TaskModel.find({
@@ -159,19 +173,22 @@ export async function globalSearchImpl(
         });
     }
 
-    const users = await UserModel.find({
-        ...agencyFilter,
-        $or: [{ name: regex }, { email: regex }],
-    }).limit(5).select("-password").lean() as User[];
+    if (canSearchTeam) {
+        const users = await UserModel.find({
+            ...agencyFilter,
+            archived: { $ne: true },
+            $or: [{ name: regex }, { email: regex }],
+        }).limit(5).select("-password").lean() as User[];
 
-    for (const user of users) {
-        results.push({
-            id: user.id,
-            type: "user",
-            title: user.name,
-            subtitle: user.role,
-            url: `/dashboard/team/${user.username || user.id}`,
-        });
+        for (const user of users) {
+            results.push({
+                id: user.id,
+                type: "user",
+                title: user.name,
+                subtitle: user.role,
+                url: `/dashboard/team/${user.username || user.id}`,
+            });
+        }
     }
 
     return results.slice(0, 10);

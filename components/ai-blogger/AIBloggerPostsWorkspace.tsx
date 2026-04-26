@@ -123,6 +123,8 @@ const bulkStatusOptions: Array<{ value: BlogStudioPostStatus; label: string }> =
     { value: "Approved", label: "Approved" },
 ];
 
+const POSTS_ACTION_REFRESH_LOCK_MS = 2500;
+
 const refreshReasonOptions = [
     { value: "all", label: "All signals" },
     { value: "low-ctr", label: "Low CTR" },
@@ -179,10 +181,13 @@ export function AIBloggerPostsWorkspace({
     const [refreshingSlug, setRefreshingSlug] = useState<string | null>(null);
     const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
     const [isBulkPending, startBulkTransition] = useTransition();
+    const [bulkActionStatus, setBulkActionStatus] = useState<BlogStudioPostStatus | null>(null);
     const [isRefreshQueueOpen, setIsRefreshQueueOpen] = useState(
         postsPage.refreshQueue.totalCandidates > 0,
     );
     const [isFilterOpen, setIsFilterOpen] = useState(hasEditorialFiltersApplied(postsPage));
+    const refreshFromPerformanceBusy = isRefreshPending || refreshingSlug !== null;
+    const bulkBusy = isBulkPending || bulkActionStatus !== null;
 
     const pushWithParams = (updates: Record<string, string | null>) => {
         const params = new URLSearchParams(searchParams.toString());
@@ -221,17 +226,28 @@ export function AIBloggerPostsWorkspace({
         : Math.min(postsPage.page * postsPage.pageSize, postsPage.total);
 
     const handleRefreshFromPerformance = (slug: string) => {
+        if (refreshFromPerformanceBusy) {
+            return;
+        }
+
         setRefreshingSlug(slug);
 
         startRefreshTransition(async () => {
+            let waitingForRefresh = false;
             try {
                 const refreshed = await refreshBlogStudioPostFromPerformance(slug);
                 toast.success(`Refresh draft ready: ${refreshed.title}`);
+                waitingForRefresh = true;
                 router.refresh();
             } catch (error) {
                 toast.error(error instanceof Error ? error.message : "Unable to refresh this post from performance.");
-            } finally {
                 setRefreshingSlug(null);
+            } finally {
+                if (waitingForRefresh) {
+                    window.setTimeout(() => setRefreshingSlug(null), POSTS_ACTION_REFRESH_LOCK_MS);
+                } else {
+                    setRefreshingSlug(null);
+                }
             }
         });
     };
@@ -262,9 +278,11 @@ export function AIBloggerPostsWorkspace({
     }, []);
 
     const handleBulkStatusChange = (nextStatus: BlogStudioPostStatus) => {
-        if (selectedSlugs.size === 0) return;
+        if (selectedSlugs.size === 0 || bulkBusy) return;
 
+        setBulkActionStatus(nextStatus);
         startBulkTransition(async () => {
+            let waitingForRefresh = false;
             try {
                 const result = await bulkUpdateBlogStudioPostStatus({
                     slugs: Array.from(selectedSlugs),
@@ -280,9 +298,17 @@ export function AIBloggerPostsWorkspace({
                 }
 
                 setSelectedSlugs(new Set());
+                waitingForRefresh = true;
                 router.refresh();
             } catch (error) {
                 toast.error(error instanceof Error ? error.message : "Bulk update failed.");
+                setBulkActionStatus(null);
+            } finally {
+                if (waitingForRefresh) {
+                    window.setTimeout(() => setBulkActionStatus(null), POSTS_ACTION_REFRESH_LOCK_MS);
+                } else {
+                    setBulkActionStatus(null);
+                }
             }
         });
     };
@@ -626,10 +652,10 @@ export function AIBloggerPostsWorkspace({
                                             type="button"
                                             variant="outline"
                                             size="sm"
-                                            disabled={isRefreshPending}
+                                            disabled={refreshFromPerformanceBusy}
                                             onClick={() => handleRefreshFromPerformance(item.post.slug)}
                                         >
-                                            {isRefreshPending && refreshingSlug === item.post.slug ? "Refreshing..." : "Refresh From Performance"}
+                                            {refreshFromPerformanceBusy && refreshingSlug === item.post.slug ? "Refreshing..." : "Refresh From Performance"}
                                         </AIBloggerGradientButton>
                                         <AIBloggerGradientButton asChild size="sm">
                                             <Link href={`${basePath}/posts/${item.post.slug}`}>
@@ -1276,17 +1302,18 @@ export function AIBloggerPostsWorkspace({
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                disabled={isBulkPending}
+                                disabled={bulkBusy}
                                 onClick={() => handleBulkStatusChange(option.value)}
                             >
-                                {isBulkPending ? "Moving..." : `Move to ${option.label}`}
+                                {bulkActionStatus === option.value ? "Moving..." : `Move to ${option.label}`}
                             </AIBloggerGradientButton>
                         ))}
                         <div className="h-5 w-px bg-border/60" />
                         <button
                             type="button"
                             onClick={clearSelection}
-                            className="flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            disabled={bulkBusy}
+                            className="flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
                             aria-label="Clear selection"
                         >
                             <X className="h-4 w-4" />

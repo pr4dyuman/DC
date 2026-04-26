@@ -22,8 +22,8 @@ export function FinanceSkeleton() {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                    <div className="col-span-4 h-[400px] bg-muted rounded-xl"></div>
-                    <div className="col-span-3 h-[400px] bg-muted rounded-xl"></div>
+                    <div className="h-[400px] bg-muted rounded-xl lg:col-span-4"></div>
+                    <div className="h-[400px] bg-muted rounded-xl lg:col-span-3"></div>
                 </div>
             </div>
         </div>

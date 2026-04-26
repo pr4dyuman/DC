@@ -1,12 +1,14 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, Download, FileJson, FileText, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { AIBloggerGradientButton } from "@/components/ai-blogger/AIBloggerPrimitives";
 import { refreshBlogStudioPostFromPerformance } from "@/lib/actions";
+
+const REFRESH_ACTION_LOCK_MS = 2500;
 
 type AIBloggerPostActionsProps = {
     slug?: string;
@@ -38,7 +40,9 @@ export function AIBloggerPostActions({
 }: AIBloggerPostActionsProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const exportBody = content?.trim() ? content : `# ${title}\n`;
+    const refreshBusy = isRefreshing || isPending;
 
     const handleCopyBody = async () => {
         try {
@@ -103,19 +107,33 @@ export function AIBloggerPostActions({
     };
 
     const handleRefreshFromPerformance = () => {
+        if (refreshBusy) {
+            return;
+        }
+
         if (!slug) {
             toast.error("This post cannot run the refresh workflow right now");
             return;
         }
 
+        setIsRefreshing(true);
         startTransition(async () => {
+            let waitingForRefresh = false;
             try {
                 const refreshed = await refreshBlogStudioPostFromPerformance(slug);
                 toast.success(`Refresh draft ready: ${refreshed.title}`);
+                waitingForRefresh = true;
                 router.refresh();
             } catch (error) {
                 console.error(error);
                 toast.error(error instanceof Error ? error.message : "Unable to refresh this post");
+                setIsRefreshing(false);
+            } finally {
+                if (waitingForRefresh) {
+                    window.setTimeout(() => setIsRefreshing(false), REFRESH_ACTION_LOCK_MS);
+                } else {
+                    setIsRefreshing(false);
+                }
             }
         });
     };
@@ -128,9 +146,9 @@ export function AIBloggerPostActions({
                     variant="outline"
                     size="sm"
                     onClick={handleRefreshFromPerformance}
-                    disabled={isPending}
+                    disabled={refreshBusy}
                 >
-                    {isPending ? (
+                    {refreshBusy ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                         <Sparkles className="h-4 w-4" />

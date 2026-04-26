@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Search, Settings, LogOut, User as UserIcon, Building2 } from "lucide-react";
 import { MobileSidebar } from "./MobileSidebar";
 import { Notification } from "@/lib/types";
@@ -22,6 +22,8 @@ import { toast } from "sonner";
 import { TopbarDesktopSearch } from "./TopbarDesktopSearch";
 import { TopbarMobileSearch } from "./TopbarMobileSearch";
 import { TopbarNotificationsMenu } from "./TopbarNotificationsMenu";
+import { ProfileModal } from "./ProfileModal";
+import type { User } from "@/lib/types";
 
 interface TopbarProps {
     currentUser?: CurrentUserResult;
@@ -30,6 +32,18 @@ interface TopbarProps {
     agencyPlan?: string;
     agencyStatus?: string;
     agencyHasAIBlogger?: boolean;
+    currentUserCanUseAI?: boolean;
+}
+
+function getTopbarTitle(pathname: string) {
+    if (pathname.startsWith("/dashboard/projects")) return "Projects";
+    if (pathname.startsWith("/dashboard/clients")) return "Clients";
+    if (pathname.startsWith("/dashboard/finance")) return "Finance";
+    if (pathname.startsWith("/dashboard/messages")) return "Messages";
+    if (pathname.startsWith("/dashboard/settings")) return "Settings";
+    if (pathname.startsWith("/dashboard/singularity")) return "Singularity";
+    if (pathname.startsWith("/dashboard/team")) return "Team";
+    return "Dashboard";
 }
 
 export function Topbar({
@@ -39,10 +53,14 @@ export function Topbar({
     agencyPlan,
     agencyStatus,
     agencyHasAIBlogger,
+    currentUserCanUseAI,
 }: TopbarProps) {
     const router = useRouter();
+    const pathname = usePathname();
+    const title = getTopbarTitle(pathname);
 
     const [user, setUser] = useState<CurrentUserResult | undefined>(propUser);
+    const [profileOpen, setProfileOpen] = useState(false);
 
     // Search State
     const [query, setQuery] = useState("");
@@ -127,19 +145,26 @@ export function Topbar({
     }, []);
 
     const handleNotificationRead = async (id: string) => {
-        // Optimistically update
+        const wasUnread = notifications.some((notification) => notification.id === id && !notification.read);
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        if (wasUnread) setUnreadCount(prev => Math.max(0, prev - 1));
 
-        await markNotificationAsRead(id);
+        try {
+            await markNotificationAsRead(id);
+        } catch (error) {
+            console.error("Failed to mark notification as read", error);
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: false } : n));
+            if (wasUnread) setUnreadCount(prev => prev + 1);
+            toast.error("Could not update notification");
+        }
     };
 
     if (!user) return null;
 
     return (
         <>
-            <div className="h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 flex items-center justify-between z-10">
-                <div className="flex items-center gap-4">
+            <div className="h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-3 sm:px-6 flex items-center justify-between gap-3 z-10">
+                <div className="flex min-w-0 items-center gap-2 sm:gap-4">
                     <div className="md:hidden mr-2">
                         {mounted && (
                             <MobileSidebar
@@ -151,13 +176,14 @@ export function Topbar({
                                 agencyPlan={agencyPlan}
                                 agencyStatus={agencyStatus}
                                 agencyHasAIBlogger={agencyHasAIBlogger}
+                                currentUserCanUseAI={currentUserCanUseAI}
                             />
                         )}
                     </div>
-                    <h2 className="text-lg font-semibold">Dashboard</h2>
+                    <h2 className="truncate text-base font-semibold sm:text-lg">{title}</h2>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex shrink-0 items-center gap-1.5 sm:gap-4">
                     {/* Mobile Search Toggle */}
                     <button
                         className="sm:hidden p-2 rounded-full hover:bg-accent transition-colors"
@@ -200,18 +226,22 @@ export function Topbar({
                             <DropdownMenuContent align="end" className="w-56">
                                 <DropdownMenuLabel className="font-normal">
                                     <div className="flex flex-col space-y-1">
-                                        <p className="text-sm font-medium leading-none">{user.name}</p>
-                                        <p className="text-xs leading-none text-muted-foreground">
+                                        <p className="truncate text-sm font-medium leading-none">{user.name}</p>
+                                        <p className="truncate text-xs leading-none text-muted-foreground">
                                             {user.email}
                                         </p>
                                     </div>
                                 </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem asChild>
-                                    <Link href={`/dashboard/team/${user.username}`} className="cursor-pointer">
-                                        <UserIcon className="mr-2 h-4 w-4" />
-                                        <span>My Profile</span>
-                                    </Link>
+                                <DropdownMenuItem
+                                    className="cursor-pointer"
+                                    onSelect={(event) => {
+                                        event.preventDefault();
+                                        setProfileOpen(true);
+                                    }}
+                                >
+                                    <UserIcon className="mr-2 h-4 w-4" />
+                                    <span>My Profile</span>
                                 </DropdownMenuItem>
                                 {user.role === 'admin' && (
                                     <DropdownMenuItem asChild>
@@ -266,6 +296,14 @@ export function Topbar({
                         setShowMobileSearch(false);
                         setQuery("");
                     }}
+                />
+            )}
+
+            {mounted && (
+                <ProfileModal
+                    user={user as unknown as User}
+                    open={profileOpen}
+                    setOpen={setProfileOpen}
                 />
             )}
 

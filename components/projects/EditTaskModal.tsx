@@ -162,16 +162,17 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId,
                             <div className="relative">
                                 <input
                                     type="number"
-                                    min="0"
-                                    step="0.5"
-                                    value={estimatedHours || ""}
-                                    onChange={e => setEstimatedHours(parseFloat(e.target.value) || 0)}
-                                    placeholder="e.g. 4"
-                                    className={`${inputCls} w-28 pr-9`}
-                                />
-                                <button
-                                    type="button"
-                                    disabled={!title.trim() || estimating}
+                                     min="0"
+                                     step="0.5"
+                                     value={estimatedHours || ""}
+                                     onChange={e => setEstimatedHours(parseFloat(e.target.value) || 0)}
+                                     disabled={!canEdit}
+                                     placeholder="e.g. 4"
+                                     className={`${inputCls} w-28 pr-9`}
+                                 />
+                                 <button
+                                     type="button"
+                                     disabled={!canEdit || !title.trim() || estimating}
                                     title="AI Estimate"
                                     onClick={async () => {
                                         setEstimating(true);

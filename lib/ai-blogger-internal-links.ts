@@ -84,6 +84,11 @@ const LOW_VALUE_WEBSITE_CATEGORIES = new Set<BlogStudioSitePriorityPageCategory>
     "contact",
 ]);
 
+const LINK_HEALTH_CHECK_TIMEOUT_MS = 6_000;
+const LINK_HEALTH_CHECK_CONCURRENCY = 6;
+const LINK_HEALTH_USER_AGENT =
+    "Mozilla/5.0 (compatible; AIBloggerInternalLinkChecker/1.0; +https://example.com/ai-blogger)";
+
 function resolveSiteOrigin(value?: string) {
     const rawValue = value?.trim();
 
@@ -282,6 +287,118 @@ async function validateBlogHrefs(candidates: LinkCandidate[]): Promise<LinkCandi
         .map((entry) => entry.candidate);
 }
 
+function isHttpCandidateHref(href: string) {
+    try {
+        const url = new URL(href);
+        return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
+        return false;
+    }
+}
+
+function isReachableLinkStatus(status: number) {
+    if (status >= 200 && status < 400) {
+        return true;
+    }
+
+    // Some sites block server-side link checkers even though the page is
+    // browser-accessible. Keep these rather than wiping out all suggestions.
+    return status === 401 || status === 403 || status === 429;
+}
+
+function shouldRetryLinkHealthWithGet(status: number) {
+    return status === 400 ||
+        status === 404 ||
+        status === 405 ||
+        status === 410 ||
+        status === 451 ||
+        status >= 500;
+}
+
+async function fetchLinkHealthStatus(href: string, method: "HEAD" | "GET") {
+    const response = await fetch(href, {
+        method,
+        redirect: "follow",
+        cache: "no-store",
+        headers: {
+            "User-Agent": LINK_HEALTH_USER_AGENT,
+            Accept: method === "HEAD"
+                ? "*/*"
+                : "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+        signal: AbortSignal.timeout(LINK_HEALTH_CHECK_TIMEOUT_MS),
+    });
+
+    if (response.body) {
+        await response.body.cancel().catch(() => undefined);
+    }
+
+    return response.status;
+}
+
+async function isReachableCandidateHref(href: string) {
+    if (!isHttpCandidateHref(href)) {
+        return true;
+    }
+
+    try {
+        const headStatus = await fetchLinkHealthStatus(href, "HEAD");
+        if (isReachableLinkStatus(headStatus)) {
+            return true;
+        }
+
+        if (!shouldRetryLinkHealthWithGet(headStatus)) {
+            return false;
+        }
+
+        const getStatus = await fetchLinkHealthStatus(href, "GET");
+        return isReachableLinkStatus(getStatus);
+    } catch {
+        // Network errors can be transient or caused by bot protection. Keep the
+        // candidate unless the server gave us a definite broken HTTP status.
+        return true;
+    }
+}
+
+async function validateReachableLinkCandidates(candidates: LinkCandidate[]): Promise<LinkCandidate[]> {
+    if (candidates.length === 0) {
+        return [];
+    }
+
+    if (!candidates.some((candidate) => isHttpCandidateHref(candidate.href))) {
+        return validateBlogHrefs(candidates);
+    }
+
+    const keepCandidate = new Array<boolean>(candidates.length).fill(true);
+    let nextIndex = 0;
+
+    async function worker() {
+        while (nextIndex < candidates.length) {
+            const index = nextIndex;
+            nextIndex += 1;
+            keepCandidate[index] = await isReachableCandidateHref(candidates[index].href);
+        }
+    }
+
+    await Promise.all(
+        Array.from(
+            { length: Math.min(LINK_HEALTH_CHECK_CONCURRENCY, candidates.length) },
+            () => worker(),
+        ),
+    );
+
+    return candidates.filter((_, index) => keepCandidate[index]);
+}
+
+async function filterReachableRankedCandidates(ranked: RankedLinkCandidate[]) {
+    const reachableCandidates = await validateReachableLinkCandidates(
+        ranked.map((entry) => entry.candidate),
+    );
+    const reachableHrefs = new Set(reachableCandidates.map((candidate) => candidate.href));
+
+    return ranked.filter((entry) => reachableHrefs.has(entry.candidate.href));
+}
+
 function humanizePathSegment(pathname: string) {
     if (pathname === "/" || !pathname) {
         return "Home";
@@ -299,6 +416,46 @@ function humanizePathSegment(pathname: string) {
     return segments[segments.length - 1]
         .replace(/[-_]+/g, " ")
         .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function resolveWebsiteCandidateTitle(pathname: string, rawTitle: string) {
+    const title = rawTitle.trim();
+    const pathTitle = humanizePathSegment(pathname);
+
+    if (!title || pathname === "/") {
+        return title || pathTitle;
+    }
+
+    const genericPathTokens = new Set([
+        "service",
+        "services",
+        "solution",
+        "solutions",
+        "product",
+        "products",
+        "collection",
+        "collections",
+        "category",
+        "categories",
+        "blog",
+        "blogs",
+        "article",
+        "articles",
+    ]);
+    const specificPathTokens = tokenize([pathname.replace(/[\/_-]+/g, " ")])
+        .filter((token) => !genericPathTokens.has(token));
+    const normalizedTitle = normalizeText(title);
+    const titleLooksBrandLevel = /[|:\-\u2013\u2014]/.test(title);
+
+    if (
+        titleLooksBrandLevel &&
+        specificPathTokens.length > 0 &&
+        !specificPathTokens.some((token) => normalizedTitle.includes(token))
+    ) {
+        return pathTitle;
+    }
+
+    return title;
 }
 
 function uniqueCandidateStrings(values: Array<string | undefined>, limit = 10) {
@@ -426,6 +583,10 @@ function getWebsiteCategoryFromPath(pathname: string): BlogStudioSitePriorityPag
 }
 
 function getCandidateSourceForWebsiteCategory(category?: BlogStudioSitePriorityPageCategory): LinkCandidate["source"] {
+    if (category === "blog") {
+        return "blog";
+    }
+
     return category && COMMERCIAL_WEBSITE_CATEGORIES.has(category) ? "service" : "page";
 }
 
@@ -449,7 +610,7 @@ function getCandidatePathname(candidate: Pick<LinkCandidate, "href">) {
 }
 
 function isBlogArchiveCandidate(candidate: Pick<LinkCandidate, "href" | "source" | "websiteCategory">) {
-    if (candidate.source !== "page" || candidate.websiteCategory !== "blog") {
+    if (candidate.websiteCategory !== "blog") {
         return false;
     }
 
@@ -548,9 +709,11 @@ function buildWebsiteCandidateAnchor(
 function buildWebsitePriorityPageCandidates(siteUrl: string, pages: BlogStudioSitePriorityPage[]) {
     return pages.map((page, index) => {
         const pathname = page.path.trim() || "/";
-        const title = page.title.trim() || humanizePathSegment(pathname);
-        const source = getCandidateSourceForWebsiteCategory(page.pageCategory);
-        const categoryLabel = getWebsiteCategoryLabel(page.pageCategory);
+        const title = resolveWebsiteCandidateTitle(pathname, page.title);
+        const pathCategory = getWebsiteCategoryFromPath(pathname);
+        const pageCategory = pathCategory === "general" ? page.pageCategory : pathCategory;
+        const source = getCandidateSourceForWebsiteCategory(pageCategory);
+        const categoryLabel = getWebsiteCategoryLabel(pageCategory);
         const description = uniqueCandidateStrings([
             page.description,
             page.excerpt,
@@ -574,9 +737,9 @@ function buildWebsitePriorityPageCandidates(siteUrl: string, pages: BlogStudioSi
             href: buildAbsoluteSiteHref(siteUrl, page.url || pathname),
             source,
             description: description || `${title} ${categoryLabel} page discovered on the target website.`,
-            suggestedAnchor: buildWebsiteCandidateAnchor(pathname, page.pageCategory, title, description),
+            suggestedAnchor: buildWebsiteCandidateAnchor(pathname, pageCategory, title, description),
             keywords,
-            websiteCategory: page.pageCategory,
+            websiteCategory: pageCategory,
             priorityScore: page.pageScore,
         } satisfies LinkCandidate;
     });
@@ -916,7 +1079,7 @@ async function getPublishedBlogCandidates(siteUrl?: string) {
                 shortDescription?: string;
             }>;
 
-        const candidates = blogs.map((blog) => ({
+        const candidates: LinkCandidate[] = blogs.map((blog) => ({
             id: `blog-${blog._id.toString()}`,
             title: blog.title,
             href: buildPublishedBlogHref(siteUrl, blog.slug),
@@ -931,7 +1094,7 @@ async function getPublishedBlogCandidates(siteUrl?: string) {
             ].filter(Boolean) as string[],
         }));
 
-        return await validateBlogHrefs(candidates);
+        return candidates;
     } catch (error) {
         console.warn(
             "[AI-BLOGGER] Marketing blog candidates unavailable; continuing without published blog suggestions:",
@@ -978,7 +1141,7 @@ async function getPublishedAIBloggerCandidates(post: BlogStudioPost, siteUrl?: s
             return true;
         });
 
-        const candidates = filteredPosts.map((candidatePost) => ({
+        const candidates: LinkCandidate[] = filteredPosts.map((candidatePost) => ({
             id: `ai-blogger-${candidatePost.id || candidatePost.slug}`,
             title: candidatePost.title,
             href: resolvePublishedBlogHref(
@@ -1001,7 +1164,7 @@ async function getPublishedAIBloggerCandidates(post: BlogStudioPost, siteUrl?: s
             targetParentTopicSlug: candidatePost.parentTopicSlug,
         }));
 
-        return await validateBlogHrefs(candidates);
+        return candidates;
     } catch (error) {
         console.error("[AI-BLOGGER] Failed to fetch AI Blogger internal link candidates:", error instanceof Error ? error.message : error);
         return [];
@@ -1377,7 +1540,21 @@ export async function getBlogStudioInternalLinkSuggestions(
         ? ranked.filter((entry) => !isLowValueWebsiteCategory(entry.candidate.websiteCategory))
         : ranked;
 
-    const selectedCandidates = selectSuggestionMix(rankingPool, limit);
+    const validationBatchSize = Math.max(limit * 4, 16);
+    let reachableRankingPool = await filterReachableRankedCandidates(
+        rankingPool.slice(0, validationBatchSize),
+    );
+
+    if (reachableRankingPool.length < Math.min(limit, rankingPool.length)) {
+        reachableRankingPool = [
+            ...reachableRankingPool,
+            ...(await filterReachableRankedCandidates(
+                rankingPool.slice(validationBatchSize, validationBatchSize * 2),
+            )),
+        ];
+    }
+
+    const selectedCandidates = selectSuggestionMix(reachableRankingPool, limit);
     const suggestions = dedupeSuggestions(
         selectedCandidates.map(({ candidate, score, matchReason, relationType, clusterAligned, suggestedSectionHeading }) =>
             toStructuredInternalLinkSuggestion(
@@ -1394,10 +1571,11 @@ export async function getBlogStudioInternalLinkSuggestions(
         return suggestions.slice(0, limit);
     }
 
+    const reachableSiteCandidates = await validateReachableLinkCandidates(siteCandidates);
     const fallback = dedupeSuggestions(
         [
             ...suggestions,
-            ...siteCandidates.map((candidate) =>
+            ...reachableSiteCandidates.map((candidate) =>
                 toStructuredInternalLinkSuggestion(
                     candidate,
                     candidate.source === "service"

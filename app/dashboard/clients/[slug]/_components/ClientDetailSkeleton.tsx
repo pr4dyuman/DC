@@ -7,9 +7,9 @@ export function ClientDetailSkeleton() {
                 <div className="h-9 w-9 rounded-full bg-muted animate-pulse" />
                 <div className="h-7 w-44 rounded-md bg-muted animate-pulse" />
             </div>
-            <div className="relative rounded-xl overflow-hidden bg-gradient-to-r from-secondary to-muted border border-border shadow-2xl">
-                <div className="p-8 md:p-10 flex flex-col md:flex-row gap-8 items-center md:items-start">
-                    <div className="h-32 w-32 rounded-full bg-muted-foreground/10 animate-pulse" />
+            <div className="relative overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+                <div className="flex flex-col items-center gap-5 p-5 sm:gap-8 sm:p-6 md:flex-row md:items-start md:p-8">
+                    <div className="h-20 w-20 rounded-full bg-muted-foreground/10 animate-pulse sm:h-32 sm:w-32" />
                     <div className="flex-1 space-y-4 w-full">
                         <div className="space-y-3">
                             <div className="h-8 w-52 rounded-md bg-muted-foreground/10 animate-pulse mx-auto md:mx-0" />
@@ -21,7 +21,7 @@ export function ClientDetailSkeleton() {
                             <div className="h-7 w-32 rounded-full bg-muted-foreground/10 animate-pulse" />
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 min-w-[200px]">
+                    <div className="grid w-full grid-cols-2 gap-3 md:w-auto md:min-w-[200px]">
                         <div className="h-20 rounded-lg bg-muted-foreground/10 animate-pulse" />
                         <div className="h-20 rounded-lg bg-muted-foreground/10 animate-pulse" />
                         <div className="h-20 rounded-lg bg-muted-foreground/10 animate-pulse" />

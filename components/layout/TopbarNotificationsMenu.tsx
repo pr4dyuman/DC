@@ -47,7 +47,7 @@ export function TopbarNotificationsMenu({
                     )}
                 </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80">
+            <DropdownMenuContent align="end" className="w-[calc(100vw-2rem)] sm:w-80">
                 <DropdownMenuLabel className="flex items-center justify-between">
                     <span>Notifications</span>
                     {unreadCount > 0 && (
@@ -77,7 +77,7 @@ export function TopbarNotificationsMenu({
                                     }}
                                 >
                                     <div className="flex items-start justify-between gap-2">
-                                        <p className={`text-sm ${!notification.read ? "font-medium" : "text-muted-foreground"}`}>
+                                        <p className={`min-w-0 break-words text-sm ${!notification.read ? "font-medium" : "text-muted-foreground"}`}>
                                             {notification.message}
                                         </p>
                                         {!notification.read && (

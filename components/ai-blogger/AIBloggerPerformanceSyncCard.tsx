@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
     AlertCircle,
@@ -19,6 +19,8 @@ import {
     AIBloggerGradientButton,
 } from "@/components/ai-blogger/AIBloggerPrimitives";
 import { Badge } from "@/components/ui/badge";
+
+const PERFORMANCE_SYNC_REFRESH_LOCK_MS = 2500;
 
 type AIBloggerPerformanceSyncCardProps = {
     syncStatus: BlogStudioPerformanceSyncStatus;
@@ -148,14 +150,22 @@ export function AIBloggerPerformanceSyncCard({
 }: AIBloggerPerformanceSyncCardProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
+    const [isSyncing, setIsSyncing] = useState(false);
     const tone = getStatusTone(syncStatus);
     const label = getStatusLabel(syncStatus);
     const summary = getStatusSummary(syncStatus);
     const canRunSync = syncStatus.hasValidConfig && syncStatus.publishedPosts > 0;
     const capabilityBadges = getCapabilityBadges(syncStatus);
+    const syncBusy = isSyncing || isPending;
 
     const handleSync = () => {
+        if (syncBusy) {
+            return;
+        }
+
+        setIsSyncing(true);
         startTransition(async () => {
+            let waitingForRefresh = false;
             try {
                 const result = await runBlogStudioPerformanceSync(true);
                 const message = result.summaries[0] || "Performance sync finished.";
@@ -168,9 +178,17 @@ export function AIBloggerPerformanceSyncCard({
                     toast(message);
                 }
 
+                waitingForRefresh = true;
                 router.refresh();
             } catch (error) {
                 toast.error(error instanceof Error ? error.message : "Unable to run performance sync.");
+                setIsSyncing(false);
+            } finally {
+                if (waitingForRefresh) {
+                    window.setTimeout(() => setIsSyncing(false), PERFORMANCE_SYNC_REFRESH_LOCK_MS);
+                } else {
+                    setIsSyncing(false);
+                }
             }
         });
     };
@@ -245,9 +263,9 @@ export function AIBloggerPerformanceSyncCard({
                     variant={compact ? "outline" : "primary"}
                     size={compact ? "sm" : "default"}
                     onClick={handleSync}
-                    disabled={isPending || !canRunSync}
+                    disabled={syncBusy || !canRunSync}
                 >
-                    {isPending ? (
+                    {syncBusy ? (
                         <>
                             <Loader2 className="h-4 w-4 animate-spin" />
                             Syncing

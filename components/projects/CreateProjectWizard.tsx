@@ -36,6 +36,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
     const { symbol } = useCurrency();
     const [step, setStep] = useState(1);
     const [submitting, setSubmitting] = useState(false);
+    const [formError, setFormError] = useState("");
     const [serviceInput, setServiceInput] = useState("");
     const [clients, setClients] = useState<ClientOption[]>([]);
     const [services, setServices] = useState<ServiceOption[]>([]);
@@ -53,6 +54,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
     useEffect(() => {
         if (open) {
             setStep(1);
+            setFormError("");
             loadData();
         }
     }, [open]);
@@ -64,6 +66,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
             setServices(loadedServices);
         } catch (error) {
             console.error("Failed to load data", error);
+            setFormError(error instanceof Error ? error.message : "Failed to load project form data.");
         }
     };
 
@@ -72,7 +75,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
             // Only rebuild configs when none exist yet
             if (formData.serviceConfigs.length === 0) {
                 const totalServices = formData.services.length || 1;
-                // Distribute budget equally across services; 0 budget → pay later
+                // Distribute budget equally across services; 0 budget means pay later.
                 const amountPerService = formData.budget > 0
                     ? Math.round(formData.budget / totalServices)
                     : 0;
@@ -196,6 +199,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
         setSubmitting(true);
 
         try {
+            setFormError("");
             await createProject({
                 name: formData.name,
                 slug: formData.slug || undefined,
@@ -210,6 +214,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
             onOpenChange(false);
         } catch (error) {
             console.error(error);
+            setFormError(error instanceof Error ? error.message : "Failed to create project.");
         } finally {
             setSubmitting(false);
         }
@@ -227,6 +232,12 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
                     </DialogTitle>
                     <DialogDescription>Step {step} of 4</DialogDescription>
                 </DialogHeader>
+
+                {formError && (
+                    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                        {formError}
+                    </div>
+                )}
 
                 <div className="flex-1 overflow-y-auto min-h-[300px] p-1">
                     {step === 1 && (

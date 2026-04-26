@@ -68,18 +68,15 @@ export function ClientDashboard({
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             {/* Welcome Banner */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900 to-purple-900 p-5 sm:p-8 text-white shadow-2xl">
-                <div className="relative z-10">
-                    <h1 className="text-2xl sm:text-3xl font-bold mb-2">Welcome back, {clientName}</h1>
-                    <p className="text-indigo-200">Here&#39;s what&#39;s happening with your projects today.</p>
+            <div className="rounded-lg border bg-card p-4 sm:p-5">
+                <div className="min-w-0">
+                    <h1 className="truncate text-2xl font-bold sm:text-3xl">Welcome back, {clientName}</h1>
+                    <p className="mt-1 text-sm text-muted-foreground">Here&#39;s what&#39;s happening with your projects today.</p>
                 </div>
-                {/* Abstract Shapes */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-                <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
             </div>
 
             {/* Enhanced Quick Stats Grid */}
-            <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 <Link href="/dashboard/projects" className="block">
                     <Card className="hover:border-indigo-500/50 transition-colors cursor-pointer h-full">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -131,7 +128,7 @@ export function ClientDashboard({
                             <Wallet className="h-4 w-4 text-blue-500" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{formatMoney(metrics.totalSpent)}</div>
+                            <div className="break-words text-xl font-bold sm:text-2xl">{formatMoney(metrics.totalSpent)}</div>
                             <p className="text-xs text-muted-foreground">Payments made</p>
                         </CardContent>
                     </Card>
@@ -158,7 +155,10 @@ export function ClientDashboard({
                             <div className="space-y-1">
                                 <div className="flex justify-between text-xs">
                                     <span className="font-medium truncate group-hover:text-indigo-400 transition-colors">{p.name}</span>
+                                    <span className="text-muted-foreground ml-2 shrink-0">{p.done}/{p.total} tasks - {p.pct}%</span>
+                                    <span className="hidden" aria-hidden="true">
                                     <span className="text-muted-foreground ml-2 shrink-0">{p.done}/{p.total} tasks · {p.pct}%</span>
+                                    </span>
                                 </div>
                                 <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                                     <div

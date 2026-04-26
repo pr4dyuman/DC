@@ -33,7 +33,7 @@ export function FinanceFilters({ projects, users }: FinanceFiltersProps) {
     const isCategoryActive = currentCategory !== "all";
 
     return (
-        <div className="flex flex-col sm:flex-row gap-4 items-center">
+        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             {/* Show Project Dropdown if User and Category are not active */}
             {!isUserActive && !isCategoryActive && (
                 <div className="w-full sm:w-[250px]">
@@ -96,7 +96,7 @@ export function FinanceFilters({ projects, users }: FinanceFiltersProps) {
             {(isProjectActive || isUserActive || isCategoryActive) && (
                 <button
                     onClick={clearFilters}
-                    className="text-sm text-muted-foreground hover:text-primary underline underline-offset-4"
+                    className="inline-flex h-9 w-full items-center justify-center rounded-md border border-border px-3 text-sm text-muted-foreground transition hover:bg-muted hover:text-primary sm:w-auto"
                 >
                     Back to Overview
                 </button>

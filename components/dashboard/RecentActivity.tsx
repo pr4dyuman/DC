@@ -5,7 +5,7 @@ import { Activity } from "@/lib/types";
 
 export function RecentActivity({ activities }: { activities: Activity[] }) {
     return (
-        <Card className="col-span-3">
+        <Card className="min-w-0 lg:col-span-3">
             <CardHeader>
                 <CardTitle>Recent Activity</CardTitle>
                 <CardDescription>

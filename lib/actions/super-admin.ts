@@ -17,7 +17,6 @@ import {
     getAgencyAIConfigSuperAdminImpl,
     getAgencyDetailsImpl,
     getAllAgenciesWithStatsImpl,
-    getDefaultAiConfigForSignupImpl,
     getDefaultAiConfigImpl,
     getDefaultCurrencyImpl,
     getNotificationDefaultsImpl,
@@ -49,7 +48,6 @@ import {
     getSuperAdminAlertSettings,
     sendSuperAdminAlertEmail,
     type SettingsUpdateRecord,
-    type StoredAIConfig,
     type SystemSettingsRecord,
     verifySuperAdmin,
 } from "./super-admin-shared";
@@ -276,7 +274,7 @@ export async function updateAgencyCurrency(agencyId: string, currency: string) {
 }
 
 /**
- * Suspend agency â€” requires super-admin password confirmation
+ * Suspend agency - requires super-admin password confirmation
  */
 export async function suspendAgency(agencyId: string, password: string, reason?: string) {
     return suspendAgencyImpl(agencyId, password, reason);
@@ -290,7 +288,7 @@ export async function activateAgency(agencyId: string) {
 }
 
 /**
- * Delete agency (dangerous!) â€” requires super-admin password confirmation
+ * Delete agency (dangerous!) - requires super-admin password confirmation
  */
 export async function deleteAgency(agencyId: string, password: string) {
     return deleteAgencyImpl(agencyId, password);
@@ -1031,14 +1029,6 @@ export async function saveDefaultAiConfig(config: AIConfig | null) {
     return true;
 }
 
-/**
- * Get raw default AI config for signup (NOT masked, with encrypted key).
- * This is used internally by the signup route, not exposed to UI.
- */
-export async function getDefaultAiConfigForSignup(): Promise<StoredAIConfig | null> {
-    return getDefaultAiConfigForSignupImpl();
-}
-
 // =============================================================================
 // System Settings (Global platform settings)
 // =============================================================================
@@ -1047,7 +1037,7 @@ export async function getSystemSettings(): Promise<SystemSettingsRecord | null> 
     return getSystemSettingsImpl();
 }
 
-/** Public read of security settings â€” no auth required (used by signup route) */
+/** Public read of security settings - no auth required (used by signup route) */
 export async function getPublicSecuritySettings(): Promise<{
     allowSelfRegistration: boolean;
     enforceStrongPasswords: boolean;
@@ -1055,12 +1045,12 @@ export async function getPublicSecuritySettings(): Promise<{
     return getPublicSecuritySettingsImpl();
 }
 
-/** Public read of platform default currency â€” no auth required */
+/** Public read of platform default currency - no auth required */
 export async function getDefaultCurrency(): Promise<string> {
     return getDefaultCurrencyImpl();
 }
 
-/** Public read of notification defaults â€” no auth required (used by actions.ts) */
+/** Public read of notification defaults - no auth required (used by actions.ts) */
 export async function getNotificationDefaults(): Promise<Record<string, boolean>> {
     return getNotificationDefaultsImpl();
 }

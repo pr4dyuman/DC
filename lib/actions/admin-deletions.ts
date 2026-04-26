@@ -74,8 +74,47 @@ export async function permanentlyDeleteClientImpl(id: string, agencyId: string) 
     const client = await ClientModel.findOne({ id, agencyId }).select("-password").lean();
     if (!client) throw new Error("Client not found");
 
-    const clientProjects = await ProjectModel.find({ clientId: id, agencyId }).select("id").lean() as Array<Pick<Project, "id">>;
-    const projectIds = clientProjects.map((project) => project.id);
+    const clientProjects = await ProjectModel.find({
+        agencyId,
+        $or: [{ clientId: id }, { clientIds: id }],
+    }).select("id clientId clientIds").lean() as Array<Pick<Project, "id" | "clientId" | "clientIds">>;
+
+    const projectIds: string[] = [];
+    const projectDetachUpdates: Array<{ projectId: string; clientIds: string[]; clientId?: string }> = [];
+    for (const project of clientProjects) {
+        const linkedClientIds = new Set<string>();
+        if (project.clientId) linkedClientIds.add(project.clientId);
+        for (const clientId of project.clientIds || []) {
+            if (clientId) linkedClientIds.add(clientId);
+        }
+        linkedClientIds.delete(id);
+        const remainingClientIds = [...linkedClientIds];
+        if (remainingClientIds.length === 0) {
+            projectIds.push(project.id);
+        } else {
+            projectDetachUpdates.push({
+                projectId: project.id,
+                clientIds: remainingClientIds,
+                clientId: project.clientId && project.clientId !== id ? project.clientId : remainingClientIds[0],
+            });
+        }
+    }
+
+    if (projectDetachUpdates.length > 0) {
+        const primaryClientIds = [...new Set(projectDetachUpdates.map((update) => update.clientId).filter(Boolean) as string[])];
+        const primaryClients = await ClientModel.find({ id: { $in: primaryClientIds }, agencyId }).select("id name").lean() as Array<{ id: string; name?: string }>;
+        const clientNameById = new Map(primaryClients.map((primaryClient) => [primaryClient.id, primaryClient.name || ""]));
+        await Promise.all(projectDetachUpdates.map((update) => ProjectModel.updateOne(
+            { id: update.projectId, agencyId },
+            {
+                $set: {
+                    clientId: update.clientId,
+                    clientIds: update.clientIds,
+                    ...(update.clientId ? { client: clientNameById.get(update.clientId) || "" } : {}),
+                },
+            }
+        )));
+    }
 
     if (projectIds.length > 0) {
         const assets = await AssetModel.find({ projectId: { $in: projectIds }, agencyId }).select("url size").lean() as Array<Pick<Asset, "url" | "size">>;

@@ -40,9 +40,9 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
     } = useChatPanelState({ currentUserId });
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background p-4 md:p-8">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background p-3 sm:p-4 md:p-8">
             <div
-                className="w-full max-w-6xl h-[85vh] bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row ring-1 ring-border"
+                className="w-full max-w-6xl h-[calc(100dvh-1.5rem)] sm:h-[calc(100dvh-2rem)] md:h-[85vh] bg-card border border-border rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row ring-1 ring-border"
                 style={{ backdropFilter: 'blur(20px)' }}
             >
                 {/* Sidebar / Contact List */}
@@ -55,7 +55,7 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
                             >
                                 <ArrowLeft className="w-4 h-4" />
                             </button>
-                            <h2 className="text-lg font-bold text-foreground">Messages</h2>
+                            <h2 className="truncate text-lg font-bold text-foreground">Messages</h2>
                         </div>
                         <button onClick={() => router.back()} className="md:hidden p-2 hover:bg-muted rounded-full text-muted-foreground">
                             <X className="w-5 h-5" />
@@ -127,13 +127,13 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
                                         <img src={activeContact.avatar || "/placeholder-avatar.jpg"} alt={activeContact.name} className="w-10 h-10 rounded-full border border-border" />
                                         {activeContact.isOnline && <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card shadow-[0_0_8px_rgba(34,197,94,0.6)]" />}
                                     </div>
-                                    <div className="ml-3">
-                                        <h3 className="font-semibold text-foreground leading-tight">{activeContact.name}</h3>
-                                        <div className="text-xs text-muted-foreground flex items-center">
+                                <div className="ml-3 min-w-0">
+                                    <h3 className="truncate font-semibold text-foreground leading-tight">{activeContact.name}</h3>
+                                    <div className="flex min-w-0 items-center text-xs text-muted-foreground">
                                             {activeContact.isOnline ? (
                                                 <span className="text-green-500 font-medium">Online</span>
                                             ) : (
-                                                <span className="text-muted-foreground">
+                                                <span className="truncate text-muted-foreground">
                                                     {activeContact.lastActiveAt
                                                         ? fmt.presence(activeContact.lastActiveAt)
                                                         : (activeContact.jobTitle || activeContact.role)}
@@ -189,7 +189,7 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
                             </div>
 
                             {/* Input Area */}
-                            <div className="p-4 bg-card border-t border-border">
+                            <div className="p-3 bg-card border-t border-border sm:p-4">
                                 <div className="relative bg-secondary border border-border rounded-2xl p-2 flex items-end gap-1 shadow-lg">
                                     {showEmoji && (
                                         <EmojiPicker
@@ -221,12 +221,12 @@ export function MessagesPageClient({ currentUserId }: { currentUserId: string })
                                         {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                                     </button>
                                 </div>
-                                <p className="text-center text-[10px] text-muted-foreground/50 mt-1.5">Press Enter to send, Shift + Enter for new line</p>
+                                <p className="mt-1.5 hidden text-center text-[10px] text-muted-foreground/50 sm:block">Press Enter to send, Shift + Enter for new line</p>
                             </div>
                         </>
                     ) : (
                         <div className="h-full flex flex-col items-center justify-center text-muted-foreground relative">
-                            <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mb-6 shadow-2xl border border-primary/20">
+                            <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-primary/20">
                                 <MessageSquare className="w-10 h-10 text-primary" />
                             </div>
                             <h2 className="text-2xl font-bold text-foreground mb-2">Agency Messenger</h2>

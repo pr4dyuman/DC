@@ -576,9 +576,18 @@ export async function getUserContributionHistory(userId: string) {
 }
 
 export async function createUser(user: Omit<User, "id" | "agencyId">) {
-    await requireRole('admin', 'manager');
+    const currentUser = await requireRole('admin', 'manager');
+    const userToCreate = { ...user };
+    if (currentUser.role === 'manager') {
+        if (userToCreate.role && userToCreate.role !== 'employee') {
+            throw new Error('Unauthorized: Managers can only create employee accounts.');
+        }
+        userToCreate.role = 'employee';
+        delete userToCreate.salary;
+        delete userToCreate.employmentType;
+    }
     const agency = await getCurrentAgency();
-    return createUserImpl(user, agency);
+    return createUserImpl(userToCreate, agency);
 }
 
 export async function getCurrentUser() {
@@ -1069,7 +1078,7 @@ export async function approveDocumentUpdate(userId: string, type: 'adhar' | 'pan
 
 export async function adminResetPassword(id: string, newPassword: string) {
     const currentUser = await getCurrentUser();
-    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+    if (!currentUser || currentUser.role !== 'admin') {
         throw new Error("Unauthorized: Only Admins can reset passwords.");
     }
     const agency = await getCurrentAgency();
@@ -1155,6 +1164,8 @@ export async function getServiceTaskCount(projectId: string, serviceName: string
     await requireAuth();
     const agency = await getCurrentAgency();
     if (!agency?.id) throw new Error('Agency context required');
+    const canAccess = await canCurrentUserAccessProject(projectId, agency.id);
+    if (!canAccess) throw new Error('Unauthorized: You cannot access this project.');
     return getServiceTaskCountImpl(agency.id, projectId, serviceName);
 }
 
@@ -1215,7 +1226,7 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
 
 export async function updateUserPermissions(targetUserId: string, permissions: UserPermissions) {
     const currentUser = await getCurrentUser();
-    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'manager')) {
+    if (!currentUser || currentUser.role !== 'admin') {
         throw new Error("Unauthorized: Only Admins can manage permissions.");
     }
     // Prevent NoSQL injection via key path manipulation
@@ -1306,7 +1317,7 @@ export async function createTask(task: Omit<TaskEffectRecord, "id" | "agencyId">
 // --- Client Actions ---
 
 export async function getClients() {
-    await requireAuth();
+    await requireRole('admin', 'manager');
     const agency = await getCurrentAgency();
     if (!agency?.id) throw new Error('Agency context required');
     return getClientsImpl(agency.id);
@@ -1578,7 +1589,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
         caller.role === "admin" || caller.role === "manager" || caller.role === "superadmin"
             ? null
             : await getScopedProjectIdsForCurrentUser(agency.id);
-    return globalSearchImpl(query, agency.id, scopedProjectIds);
+    return globalSearchImpl(query, agency.id, scopedProjectIds, { id: caller.id, role: caller.role });
 }
 
 
@@ -1794,7 +1805,11 @@ export async function cancelLeaveRequest(leaveRequestId: string) {
 
 // Get leave statistics for an employee
 export async function getEmployeeLeaveStats(userId: string) {
-    await requireAuth();
+    const currentUser = await requireAuth();
+    const isPrivileged = currentUser.role === 'admin' || currentUser.role === 'manager';
+    if (!isPrivileged && currentUser.id !== userId) {
+        throw new Error("Unauthorized: You can only view your own leave statistics.");
+    }
     const agency = await getCurrentAgency();
     if (!agency?.id) throw new Error('Agency context required');
     return getEmployeeLeaveStatsImpl(userId, agency.id);

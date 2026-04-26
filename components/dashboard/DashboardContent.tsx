@@ -63,7 +63,7 @@ export async function DashboardContent({ currentUser }: { currentUser: CurrentUs
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="hidden md:flex h-9 items-center rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm whitespace-nowrap">
-                            <span className="text-muted-foreground">{fmtDateShort(new Date(new Date().getFullYear(), new Date().getMonth(), 1), currentUser.timezone || 'UTC', getLocaleForTimezone(currentUser.timezone || 'UTC'))} — {fmtDateShort(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0), currentUser.timezone || 'UTC', getLocaleForTimezone(currentUser.timezone || 'UTC'))}</span>
+                            <span className="text-muted-foreground">{fmtDateShort(new Date(new Date().getFullYear(), new Date().getMonth(), 1), currentUser.timezone || 'UTC', getLocaleForTimezone(currentUser.timezone || 'UTC'))} - {fmtDateShort(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0), currentUser.timezone || 'UTC', getLocaleForTimezone(currentUser.timezone || 'UTC'))}</span>
                         </div>
                         <ExportReportButton />
                     </div>
@@ -109,7 +109,7 @@ export async function DashboardContent({ currentUser }: { currentUser: CurrentUs
                             <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
                                 {metrics?.pendingLeaveCount} leave request{(metrics?.pendingLeaveCount ?? 0) > 1 ? 's' : ''} pending approval
                             </p>
-                            <span className="ml-auto text-xs text-amber-500 hover:underline">Review →</span>
+                            <span className="ml-auto text-xs text-amber-500 hover:underline">Review -&gt;</span>
                         </div>
                     </Link>
                 )}
@@ -227,7 +227,7 @@ export async function DashboardContent({ currentUser }: { currentUser: CurrentUs
             {/* Upcoming Deadlines Alert */}
             {upcomingDeadlines.length > 0 && (
                 <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 space-y-2">
-                    <p className="text-xs font-semibold text-red-500 uppercase tracking-wide">⚠ Deadlines in the next 3 days</p>
+                    <p className="text-xs font-semibold text-red-500 uppercase tracking-wide">Deadlines in the next 3 days</p>
                     <div className="flex flex-wrap gap-2">
                         {upcomingDeadlines.map((t: Task) => {
                             const due = t.dueDate ? toLocalCalendarDay(dateKeyTz(t.dueDate, userTimezone)) : null;
@@ -252,7 +252,7 @@ export async function DashboardContent({ currentUser }: { currentUser: CurrentUs
 
             <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
                 {/* My Active Tasks List */}
-                <div className="col-span-2">
+                <div className="md:col-span-2">
                     <EmployeeTasksList
                         initialTasks={myTasks?.filter((t: Task) => t.status === 'In Progress' || t.status === 'Todo').slice(0, 5) || []}
                         userId={userId}

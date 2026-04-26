@@ -92,7 +92,17 @@ type BlockerResolutionClientResult = Pick<
     "changedFields" | "blockersAfter" | "aiFixed" | "remainingHuman" | "remainingSystem" | "summary"
 >;
 
+type StatusControlAction = "advance" | "fix-blockers" | "refresh-research" | "retarget-cannibalization";
+
+type StatusRefreshLock = {
+    action: StatusControlAction;
+    slug: string;
+    expectedStatus?: BlogStudioPostStatus;
+    expectedBlockerSignature?: string;
+};
+
 const BLOCKER_RESOLUTION_STORAGE_PREFIX = "ai-blogger:blocker-resolution:";
+const ACTION_REFRESH_LOCK_MS = 4000;
 
 function getBlockerResolutionStorageKey(slug: string) {
     return `${BLOCKER_RESOLUTION_STORAGE_PREFIX}${slug}`;
@@ -184,7 +194,8 @@ export function AIBloggerPostStatusControls({
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [deleteWithPublished, setDeleteWithPublished] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [activeAction, setActiveAction] = useState<"advance" | "fix-blockers" | "refresh-research" | "retarget-cannibalization" | null>(null);
+    const [activeAction, setActiveAction] = useState<StatusControlAction | null>(null);
+    const [refreshLock, setRefreshLock] = useState<StatusRefreshLock | null>(null);
     const [blockerResolutionResult, setBlockerResolutionResult] = useState<BlockerResolutionClientResult | null>(null);
     const blockerResolutionStorageKey = getBlockerResolutionStorageKey(slug);
     const liveBlockerPreviewSignature = useMemo(
@@ -227,7 +238,7 @@ export function AIBloggerPostStatusControls({
         !Boolean(blockerResolutionPreview?.hasAiFixable) &&
         !canRefreshGroundedResearch &&
         !canRetargetCannibalization;
-    const hasActiveAction = activeAction !== null;
+    const hasActiveAction = activeAction !== null || isPending;
     const isAdvancing = activeAction === "advance";
     const isResolvingBlockers = activeAction === "fix-blockers";
     const isRefreshingGroundedResearch = activeAction === "refresh-research";
@@ -330,6 +341,35 @@ export function AIBloggerPostStatusControls({
         window.sessionStorage.removeItem(blockerResolutionStorageKey);
     }, [blockerResolutionResult, blockerResolutionStorageKey, liveBlockerPreviewSignature]);
 
+    useEffect(() => {
+        if (!refreshLock) {
+            return;
+        }
+
+        const reachedExpectedStatus = refreshLock.expectedStatus && status === refreshLock.expectedStatus;
+        const reachedExpectedBlockers =
+            refreshLock.expectedBlockerSignature &&
+            refreshLock.expectedBlockerSignature === liveBlockerPreviewSignature;
+
+        if (refreshLock.slug !== slug || reachedExpectedStatus || reachedExpectedBlockers) {
+            setRefreshLock(null);
+            setActiveAction(null);
+        }
+    }, [liveBlockerPreviewSignature, refreshLock, slug, status]);
+
+    useEffect(() => {
+        if (!refreshLock) {
+            return;
+        }
+
+        const timeout = window.setTimeout(() => {
+            setRefreshLock(null);
+            setActiveAction(null);
+        }, ACTION_REFRESH_LOCK_MS);
+
+        return () => window.clearTimeout(timeout);
+    }, [refreshLock]);
+
     const clearBlockerResolutionResult = () => {
         setBlockerResolutionResult(null);
 
@@ -338,7 +378,23 @@ export function AIBloggerPostStatusControls({
         }
     };
 
+    const refreshAndKeepActionLocked = (
+        action: StatusControlAction,
+        options: Omit<StatusRefreshLock, "action" | "slug"> = {},
+    ) => {
+        setRefreshLock({
+            action,
+            slug,
+            ...options,
+        });
+        router.refresh();
+    };
+
     const handleAdvance = () => {
+        if (hasActiveAction) {
+            return;
+        }
+
         if (!nextStatus || !actionLabel) {
             return;
         }
@@ -362,6 +418,7 @@ export function AIBloggerPostStatusControls({
 
         setActiveAction("advance");
         startTransition(async () => {
+            let waitingForRefresh = false;
             try {
                 if (publishesToWebhook) {
                     await publishBlogStudioPost(slug);
@@ -380,7 +437,10 @@ export function AIBloggerPostStatusControls({
                         toast("Approved with warning: word count is outside the target range.");
                     }
                 }
-                router.refresh();
+                waitingForRefresh = true;
+                refreshAndKeepActionLocked("advance", {
+                    expectedStatus: publishesToWebhook ? "Published" : nextStatus,
+                });
             } catch (submitError: unknown) {
                 const message = submitError instanceof Error ? submitError.message : "Failed to update post status";
                 const shouldRefreshAfterError =
@@ -394,13 +454,20 @@ export function AIBloggerPostStatusControls({
                 if (shouldRefreshAfterError) {
                     router.refresh();
                 }
-            } finally {
                 setActiveAction(null);
+            } finally {
+                if (!waitingForRefresh) {
+                    setActiveAction(null);
+                }
             }
         });
     };
 
     const handleFixBlockers = () => {
+        if (hasActiveAction) {
+            return;
+        }
+
         if (!hasAiFixableBlockers) {
             toast.error("No AI-fixable blockers are available on this draft.");
             return;
@@ -411,6 +478,7 @@ export function AIBloggerPostStatusControls({
 
         setActiveAction("fix-blockers");
         startTransition(async () => {
+            let waitingForRefresh = false;
             try {
                 const result = await resolveBlogStudioPostBlockersWithAI(slug);
                 const nextResult: BlockerResolutionClientResult = {
@@ -434,18 +502,28 @@ export function AIBloggerPostStatusControls({
                     toast(result.summary);
                 }
 
-                router.refresh();
+                waitingForRefresh = true;
+                refreshAndKeepActionLocked("fix-blockers", {
+                    expectedBlockerSignature: getBlockerPreviewSignature(result.blockersAfter),
+                });
             } catch (resolveError: unknown) {
                 const message = resolveError instanceof Error ? resolveError.message : "Failed to resolve blockers with AI";
                 setError(message);
                 toast.error(message);
-            } finally {
                 setActiveAction(null);
+            } finally {
+                if (!waitingForRefresh) {
+                    setActiveAction(null);
+                }
             }
         });
     };
 
     const handleRefreshGroundedResearch = () => {
+        if (hasActiveAction) {
+            return;
+        }
+
         if (!canRefreshGroundedResearch) {
             toast.error("This draft does not need a grounded-research refresh right now.");
             return;
@@ -456,6 +534,7 @@ export function AIBloggerPostStatusControls({
 
         setActiveAction("refresh-research");
         startTransition(async () => {
+            let waitingForRefresh = false;
             try {
                 const result = await refreshBlogStudioPostGroundedResearch(slug);
                 if (result.claimsGroundingCleared) {
@@ -465,18 +544,26 @@ export function AIBloggerPostStatusControls({
                 } else {
                     toast.error(result.summary);
                 }
-                router.refresh();
+                waitingForRefresh = true;
+                refreshAndKeepActionLocked("refresh-research");
             } catch (refreshError: unknown) {
                 const message = refreshError instanceof Error ? refreshError.message : "Failed to rerun grounded research";
                 setError(message);
                 toast.error(message);
-            } finally {
                 setActiveAction(null);
+            } finally {
+                if (!waitingForRefresh) {
+                    setActiveAction(null);
+                }
             }
         });
     };
 
     const handleRetargetCannibalization = () => {
+        if (hasActiveAction) {
+            return;
+        }
+
         if (!canRetargetCannibalization) {
             toast.error("This draft does not currently need AI cannibalization retargeting.");
             return;
@@ -487,6 +574,7 @@ export function AIBloggerPostStatusControls({
 
         setActiveAction("retarget-cannibalization");
         startTransition(async () => {
+            let waitingForRefresh = false;
             try {
                 const result = await retargetBlogStudioPostCannibalizationWithAI(slug);
                 const nextResult: BlockerResolutionClientResult = {
@@ -510,13 +598,19 @@ export function AIBloggerPostStatusControls({
                     toast(result.summary);
                 }
 
-                router.refresh();
+                waitingForRefresh = true;
+                refreshAndKeepActionLocked("retarget-cannibalization", {
+                    expectedBlockerSignature: getBlockerPreviewSignature(result.blockersAfter),
+                });
             } catch (retargetError: unknown) {
                 const message = retargetError instanceof Error ? retargetError.message : "Failed to retarget cannibalization with AI";
                 setError(message);
                 toast.error(message);
-            } finally {
                 setActiveAction(null);
+            } finally {
+                if (!waitingForRefresh) {
+                    setActiveAction(null);
+                }
             }
         });
     };

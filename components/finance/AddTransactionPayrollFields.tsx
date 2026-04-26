@@ -43,7 +43,6 @@ export function SalaryTransactionFields({
                         <SelectValue placeholder="Select Employee" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="" disabled>Select Employee</SelectItem>
                         {availableUsers.map((user) => (
                             <SelectItem key={user.id} value={user.id}>
                                 {user.name}
@@ -145,7 +144,6 @@ export function InternalTransferTransactionFields({
                         <SelectValue placeholder="Select Employee" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="" disabled>Select Employee</SelectItem>
                         {availableUsers.map((user) => (
                             <SelectItem key={user.id} value={user.id}>
                                 {user.name}

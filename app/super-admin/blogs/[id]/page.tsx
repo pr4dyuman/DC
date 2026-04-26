@@ -57,6 +57,11 @@ interface BlogData {
   publishedAt?: string;
 }
 
+type BlogDataInput = Partial<Omit<BlogData, "faqItems" | "publishedAt">> & {
+  faqItems?: Array<{ question?: string; answer?: string }>;
+  publishedAt?: string | Date;
+};
+
 const CATEGORIES = [
   "Technology",
   "Business",
@@ -68,6 +73,32 @@ const CATEGORIES = [
   "Analytics",
   "Other",
 ];
+
+function toBlogData(data: BlogDataInput): BlogData {
+  return {
+    _id: data._id,
+    title: data.title || "",
+    slug: data.slug || "",
+    content: data.content || "",
+    image: data.image || "",
+    imageAlt: data.imageAlt || "",
+    shortDescription: data.shortDescription || "",
+    category: data.category || "Technology",
+    status: data.status === "published" ? "published" : "draft",
+    metaTitle: data.metaTitle || "",
+    metaDescription: data.metaDescription || "",
+    metaKeywords: data.metaKeywords || "",
+    canonicalUrl: data.canonicalUrl || "",
+    schemaMarkup: data.schemaMarkup || "",
+    faqItems: (data.faqItems || []).map((item) => ({
+      question: item.question || "",
+      answer: item.answer || "",
+    })),
+    contentClusterId: data.contentClusterId || "",
+    parentTopicSlug: data.parentTopicSlug || "",
+    publishedAt: data.publishedAt instanceof Date ? data.publishedAt.toISOString() : data.publishedAt,
+  };
+}
 
 export default function BlogEditorPage() {
   const router = useRouter();
@@ -111,7 +142,7 @@ export default function BlogEditorPage() {
       try {
         setLoading(true);
         const data = await getBlogById(blogId);
-        setBlog(data as BlogData);
+        setBlog(toBlogData(data));
       } catch (err) {
         console.error("Failed to load blog:", err);
         toast.error("Failed to load blog");
@@ -179,7 +210,8 @@ export default function BlogEditorPage() {
           });
 
           if (!response.ok) {
-            throw new Error("Failed to create blog");
+            const errorBody = await response.json().catch(() => null);
+            throw new Error(errorBody?.error || "Failed to create blog");
           }
 
           const createdBlog = await response.json();
@@ -189,8 +221,8 @@ export default function BlogEditorPage() {
           // Update existing blog
           const { publishedAt: _publishedAt, ...blogUpdate } = dataToSave;
           void _publishedAt;
-          await updateBlog(blog._id!, blogUpdate);
-          setBlog(dataToSave);
+          const updatedBlog = await updateBlog(blog._id!, blogUpdate);
+          setBlog(toBlogData(updatedBlog));
           toast.success("Blog updated successfully");
         }
       } catch (err) {
@@ -309,9 +341,9 @@ export default function BlogEditorPage() {
       </div>
 
       {/* Main content with tabs style */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Left column - main form */}
-        <div className="col-span-2 space-y-6">
+        <div className="space-y-6 lg:col-span-2">
           {/* Basic Info */}
           <Card>
             <CardHeader>

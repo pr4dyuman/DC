@@ -274,7 +274,10 @@ export async function getClientDashboardDataImpl(actor: DashboardActor, clientId
 
     await connectDB();
 
-    const clientProjects = await ProjectModel.find({ clientId, agencyId }).lean() as Project[];
+    const clientProjects = await ProjectModel.find({
+        agencyId,
+        $or: [{ clientId }, { clientIds: clientId }],
+    }).lean() as Project[];
     const projectIds = clientProjects.map((project) => project.id);
     const serviceLookupQuery = buildProjectServiceLookupQuery(clientProjects);
 
@@ -317,7 +320,8 @@ export async function getClientDashboardDataImpl(actor: DashboardActor, clientId
 }
 
 export async function getEmployeeDashboardDataImpl(actor: DashboardActor, userId: string, agencyId: string) {
-    if (actor.role === "employee" && actor.id !== userId) {
+    const isPrivileged = actor.role === "admin" || actor.role === "manager";
+    if (!isPrivileged && (actor.role !== "employee" || actor.id !== userId)) {
         throw new Error("Unauthorized: You can only view your own dashboard.");
     }
 

@@ -34,6 +34,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 
+const EDITOR_SAVE_REFRESH_LOCK_MS = 2500;
+
 function splitCommaList(value: string) {
     return value
         .split(",")
@@ -207,6 +209,8 @@ export function AIBloggerPostEditorForm({
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [isImageActionPending, startImageActionTransition] = useTransition();
+    const [isSaving, setIsSaving] = useState(false);
+    const [imageAction, setImageAction] = useState<"generate" | "remove" | null>(null);
     const [error, setError] = useState("");
     const [title, setTitle] = useState(post.title);
     const [excerpt, setExcerpt] = useState(post.excerpt);
@@ -277,7 +281,8 @@ export function AIBloggerPostEditorForm({
             : featuredImageSource === "upload"
                 ? "Uploaded"
                 : "No asset";
-    const imageBusy = isUploadingImage || isImageActionPending;
+    const saveBusy = isSaving || isPending;
+    const imageBusy = isUploadingImage || isImageActionPending || imageAction !== null;
 
     useEffect(() => {
         publishAIBloggerWordCount(post.id, liveWordCount);
@@ -329,7 +334,12 @@ export function AIBloggerPostEditorForm({
     };
 
     const handleGenerateFeaturedImage = () => {
+        if (imageBusy) {
+            return;
+        }
+
         setError("");
+        setImageAction("generate");
         startImageActionTransition(async () => {
             try {
                 const result = await generateBlogStudioFeaturedImage(post.slug);
@@ -341,12 +351,19 @@ export function AIBloggerPostEditorForm({
                 const message = generationError instanceof Error ? generationError.message : "Failed to generate featured image";
                 setError(message);
                 toast.error(message);
+            } finally {
+                setImageAction(null);
             }
         });
     };
 
     const handleRemoveFeaturedImage = () => {
+        if (imageBusy) {
+            return;
+        }
+
         setError("");
+        setImageAction("remove");
         startImageActionTransition(async () => {
             try {
                 await updateBlogStudioPost(post.slug, { featuredImageUrl: "" });
@@ -357,18 +374,26 @@ export function AIBloggerPostEditorForm({
                 const message = removeError instanceof Error ? removeError.message : "Failed to remove featured image";
                 setError(message);
                 toast.error(message);
+            } finally {
+                setImageAction(null);
             }
         });
     };
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
+        if (saveBusy) {
+            return;
+        }
+
         if (isPublished) {
             setError("Published posts cannot be edited here yet.");
             return;
         }
         setError("");
+        setIsSaving(true);
         startTransition(async () => {
+            let waitingForRefresh = false;
             try {
                 await updateBlogStudioPost(post.slug, {
                     title,
@@ -401,11 +426,19 @@ export function AIBloggerPostEditorForm({
                     wordCount: liveWordCount || post.wordCount,
                 });
                 toast.success("Draft changes saved");
+                waitingForRefresh = true;
                 router.refresh();
             } catch (submitError: unknown) {
                 const message = submitError instanceof Error ? submitError.message : "Failed to save the draft";
                 setError(message);
                 toast.error(message);
+                setIsSaving(false);
+            } finally {
+                if (waitingForRefresh) {
+                    window.setTimeout(() => setIsSaving(false), EDITOR_SAVE_REFRESH_LOCK_MS);
+                } else {
+                    setIsSaving(false);
+                }
             }
         });
     };
@@ -437,7 +470,7 @@ export function AIBloggerPostEditorForm({
                                 value={title}
                                 onChange={(event) => setTitle(event.target.value)}
                                 className="h-12 rounded-2xl border-border/60 bg-background/60 text-base"
-                                disabled={isPending || isPublished}
+                                disabled={saveBusy || isPublished}
                             />
                             <div className="space-y-1.5 px-1">
                                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
@@ -479,7 +512,7 @@ export function AIBloggerPostEditorForm({
                             value={content}
                             onChange={(event) => setContent(event.target.value)}
                             className="min-h-[640px] rounded-xl border-border/60 bg-background/60 px-5 py-5 font-mono text-sm leading-7"
-                            disabled={isPending || isPublished}
+                            disabled={saveBusy || isPublished}
                         />
                         <div className="flex flex-wrap items-center gap-2 px-1 text-xs text-muted-foreground">
                             <span>{internalLinkCount} internal links detected</span>
@@ -517,7 +550,7 @@ export function AIBloggerPostEditorForm({
                             value={excerpt}
                             onChange={(event) => setExcerpt(event.target.value)}
                             className="min-h-[100px] rounded-xl border-border/60 bg-background/60"
-                            disabled={isPending || isPublished}
+                            disabled={saveBusy || isPublished}
                         />
                         <p className="px-1 text-xs text-muted-foreground">Used in queue previews and as a fallback meta description.</p>
                     </div>
@@ -532,7 +565,7 @@ export function AIBloggerPostEditorForm({
                                 onChange={(event) => setTagsText(event.target.value)}
                                 placeholder="SEO, AI Blogging, Content Ops"
                                 className="min-h-[120px] rounded-xl border-border/60 bg-background/60"
-                                disabled={isPending || isPublished}
+                                disabled={saveBusy || isPublished}
                             />
                             <p className="px-1 text-xs text-muted-foreground">Separate tags with commas.</p>
                         </div>
@@ -544,7 +577,7 @@ export function AIBloggerPostEditorForm({
                                 onChange={(event) => setOutlineText(event.target.value)}
                                 placeholder={"Intro\nProblem\nFramework\nExamples\nCTA"}
                                 className="min-h-[120px] rounded-xl border-border/60 bg-background/60"
-                                disabled={isPending || isPublished}
+                                disabled={saveBusy || isPublished}
                             />
                             <p className="px-1 text-xs text-muted-foreground">One line per section heading.</p>
                         </div>
@@ -563,7 +596,7 @@ export function AIBloggerPostEditorForm({
                             value={metaTitle}
                             onChange={(event) => setMetaTitle(event.target.value)}
                             className="h-12 rounded-2xl border-border/60 bg-background/60"
-                            disabled={isPending || isPublished}
+                            disabled={saveBusy || isPublished}
                         />
                         <div className="space-y-1.5 px-1">
                             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
@@ -595,7 +628,7 @@ export function AIBloggerPostEditorForm({
                             value={metaDescription}
                             onChange={(event) => setMetaDescription(event.target.value)}
                             className="min-h-[110px] rounded-xl border-border/60 bg-background/60"
-                            disabled={isPending || isPublished}
+                            disabled={saveBusy || isPublished}
                         />
                         <div className="space-y-1.5 px-1">
                             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
@@ -628,7 +661,7 @@ export function AIBloggerPostEditorForm({
                                 value={featuredImageAlt}
                                 onChange={(event) => setFeaturedImageAlt(event.target.value)}
                                 className="h-12 rounded-2xl border-border/60 bg-background/60"
-                                disabled={isPending || isPublished}
+                                disabled={saveBusy || isPublished}
                             />
                             <p className="px-1 text-xs text-muted-foreground">Required when publishing via webhook.</p>
                         </div>
@@ -640,7 +673,7 @@ export function AIBloggerPostEditorForm({
                                 onChange={(event) => setCanonicalUrl(event.target.value)}
                                 placeholder={siteUrl ? `${siteUrl.replace(/\/+$/, "")}/blog/your-post` : "https://your-site.com/blog/your-post"}
                                 className="h-12 rounded-2xl border-border/60 bg-background/60"
-                                disabled={isPending || isPublished}
+                                disabled={saveBusy || isPublished}
                             />
                             <p className="px-1 text-xs text-muted-foreground">Optional. Defaults to the site URL after publish.</p>
                         </div>
@@ -713,7 +746,7 @@ export function AIBloggerPostEditorForm({
                                                 <button
                                                     type="button"
                                                     onClick={() => toggleAcceptedInternalLink(suggestion)}
-                                                    disabled={isPending || isPublished}
+                                                    disabled={saveBusy || isPublished}
                                                     className={`inline-flex h-9 items-center rounded-2xl border px-3 text-xs font-medium transition-colors ${isAcceptedSuggestion ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600" : "border-border/60 bg-background/60 text-foreground hover:border-primary/30 hover:text-primary"}`}
                                                 >
                                                     {isAcceptedSuggestion ? "Accepted" : "Accept target"}
@@ -767,7 +800,7 @@ export function AIBloggerPostEditorForm({
                                                 <button
                                                     type="button"
                                                     onClick={() => setAcceptedInternalLinks((cur) => cur.filter((item) => (normalizeInternalLinkHref(item.href, siteUrl) || item.href) !== normalizedLinkHref))}
-                                                    disabled={isPending || isPublished}
+                                                    disabled={saveBusy || isPublished}
                                                     className="inline-flex h-9 items-center rounded-2xl border border-border/60 bg-background/60 px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive/30 hover:text-destructive"
                                                 >
                                                     Remove
@@ -781,7 +814,7 @@ export function AIBloggerPostEditorForm({
                                                         value={link.anchorText}
                                                         onChange={(e) => updateAcceptedInternalLink(link.href, { anchorText: e.target.value })}
                                                         className="h-11 rounded-2xl border-border/60 bg-background/60"
-                                                        disabled={isPending || isPublished}
+                                                        disabled={saveBusy || isPublished}
                                                     />
                                                     {link.suggestedSectionHeading ? (
                                                         <p className="text-xs text-muted-foreground">Best section: {link.suggestedSectionHeading}</p>
@@ -789,7 +822,7 @@ export function AIBloggerPostEditorForm({
                                                 </div>
                                                 <div className="space-y-2">
                                                     <Label>Placement</Label>
-                                                    {isPending || isPublished ? (
+                                                    {saveBusy || isPublished ? (
                                                         <div className="flex h-11 items-center rounded-2xl border border-border/60 bg-background/60 px-3 text-sm text-muted-foreground">
                                                             {INTERNAL_LINK_PLACEMENTS.find((p) => p.value === link.placement)?.label || "Not set"}
                                                         </div>
@@ -832,7 +865,7 @@ export function AIBloggerPostEditorForm({
                             accept="image/png,image/jpeg,image/webp,image/gif"
                             className="hidden"
                             onChange={handleFeaturedImageUpload}
-                            disabled={isPending || isPublished || imageBusy}
+                            disabled={saveBusy || isPublished || imageBusy}
                         />
                         <div className="flex flex-col gap-4">
                             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -872,15 +905,15 @@ export function AIBloggerPostEditorForm({
                                 )}
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                <AIBloggerGradientButton type="button" variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={isPending || isPublished || imageBusy}>
+                                <AIBloggerGradientButton type="button" variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={saveBusy || isPublished || imageBusy}>
                                     {isUploadingImage ? (<><Loader2 className="h-4 w-4 animate-spin" />Uploading</>) : (<><UploadCloud className="h-4 w-4" />Upload Image</>)}
                                 </AIBloggerGradientButton>
-                                <AIBloggerGradientButton type="button" onClick={handleGenerateFeaturedImage} disabled={isPending || isPublished || imageBusy}>
-                                    {isImageActionPending ? (<><Loader2 className="h-4 w-4 animate-spin" />Working</>) : (<><Sparkles className="h-4 w-4" />Generate With AI</>)}
+                                <AIBloggerGradientButton type="button" onClick={handleGenerateFeaturedImage} disabled={saveBusy || isPublished || imageBusy}>
+                                    {imageBusy && imageAction === "generate" ? (<><Loader2 className="h-4 w-4 animate-spin" />Working</>) : (<><Sparkles className="h-4 w-4" />Generate With AI</>)}
                                 </AIBloggerGradientButton>
                                 {hasFeaturedImage ? (
-                                    <AIBloggerGradientButton type="button" variant="ghost" onClick={handleRemoveFeaturedImage} disabled={isPending || isPublished || imageBusy}>
-                                        <Trash2 className="h-4 w-4" />Remove Image
+                                    <AIBloggerGradientButton type="button" variant="ghost" onClick={handleRemoveFeaturedImage} disabled={saveBusy || isPublished || imageBusy}>
+                                        {imageBusy && imageAction === "remove" ? (<><Loader2 className="h-4 w-4 animate-spin" />Working</>) : (<><Trash2 className="h-4 w-4" />Remove Image</>)}
                                     </AIBloggerGradientButton>
                                 ) : null}
                             </div>
@@ -1040,7 +1073,7 @@ export function AIBloggerPostEditorForm({
                                     value={targetLabel}
                                     onChange={(e) => setTargetLabel(e.target.value)}
                                     className="h-11 rounded-2xl border-border/60 bg-background/60"
-                                    disabled={isPending || isPublished}
+                                    disabled={saveBusy || isPublished}
                                 />
                             </div>
                         </div>
@@ -1078,7 +1111,7 @@ export function AIBloggerPostEditorForm({
                                                 value={value}
                                                 onChange={(e) => setter(e.target.value)}
                                                 className="h-11 rounded-2xl border-border/60 bg-background/60"
-                                                disabled={isPending || isPublished}
+                                                disabled={saveBusy || isPublished}
                                             />
                                         </div>
                                     ))}
@@ -1099,7 +1132,7 @@ export function AIBloggerPostEditorForm({
                                     onChange={(e) => setContentClusterId(e.target.value)}
                                     placeholder="seo-automation"
                                     className="h-11 rounded-2xl border-border/60 bg-background/60"
-                                    disabled={isPending || isPublished}
+                                    disabled={saveBusy || isPublished}
                                 />
                                 <p className="px-1 text-xs text-muted-foreground">Use one shared slug for all drafts in the same cluster.</p>
                             </div>
@@ -1111,7 +1144,7 @@ export function AIBloggerPostEditorForm({
                                     onChange={(e) => setParentTopicSlug(e.target.value)}
                                     placeholder="ai-seo-automation"
                                     className="h-11 rounded-2xl border-border/60 bg-background/60"
-                                    disabled={isPending || isPublished}
+                                    disabled={saveBusy || isPublished}
                                 />
                                 <p className="px-1 text-xs text-muted-foreground">Set the pillar topic this draft rolls up under.</p>
                             </div>
@@ -1138,8 +1171,8 @@ export function AIBloggerPostEditorForm({
                         View-only published post
                     </div>
                 ) : (
-                    <AIBloggerGradientButton type="submit" disabled={isPending}>
-                        {isPending ? (
+                    <AIBloggerGradientButton type="submit" disabled={saveBusy}>
+                        {saveBusy ? (
                             <><Loader2 className="h-4 w-4 animate-spin" />Saving Changes</>
                         ) : (
                             <><Save className="h-4 w-4" />Save Changes</>

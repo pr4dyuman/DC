@@ -46,7 +46,6 @@ export function ProjectTransactionFields({
                             <SelectValue placeholder="Select Project" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="" disabled>Select Project</SelectItem>
                             {projects.map((project) => (
                                 <SelectItem key={project.id} value={project.id}>
                                     {project.name}
@@ -129,7 +128,6 @@ export function RefundTransactionFields({
                             <SelectValue placeholder="Select Project" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="" disabled>Select Project</SelectItem>
                             {projects.map((project) => (
                                 <SelectItem key={project.id} value={project.id}>
                                     {project.name}

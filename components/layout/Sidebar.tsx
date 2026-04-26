@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAIBloggerAccessState } from "@/lib/ai-blogger-access";
+import { isDashboardNavRouteVisible } from "@/lib/dashboard-route-access";
 
 interface SidebarProps {
     currentUserId?: string;
@@ -26,6 +27,7 @@ interface SidebarProps {
     agencyPlan?: string;
     agencyStatus?: string;
     agencyHasAIBlogger?: boolean;
+    currentUserCanUseAI?: boolean;
 }
 
 export function Sidebar({
@@ -36,6 +38,7 @@ export function Sidebar({
     agencyPlan,
     agencyStatus,
     agencyHasAIBlogger,
+    currentUserCanUseAI,
 }: SidebarProps) {
     const pathname = usePathname();
     const aiBloggerAccess = getAIBloggerAccessState({
@@ -102,19 +105,12 @@ export function Sidebar({
             label: "Settings",
             icon: Settings,
             href: "/dashboard/settings",
-            isSettings: true, // Marker for filtering
         },
     ];
 
-    // Filter routes based on role logic...
     const filteredRoutes = routes.filter(route => {
         if (route.show === false) return false;
-        if (currentUserRole === 'client') {
-            if (route.isSettings) return false;
-            if (route.label === 'Team') return false;
-            if (route.label === 'Clients') return false;
-        }
-        return true;
+        return isDashboardNavRouteVisible(currentUserRole, route.href, { canUseAI: currentUserCanUseAI });
     });
 
     const isRouteActive = (href: string) => {

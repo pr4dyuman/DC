@@ -21,7 +21,7 @@ const OtpSchema = new Schema({
     purpose: { type: String, enum: ["signup", "password-reset"], default: "signup" },
     expiresAt: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
 });
-OtpSchema.index({ email: 1, purpose: 1 });
+OtpSchema.index({ email: 1, purpose: 1 }, { unique: true });
 
 const RateLimitSchema = new Schema({
     key: { type: String, required: true, unique: true },

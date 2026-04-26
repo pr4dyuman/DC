@@ -89,13 +89,16 @@ export async function POST(request: Request) {
         }
 
         // ── Check if email exists in any collection ──
-        const [existingUser, existingSuperAdmin, existingClient] = await Promise.all([
-            UserModel.findOne({ email: validatedEmail }).lean(),
-            SuperAdminModel.findOne({ email: validatedEmail }).lean(),
-            ClientModel.findOne({ email: validatedEmail }).lean(),
+        const [existingUsers, existingSuperAdmins, existingClients] = await Promise.all([
+            UserModel.find({ email: validatedEmail }).limit(2).lean(),
+            SuperAdminModel.find({ email: validatedEmail }).limit(2).lean(),
+            ClientModel.find({ email: validatedEmail }).limit(2).lean(),
         ]);
+        const matchingAccountCount = existingUsers.length + existingSuperAdmins.length + existingClients.length;
+        const existingUser = existingUsers[0];
+        const existingClient = existingClients[0];
 
-        if (!existingUser && !existingSuperAdmin && !existingClient) {
+        if (matchingAccountCount !== 1) {
             // Return same success-like response to prevent email enumeration
             return NextResponse.json({
                 success: true,

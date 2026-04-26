@@ -24,8 +24,37 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
     let userId = typeof params.userId === 'string' ? params.userId : undefined;
     const category = typeof params.category === 'string' ? params.category : undefined;
     const memberId = typeof params.memberId === 'string' ? params.memberId : undefined;
-    const activeTab = typeof params.tab === 'string' && ['overview', 'transactions', 'invoices', 'payroll'].includes(params.tab)
-        ? params.tab
+    const requestedTab = typeof params.tab === 'string' ? params.tab : undefined;
+
+    const currentUserId = await getSessionId();
+    const currentUser = currentUserId ? await getUser(currentUserId) : null;
+    const isUserAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager';
+    const isRestricted = currentUser?.role === 'employee';
+
+    if (isRestricted) {
+        redirect("/dashboard");
+    }
+
+    if (currentUser?.role === 'client') {
+        const activeTab = requestedTab && ['invoices', 'history'].includes(requestedTab)
+            ? requestedTab
+            : 'invoices';
+        // Force Client View immediately - Do not execute Admin logic
+        const [clientInvoices, clientTransactions, clientProjects] = await Promise.all([
+            getInvoices(),         // internally filters for client
+            getTransactions(),      // internally filters for client
+            getProjects(),          // returns only this client's projects
+        ]);
+
+        const pendingTotal = clientInvoices
+            .filter(i => i.status === 'Pending' || i.status === 'Overdue')
+            .reduce((acc, curr) => acc + curr.amount, 0);
+
+        return <FinanceClientView activeTab={activeTab} invoices={clientInvoices} transactions={clientTransactions} pendingTotal={pendingTotal} currency={currency} projects={clientProjects} />;
+    }
+
+    const activeTab = requestedTab && ['overview', 'transactions', 'invoices', 'payroll'].includes(requestedTab)
+        ? requestedTab
         : 'overview';
 
     // Resolve username to userId if provided
@@ -43,33 +72,6 @@ export async function FinanceContent({ searchParams }: { searchParams: { [key: s
                 userId = client.id;
             }
         }
-    }
-
-    // STRICT CLIENT CHECK: Perform this FIRST
-    const currentUserId = await getSessionId();
-    // Optimization: Use getUser which handles both Users and Clients tables
-    // getUsers() ONLY returns employees, which is why the previous check failed for clients.
-    const currentUser = currentUserId ? await getUser(currentUserId) : null;
-    const isUserAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager';
-    const isRestricted = currentUser?.role === 'employee';
-
-    if (isRestricted) {
-        redirect("/dashboard");
-    }
-
-    if (currentUser?.role === 'client') {
-        // Force Client View immediately - Do not execute Admin logic
-        const [clientInvoices, clientTransactions, clientProjects] = await Promise.all([
-            getInvoices(),         // internally filters for client
-            getTransactions(),      // internally filters for client
-            getProjects(),          // returns only this client's projects
-        ]);
-
-        const pendingTotal = clientInvoices
-            .filter(i => i.status === 'Pending' || i.status === 'Overdue')
-            .reduce((acc, curr) => acc + curr.amount, 0);
-
-        return <FinanceClientView activeTab={activeTab} invoices={clientInvoices} transactions={clientTransactions} pendingTotal={pendingTotal} currency={currency} projects={clientProjects} />;
     }
 
     // --- ADMIN / EMPLOYEE LOGIC BELOW (Only runs if NOT client) ---

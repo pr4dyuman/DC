@@ -15,6 +15,7 @@ interface MobileSidebarProps {
     agencyPlan?: string;
     agencyStatus?: string;
     agencyHasAIBlogger?: boolean;
+    currentUserCanUseAI?: boolean;
 }
 
 const subscribe = () => () => { };
@@ -28,6 +29,7 @@ export function MobileSidebar({
     agencyPlan,
     agencyStatus,
     agencyHasAIBlogger,
+    currentUserCanUseAI,
 }: MobileSidebarProps) {
     const [open, setOpen] = useState(false);
     const pathname = usePathname();
@@ -61,6 +63,7 @@ export function MobileSidebar({
                         agencyPlan={agencyPlan}
                         agencyStatus={agencyStatus}
                         agencyHasAIBlogger={agencyHasAIBlogger}
+                        currentUserCanUseAI={currentUserCanUseAI}
                     />
                 </div>
             </SheetContent>

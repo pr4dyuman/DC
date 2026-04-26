@@ -86,6 +86,8 @@ type AIBloggerSettingsWorkspaceProps = {
     postsHref?: string;
 };
 
+const SETTINGS_ACTION_REFRESH_LOCK_MS = 2500;
+
 type WebhookHealthcheckState = {
     success: boolean;
     message: string;
@@ -360,6 +362,7 @@ export function AIBloggerSettingsWorkspace({
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [pendingAction, setPendingAction] = useState("");
+    const hasPendingAction = pendingAction !== "" || isPending;
     const [deleteTarget, setDeleteTarget] = useState<BlogStudioSchedule | null>(null);
     const [isDocModalOpen, setIsDocModalOpen] = useState(false);
     const [oauthRefreshKey, setOAuthRefreshKey] = useState(0);
@@ -454,19 +457,29 @@ export function AIBloggerSettingsWorkspace({
     };
 
     const runAction = (key: string, action: () => Promise<unknown>, successMessage: string) => {
+        if (hasPendingAction) {
+            return;
+        }
+
         setPendingAction(key);
         startTransition(async () => {
+            let waitingForRefresh = false;
             try {
                 await action();
                 toast.success(successMessage);
+                waitingForRefresh = true;
                 router.refresh();
             } catch (error: unknown) {
                 const message = error instanceof Error ? error.message : "AI Blogger update failed";
                 console.error(`[${key}] Action failed:`, message);
                 toast.error(message);
-            } finally {
-                // Ensure pending state is always cleared
                 setPendingAction("");
+            } finally {
+                if (waitingForRefresh) {
+                    window.setTimeout(() => setPendingAction(""), SETTINGS_ACTION_REFRESH_LOCK_MS);
+                } else {
+                    setPendingAction("");
+                }
             }
         });
     };
@@ -542,6 +555,10 @@ export function AIBloggerSettingsWorkspace({
     );
 
     const runWebhookHealthCheck = () => {
+        if (hasPendingAction) {
+            return;
+        }
+
         const validationMessage = validatePublishingForm({
             defaultTargetType,
             defaultTargetLabel,
@@ -689,8 +706,13 @@ export function AIBloggerSettingsWorkspace({
     };
 
     const runScheduleNow = (schedule: BlogStudioSchedule) => {
+        if (hasPendingAction) {
+            return;
+        }
+
         setPendingAction(`run-${schedule.id}`);
         startTransition(async () => {
+            let waitingForRefresh = false;
             try {
                 const result = await runBlogStudioScheduleNow(schedule.id);
                 if (result.ok) {
@@ -698,12 +720,18 @@ export function AIBloggerSettingsWorkspace({
                 } else {
                     toast.error(result.summary);
                 }
+                waitingForRefresh = true;
                 router.refresh();
             } catch (error: unknown) {
                 const message = error instanceof Error ? error.message : "AI Blogger update failed";
                 toast.error(message);
-            } finally {
                 setPendingAction("");
+            } finally {
+                if (waitingForRefresh) {
+                    window.setTimeout(() => setPendingAction(""), SETTINGS_ACTION_REFRESH_LOCK_MS);
+                } else {
+                    setPendingAction("");
+                }
             }
         });
     };
@@ -829,8 +857,8 @@ export function AIBloggerSettingsWorkspace({
                                 </div>
 
                                 <div className="flex justify-end">
-                                    <AIBloggerGradientButton type="button" onClick={saveBrandVoice} disabled={isPending}>
-                                        {isPending && pendingAction === "brand" ? (
+                                    <AIBloggerGradientButton type="button" onClick={saveBrandVoice} disabled={hasPendingAction}>
+                                        {pendingAction === "brand" ? (
                                             <>
                                                 <Loader2 className="h-4 w-4 animate-spin" />
                                                 Saving
@@ -938,9 +966,9 @@ export function AIBloggerSettingsWorkspace({
                                                  type="button"
                                                  variant="outline"
                                                  onClick={runWebhookHealthCheck}
-                                                 disabled={isPending}
+                                                 disabled={hasPendingAction}
                                              >
-                                                 {isPending && pendingAction === "webhook-test" ? (
+                                                 {pendingAction === "webhook-test" ? (
                                                      <>
                                                          <Loader2 className="h-4 w-4 animate-spin" />
                                                          Testing
@@ -1059,8 +1087,8 @@ export function AIBloggerSettingsWorkspace({
                                 </div>
 
                                 <div className="flex justify-end">
-                                    <AIBloggerGradientButton type="button" onClick={savePublishing} disabled={isPending}>
-                                        {isPending && pendingAction === "publishing" ? (
+                                    <AIBloggerGradientButton type="button" onClick={savePublishing} disabled={hasPendingAction}>
+                                        {pendingAction === "publishing" ? (
                                             <>
                                                 <Loader2 className="h-4 w-4 animate-spin" />
                                                 Saving
@@ -1136,8 +1164,8 @@ export function AIBloggerSettingsWorkspace({
                                 </div>
 
                                 <div className="flex justify-end">
-                                    <AIBloggerGradientButton type="button" onClick={saveSeo} disabled={isPending}>
-                                        {isPending && pendingAction === "seo" ? (
+                                    <AIBloggerGradientButton type="button" onClick={saveSeo} disabled={hasPendingAction}>
+                                        {pendingAction === "seo" ? (
                                             <>
                                                 <Loader2 className="h-4 w-4 animate-spin" />
                                                 Saving
@@ -1330,8 +1358,8 @@ export function AIBloggerSettingsWorkspace({
                                                     Cancel Edit
                                                 </AIBloggerGradientButton>
                                             ) : null}
-                                            <AIBloggerGradientButton type="button" onClick={saveSchedule} disabled={isPending}>
-                                                {isPending && pendingAction === "schedule" ? (
+                                            <AIBloggerGradientButton type="button" onClick={saveSchedule} disabled={hasPendingAction}>
+                                                {pendingAction === "schedule" ? (
                                                     <>
                                                         <Loader2 className="h-4 w-4 animate-spin" />
                                                         Saving
@@ -1367,7 +1395,7 @@ export function AIBloggerSettingsWorkspace({
                                                 const latestRun = history[0];
                                                 const health = getScheduleHealthState(schedule, latestRun);
                                                 const lockState = getScheduleLockState(schedule);
-                                                const scheduleBusy = isPending || lockState.isLocked;
+                                                const scheduleBusy = hasPendingAction || lockState.isLocked;
 
                                                 return (
                                                     <div key={schedule.id} className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
@@ -1426,7 +1454,7 @@ export function AIBloggerSettingsWorkspace({
 
                                                             <div className="flex flex-wrap gap-2">
                                                                 <AIBloggerGradientButton type="button" size="sm" variant="outline" disabled={scheduleBusy} onClick={() => toggleScheduleStatus(schedule)}>
-                                                                    {isPending && pendingAction === `status-${schedule.id}` ? (
+                                                                    {pendingAction === `status-${schedule.id}` ? (
                                                                         <>
                                                                             <Loader2 className="h-4 w-4 animate-spin" />
                                                                             Saving
@@ -1434,7 +1462,7 @@ export function AIBloggerSettingsWorkspace({
                                                                     ) : schedule.status === "active" ? "Pause" : "Activate"}
                                                                 </AIBloggerGradientButton>
                                                                 <AIBloggerGradientButton type="button" size="sm" variant="outline" disabled={scheduleBusy} onClick={() => runScheduleNow(schedule)}>
-                                                                    {isPending && pendingAction === `run-${schedule.id}` ? (
+                                                                    {pendingAction === `run-${schedule.id}` ? (
                                                                         <>
                                                                             <Loader2 className="h-4 w-4 animate-spin" />
                                                                             Running
@@ -1533,9 +1561,9 @@ export function AIBloggerSettingsWorkspace({
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmDeleteSchedule} className="bg-red-600 text-white hover:bg-red-700" disabled={isPending}>
-                            {isPending && deleteTarget && pendingAction === `delete-${deleteTarget.id}` ? "Deleting" : "Delete"}
+                        <AlertDialogCancel disabled={hasPendingAction}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmDeleteSchedule} className="bg-red-600 text-white hover:bg-red-700" disabled={hasPendingAction}>
+                            {deleteTarget && pendingAction === `delete-${deleteTarget.id}` ? "Deleting" : "Delete"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

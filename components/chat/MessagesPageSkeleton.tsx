@@ -1,8 +1,8 @@
 
 export function MessagesPageSkeleton() {
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background p-4 md:p-8">
-            <div className="w-full max-w-6xl h-[85vh] bg-card border border-border rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row ring-1 ring-border animate-pulse">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background p-3 sm:p-4 md:p-8">
+            <div className="w-full max-w-6xl h-[calc(100dvh-1.5rem)] sm:h-[calc(100dvh-2rem)] md:h-[85vh] bg-card border border-border rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row ring-1 ring-border animate-pulse">
                 {/* Sidebar */}
                 <div className="w-full md:w-80 border-r border-border flex flex-col bg-secondary">
                     <div className="p-4 border-b border-border flex justify-between items-center">
@@ -31,7 +31,7 @@ export function MessagesPageSkeleton() {
                 {/* Main Chat Area */}
                 <div className="flex-1 flex flex-col bg-background hidden md:flex">
                     <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
-                        <div className="w-20 h-20 bg-muted/50 rounded-3xl" />
+                        <div className="w-20 h-20 bg-muted/50 rounded-2xl" />
                         <div className="h-6 w-48 bg-muted rounded mt-6" />
                         <div className="h-4 w-64 bg-muted/60 rounded mt-2" />
                     </div>

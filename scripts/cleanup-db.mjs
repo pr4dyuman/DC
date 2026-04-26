@@ -11,9 +11,15 @@
  */
 import { MongoClient } from 'mongodb';
 import bcrypt from 'bcryptjs';
+import 'dotenv/config';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://chandanvsharma00_agencyos:tUhRWo1W1PdzfsJI@cluster0.o2mv8lz.mongodb.net/?appName=Cluster0';
+const MONGODB_URI = process.env.MONGODB_URI;
+const TEMP_ADMIN_PASSWORD = process.env.CLEANUP_TEMP_ADMIN_PASSWORD;
 const PRODUCTION_DB = 'agency-os';
+
+if (!MONGODB_URI) {
+    throw new Error('MONGODB_URI is required. Set it in .env.local or the shell environment before running this script.');
+}
 
 async function cleanup() {
     const client = new MongoClient(MONGODB_URI);
@@ -191,19 +197,20 @@ async function cleanup() {
                 ]
             }).project({ id: 1, name: 1, email: 1, role: 1 }).toArray();
 
-            if (emptyPwdUsers.length > 0) {
+            if (emptyPwdUsers.length > 0 && !TEMP_ADMIN_PASSWORD) {
+                fail('CLEANUP_TEMP_ADMIN_PASSWORD is required to repair users with empty passwords');
+            } else if (emptyPwdUsers.length > 0) {
                 for (const user of emptyPwdUsers) {
                     console.log(`  Empty password: "${user.name}" (${user.email}, role: ${user.role})`);
                     
                     // Set a temp password — user MUST change it on next login
-                    const tempPassword = 'Agency@123';
-                    const hashedPassword = await bcrypt.hash(tempPassword, 12);
+                    const hashedPassword = await bcrypt.hash(TEMP_ADMIN_PASSWORD, 12);
                     
                     await prodDb.collection('users').updateOne(
                         { _id: user._id },
                         { $set: { password: hashedPassword } }
                     );
-                    ok(`Set temp password for "${user.name}" (${user.email}) — temp pwd: Agency@123`);
+                    ok(`Set temp password for "${user.name}" (${user.email})`);
                 }
             } else {
                 skip('No users with empty passwords');
@@ -365,8 +372,7 @@ async function cleanup() {
             results.skipped.forEach(s => console.log(`     • ${s}`));
         }
 
-        console.log('\n⚠️  IMPORTANT: Temp password for admin user chandan sharma is: Agency@123');
-        console.log('   Please change it immediately after logging in!\n');
+        console.log('\nIMPORTANT: If any temp passwords were set, change them immediately after logging in.\n');
 
     } catch (err) {
         console.error('💥 Fatal error:', err);

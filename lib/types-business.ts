@@ -195,6 +195,7 @@ export type Message = {
     timestamp: string;
     read: boolean;
     type: "text" | "image";
+    deletedFor?: string[];
 };
 
 export type Service = {

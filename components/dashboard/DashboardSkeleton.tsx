@@ -28,8 +28,8 @@ export function DashboardSkeleton() {
             </div>
 
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-7">
-                <div className="col-span-4 h-[350px] bg-muted rounded-xl"></div>
-                <div className="col-span-3 h-[350px] bg-muted rounded-xl"></div>
+                <div className="h-[350px] bg-muted rounded-xl lg:col-span-4"></div>
+                <div className="h-[350px] bg-muted rounded-xl lg:col-span-3"></div>
             </div>
 
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2">

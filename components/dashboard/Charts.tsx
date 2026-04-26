@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCurrency } from "@/context/CurrencyContext";
@@ -21,40 +22,52 @@ interface RevenueChartProps {
     data: RevenueChartPoint[];
 }
 
+const subscribeToClientMount = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
+
+function useIsClient() {
+    return useSyncExternalStore(subscribeToClientMount, getClientSnapshot, getServerSnapshot);
+}
+
 export function RevenueChart({ data }: RevenueChartProps) {
     const { symbol } = useCurrency();
+    const isClient = useIsClient();
+
     return (
-        <Card className="col-span-4 min-w-0">
+        <Card className="min-w-0 lg:col-span-4">
             <CardHeader>
                 <CardTitle>Revenue vs Expenses</CardTitle>
             </CardHeader>
             <CardContent className="pl-2 min-w-0">
                 <div className="h-[250px] sm:h-[350px] w-full min-w-0">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={250}>
-                        <BarChart data={data}>
-                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                            <XAxis
-                                dataKey="name"
-                                stroke="#888888"
-                                fontSize={12}
-                                tickLine={false}
-                                axisLine={false}
-                            />
-                            <YAxis
-                                stroke="#888888"
-                                fontSize={12}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={(value) => `${symbol}${value}`}
-                            />
-                            <Tooltip
-                                cursor={{ fill: 'transparent' }}
-                                contentStyle={{ backgroundColor: 'var(--card)', color: 'var(--card-foreground)', borderRadius: '8px', border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}
-                            />
-                            <Bar dataKey="revenue" fill="#a78bfa" radius={[4, 4, 0, 0]} name="Revenue" />
-                            <Bar dataKey="expenses" fill="#fb7185" radius={[4, 4, 0, 0]} name="Expenses" />
-                        </BarChart>
-                    </ResponsiveContainer>
+                    {isClient && (
+                        <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={250}>
+                            <BarChart data={data}>
+                                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                <XAxis
+                                    dataKey="name"
+                                    stroke="#888888"
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                />
+                                <YAxis
+                                    stroke="#888888"
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickFormatter={(value) => `${symbol}${value}`}
+                                />
+                                <Tooltip
+                                    cursor={{ fill: 'transparent' }}
+                                    contentStyle={{ backgroundColor: 'var(--card)', color: 'var(--card-foreground)', borderRadius: '8px', border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}
+                                />
+                                <Bar dataKey="revenue" fill="#a78bfa" radius={[4, 4, 0, 0]} name="Revenue" />
+                                <Bar dataKey="expenses" fill="#fb7185" radius={[4, 4, 0, 0]} name="Expenses" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    )}
                 </div>
             </CardContent>
         </Card>
@@ -92,39 +105,42 @@ function StatusTooltip({ active, payload }: StatusTooltipProps) {
 }
 
 export function ProjectDistributionChart({ data }: { data: ProjectDistributionPoint[] }) {
+    const isClient = useIsClient();
     const total = data.reduce((sum, d) => sum + d.value, 0);
     // Attach total to each entry so the tooltip can compute percentages
     const enriched = data.map((d) => ({ ...d, _total: total }));
 
     return (
-        <Card className="col-span-3 min-w-0">
+        <Card className="min-w-0 lg:col-span-3">
             <CardHeader>
                 <CardTitle>Projects by Status</CardTitle>
             </CardHeader>
             <CardContent className="min-w-0">
                 <div className="h-[250px] sm:h-[350px] w-full min-w-0">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={250}>
-                        <PieChart>
-                            <Pie
-                                data={enriched}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={60}
-                                outerRadius={80}
-                                paddingAngle={5}
-                                dataKey="value"
-                            >
-                                {enriched.map((entry) => (
-                                    <Cell
-                                        key={`cell-${entry.name}`}
-                                        fill={STATUS_COLORS[entry.name] ?? DEFAULT_COLOR}
-                                    />
-                                ))}
-                            </Pie>
-                            <Tooltip content={<StatusTooltip />} />
-                            <Legend />
-                        </PieChart>
-                    </ResponsiveContainer>
+                    {isClient && (
+                        <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={250}>
+                            <PieChart>
+                                <Pie
+                                    data={enriched}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={60}
+                                    outerRadius={80}
+                                    paddingAngle={5}
+                                    dataKey="value"
+                                >
+                                    {enriched.map((entry) => (
+                                        <Cell
+                                            key={`cell-${entry.name}`}
+                                            fill={STATUS_COLORS[entry.name] ?? DEFAULT_COLOR}
+                                        />
+                                    ))}
+                                </Pie>
+                                <Tooltip content={<StatusTooltip />} />
+                                <Legend />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    )}
                 </div>
             </CardContent>
         </Card>

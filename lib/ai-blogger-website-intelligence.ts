@@ -244,6 +244,42 @@ function isBrandPath(pathname: string) {
     return /(^|\/)(brands?|manufacturers?|makers?)(\/|$)/.test(pathname);
 }
 
+function isServicePath(pathname: string) {
+    return /(^|\/)(services?|offers?|consulting|implementation)(\/|$)/.test(pathname);
+}
+
+function isSolutionPath(pathname: string) {
+    return /(^|\/)(solutions?|platforms?|workflows?)(\/|$)/.test(pathname);
+}
+
+function isPricingPath(pathname: string) {
+    return /(^|\/)(pricing|plans?|packages?|costs?|quotes?)(\/|$)/.test(pathname);
+}
+
+function isCaseStudyPath(pathname: string) {
+    return /(^|\/)(case-studies?|work|portfolio|results|customer-stories?|success-stories?)(\/|$)/.test(pathname);
+}
+
+function isIndustryPath(pathname: string) {
+    return /(^|\/)(industr(y|ies)|sectors?|verticals?)(\/|$)/.test(pathname);
+}
+
+function isBlogPath(pathname: string) {
+    return /(^|\/)(blog|blogs|articles?|resources?|news|insights)(\/|$)/.test(pathname);
+}
+
+function isFaqPath(pathname: string) {
+    return /(^|\/)(faq|faqs|help|questions)(\/|$)/.test(pathname);
+}
+
+function isAboutPath(pathname: string) {
+    return /(^|\/)(about|company|team)(\/|$)/.test(pathname);
+}
+
+function isContactPath(pathname: string) {
+    return /(^|\/)(contact|book|demo|consultation|schedule|get-started)(\/|$)/.test(pathname);
+}
+
 function classifyPriorityPageCategory(page: CrawledPage): BlogStudioSitePriorityPageCategory {
     const pathname = new URL(page.url).pathname.toLowerCase() || "/";
     const signals = [
@@ -274,6 +310,42 @@ function classifyPriorityPageCategory(page: CrawledPage): BlogStudioSitePriority
 
     if (isBrandPath(pathname)) {
         return "brand";
+    }
+
+    if (isPricingPath(pathname)) {
+        return "pricing";
+    }
+
+    if (isCaseStudyPath(pathname)) {
+        return "case-study";
+    }
+
+    if (isIndustryPath(pathname)) {
+        return "industry";
+    }
+
+    if (isSolutionPath(pathname)) {
+        return "solution";
+    }
+
+    if (isServicePath(pathname)) {
+        return "service";
+    }
+
+    if (isBlogPath(pathname)) {
+        return "blog";
+    }
+
+    if (isFaqPath(pathname)) {
+        return "faq";
+    }
+
+    if (isAboutPath(pathname)) {
+        return "about";
+    }
+
+    if (isContactPath(pathname)) {
+        return "contact";
     }
 
     if (hasAnySchemaType(page, ["product"])) {
@@ -706,7 +778,7 @@ function scoreInternalLink(link: string) {
         return -50;
     }
 
-    let score = pathname === "/" ? 18 : 4;
+    let score = pathname === "/" ? 2 : 4;
 
     for (const segment of PRIORITY_SEGMENTS) {
         if (pathname.includes(segment)) {

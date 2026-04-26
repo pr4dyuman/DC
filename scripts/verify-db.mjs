@@ -2,8 +2,12 @@
  * Post-Cleanup Verification — Confirms everything is clean
  */
 import { MongoClient } from 'mongodb';
+import 'dotenv/config';
 
-const MONGODB_URI = 'mongodb+srv://chandanvsharma00_agencyos:tUhRWo1W1PdzfsJI@cluster0.o2mv8lz.mongodb.net/?appName=Cluster0';
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+    throw new Error('MONGODB_URI is required. Set it in .env.local or the shell environment before running this script.');
+}
 
 async function verify() {
     const client = new MongoClient(MONGODB_URI);

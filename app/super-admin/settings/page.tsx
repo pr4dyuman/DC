@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Shield, Bell, Database, Globe, Mail, Loader2, Brain, FileText, BarChart3 } from "lucide-react";
+import { Shield, Bell, Database, Globe, Mail, Loader2, Brain, FileText } from "lucide-react";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { getSystemSettings, updateSystemSettings, getAllAgenciesWithStats, getDefaultAiConfig, saveDefaultAiConfig, getPromptConfig, savePromptConfig } from "@/lib/actions/super-admin";
 import { AI_MODELS } from "@/lib/ai-models";

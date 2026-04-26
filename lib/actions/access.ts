@@ -11,6 +11,7 @@ import {
     UserModel,
     connectDB,
 } from "../mongodb";
+import { getDefaultUserPermissionsForRole } from "../types-business";
 import { sanitizeDoc } from "./shared";
 
 export type AllowedRole = 'admin' | 'manager' | 'employee' | 'client' | 'superadmin';
@@ -42,20 +43,28 @@ export async function getCurrentUserImpl(): Promise<CurrentUserResult | null> {
             const admin = await SuperAdminModel.findOne({ id: session.userId }).select('-password').lean() as CurrentUserResult | null;
             if (admin) return sanitizeDoc(admin) as CurrentUserResult;
         } else if (session.role === 'client') {
-            const client = await ClientModel.findOne({ id: session.userId }).select('-password').lean() as Client | null;
+            const client = await ClientModel.findOne({
+                id: session.userId,
+                agencyId: session.agencyId,
+                archived: { $ne: true },
+            }).select('-password').lean() as Client | null;
             if (client) {
                 const lastActive = client.lastActiveAt ? new Date(client.lastActiveAt).getTime() : 0;
                 if (Date.now() - lastActive > 5 * 60 * 1000) {
-                    ClientModel.updateOne({ id: session.userId }, { $set: { lastActiveAt: now } }).catch(() => { });
+                    ClientModel.updateOne({ id: session.userId, agencyId: session.agencyId }, { $set: { lastActiveAt: now } }).catch(() => { });
                 }
                 return sanitizeDoc({ ...client, role: 'client' }) as CurrentUserResult;
             }
         } else {
-            const user = await UserModel.findOne({ id: session.userId }).select('-password').lean() as User | null;
+            const user = await UserModel.findOne({
+                id: session.userId,
+                agencyId: session.agencyId,
+                archived: { $ne: true },
+            }).select('-password').lean() as User | null;
             if (user) {
                 const lastActive = user.lastActiveAt ? new Date(user.lastActiveAt).getTime() : 0;
                 if (Date.now() - lastActive > 5 * 60 * 1000) {
-                    UserModel.updateOne({ id: session.userId }, { $set: { lastActiveAt: now } }).catch(() => { });
+                    UserModel.updateOne({ id: session.userId, agencyId: session.agencyId }, { $set: { lastActiveAt: now } }).catch(() => { });
                 }
                 return sanitizeDoc(user) as User;
             }
@@ -68,10 +77,10 @@ export async function getCurrentUserImpl(): Promise<CurrentUserResult | null> {
     const superAdmin = await SuperAdminModel.findOne({ id: userId }).select('-password').lean() as CurrentUserResult | null;
     if (superAdmin) return sanitizeDoc(superAdmin) as CurrentUserResult;
 
-    const user = await UserModel.findOne({ id: userId }).select('-password').lean() as User | null;
+    const user = await UserModel.findOne({ id: userId, archived: { $ne: true } }).select('-password').lean() as User | null;
     if (user) return sanitizeDoc(user) as User;
 
-    const client = await ClientModel.findOne({ id: userId }).select('-password').lean() as Client | null;
+    const client = await ClientModel.findOne({ id: userId, archived: { $ne: true } }).select('-password').lean() as Client | null;
     if (client) {
         return sanitizeDoc({
             id: client.id,
@@ -118,7 +127,10 @@ export async function getScopedProjectIdsForCurrentUser(agencyId: string): Promi
     }
 
     if (currentUser.role === 'client') {
-        return await ProjectModel.distinct('id', { clientId: currentUser.id, agencyId });
+        return await ProjectModel.distinct('id', {
+            agencyId,
+            $or: [{ clientId: currentUser.id }, { clientIds: currentUser.id }],
+        });
     }
 
     return await TaskModel.distinct('projectId', { assigneeId: currentUser.id, agencyId });
@@ -132,7 +144,11 @@ export async function canCurrentUserAccessProject(projectId: string, agencyId: s
     }
 
     if (currentUser.role === 'client') {
-        return !!await ProjectModel.exists({ id: projectId, agencyId, clientId: currentUser.id });
+        return !!await ProjectModel.exists({
+            id: projectId,
+            agencyId,
+            $or: [{ clientId: currentUser.id }, { clientIds: currentUser.id }],
+        });
     }
 
     return !!await TaskModel.exists({ projectId, agencyId, assigneeId: currentUser.id });
@@ -153,10 +169,11 @@ export async function hasExplicitAIAccessSetting(
         .lean() as AIPermissionSettingsSnapshot | null;
 
     if (!settings?.userPermissions || !(actor.id in settings.userPermissions)) {
-        return null;
+        return getDefaultUserPermissionsForRole(actor.role).canUseAI;
     }
 
-    return settings.userPermissions[actor.id]?.canUseAI !== false;
+    const defaultCanUseAI = getDefaultUserPermissionsForRole(actor.role).canUseAI;
+    return settings.userPermissions[actor.id]?.canUseAI ?? defaultCanUseAI;
 }
 
 export async function ensureAIAccess(

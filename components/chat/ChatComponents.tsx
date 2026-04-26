@@ -2,10 +2,9 @@ import type { Contact, Message } from "@/lib/chat-types";
 import { cn } from "@/lib/utils";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { Check, CheckCheck, User, Image as ImageIcon, Trash2, X, Loader2 } from "lucide-react";
-import NextImage from 'next/image';
-import { useState, useRef, useEffect } from "react";
+import NextImage from "next/image";
+import { useEffect, useRef, useState } from "react";
 
-// ── Message Bubble ──────────────────────────────────────────
 interface MessageBubbleProps {
     message: Message;
     isOwn: boolean;
@@ -13,31 +12,38 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
     const fmt = useDateFormat();
+
     return (
         <div className={cn("flex w-full mb-4", isOwn ? "justify-end" : "justify-start")}>
-            <div className={cn(
-                "max-w-[70%] rounded-2xl px-4 py-3 shadow-sm transition-all",
-                isOwn
-                    ? "bg-primary text-primary-foreground rounded-br-none"
-                    : "bg-muted text-foreground rounded-bl-none border border-border"
-            )}>
-                {message.type === 'image' ? (
-                    <div className="relative rounded-lg overflow-hidden mb-1">
-                        <div className="flex items-center justify-center bg-black/20 h-32 w-48 text-xs">
-                            <ImageIcon className="w-4 h-4 mr-1" /> Image
+            <div
+                className={cn(
+                    "max-w-[85%] min-w-0 rounded-2xl px-4 py-3 shadow-sm transition-all sm:max-w-[70%]",
+                    isOwn
+                        ? "bg-primary text-primary-foreground rounded-br-none"
+                        : "bg-muted text-foreground rounded-bl-none border border-border"
+                )}
+            >
+                {message.type === "image" ? (
+                    <div className="relative mb-1 overflow-hidden rounded-lg">
+                        <div className="flex h-32 w-48 items-center justify-center bg-black/20 text-xs">
+                            <ImageIcon className="mr-1 h-4 w-4" /> Image
                         </div>
                     </div>
                 ) : (
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.content}</p>
+                    <p className="break-words text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
                 )}
 
-                <div className="flex items-center justify-end mt-1 space-x-1 opacity-70">
+                <div className="mt-1 flex items-center justify-end space-x-1 opacity-70">
                     <span className="text-[10px] font-medium">
                         {fmt.time(message.timestamp)}
                     </span>
                     {isOwn && (
                         <span>
-                            {message.read ? <CheckCheck className="w-3.5 h-3.5 text-blue-400" /> : <Check className="w-3.5 h-3.5" />}
+                            {message.read ? (
+                                <CheckCheck className="h-3.5 w-3.5 text-blue-400" />
+                            ) : (
+                                <Check className="h-3.5 w-3.5" />
+                            )}
                         </span>
                     )}
                 </div>
@@ -46,7 +52,6 @@ export function MessageBubble({ message, isOwn }: MessageBubbleProps) {
     );
 }
 
-// ── Date Separator ──────────────────────────────────────────
 interface DateSeparatorProps {
     date: Date;
 }
@@ -54,6 +59,7 @@ interface DateSeparatorProps {
 export function DateSeparator({ date }: DateSeparatorProps) {
     const fmt = useDateFormat();
     let label: string;
+
     if (fmt.isToday(date)) {
         label = "Today";
     } else if (fmt.isYesterday(date)) {
@@ -63,17 +69,16 @@ export function DateSeparator({ date }: DateSeparatorProps) {
     }
 
     return (
-        <div className="flex items-center gap-3 my-4">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-[11px] font-medium text-muted-foreground bg-background px-3 py-1 rounded-full border border-border shadow-sm">
+        <div className="my-4 flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="rounded-full border border-border bg-background px-3 py-1 text-[11px] font-medium text-muted-foreground shadow-sm">
                 {label}
             </span>
-            <div className="flex-1 h-px bg-border" />
+            <div className="h-px flex-1 bg-border" />
         </div>
     );
 }
 
-// ── Messages List with Date Grouping ────────────────────────
 interface MessagesListProps {
     messages: Message[];
     currentUserId: string;
@@ -96,29 +101,26 @@ export function MessagesList({ messages, currentUserId }: MessagesListProps) {
 
     return (
         <>
-            {groupedMessages.map(({ msg, idx, msgDate, showSeparator }) => {
-                return (
-                    <div key={msg.id || idx}>
-                        {showSeparator && <DateSeparator date={msgDate} />}
-                        <MessageBubble
-                            message={msg}
-                            isOwn={msg.senderId === currentUserId}
-                        />
-                    </div>
-                );
-            })}
+            {groupedMessages.map(({ msg, idx, msgDate, showSeparator }) => (
+                <div key={msg.id || idx}>
+                    {showSeparator && <DateSeparator date={msgDate} />}
+                    <MessageBubble
+                        message={msg}
+                        isOwn={msg.senderId === currentUserId}
+                    />
+                </div>
+            ))}
         </>
     );
 }
 
-// ── Loading States ──────────────────────────────────────────
 export function ContactSkeleton() {
     return (
-        <div className="flex items-center p-3 rounded-xl mb-1 animate-pulse">
-            <div className="w-10 h-10 rounded-full bg-muted shrink-0" />
+        <div className="mb-1 flex animate-pulse items-center rounded-xl p-3">
+            <div className="h-10 w-10 shrink-0 rounded-full bg-muted" />
             <div className="ml-3 flex-1 space-y-2">
-                <div className="h-3.5 bg-muted rounded-md w-3/4" />
-                <div className="h-2.5 bg-muted/60 rounded-md w-1/2" />
+                <div className="h-3.5 w-3/4 rounded-md bg-muted" />
+                <div className="h-2.5 w-1/2 rounded-md bg-muted/60" />
             </div>
         </div>
     );
@@ -126,14 +128,13 @@ export function ContactSkeleton() {
 
 export function MessagesSkeleton() {
     return (
-        <div className="flex flex-col items-center justify-center h-full opacity-60">
-            <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
+        <div className="flex h-full flex-col items-center justify-center opacity-60">
+            <Loader2 className="mb-3 h-8 w-8 animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">Loading messages...</p>
         </div>
     );
 }
 
-// ── Emoji Picker ────────────────────────────────────────────
 const EMOJI_CATEGORIES = [
     { label: "Smileys", emojis: ["😀", "😂", "🤣", "😊", "😍", "🥰", "😘", "😎", "🤔", "😏", "😢", "😭", "😤", "🤯", "🥳", "😴"] },
     { label: "Gestures", emojis: ["👍", "👎", "👏", "🙌", "🤝", "✌️", "🤞", "💪", "🙏", "👋", "✋", "🤙", "👀", "🫡", "🫶", "❤️"] },
@@ -149,11 +150,12 @@ export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
     const ref = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        function handleClickOutside(e: MouseEvent) {
-            if (ref.current && !ref.current.contains(e.target as Node)) {
+        function handleClickOutside(event: MouseEvent) {
+            if (ref.current && !ref.current.contains(event.target as Node)) {
                 onClose();
             }
         }
+
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [onClose]);
@@ -161,24 +163,32 @@ export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
     return (
         <div
             ref={ref}
-            className="absolute bottom-full left-0 mb-2 bg-card border border-border rounded-2xl shadow-2xl p-3 w-72 animate-in slide-in-from-bottom-2 fade-in duration-200 z-50"
+            className="absolute bottom-full left-0 z-50 mb-2 w-72 animate-in rounded-2xl border border-border bg-card p-3 shadow-2xl fade-in slide-in-from-bottom-2 duration-200"
         >
-            <div className="flex items-center justify-between mb-2 pb-2 border-b border-border">
+            <div className="mb-2 flex items-center justify-between border-b border-border pb-2">
                 <span className="text-xs font-semibold text-foreground">Emoji</span>
-                <button onClick={onClose} className="p-0.5 hover:bg-muted rounded-md transition">
-                    <X className="w-3.5 h-3.5 text-muted-foreground" />
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="rounded-md p-0.5 transition hover:bg-muted"
+                    aria-label="Close emoji picker"
+                >
+                    <X className="h-3.5 w-3.5 text-muted-foreground" />
                 </button>
             </div>
-            <div className="max-h-48 overflow-y-auto space-y-2 custom-scrollbar">
-                {EMOJI_CATEGORIES.map(cat => (
-                    <div key={cat.label}>
-                        <p className="text-[10px] font-medium text-muted-foreground mb-1 uppercase tracking-wider">{cat.label}</p>
+            <div className="max-h-48 space-y-2 overflow-y-auto custom-scrollbar">
+                {EMOJI_CATEGORIES.map((category) => (
+                    <div key={category.label}>
+                        <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                            {category.label}
+                        </p>
                         <div className="grid grid-cols-8 gap-0.5">
-                            {cat.emojis.map(emoji => (
+                            {category.emojis.map((emoji) => (
                                 <button
+                                    type="button"
                                     key={emoji}
                                     onClick={() => onSelect(emoji)}
-                                    className="w-8 h-8 flex items-center justify-center text-lg hover:bg-muted rounded-lg transition-colors"
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-colors hover:bg-muted"
                                 >
                                     {emoji}
                                 </button>
@@ -190,9 +200,6 @@ export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
         </div>
     );
 }
-
-
-// ── Contact Item ────────────────────────────────────────────
 
 interface ContactItemProps {
     contact: Contact;
@@ -212,17 +219,19 @@ export function ContactItem({ contact, isActive, onClick, onDelete }: ContactIte
             ? fmt.presence(contact.lastActiveAt)
             : contact.jobTitle || contact.role || "";
 
-    function handleDeleteClick(e: React.MouseEvent) {
-        e.stopPropagation();
+    function handleDeleteClick(event: React.MouseEvent) {
+        event.stopPropagation();
         setConfirming(true);
     }
-    function handleConfirm(e: React.MouseEvent) {
-        e.stopPropagation();
+
+    function handleConfirm(event: React.MouseEvent) {
+        event.stopPropagation();
         setConfirming(false);
         onDelete?.(contact.id);
     }
-    function handleCancel(e: React.MouseEvent) {
-        e.stopPropagation();
+
+    function handleCancel(event: React.MouseEvent) {
+        event.stopPropagation();
         setConfirming(false);
     }
 
@@ -230,31 +239,43 @@ export function ContactItem({ contact, isActive, onClick, onDelete }: ContactIte
         <div
             onClick={onClick}
             className={cn(
-                "flex items-center hover:bg-muted/50 p-3 rounded-xl cursor-pointer transition w-full group mb-1 relative",
-                isActive ? "bg-muted" : ""
+                "group relative mb-1 flex w-full cursor-pointer items-center rounded-xl p-3 transition hover:bg-muted/50",
+                isActive ? "bg-muted" : "",
+                confirming ? "pr-32" : onDelete && contact.lastMessage ? "pr-10" : ""
             )}
         >
             <div className="relative shrink-0">
                 {contact.avatar ? (
-                    <NextImage src={contact.avatar} alt={contact.name} width={40} height={40} className="w-10 h-10 rounded-full object-cover border border-border" unoptimized />
+                    <NextImage
+                        src={contact.avatar}
+                        alt={contact.name}
+                        width={40}
+                        height={40}
+                        className="h-10 w-10 rounded-full border border-border object-cover"
+                        unoptimized
+                    />
                 ) : (
-                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center border border-border text-muted-foreground">
-                        <User className="w-5 h-5" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
+                        <User className="h-5 w-5" />
                     </div>
                 )}
                 {isOnline && (
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-card shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                    <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-card bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
                 )}
             </div>
 
-            <div className="ml-3 flex-1 overflow-hidden min-w-0">
-                <div className="flex justify-between items-center">
-                    <h4 className={cn("text-sm font-semibold truncate", isActive ? "text-primary" : "text-foreground group-hover:text-primary")}>
-                        {contact.name}
-                        {contact.username && <span className="ml-1 text-xs text-muted-foreground font-normal">@{contact.username}</span>}
+            <div className="ml-3 min-w-0 flex-1 overflow-hidden">
+                <div className="flex items-center justify-between gap-2">
+                    <h4 className={cn("flex min-w-0 items-baseline gap-1 text-sm font-semibold", isActive ? "text-primary" : "text-foreground group-hover:text-primary")}>
+                        <span className="truncate">{contact.name}</span>
+                        {contact.username && (
+                            <span className="shrink truncate text-xs font-normal text-muted-foreground">
+                                @{contact.username}
+                            </span>
+                        )}
                     </h4>
                     {contact.lastMessage && !confirming && (
-                        <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-2 shrink-0">
+                        <span className="ml-2 shrink-0 text-[10px] text-muted-foreground whitespace-nowrap">
                             {fmt.isToday(contact.lastMessage.timestamp)
                                 ? fmt.time(contact.lastMessage.timestamp)
                                 : fmt.isYesterday(contact.lastMessage.timestamp)
@@ -264,50 +285,49 @@ export function ContactItem({ contact, isActive, onClick, onDelete }: ContactIte
                     )}
                 </div>
 
-                {/* Last message or presence */}
-                <div className="flex justify-between items-center mt-0.5">
+                <div className="mt-0.5 flex items-center justify-between gap-2">
                     {contact.lastMessage ? (
-                        <p className="text-xs text-muted-foreground truncate max-w-[140px]">
+                        <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                             {contact.lastMessage.content}
                         </p>
                     ) : (
-                        <p className={cn("text-xs truncate max-w-[140px]", isOnline ? "text-green-500 font-medium" : "text-muted-foreground")}>
+                        <p className={cn("min-w-0 flex-1 truncate text-xs", isOnline ? "font-medium text-green-500" : "text-muted-foreground")}>
                             {presenceText}
                         </p>
                     )}
-                    {contact.unreadCount > 0 && !confirming && (
-                        <div className="bg-primary text-primary-foreground text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full shrink-0 ml-1">
+                    {(contact.unreadCount ?? 0) > 0 && !confirming && (
+                        <div className="ml-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                             {contact.unreadCount}
                         </div>
                     )}
                 </div>
 
-                {/* Presence line */}
                 {contact.lastMessage && (
-                    <p className={cn("text-[10px] mt-0.5 truncate", isOnline ? "text-green-500 font-medium" : "text-muted-foreground/70")}>
+                    <p className={cn("mt-0.5 truncate text-[10px]", isOnline ? "font-medium text-green-500" : "text-muted-foreground/70")}>
                         {presenceText}
                     </p>
                 )}
             </div>
 
-            {/* Delete controls */}
             {onDelete && contact.lastMessage && (
                 confirming ? (
                     <div
-                        onClick={e => e.stopPropagation()}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-card border border-border shadow-lg rounded-xl px-2 py-1 text-xs"
+                        onClick={(event) => event.stopPropagation()}
+                        className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 rounded-xl border border-border bg-card px-2 py-1 text-xs shadow-lg"
                     >
-                        <span className="text-muted-foreground mr-1 whitespace-nowrap">Delete?</span>
+                        <span className="mr-1 text-muted-foreground whitespace-nowrap">Delete?</span>
                         <button
+                            type="button"
                             onClick={handleConfirm}
-                            className="w-6 h-6 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded-lg transition"
+                            className="flex h-6 w-6 items-center justify-center rounded-lg bg-red-500 text-white transition hover:bg-red-600"
                             title="Confirm delete"
                         >
-                            <Check className="w-3.5 h-3.5" />
+                            <Check className="h-3.5 w-3.5" />
                         </button>
                         <button
+                            type="button"
                             onClick={handleCancel}
-                            className="w-6 h-6 flex items-center justify-center bg-muted hover:bg-muted/80 text-foreground rounded-lg transition"
+                            className="flex h-6 w-6 items-center justify-center rounded-lg bg-muted text-foreground transition hover:bg-muted/80"
                             title="Cancel"
                         >
                             <span className="text-sm leading-none">&times;</span>
@@ -315,11 +335,12 @@ export function ContactItem({ contact, isActive, onClick, onDelete }: ContactIte
                     </div>
                 ) : (
                     <button
+                        type="button"
                         onClick={handleDeleteClick}
                         title="Delete conversation"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 text-muted-foreground"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-muted-foreground opacity-100 transition hover:bg-red-500/10 hover:text-red-500 md:opacity-0 md:group-hover:opacity-100"
                     >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="h-3.5 w-3.5" />
                     </button>
                 )
             )}

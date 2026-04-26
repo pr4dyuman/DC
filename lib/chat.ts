@@ -104,6 +104,7 @@ export async function getTotalUnreadCount(_currentUserId?: string): Promise<numb
         receiverId: authedUserId,
         read: false,
         agencyId: agency.id,
+        deletedFor: { $ne: authedUserId },
     });
 }
 
@@ -121,16 +122,16 @@ export async function getContacts(_currentUserId?: string): Promise<Contact[]> {
 
     // Fetch users/clients, and use aggregation for message stats instead of loading all messages.
     const [users, clients, lastMessages, unreadCounts] = await Promise.all([
-        UserModel.find({ id: { $ne: currentUserId }, ...agencyFilter }).select('-password').lean() as Promise<UserContactRecord[]>,
-        ClientModel.find({ ...agencyFilter }).select('-password').lean() as Promise<ClientContactRecord[]>,
+        UserModel.find({ id: { $ne: currentUserId }, archived: { $ne: true }, ...agencyFilter }).select('-password').lean() as Promise<UserContactRecord[]>,
+        ClientModel.find({ archived: { $ne: true }, ...agencyFilter }).select('-password').lean() as Promise<ClientContactRecord[]>,
         MessageModel.aggregate([
-            { $match: { $or: [{ senderId: currentUserId }, { receiverId: currentUserId }], ...agencyFilter } },
+            { $match: { $or: [{ senderId: currentUserId }, { receiverId: currentUserId }], deletedFor: { $ne: currentUserId }, ...agencyFilter } },
             { $addFields: { contactId: { $cond: [{ $eq: ['$senderId', currentUserId] }, '$receiverId', '$senderId'] } } },
             { $sort: { timestamp: -1 } },
             { $group: { _id: '$contactId', lastMsg: { $first: '$$ROOT' } } },
         ]) as Promise<ContactMessageAggregateRow[]>,
         MessageModel.aggregate([
-            { $match: { receiverId: currentUserId, read: false, ...agencyFilter } },
+            { $match: { receiverId: currentUserId, read: false, deletedFor: { $ne: currentUserId }, ...agencyFilter } },
             { $group: { _id: '$senderId', count: { $sum: 1 } } },
         ]) as Promise<UnreadCountAggregateRow[]>,
     ]);
@@ -206,6 +207,7 @@ export async function getMessages(_currentUserId: string, otherUserId: string): 
             { senderId: otherUserId, receiverId: currentUserId },
         ],
         agencyId: agency.id,
+        deletedFor: { $ne: currentUserId },
     }).lean() as unknown as MessageRecord[];
 
     return msgs
@@ -238,6 +240,14 @@ export async function sendMessage(_senderId: string, receiverId: string, content
 
     if (!agencyId) throw new Error('Agency context required');
 
+    const [receiverUser, receiverClient] = await Promise.all([
+        UserModel.exists({ id: receiverId, agencyId, archived: { $ne: true } }),
+        ClientModel.exists({ id: receiverId, agencyId, archived: { $ne: true } }),
+    ]);
+    if (!receiverUser && !receiverClient) {
+        throw new Error('Message recipient not found in this agency.');
+    }
+
     const newMessage: Message = {
         id: generateId(),
         senderId,
@@ -247,6 +257,7 @@ export async function sendMessage(_senderId: string, receiverId: string, content
         read: false,
         type,
         agencyId,
+        deletedFor: [],
     };
 
     // Direct MongoDB insert - bypasses the heavier read-modify-write helper path.
@@ -270,7 +281,7 @@ export async function markAsRead(_currentUserId: string, senderId: string) {
     if (!agency?.id) return;
 
     await MessageModel.updateMany(
-        { senderId, receiverId: currentUserId, agencyId: agency.id, read: false },
+        { senderId, receiverId: currentUserId, agencyId: agency.id, read: false, deletedFor: { $ne: currentUserId } },
         { $set: { read: true } }
     );
 
@@ -287,13 +298,13 @@ export async function deleteConversation(_currentUserId: string, otherUserId: st
     const agency = await getCurrentAgency();
     if (!agency) throw new Error('No agency context - cannot delete conversation');
 
-    await MessageModel.deleteMany({
+    await MessageModel.updateMany({
         agencyId: agency.id,
         $or: [
             { senderId: currentUserId, receiverId: otherUserId },
             { senderId: otherUserId, receiverId: currentUserId },
         ],
-    });
+    }, { $addToSet: { deletedFor: currentUserId } });
 
     revalidatePath('/dashboard');
 }

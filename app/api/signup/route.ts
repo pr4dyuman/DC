@@ -197,8 +197,8 @@ export async function POST(request: Request) {
 
         // --- Create Agency ---
         // Get default AI config for trial agencies (if configured by super-admin)
-        const { getDefaultAiConfigForSignup } = await import('@/lib/actions/super-admin');
-        const defaultAiConfig = await getDefaultAiConfigForSignup();
+        const { getDefaultAiConfigForSignupImpl } = await import('@/lib/actions/super-admin-queries');
+        const defaultAiConfig = await getDefaultAiConfigForSignupImpl();
 
         await AgencyModel.create({
             id: agencyId,

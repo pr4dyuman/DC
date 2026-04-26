@@ -57,6 +57,9 @@ interface PaginatedBlogsResult {
   totalPages: number;
 }
 
+const ALL_CATEGORIES_VALUE = "__all_categories";
+const ALL_STATUSES_VALUE = "__all_statuses";
+
 export default function BlogListPage() {
   const router = useRouter();
   const [blogs, setBlogs] = useState<Blog[]>([]);
@@ -224,9 +227,9 @@ export default function BlogListPage() {
 
           {/* Category Filter */}
           <Select
-            value={selectedCategory}
+            value={selectedCategory || ALL_CATEGORIES_VALUE}
             onValueChange={(val) => {
-              setSelectedCategory(val);
+              setSelectedCategory(val === ALL_CATEGORIES_VALUE ? "" : val);
               setCurrentPage(1);
             }}
           >
@@ -234,7 +237,7 @@ export default function BlogListPage() {
               <SelectValue placeholder="All categories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All categories</SelectItem>
+              <SelectItem value={ALL_CATEGORIES_VALUE}>All categories</SelectItem>
               {categories.map((cat) => (
                 <SelectItem key={cat} value={cat}>
                   {cat}
@@ -245,9 +248,9 @@ export default function BlogListPage() {
 
           {/* Status Filter */}
           <Select
-            value={selectedStatus}
+            value={selectedStatus || ALL_STATUSES_VALUE}
             onValueChange={(val) => {
-              setSelectedStatus(val as "" | "draft" | "published");
+              setSelectedStatus(val === ALL_STATUSES_VALUE ? "" : val as "draft" | "published");
               setCurrentPage(1);
             }}
           >
@@ -255,7 +258,7 @@ export default function BlogListPage() {
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All statuses</SelectItem>
+              <SelectItem value={ALL_STATUSES_VALUE}>All statuses</SelectItem>
               <SelectItem value="published">Published</SelectItem>
               <SelectItem value="draft">Draft</SelectItem>
             </SelectContent>

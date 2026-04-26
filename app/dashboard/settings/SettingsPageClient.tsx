@@ -31,6 +31,7 @@ type AgencySettingsData = {
 export default function SettingsPage() {
     const router = useRouter();
     const [authorized, setAuthorized] = useState(false);
+    const [currentRole, setCurrentRole] = useState<string | null>(null);
 
     // Agency settings (shared between AgencySettings + EmailSettings)
     const [agencySettings, setAgencySettings] = useState<AgencySettingsData | null>(null);
@@ -92,6 +93,7 @@ export default function SettingsPage() {
             if (!user || (user.role !== 'admin' && user.role !== 'manager')) {
                 router.replace('/dashboard');
             } else {
+                setCurrentRole(user.role);
                 setAuthorized(true);
             }
         });
@@ -170,17 +172,18 @@ export default function SettingsPage() {
                 <p className="text-xs text-muted-foreground mt-3">Your preference is saved automatically.</p>
             </SectionAccordion>
 
-            {/* Permission Management Section */}
-            <SectionAccordion
-                title="Permission Management"
-                description="Configure user access and roles."
-                icon={<Shield className="h-6 w-6 text-purple-500" />}
-                iconBg="bg-purple-500/10"
-                isOpen={!!openSections.permissions}
-                onToggle={() => toggleSection('permissions')}
-            >
-                <PermissionSettings />
-            </SectionAccordion>
+            {currentRole === 'admin' && (
+                <SectionAccordion
+                    title="Permission Management"
+                    description="Configure user access and roles."
+                    icon={<Shield className="h-6 w-6 text-purple-500" />}
+                    iconBg="bg-purple-500/10"
+                    isOpen={!!openSections.permissions}
+                    onToggle={() => toggleSection('permissions')}
+                >
+                    <PermissionSettings />
+                </SectionAccordion>
+            )}
 
             {/* AI Settings Section */}
             <SectionAccordion

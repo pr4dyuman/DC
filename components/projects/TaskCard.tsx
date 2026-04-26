@@ -312,14 +312,16 @@ export function TaskCard({
                                         <span className="text-[10px] font-semibold">Move</span>
                                     </button>
                                 )}
-                                <button
-                                    onClick={handleExplainClick}
-                                    className="flex items-center gap-1 transition-colors px-2 py-1 sm:px-1.5 sm:py-0.5 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-accent"
-                                    title="Explain this task with AI"
-                                >
-                                    <Sparkles className="w-3.5 h-3.5 sm:w-3 sm:h-3 shrink-0" />
-                                    <span className="text-[10px] sm:text-[9px] font-medium">Explain</span>
-                                </button>
+                                {effectivePermissions.canUseAI && (
+                                    <button
+                                        onClick={handleExplainClick}
+                                        className="flex items-center gap-1 transition-colors px-2 py-1 sm:px-1.5 sm:py-0.5 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-accent"
+                                        title="Explain this task with AI"
+                                    >
+                                        <Sparkles className="w-3.5 h-3.5 sm:w-3 sm:h-3 shrink-0" />
+                                        <span className="text-[10px] sm:text-[9px] font-medium">Explain</span>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>

@@ -52,7 +52,12 @@ import {
     buildBlogStudioInternalLinkHealthMap,
     getBlogStudioInternalLinkSuggestions,
 } from "../ai-blogger-internal-links";
-import { hasInternalLinks, normalizeInternalLinkHref } from "../ai-blogger-internal-link-utils";
+import {
+    countInternalLinks,
+    extractInternalLinkTargets,
+    hasInternalLinks,
+    normalizeInternalLinkHref,
+} from "../ai-blogger-internal-link-utils";
 import {
     getAIBloggerSerpAnalysis,
     type AIBloggerSerpAnalysis,
@@ -8051,13 +8056,39 @@ export function validateBlogStudioPublishPackage(
             canonicalUrl: post.canonicalUrl,
             brief: post.brief,
         }) || undefined;
+    const bodyInternalLinkCount = countInternalLinks(content, contentSiteUrl);
+    const bodyInternalLinkTargets = extractInternalLinkTargets(content, contentSiteUrl);
+    const trackedInternalLinkTargets = new Set(
+        (post.internalLinks || [])
+            .map((link) => normalizeInternalLinkHref(link.href, contentSiteUrl) || link.href.trim())
+            .filter(Boolean),
+    );
+    const trackedBodyInternalLinkCount = bodyInternalLinkTargets.filter((href) =>
+        trackedInternalLinkTargets.has(href),
+    ).length;
+    const nonBlogTrackedLinkCount = (post.internalLinks || []).filter((link) =>
+        link.source !== "blog" && !/^\/(?:blog|blogs|articles?|resources?|news|insights)(?:\/|$)/i.test(
+            normalizeInternalLinkHref(link.href, contentSiteUrl) || link.href.trim(),
+        ),
+    ).length;
     const bodyHasInternalLinks = hasInternalLinks(content, contentSiteUrl);
-    if (!bodyHasInternalLinks && internalLinkMapCount === 0 && rules?.requireInternalLinks) {
+    const requiredInternalLinkCount = rules?.requireInternalLinks ? 2 : 1;
+
+    if (rules?.requireInternalLinks && bodyInternalLinkCount < requiredInternalLinkCount) {
         issues.push({
             category: "internal-links",
             severity: "blocker",
-            message: "No internal links found in body copy or link map",
-            fixHint: "Add at least 1-2 internal links in the post body and accept link targets in the editor.",
+            message: `Only ${bodyInternalLinkCount} internal link(s) found in body copy`,
+            fixHint: `Add at least ${requiredInternalLinkCount} natural internal links directly in the post body.`,
+        });
+    }
+
+    if (rules?.requireInternalLinks && internalLinkMapCount < requiredInternalLinkCount) {
+        issues.push({
+            category: "internal-links",
+            severity: "blocker",
+            message: `Only ${internalLinkMapCount} internal link target(s) tracked in the link map`,
+            fixHint: `Track at least ${requiredInternalLinkCount} accepted internal link targets so the body links can be audited.`,
         });
     } else if (!bodyHasInternalLinks && internalLinkMapCount > 0) {
         issues.push({
@@ -8069,9 +8100,36 @@ export function validateBlogStudioPublishPackage(
     } else if (bodyHasInternalLinks && internalLinkMapCount === 0) {
         issues.push({
             category: "internal-links",
-            severity: "warning",
+            severity: rules?.requireInternalLinks ? "blocker" : "warning",
             message: "Body has internal links but no targets are tracked in the link map",
             fixHint: "Accept link targets in the editor for better link tracking.",
+        });
+    }
+
+    if (
+        rules?.requireInternalLinks &&
+        bodyInternalLinkCount >= requiredInternalLinkCount &&
+        internalLinkMapCount >= requiredInternalLinkCount &&
+        trackedBodyInternalLinkCount < requiredInternalLinkCount
+    ) {
+        issues.push({
+            category: "internal-links",
+            severity: "blocker",
+            message: "Tracked internal links do not match the links in the body copy",
+            fixHint: "Use the accepted link targets in the article body or refresh the link map from the body links.",
+        });
+    }
+
+    if (
+        rules?.requireInternalLinks &&
+        internalLinkMapCount >= requiredInternalLinkCount &&
+        nonBlogTrackedLinkCount === 0
+    ) {
+        issues.push({
+            category: "internal-links",
+            severity: "warning",
+            message: "Internal link mix is blog-heavy",
+            fixHint: "When the website has relevant service, product, collection, pricing, or case-study pages, include at least one of those links alongside related articles.",
         });
     }
 

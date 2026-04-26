@@ -41,6 +41,17 @@ type AgencyStatusRecord = {
     status?: string;
 };
 
+type SessionUserRecord = {
+    agencyId?: string;
+    role?: string;
+    archived?: boolean;
+};
+
+type SessionClientRecord = {
+    agencyId?: string;
+    archived?: boolean;
+};
+
 function getErrorMessage(error: unknown, fallback: string): string {
     return error instanceof Error && error.message ? error.message : fallback;
 }
@@ -51,10 +62,10 @@ async function getSessionAgencyId(session: AuthSession): Promise<string | undefi
 
     await connectDB();
 
-    const user = await UserModel.findOne({ id: session.userId }).select('agencyId').lean() as { agencyId?: string } | null;
+    const user = await UserModel.findOne({ id: session.userId, archived: { $ne: true } }).select('agencyId').lean() as { agencyId?: string } | null;
     if (user?.agencyId) return user.agencyId;
 
-    const client = await ClientModel.findOne({ id: session.userId }).select('agencyId').lean() as { agencyId?: string } | null;
+    const client = await ClientModel.findOne({ id: session.userId, archived: { $ne: true } }).select('agencyId').lean() as { agencyId?: string } | null;
     return client?.agencyId;
 }
 
@@ -67,6 +78,32 @@ async function isSessionAgencyAccessible(session: AuthSession): Promise<boolean>
     await connectDB();
     const agency = await AgencyModel.findOne({ id: agencyId }).select('status').lean() as AgencyStatusRecord | null;
     return !!agency && agency.status !== 'suspended';
+}
+
+async function getAccessibleSession(session: AuthSession): Promise<AuthSession | null> {
+    await connectDB();
+
+    if (session.role === 'superadmin') {
+        const superAdminExists = await SuperAdminModel.exists({ id: session.userId });
+        return superAdminExists ? { userId: session.userId, role: 'superadmin' } : null;
+    }
+
+    if (session.role === 'client') {
+        const client = await ClientModel.findOne({ id: session.userId })
+            .select('agencyId archived')
+            .lean() as SessionClientRecord | null;
+        if (!client || client.archived || !client.agencyId) return null;
+        const normalizedSession = { userId: session.userId, role: 'client', agencyId: client.agencyId };
+        return await isSessionAgencyAccessible(normalizedSession) ? normalizedSession : null;
+    }
+
+    const user = await UserModel.findOne({ id: session.userId })
+        .select('agencyId role archived')
+        .lean() as SessionUserRecord | null;
+    if (!user || user.archived || !user.agencyId || !user.role) return null;
+
+    const normalizedSession = { userId: session.userId, role: user.role, agencyId: user.agencyId };
+    return await isSessionAgencyAccessible(normalizedSession) ? normalizedSession : null;
 }
 
 async function checkLoginRateLimit(email: string): Promise<void> {
@@ -159,8 +196,7 @@ export async function getSessionUser(): Promise<AuthSession | null> {
     if (token) {
         const session = await verifyToken(token);
         if (!session) return null;
-        if (!(await isSessionAgencyAccessible(session))) return null;
-        return session;
+        return getAccessibleSession(session);
     }
 
     // No JWT token = not authenticated (legacy fallback removed for security)

@@ -107,7 +107,7 @@ export function CreateProjectWizardBasicStep({
             </div>
 
             <div className="space-y-2">
-                <Label>Target Due Date</Label>
+                <Label>Target Due Date *</Label>
                 <div className="relative">
                     <input
                         type="date"

@@ -112,7 +112,7 @@ export function EditUserDialogForm({
                                 placeholder="johndoe"
                             />
                         </div>
-                        <div className="col-span-2 space-y-1.5">
+                        <div className="sm:col-span-2 space-y-1.5">
                             <label className="text-xs font-medium text-muted-foreground">Email</label>
                             <input
                                 required

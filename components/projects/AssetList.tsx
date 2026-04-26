@@ -10,9 +10,10 @@ import { toast } from "sonner";
 
 interface AssetListProps {
     assets: Asset[];
+    canDelete?: boolean;
 }
 
-export function AssetList({ assets }: AssetListProps) {
+export function AssetList({ assets, canDelete = false }: AssetListProps) {
     const router = useRouter();
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [deleting, setDeleting] = useState(false);
@@ -55,7 +56,7 @@ export function AssetList({ assets }: AssetListProps) {
         <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {assets.map((asset) => (
-                    <AssetCard key={asset.id} asset={asset} onDelete={handleDeleteRequest} />
+                    <AssetCard key={asset.id} asset={asset} onDelete={canDelete ? handleDeleteRequest : undefined} />
                 ))}
             </div>
 

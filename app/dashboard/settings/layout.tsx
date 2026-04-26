@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/actions";
+import { isDashboardRouteAllowed } from "@/lib/dashboard-route-access";
 import { redirect } from "next/navigation";
 
 export default async function SettingsLayout({
@@ -9,8 +10,7 @@ export default async function SettingsLayout({
     const user = await getCurrentUser();
     if (!user) redirect("/login");
 
-    // Only admin and manager can access /dashboard/settings
-    if (user.role !== 'admin' && user.role !== 'manager') {
+    if (!isDashboardRouteAllowed(user.role, "/dashboard/settings")) {
         redirect("/dashboard");
     }
 

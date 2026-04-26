@@ -9,7 +9,7 @@ import { useDateFormat } from "@/context/TimezoneContext";
 
 interface AssetCardProps {
     asset: Asset;
-    onDelete: (id: string) => void;
+    onDelete?: (id: string) => void;
 }
 
 const getIcon = (type: Asset['type']) => {
@@ -114,25 +114,27 @@ export function AssetCard({ asset, onDelete }: AssetCardProps) {
                         </Button>
                     </a>
 
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-primary"
-                                aria-label={`More actions for ${asset.name}`}
-                                title="More actions"
-                            >
-                                <MoreVerticalIcon className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onDelete(asset.id)}>
-                                <TrashIcon className="mr-2 h-4 w-4" />
-                                Delete Asset
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    {onDelete && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                    aria-label={`More actions for ${asset.name}`}
+                                    title="More actions"
+                                >
+                                    <MoreVerticalIcon className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onDelete(asset.id)}>
+                                    <TrashIcon className="mr-2 h-4 w-4" />
+                                    Delete Asset
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
                 </div>
             </div>
             <AssetViewerModal asset={asset} open={viewerOpen} onClose={() => setViewerOpen(false)} />
