@@ -153,6 +153,17 @@ export type BlogStudioDraftBrief = {
     searchIntent?: BlogStudioSearchIntent;
     contentType?: BlogStudioContentType;
     entities: string[];
+    topicalCluster?: string;
+    readerPromise?: string;
+    serpGap?: string;
+    uniqueAngle?: string;
+    originalValueAsset?: string;
+    proofPlan?: string[];
+    internalLinkPlan?: string[];
+    conversionPath?: string;
+    avoidAngles?: string[];
+    publishReadinessScore?: number;
+    publishReadinessWarnings?: string[];
 };
 
 export type BlogStudioGenerationScorecard = {
@@ -162,6 +173,10 @@ export type BlogStudioGenerationScorecard = {
     businessFit?: number;
     topicIntegrity?: number;
     websiteTopicAccepted?: boolean;
+    strategyReadiness?: number;
+    originalValue?: number;
+    proofStrength?: number;
+    conversionFit?: number;
 };
 
 export type BlogStudioGenerationSourceUsage = {

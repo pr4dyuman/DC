@@ -16,6 +16,8 @@ import type {
     BlogStudioSettings,
 } from "./types-ai-blogger";
 
+type BlogStudioWebhookDeliveryLogDocument = Record<string, unknown>;
+
 const BlogStudioTargetSchema = new Schema(
     {
         type: {
@@ -118,6 +120,17 @@ const BlogStudioDraftBriefSchema = new Schema<BlogStudioDraftBrief>(
             enum: ["evergreen-guide", "trend-reaction", "comparison", "how-to", "solution-explainer", "category-authority"],
         },
         entities: [{ type: String }],
+        topicalCluster: { type: String },
+        readerPromise: { type: String },
+        serpGap: { type: String },
+        uniqueAngle: { type: String },
+        originalValueAsset: { type: String },
+        proofPlan: [{ type: String }],
+        internalLinkPlan: [{ type: String }],
+        conversionPath: { type: String },
+        avoidAngles: [{ type: String }],
+        publishReadinessScore: { type: Number },
+        publishReadinessWarnings: [{ type: String }],
     },
     { _id: false }
 );
@@ -130,6 +143,10 @@ const BlogStudioGenerationScorecardSchema = new Schema(
         businessFit: { type: Number },
         topicIntegrity: { type: Number },
         websiteTopicAccepted: { type: Boolean },
+        strategyReadiness: { type: Number },
+        originalValue: { type: Number },
+        proofStrength: { type: Number },
+        conversionFit: { type: Number },
     },
     { _id: false }
 );
@@ -920,8 +937,8 @@ BlogStudioPipelineJobSchema.index({ agencyId: 1, createdAt: -1 });
 BlogStudioPipelineJobSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export const BlogStudioWebhookDeliveryLogModel =
-    (mongoose.models.BlogStudioWebhookDeliveryLog as Model<any>) ||
-    mongoose.model("BlogStudioWebhookDeliveryLog", BlogStudioWebhookDeliveryLogSchema);
+    (mongoose.models.BlogStudioWebhookDeliveryLog as Model<BlogStudioWebhookDeliveryLogDocument>) ||
+    mongoose.model<BlogStudioWebhookDeliveryLogDocument>("BlogStudioWebhookDeliveryLog", BlogStudioWebhookDeliveryLogSchema);
 
 export const BlogStudioPipelineJobModel =
     (mongoose.models.BlogStudioPipelineJob as Model<BlogStudioPipelineJob>) ||

@@ -550,7 +550,7 @@ export async function getWebhookDeliveryLogs(
         const safeOffset = Math.max(0, offset);
 
         // Build query
-        const query: Record<string, any> = { agencyId };
+        const query: Record<string, string | { $gte?: string; $lte?: string }> = { agencyId };
 
         if (filters?.status) {
             query.finalStatus = filters.status;
@@ -581,7 +581,7 @@ export async function getWebhookDeliveryLogs(
             .lean();
 
         return {
-            logs: logs as WebhookDeliveryLog[],
+            logs: logs as unknown as WebhookDeliveryLog[],
             total,
             hasMore: safeOffset + safeLimit < total,
         };
