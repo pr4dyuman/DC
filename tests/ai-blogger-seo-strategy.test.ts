@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildSeoStrategyReadinessAssessment } from "../lib/actions/ai-blogger";
+import { buildSeoStrategyReadinessAssessment, parseAdvancedBriefResponse } from "../lib/actions/ai-blogger";
 
 test("seo strategy readiness rewards strong topic fit, original value, proof, and conversion path", () => {
     const assessment = buildSeoStrategyReadinessAssessment({
@@ -50,4 +50,39 @@ test("seo strategy readiness blocks off-lane YMYL topics without expert proof", 
     assert.ok(
         assessment.warnings.some((warning) => /YMYL|commercial pages|Original value|Conversion path/i.test(warning)),
     );
+});
+
+test("advanced brief parser tolerates array and object fields from model JSON", () => {
+    const brief = parseAdvancedBriefResponse(
+        JSON.stringify({
+            businessFitSummary: ["Limited drop content strategy", "for a beverage campaign"],
+            businessFitScore: 82,
+            targetAudience: { label: "Retail marketers" },
+            ctaGoal: { text: "Invite readers to audit launch content operations" },
+            topicalCluster: { name: "Limited launch SEO operations" },
+            readerPromise: ["A practical launch planning framework"],
+            serpGap: { description: "Competitors explain the product but not the content system" },
+            uniqueAngle: ["Turn the product launch into a search and social operations case study"],
+            originalValueAsset: { title: "Limited-drop content readiness checklist" },
+            proofPlan: [{ text: "Official launch timing" }, "Retail availability patterns"],
+            internalLinkPlan: { service: "SEO services", blog: "AI Blogger service" },
+            conversionPath: { summary: "Book a content operations review" },
+            avoidAngles: [{ label: "Alcohol consumption advice" }],
+            publishReadinessWarnings: [{ text: "Keep the angle marketing-led" }],
+        }),
+        {
+            audience: "Marketers",
+            ctaGoal: "Review the content plan",
+            toneDirection: "Practical",
+            searchIntent: "informational",
+        },
+    );
+
+    assert.match(brief.businessFitSummary, /Limited drop content strategy/);
+    assert.equal(brief.targetAudience, "Retail marketers");
+    assert.equal(brief.topicalCluster, "Limited launch SEO operations");
+    assert.equal(brief.originalValueAsset, "Limited-drop content readiness checklist");
+    assert.deepEqual(brief.proofPlan, ["Official launch timing", "Retail availability patterns"]);
+    assert.ok(brief.internalLinkPlan.some((item) => item.includes("SEO services")));
+    assert.equal(brief.avoidAngles[0], "Alcohol consumption advice");
 });

@@ -807,28 +807,78 @@ function revalidateAIBloggerRoute(pathSuffix = "") {
     revalidatePath(AI_BLOGGER_SUPERADMIN_BASE);
 }
 
-function sanitizeText(value: string | undefined, maxLength: number, fallback = "") {
-    if (!value) return fallback;
-    return value.trim().slice(0, maxLength);
+function coerceTextValue(value: unknown, depth = 0): string {
+    if (value === undefined || value === null || depth > 2) {
+        return "";
+    }
+
+    if (typeof value === "string") {
+        return value;
+    }
+
+    if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+        return String(value);
+    }
+
+    if (Array.isArray(value)) {
+        return value
+            .map((item) => coerceTextValue(item, depth + 1))
+            .filter(Boolean)
+            .join(" ");
+    }
+
+    if (typeof value === "object") {
+        const record = value as Record<string, unknown>;
+        const preferredKeys = ["text", "value", "label", "name", "title", "description", "summary", "answer", "question"];
+        const preferredValues = preferredKeys
+            .map((key) => coerceTextValue(record[key], depth + 1))
+            .filter(Boolean);
+
+        if (preferredValues.length > 0) {
+            return preferredValues.join(" ");
+        }
+
+        return Object.values(record)
+            .slice(0, 8)
+            .map((item) => coerceTextValue(item, depth + 1))
+            .filter(Boolean)
+            .join(" ");
+    }
+
+    return "";
 }
 
-function sanitizeProvidedText(value: string | undefined, maxLength: number, fallback = "") {
+function sanitizeText(value: unknown, maxLength: number, fallback = "") {
+    const normalizedValue = coerceTextValue(value).replace(/\s+/g, " ").trim();
+    if (!normalizedValue) return fallback;
+    return normalizedValue.slice(0, maxLength);
+}
+
+function sanitizeProvidedText(value: unknown, maxLength: number, fallback = "") {
     if (value === undefined) {
         return fallback;
     }
-    return value.trim().slice(0, maxLength);
+    return sanitizeText(value, maxLength, fallback);
 }
 
 function getPromptAgencyName(agencyName: string | undefined) {
     return sanitizeText(agencyName, 160, DEFAULT_PROMPT_AGENCY_NAME);
 }
 
-function sanitizeStringArray(values: string[] | undefined, maxItems: number, maxLength: number) {
-    if (!values?.length) return [];
+function sanitizeStringArray(values: unknown, maxItems: number, maxLength: number) {
+    const sourceValues = Array.isArray(values)
+        ? values
+        : typeof values === "string"
+            ? [values]
+            : values && typeof values === "object"
+                ? Object.values(values as Record<string, unknown>)
+                : [];
+
+    if (!sourceValues.length) return [];
 
     return Array.from(
         new Set(
-            values
+            sourceValues
                 .map((value) => sanitizeText(value, maxLength))
                 .filter(Boolean)
         )
@@ -6077,7 +6127,7 @@ function scoreSerpFormatForBlog(format?: string) {
     return 0;
 }
 
-function hasSubstantialStrategyText(value: string | undefined, minLength = 18) {
+function hasSubstantialStrategyText(value: unknown, minLength = 18) {
     return sanitizeText(value, 260).length >= minLength;
 }
 
@@ -6842,7 +6892,7 @@ function parseResearchInsightsResponse(rawText: string): ResearchInsightsResult 
 }
 
 
-function parseAdvancedBriefResponse(
+export function parseAdvancedBriefResponse(
     rawText: string,
     defaults: {
         audience: string;
