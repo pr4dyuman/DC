@@ -5,6 +5,7 @@ import {
     assessTrendAgainstWebsite,
     buildTrendFirstDiscoveryStage,
     isAcceptedTrendFirstTopic,
+    shouldUseWebsiteLedDiscoveryAfterTrendMiss,
 } from "../lib/actions/ai-blogger";
 import type { AIBloggerWebsiteIntelligence } from "../lib/ai-blogger-website-intelligence";
 import { fetchAIBloggerTrendSignals } from "../lib/ai-blogger-trends";
@@ -386,6 +387,53 @@ test("website trend-first returns live topics without auto-selecting an unrelate
     } finally {
         globalThis.fetch = originalFetch;
     }
+});
+
+test("website mode switches to site-led discovery when live trends miss website fit", () => {
+    const unrelatedTrends = buildTrendSignals([
+        {
+            ...buildTrend(
+                "birds",
+                ["Entertainment"],
+                ["birds live stream", "wildlife videos"],
+                ["birds", "viral animals"],
+            ),
+            score: 39,
+            fitScore: 78,
+            viralScore: 52,
+            sourceRank: 334,
+            acceptedForTrendFirst: false,
+        },
+    ]);
+    unrelatedTrends.selectedViralTrend = undefined;
+    unrelatedTrends.scanStats = {
+        trendFirstMode: true,
+        requestCount: 5,
+        maxRequests: 8,
+        timeBudgetMs: 45_000,
+        elapsedMs: 15_039,
+        windowsScanned: [4, 24, 48, 168],
+        categoriesScanned: [],
+        geoScanned: ["US"],
+        acceptedCount: 0,
+        rejectedCount: 30,
+        errorCount: 0,
+        stoppedEarly: false,
+        budgetExhausted: false,
+        fallbackUsed: false,
+    };
+
+    assert.equal(shouldUseWebsiteLedDiscoveryAfterTrendMiss("website", unrelatedTrends), true);
+    assert.equal(shouldUseWebsiteLedDiscoveryAfterTrendMiss("trending", unrelatedTrends), false);
+    assert.equal(
+        buildTrendFirstDiscoveryStage({
+            trendSignals: unrelatedTrends,
+            runtimeConfig: testRuntimeConfig,
+            recentPostTitles: [],
+            sourceMode: "website",
+        }),
+        null,
+    );
 });
 
 test("website trend-first does not rescue a near-fit live topic below threshold", async () => {

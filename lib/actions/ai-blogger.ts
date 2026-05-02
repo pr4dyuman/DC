@@ -5746,7 +5746,7 @@ function applyDynamicWebsiteTrendGate(input: {
     };
 }
 
-function buildStrictWebsiteTrendFailureMessage(
+function buildWebsiteTrendMissFallbackMessage(
     trendSignals: AIBloggerTrendSignals,
     topRejectedTrends: Array<AIBloggerViralTrendSignal & { dynamicFitScore?: number }> = [],
 ) {
@@ -5757,7 +5757,18 @@ function buildStrictWebsiteTrendFailureMessage(
 
     return (
         `Trend-first Google Trends scan found ${trendSignals.viralTrends.length} live topic(s), ` +
-        `but none met the configured site-fit threshold.${bestMatchDetails} Strict trend-first mode will not generate an unrelated blog.`
+        `but none met the website-fit threshold.${bestMatchDetails} Rejected unrelated trends and switched to website-led SEO topic discovery.`
+    );
+}
+
+export function shouldUseWebsiteLedDiscoveryAfterTrendMiss(
+    sourceMode: BlogStudioBrief["sourceMode"],
+    trendSignals: AIBloggerTrendSignals | null,
+) {
+    return Boolean(
+        sourceMode === "website" &&
+        trendSignals?.mode === "live-topics" &&
+        (trendSignals.scanStats?.acceptedCount || 0) === 0,
     );
 }
 
@@ -6912,6 +6923,14 @@ function formatFetchTrendsDiagnosticsLabel(
     }
 
     if (fetchTrendsSource === "ai-fallback-after-live-failure") {
+        if (
+            trendSignals?.mode === "live-topics" &&
+            (trendSignals.scanStats?.acceptedCount || 0) === 0 &&
+            trendSignals.viralTrends.length > 0
+        ) {
+            return "Website-led discovery after live trend miss";
+        }
+
         return "AI fallback after live trends issue";
     }
 
@@ -14457,91 +14476,59 @@ export async function generateBlogStudioDraftImpl(
                     }
                 }
 
-                if (
-                    brief.sourceMode === "website" &&
-                    capturedTrendSignals.mode === "live-topics" &&
-                    (capturedTrendSignals.scanStats?.acceptedCount || 0) === 0
-                ) {
-                    const failureMessage = buildStrictWebsiteTrendFailureMessage(
+                if (shouldUseWebsiteLedDiscoveryAfterTrendMiss(brief.sourceMode, capturedTrendSignals)) {
+                    const fallbackMessage = buildWebsiteTrendMissFallbackMessage(
                         capturedTrendSignals,
                         topRejectedWebsiteTrends,
                     );
 
-                    addRunStep(
-                        "fetch-trends",
-                        "Fetch Trends",
-                        "failed",
-                        failureMessage,
-                        step1StartedAt,
+                    discoverySummary = fallbackMessage;
+                    fetchTrendsSource = "ai-fallback-after-live-failure";
+                    blogLogStep(
+                        "TREND-MINER",
+                        fallbackMessage,
+                        { scanStats: capturedTrendSignals.scanStats },
                     );
-
-                    if (jobId) {
-                        const step2EndTime = getNowIso();
-                        const step2Duration = new Date(step2EndTime).getTime() - new Date(step1StartedAt).getTime();
-                        await generationLogger.logStep(
-                            2,
-                            "Fetch Trends / Discovery",
-                            {
-                                sourceMode: brief.sourceMode,
-                                sourceValue: brief.sourceValue,
-                                trendsEnabled: liveTrendsConfig?.enabled,
-                            },
-                            {
-                                startedAt: step1StartedAt,
-                                completedAt: step2EndTime,
-                                durationMs: step2Duration,
-                                details: {
-                                    trendsSource: fetchTrendsSource,
-                                    fallbackUsed: false,
-                                },
-                            },
-                            {
-                                status: "failed",
-                                summary: failureMessage,
-                                data: {
-                                    viralTrends: capturedTrendSignals.viralTrends.slice(0, 8),
-                                    topRejectedTrends: topRejectedWebsiteTrends,
-                                    trendScanStats: capturedTrendSignals.scanStats,
-                                    trendsSource: fetchTrendsSource,
-                                },
-                            },
-                            [failureMessage],
-                        );
-                    }
-
-                    throw new Error(failureMessage);
-                }
-
-                const trendFirstDiscovery = buildTrendFirstDiscoveryStage({
-                    trendSignals: capturedTrendSignals,
-                    runtimeConfig: mergedAIBloggerConfig.extractKeywords,
-                    recentPostTitles,
-                    sourceMode: brief.sourceMode,
-                });
-
-                if (trendFirstDiscovery) {
-                    discoveryStage = trendFirstDiscovery.stage;
-                    discoverySummary = trendFirstDiscovery.summary;
-                    blogLogOutput("DISCOVERY (trend-first)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
-                } else {
-                    const discoveryLogLabel = getTrendDiscoveryLogLabel(capturedTrendSignals);
-                    const liveTrendsPrompt = [
-                        getLiveTrendsTopicDiscoveryPrompt(agency.name, title, brief, settings, capturedTrendSignals, recentPostTitles),
-                        websitePromptBlock,
-                    ]
-                        .filter(Boolean)
-                        .join("\n\n");
-                    blogLogInput(discoveryLogLabel, liveTrendsPrompt);
+                    blogLogInput("DISCOVERY (website-led-after-trend-miss)", aiOnlyDiscoveryPrompt);
                     discoveryStage = await runAIBloggerStage(
                         aiConfig,
                         aiBloggerConfig,
                         "extractKeywords",
-                        liveTrendsPrompt,
+                        aiOnlyDiscoveryPrompt,
                     );
-                    blogLogOutput(discoveryLogLabel, discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
+                    blogLogOutput("DISCOVERY (website-led-after-trend-miss)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
+                } else {
+                    const trendFirstDiscovery = buildTrendFirstDiscoveryStage({
+                        trendSignals: capturedTrendSignals,
+                        runtimeConfig: mergedAIBloggerConfig.extractKeywords,
+                        recentPostTitles,
+                        sourceMode: brief.sourceMode,
+                    });
+
+                    if (trendFirstDiscovery) {
+                        discoveryStage = trendFirstDiscovery.stage;
+                        discoverySummary = trendFirstDiscovery.summary;
+                        blogLogOutput("DISCOVERY (trend-first)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
+                    } else {
+                        const discoveryLogLabel = getTrendDiscoveryLogLabel(capturedTrendSignals);
+                        const liveTrendsPrompt = [
+                            getLiveTrendsTopicDiscoveryPrompt(agency.name, title, brief, settings, capturedTrendSignals, recentPostTitles),
+                            websitePromptBlock,
+                        ]
+                            .filter(Boolean)
+                            .join("\n\n");
+                        blogLogInput(discoveryLogLabel, liveTrendsPrompt);
+                        discoveryStage = await runAIBloggerStage(
+                            aiConfig,
+                            aiBloggerConfig,
+                            "extractKeywords",
+                            liveTrendsPrompt,
+                        );
+                        blogLogOutput(discoveryLogLabel, discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
+                    }
                 }
             } catch (error) {
-                if ((liveTrendsConfig?.trendFirstMode ?? true) || !allowAiDiscoveryFallback) {
+                if (brief.sourceMode !== "website" || !allowAiDiscoveryFallback) {
                     const fetchTrendsError = getErrorMessage(error);
                     addRunStep(
                         "fetch-trends",
@@ -17608,91 +17595,59 @@ export async function runBlogStudioDraftResearchPhase(
                     }
                 }
 
-                if (
-                    brief.sourceMode === "website" &&
-                    capturedTrendSignals.mode === "live-topics" &&
-                    (capturedTrendSignals.scanStats?.acceptedCount || 0) === 0
-                ) {
-                    const failureMessage = buildStrictWebsiteTrendFailureMessage(
+                if (shouldUseWebsiteLedDiscoveryAfterTrendMiss(brief.sourceMode, capturedTrendSignals)) {
+                    const fallbackMessage = buildWebsiteTrendMissFallbackMessage(
                         capturedTrendSignals,
                         topRejectedWebsiteTrends,
                     );
 
-                    addRunStep(
-                        "fetch-trends",
-                        "Fetch Trends",
-                        "failed",
-                        failureMessage,
-                        fetchTrendsStartedAt,
+                    discoverySummary = fallbackMessage;
+                    fetchTrendsSource = "ai-fallback-after-live-failure";
+                    blogLogStep(
+                        "TREND-MINER",
+                        fallbackMessage,
+                        { scanStats: capturedTrendSignals.scanStats },
                     );
-
-                    if (jobId) {
-                        const fetchTrendsEndTime = getNowIso();
-                        const fetchTrendsDuration = new Date(fetchTrendsEndTime).getTime() - new Date(fetchTrendsStartedAt).getTime();
-                        await generationLogger.logStep(
-                            2,
-                            "Fetch Trends / Discovery",
-                            {
-                                sourceMode: brief.sourceMode,
-                                sourceValue: brief.sourceValue,
-                                trendsEnabled: liveTrendsConfig?.enabled,
-                            },
-                            {
-                                startedAt: fetchTrendsStartedAt,
-                                completedAt: fetchTrendsEndTime,
-                                durationMs: fetchTrendsDuration,
-                                details: {
-                                    trendsSource: fetchTrendsSource,
-                                    fallbackUsed: false,
-                                },
-                            },
-                            {
-                                status: "failed",
-                                summary: failureMessage,
-                                data: {
-                                    viralTrends: capturedTrendSignals.viralTrends.slice(0, 8),
-                                    topRejectedTrends: topRejectedWebsiteTrends,
-                                    trendScanStats: capturedTrendSignals.scanStats,
-                                    trendsSource: fetchTrendsSource,
-                                },
-                            },
-                            [failureMessage],
-                        );
-                    }
-
-                    throw new Error(failureMessage);
-                }
-
-                const trendFirstDiscovery = buildTrendFirstDiscoveryStage({
-                    trendSignals: capturedTrendSignals,
-                    runtimeConfig: mergedAIBloggerConfig.extractKeywords,
-                    recentPostTitles,
-                    sourceMode: brief.sourceMode,
-                });
-
-                if (trendFirstDiscovery) {
-                    discoveryStage = trendFirstDiscovery.stage;
-                    discoverySummary = trendFirstDiscovery.summary;
-                    blogLogOutput("DISCOVERY (trend-first)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
-                } else {
-                    const discoveryLogLabel = getTrendDiscoveryLogLabel(capturedTrendSignals);
-                    const liveTrendsPrompt = [
-                        getLiveTrendsTopicDiscoveryPrompt(agency.name, title, brief, settings, capturedTrendSignals, recentPostTitles),
-                        websitePromptBlock,
-                    ]
-                        .filter(Boolean)
-                        .join("\n\n");
-                    blogLogInput(discoveryLogLabel, liveTrendsPrompt);
+                    blogLogInput("DISCOVERY (website-led-after-trend-miss)", aiOnlyDiscoveryPrompt);
                     discoveryStage = await runAIBloggerStage(
                         aiConfig,
                         aiBloggerConfig,
                         "extractKeywords",
-                        liveTrendsPrompt,
+                        aiOnlyDiscoveryPrompt,
                     );
-                    blogLogOutput(discoveryLogLabel, discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
+                    blogLogOutput("DISCOVERY (website-led-after-trend-miss)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
+                } else {
+                    const trendFirstDiscovery = buildTrendFirstDiscoveryStage({
+                        trendSignals: capturedTrendSignals,
+                        runtimeConfig: mergedAIBloggerConfig.extractKeywords,
+                        recentPostTitles,
+                        sourceMode: brief.sourceMode,
+                    });
+
+                    if (trendFirstDiscovery) {
+                        discoveryStage = trendFirstDiscovery.stage;
+                        discoverySummary = trendFirstDiscovery.summary;
+                        blogLogOutput("DISCOVERY (trend-first)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
+                    } else {
+                        const discoveryLogLabel = getTrendDiscoveryLogLabel(capturedTrendSignals);
+                        const liveTrendsPrompt = [
+                            getLiveTrendsTopicDiscoveryPrompt(agency.name, title, brief, settings, capturedTrendSignals, recentPostTitles),
+                            websitePromptBlock,
+                        ]
+                            .filter(Boolean)
+                            .join("\n\n");
+                        blogLogInput(discoveryLogLabel, liveTrendsPrompt);
+                        discoveryStage = await runAIBloggerStage(
+                            aiConfig,
+                            aiBloggerConfig,
+                            "extractKeywords",
+                            liveTrendsPrompt,
+                        );
+                        blogLogOutput(discoveryLogLabel, discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
+                    }
                 }
             } catch (error) {
-                if ((liveTrendsConfig?.trendFirstMode ?? true) || !allowAiDiscoveryFallback) {
+                if (brief.sourceMode !== "website" || !allowAiDiscoveryFallback) {
                     const fetchTrendsError = getErrorMessage(error);
                     addRunStep(
                         "fetch-trends",
