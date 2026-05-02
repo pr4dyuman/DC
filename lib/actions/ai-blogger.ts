@@ -4981,37 +4981,42 @@ function topicHasSpecificityCue(value: string) {
         || /[:()\d]/.test(value);
 }
 
+function isCommercialPriorityPage(page: { path?: string; pageCategory?: string }) {
+    const path = page.path || "";
+    if (/^\/blog(?:\/|$)/i.test(path)) {
+        return false;
+    }
+
+    return (
+        /^\/services(?:\/|$)/i.test(path) ||
+        page.pageCategory === "service" ||
+        page.pageCategory === "product" ||
+        page.pageCategory === "collection" ||
+        page.pageCategory === "category" ||
+        page.pageCategory === "brand" ||
+        page.pageCategory === "solution" ||
+        page.pageCategory === "pricing" ||
+        page.pageCategory === "industry"
+    );
+}
+
 function buildWebsiteCommercialTopicHints(websiteIntelligence: AIBloggerWebsiteIntelligence | null | undefined) {
     if (!websiteIntelligence) {
         return [];
     }
 
     return sanitizeStringArray(
-        [
-            ...websiteIntelligence.serviceSignals,
-            ...websiteIntelligence.topicHints,
-            ...websiteIntelligence.priorityPages
-                .filter((page) =>
-                    page.pageCategory === "service"
-                    || page.pageCategory === "product"
-                    || page.pageCategory === "collection"
-                    || page.pageCategory === "category"
-                    || page.pageCategory === "brand"
-                    || page.pageCategory === "solution"
-                    || page.pageCategory === "pricing"
-                    || page.pageCategory === "case-study"
-                    || page.pageCategory === "industry",
-                )
-                .flatMap((page) => [
-                    page.title,
-                    page.description,
-                    page.excerpt,
-                    ...page.highlights,
-                    ...page.serviceSignals,
-                    ...page.proofSignals,
-                ]),
-        ],
-        36,
+        (websiteIntelligence.priorityPages || [])
+            .filter(isCommercialPriorityPage)
+            .flatMap((page) => [
+                page.title,
+                page.description,
+                page.excerpt,
+                ...page.highlights,
+                ...page.serviceSignals,
+                ...page.proofSignals,
+            ]),
+        48,
         180,
     );
 }
@@ -5019,6 +5024,7 @@ function buildWebsiteCommercialTopicHints(websiteIntelligence: AIBloggerWebsiteI
 const WEBSITE_FIT_GENERIC_TOKENS = new Set([
     ...TOPIC_SELECTION_STOP_WORDS,
     "about",
+    "action",
     "blog",
     "blogs",
     "brand",
@@ -5032,6 +5038,8 @@ const WEBSITE_FIT_GENERIC_TOKENS = new Set([
     "customers",
     "design",
     "digital",
+    "engagement",
+    "full",
     "general",
     "growth",
     "guide",
@@ -5044,6 +5052,7 @@ const WEBSITE_FIT_GENERIC_TOKENS = new Set([
     "marketing",
     "media",
     "online",
+    "one",
     "page",
     "pages",
     "product",
@@ -5054,6 +5063,7 @@ const WEBSITE_FIT_GENERIC_TOKENS = new Set([
     "services",
     "solution",
     "solutions",
+    "story",
     "strategy",
     "support",
     "system",
@@ -5066,18 +5076,7 @@ const WEBSITE_FIT_GENERIC_TOKENS = new Set([
     "workflows",
 ]);
 
-const WEBSITE_TREND_CORE_GROUPS = new Set(["services", "topics", "priority"]);
-const COMMERCIAL_PRIORITY_PAGE_CATEGORIES = new Set([
-    "brand",
-    "case-study",
-    "category",
-    "collection",
-    "industry",
-    "pricing",
-    "product",
-    "service",
-    "solution",
-]);
+const WEBSITE_TREND_CORE_GROUPS = new Set(["services", "priority"]);
 const OFF_TOPIC_COMMERCIAL_TREND_CATEGORIES = new Set([
     "entertainment",
     "fashion",
@@ -5152,13 +5151,15 @@ function buildWebsiteTrendFitGroups(
         {
             name: "priority",
             hints: sanitizeStringArray(
-                websiteIntelligence?.priorityPages.flatMap((page) => [
-                    page.title,
-                    page.description,
-                    page.excerpt,
-                    ...page.highlights,
-                    ...page.serviceSignals,
-                ]) || [],
+                websiteIntelligence?.priorityPages
+                    .filter(isCommercialPriorityPage)
+                    .flatMap((page) => [
+                        page.title,
+                        page.description,
+                        page.excerpt,
+                        ...page.highlights,
+                        ...page.serviceSignals,
+                    ]) || [],
                 48,
                 180,
             ),
@@ -5197,13 +5198,10 @@ function buildWebsiteTrendFitGroups(
     };
 }
 
-function isCommercialWebsiteTrendContext(
-    websiteIntelligence: AIBloggerWebsiteIntelligence | null,
-    _brief: BlogStudioBrief,
-) {
+function isCommercialWebsiteTrendContext(websiteIntelligence: AIBloggerWebsiteIntelligence | null) {
     return Boolean(
-        (websiteIntelligence?.serviceSignals.length || 0) > 0 ||
-        websiteIntelligence?.priorityPages.some((page) => COMMERCIAL_PRIORITY_PAGE_CATEGORIES.has(page.pageCategory)) ||
+        buildWebsiteCommercialTopicHints(websiteIntelligence).length > 0 ||
+        websiteIntelligence?.priorityPages?.some(isCommercialPriorityPage) ||
         websiteIntelligence?.priorityPaths.some((path) => /\/(?:services?|products?|pricing|solutions?|industries|case-studies|collections?|category|brand)/i.test(path)),
     );
 }
@@ -5267,7 +5265,7 @@ export function assessTrendAgainstWebsite(
     const coreGroupMatches = groupMatches.filter((group) => WEBSITE_TREND_CORE_GROUPS.has(group));
     const normalizedTrendCategories = normalizeTrendCategories(trend.categories);
     const offTopicCategoryMismatch =
-        isCommercialWebsiteTrendContext(websiteIntelligence, brief) &&
+        isCommercialWebsiteTrendContext(websiteIntelligence) &&
         normalizedTrendCategories.length > 0 &&
         normalizedTrendCategories.every((category) => OFF_TOPIC_COMMERCIAL_TREND_CATEGORIES.has(category)) &&
         matchedCoreTokens.length < 2 &&
@@ -5346,7 +5344,11 @@ export function assessTrendAgainstWebsite(
         !offTopicCategoryMismatch;
 
     if (!accepted) {
-        reasons.push(`below strict website-fit threshold ${minimumFitScore}`);
+        reasons.push(
+            score < minimumFitScore
+                ? `below strict website-fit threshold ${minimumFitScore}`
+                : "failed strict website-fit evidence requirements",
+        );
     }
 
     return {
@@ -13395,8 +13397,7 @@ export async function generateBlogStudioDraftImpl(
             [
                 ...buildKeywordCandidatesFromSource(brief.sourceValue || "", 10),
                 brief.trendFocus || "",
-                ...(brief.sourceMode === "trending" ? [] : websiteIntelligence?.serviceSignals || []),
-                ...(brief.sourceMode === "trending" ? [] : websiteIntelligence?.topicHints || []),
+                ...(brief.sourceMode === "trending" ? [] : buildWebsiteCommercialTopicHints(websiteIntelligence)),
                 brief.primaryKeyword || "",
                 title,
             ],
@@ -16427,8 +16428,7 @@ export async function runBlogStudioDraftResearchPhase(
             [
                 ...buildKeywordCandidatesFromSource(brief.sourceValue || "", 10),
                 brief.trendFocus || "",
-                ...(brief.sourceMode === "trending" ? [] : websiteIntelligence?.serviceSignals || []),
-                ...(brief.sourceMode === "trending" ? [] : websiteIntelligence?.topicHints || []),
+                ...(brief.sourceMode === "trending" ? [] : buildWebsiteCommercialTopicHints(websiteIntelligence)),
                 brief.primaryKeyword || "",
                 title,
             ],

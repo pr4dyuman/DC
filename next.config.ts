@@ -26,6 +26,30 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'www.digitalcorvids.com' }],
+        destination: 'https://digitalcorvids.com/:path*',
+        permanent: true,
+      },
+      { source: '/Aboutus.html', destination: '/about', permanent: true },
+      { source: '/aboutus.html', destination: '/about', permanent: true },
+      { source: '/about.html', destination: '/about', permanent: true },
+      { source: '/contact.html', destination: '/contact', permanent: true },
+      { source: '/contact-us.html', destination: '/contact', permanent: true },
+      { source: '/blog_listing.html', destination: '/blog', permanent: true },
+      { source: '/blog_read.html', destination: '/blog', permanent: true },
+      { source: '/web-development.html', destination: '/services/web-development', permanent: true },
+      { source: '/seo.html', destination: '/services/seo', permanent: true },
+      { source: '/ppc.html', destination: '/services/ppc', permanent: true },
+      { source: '/social-media-marketing.html', destination: '/services/social-media-marketing', permanent: true },
+      { source: '/video-production.html', destination: '/services/video-production-ad', permanent: true },
+      { source: '/influencer-marketing.html', destination: '/services/influencer-marketing', permanent: true },
+      { source: '/manage-company.html', destination: '/services/manage-company', permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;
