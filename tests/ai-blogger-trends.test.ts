@@ -638,6 +638,62 @@ test("dynamic website fit rejects entertainment trends that only overlap on a ye
     );
 });
 
+test("dynamic website fit rejects local incident trends matched only by ambiguous site language", () => {
+    const highSignalWebsiteIntelligence: AIBloggerWebsiteIntelligence = {
+        ...websiteIntelligence,
+        pageTitles: [
+            "High Velocity Digital Production Systems",
+            "High Quality Content Operations",
+        ],
+        topicHints: [
+            "high velocity media production",
+            "high quality brand systems",
+        ],
+        faqQuestions: [
+            "How do high growth brands protect campaign quality?",
+        ],
+        priorityPages: [
+            {
+                path: "/services/high-velocity-production",
+                url: "https://www.digitalcorvids.com/services/high-velocity-production",
+                title: "High Velocity Production",
+                description: "High quality digital production for content teams.",
+                excerpt: "Build high impact launch systems.",
+                highlights: ["high quality production", "high velocity content"],
+                serviceSignals: ["high quality content", "high velocity media"],
+                proofSignals: ["high impact launches"],
+                ctaPatterns: ["GET STARTED"],
+                pageCategory: "service",
+                pageScore: 92,
+            },
+        ],
+        serviceSignals: ["high quality content", "high velocity media"],
+        proofSignals: ["high impact launches"],
+        summary: "High velocity digital production site.",
+    };
+
+    const assessment = assessTrendAgainstWebsite(
+        buildTrend(
+            "foss high school",
+            ["Law and Government"],
+            ["foss high school stabbing", "tacoma washington"],
+            ["foss high school stabbing", "hs"],
+        ),
+        highSignalWebsiteIntelligence,
+        websiteBrief,
+        55,
+    );
+
+    assert.equal(assessment.accepted, false);
+    assert.ok(assessment.score < 55);
+    assert.ok(!assessment.matchedStrongTokens.includes("high"));
+    assert.ok(
+        assessment.reasons.some((reason) =>
+            /local institution incident|off-lane|no core site tokens|below strict website-fit threshold/i.test(reason),
+        ),
+    );
+});
+
 test("dynamic website fit accepts live topics with strong multi-signal site evidence", () => {
     const assessment = assessTrendAgainstWebsite(
         buildTrend(

@@ -5138,9 +5138,12 @@ const WEBSITE_FIT_GENERIC_TOKENS = new Set([
     "growth",
     "guide",
     "guides",
+    "high",
     "home",
     "industry",
     "learn",
+    "live",
+    "low",
     "management",
     "market",
     "marketing",
@@ -5149,10 +5152,14 @@ const WEBSITE_FIT_GENERIC_TOKENS = new Set([
     "one",
     "page",
     "pages",
+    "post",
+    "posts",
     "product",
     "products",
     "professional",
     "proof",
+    "result",
+    "results",
     "service",
     "services",
     "solution",
@@ -5163,6 +5170,14 @@ const WEBSITE_FIT_GENERIC_TOKENS = new Set([
     "system",
     "team",
     "teams",
+    "free",
+    "game",
+    "games",
+    "price",
+    "prices",
+    "status",
+    "stock",
+    "stocks",
     "website",
     "websites",
     "work",
@@ -5172,10 +5187,14 @@ const WEBSITE_FIT_GENERIC_TOKENS = new Set([
 
 const WEBSITE_TREND_CORE_GROUPS = new Set(["services", "priority"]);
 const OFF_TOPIC_COMMERCIAL_TREND_CATEGORIES = new Set([
+    "business and finance",
     "entertainment",
     "fashion",
     "finance",
     "food",
+    "games",
+    "hobbies and leisure",
+    "law and government",
     "lifestyle",
     "politics",
     "shopping",
@@ -5207,6 +5226,35 @@ function tokenizeWebsiteFit(value: string) {
                 .filter((token) => !isWeakOverlapToken(token) && !WEBSITE_FIT_GENERIC_TOKENS.has(token)),
         ),
     );
+}
+
+function scoreWebsiteFitOverlap(topic: string, hints: string[]) {
+    const topicTokens = new Set(tokenizeWebsiteFit(topic));
+
+    if (topicTokens.size === 0) {
+        return 0;
+    }
+
+    const hintTokens = new Set(hints.flatMap((hint) => tokenizeWebsiteFit(hint)));
+
+    if (hintTokens.size === 0) {
+        return 0;
+    }
+
+    const overlapCount = Array.from(topicTokens).filter((token) => hintTokens.has(token)).length;
+    return clampBlogStudioScore((overlapCount / Math.max(1, Math.min(topicTokens.size, 6))) * 100);
+}
+
+function hasLocalInstitutionIncidentRisk(topic: string, trendContext: string) {
+    const normalizedTopic = sanitizeText(topic, 180).toLowerCase();
+    const normalizedContext = sanitizeText(trendContext, 420).toLowerCase();
+    const isLocalInstitution =
+        /\b(?:high school|middle school|elementary school|school district|academy)\b/.test(normalizedTopic) ||
+        /\b(?:high school|middle school|elementary school|school district|academy)\b/.test(normalizedContext);
+    const hasSafetyIncident =
+        /\b(?:arrest|dead|death|injured|injury|killed|knife|lockdown|police|shooting|stabbed|stabbing|threat|violence)\b/.test(normalizedContext);
+
+    return isLocalInstitution && hasSafetyIncident;
 }
 
 function buildWebsiteTrendFitGroups(
@@ -5246,7 +5294,7 @@ function buildWebsiteTrendFitGroups(
             name: "priority",
             hints: sanitizeStringArray(
                 websiteIntelligence?.priorityPages
-                    .filter(isCommercialPriorityPage)
+                    ?.filter(isCommercialPriorityPage)
                     .flatMap((page) => [
                         page.title,
                         page.description,
@@ -5286,6 +5334,13 @@ function buildWebsiteTrendFitGroups(
     return {
         groups,
         allHints: sanitizeStringArray(groups.flatMap((group) => group.hints), 80, 180),
+        coreHints: sanitizeStringArray(
+            groups
+                .filter((group) => WEBSITE_TREND_CORE_GROUPS.has(group.name))
+                .flatMap((group) => group.hints),
+            60,
+            180,
+        ),
         commercialHints: groups.find((group) => group.name === "services")?.hints || [],
         strongTokens,
         tokenGroupMap,
@@ -5296,7 +5351,7 @@ function isCommercialWebsiteTrendContext(websiteIntelligence: AIBloggerWebsiteIn
     return Boolean(
         buildWebsiteCommercialTopicHints(websiteIntelligence).length > 0 ||
         websiteIntelligence?.priorityPages?.some(isCommercialPriorityPage) ||
-        websiteIntelligence?.priorityPaths.some((path) => /\/(?:services?|products?|pricing|solutions?|industries|case-studies|collections?|category|brand)/i.test(path)),
+        websiteIntelligence?.priorityPaths?.some((path) => /\/(?:services?|products?|pricing|solutions?|industries|case-studies|collections?|category|brand)/i.test(path)),
     );
 }
 
@@ -5327,9 +5382,9 @@ export function assessTrendAgainstWebsite(
         180,
     );
     const trendContext = trendContextParts.join(" | ");
-    const topicOverlap = scoreTopicOverlap(trend.topic, fingerprint.allHints);
-    const contextOverlap = scoreTopicOverlap(trendContext, fingerprint.allHints);
-    const commercialOverlap = scoreTopicOverlap(trendContext, fingerprint.commercialHints);
+    const topicOverlap = scoreWebsiteFitOverlap(trend.topic, fingerprint.allHints);
+    const contextOverlap = scoreWebsiteFitOverlap(trendContext, fingerprint.allHints);
+    const commercialOverlap = scoreWebsiteFitOverlap(trendContext, fingerprint.commercialHints);
     const topicTokens = tokenizeWebsiteFit(trend.topic);
     const contextTokens = tokenizeWebsiteFit(trendContext);
     const topicNormalized = sanitizeText(trend.topic, 180).toLowerCase();
@@ -5341,17 +5396,19 @@ export function assessTrendAgainstWebsite(
     );
     const exactPhraseMatch =
         topicTokens.length >= 2 &&
-        fingerprint.allHints.some((hint) => sanitizeText(hint, 240).toLowerCase().includes(topicNormalized));
-    const exactEntityMatch = matchedCoreTokens.some((token) =>
-        token.length >= 4 &&
+        fingerprint.coreHints.some((hint) => sanitizeText(hint, 240).toLowerCase().includes(topicNormalized));
+    const exactEntityTokens = matchedCoreTokens.filter((token) =>
         topicNormalized.includes(token) &&
         Array.from(fingerprint.tokenGroupMap.get(token) || []).filter((group) => WEBSITE_TREND_CORE_GROUPS.has(group)).length >= 2,
     );
+    const exactEntityMatch =
+        exactEntityTokens.length >= 2 ||
+        (topicTokens.length === 1 && exactEntityTokens.some((token) => token.length >= 6));
     const groupMatches = fingerprint.groups
         .filter((group) => {
             const overlap = Math.max(
-                scoreTopicOverlap(trend.topic, group.hints),
-                scoreTopicOverlap(trendContext, group.hints),
+                scoreWebsiteFitOverlap(trend.topic, group.hints),
+                scoreWebsiteFitOverlap(trendContext, group.hints),
             );
             return overlap >= 26;
         })
@@ -5364,6 +5421,10 @@ export function assessTrendAgainstWebsite(
         normalizedTrendCategories.every((category) => OFF_TOPIC_COMMERCIAL_TREND_CATEGORIES.has(category)) &&
         matchedCoreTokens.length < 2 &&
         !exactPhraseMatch;
+    const localInstitutionIncidentRisk =
+        hasLocalInstitutionIncidentRisk(trend.topic, trendContext) &&
+        matchedCoreTokens.length < 2 &&
+        !exactPhraseMatch;
 
     let score = clampBlogStudioScore(
         (topicOverlap * 0.26) +
@@ -5374,7 +5435,8 @@ export function assessTrendAgainstWebsite(
         (matchedCoreTokens.length >= 2 ? 14 : matchedCoreTokens.length === 1 ? 5 : 0) +
         (exactPhraseMatch ? 12 : 0) +
         (exactEntityMatch ? 10 : 0) +
-        (offTopicCategoryMismatch ? -28 : 0),
+        (offTopicCategoryMismatch ? -28 : 0) +
+        (localInstitutionIncidentRisk ? -35 : 0),
     );
 
     const reasons: string[] = [];
@@ -5420,6 +5482,10 @@ export function assessTrendAgainstWebsite(
         reasons.push("trend categories are off-lane for the website");
     }
 
+    if (localInstitutionIncidentRisk) {
+        reasons.push("local institution incident trend needs explicit site fit");
+    }
+
     const accepted =
         score >= minimumFitScore &&
         topicOverlap >= 18 &&
@@ -5435,7 +5501,8 @@ export function assessTrendAgainstWebsite(
             exactPhraseMatch ||
             (exactEntityMatch && coreGroupMatches.length >= 1)
         ) &&
-        !offTopicCategoryMismatch;
+        !offTopicCategoryMismatch &&
+        !localInstitutionIncidentRisk;
 
     if (!accepted) {
         reasons.push(
@@ -5559,7 +5626,7 @@ function applyDynamicWebsiteTrendGate(input: {
 
         return {
             ...trend,
-            fitScore: Math.max(trend.fitScore, dynamicFit.score),
+            fitScore: dynamicFit.score,
             acceptedForTrendFirst: dynamicFit.accepted,
             rejectionReasons: dynamicFit.accepted ? [] : mergedReasons,
             reasons: sanitizeStringArray(
