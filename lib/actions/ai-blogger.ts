@@ -99,6 +99,7 @@ import type {
     BlogStudioDraftBrief,
     BlogStudioExternalSource,
     BlogStudioFaqItem,
+    BlogStudioFinalQualityAssessment,
     BlogStudioGenerateDraftResult,
     BlogStudioFetchTrendsSource,
     BlogStudioInternalLinkHealth,
@@ -257,6 +258,7 @@ function buildGenerateDraftResult(input: {
             businessFitScore: input.businessFitScore,
             businessFitWarnings: input.businessFitWarnings,
             scorecard: input.post.generationDiagnostics?.scorecard,
+            finalQuality: input.post.generationDiagnostics?.finalQuality,
             sourceUsage: input.post.generationDiagnostics?.sourceUsage,
             steps: input.runSteps.map((step) => ({
                 key: step.key,
@@ -382,6 +384,7 @@ const MINIMUM_BUSINESS_FIT_SCORE = 60;
 const MINIMUM_SEO_STRATEGY_READINESS_SCORE = 70;
 const MINIMUM_DRAFTING_SEO_STRATEGY_SCORE = 65;
 const MINIMUM_STRATEGY_SOURCE_DEPTH_SCORE = 55;
+const MINIMUM_FINAL_SEO_QUALITY_SCORE = 72;
 
 type MarketingCannibalizationPost = {
     slug?: string;
@@ -1463,6 +1466,57 @@ function sanitizeGenerationDiagnostics(value: BlogStudioPost["generationDiagnost
                 typeof value.scorecard.websiteTopicAccepted === "boolean"
                     ? value.scorecard.websiteTopicAccepted
                     : undefined,
+            strategyReadiness:
+                typeof value.scorecard.strategyReadiness === "number"
+                    ? sanitizeNumber(value.scorecard.strategyReadiness, 0, 0, 100)
+                    : undefined,
+            originalValue:
+                typeof value.scorecard.originalValue === "number"
+                    ? sanitizeNumber(value.scorecard.originalValue, 0, 0, 100)
+                    : undefined,
+            proofStrength:
+                typeof value.scorecard.proofStrength === "number"
+                    ? sanitizeNumber(value.scorecard.proofStrength, 0, 0, 100)
+                    : undefined,
+            sourceDepth:
+                typeof value.scorecard.sourceDepth === "number"
+                    ? sanitizeNumber(value.scorecard.sourceDepth, 0, 0, 100)
+                    : undefined,
+            conversionFit:
+                typeof value.scorecard.conversionFit === "number"
+                    ? sanitizeNumber(value.scorecard.conversionFit, 0, 0, 100)
+                    : undefined,
+            finalQuality:
+                typeof value.scorecard.finalQuality === "number"
+                    ? sanitizeNumber(value.scorecard.finalQuality, 0, 0, 100)
+                    : undefined,
+            intentSatisfaction:
+                typeof value.scorecard.intentSatisfaction === "number"
+                    ? sanitizeNumber(value.scorecard.intentSatisfaction, 0, 0, 100)
+                    : undefined,
+            originalValueExecution:
+                typeof value.scorecard.originalValueExecution === "number"
+                    ? sanitizeNumber(value.scorecard.originalValueExecution, 0, 0, 100)
+                    : undefined,
+            clusterFit:
+                typeof value.scorecard.clusterFit === "number"
+                    ? sanitizeNumber(value.scorecard.clusterFit, 0, 0, 100)
+                    : undefined,
+        }
+        : undefined;
+    const finalQuality = value.finalQuality
+        ? {
+            score: sanitizeNumber(value.finalQuality.score, 0, 0, 100),
+            warnings: sanitizeStringArray(value.finalQuality.warnings, 8, 180),
+            blockers: sanitizeStringArray(value.finalQuality.blockers, 8, 180),
+            components: {
+                intentSatisfaction: sanitizeNumber(value.finalQuality.components?.intentSatisfaction, 0, 0, 100),
+                originalValueExecution: sanitizeNumber(value.finalQuality.components?.originalValueExecution, 0, 0, 100),
+                proofStrength: sanitizeNumber(value.finalQuality.components?.proofStrength, 0, 0, 100),
+                clusterFit: sanitizeNumber(value.finalQuality.components?.clusterFit, 0, 0, 100),
+                conversionFit: sanitizeNumber(value.finalQuality.components?.conversionFit, 0, 0, 100),
+                structureQuality: sanitizeNumber(value.finalQuality.components?.structureQuality, 0, 0, 100),
+            },
         }
         : undefined;
 
@@ -1485,6 +1539,7 @@ function sanitizeGenerationDiagnostics(value: BlogStudioPost["generationDiagnost
         businessFitWarnings: sanitizeStringArray(value.businessFitWarnings, 4, 180),
         keywordPlan,
         scorecard,
+        finalQuality,
         sourceUsage: {
             usedWebsiteIntelligence: Boolean(value.sourceUsage?.usedWebsiteIntelligence),
             usedLiveTrends: Boolean(value.sourceUsage?.usedLiveTrends),
@@ -6361,6 +6416,234 @@ export function buildSeoStrategyReadinessAssessment(input: {
     };
 }
 
+function countMarkdownHeadings(content: string, level = 2) {
+    const marker = "#".repeat(level);
+    return (content.match(new RegExp(`^${marker}\\s+`, "gm")) || []).length;
+}
+
+function hasOriginalValueAssetCue(content: string) {
+    return /\b(?:audit|blueprint|checklist|comparison table|decision guide|framework|matrix|playbook|roadmap|scorecard|template|worksheet)\b/i.test(content);
+}
+
+function hasMarkdownTable(content: string) {
+    return /\n\|.+\|\s*\n\|[\s:|.-]+\|/m.test(content);
+}
+
+function hasActionableList(content: string) {
+    return /^\s*(?:[-*]|\d+\.)\s+\S+/m.test(content);
+}
+
+function countKeywordPhraseHits(content: string, phrases: string[]) {
+    const normalizedContent = sanitizeText(content, 50000).toLowerCase();
+    const uniquePhrases = new Set(
+        sanitizeStringArray(phrases, 16, 100)
+            .map((phrase) => phrase.toLowerCase())
+            .filter((phrase) => phrase.length >= 4),
+    );
+
+    let hits = 0;
+    for (const phrase of uniquePhrases) {
+        if (normalizedContent.includes(phrase)) {
+            hits += 1;
+        }
+    }
+
+    return hits;
+}
+
+function getFinalQualityBlockingThreshold(topic: string) {
+    return isLikelyYmyLTopic(topic)
+        ? MINIMUM_FINAL_SEO_QUALITY_SCORE
+        : MINIMUM_DRAFTING_SEO_STRATEGY_SCORE;
+}
+
+export function buildFinalSeoQualityAssessment(input: {
+    draft: Pick<
+        BlogStudioPost,
+        | "title"
+        | "metaTitle"
+        | "metaDescription"
+        | "excerpt"
+        | "content"
+        | "wordCount"
+        | "outline"
+        | "brief"
+        | "draftBrief"
+        | "faqItems"
+        | "searchIntent"
+        | "contentType"
+        | "internalLinks"
+    >;
+    audit: BlogStudioSeoAudit;
+    primaryKeyword?: string;
+    secondaryKeywords?: string[];
+    serpAnalysis?: AIBloggerSerpAnalysis | null;
+    groundedResearch?: AIBloggerGroundedResearch | null;
+}): BlogStudioFinalQualityAssessment {
+    const content = sanitizeText(input.draft.content, 50000);
+    const normalizedContent = content.toLowerCase();
+    const intro = sanitizeText(content.replace(/^#+\s+.*$/gm, " "), 1200).slice(0, 1000).toLowerCase();
+    const closing = sanitizeText(content, 50000).slice(-1400).toLowerCase();
+    const primaryKeyword = sanitizeText(
+        input.primaryKeyword ||
+        input.draft.brief.primaryKeyword ||
+        input.draft.title,
+        140,
+    );
+    const topicSeed = sanitizeText(
+        [
+            primaryKeyword,
+            input.draft.title,
+            input.draft.draftBrief?.topicalCluster,
+        ].filter(Boolean).join(" "),
+        320,
+    );
+    const ymyLTopic = isLikelyYmyLTopic(topicSeed);
+    const h2Count = countMarkdownHeadings(content, 2);
+    const citationCount = (content.match(/\[\d+\]/g) || []).length;
+    const internalLinks = input.draft.internalLinks || [];
+    const serviceLinkCount = internalLinks.filter((link) => link.source === "service" || link.source === "page").length;
+    const clusterAlignedLinkCount = internalLinks.filter((link) => link.clusterAligned).length;
+    const sourceCount = input.groundedResearch?.sources.length || 0;
+    const highTrustSourceCount = (input.groundedResearch?.sources || []).filter((source) => source.trustLevel === "high").length;
+    const secondaryHits = countKeywordPhraseHits(content, input.secondaryKeywords || []);
+    const styleFlags = detectAIBloggerStyleRedFlags(content);
+    const hasPrimaryKeywordInIntro = primaryKeyword
+        ? intro.includes(primaryKeyword.toLowerCase())
+        : false;
+    const hasIntentCue =
+        /\b(?:how|what|why|steps?|guide|checklist|framework|compare|cost|pricing|benefits?|examples?|strategy|template)\b/i.test(intro) ||
+        input.draft.outline.some((section) => /\b(?:how|what|why|steps?|guide|checklist|framework|compare|scorecard|template)\b/i.test(section));
+    const hasPlannedAsset = hasSubstantialStrategyText(input.draft.draftBrief?.originalValueAsset, 10);
+    const hasAssetCue = hasOriginalValueAssetCue(content);
+    const hasUsableAsset = hasAssetCue && (hasMarkdownTable(content) || hasActionableList(content) || countMarkdownHeadings(content, 3) >= 2);
+    const conversionCue = /\b(?:audit|book|call|consult|contact|demo|estimate|proposal|review|schedule|service|strategy session|work with|next step)\b/i;
+    const hasConversionPath = hasSubstantialStrategyText(
+        input.draft.draftBrief?.conversionPath || input.draft.draftBrief?.ctaGoal || input.draft.brief.cta,
+        12,
+    );
+    const hasClosingCta = conversionCue.test(closing);
+    const hasCluster = hasSubstantialStrategyText(input.draft.draftBrief?.topicalCluster, 6);
+    const clusterMentioned = hasCluster
+        ? normalizedContent.includes(sanitizeText(input.draft.draftBrief?.topicalCluster, 120).toLowerCase())
+        : false;
+    const hasMeta = Boolean(input.draft.metaTitle && input.draft.metaDescription);
+    const wordCount = input.draft.wordCount || countWords(content);
+    const scoreFromAudit = clampBlogStudioScore(input.audit.score);
+
+    const intentSatisfaction = clampBlogStudioScore(
+        36 +
+        (hasPrimaryKeywordInIntro ? 20 : 0) +
+        (hasIntentCue ? 18 : 0) +
+        (h2Count >= 4 ? 14 : h2Count >= 2 ? 8 : 0) +
+        Math.min(10, (input.draft.faqItems?.length || 0) * 2) +
+        Math.min(10, (input.serpAnalysis?.contentGaps?.length || 0) * 2) +
+        Math.min(10, secondaryHits * 3) -
+        Math.min(16, styleFlags.length * 4),
+    );
+    const originalValueExecution = clampBlogStudioScore(
+        30 +
+        (hasPlannedAsset ? 18 : 0) +
+        (hasAssetCue ? 20 : 0) +
+        (hasUsableAsset ? 20 : 0) +
+        (hasMarkdownTable(content) ? 8 : 0) +
+        (hasActionableList(content) ? 8 : 0),
+    );
+    const proofStrength = clampBlogStudioScore(
+        36 +
+        Math.min(22, sourceCount * 5) +
+        Math.min(22, highTrustSourceCount * 11) +
+        Math.min(14, citationCount * 3) +
+        (input.draft.draftBrief?.proofPlan?.length ? 8 : 0) -
+        (ymyLTopic && highTrustSourceCount === 0 ? 24 : 0),
+    );
+    const clusterFit = clampBlogStudioScore(
+        38 +
+        (hasCluster ? 18 : 0) +
+        (clusterMentioned ? 10 : 0) +
+        Math.min(16, internalLinks.length * 4) +
+        Math.min(16, serviceLinkCount * 8) +
+        Math.min(12, clusterAlignedLinkCount * 6) +
+        Math.min(10, secondaryHits * 2),
+    );
+    const conversionFit = clampBlogStudioScore(
+        34 +
+        (hasConversionPath ? 20 : 0) +
+        (hasClosingCta ? 18 : 0) +
+        Math.min(18, serviceLinkCount * 9) +
+        (input.audit.checks.some((check) => check.key === "cta-presence" && check.passed) ? 10 : 0),
+    );
+    const structureQuality = clampBlogStudioScore(
+        28 +
+        (wordCount >= 900 ? 16 : wordCount >= 600 ? 9 : 0) +
+        (wordCount <= 2400 ? 8 : 4) +
+        (h2Count >= 4 ? 14 : h2Count >= 2 ? 8 : 0) +
+        (hasMeta ? 10 : 0) +
+        Math.min(18, Math.round(scoreFromAudit * 0.18)) -
+        Math.min(14, styleFlags.length * 3),
+    );
+    const score = clampBlogStudioScore(
+        (intentSatisfaction * 0.22) +
+        (originalValueExecution * 0.20) +
+        (proofStrength * 0.16) +
+        (clusterFit * 0.16) +
+        (conversionFit * 0.12) +
+        (structureQuality * 0.14),
+    );
+    const warnings: string[] = [];
+    const blockers: string[] = [];
+    const blockingThreshold = getFinalQualityBlockingThreshold(topicSeed);
+
+    if (intentSatisfaction < 70) {
+        warnings.push("Search intent execution is still weak; answer the query faster and make the first sections more useful.");
+    }
+    if (originalValueExecution < 70) {
+        warnings.push("The planned original value asset is not fully executed as a usable checklist, framework, table, scorecard, template, or guide.");
+    }
+    if (proofStrength < 70) {
+        warnings.push("Proof execution is thin; add stronger source-backed examples, citations, or evidence points.");
+    }
+    if (clusterFit < 70) {
+        warnings.push("Topic cluster execution is weak; improve cluster framing and service/category internal links.");
+    }
+    if (conversionFit < 70) {
+        warnings.push("Conversion path is weak; add a natural next step tied to the article's audience and service lane.");
+    }
+    if (styleFlags.length > 0) {
+        warnings.push(`AI-style phrases remain: ${styleFlags.slice(0, 3).join(", ")}.`);
+    }
+    if (score < MINIMUM_FINAL_SEO_QUALITY_SCORE) {
+        warnings.push(`Final SEO quality is below the target (${score}/${MINIMUM_FINAL_SEO_QUALITY_SCORE}).`);
+    }
+
+    if (score < blockingThreshold) {
+        blockers.push(`Final SEO quality is too low (${score}/${blockingThreshold}) for this topic.`);
+    }
+    if (intentSatisfaction < 50) {
+        blockers.push("Draft does not satisfy the detected search intent strongly enough.");
+    }
+    if (originalValueExecution < 45) {
+        blockers.push("Draft names a strategy but does not deliver a usable original value asset.");
+    }
+    if (ymyLTopic && proofStrength < 70) {
+        blockers.push("YMYL-sensitive draft needs stronger source-backed proof before publishing.");
+    }
+
+    return {
+        score,
+        warnings: sanitizeStringArray(warnings, 8, 180),
+        blockers: sanitizeStringArray(blockers, 8, 180),
+        components: {
+            intentSatisfaction,
+            originalValueExecution,
+            proofStrength,
+            clusterFit,
+            conversionFit,
+            structureQuality,
+        },
+    };
+}
+
 async function compareTopicCandidatesWithLightweightSerp(input: {
     agencyId: string;
     rankedTopics: TopicSelectionDecision["rankedTopics"];
@@ -6590,7 +6873,23 @@ function buildGenerationScorecard(input: {
         strategyReadiness: strategyAssessment.score,
         originalValue: strategyAssessment.components.originalValue,
         proofStrength: strategyAssessment.components.proofStrength,
+        sourceDepth: strategyAssessment.components.sourceDepth,
         conversionFit: strategyAssessment.components.conversionFit,
+    } satisfies NonNullable<BlogStudioPost["generationDiagnostics"]>["scorecard"];
+}
+
+function mergeFinalQualityIntoScorecard(
+    scorecard: NonNullable<BlogStudioPost["generationDiagnostics"]>["scorecard"] | undefined,
+    finalQuality: BlogStudioFinalQualityAssessment,
+) {
+    return {
+        ...(scorecard || {}),
+        finalQuality: finalQuality.score,
+        intentSatisfaction: finalQuality.components.intentSatisfaction,
+        originalValueExecution: finalQuality.components.originalValueExecution,
+        proofStrength: Math.max(scorecard?.proofStrength || 0, finalQuality.components.proofStrength),
+        clusterFit: finalQuality.components.clusterFit,
+        conversionFit: Math.max(scorecard?.conversionFit || 0, finalQuality.components.conversionFit),
     } satisfies NonNullable<BlogStudioPost["generationDiagnostics"]>["scorecard"];
 }
 
@@ -7199,6 +7498,27 @@ function formatSeoStrategyPlanForPrompt(advancedBrief: AdvancedBriefResult) {
     ];
 
     return `SEO strategy plan:\n${lines.join("\n")}`;
+}
+
+function formatTopicClusterPlanForPrompt(
+    advancedBrief: AdvancedBriefResult,
+    internalLinkSuggestions: BlogStudioInternalLinkSuggestion[] = [],
+) {
+    const cluster = sanitizeText(advancedBrief.topicalCluster, 120);
+    const parentTopic = sanitizeText(cluster || advancedBrief.titleDirection || advancedBrief.readerPromise, 160);
+    const serviceTargets = internalLinkSuggestions
+        .filter((suggestion) => suggestion.source === "service" || suggestion.source === "page" || suggestion.clusterAligned)
+        .slice(0, 4)
+        .map((suggestion) => `${suggestion.suggestedAnchor || suggestion.title} -> ${suggestion.href}`);
+
+    return `Topic cluster plan:
+- Cluster: ${cluster || "not specified"}
+- Parent topic: ${parentTopic || "not specified"}
+- Article role: ${advancedBrief.contentType || "not specified"}
+- Reader promise this post must own: ${advancedBrief.readerPromise || "not specified"}
+- Cluster gap to fill: ${advancedBrief.serpGap || "not specified"}
+- Preferred internal targets: ${serviceTargets.length ? serviceTargets.join(" | ") : advancedBrief.internalLinkPlan.join(" | ") || "not specified"}
+- Cluster rule: this post must strengthen the named cluster, link first to the most relevant service/category/cluster parent, and avoid drifting into unrelated trend coverage.`;
 }
 
 function formatDraftBriefSeoStrategyForPrompt(draftBrief?: BlogStudioDraftBrief) {
@@ -8115,6 +8435,8 @@ function shouldUseFinalCheckerRevision(
     publishRules: AIBloggerConfig["publishRules"],
     currentAudit: ReturnType<typeof getBlogStudioSeoAudit>,
     nextAudit: ReturnType<typeof getBlogStudioSeoAudit>,
+    currentQuality?: BlogStudioFinalQualityAssessment,
+    nextQuality?: BlogStudioFinalQualityAssessment,
 ) {
     if (!passesAIBloggerDraftGuardrails(
         currentDraft,
@@ -8137,6 +8459,33 @@ function shouldUseFinalCheckerRevision(
 
     if (nextAudit.score === currentAudit.score && nextAudit.blockers.length < currentAudit.blockers.length) {
         return true;
+    }
+
+    if (currentQuality && nextQuality) {
+        if (nextQuality.blockers.length < currentQuality.blockers.length) {
+            return true;
+        }
+
+        if (
+            nextQuality.score >= MINIMUM_FINAL_SEO_QUALITY_SCORE &&
+            nextQuality.score >= currentQuality.score + 3
+        ) {
+            return true;
+        }
+
+        if (
+            nextQuality.score >= currentQuality.score &&
+            nextQuality.components.originalValueExecution >= currentQuality.components.originalValueExecution + 10
+        ) {
+            return true;
+        }
+
+        if (
+            nextQuality.score >= currentQuality.score &&
+            nextQuality.components.intentSatisfaction >= currentQuality.components.intentSatisfaction + 10
+        ) {
+            return true;
+        }
     }
 
     return false;
@@ -8667,6 +9016,36 @@ export function validateBlogStudioPublishPackage(
             message: "Original value asset is missing from the strategy brief",
             fixHint: "Add a concrete checklist, framework, scorecard, comparison table, audit process, template, or decision guide to make the post worth ranking.",
         });
+    }
+
+    const finalQuality = post.generationDiagnostics?.finalQuality;
+    if (finalQuality) {
+        if (finalQuality.score < MINIMUM_FINAL_SEO_QUALITY_SCORE) {
+            issues.push({
+                category: "content",
+                severity: finalQuality.blockers.length > 0 ? "blocker" : "warning",
+                message: `Final SEO quality is below target (${finalQuality.score}/${MINIMUM_FINAL_SEO_QUALITY_SCORE})`,
+                fixHint: "Improve intent satisfaction, original asset execution, proof strength, cluster fit, and conversion path before publishing.",
+            });
+        }
+
+        for (const blocker of finalQuality.blockers) {
+            issues.push({
+                category: "content",
+                severity: "blocker",
+                message: blocker,
+                fixHint: "Use the AI blocker resolver or revise the draft so the final quality judge passes.",
+            });
+        }
+
+        for (const warning of finalQuality.warnings.slice(0, 3)) {
+            issues.push({
+                category: "content",
+                severity: "warning",
+                message: warning,
+                fixHint: "Revise the article body, links, proof, or CTA until the final quality judge improves.",
+            });
+        }
     }
 
     const claimsCheck = audit.checks.find((check) => check.key === "claims-grounding");
@@ -15259,6 +15638,7 @@ Title direction: ${advancedBrief.titleDirection || "not specified"}
 CTA goal: ${getContextInferredCta(enrichedBrief.cta, advancedBrief.ctaGoal)}
 Business fit: ${advancedBrief.businessFitSummary || "not specified"}
 ${formatSeoStrategyPlanForPrompt(advancedBrief)}
+${formatTopicClusterPlanForPrompt(advancedBrief)}
 Research insights:
 ${research.researchInsights.length > 0 ? research.researchInsights.map((insight) => `- ${insight}`).join("\n") : "- Use best-practice analysis for this topic"}
 Section angles:
@@ -15646,6 +16026,8 @@ Rules:
             faqItems: faqPack.faqItems,
             searchIntent: advancedBrief.searchIntent,
             contentType: advancedBrief.contentType,
+            contentClusterId: advancedBrief.topicalCluster || effectivePrimaryKeyword || selectedTopicForRun,
+            parentTopicSlug: effectivePrimaryKeyword || advancedBrief.topicalCluster || selectedTopicForRun,
             researchNotes: research.sourceNotes,
             externalSources: groundedResearch?.sources || [],
             seoScore: planning.seo.score,
@@ -15750,6 +16132,7 @@ Selected topic: ${selectedTopicForRun}
 Source summary: ${discovery.sourceSummary || "Not provided"}
 Business fit: ${advancedBrief.businessFitSummary || "not specified"}
 ${formatSeoStrategyPlanForPrompt(advancedBrief)}
+${formatTopicClusterPlanForPrompt(advancedBrief, internalLinkSuggestions)}
 Target audience: ${getContextInferredAudience(enrichedBrief.audience, advancedBrief.targetAudience)}
 Tone direction: ${getContextInferredTone(enrichedBrief.tone, advancedBrief.toneDirection)}
 CTA goal: ${getContextInferredCta(enrichedBrief.cta, advancedBrief.ctaGoal)}
@@ -16032,6 +16415,22 @@ Rules:
                 const checkedSeoAudit = getBlogStudioSeoAudit(checkedAuditDraft, settings, resolvedPublishRules);
                 checkedDraftData.seoScore = checkedSeoAudit.score;
                 checkedAuditDraft.seoScore = checkedSeoAudit.score;
+                const currentFinalQuality = buildFinalSeoQualityAssessment({
+                    draft: finalAuditDraft,
+                    audit: finalSeoAudit,
+                    primaryKeyword: effectivePrimaryKeyword,
+                    secondaryKeywords: planning.keywordPlan.secondaryKeywords,
+                    serpAnalysis,
+                    groundedResearch,
+                });
+                const checkedFinalQuality = buildFinalSeoQualityAssessment({
+                    draft: checkedAuditDraft,
+                    audit: checkedSeoAudit,
+                    primaryKeyword: effectivePrimaryKeyword,
+                    secondaryKeywords: planning.keywordPlan.secondaryKeywords,
+                    serpAnalysis,
+                    groundedResearch,
+                });
                 const wordCountBefore = finalDraft.wordCount ?? countWords(finalDraft.content);
                 const wordCountAfter = checkedDraftData.wordCount ?? countWords(checkedDraftData.content);
                 const scoreBefore = finalSeoAudit.score;
@@ -16039,7 +16438,7 @@ Rules:
                 // — the AI Checker cannot fix these by editing content, so counting them as
                 // unresolved would create a false negative in the acceptance decision.
                 const CMS_ONLY_BLOCKERS = ["set a canonical url", "set a canonical URL"];
-                const isCmsOnlyBlocker = (b: string) => CMS_ONLY_BLOCKERS.some((k) => b.toLowerCase().includes("canonical url") || b.toLowerCase().includes("canonical"));
+                const isCmsOnlyBlocker = (b: string) => CMS_ONLY_BLOCKERS.some((keyword) => b.toLowerCase().includes(keyword.toLowerCase()));
                 const blockersBeforeFiltered = finalSeoAudit.blockers.filter((b) => !isCmsOnlyBlocker(b));
                 const blockersBefore = blockersBeforeFiltered.length;
                 const blockersBeforeList = [...finalSeoAudit.blockers];
@@ -16050,6 +16449,8 @@ Rules:
                     resolvedPublishRules,
                     finalSeoAudit,
                     checkedSeoAudit,
+                    currentFinalQuality,
+                    checkedFinalQuality,
                 );
                 const blockersAfterFiltered = checkedSeoAudit.blockers.filter((b) => !isCmsOnlyBlocker(b));
                 const finalCheckerNote = buildFinalCheckerStepNote({
@@ -16207,6 +16608,54 @@ Rules:
                 );
             }
         }
+
+        const finalQualityStartedAt = getNowIso();
+        const finalQualityAssessment = buildFinalSeoQualityAssessment({
+            draft: finalAuditDraft,
+            audit: finalSeoAudit,
+            primaryKeyword: effectivePrimaryKeyword,
+            secondaryKeywords: planning.keywordPlan.secondaryKeywords,
+            serpAnalysis,
+            groundedResearch,
+        });
+        const finalQualitySummary = `Final quality ${finalQualityAssessment.score}/100 | Intent ${finalQualityAssessment.components.intentSatisfaction} | Asset ${finalQualityAssessment.components.originalValueExecution} | Cluster ${finalQualityAssessment.components.clusterFit}${finalQualityAssessment.warnings.length > 0 ? ` | Warnings: ${finalQualityAssessment.warnings.length}` : ""}`;
+        addRunStep(
+            "quality-review",
+            "Quality Review",
+            finalQualityAssessment.blockers.length > 0 ? "failed" : "completed",
+            finalQualitySummary,
+            finalQualityStartedAt,
+        );
+
+        if (jobId) {
+            const finalQualityEndTime = getNowIso();
+            await generationLogger.logStep(
+                16,
+                "Quality Review",
+                {
+                    title: finalAuditDraft.title,
+                    primaryKeyword: effectivePrimaryKeyword,
+                    searchIntent: advancedBrief.searchIntent,
+                },
+                {
+                    startedAt: finalQualityStartedAt,
+                    completedAt: finalQualityEndTime,
+                    durationMs: new Date(finalQualityEndTime).getTime() - new Date(finalQualityStartedAt).getTime(),
+                    details: finalQualityAssessment.components,
+                },
+                {
+                    status: finalQualityAssessment.blockers.length > 0 ? "failed" : "completed",
+                    summary: finalQualitySummary,
+                    data: finalQualityAssessment,
+                },
+                finalQualityAssessment.blockers.length > 0 ? finalQualityAssessment.blockers : undefined,
+            );
+        }
+
+        if (finalQualityAssessment.blockers.length > 0) {
+            throw new Error(`Quality Review failed: ${finalQualityAssessment.blockers.join(" | ")}`);
+        }
+
         const step11StartedAt = getNowIso();
         let imagePack = {
             featuredImagePrompt: "",
@@ -16293,13 +16742,13 @@ Rules:
             }
         }
 
-        // Log Step 16: Generate Image
+        // Log Step 17: Generate Image
         if (jobId) {
             const generateImageEndTime = getNowIso();
             const generateImageDuration = new Date(generateImageEndTime).getTime() - new Date(step11StartedAt).getTime();
             const imageSucceeded = imagePack.featuredImagePrompt && imagePack.featuredImagePrompt.trim().length > 0;
             await generationLogger.logStep(
-                16,
+                17,
                 "Generate Image",
                 {
                     topic: selectedTopicForRun,
@@ -16362,6 +16811,8 @@ Rules:
             faqItems: faqPack.faqItems,
             searchIntent: advancedBrief.searchIntent,
             contentType: advancedBrief.contentType,
+            contentClusterId: advancedBrief.topicalCluster || effectivePrimaryKeyword || selectedTopicForRun,
+            parentTopicSlug: effectivePrimaryKeyword || advancedBrief.topicalCluster || selectedTopicForRun,
             researchNotes: research.sourceNotes,
             externalSources: groundedResearch?.sources || [],
             generationDiagnostics: {
@@ -16385,19 +16836,23 @@ Rules:
                     metaKeywords: planning.keywordPlan.metaKeywords,
                     sectionAngles: keywordSectionAngles,
                 },
-                scorecard: buildGenerationScorecard({
-                    brief: enrichedBrief,
-                    selectedTopic: selectedTopicForRun,
-                    discovery,
-                    planning,
-                    advancedBrief,
-                    websiteIntelligence,
-                    serpAnalysis,
-                    groundedResearch,
-                    performanceInsights,
-                    fetchTrendsSource,
-                    minimumWebsiteTopicIntegrityScore: minimumWebsiteTrendFitScore,
-                }),
+                scorecard: mergeFinalQualityIntoScorecard(
+                    buildGenerationScorecard({
+                        brief: enrichedBrief,
+                        selectedTopic: selectedTopicForRun,
+                        discovery,
+                        planning,
+                        advancedBrief,
+                        websiteIntelligence,
+                        serpAnalysis,
+                        groundedResearch,
+                        performanceInsights,
+                        fetchTrendsSource,
+                        minimumWebsiteTopicIntegrityScore: minimumWebsiteTrendFitScore,
+                    }),
+                    finalQualityAssessment,
+                ),
+                finalQuality: finalQualityAssessment,
                 sourceUsage: {
                     usedWebsiteIntelligence: Boolean(websiteIntelligence),
                     usedLiveTrends:
@@ -18329,6 +18784,7 @@ Title direction: ${advancedBrief.titleDirection || "not specified"}
 CTA goal: ${getContextInferredCta(enrichedBrief.cta, advancedBrief.ctaGoal)}
 Business fit: ${advancedBrief.businessFitSummary || "not specified"}
 ${formatSeoStrategyPlanForPrompt(advancedBrief)}
+${formatTopicClusterPlanForPrompt(advancedBrief)}
 Research insights:
 ${research.researchInsights.length > 0 ? research.researchInsights.map((insight) => `- ${insight}`).join("\n") : "- Use best-practice analysis for this topic"}
 Section angles:
@@ -19203,6 +19659,7 @@ Title direction: ${advancedBrief.titleDirection || "not specified"}
 CTA goal: ${getContextInferredCta(enrichedBrief.cta, advancedBrief.ctaGoal)}
 Business fit: ${advancedBrief.businessFitSummary || "not specified"}
 ${formatSeoStrategyPlanForPrompt(advancedBrief)}
+${formatTopicClusterPlanForPrompt(advancedBrief)}
 Research insights:
 ${research.researchInsights.length > 0 ? research.researchInsights.map((insight) => `- ${insight}`).join("\n") : "- Use best-practice analysis for this topic"}
 Section angles:
@@ -19734,6 +20191,8 @@ Rules:
             faqItems: faqPack.faqItems,
             searchIntent: advancedBrief.searchIntent,
             contentType: advancedBrief.contentType,
+            contentClusterId: advancedBrief.topicalCluster || effectivePrimaryKeyword || selectedTopicForRun,
+            parentTopicSlug: effectivePrimaryKeyword || advancedBrief.topicalCluster || selectedTopicForRun,
             researchNotes: research.sourceNotes,
             externalSources: groundedResearch?.sources || [],
             seoScore: planning.seo.score,
@@ -19840,6 +20299,7 @@ Selected topic: ${selectedTopicForRun}
 Source summary: ${discovery.sourceSummary || "Not provided"}
 Business fit: ${advancedBrief.businessFitSummary || "not specified"}
 ${formatSeoStrategyPlanForPrompt(advancedBrief)}
+${formatTopicClusterPlanForPrompt(advancedBrief, internalLinkSuggestions)}
 Target audience: ${getContextInferredAudience(enrichedBrief.audience, advancedBrief.targetAudience)}
 Tone direction: ${getContextInferredTone(enrichedBrief.tone, advancedBrief.toneDirection)}
 CTA goal: ${getContextInferredCta(enrichedBrief.cta, advancedBrief.ctaGoal)}
@@ -20106,6 +20566,22 @@ Rules:
                 const checkedSeoAudit = getBlogStudioSeoAudit(checkedAuditDraft, settings, resolvedPublishRules);
                 checkedDraftData.seoScore = checkedSeoAudit.score;
                 checkedAuditDraft.seoScore = checkedSeoAudit.score;
+                const currentFinalQuality = buildFinalSeoQualityAssessment({
+                    draft: finalAuditDraft,
+                    audit: finalSeoAudit,
+                    primaryKeyword: effectivePrimaryKeyword,
+                    secondaryKeywords: planning.keywordPlan.secondaryKeywords,
+                    serpAnalysis,
+                    groundedResearch,
+                });
+                const checkedFinalQuality = buildFinalSeoQualityAssessment({
+                    draft: checkedAuditDraft,
+                    audit: checkedSeoAudit,
+                    primaryKeyword: effectivePrimaryKeyword,
+                    secondaryKeywords: planning.keywordPlan.secondaryKeywords,
+                    serpAnalysis,
+                    groundedResearch,
+                });
                 const acceptedFinalCheckerRevision = shouldUseFinalCheckerRevision(
                     finalAuditDraft,
                     checkedAuditDraft,
@@ -20113,6 +20589,8 @@ Rules:
                     resolvedPublishRules,
                     finalSeoAudit,
                     checkedSeoAudit,
+                    currentFinalQuality,
+                    checkedFinalQuality,
                 );
                 const blockersAfterFiltered = checkedSeoAudit.blockers.filter((blocker) => !blocker.toLowerCase().includes("canonical"));
                 const finalCheckerNote = buildFinalCheckerStepNote({
@@ -20193,6 +20671,53 @@ Rules:
                     : "Final AI checker skipped because the draft content is empty.",
                 finalCheckerStartedAt,
             );
+        }
+
+        const finalQualityStartedAt = getNowIso();
+        const finalQualityAssessment = buildFinalSeoQualityAssessment({
+            draft: finalAuditDraft,
+            audit: finalSeoAudit,
+            primaryKeyword: effectivePrimaryKeyword,
+            secondaryKeywords: planning.keywordPlan.secondaryKeywords,
+            serpAnalysis,
+            groundedResearch,
+        });
+        const finalQualitySummary = `Final quality ${finalQualityAssessment.score}/100 | Intent ${finalQualityAssessment.components.intentSatisfaction} | Asset ${finalQualityAssessment.components.originalValueExecution} | Cluster ${finalQualityAssessment.components.clusterFit}${finalQualityAssessment.warnings.length > 0 ? ` | Warnings: ${finalQualityAssessment.warnings.length}` : ""}`;
+        addRunStep(
+            "quality-review",
+            "Quality Review",
+            finalQualityAssessment.blockers.length > 0 ? "failed" : "completed",
+            finalQualitySummary,
+            finalQualityStartedAt,
+        );
+
+        if (jobId) {
+            const finalQualityEndTime = getNowIso();
+            await generationLogger.logStep(
+                16,
+                "Quality Review",
+                {
+                    title: finalAuditDraft.title,
+                    primaryKeyword: effectivePrimaryKeyword,
+                    searchIntent: advancedBrief.searchIntent,
+                },
+                {
+                    startedAt: finalQualityStartedAt,
+                    completedAt: finalQualityEndTime,
+                    durationMs: new Date(finalQualityEndTime).getTime() - new Date(finalQualityStartedAt).getTime(),
+                    details: finalQualityAssessment.components,
+                },
+                {
+                    status: finalQualityAssessment.blockers.length > 0 ? "failed" : "completed",
+                    summary: finalQualitySummary,
+                    data: finalQualityAssessment,
+                },
+                finalQualityAssessment.blockers.length > 0 ? finalQualityAssessment.blockers : undefined,
+            );
+        }
+
+        if (finalQualityAssessment.blockers.length > 0) {
+            throw new Error(`Quality Review failed: ${finalQualityAssessment.blockers.join(" | ")}`);
         }
 
         const imageStartedAt = getNowIso();
@@ -20294,6 +20819,8 @@ Return JSON only with this shape:
             faqItems: faqPack.faqItems,
             searchIntent: advancedBrief.searchIntent,
             contentType: advancedBrief.contentType,
+            contentClusterId: advancedBrief.topicalCluster || effectivePrimaryKeyword || selectedTopicForRun,
+            parentTopicSlug: effectivePrimaryKeyword || advancedBrief.topicalCluster || selectedTopicForRun,
             researchNotes: research.sourceNotes,
             externalSources: groundedResearch?.sources || [],
             generationDiagnostics: {
@@ -20317,19 +20844,23 @@ Return JSON only with this shape:
                     metaKeywords: planning.keywordPlan.metaKeywords,
                     sectionAngles: keywordSectionAngles,
                 },
-                scorecard: buildGenerationScorecard({
-                    brief: enrichedBrief,
-                    selectedTopic: selectedTopicForRun,
-                    discovery,
-                    planning,
-                    advancedBrief,
-                    websiteIntelligence,
-                    serpAnalysis,
-                    groundedResearch,
-                    performanceInsights,
-                    fetchTrendsSource,
-                    minimumWebsiteTopicIntegrityScore: minimumWebsiteTrendFitScore,
-                }),
+                scorecard: mergeFinalQualityIntoScorecard(
+                    buildGenerationScorecard({
+                        brief: enrichedBrief,
+                        selectedTopic: selectedTopicForRun,
+                        discovery,
+                        planning,
+                        advancedBrief,
+                        websiteIntelligence,
+                        serpAnalysis,
+                        groundedResearch,
+                        performanceInsights,
+                        fetchTrendsSource,
+                        minimumWebsiteTopicIntegrityScore: minimumWebsiteTrendFitScore,
+                    }),
+                    finalQualityAssessment,
+                ),
+                finalQuality: finalQualityAssessment,
                 sourceUsage: {
                     usedWebsiteIntelligence: Boolean(websiteIntelligence),
                     usedLiveTrends:

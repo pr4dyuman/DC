@@ -176,7 +176,26 @@ export type BlogStudioGenerationScorecard = {
     strategyReadiness?: number;
     originalValue?: number;
     proofStrength?: number;
+    sourceDepth?: number;
     conversionFit?: number;
+    finalQuality?: number;
+    intentSatisfaction?: number;
+    originalValueExecution?: number;
+    clusterFit?: number;
+};
+
+export type BlogStudioFinalQualityAssessment = {
+    score: number;
+    warnings: string[];
+    blockers: string[];
+    components: {
+        intentSatisfaction: number;
+        originalValueExecution: number;
+        proofStrength: number;
+        clusterFit: number;
+        conversionFit: number;
+        structureQuality: number;
+    };
 };
 
 export type BlogStudioGenerationSourceUsage = {
@@ -851,6 +870,7 @@ export type BlogStudioGenerationDiagnostics = {
     businessFitWarnings: string[];
     keywordPlan?: BlogStudioGenerationKeywordPlan;
     scorecard?: BlogStudioGenerationScorecard;
+    finalQuality?: BlogStudioFinalQualityAssessment;
     sourceUsage?: BlogStudioGenerationSourceUsage;
     steps: BlogStudioGenerationStepInsight[];
 };
