@@ -52,6 +52,30 @@ test("seo strategy readiness blocks off-lane YMYL topics without expert proof", 
     );
 });
 
+test("seo strategy readiness treats a thin source pack as a quality risk", () => {
+    const assessment = buildSeoStrategyReadinessAssessment({
+        sourceMode: "website",
+        topic: "AI blog workflow for service businesses",
+        businessFitScore: 88,
+        topicIntegrityScore: 86,
+        websiteTopicAccepted: true,
+        rankingDifficulty: "Medium competition",
+        searchIntent: "informational",
+        dominantContentFormat: "guide / checklist",
+        contentGapCount: 4,
+        groundedSourceCount: 1,
+        highTrustSourceCount: 0,
+        topicalCluster: "AI Blogger service",
+        originalValueAsset: "A practical blog workflow quality scorecard",
+        conversionPath: "Invite readers to audit their AI Blogger workflow",
+    });
+
+    assert.ok(assessment.components.sourceDepth < 70);
+    assert.ok(
+        assessment.warnings.some((warning) => /Source pack is too thin/i.test(warning)),
+    );
+});
+
 test("advanced brief parser tolerates array and object fields from model JSON", () => {
     const brief = parseAdvancedBriefResponse(
         JSON.stringify({
