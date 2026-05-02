@@ -243,8 +243,13 @@ const AI_PIPELINE_STEPS: PipelineStepDefinition[] = [
     },
     {
         key: "final-ai-checker",
-        label: "Quality Review",
+        label: "AI Draft Check",
         icon: ShieldCheck,
+    },
+    {
+        key: "quality-review",
+        label: "SEO Quality Gate",
+        icon: Check,
     },
     {
         key: "generate-image",
@@ -407,13 +412,22 @@ const PIPELINE_STAGE_COPY: Record<string, PipelineStageCopy> = {
         legacyLabels: ["Write Blog"],
     },
     "final-ai-checker": {
-        title: "Quality Review",
+        title: "AI Draft Check",
         pending: "Waiting to check the finished draft.",
-        active: "Reviewing SEO score, publishing blockers, claims, links, and quality signals.",
-        completed: "Quality checks are complete.",
+        active: "Reviewing the draft for fixable SEO, claim, link, and tone issues.",
+        completed: "AI draft checks are complete.",
         skipped: "Quality review was skipped.",
-        failed: "Quality review needs attention.",
+        failed: "AI draft check needs attention.",
         legacyLabels: ["Final AI Checker"],
+    },
+    "quality-review": {
+        title: "SEO Quality Gate",
+        pending: "Waiting to score the final article against the SEO strategy.",
+        active: "Scoring search intent, original asset execution, proof, cluster fit, structure, and conversion path.",
+        completed: "The final SEO quality gate passed.",
+        skipped: "The SEO quality gate was skipped.",
+        failed: "The final article did not pass the SEO quality gate.",
+        legacyLabels: ["Quality Review"],
     },
     "generate-image": {
         title: "Image Direction",

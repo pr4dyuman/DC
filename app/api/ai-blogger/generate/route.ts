@@ -319,9 +319,18 @@ export async function POST(request: Request) {
                 releaseLocalPipelineJob(jobId);
             }
         } else {
-            // Fallback: run in-process (original behaviour).
-            // This is a dangling promise — less reliable on Vercel.
-            console.warn(`[GENERATE-ROUTE] AI_BLOGGER_WORKER_SECRET not set — running pipeline in-process (legacy mode)`);
+            if (process.env.NODE_ENV === "production") {
+                const message = "AI Blogger worker is not configured. Set AI_BLOGGER_WORKER_SECRET so generation runs in phase-based worker functions.";
+                console.error(`[GENERATE-ROUTE] ${message}`);
+                await emitPipelineEvent(jobId, { type: "error", message });
+                await awaitPipelineJobPersistence(jobId);
+                releaseLocalPipelineJob(jobId);
+                return NextResponse.json({ ok: false, error: message, jobId }, { status: 500 });
+            }
+
+            // Fallback: run in-process in local development only.
+            // This is a dangling promise, so it is intentionally blocked in production.
+            console.warn(`[GENERATE-ROUTE] AI_BLOGGER_WORKER_SECRET not set; running pipeline in-process for local development.`);
             generateBlogStudioDraftImpl(
                 { id: agency.id, name: agency.name },
                 actor,
