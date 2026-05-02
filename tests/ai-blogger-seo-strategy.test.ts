@@ -86,3 +86,20 @@ test("advanced brief parser tolerates array and object fields from model JSON", 
     assert.ok(brief.internalLinkPlan.some((item) => item.includes("SEO services")));
     assert.equal(brief.avoidAngles[0], "Alcohol consumption advice");
 });
+
+test("advanced brief parser preserves intentional line breaks in text fields", () => {
+    const brief = parseAdvancedBriefResponse(
+        JSON.stringify({
+            businessFitSummary: "Line one\nLine two",
+            businessFitScore: 80,
+        }),
+        {
+            audience: "Marketers",
+            ctaGoal: "Review the content plan",
+            toneDirection: "Practical",
+            searchIntent: "informational",
+        },
+    );
+
+    assert.equal(brief.businessFitSummary, "Line one\nLine two");
+});

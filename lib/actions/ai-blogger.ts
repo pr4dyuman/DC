@@ -849,7 +849,7 @@ function coerceTextValue(value: unknown, depth = 0): string {
 }
 
 function sanitizeText(value: unknown, maxLength: number, fallback = "") {
-    const normalizedValue = coerceTextValue(value).replace(/\s+/g, " ").trim();
+    const normalizedValue = coerceTextValue(value).trim();
     if (!normalizedValue) return fallback;
     return normalizedValue.slice(0, maxLength);
 }
