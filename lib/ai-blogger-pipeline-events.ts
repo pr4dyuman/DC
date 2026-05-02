@@ -542,7 +542,7 @@ export async function claimPipelineJobPhase(
                 "execution.claimExpiresAt": claimExpiresAt,
             },
         },
-        { new: true },
+        { returnDocument: "after" },
     ).lean();
 
     if (claimedDoc) {

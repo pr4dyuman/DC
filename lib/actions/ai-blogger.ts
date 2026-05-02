@@ -7632,9 +7632,56 @@ function getMarketingMetaKeywords(post: BlogStudioPost) {
     const keywords = sanitizeStringArray(
         [...post.tags, post.brief.primaryKeyword || ""],
         12,
-        40,
+        80,
     );
     return keywords.join(", ");
+}
+
+function normalizeMarketingBrandSpelling(value: string | undefined) {
+    return (value || "").replace(/\bDigitalcorvids\b(?!\.)/gi, "Digital Corvids");
+}
+
+function normalizeSchemaOrganizationName(value: string | undefined, fallback = "Digital Corvids") {
+    const name = sanitizeText(value, 160, fallback);
+
+    if (/^digitalcorvids$/i.test(name)) {
+        return "Digital Corvids";
+    }
+
+    return name || "Digital Corvids";
+}
+
+function normalizeMarketingQuestion(value: string | undefined) {
+    const question = sanitizeText(value, 180)
+        .replace(/\s+/g, " ")
+        .trim();
+
+    if (!question || question.length < 12) {
+        return "";
+    }
+
+    return question.endsWith("?") ? question : `${question}?`;
+}
+
+function buildMarketingPeopleAlsoAsk(input: {
+    faqItems: BlogStudioFaqItem[];
+    serpPeopleAlsoAsk?: string[];
+}) {
+    const faqQuestions = input.faqItems
+        .map((item) => normalizeMarketingQuestion(item.question))
+        .filter(Boolean);
+
+    if (faqQuestions.length > 0) {
+        return Array.from(new Set(faqQuestions)).slice(0, 6);
+    }
+
+    return Array.from(
+        new Set(
+            (input.serpPeopleAlsoAsk || [])
+                .map((item) => normalizeMarketingQuestion(item))
+                .filter(Boolean),
+        ),
+    ).slice(0, 6);
 }
 
 async function getAgencyAIBloggerRuntimeConfig(agencyId: string) {
@@ -19799,13 +19846,16 @@ export async function publishBlogStudioPostImpl(
         warnings: publishValidation.warningsCount,
     });
 
-    const content = sanitizeText(currentPost.content, 50000);
+    const content = normalizeMarketingBrandSpelling(sanitizeText(currentPost.content, 50000));
+    const resolvedTitle = normalizeMarketingBrandSpelling(currentPost.title);
+    const resolvedExcerpt = normalizeMarketingBrandSpelling(buildExcerpt(currentPost.excerpt, content, resolvedTitle));
 
-    const resolvedMetaTitle = currentPost.metaTitle?.trim() || currentPost.title;
-    const resolvedMetaDescription =
+    const resolvedMetaTitle = normalizeMarketingBrandSpelling(currentPost.metaTitle?.trim() || resolvedTitle);
+    const resolvedMetaDescription = normalizeMarketingBrandSpelling(
         currentPost.metaDescription?.trim() ||
-        buildMetaDescription("", currentPost.excerpt, content, currentPost.title);
-    const resolvedImageAlt = currentPost.featuredImageAlt?.trim() || currentPost.title;
+        buildMetaDescription("", resolvedExcerpt, content, resolvedTitle),
+    );
+    const resolvedImageAlt = normalizeMarketingBrandSpelling(currentPost.featuredImageAlt?.trim() || resolvedTitle);
     const resolvedImageUrl = toAbsoluteMarketingImageUrl(
         currentPost.featuredImageUrl?.trim() ||
         `${MARKETING_SITE_URL.replace(/\/+$/, "")}/ai-blogger.svg`,
@@ -19838,9 +19888,6 @@ export async function publishBlogStudioPostImpl(
             return null;
         })
         : null;
-    const resolvedPeopleAlsoAsk =
-        publishSerpAnalysis?.peopleAlsoAsk?.filter((item) => Boolean(item?.trim())).slice(0, 6) ||
-        resolvedFaqItems.map((item) => item.question);
     const resolvedSiteUrl = normalizeMarketingSiteOrigin(
         resolveBlogStudioSiteUrl({
             canonicalUrl: currentPost.canonicalUrl,
@@ -19849,21 +19896,26 @@ export async function publishBlogStudioPostImpl(
             entityModeling: aiBloggerConfig?.entityModeling,
         }) || MARKETING_SITE_URL,
     );
+    const agencyDoc = await AgencyModel.findOne({ id: agencyId }).select("name").lean();
+    const agencyName = agencyDoc?.name || "Unknown Agency";
     const resolvedOrganizationName =
-        sanitizeText(
+        normalizeSchemaOrganizationName(
             aiBloggerConfig?.entityModeling?.organizationName,
-            160,
-            effectiveTarget.label || "Publishing Target",
-        ) || "Publishing Target";
+            agencyName,
+        );
+    const resolvedPeopleAlsoAsk = buildMarketingPeopleAlsoAsk({
+        faqItems: resolvedFaqItems,
+        serpPeopleAlsoAsk: publishSerpAnalysis?.peopleAlsoAsk,
+    });
     const publishedSlug = sanitizeText(
         currentPost.slug,
         180,
         currentPost.publishedEntrySlug || currentPost.slug,
     );
     const publishBodyContent = normalizeDraftContentForStoredFaq(
-        currentPost.content || "",
+        content,
         resolvedFaqItems,
-        currentPost.content || "",
+        content,
     );
     const renderedPublishedContent = buildMarketingBlogHtml(publishBodyContent, {
         internalLinks: currentPost.internalLinks,
@@ -20001,8 +20053,6 @@ export async function publishBlogStudioPostImpl(
         currentPost.canonicalUrl,
         MARKETING_SITE_URL,
     ]);
-    const agencyDoc = await AgencyModel.findOne({ id: agencyId }).select("name").lean();
-    const agencyName = agencyDoc?.name || "Unknown Agency";
 
     const persistWebhookStatus = async (success: boolean, errorMessage = "") => {
         try {
@@ -20055,7 +20105,9 @@ export async function publishBlogStudioPostImpl(
 
         const publishedPostSnapshot: BlogStudioPost = {
             ...currentPost,
+            title: resolvedTitle,
             content: renderedPublishedContent,
+            excerpt: resolvedExcerpt,
             internalLinks: resolvedPublishedInternalLinks,
             target: effectiveTarget,
             metaTitle: resolvedMetaTitle,
@@ -20186,6 +20238,8 @@ export async function publishBlogStudioPostImpl(
                     target: effectiveTarget,
                     content: renderedPublishedContent,
                     internalLinks: resolvedPublishedInternalLinks,
+                    title: resolvedTitle,
+                    excerpt: resolvedExcerpt,
                     metaTitle: resolvedMetaTitle,
                     metaDescription: resolvedMetaDescription,
                     publishedAt: now,

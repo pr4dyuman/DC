@@ -4,7 +4,9 @@ import dbConnect from "@/lib/marketing-db";
 import { normalizeMarketingCanonicalUrl, toAbsoluteMarketingImageUrl } from "@/lib/marketing-blog-utils";
 import Blog from "@/models/marketing/Blog";
 
-export const revalidate = 3600;
+// Published blogs are stored in MongoDB, so keep the sitemap fresh for crawlers
+// immediately after a post is published or corrected.
+export const dynamic = "force-dynamic";
 
 const SITE_URL = (
     process.env.NEXT_PUBLIC_SITE_URL ||

@@ -88,8 +88,8 @@ function normalizeFaqItems(
 
     return items
         .map((item) => ({
-            question: hasNonEmptyString(item?.question) ? item.question.trim() : "",
-            answer: hasNonEmptyString(item?.answer) ? item.answer.trim() : "",
+            question: hasNonEmptyString(item?.question) ? normalizeBrandSpelling(item.question.trim()) : "",
+            answer: hasNonEmptyString(item?.answer) ? normalizeBrandSpelling(item.answer.trim()) : "",
         }))
         .filter((item) => item.question && item.answer);
 }
@@ -101,8 +101,12 @@ function normalizeQuestionList(items?: string[]) {
 
     return items
         .filter((item) => hasNonEmptyString(item))
-        .map((item) => item.trim())
+        .map((item) => normalizeBrandSpelling(item.trim()))
         .filter(Boolean);
+}
+
+function normalizeBrandSpelling(value: string) {
+    return value.replace(/\bDigitalcorvids\b(?!\.)/gi, "Digital Corvids");
 }
 
 function normalizeExternalSources(
@@ -506,8 +510,8 @@ export async function POST(request: NextRequest) {
             : "";
         const normalizedContent =
             normalizedFaqItems.length > 0
-                ? stripStandaloneFaqSection(payload.blog.content)
-                : payload.blog.content;
+                ? normalizeBrandSpelling(stripStandaloneFaqSection(payload.blog.content))
+                : normalizeBrandSpelling(payload.blog.content);
 
         const { existingBlog, matchedBy } = await resolveExistingWebhookBlog({
             sourcePostId: normalizedSourcePostId,
@@ -556,19 +560,19 @@ export async function POST(request: NextRequest) {
 
         const blogData = {
             sourcePostId: normalizedSourcePostId || undefined,
-            title: payload.blog.title,
+            title: normalizeBrandSpelling(payload.blog.title),
             slug: payload.blog.slug,
             content: normalizedContent,
             image: normalizedImage,
-            imageAlt: payload.blog.imageAlt || payload.blog.title,
-            shortDescription: payload.blog.excerpt,
-            category: payload.blog.category || "AI Blogger",
+            imageAlt: normalizeBrandSpelling(payload.blog.imageAlt || payload.blog.title),
+            shortDescription: normalizeBrandSpelling(payload.blog.excerpt),
+            category: normalizeBrandSpelling(payload.blog.category || "AI Blogger"),
             status: "published",
-            metaKeywords: hasNonEmptyString(payload.blog.metaKeywords) ? payload.blog.metaKeywords.trim() : "",
-            metaTitle: payload.blog.metaTitle,
-            metaDescription: payload.blog.metaDescription,
+            metaKeywords: hasNonEmptyString(payload.blog.metaKeywords) ? normalizeBrandSpelling(payload.blog.metaKeywords.trim()) : "",
+            metaTitle: normalizeBrandSpelling(payload.blog.metaTitle),
+            metaDescription: normalizeBrandSpelling(payload.blog.metaDescription),
             canonicalUrl: normalizedCanonicalUrl || undefined,
-            schemaMarkup: payload.blog.schemaMarkup,
+            schemaMarkup: payload.blog.schemaMarkup ? normalizeBrandSpelling(payload.blog.schemaMarkup) : payload.blog.schemaMarkup,
             faqItems: normalizedFaqItems,
             externalSources: normalizedExternalSources,
             peopleAlsoAsk: normalizedPeopleAlsoAsk,
@@ -669,6 +673,7 @@ export async function POST(request: NextRequest) {
         // Revalidate blog pages for ISR (Incremental Static Regeneration)
         try {
             revalidatePath("/blog");
+            revalidatePath("/sitemap.xml");
             if (previousSlug && previousSlug !== payload.blog.slug) {
                 revalidatePath(`/blog/${previousSlug}`);
             }

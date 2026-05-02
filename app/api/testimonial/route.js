@@ -149,7 +149,7 @@ export async function PUT(request) {
     const testimonial = await Testimonial.findByIdAndUpdate(
       id,
       updateData,
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!testimonial) {
