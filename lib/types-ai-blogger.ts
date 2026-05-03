@@ -622,6 +622,24 @@ export type BlogStudioSitePriorityPage = {
     pageScore: number;
 };
 
+export type BlogStudioSiteAuthorityProfile = {
+    siteType: string;
+    businessModel: string;
+    coreOffers: string[];
+    authorityLanes: string[];
+    adjacentLanes: string[];
+    forbiddenLanes: string[];
+    moneyPages: Array<{
+        path: string;
+        title: string;
+        category: BlogStudioSitePriorityPageCategory;
+    }>;
+    contentClusters: string[];
+    audienceSegments: string[];
+    locationSignals: string[];
+    confidenceScore: number;
+};
+
 export type BlogStudioSiteSnapshot = {
     id: string;
     agencyId: string;
@@ -633,6 +651,7 @@ export type BlogStudioSiteSnapshot = {
     faqQuestions: string[];
     priorityPaths: string[];
     priorityPages?: BlogStudioSitePriorityPage[];
+    authorityProfile?: BlogStudioSiteAuthorityProfile;
     serviceSignals: string[];
     ctaPatterns: string[];
     proofSignals: string[];
@@ -843,6 +862,7 @@ export type BlogStudioRefreshReporting = {
 export type BlogStudioFetchTrendsSource =
     | "live-google-trends"
     | "live-google-trends-fallback-key"
+    | "internet-trend-research"
     | "ai-only-discovery"
     | "ai-fallback-after-live-failure";
 

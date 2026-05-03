@@ -125,17 +125,17 @@ const sourceModeCards: Array<{
     badge?: string;
 }> = [
     {
-        value: "trending",
-        title: "Trending Topic",
-        note: "Let AI Blogger choose a timely topic and title from trend discovery.",
-        icon: Sparkles,
-        badge: "Popular",
-    },
-    {
         value: "website",
         title: "Website URL",
-        note: "Start from a live website so AI can infer services, offers, and on-site content themes.",
+        note: "Start from a live website, then use Google Trends only when a topic fits the site's authority.",
         icon: Globe,
+        badge: "Recommended",
+    },
+    {
+        value: "trending",
+        title: "Trend Assisted",
+        note: "Use live trend discovery with an optional target website to protect topical fit.",
+        icon: Sparkles,
     },
     {
         value: "keywords",
@@ -848,7 +848,7 @@ export function AIBloggerDraftBuilder({
     const [showPipelinePlan, setShowPipelinePlan] = useState(false);
 
     const [title, setTitle] = useState("");
-    const [sourceMode, setSourceMode] = useState<BlogStudioInputMode>("trending");
+    const [sourceMode, setSourceMode] = useState<BlogStudioInputMode>("website");
     const [sourceValue, setSourceValue] = useState("");
     const [targetWebsiteUrl, setTargetWebsiteUrl] = useState("");
     const [trendFocus, setTrendFocus] = useState("");
@@ -2361,7 +2361,7 @@ export function AIBloggerDraftBuilder({
                             <div className="rounded-xl border border-border/60 bg-background/40 p-3">
                                 <p className="text-xs font-semibold text-muted-foreground mb-2">Run Setup</p>
                                 <div className="space-y-1.5 text-xs text-muted-foreground">
-                                    <div><span className="font-medium text-foreground">Source:</span> {sourceMode === "website" ? "Website" : sourceMode === "trending" ? "Trending Topic" : "Keywords"} | {compactSourceSummary}</div>
+                                    <div><span className="font-medium text-foreground">Source:</span> {sourceMode === "website" ? "Website" : sourceMode === "trending" ? "Trend Assisted" : "Keywords"} | {compactSourceSummary}</div>
                                     <div><span className="font-medium text-foreground">Word target:</span> {selectedWordTarget} words {compactPrimaryKeyword && `| Keyword: ${compactPrimaryKeyword}`}</div>
                                 </div>
                             </div>

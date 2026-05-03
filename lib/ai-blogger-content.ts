@@ -28,7 +28,7 @@ export const aiBloggerGenerationModes = [
         description: "Use a company URL to infer niche, positioning, and content angle before generating topics.",
     },
     {
-        title: "Trending Topic",
+        title: "Trend Assisted",
         badge: "Fastest",
         description: "Find a trend worth covering, then turn it into a draft that still matches the brand voice.",
     },

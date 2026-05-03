@@ -2,6 +2,7 @@ import "server-only";
 
 import { BlogStudioSiteSnapshotModel, connectDB } from "./mongodb";
 import type {
+    BlogStudioSiteAuthorityProfile,
     BlogStudioSitePriorityPage,
     BlogStudioSitePriorityPageCategory,
     BlogStudioSiteSnapshot,
@@ -35,6 +36,7 @@ export type AIBloggerWebsiteIntelligence = {
     faqQuestions: string[];
     priorityPaths: string[];
     priorityPages: BlogStudioSitePriorityPage[];
+    authorityProfile?: BlogStudioSiteAuthorityProfile;
     serviceSignals: string[];
     ctaPatterns: string[];
     proofSignals: string[];
@@ -1248,6 +1250,253 @@ function buildPriorityPages(pages: CrawledPage[]): BlogStudioSitePriorityPage[] 
         .slice(0, 12);
 }
 
+function clampAuthorityScore(value: number) {
+    if (!Number.isFinite(value)) {
+        return 0;
+    }
+
+    return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function isCommercialPriorityCategory(category: BlogStudioSitePriorityPageCategory) {
+    return [
+        "service",
+        "product",
+        "collection",
+        "category",
+        "brand",
+        "solution",
+        "pricing",
+        "industry",
+        "case-study",
+    ].includes(category);
+}
+
+function inferSiteType(input: {
+    priorityPages: BlogStudioSitePriorityPage[];
+    serviceSignals: string[];
+    topicHints: string[];
+    pageTitles: string[];
+}) {
+    const categories = input.priorityPages.map((page) => page.pageCategory);
+    const text = [
+        ...input.serviceSignals,
+        ...input.topicHints,
+        ...input.pageTitles,
+        ...input.priorityPages.flatMap((page) => [page.title, page.description, page.excerpt]),
+    ].join(" ").toLowerCase();
+
+    if (categories.some((category) => ["product", "collection", "category", "brand"].includes(category))) {
+        return "ecommerce";
+    }
+
+    if (/\b(?:software|saas|platform|app|dashboard|workflow|automation|api)\b/.test(text)) {
+        return "saas-or-software";
+    }
+
+    if (categories.some((category) => ["service", "solution", "pricing", "case-study", "industry"].includes(category))) {
+        return "service-business";
+    }
+
+    if (categories.filter((category) => category === "blog").length >= Math.max(2, categories.length / 2)) {
+        return "publisher-or-content-site";
+    }
+
+    if (/\b(?:clinic|restaurant|hotel|salon|near me|local|appointment|book now)\b/.test(text)) {
+        return "local-business";
+    }
+
+    return "general-website";
+}
+
+function inferBusinessModel(siteType: string, input: {
+    priorityPages: BlogStudioSitePriorityPage[];
+    ctaPatterns: string[];
+    serviceSignals: string[];
+}) {
+    const text = [
+        siteType,
+        ...input.ctaPatterns,
+        ...input.serviceSignals,
+        ...input.priorityPages.flatMap((page) => [page.title, page.description, page.excerpt]),
+    ].join(" ").toLowerCase();
+
+    if (siteType === "ecommerce") {
+        return "transactional-commerce";
+    }
+
+    if (/\b(?:book a call|contact us|request a quote|free consultation|get in touch|hire us|schedule)\b/.test(text)) {
+        return "lead-generation";
+    }
+
+    if (/\b(?:pricing|plans|subscription|trial|demo|sign up|try free)\b/.test(text)) {
+        return "subscription-or-demo";
+    }
+
+    if (siteType === "publisher-or-content-site") {
+        return "audience-and-content";
+    }
+
+    return "general-conversion";
+}
+
+function extractAudienceSegments(values: string[]) {
+    const text = values.join(" ");
+    const audienceMatches = Array.from(
+        text.matchAll(/\b(?:for|helping|serving|built for|made for)\s+([a-z0-9][a-z0-9\s&,-]{3,70}?)(?:\.|,|;|\||\n|$)/gi),
+        (match) => match[1],
+    );
+
+    return uniqueStrings(
+        audienceMatches
+            .map((value) => cleanText(value, 90))
+            .filter((value) => value.split(/\s+/).length <= 8),
+        8,
+        90,
+    );
+}
+
+function extractLocationSignals(values: string[]) {
+    const text = values.join(" ");
+    const locationMatches = [
+        ...Array.from(text.matchAll(/\b(?:in|near|serving)\s+([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,3})(?:,|\s|\.|$)/g), (match) => match[1]),
+        ...Array.from(text.matchAll(/\b([A-Z][A-Za-z]+,\s*[A-Z]{2})\b/g), (match) => match[1]),
+    ];
+
+    return uniqueStrings(locationMatches, 8, 80);
+}
+
+function buildForbiddenLanes(siteType: string, authorityText: string) {
+    const forbidden = [
+        "celebrity gossip",
+        "sports scores and match recaps",
+        "unrelated political commentary",
+        "viral incidents without a direct service connection",
+    ];
+    const normalized = authorityText.toLowerCase();
+
+    if (!/\b(?:finance|bank|tax|loan|insurance|investment|accounting|wealth)\b/.test(normalized)) {
+        forbidden.push("financial advice or settlement topics without site authority");
+    }
+
+    if (!/\b(?:health|medical|clinic|doctor|therapy|dentist|wellness)\b/.test(normalized)) {
+        forbidden.push("medical or health advice without site authority");
+    }
+
+    if (!/\b(?:law|legal|attorney|lawyer|compliance)\b/.test(normalized)) {
+        forbidden.push("legal advice without site authority");
+    }
+
+    if (siteType !== "ecommerce") {
+        forbidden.push("shopping deals unrelated to the site's offers");
+    }
+
+    return uniqueStrings(forbidden, 8, 120);
+}
+
+function buildWebsiteAuthorityProfile(input: {
+    sourceUrl: string;
+    pageCount: number;
+    pageTitles: string[];
+    topicHints: string[];
+    faqQuestions: string[];
+    priorityPaths: string[];
+    priorityPages: BlogStudioSitePriorityPage[];
+    serviceSignals: string[];
+    ctaPatterns: string[];
+    proofSignals: string[];
+}): BlogStudioSiteAuthorityProfile {
+    const commercialPages = input.priorityPages.filter((page) =>
+        isCommercialPriorityCategory(page.pageCategory),
+    );
+    const authoritySourceText = [
+        ...input.pageTitles,
+        ...input.topicHints,
+        ...input.serviceSignals,
+        ...input.faqQuestions,
+        ...input.proofSignals,
+        ...input.priorityPages.flatMap((page) => [
+            page.title,
+            page.description,
+            page.excerpt,
+            ...page.highlights,
+            ...page.serviceSignals,
+        ]),
+    ];
+    const siteType = inferSiteType(input);
+    const businessModel = inferBusinessModel(siteType, input);
+    const coreOffers = uniqueStrings(
+        [
+            ...commercialPages.flatMap((page) => [page.title, ...page.serviceSignals]),
+            ...input.serviceSignals,
+        ].filter((value) => isMeaningfulTopicHint(value) || value.split(/\s+/).length >= 2),
+        16,
+        120,
+    );
+    const authorityLanes = uniqueStrings(
+        [
+            ...coreOffers,
+            ...commercialPages.flatMap((page) => [
+                page.description,
+                page.excerpt,
+                ...page.highlights,
+            ]),
+            ...input.topicHints,
+        ].filter(isMeaningfulTopicHint),
+        18,
+        140,
+    );
+    const adjacentLanes = uniqueStrings(
+        [
+            ...input.faqQuestions,
+            ...input.topicHints,
+            ...input.pageTitles,
+        ].filter(isMeaningfulTopicHint),
+        14,
+        140,
+    );
+    const moneyPages = commercialPages.slice(0, 12).map((page) => ({
+        path: page.path,
+        title: page.title,
+        category: page.pageCategory,
+    }));
+    const contentClusters = uniqueStrings(
+        [
+            ...input.priorityPages
+                .filter((page) => ["blog", "faq", "case-study", "industry"].includes(page.pageCategory))
+                .flatMap((page) => [page.title, page.description]),
+            ...input.topicHints,
+        ].filter(isMeaningfulTopicHint),
+        16,
+        140,
+    );
+    const audienceSegments = extractAudienceSegments(authoritySourceText);
+    const locationSignals = extractLocationSignals(authoritySourceText);
+    const confidenceScore = clampAuthorityScore(
+        18 +
+        Math.min(22, input.pageCount * 4) +
+        Math.min(18, input.priorityPages.length * 3) +
+        Math.min(16, coreOffers.length * 3) +
+        Math.min(12, authorityLanes.length * 2) +
+        Math.min(8, input.proofSignals.length * 2) +
+        Math.min(6, input.ctaPatterns.length * 2),
+    );
+
+    return {
+        siteType,
+        businessModel,
+        coreOffers,
+        authorityLanes,
+        adjacentLanes,
+        forbiddenLanes: buildForbiddenLanes(siteType, authoritySourceText.join(" ")),
+        moneyPages,
+        contentClusters,
+        audienceSegments,
+        locationSignals,
+        confidenceScore,
+    };
+}
+
 function buildTopicHints(pages: CrawledPage[]) {
     return uniqueStrings(
         sortPagesByScore(pages).flatMap((page) => [
@@ -1321,6 +1570,7 @@ function toWebsiteIntelligence(snapshot: Pick<
     | "faqQuestions"
     | "priorityPaths"
     | "priorityPages"
+    | "authorityProfile"
     | "serviceSignals"
     | "ctaPatterns"
     | "proofSignals"
@@ -1336,6 +1586,18 @@ function toWebsiteIntelligence(snapshot: Pick<
         faqQuestions: snapshot.faqQuestions,
         priorityPaths: snapshot.priorityPaths,
         priorityPages: snapshot.priorityPages || [],
+        authorityProfile: snapshot.authorityProfile || buildWebsiteAuthorityProfile({
+            sourceUrl: snapshot.sourceUrl,
+            pageCount: snapshot.pageCount,
+            pageTitles: snapshot.pageTitles || [],
+            topicHints: snapshot.topicHints || [],
+            faqQuestions: snapshot.faqQuestions || [],
+            priorityPaths: snapshot.priorityPaths || [],
+            priorityPages: snapshot.priorityPages || [],
+            serviceSignals: snapshot.serviceSignals || [],
+            ctaPatterns: snapshot.ctaPatterns || [],
+            proofSignals: snapshot.proofSignals || [],
+        }),
         serviceSignals: snapshot.serviceSignals || [],
         ctaPatterns: snapshot.ctaPatterns || [],
         proofSignals: snapshot.proofSignals || [],
@@ -1407,6 +1669,7 @@ async function storeWebsiteIntelligenceSnapshot(
                 faqQuestions: intelligence.faqQuestions,
                 priorityPaths: intelligence.priorityPaths,
                 priorityPages: intelligence.priorityPages,
+                authorityProfile: intelligence.authorityProfile,
                 serviceSignals: intelligence.serviceSignals,
                 ctaPatterns: intelligence.ctaPatterns,
                 proofSignals: intelligence.proofSignals,
@@ -1572,19 +1835,39 @@ export async function getAIBloggerWebsiteIntelligence(
     }
 
     const rankedPages = sortPagesByScore(fetchedPages);
+    const pageTitles = uniqueStrings(rankedPages.map((page) => page.title), 50, 160);
+    const topicHints = buildTopicHints(rankedPages);
+    const faqQuestions = uniqueStrings(rankedPages.flatMap((page) => page.faqQuestions), 20, 180);
+    const priorityPaths = buildPriorityPaths(rankedPages);
+    const priorityPages = buildPriorityPages(rankedPages);
+    const serviceSignals = uniqueStrings(rankedPages.flatMap((page) => page.serviceSignals), 20, 140);
+    const ctaPatterns = uniqueStrings(rankedPages.flatMap((page) => page.ctaPatterns), 16, 140);
+    const proofSignals = uniqueStrings(rankedPages.flatMap((page) => page.proofSignals), 16, 160);
 
     const intelligence: AIBloggerWebsiteIntelligence = {
         sourceUrl: rawUrl.trim(),
         normalizedUrl: sourceUrl.toString(),
         pageCount: rankedPages.length,
-        pageTitles: uniqueStrings(rankedPages.map((page) => page.title), 50, 160),
-        topicHints: buildTopicHints(rankedPages),
-        faqQuestions: uniqueStrings(rankedPages.flatMap((page) => page.faqQuestions), 20, 180),
-        priorityPaths: buildPriorityPaths(rankedPages),
-        priorityPages: buildPriorityPages(rankedPages),
-        serviceSignals: uniqueStrings(rankedPages.flatMap((page) => page.serviceSignals), 20, 140),
-        ctaPatterns: uniqueStrings(rankedPages.flatMap((page) => page.ctaPatterns), 16, 140),
-        proofSignals: uniqueStrings(rankedPages.flatMap((page) => page.proofSignals), 16, 160),
+        pageTitles,
+        topicHints,
+        faqQuestions,
+        priorityPaths,
+        priorityPages,
+        authorityProfile: buildWebsiteAuthorityProfile({
+            sourceUrl: sourceUrl.toString(),
+            pageCount: rankedPages.length,
+            pageTitles,
+            topicHints,
+            faqQuestions,
+            priorityPaths,
+            priorityPages,
+            serviceSignals,
+            ctaPatterns,
+            proofSignals,
+        }),
+        serviceSignals,
+        ctaPatterns,
+        proofSignals,
         summary: buildSummary(sourceUrl, rankedPages, maxPages),
         cacheStatus: "live",
         refreshedAt: new Date().toISOString(),

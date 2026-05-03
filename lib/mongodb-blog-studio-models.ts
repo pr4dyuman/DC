@@ -11,6 +11,7 @@ import type {
     BlogStudioSchedule,
     BlogStudioExternalSource,
     BlogStudioSerpSnapshot,
+    BlogStudioSiteAuthorityProfile,
     BlogStudioSitePriorityPage,
     BlogStudioSiteSnapshot,
     BlogStudioSettings,
@@ -196,6 +197,7 @@ const BlogStudioGenerationDiagnosticsSchema = new Schema(
             enum: [
                 "live-google-trends",
                 "live-google-trends-fallback-key",
+                "internet-trend-research",
                 "ai-only-discovery",
                 "ai-fallback-after-live-failure",
             ],
@@ -586,6 +588,33 @@ const BlogStudioSiteSnapshotSchema = new Schema<BlogStudioSiteSnapshot>(
             },
             { _id: false }
         )], default: [] },
+        authorityProfile: {
+            type: new Schema<BlogStudioSiteAuthorityProfile>(
+                {
+                    siteType: { type: String, default: "" },
+                    businessModel: { type: String, default: "" },
+                    coreOffers: [{ type: String }],
+                    authorityLanes: [{ type: String }],
+                    adjacentLanes: [{ type: String }],
+                    forbiddenLanes: [{ type: String }],
+                    moneyPages: [{
+                        path: { type: String, default: "" },
+                        title: { type: String, default: "" },
+                        category: {
+                            type: String,
+                            enum: ["service", "product", "collection", "category", "brand", "solution", "case-study", "pricing", "industry", "blog", "faq", "about", "contact", "home", "general"],
+                            default: "general",
+                        },
+                    }],
+                    contentClusters: [{ type: String }],
+                    audienceSegments: [{ type: String }],
+                    locationSignals: [{ type: String }],
+                    confidenceScore: { type: Number, default: 0 },
+                },
+                { _id: false },
+            ),
+            default: undefined,
+        },
         serviceSignals: [{ type: String }],
         ctaPatterns: [{ type: String }],
         proofSignals: [{ type: String }],

@@ -603,6 +603,31 @@ test("pure trending mode selects the top viral trend when no fit hints are suppl
     }
 });
 
+test("custom keyword mode does not select unrelated live trends", () => {
+    const unrelatedTrend: AIBloggerViralTrendSignal = {
+        ...buildTrend(
+            "championship final",
+            ["Sports"],
+            ["live score", "match highlights"],
+            ["final score", "sports highlights"],
+        ),
+        score: 92,
+        fitScore: 0,
+        viralScore: 96,
+        acceptedForTrendFirst: false,
+        rejectionReasons: ["site-fit below 55"],
+    };
+    const signals = buildTrendSignals([unrelatedTrend]);
+
+    const stage = buildTrendFirstDiscoveryStage({
+        trendSignals: signals,
+        runtimeConfig: testRuntimeConfig,
+        sourceMode: "keywords",
+    });
+
+    assert.equal(stage, null);
+});
+
 test("trend-first lock is disabled for accepted trends that duplicate recent topics", () => {
     const duplicateTrend: AIBloggerViralTrendSignal = {
         ...buildTrend(

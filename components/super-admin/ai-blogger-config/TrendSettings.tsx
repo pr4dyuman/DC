@@ -29,7 +29,7 @@ export default function TrendSettings({ config, setConfig, visibleKeys, toggleKe
                         <div>
                             <h2 className="text-lg font-semibold text-foreground">Live Trends Provider</h2>
                             <p className="text-sm text-muted-foreground">
-                                Powers the real Google Trends fetch for Trending Topic mode and the first trend-scoring step.
+                                Powers the real Google Trends fetch for Trend Assisted mode and the first trend-scoring step.
                             </p>
                         </div>
                     </div>

@@ -157,6 +157,10 @@ test("website intelligence classifies ecommerce collection, product, and brand p
         assert.equal(collectionPage?.pageCategory, "collection");
         assert.equal(brandPage?.pageCategory, "brand");
         assert.ok(intelligence.serviceSignals.some((signal) => signal.toLowerCase().includes("nike air zoom pegasus 41")));
+        assert.equal(intelligence.authorityProfile?.siteType, "ecommerce");
+        assert.equal(intelligence.authorityProfile?.businessModel, "transactional-commerce");
+        assert.ok(intelligence.authorityProfile?.authorityLanes.some((lane) => lane.toLowerCase().includes("running shoes")));
+        assert.ok(intelligence.authorityProfile?.moneyPages.some((page) => page.path === "/nike-air-zoom-pegasus-41"));
     } finally {
         globalThis.fetch = originalFetch;
     }

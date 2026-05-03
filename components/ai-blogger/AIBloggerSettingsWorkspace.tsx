@@ -398,7 +398,7 @@ export function AIBloggerSettingsWorkspace({
     const [scheduleName, setScheduleName] = useState("");
     const [scheduleStatus, setScheduleStatus] = useState<BlogStudioScheduleStatus>("active");
     const [scheduleCadence, setScheduleCadence] = useState<BlogStudioScheduleCadence>("weekly");
-    const [scheduleSourceMode, setScheduleSourceMode] = useState<BlogStudioInputMode>("trending");
+    const [scheduleSourceMode, setScheduleSourceMode] = useState<BlogStudioInputMode>("website");
     const [scheduleSourceValue, setScheduleSourceValue] = useState("");
     const [scheduleTrendFocus, setScheduleTrendFocus] = useState("");
     const [scheduleKeyword, setScheduleKeyword] = useState("");
@@ -446,7 +446,7 @@ export function AIBloggerSettingsWorkspace({
         setScheduleName("");
         setScheduleStatus("active");
         setScheduleCadence("weekly");
-        setScheduleSourceMode("trending");
+        setScheduleSourceMode("website");
         setScheduleSourceValue("");
         setScheduleTrendFocus("");
         setScheduleKeyword("");
@@ -1296,7 +1296,7 @@ export function AIBloggerSettingsWorkspace({
                                                 <Select value={scheduleSourceMode} onValueChange={(value) => setScheduleSourceMode(value as BlogStudioInputMode)}>
                                                     <SelectContent>
                                                         <SelectItem value="website">Website Brief</SelectItem>
-                                                        <SelectItem value="trending">Trending Topic</SelectItem>
+                                                        <SelectItem value="trending">Trend Assisted</SelectItem>
                                                         <SelectItem value="keywords">Keyword Cluster</SelectItem>
                                                     </SelectContent>
                                                 </Select>

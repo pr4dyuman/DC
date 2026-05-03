@@ -25,7 +25,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
 
 const sourceLabels: Record<BlogStudioInputMode, string> = {
     website: "Website Brief",
-    trending: "Trending Topic",
+    trending: "Trend Assisted",
     keywords: "Keyword Cluster",
 };
 
