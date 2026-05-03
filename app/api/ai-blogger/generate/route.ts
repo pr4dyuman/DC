@@ -47,6 +47,18 @@ function getAppBaseUrl(request?: Request): string {
     return "http://localhost:3000";
 }
 
+function shouldUseDedicatedWorkerDispatch(workerSecret: string | undefined): workerSecret is string {
+    if (!workerSecret) {
+        return false;
+    }
+
+    if (process.env.NODE_ENV === "development") {
+        return process.env.AI_BLOGGER_USE_HTTP_WORKER_LOCAL === "true";
+    }
+
+    return true;
+}
+
 async function readDispatchFailureMessage(label: string, response: Response): Promise<string> {
     let detail = "";
     try {
@@ -193,10 +205,11 @@ export async function POST(request: Request) {
         const aiBloggerConfig = await getAgencyAIBloggerConfigServer();
         const crawlConfig = aiBloggerConfig?.crawl;
 
-        // Prefer the dedicated worker endpoint when the secret is configured.
-        // Falls back to the original in-process execution if not.
+        // Prefer the dedicated worker endpoint in production when the secret is configured.
+        // Local dev runs in-process by default because localhost can resolve to a different
+        // Node server when multiple projects bind IPv4/IPv6 on the same port.
         const workerSecret = process.env.AI_BLOGGER_WORKER_SECRET;
-        if (workerSecret) {
+        if (shouldUseDedicatedWorkerDispatch(workerSecret)) {
             await updatePipelineJobExecution(jobId, {
                 phase: "research",
                 request: {
@@ -310,14 +323,9 @@ export async function POST(request: Request) {
                 return NextResponse.json({ ok: false, error: message, jobId }, { status: 502 });
             }
 
-            // In production (Vercel), remove the in-memory job so the SSE stream
-            // falls back to MongoDB polling — the worker runs on a separate serverless
-            // instance and won't share the EventEmitter.
-            // In development (localhost), keep the in-memory job because the worker
-            // runs in the same Node.js process and events flow via the shared emitter.
-            if (process.env.NODE_ENV !== "development") {
-                releaseLocalPipelineJob(jobId);
-            }
+            // HTTP worker dispatch does not share this route's in-memory EventEmitter,
+            // so the SSE stream should fall back to MongoDB polling.
+            releaseLocalPipelineJob(jobId);
         } else {
             if (process.env.NODE_ENV === "production") {
                 const message = "AI Blogger worker is not configured. Set AI_BLOGGER_WORKER_SECRET so generation runs in phase-based worker functions.";
@@ -330,7 +338,11 @@ export async function POST(request: Request) {
 
             // Fallback: run in-process in local development only.
             // This is a dangling promise, so it is intentionally blocked in production.
-            console.warn(`[GENERATE-ROUTE] AI_BLOGGER_WORKER_SECRET not set; running pipeline in-process for local development.`);
+            console.warn(
+                workerSecret
+                    ? `[GENERATE-ROUTE] Local HTTP worker dispatch disabled; running pipeline in-process for development. Set AI_BLOGGER_USE_HTTP_WORKER_LOCAL=true to test worker endpoints.`
+                    : `[GENERATE-ROUTE] AI_BLOGGER_WORKER_SECRET not set; running pipeline in-process for local development.`,
+            );
             generateBlogStudioDraftImpl(
                 { id: agency.id, name: agency.name },
                 actor,
