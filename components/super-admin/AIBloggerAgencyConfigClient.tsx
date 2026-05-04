@@ -1,15 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import {
+    Activity,
     AlertCircle,
     ArrowLeft,
+    BookOpenCheck,
     Brain,
     Check,
+    DatabaseZap,
     Loader2,
+    Route,
     Save,
+    ShieldCheck,
     Trash2,
+    type LucideIcon,
 } from "lucide-react";
 
 import {
@@ -21,6 +28,7 @@ import {
     updateAgencyAIBloggerConfigSuperAdmin,
 } from "@/lib/actions/super-admin";
 import {
+    AI_BLOGGER_STAGE_KEYS,
     getDefaultAIBloggerConfig,
     getDefaultAIBloggerGroundedResearchConfig,
     getDefaultAIBloggerImageGenerationConfig,
@@ -50,7 +58,81 @@ import {
     type AIBloggerPresetKey,
     type KeyVisibilityState,
     AI_BLOGGER_PRESET_META,
+    getStageConfigStatus,
 } from "./ai-blogger-config";
+
+type SettingsMapItem = {
+    id: string;
+    label: string;
+    description: string;
+    icon: LucideIcon;
+    status: string;
+};
+
+type SettingsGroupProps = {
+    id: string;
+    icon: LucideIcon;
+    eyebrow: string;
+    title: string;
+    description: string;
+    children: ReactNode;
+};
+
+function SettingsGroup({ id, icon: Icon, eyebrow, title, description, children }: SettingsGroupProps) {
+    return (
+        <section id={id} className="scroll-mt-6 space-y-4">
+            <div className="flex items-start gap-4 rounded-2xl border border-border bg-card/80 p-5 shadow-sm">
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{eyebrow}</p>
+                    <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+                    <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
+                </div>
+            </div>
+            <div className="space-y-4">{children}</div>
+        </section>
+    );
+}
+
+function SettingsMap({ items }: { items: SettingsMapItem[] }) {
+    return (
+        <aside className="space-y-3 xl:sticky xl:top-6 xl:self-start">
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Settings Map</p>
+                    <h2 className="text-base font-semibold text-foreground">Configuration order</h2>
+                </div>
+                <nav className="mt-4 space-y-2" aria-label="AI Blogger settings sections">
+                    {items.map((item, index) => {
+                        const Icon = item.icon;
+
+                        return (
+                            <a
+                                key={item.id}
+                                href={`#${item.id}`}
+                                className="group flex gap-3 rounded-xl border border-border/70 bg-background/60 p-3 transition hover:border-primary/40 hover:bg-primary/5"
+                            >
+                                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary">
+                                    {index + 1}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                        <Icon className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                                        <p className="truncate text-sm font-medium text-foreground">{item.label}</p>
+                                    </div>
+                                    <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.description}</p>
+                                    <p className="mt-2 text-[11px] font-medium uppercase tracking-wide text-primary">{item.status}</p>
+                                </div>
+                            </a>
+                        );
+                    })}
+                </nav>
+            </div>
+        </aside>
+    );
+}
 
 /* ── Preset builder ──────────────────────────────────────────────── */
 
@@ -477,6 +559,40 @@ export default function AIBloggerAgencyConfigClient({ agencyId }: { agencyId: st
         return null;
     }, [baseAiConfig, config]);
 
+    const settingsMapItems = useMemo<SettingsMapItem[]>(
+        () => [
+            {
+                id: "command-center",
+                label: "Command Center",
+                description: "Queue health, presets, fallback behavior, and readiness checks.",
+                icon: Activity,
+                status: `${readinessChecks.filter((item) => item.ready).length}/${readinessChecks.length} ready`,
+            },
+            {
+                id: "research-intelligence",
+                label: "Research Intelligence",
+                description: "Trends, crawl depth, SERP context, and grounded source rules.",
+                icon: BookOpenCheck,
+                status: config.groundedResearch.enabled ? "Research active" : "Research optional",
+            },
+            {
+                id: "publishing-governance",
+                label: "Publishing Governance",
+                description: "Data providers, quality gates, author identity, and entity settings.",
+                icon: ShieldCheck,
+                status: `${config.publishRules.minimumSeoScore} SEO gate`,
+            },
+            {
+                id: "runtime-stages",
+                label: "Runtime Stages",
+                description: "Per-stage providers, models, prompts, keys, and final config preview.",
+                icon: Route,
+                status: `${AI_BLOGGER_STAGE_KEYS.filter((stageKey) => getStageConfigStatus(config[stageKey], baseAiConfig).label !== "Not set").length}/${AI_BLOGGER_STAGE_KEYS.length} stages`,
+            },
+        ],
+        [baseAiConfig, config, readinessChecks],
+    );
+
     const toggleKeyVisibility = (key: string) => {
         setVisibleKeys((prev) => ({ ...prev, [key]: !prev[key] }));
     };
@@ -783,56 +899,72 @@ export default function AIBloggerAgencyConfigClient({ agencyId }: { agencyId: st
                 </div>
             )}
 
-            {/* Section: Refresh Queue */}
-            <RefreshQueueSection config={config} overview={overview} />
+            <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+                <SettingsMap items={settingsMapItems} />
 
-            {/* Section: Preset Profiles */}
-            <PresetProfilesSection activePreset={activePreset} applyPreset={applyPreset} resetSection={resetSection} />
+                <div className="space-y-8">
+                    <SettingsGroup
+                        id="command-center"
+                        icon={Activity}
+                        eyebrow="Step 1"
+                        title="Command Center"
+                        description="Start here for operational health, safe presets, and the high-level readiness snapshot before changing detailed controls."
+                    >
+                        <RefreshQueueSection config={config} overview={overview} />
+                        <PresetProfilesSection activePreset={activePreset} applyPreset={applyPreset} resetSection={resetSection} />
+                        <PipelineOverviewSection
+                            {...sectionProps}
+                            baseAiConfig={baseAiConfig}
+                            runtimeInheritanceSummary={runtimeInheritanceSummary}
+                            readinessChecks={readinessChecks}
+                            readinessIssues={readinessIssues}
+                        />
+                    </SettingsGroup>
 
-            {/* Section: Review Pipeline Overview */}
-            <ReviewPipelineOverview config={config} baseAiConfig={baseAiConfig} />
+                    <SettingsGroup
+                        id="research-intelligence"
+                        icon={BookOpenCheck}
+                        eyebrow="Step 2"
+                        title="Research Intelligence"
+                        description="Control how AI Blogger understands a client website, reads search demand, studies competitors, and grounds claims before drafting."
+                    >
+                        <ReviewPipelineOverview config={config} baseAiConfig={baseAiConfig} />
+                        <TrendSettings {...sectionProps} />
+                        <CrawlSettings {...sectionProps} />
+                        <SerpSettings {...sectionProps} />
+                        <GroundedResearchSettings {...sectionProps} resetSection={resetSection} />
+                    </SettingsGroup>
 
-            {/* Section: Fallback System + Pipeline Snapshot */}
-            <PipelineOverviewSection
-                {...sectionProps}
-                baseAiConfig={baseAiConfig}
-                runtimeInheritanceSummary={runtimeInheritanceSummary}
-                readinessChecks={readinessChecks}
-                readinessIssues={readinessIssues}
-            />
+                    <SettingsGroup
+                        id="publishing-governance"
+                        icon={ShieldCheck}
+                        eyebrow="Step 3"
+                        title="Publishing Governance"
+                        description="Keep publishing safe by organizing provider connections, quality rules, author attribution, and entity signals in one place."
+                    >
+                        <DataProviderSettings {...sectionProps} resetSection={resetSection} />
+                        <PublishRulesEditor {...sectionProps} resetSection={resetSection} />
+                        <AuthorEntityEditor {...sectionProps} resetSection={resetSection} />
+                    </SettingsGroup>
 
-            {/* Section: Live Trends */}
-            <TrendSettings {...sectionProps} />
-
-            {/* Section: Website Crawl */}
-            <CrawlSettings {...sectionProps} />
-
-            {/* Section: SERP Analysis */}
-            <SerpSettings {...sectionProps} />
-
-            {/* Section: Grounded Research */}
-            <GroundedResearchSettings {...sectionProps} resetSection={resetSection} />
-
-            {/* Section: Search Console + Page Performance + Image Generation */}
-            <DataProviderSettings {...sectionProps} resetSection={resetSection} />
-
-            {/* Section: Publish Rules */}
-            <PublishRulesEditor {...sectionProps} resetSection={resetSection} />
-
-            {/* Section: Author & Entity Modeling */}
-            <AuthorEntityEditor {...sectionProps} resetSection={resetSection} />
-
-            {/* Section: AI Pipeline Stages */}
-            <PipelineStagesEditor
-                config={config}
-                setConfig={setConfig}
-                baseAiConfig={baseAiConfig}
-                visibleKeys={visibleKeys}
-                toggleKeyVisibility={toggleKeyVisibility}
-            />
-
-            {/* Footer: Pipeline Config Preview */}
-            <ConfigPipelinePreview config={config} baseAiConfig={baseAiConfig} />
+                    <SettingsGroup
+                        id="runtime-stages"
+                        icon={DatabaseZap}
+                        eyebrow="Step 4"
+                        title="Runtime Stages"
+                        description="Fine-tune every AI stage after the governance layer is clear, then confirm the final resolved configuration."
+                    >
+                        <PipelineStagesEditor
+                            config={config}
+                            setConfig={setConfig}
+                            baseAiConfig={baseAiConfig}
+                            visibleKeys={visibleKeys}
+                            toggleKeyVisibility={toggleKeyVisibility}
+                        />
+                        <ConfigPipelinePreview config={config} baseAiConfig={baseAiConfig} />
+                    </SettingsGroup>
+                </div>
+            </div>
         </div>
     );
 }

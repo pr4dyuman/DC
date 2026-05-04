@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, BookOpen, Settings, Link as LinkIcon, Loader2 } from "lucide-react";
+import { FileText, BookOpen, Settings, Link as LinkIcon, Loader2, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { getBlogStats } from "@/lib/actions/super-admin-blog-management";
 import { Button } from "@/components/ui/button";
@@ -114,10 +114,10 @@ export function SystemSettingsBlogManagementSection() {
               Manage All Blogs
             </Button>
           </Link>
-          <Link href="/super-admin/blogs/new">
+          <Link href="/super-admin/blogs">
             <Button variant="outline" className="w-full justify-start gap-2">
-              <FileText className="w-4 h-4" />
-              Create New Blog
+              <PlusCircle className="w-4 h-4" />
+              Add From Blog Manager
             </Button>
           </Link>
           <Link href="/super-admin/ai-blogger">
