@@ -31,7 +31,9 @@ const features = [
     },
 ];
 
-export default function ManageCompanySection() {
+export default function ManageCompanySection({ headingLevel = "h2" }) {
+    const HeadingTag = headingLevel === "h1" ? "h1" : "h2";
+
     return (
         <section className="bg-black text-white py-16 sm:py-20 lg:py-24 relative overflow-hidden">
             {/* Subtle background glow */}
@@ -50,11 +52,11 @@ export default function ManageCompanySection() {
                 <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center mb-16 sm:mb-20">
                     {/* Left - Text Content */}
                     <div className="space-y-6">
-                        <h2 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold uppercase leading-tight">
+                        <HeadingTag className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold uppercase leading-tight">
                             Manage Your Entire
                             <br />
                             <span className="text-[#F5EE30]">Company With AI</span>
-                        </h2>
+                        </HeadingTag>
 
                         <p className="text-gray-300 text-sm sm:text-base lg:text-lg leading-relaxed max-w-xl">
                             Your all-in-one agency management platform. Track projects, manage

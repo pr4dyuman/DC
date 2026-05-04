@@ -149,9 +149,9 @@ useEffect(() => {
               <span className="w-2 h-2 sm:w-3 sm:h-3 bg-[#F5EE30] rounded-full mr-2 sm:mr-3 mt-1 sm:mt-1.5 flex-shrink-0"></span>
               <span className="leading-relaxed whitespace-normal font-glacial-bold xl:whitespace-nowrap">Amplify Your Brand with Authentic Voices that Drive Action</span>
             </h3>
-            <h2 className="text-2xl sm:text-4xl md:text-5xl lg:text-5xl xl:text-6xl font-['Etna'] font-bold mb-4 sm:mb-6 text-[#F5EE30] uppercase whitespace-nowrap">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-5xl xl:text-6xl font-['Etna'] font-bold mb-4 sm:mb-6 text-[#F5EE30] uppercase whitespace-nowrap">
               Influencer Marketing
-            </h2>
+            </h1>
             <p className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-white">OUR MISSION</p>
             <p className="text-white mb-4 sm:mb-6 leading-relaxed text-base sm:text-lg font-['Glacial_Indifference']">
               To empower businesses by transforming social media into a powerhouse of engagement, loyalty, and revenue. We craft data-backed strategies that turn followers into brand advocates and scrolls into sales.

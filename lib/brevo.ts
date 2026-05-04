@@ -94,7 +94,7 @@ export async function sendOtpEmail(email: string, otp: string): Promise<{ succes
         
         <!-- Footer -->
         <div style="padding:15px 30px;border-top:1px solid #222;text-align:center;">
-            <p style="color:#555;font-size:11px;margin:0;">© Digital Corvids — Strategic Birds of the Digital Sky</p>
+            <p style="color:#555;font-size:11px;margin:0;">© Digital Corvids - Digital Marketing Agency</p>
         </div>
     </div>
 </body>
@@ -144,7 +144,7 @@ export async function sendPasswordResetOtpEmail(email: string, otp: string): Pro
         
         <!-- Footer -->
         <div style="padding:15px 30px;border-top:1px solid #222;text-align:center;">
-            <p style="color:#555;font-size:11px;margin:0;">© Digital Corvids — Strategic Birds of the Digital Sky</p>
+            <p style="color:#555;font-size:11px;margin:0;">© Digital Corvids - Digital Marketing Agency</p>
         </div>
     </div>
 </body>

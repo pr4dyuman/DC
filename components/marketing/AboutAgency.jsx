@@ -11,14 +11,14 @@ export default function AboutAgency() {
           <p className="text-[#F5EE30] text-xs sm:text-sm font-glacial-bold tracking-wide mb-3 sm:mb-4">
             ● ABOUT AGENCY
           </p>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight">
             BECOME PART OF THE WINNING CIRCLE
             <br className="hidden sm:block" />
             <span className="sm:inline"> </span>BY WORKING WITH OUR TALENTED
             <br className="hidden sm:block" />
             <span className="sm:inline"> </span>
             <span className="text-[#F5EE30]">CREATIVE TEAM.</span>
-          </h1>
+          </h2>
         </div>
 
         {/* Content Grid */}

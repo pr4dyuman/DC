@@ -88,7 +88,7 @@ export default function Services() {
       <div className="max-w-7xl mx-auto px-6 pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12">
         {/* Header */}
         <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold uppercase tracking-wide mb-4">SERVICES</h2>
+          <h1 className="text-4xl md:text-5xl font-bold uppercase tracking-wide mb-4">SERVICES</h1>
           <p className="text-[#F5EE30] font-glacial-bold text-xl md:text-2xl uppercase tracking-wider">WHAT WE DO</p>
         </div>
 

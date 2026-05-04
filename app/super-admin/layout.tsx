@@ -1,10 +1,22 @@
 import { getSessionUser } from "@/lib/auth";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import SuperAdminShell from "@/components/super-admin/SuperAdminShell";
 import { TimezoneProvider } from "@/context/TimezoneContext";
 import { updateUserTimezone } from "@/lib/actions";
 import { connectDB, SuperAdminModel } from "@/lib/mongodb";
 import type { SuperAdmin } from "@/lib/types";
+
+export const metadata: Metadata = {
+    robots: {
+        index: false,
+        follow: false,
+        googleBot: {
+            index: false,
+            follow: false,
+        },
+    },
+};
 
 export default async function SuperAdminLayout({
     children,

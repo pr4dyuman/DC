@@ -33,23 +33,20 @@ export default function AboutPage() {
             {/* Main Heading */}
             <div className="space-y-1">
               <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight mb-2">
-                STRATEGIC BIRDS OF
+                DIGITAL MARKETING BUILT FOR
               </h2>
               <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight text-gray-500">
-                DIGITAL SKY
+                MEASURABLE GROWTH
               </h2>
             </div>
 
             {/* Description */}
             <p className="text-gray-300 leading-relaxed text-sm md:text-base lg:text-lg max-w-2xl">
-              At Digital Corvids, we draw inspiration from one of nature&apos;s most
-              intelligent and adaptable creatures: the corvid family of birds.
-              Much like these resourceful birds, we embody creativity,
-              versatility, and an innate ability to solve complex problems. We
-              believe that just as the thirsty crow found an innovative solution
-              to quench its thirst, every challenge presents an opportunity to
-              find unique solutions. Our approach to digital marketing mirrors
-              this ethos — strategic, agile, and always a step ahead.
+              At Digital Corvids, we combine creative strategy, technical SEO,
+              performance marketing, social content, websites, and video
+              production to help brands turn attention into measurable business
+              growth. Our work is practical, data-aware, and built around the
+              outcomes each client needs most.
             </p>
 
             {/* Experience Box */}

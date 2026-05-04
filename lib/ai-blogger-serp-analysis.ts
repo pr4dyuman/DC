@@ -720,7 +720,18 @@ function isQuotaOrRateLimitFailure(message: string) {
         normalized.includes("rate limit") ||
         normalized.includes("too many requests") ||
         normalized.includes("payment required") ||
-        normalized.includes("credits")
+        normalized.includes("credits") ||
+        normalized.includes("out of searches") ||
+        normalized.includes("run out of searches") ||
+        normalized.includes("exhausted") ||
+        normalized.includes("insufficient") ||
+        normalized.includes("billing") ||
+        normalized.includes("invalid api key") ||
+        normalized.includes("invalid_api_key") ||
+        normalized.includes("api key not valid") ||
+        normalized.includes("unauthorized") ||
+        normalized.includes("forbidden") ||
+        normalized.includes("permission denied")
     );
 }
 

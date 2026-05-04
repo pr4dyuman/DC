@@ -177,10 +177,7 @@ export default async function AIBloggerPostDetailPage({
             trendsApiKey: aiBloggerConfig?.trends?.apiKey,
             trendsFallbackApiKey: aiBloggerConfig?.trends?.fallbackApiKey,
             trendsFallbackEnabled: aiBloggerConfig?.trends?.fallbackEnabled,
-        }).catch((error) => {
-            console.error("[AI-BLOGGER] SERP analysis failed (non-fatal):", error instanceof Error ? error.message : error);
-            return null;
-        }),
+        }).catch(() => null),
         listBlogStudioRelatedPostsImpl(agency.id, post, 6),
     ]);
 

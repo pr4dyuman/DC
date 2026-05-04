@@ -137,9 +137,9 @@ export default function PPCAdvertising() {
                 <span className="w-2 h-2 sm:w-3 sm:h-3 bg-[#F5EE30] rounded-full mr-2 sm:mr-3 mt-1 sm:mt-1.5 flex-shrink-0"></span>
                 <span className="leading-relaxed whitespace-normal xl:whitespace-nowrap">Get Instant Visibility, Drive Qualified Traffic, and Maximize ROI</span>
               </h3>
-              <h2 className="text-2xl sm:text-4xl md:text-2xl lg:text-3xl xl:text-4xl font-['Etna'] font-bold mb-4 sm:mb-6 text-[#F5EE30] whitespace-nowrap">
+              <h1 className="text-2xl sm:text-4xl md:text-2xl lg:text-3xl xl:text-4xl font-['Etna'] font-bold mb-4 sm:mb-6 text-[#F5EE30] whitespace-nowrap">
                 PAY-PER-CLICK (PPC) ADVERTISING
-              </h2>
+              </h1>
               <p className="text-lg sm:text-xl font-glacial-bold mb-3 sm:mb-4 text-white">OUR MISSION</p>
               <p className="text-white mb-4 sm:mb-6 leading-relaxed text-base sm:text-lg font-['Glacial_Indifference']">
                 To deliver high-impact PPC campaigns that put your business in front of the right audience at the right time. We combine strategic targeting, compelling ad copy, and continuous optimization to turn every click into a valuable conversion.

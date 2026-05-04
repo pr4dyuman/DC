@@ -141,13 +141,39 @@ const BlogStudioGenerationScorecardSchema = new Schema(
         websiteRelevance: { type: Number },
         trendRelevance: { type: Number },
         keywordStrength: { type: Number },
+        opportunityScore: { type: Number },
+        searchDemand: { type: Number },
+        winnability: { type: Number },
+        internalLinkSupport: { type: Number },
         businessFit: { type: Number },
         topicIntegrity: { type: Number },
         websiteTopicAccepted: { type: Boolean },
         strategyReadiness: { type: Number },
         originalValue: { type: Number },
         proofStrength: { type: Number },
+        sourceDepth: { type: Number },
         conversionFit: { type: Number },
+        finalQuality: { type: Number },
+        intentSatisfaction: { type: Number },
+        originalValueExecution: { type: Number },
+        clusterFit: { type: Number },
+    },
+    { _id: false }
+);
+
+const BlogStudioFinalQualityAssessmentSchema = new Schema(
+    {
+        score: { type: Number },
+        warnings: [{ type: String }],
+        blockers: [{ type: String }],
+        components: {
+            intentSatisfaction: { type: Number },
+            originalValueExecution: { type: Number },
+            proofStrength: { type: Number },
+            clusterFit: { type: Number },
+            conversionFit: { type: Number },
+            structureQuality: { type: Number },
+        },
     },
     { _id: false }
 );
@@ -164,12 +190,28 @@ const BlogStudioGenerationSourceUsageSchema = new Schema(
     { _id: false }
 );
 
+const BlogStudioKeywordOpportunityScoreSchema = new Schema(
+    {
+        keyword: { type: String },
+        score: { type: Number },
+        topicFitScore: { type: Number },
+        longTailScore: { type: Number },
+        serpIntentScore: { type: Number },
+        winnabilityScore: { type: Number },
+        trendFitScore: { type: Number },
+        internalLinkSupportScore: { type: Number },
+        reasons: [{ type: String }],
+    },
+    { _id: false }
+);
+
 const BlogStudioGenerationKeywordPlanSchema = new Schema(
     {
         primaryKeyword: { type: String },
         secondaryKeywords: [{ type: String }],
         metaKeywords: [{ type: String }],
         sectionAngles: [{ type: String }],
+        keywordOpportunityScores: [BlogStudioKeywordOpportunityScoreSchema],
     },
     { _id: false }
 );
@@ -209,6 +251,7 @@ const BlogStudioGenerationDiagnosticsSchema = new Schema(
         businessFitWarnings: [{ type: String }],
         keywordPlan: { type: BlogStudioGenerationKeywordPlanSchema },
         scorecard: { type: BlogStudioGenerationScorecardSchema },
+        finalQuality: { type: BlogStudioFinalQualityAssessmentSchema },
         sourceUsage: { type: BlogStudioGenerationSourceUsageSchema },
         steps: { type: [BlogStudioGenerationStepSchema], default: [] },
     },

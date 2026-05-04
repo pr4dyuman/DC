@@ -178,7 +178,7 @@ const AI_PIPELINE_STEPS: PipelineStepDefinition[] = [
     },
     {
         key: "fetch-trends",
-        label: "Trend Discovery",
+        label: "Topic Opportunity Gate",
         icon: Globe,
     },
     {
@@ -203,7 +203,7 @@ const AI_PIPELINE_STEPS: PipelineStepDefinition[] = [
     },
     {
         key: "keywords",
-        label: "Keyword Map",
+        label: "Winnable Keywords",
         icon: KeyRound,
     },
     {
@@ -295,12 +295,12 @@ const PIPELINE_STAGE_COPY: Record<string, PipelineStageCopy> = {
         legacyLabels: ["Website Intelligence", "Website Intelligence (target site)"],
     },
     "fetch-trends": {
-        title: "Trend Discovery",
-        pending: "Waiting to identify timely topic angles.",
-        active: "Finding timely topics and demand signals that fit the business.",
-        completed: "A timely topic angle is selected for the draft.",
-        skipped: "Trend discovery was skipped for this run.",
-        failed: "Trend discovery needs attention before topic selection can continue.",
+        title: "Topic Opportunity Gate",
+        pending: "Waiting to compare trend demand against the website service lane.",
+        active: "Checking Google Trends first, then internet signals if no live trend fits the site.",
+        completed: "A website-fit topic opportunity passed trend, freshness, and business relevance checks.",
+        skipped: "Topic opportunity checks were skipped for this run.",
+        failed: "Topic opportunity checks blocked the run before drafting.",
         legacyLabels: ["Fetch Trends"],
     },
     "serp-analysis": {
@@ -314,11 +314,11 @@ const PIPELINE_STAGE_COPY: Record<string, PipelineStageCopy> = {
     },
     "grounded-research": {
         title: "Source Verification",
-        pending: "Waiting to collect trusted external support.",
-        active: "Collecting trusted sources so claims can be supported or softened.",
-        completed: "Grounded source support is ready for the writer.",
+        pending: "Waiting to collect and fit-check trusted external support.",
+        active: "Collecting trusted sources and checking that they match the selected topic.",
+        completed: "Grounded source support passed relevance checks for the writer.",
         skipped: "Source verification was skipped because trusted source collection is disabled or unavailable.",
-        failed: "Source verification needs attention before stronger claims are safe to publish.",
+        failed: "Source verification blocked the run or needs attention before drafting.",
         legacyLabels: ["Grounded Research"],
     },
     "performance-feedback": {
@@ -340,12 +340,12 @@ const PIPELINE_STAGE_COPY: Record<string, PipelineStageCopy> = {
         legacyLabels: ["Deep Research"],
     },
     keywords: {
-        title: "Keyword Map",
-        pending: "Waiting to map primary and supporting keywords.",
-        active: "Mapping primary keywords, supporting terms, and audience intent.",
-        completed: "Keyword targets are ready.",
-        skipped: "Keyword mapping was skipped.",
-        failed: "Keyword mapping needs attention.",
+        title: "Winnable Keywords",
+        pending: "Waiting to score primary and supporting keyword opportunities.",
+        active: "Scoring keyword fit, long-tail intent, SERP winnability, and internal-link support.",
+        completed: "Winnable keyword targets are ready.",
+        skipped: "Winnable keyword scoring was skipped.",
+        failed: "Winnable keyword scoring needs attention.",
         legacyLabels: ["Keywords"],
     },
     "seo-analysis": {

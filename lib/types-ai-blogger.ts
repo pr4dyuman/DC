@@ -170,6 +170,10 @@ export type BlogStudioGenerationScorecard = {
     websiteRelevance?: number;
     trendRelevance?: number;
     keywordStrength?: number;
+    opportunityScore?: number;
+    searchDemand?: number;
+    winnability?: number;
+    internalLinkSupport?: number;
     businessFit?: number;
     topicIntegrity?: number;
     websiteTopicAccepted?: boolean;
@@ -182,6 +186,18 @@ export type BlogStudioGenerationScorecard = {
     intentSatisfaction?: number;
     originalValueExecution?: number;
     clusterFit?: number;
+};
+
+export type BlogStudioKeywordOpportunityScore = {
+    keyword: string;
+    score: number;
+    topicFitScore: number;
+    longTailScore: number;
+    serpIntentScore: number;
+    winnabilityScore: number;
+    trendFitScore: number;
+    internalLinkSupportScore: number;
+    reasons: string[];
 };
 
 export type BlogStudioFinalQualityAssessment = {
@@ -878,6 +894,7 @@ export type BlogStudioGenerationKeywordPlan = {
     secondaryKeywords: string[];
     metaKeywords: string[];
     sectionAngles: string[];
+    keywordOpportunityScores?: BlogStudioKeywordOpportunityScore[];
 };
 
 export type BlogStudioGenerationDiagnostics = {

@@ -52,7 +52,7 @@ function staticEntry(
 ): MetadataRoute.Sitemap[number] {
     return {
         url: withSiteUrl(path),
-        lastModified: new Date("2026-01-05"),
+        lastModified: new Date("2026-05-04"),
         changeFrequency,
         priority,
     };

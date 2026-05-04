@@ -44,9 +44,9 @@ export default function WebDevelopment() {
             <p className="text-white text-lg font-glacial-bold mb-4 uppercase tracking-wide">
               BUILDING DIGITAL EXPERIENCES THAT DRIVE RESULTS
             </p>
-            <h2 className="text-3xl md:text-4xl font-bold mb-6 text-[#F5EE30]">
+            <h1 className="text-3xl md:text-4xl font-bold mb-6 text-[#F5EE30]">
               WEB DEVELOPMENT
-            </h2>
+            </h1>
             <h4 className="text-xl font-glacial-bold mb-4 text-white">OUR MISSION</h4>
             <p className="text-white mb-6 leading-relaxed text-lg">
               To design high-performance websites tailored to enhance user

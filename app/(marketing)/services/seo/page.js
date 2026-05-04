@@ -29,7 +29,7 @@ export default function SEOServices() {
             <p className="text-white text-sm font-glacial-bold mb-4 uppercase tracking-wide text-left">
               DOMINATE GOOGLE, DRIVE ORGANIC GROWTH, AND OUTRANK THE COMPETITION
             </p>
-            <h2 className="text-3xl md:text-4xl font-bold mb-6 text-[#F5EE30] text-left">SEARCH ENGINE OPTIMIZATION</h2>
+            <h1 className="text-3xl md:text-4xl font-bold mb-6 text-[#F5EE30] text-left">SEARCH ENGINE OPTIMIZATION</h1>
             <h4 className="text-xl font-glacial-bold mb-4 text-white text-left">OUR MISSION</h4>
             <p className="text-white mb-6 leading-relaxed text-lg text-left">
               To enhance our client&apos;s online visibility and drive meaningful organic growth through strategic

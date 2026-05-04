@@ -180,7 +180,16 @@ function isQuotaOrRateLimitFailure(message: string) {
         normalized.includes("payment required") ||
         normalized.includes("credits") ||
         normalized.includes("out of searches") ||
-        normalized.includes("run out of searches")
+        normalized.includes("run out of searches") ||
+        normalized.includes("exhausted") ||
+        normalized.includes("insufficient") ||
+        normalized.includes("billing") ||
+        normalized.includes("invalid api key") ||
+        normalized.includes("invalid_api_key") ||
+        normalized.includes("api key not valid") ||
+        normalized.includes("unauthorized") ||
+        normalized.includes("forbidden") ||
+        normalized.includes("permission denied")
     );
 }
 
@@ -585,6 +594,10 @@ function getTrendCategoryHints(fitHints: string[]) {
         categories.push("18");
     }
 
+    if (/\b(marketing|advertising|ads|agency|brand|branding|seo|ppc|content|social media|lead generation|sales|commerce|business|video production|influencer)\b/i.test(text)) {
+        categories.push("3");
+    }
+
     if (/\b(health|medical|doctor|clinic|fitness|wellness|therapy|dentist)\b/i.test(text)) {
         categories.push("7");
     }
@@ -593,7 +606,7 @@ function getTrendCategoryHints(fitHints: string[]) {
         categories.push("10");
     }
 
-    return sanitizeStringArray(categories, 2, 12);
+    return sanitizeStringArray(categories, 3, 12);
 }
 
 function buildTrendScanPlan(location: string, fitHints: string[], maxRequests: number) {
@@ -846,6 +859,7 @@ async function fetchKeywordTrendResult(
     keyword: string,
     location: string,
     config: AIBloggerTrendsConfig,
+    options?: { timeoutMs?: number },
 ): Promise<{ result: AIBloggerKeywordTrendResult; usedFallbackKey: boolean }> {
     let relatedQueries: string[] = [];
     let trendScore = 30;
@@ -868,6 +882,7 @@ async function fetchKeywordTrendResult(
                 date: "now 7-d",
             },
             config,
+            options,
         );
 
         usedFallbackKey = usedFallbackKey || relatedUsedFallbackKey;
@@ -901,6 +916,7 @@ async function fetchKeywordTrendResult(
                 date: "now 7-d",
             },
             config,
+            options,
         );
 
         usedFallbackKey = usedFallbackKey || timeseriesUsedFallbackKey;
@@ -944,6 +960,15 @@ async function fetchKeywordTrendResult(
             usedFallbackKey: false,
         };
     }
+}
+
+export async function fetchAIBloggerKeywordTrendResult(
+    keyword: string,
+    location: string,
+    config: AIBloggerTrendsConfig,
+    options?: { timeoutMs?: number },
+) {
+    return fetchKeywordTrendResult(keyword, location, config, options);
 }
 
 function buildLiveTrendSummary(

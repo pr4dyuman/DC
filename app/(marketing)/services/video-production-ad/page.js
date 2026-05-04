@@ -44,9 +44,9 @@ export default function VideoProduction() {
             <p className="text-white text-sm font-glacial-bold mb-4 uppercase tracking-wide">
               CRAFTING CINEMATIC STORIES THAT CAPTIVATE, CONNECT, AND LEAVE A LEGACY
             </p>
-            <h2 className="text-3xl md:text-4xl font-bold mb-6 text-[#F5EE30]">
+            <h1 className="text-3xl md:text-4xl font-bold mb-6 text-[#F5EE30]">
               VIDEO PRODUCTION & AD FILMS
-            </h2>
+            </h1>
             <h4 className="text-xl font-glacial-bold mb-4 text-white">OUR MISSION</h4>
             <p className="text-white mb-6 leading-relaxed text-lg">
               To produce impactful, emotionally rich video content that not only tells your story but also drives engagement, builds emotional connections, and strengthens brand presence across all digital platforms.

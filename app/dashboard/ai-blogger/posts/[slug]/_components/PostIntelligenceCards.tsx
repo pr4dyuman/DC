@@ -3,8 +3,11 @@ import {
     BarChart3,
     ExternalLink,
     FileText,
+    Link2,
     Search,
+    ShieldCheck,
     Sparkles,
+    Target,
 } from "lucide-react";
 
 import {
@@ -66,6 +69,19 @@ export function PostGenerationStrategyCard({
     const sourceUsage = diagnostics?.sourceUsage;
     const scorecard = diagnostics?.scorecard;
     const enabledSources = generationSourceLabels.filter((item) => sourceUsage?.[item.key]);
+    const keywordOpportunities = diagnostics?.keywordPlan?.keywordOpportunityScores?.slice(0, 4) || [];
+    const finalQualityScore = diagnostics?.finalQuality?.score ?? scorecard?.finalQuality;
+    const scoreMetrics = [
+        { label: "Opportunity Score", value: scorecard?.opportunityScore, icon: Target },
+        { label: "Topic Integrity", value: scorecard?.topicIntegrity, icon: ShieldCheck },
+        { label: "Search Demand", value: scorecard?.searchDemand, icon: BarChart3 },
+        { label: "Winnability", value: scorecard?.winnability, icon: ShieldCheck },
+        { label: "Internal Link Support", value: scorecard?.internalLinkSupport, icon: Link2 },
+        { label: "Website Relevance", value: scorecard?.websiteRelevance, icon: FileText },
+        { label: "Trend Relevance", value: scorecard?.trendRelevance, icon: Sparkles },
+        { label: "Business Fit", value: scorecard?.businessFit, icon: BarChart3 },
+        { label: "Final Quality", value: finalQualityScore, icon: Search },
+    ];
 
     return (
         <AIBloggerGlassCard className="p-6">
@@ -104,13 +120,8 @@ export function PostGenerationStrategyCard({
                             </p>
                         </div>
 
-                        <div className="grid gap-3 md:grid-cols-2">
-                            {[
-                                { label: "Website Relevance", value: scorecard?.websiteRelevance, icon: FileText },
-                                { label: "Trend Relevance", value: scorecard?.trendRelevance, icon: Sparkles },
-                                { label: "Keyword Strength", value: scorecard?.keywordStrength, icon: Search },
-                                { label: "Business Fit", value: scorecard?.businessFit, icon: BarChart3 },
-                            ].map((item) => (
+                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            {scoreMetrics.map((item) => (
                                 <div key={item.label} className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                     <div className="flex items-center justify-between gap-3">
                                         <div>
@@ -129,6 +140,30 @@ export function PostGenerationStrategyCard({
                                 </div>
                             ))}
                         </div>
+
+                        {keywordOpportunities.length > 0 ? (
+                            <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
+                                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                                    Winnable Keyword Signals
+                                </p>
+                                <div className="mt-3 space-y-3">
+                                    {keywordOpportunities.map((item) => (
+                                        <div key={`${item.keyword}-${item.score}`} className="flex flex-col gap-2 rounded-lg border border-border/50 bg-background/50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                            <div>
+                                                <p className="text-sm font-medium">{item.keyword}</p>
+                                                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                                    {item.reasons.slice(0, 2).join(" | ") || "No reason stored."}
+                                                </p>
+                                            </div>
+                                            <div className={`inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${getScoreTone(item.score)}`}>
+                                                <Target className="h-3.5 w-3.5" />
+                                                {item.score}/100
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : null}
 
                         <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                             <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
