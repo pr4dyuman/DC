@@ -677,12 +677,16 @@ function getPlannedFetchTrendsLabel(plan: AIBloggerTrendPlan) {
     return plan.liveTrendsEnabled && plan.trendFirstMode ? "Trend-first Google Trends" : plan.liveTrendsEnabled ? "Live Google Trends" : "AI topic discovery";
 }
 
+function formatPlanLocationLabel(location: string) {
+    return location.trim() ? location.toUpperCase() : "GLOBAL";
+}
+
 function getPlannedFetchTrendsNote(
     plan: AIBloggerTrendPlan,
     sourceMode: BlogStudioInputMode,
     trendFocus: string,
 ) {
-    const location = plan.defaultLocation.toUpperCase();
+    const location = formatPlanLocationLabel(plan.defaultLocation);
     const normalizedTrendFocus = trendFocus.trim();
 
     if (plan.liveTrendsEnabled) {
@@ -703,7 +707,7 @@ function getPlannedFetchTrendsNote(
 
 function getPlannedSerpAnalysisNote(plan: AIBloggerSerpPlan) {
     if (plan.enabled) {
-        return `The workflow will review Google results for ${plan.defaultLocation.toUpperCase()} on ${plan.device} to capture search intent, competitors, and People Also Ask patterns.`;
+        return `The workflow will review Google results for ${formatPlanLocationLabel(plan.defaultLocation)} on ${plan.device} to capture search intent, competitors, and People Also Ask patterns.`;
     }
 
     return "Search landscape review is skipped unless it is enabled in AI Blogger admin.";

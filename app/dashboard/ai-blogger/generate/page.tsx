@@ -30,14 +30,14 @@ export default async function AIBloggerGeneratePage() {
                     trendPlan={{
                         liveTrendsEnabled: aiBloggerConfig?.trends?.enabled ?? false,
                         fallbackToAi: aiBloggerConfig?.trends?.fallbackToAi ?? true,
-                        defaultLocation: aiBloggerConfig?.trends?.defaultLocation || settings.seo.defaultLocation,
+                        defaultLocation: aiBloggerConfig?.trends?.defaultLocation ?? settings.seo.defaultLocation,
                         trendFirstMode: aiBloggerConfig?.trends?.trendFirstMode ?? true,
                         maxTrendRequestsPerBlog: aiBloggerConfig?.trends?.maxTrendRequestsPerBlog ?? 8,
                     }}
                     serpPlan={{
                         enabled: aiBloggerConfig?.serp?.enabled ?? false,
                         device: aiBloggerConfig?.serp?.device || "desktop",
-                        defaultLocation: aiBloggerConfig?.serp?.defaultLocation || settings.seo.defaultLocation,
+                        defaultLocation: aiBloggerConfig?.serp?.defaultLocation ?? settings.seo.defaultLocation,
                     }}
                     crawlPlan={{
                         enabled: aiBloggerConfig?.crawl?.enabled ?? true,

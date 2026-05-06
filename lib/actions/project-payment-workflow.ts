@@ -2,6 +2,7 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 import type { Invoice, PaymentConfig } from "../db";
+import { decrementAgencyUsage, reserveAgencyUsage } from "../agency-context";
 import { sanitizeMongoInput } from "../validation";
 import { InvoiceModel, ProjectModel, ServiceModel, connectDB } from "../mongodb";
 import { generateId } from "../utils-server";
@@ -110,7 +111,7 @@ export async function updateProjectPaymentImpl(
     // Strategy: delete ALL Pending invoices for this project (old invoices may
     // not have serviceId so filtering by it is unreliable), then regenerate
     // from the updated serviceConfigs. Processing/Paid invoices are kept as-is.
-    await InvoiceModel.deleteMany({ projectId, agencyId, status: "Pending" });
+    const existingPendingInvoiceCount = await InvoiceModel.countDocuments({ projectId, agencyId, status: "Pending" });
 
     // Re-read the project after the serviceConfig update so we get the latest configs
     const updatedProject = await ProjectModel.findOne({ id: projectId, agencyId })
@@ -181,8 +182,35 @@ export async function updateProjectPaymentImpl(
         }
     }
 
-    if (newInvoices.length > 0) {
-        await InvoiceModel.insertMany(newInvoices);
+    const invoiceUsageDelta = newInvoices.length - existingPendingInvoiceCount;
+    let reservedInvoiceCount = 0;
+    const releaseReservedInvoices = async () => {
+        if (reservedInvoiceCount > 0) {
+            await decrementAgencyUsage(agencyId, "monthlyInvoices", reservedInvoiceCount);
+            reservedInvoiceCount = 0;
+        }
+    };
+
+    if (invoiceUsageDelta > 0) {
+        const invoiceLimit = await reserveAgencyUsage(agencyId, "monthlyInvoices", invoiceUsageDelta);
+        if (!invoiceLimit.allowed) {
+            throw new Error(`Plan limit reached: your plan allows ${invoiceLimit.limit} monthly invoices (currently ${invoiceLimit.current}).`);
+        }
+        reservedInvoiceCount = invoiceUsageDelta;
+    }
+
+    try {
+        await InvoiceModel.deleteMany({ projectId, agencyId, status: "Pending" });
+        if (newInvoices.length > 0) {
+            await InvoiceModel.insertMany(newInvoices);
+        }
+        reservedInvoiceCount = 0;
+        if (invoiceUsageDelta < 0) {
+            await decrementAgencyUsage(agencyId, "monthlyInvoices", Math.abs(invoiceUsageDelta));
+        }
+    } catch (error) {
+        await releaseReservedInvoices();
+        throw error;
     }
 
     // ── Sync project.budget ← sum of service payment configs ─────────────────

@@ -2,7 +2,7 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 import type { Invoice, User } from "../db";
-import { checkAgencyLimit } from "../agency-context";
+import { decrementAgencyUsage, reserveAgencyUsage } from "../agency-context";
 import { sendInvoiceCreatedEmail, sendPaymentApprovedEmail, sendPaymentPendingApprovalEmail, sendPaymentRejectedEmail } from "../brevo-mail";
 import { formatCurrency } from "../currency";
 import { generateId } from "../utils-server";
@@ -25,6 +25,99 @@ function getProjectClientIds(project: { clientId?: string; clientIds?: string[] 
         if (clientId) ids.add(clientId);
     }
     return [...ids];
+}
+
+type PaidInvoiceResult = {
+    invoice: Invoice;
+    projectName: string;
+    clientIds: string[];
+    transactionId?: string;
+    transactionCreated: boolean;
+};
+
+async function markInvoicePaidWithIncomeTransaction(
+    invoiceId: string,
+    agencyId: string,
+    allowedCurrentStatuses: Invoice["status"][],
+    alreadyPaidIsOk: boolean
+): Promise<PaidInvoiceResult> {
+    const invoice = await InvoiceModel.findOneAndUpdate(
+        {
+            id: invoiceId,
+            agencyId,
+            status: { $in: allowedCurrentStatuses },
+        },
+        { $set: { status: "Paid" } },
+        { new: false, lean: true }
+    ) as Invoice | null;
+
+    if (!invoice) {
+        const currentInvoice = await InvoiceModel.findOne({ id: invoiceId, agencyId }).lean() as Invoice | null;
+        if (!currentInvoice) throw new Error("Invoice not found");
+        if (alreadyPaidIsOk && currentInvoice.status === "Paid") {
+            return {
+                invoice: currentInvoice,
+                projectName: "Project",
+                clientIds: [],
+                transactionCreated: false,
+            };
+        }
+        throw new Error(`Can only mark ${allowedCurrentStatuses.join(", ")} invoices as Paid, this is ${currentInvoice.status}`);
+    }
+
+    try {
+        const projectInvoices = await InvoiceModel.find({ projectId: invoice.projectId, agencyId })
+            .sort({ date: 1 }).lean() as Invoice[];
+        const installmentIndex = projectInvoices.findIndex((item) => item.id === invoiceId);
+        const installmentNumber = installmentIndex !== -1 ? installmentIndex + 1 : "?";
+        const totalInstallments = projectInvoices.length;
+
+        const project = await getProjectDoc(agencyId, invoice.projectId);
+        const projectName = project?.name || "Project";
+        const description = `Installment ${installmentNumber}/${totalInstallments} for ${projectName} - ${invoice.date}`;
+        const clientIds = getProjectClientIds(project);
+        const existingTransaction = await TransactionModel.findOne({ agencyId, invoiceId: invoice.id })
+            .select("id")
+            .lean() as { id?: string } | null;
+
+        if (existingTransaction?.id) {
+            return {
+                invoice,
+                projectName,
+                clientIds,
+                transactionId: existingTransaction.id,
+                transactionCreated: false,
+            };
+        }
+
+        const newTransaction = {
+            id: generateId(),
+            agencyId,
+            date: new Date().toISOString().split("T")[0],
+            amount: invoice.amount,
+            type: "income" as const,
+            category: "Project" as const,
+            description,
+            status: "completed" as const,
+            projectId: invoice.projectId,
+            invoiceId: invoice.id,
+        };
+        await TransactionModel.create(newTransaction);
+
+        return {
+            invoice,
+            projectName,
+            clientIds,
+            transactionId: newTransaction.id,
+            transactionCreated: true,
+        };
+    } catch (error) {
+        await InvoiceModel.updateOne(
+            { id: invoiceId, agencyId, status: "Paid" },
+            { $set: { status: invoice.status } }
+        );
+        throw error;
+    }
 }
 
 export async function clientMarkInvoiceAsPaidImpl(
@@ -89,37 +182,13 @@ export async function clientMarkInvoiceAsPaidImpl(
 export async function adminApproveInvoicePaymentImpl(invoiceId: string, agencyId: string) {
     await connectDB();
 
-    const invoice = await InvoiceModel.findOne({ id: invoiceId, agencyId }).lean() as Invoice | null;
-    if (!invoice) throw new Error("Invoice not found");
-    if (invoice.status !== "Processing") {
-        throw new Error(`Can only approve Processing invoices, this is ${invoice.status} `);
-    }
-
-    const projectInvoices = await InvoiceModel.find({ projectId: invoice.projectId, agencyId })
-        .sort({ date: 1 }).lean() as Invoice[];
-    const installmentIndex = projectInvoices.findIndex((item) => item.id === invoiceId);
-    const installmentNumber = installmentIndex !== -1 ? installmentIndex + 1 : "?";
-    const totalInstallments = projectInvoices.length;
-
-    const project = await getProjectDoc(agencyId, invoice.projectId);
-    const projectName = project?.name || "Project";
-    const description = `Installment ${installmentNumber}/${totalInstallments} for ${projectName} - ${invoice.date}`;
-    const clientIds = getProjectClientIds(project);
-
-    await InvoiceModel.updateOne({ id: invoiceId, agencyId }, { $set: { status: "Paid" } });
-    const newTransaction = {
-        id: generateId(),
+    const paymentResult = await markInvoicePaidWithIncomeTransaction(
+        invoiceId,
         agencyId,
-        date: new Date().toISOString().split("T")[0],
-        amount: invoice.amount,
-        type: "income" as const,
-        category: "Project" as const,
-        description,
-        status: "completed" as const,
-        projectId: invoice.projectId,
-        invoiceId: invoice.id,
-    };
-    await TransactionModel.create(newTransaction);
+        ["Processing"],
+        false
+    );
+    const { invoice, projectName, clientIds } = paymentResult;
 
     if (clientIds.length > 0 && await isNotifEnabled("invoice")) {
         const currency = await getDefaultCurrency();
@@ -152,6 +221,7 @@ export async function adminApproveInvoicePaymentImpl(invoiceId: string, agencyId
     }
 
     revalidatePath("/dashboard/finance");
+    return paymentResult;
 }
 
 export async function adminRejectInvoicePaymentImpl(invoiceId: string, agencyId: string, reason?: string) {
@@ -212,6 +282,17 @@ export async function updateInvoiceStatusImpl(
     const invoice = await InvoiceModel.findOne({ id: invoiceId, agencyId }).lean() as Invoice | null;
     if (!invoice) throw new Error("Invoice not found");
 
+    if (status === "Paid") {
+        const result = await markInvoicePaidWithIncomeTransaction(
+            invoiceId,
+            agencyId,
+            ["Pending", "Overdue", "Processing"],
+            true
+        );
+        revalidatePath("/dashboard/finance");
+        return result;
+    }
+
     const currentStatus = invoice.status;
     const invalidTransitions: Record<string, string[]> = {
         Paid: ["Pending"],
@@ -225,6 +306,7 @@ export async function updateInvoiceStatusImpl(
         { $set: { status } }
     );
     revalidatePath("/dashboard/finance");
+    return { transactionCreated: false };
 }
 
 export async function createInvoiceImpl(
@@ -242,14 +324,14 @@ export async function createInvoiceImpl(
     }
     if (!invoice.projectId) throw new Error("Validation Error: Invoice must be linked to a project.");
 
-    const invoiceLimit = await checkAgencyLimit(agency.id, "monthlyInvoices");
-    if (!invoiceLimit.allowed) {
-        throw new Error(`Plan limit reached: your plan allows ${invoiceLimit.limit} monthly invoices (currently ${invoiceLimit.current}).`);
-    }
-
     const project = await getProjectDoc(agency.id, invoice.projectId);
     if (!project) throw new Error(`Project with ID ${invoice.projectId} not found`);
     const clientIds = getProjectClientIds(project);
+
+    const invoiceLimit = await reserveAgencyUsage(agency.id, "monthlyInvoices");
+    if (!invoiceLimit.allowed) {
+        throw new Error(`Plan limit reached: your plan allows ${invoiceLimit.limit} monthly invoices (currently ${invoiceLimit.current}).`);
+    }
 
     const newInvoice: Invoice = {
         ...invoice,
@@ -258,7 +340,12 @@ export async function createInvoiceImpl(
         agencyId: agency.id,
         ...(currentUser ? { performedBy: currentUser.id } : {}),
     };
-    await InvoiceModel.create(newInvoice);
+    try {
+        await InvoiceModel.create(newInvoice);
+    } catch (error) {
+        await decrementAgencyUsage(agency.id, "monthlyInvoices");
+        throw error;
+    }
 
     if (clientIds.length > 0 && await isNotifEnabled("invoice")) {
         const currency = await getDefaultCurrency();

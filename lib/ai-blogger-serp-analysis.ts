@@ -642,6 +642,7 @@ async function getCachedSerpAnalysis(
     location: string,
     device: AIBloggerSerpDevice,
     refreshWindowHours: number,
+    minimumTopResultUrls = 0,
 ) {
     await connectDB();
 
@@ -663,6 +664,10 @@ async function getCachedSerpAnalysis(
 
     const refreshWindowMs = refreshWindowHours * 60 * 60 * 1000;
     if (Date.now() - refreshedAtMs > refreshWindowMs) {
+        return null;
+    }
+
+    if ((snapshot.topResultUrls || []).length < minimumTopResultUrls) {
         return null;
     }
 
@@ -873,6 +878,7 @@ export async function getAIBloggerSerpAnalysis(
             location,
             device,
             refreshWindowHours,
+            maxCompetitors,
         );
 
         if (cached) {

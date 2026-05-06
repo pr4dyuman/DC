@@ -40,6 +40,7 @@ import {
     handleTaskAssignmentChangeEffectsImpl,
     handleTaskStatusChangeEffectsImpl,
 } from "./task-effects";
+import { shouldSuppressTaskEmailNotifications } from "./task-email-context";
 
 export { addCommentImpl, deleteTaskImpl } from "./task-collaboration";
 
@@ -165,10 +166,11 @@ export async function createTaskImpl(
         timestamp: new Date().toISOString(),
     });
 
+    const suppressEmailNotifications = shouldSuppressTaskEmailNotifications();
     const emailCats = getEmailCategories(agency);
     const taskEmailEvents = emailCats.taskEmailEvents || {};
     const createdEventConfig = { ...DEFAULT_TASK_EMAIL_EVENTS.taskCreated, ...taskEmailEvents.taskCreated };
-    const shouldSendTaskEmail = emailCats.taskUpdates !== false && createdEventConfig.enabled;
+    const shouldSendTaskEmail = !suppressEmailNotifications && emailCats.taskUpdates !== false && createdEventConfig.enabled;
 
     if (shouldSendTaskEmail) {
         try {

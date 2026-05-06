@@ -2,7 +2,7 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 import type { Invoice, Project } from "../db";
-import { checkAgencyLimit, incrementAgencyUsage } from "../agency-context";
+import { checkAgencyLimit, decrementAgencyUsage, incrementAgencyUsage, reserveAgencyUsage } from "../agency-context";
 import { sendProjectCreatedEmail } from "../brevo-mail";
 import { generateId } from "../utils-server";
 import { sanitizeMongoInput, sanitizeName, sanitizeString } from "../validation";
@@ -230,11 +230,28 @@ export async function createProjectImpl(
         }
     }
 
+    let reservedInvoiceCount = 0;
+    const releaseReservedInvoices = async () => {
+        if (reservedInvoiceCount > 0) {
+            await decrementAgencyUsage(agencyId, "monthlyInvoices", reservedInvoiceCount);
+            reservedInvoiceCount = 0;
+        }
+    };
+
+    if (newInvoices.length > 0) {
+        const invoiceLimit = await reserveAgencyUsage(agencyId, "monthlyInvoices", newInvoices.length);
+        if (!invoiceLimit.allowed) {
+            throw new Error(`Plan limit reached: your plan allows ${invoiceLimit.limit} monthly invoices (currently ${invoiceLimit.current}).`);
+        }
+        reservedInvoiceCount = newInvoices.length;
+    }
+
     if (serviceDocs.length > 0) {
         try {
             await ServiceModel.insertMany(serviceDocs, { ordered: true });
         } catch (serviceSyncError) {
             console.error("[createProject] Service sync failed before project creation:", serviceSyncError);
+            await releaseReservedInvoices();
             throw new Error("Project creation failed while creating services. No changes were saved.");
         }
     }
@@ -249,13 +266,20 @@ export async function createProjectImpl(
                 console.error("[createProject] Failed to roll back services after project creation error:", serviceRollbackError);
             }
         }
+        await releaseReservedInvoices();
         throw projectCreationError;
     }
 
     await incrementAgencyUsage(agencyId, "projects");
 
     if (newInvoices.length > 0) {
-        await InvoiceModel.insertMany(newInvoices);
+        try {
+            await InvoiceModel.insertMany(newInvoices);
+            reservedInvoiceCount = 0;
+        } catch (invoiceCreationError) {
+            await releaseReservedInvoices();
+            throw invoiceCreationError;
+        }
     }
 
     // Notify ALL linked clients about new invoices

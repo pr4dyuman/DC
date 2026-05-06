@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { sanitizeName, sanitizeString, sanitizePhone, validateEmail, validatePassword, validateStrongPassword } from "../validation";
 import { mergeAIBloggerConfig } from "../ai-blogger-config";
+import { sanitizeLocation } from "../ai-blogger-text-utils";
 import { getBlogStudioOverviewImpl } from "./ai-blogger";
 import {
     getAgencyAIBloggerConfigSuperAdminImpl,
@@ -542,7 +543,7 @@ export async function updateAgencyAIBloggerConfigSuperAdmin(agencyId: string, co
             fallbackApiKey: resolvedFallbackApiKey,
             fallbackEnabled: Boolean(nextConfig.fallbackEnabled),
             fallbackToAi: Boolean(nextConfig.fallbackToAi),
-            defaultLocation: sanitizeString(nextConfig.defaultLocation || "us", 12).toLowerCase() || "us",
+            defaultLocation: sanitizeLocation(nextConfig.defaultLocation, "us"),
             trendFirstMode: nextConfig.trendFirstMode ?? true,
             maxTrendRequestsPerBlog: Math.min(20, Math.max(1, Math.round(nextConfig.maxTrendRequestsPerBlog || 8))),
             trendScanTimeBudgetMs: Math.min(90_000, Math.max(8_000, Math.round(nextConfig.trendScanTimeBudgetMs || 45_000))),
@@ -616,7 +617,7 @@ export async function updateAgencyAIBloggerConfigSuperAdmin(agencyId: string, co
             apiKey: resolvedPrimaryApiKey,
             fallbackApiKey: resolvedFallbackApiKey,
             fallbackEnabled: Boolean(nextConfig.fallbackEnabled),
-            defaultLocation: sanitizeString(nextConfig.defaultLocation || "us", 12).toLowerCase() || "us",
+            defaultLocation: sanitizeLocation(nextConfig.defaultLocation, "us"),
             device: nextConfig.device === "mobile" ? "mobile" : "desktop",
             maxCompetitors: Math.min(10, Math.max(3, Math.round(nextConfig.maxCompetitors || 5))),
             refreshWindowHours: Math.min(24 * 30, Math.max(1, Math.round(nextConfig.refreshWindowHours || 24))),

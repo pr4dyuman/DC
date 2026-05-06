@@ -32,6 +32,7 @@ import {
 import { getAIBloggerDashboardContext } from "@/lib/ai-blogger-dashboard";
 import { getBlogStudioInternalLinkSuggestions } from "@/lib/ai-blogger-internal-links";
 import { getAIBloggerSerpAnalysis } from "@/lib/ai-blogger-serp-analysis";
+import { sanitizeLocation } from "@/lib/ai-blogger-text-utils";
 import { getBlogStudioSeoAudit } from "@/lib/ai-blogger-seo-audit";
 import { getAIBloggerWebsiteIntelligence } from "@/lib/ai-blogger-website-intelligence";
 import {
@@ -82,6 +83,22 @@ function resolveActiveTab(searchParams: Record<string, string>): "write" | "seo"
     const raw = searchParams["tab"];
     if (raw === "seo" || raw === "assets" || raw === "settings") return raw;
     return "write";
+}
+
+function resolvePostSearchLocation(
+    configLocation: string | undefined,
+    briefLocation: string | undefined,
+    defaultLocation: string | undefined,
+) {
+    if (typeof configLocation === "string") {
+        return sanitizeLocation(configLocation, defaultLocation ?? "us");
+    }
+
+    if (typeof briefLocation === "string") {
+        return sanitizeLocation(briefLocation, defaultLocation ?? "us");
+    }
+
+    return sanitizeLocation(defaultLocation, "us");
 }
 
 /* ─── Page ─────────────────────────────────────────────────────── */
@@ -167,10 +184,11 @@ export default async function AIBloggerPostDetailPage({
             apiKey: aiBloggerConfig?.serp?.apiKey,
             fallbackApiKey: aiBloggerConfig?.serp?.fallbackApiKey,
             fallbackEnabled: aiBloggerConfig?.serp?.fallbackEnabled ?? true,
-            location:
-                post.brief.location ||
-                aiBloggerConfig?.serp?.defaultLocation ||
+            location: resolvePostSearchLocation(
+                aiBloggerConfig?.serp?.defaultLocation,
+                post.brief.location,
                 settings.seo.defaultLocation,
+            ),
             device: aiBloggerConfig?.serp?.device,
             maxCompetitors: aiBloggerConfig?.serp?.maxCompetitors,
             refreshWindowHours: aiBloggerConfig?.serp?.refreshWindowHours,

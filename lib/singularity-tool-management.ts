@@ -1,3 +1,5 @@
+import crypto from "crypto";
+
 import {
     addService,
     approveLeaveRequest,
@@ -17,7 +19,7 @@ type ToolArgs = Record<string, unknown>;
 type RollbackAction = {
     toolName: string;
     actionType: "create" | "update" | "delete";
-    entityType: "task" | "project" | "client" | "invoice" | "transaction" | "service" | "leaveRequest" | "comment";
+    entityType: "task" | "project" | "client" | "user" | "invoice" | "transaction" | "service" | "leaveRequest" | "comment";
     entityId: string;
     beforeSnapshot?: unknown;
     createdEntityIds?: string[];
@@ -59,6 +61,10 @@ function getStringArrayArg(args: ToolArgs, key: string): string[] {
     return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
+function generateTemporaryPassword() {
+    return `${crypto.randomBytes(12).toString("base64url")}Aa1!`;
+}
+
 export async function executeManagementTool(
     name: ManagementToolName,
     args: ToolArgs,
@@ -66,6 +72,7 @@ export async function executeManagementTool(
 ): Promise<ToolExecutionResult> {
     switch (name) {
         case "create_client": {
+            const generatedPassword = getOptionalStringArg(args, "password") || generateTemporaryPassword();
             const result = await createClient({
                 name: getStringArg(args, "name"),
                 email: getStringArg(args, "email"),
@@ -73,6 +80,7 @@ export async function executeManagementTool(
                 phone: getOptionalStringArg(args, "phone"),
                 address: getOptionalStringArg(args, "address"),
                 logo: getOptionalStringArg(args, "logo"),
+                password: generatedPassword,
             });
 
             if (!result.success) {
@@ -92,13 +100,14 @@ export async function executeManagementTool(
 
             return {
                 success: true,
-                data: { id: newClient.id, name: newClient.name, companyName: newClient.companyName },
-                summary: `Client "${newClient.name}" (${newClient.companyName}) created${createdAt ? ` (backdated: ${createdAt})` : ""}`,
+                data: { id: newClient.id, name: newClient.name, companyName: newClient.companyName, temporaryPassword: generatedPassword },
+                summary: `Client "${newClient.name}" (${newClient.companyName}) created${createdAt ? ` (backdated: ${createdAt})` : ""}. Temporary password: ${generatedPassword} - please change on first login.`,
                 rollbackData: [{
                     toolName: "create_client",
                     actionType: "create",
                     entityType: "client",
                     entityId: newClient.id,
+                    beforeSnapshot: { agencyId: newClient.agencyId },
                     executedAt: new Date().toISOString(),
                 }],
             };
@@ -165,7 +174,7 @@ export async function executeManagementTool(
                 rollbackData: empBefore ? [{
                     toolName: "update_employee",
                     actionType: "update",
-                    entityType: "task",
+                    entityType: "user",
                     entityId: userId,
                     beforeSnapshot: empBefore,
                     executedAt: new Date().toISOString(),

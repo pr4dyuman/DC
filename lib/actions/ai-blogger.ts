@@ -76,6 +76,7 @@ import {
     type AIBloggerViralTrendSignal,
 } from "../ai-blogger-trends";
 import { isValidUrl } from "../ai-blogger-url-utils";
+import { formatLocationLabel, sanitizeLocation } from "../ai-blogger-text-utils";
 import {
     normalizeMarketingCanonicalUrl,
     normalizeMarketingSiteOrigin,
@@ -171,6 +172,94 @@ type StoredAgencyAIBloggerContext = {
     aiConfig?: unknown;
     aiBloggerConfig?: unknown;
 };
+
+type WebsiteCrawlRuntimeConfig = Pick<
+    AIBloggerConfig["crawl"],
+    "enabled" | "maxPages" | "timeoutMs" | "refreshWindowHours" | "allowedPaths" | "blockedPaths"
+> | undefined;
+
+function shouldWaitForWebsitePrecache() {
+    return process.env.NODE_ENV === "production" || process.env.AI_BLOGGER_USE_HTTP_WORKER_LOCAL === "true";
+}
+
+function getConfiguredWebsiteCrawlMaxPages(crawlConfig: WebsiteCrawlRuntimeConfig) {
+    return Math.max(1, Math.min(50, Math.round(crawlConfig?.maxPages || 8)));
+}
+
+function getEmergencyWebsiteCrawlBudgetMs(maxPages: number) {
+    return Math.min(60_000, Math.max(25_000, 15_000 + (maxPages * 2_000)));
+}
+
+function getEmergencyWebsiteCrawlConcurrency(maxPages: number) {
+    if (maxPages >= 18) {
+        return 4;
+    }
+
+    if (maxPages >= 10) {
+        return 3;
+    }
+
+    return 2;
+}
+
+function getEmergencyWebsiteCrawlLogPrefix(waitedMs: number) {
+    return waitedMs > 0
+        ? `Precache miss after ${waitedMs / 1000}s`
+        : "No precache worker in this local run";
+}
+
+function resolveSerpMaxCompetitorsForGroundedResearch(
+    serpConfig: AIBloggerConfig["serp"] | undefined,
+    groundedResearchConfig: AIBloggerConfig["groundedResearch"] | undefined,
+) {
+    const configuredCompetitors = serpConfig?.maxCompetitors ?? 5;
+    if (groundedResearchConfig?.enabled === false) {
+        return configuredCompetitors;
+    }
+
+    const desiredSourcePool = Math.min(10, Math.max(5, (groundedResearchConfig?.maxSources || 5) * 2));
+    return Math.min(10, Math.max(configuredCompetitors, desiredSourcePool));
+}
+
+function resolveExternalSearchLocation(
+    configLocation: string | undefined,
+    briefLocation: string | undefined,
+    defaultLocation: string | undefined,
+) {
+    if (typeof configLocation === "string") {
+        return sanitizeLocation(configLocation, defaultLocation ?? "us");
+    }
+
+    if (typeof briefLocation === "string") {
+        return sanitizeLocation(briefLocation, defaultLocation ?? "us");
+    }
+
+    return sanitizeLocation(defaultLocation, "us");
+}
+
+function isExternalAiCapacityError(error: unknown) {
+    const normalized = getErrorMessage(error).toLowerCase();
+    return (
+        /\b(?:408|409|429|500|502|503|504)\b/.test(normalized) ||
+        normalized.includes("quota") ||
+        normalized.includes("rate limit") ||
+        normalized.includes("rate_limit") ||
+        normalized.includes("too many requests") ||
+        normalized.includes("resource exhausted") ||
+        normalized.includes("resource_exhausted") ||
+        normalized.includes("exhausted") ||
+        normalized.includes("timeout") ||
+        normalized.includes("timed out") ||
+        normalized.includes("aborted") ||
+        normalized.includes("overloaded") ||
+        normalized.includes("temporarily unavailable")
+    );
+}
+
+function buildFinalCheckerCapacitySkipSummary(error: unknown) {
+    const reason = sanitizeText(getErrorMessage(error), 220);
+    return `Final AI Checker skipped because the AI provider could not complete the review after retry/fallback handling. Deterministic Quality Review still ran.${reason ? ` Provider message: ${reason}` : ""}`;
+}
 
 function buildPipelineCompletionResult(
     post: BlogStudioPost,
@@ -3915,7 +4004,7 @@ function formatSerpAnalysisForPrompt(analysis: AIBloggerSerpAnalysis | null) {
     return `SERP analysis:
 - Source: ${describeSerpAnalysisSource(analysis)}
 - Query: ${analysis.query}
-- Region: ${analysis.location.toUpperCase()}
+- Region: ${formatLocationLabel(analysis.location)}
 - Device: ${analysis.device}
 - Intent: ${analysis.intent}
 - Ranking difficulty: ${analysis.rankingDifficulty || "not assessed"}
@@ -3941,7 +4030,7 @@ function formatGroundedResearchForPrompt(groundedResearch: AIBloggerGroundedRese
     return `Grounded research sources:
 - Source set: ${describeGroundedResearchSource(groundedResearch)}
 - Query: ${groundedResearch.query}
-- Region: ${groundedResearch.location.toUpperCase()}
+- Region: ${formatLocationLabel(groundedResearch.location)}
 - Summary: ${groundedResearch.summary}
 
 ${groundedResearch.sources
@@ -5589,6 +5678,8 @@ const WEBSITE_FIT_GENERIC_TOKENS = new Set([
     "blog",
     "blogs",
     "brand",
+    "build",
+    "building",
     "business",
     "businesses",
     "company",
@@ -5599,6 +5690,8 @@ const WEBSITE_FIT_GENERIC_TOKENS = new Set([
     "customers",
     "design",
     "digital",
+    "draft",
+    "drafts",
     "engagement",
     "full",
     "general",
@@ -5897,6 +5990,12 @@ export function assessTrendAgainstWebsite(
         hasLocalInstitutionIncidentRisk(trend.topic, trendContext) &&
         matchedCoreTokens.length < 2 &&
         !exactPhraseMatch;
+    const requiresCommercialEvidence = isCommercialWebsiteTrendContext(websiteIntelligence);
+    const hasCommercialTrendEvidence =
+        commercialOverlap >= 18 ||
+        (coreGroupMatches.includes("services") && matchedCoreTokens.length >= 2) ||
+        (exactEntityMatch && coreGroupMatches.includes("services")) ||
+        exactPhraseMatch;
 
     let score = clampBlogStudioScore(
         (topicOverlap * 0.26) +
@@ -5908,7 +6007,8 @@ export function assessTrendAgainstWebsite(
         (exactPhraseMatch ? 12 : 0) +
         (exactEntityMatch ? 10 : 0) +
         (offTopicCategoryMismatch ? -28 : 0) +
-        (localInstitutionIncidentRisk ? -35 : 0),
+        (localInstitutionIncidentRisk ? -35 : 0) +
+        (requiresCommercialEvidence && !hasCommercialTrendEvidence ? -22 : 0),
     );
 
     const reasons: string[] = [];
@@ -5958,6 +6058,10 @@ export function assessTrendAgainstWebsite(
         reasons.push("local institution incident trend needs explicit site fit");
     }
 
+    if (requiresCommercialEvidence && !hasCommercialTrendEvidence) {
+        reasons.push("no service or money-page evidence matched");
+    }
+
     const accepted =
         score >= minimumFitScore &&
         topicOverlap >= 18 &&
@@ -5973,6 +6077,7 @@ export function assessTrendAgainstWebsite(
             exactPhraseMatch ||
             (exactEntityMatch && coreGroupMatches.length >= 1)
         ) &&
+        (!requiresCommercialEvidence || hasCommercialTrendEvidence) &&
         !offTopicCategoryMismatch &&
         !localInstitutionIncidentRisk;
 
@@ -6148,6 +6253,18 @@ function applyDynamicWebsiteTrendGate(input: {
                 rejectedCount: Math.max(0, reassessedTrends.length - acceptedTrends.length),
             }
             : input.trendSignals.scanStats,
+        summary: buildDynamicWebsiteTrendGateSummary(
+            input.trendSignals.location,
+            reassessedTrends,
+            acceptedTrends,
+            input.trendSignals.scanStats
+                ? {
+                    ...input.trendSignals.scanStats,
+                    acceptedCount: acceptedTrends.length,
+                    rejectedCount: Math.max(0, reassessedTrends.length - acceptedTrends.length),
+                }
+                : undefined,
+        ),
     };
 
     return {
@@ -6156,6 +6273,39 @@ function applyDynamicWebsiteTrendGate(input: {
             .filter((trend) => !trend.acceptedForTrendFirst)
             .slice(0, 5),
     };
+}
+
+function buildDynamicWebsiteTrendGateSummary(
+    location: string,
+    viralTrends: Array<AIBloggerViralTrendSignal & { dynamicFitScore?: number }>,
+    acceptedTrends: Array<AIBloggerViralTrendSignal & { dynamicFitScore?: number }>,
+    scanStats?: AIBloggerTrendSignals["scanStats"],
+) {
+    const topTrend = acceptedTrends[0] || viralTrends[0];
+    if (!topTrend) {
+        return `No live Google Trends topics were ranked for ${formatLocationLabel(location)}.`;
+    }
+
+    const metrics = [
+        `score ${topTrend.score}`,
+        `viral ${topTrend.viralScore}`,
+        `site-fit ${topTrend.dynamicFitScore ?? topTrend.fitScore}`,
+        topTrend.active === true ? "active" : topTrend.active === false ? "not active" : "",
+        topTrend.searchVolume ? `volume ${formatTrendVolume(topTrend.searchVolume)}` : "",
+        topTrend.increasePercentage ? `growth +${Math.round(topTrend.increasePercentage)}%` : "",
+        topTrend.sourceRank ? `source rank #${topTrend.sourceRank}` : "",
+    ].filter(Boolean);
+    const scanPart = scanStats
+        ? `Scanned ${scanStats.requestCount}/${scanStats.maxRequests} request(s), accepted ${scanStats.acceptedCount} website-fit trend(s), rejected ${scanStats.rejectedCount}.`
+        : "";
+    const matchPart = acceptedTrends.length > 0
+        ? `Accepted live match: ${topTrend.topic} (${metrics.join(", ")}).`
+        : `No strict website-fit match. Best reviewed trend: ${topTrend.topic} (${metrics.join(", ")}).`;
+
+    return sanitizeText(
+        `Ranked ${viralTrends.length} Google Trends topics for ${formatLocationLabel(location)} by viral momentum and dynamic website fit. ${scanPart} ${matchPart}`,
+        360,
+    );
 }
 
 function buildWebsiteTrendMissFallbackMessage(
@@ -6241,6 +6391,7 @@ function buildInternetTrendSearchQueries(input: {
 function normalizeInternetTrendTopic(value: string) {
     return sanitizeText(
         value
+            .replace(/^(?:[-*•]|â€¢)\s*/i, "")
             .replace(/^PAA not covered in competitor headings:\s*/i, "")
             .replace(/&[#a-z0-9]+;/gi, " ")
             .replace(/\s[-|]\s[^-|]{2,80}$/g, "")
@@ -6298,6 +6449,43 @@ function topicLooksLikeMalformedTrendCandidate(topic: string, websiteIntelligenc
     }
 
     return false;
+}
+
+function normalizeTopicSelectionCandidate(value: string) {
+    return sanitizeText(
+        normalizeInternetTrendTopic(value)
+            .replace(/^(?:[-*•]|â€¢)\s*/i, "")
+            .replace(/^https?:\/\/\S+$/i, "")
+            .replace(/^www\.\S+$/i, "")
+            .replace(/\s+/g, " ")
+            .trim(),
+        140,
+    );
+}
+
+function isUsableTopicSelectionCandidate(
+    topic: string,
+    websiteIntelligence: AIBloggerWebsiteIntelligence | null | undefined,
+    sourceMode: BlogStudioBrief["sourceMode"],
+) {
+    const normalized = sanitizeText(topic, 140);
+    if (!normalized) {
+        return false;
+    }
+
+    if (/^(?:https?:\/\/|www\.)/i.test(normalized)) {
+        return false;
+    }
+
+    if (/^(?:home|services?|contact us|about us|get started|learn more)$/i.test(normalized)) {
+        return false;
+    }
+
+    if (topicLooksLikeMalformedTrendCandidate(normalized, websiteIntelligence)) {
+        return false;
+    }
+
+    return !(sourceMode === "website" && looksLikeBrandTagline(normalized, websiteIntelligence));
 }
 
 function buildInternetTrendCandidatesFromSerp(analysis: AIBloggerSerpAnalysis, sourceQuery: string) {
@@ -7893,7 +8081,15 @@ function rerankDiscoveredTopics(input: {
             ...safeTrendPool.keywordItems,
             ...safeTrendPool.viralTrendItems,
             ...input.fallbackCandidates,
-        ],
+        ]
+            .map(normalizeTopicSelectionCandidate)
+            .filter((topic) =>
+                isUsableTopicSelectionCandidate(
+                    topic,
+                    input.websiteIntelligence,
+                    input.brief.sourceMode,
+                ),
+            ),
         28,
         140,
     );
@@ -9106,18 +9302,18 @@ function formatLiveTrendsForPrompt(
             : liveTrends.viralTrends;
         if (requiresTrendFit && promptTrends.length === 0) {
             const gateLabel = sourceMode === "website" ? "website-fit" : "given-topic fit";
-            return `Live Google Trends viral-fit ranking for ${liveTrends.location.toUpperCase()}:
+            return `Live Google Trends viral-fit ranking for ${formatLocationLabel(liveTrends.location)}:
 No live Google Trends topic passed the ${gateLabel} gate.`;
         }
         const rankedTrends = promptTrends.length > 0
             ? promptTrends.slice(0, 12).map(formatViralTrendForPrompt).join("\n")
             : liveTrends.candidateTopics.map((topic, index) => `${index + 1}. ${topic}`).join("\n");
 
-        return `Live Google Trends viral-fit ranking for ${liveTrends.location.toUpperCase()}:
+        return `Live Google Trends viral-fit ranking for ${formatLocationLabel(liveTrends.location)}:
 ${rankedTrends}`;
     }
 
-    return `Google Trends keyword analysis for ${liveTrends.location.toUpperCase()}:
+    return `Google Trends keyword analysis for ${formatLocationLabel(liveTrends.location)}:
 ${liveTrends.keywordResults
     .map(
         (result, index) =>
@@ -9139,7 +9335,7 @@ function formatTrendsContextForPrompt(
         return "";
     }
 
-    const parts: string[] = [`Google Trends context (${trendSignals.location.toUpperCase()}):`];
+    const parts: string[] = [`Google Trends context (${formatLocationLabel(trendSignals.location)}):`];
     const requiresTrendFit = sourceModeRequiresTrendFit(sourceMode);
     const suppressRejectedLiveTopics =
         requiresTrendFit &&
@@ -14310,10 +14506,11 @@ export async function resolveBlogStudioPostBlockersWithAIImpl(
                 apiKey: aiBloggerConfig?.serp?.apiKey,
                 fallbackApiKey: aiBloggerConfig?.serp?.fallbackApiKey,
                 fallbackEnabled: aiBloggerConfig?.serp?.fallbackEnabled ?? true,
-                location:
-                    currentPost.brief.location ||
-                    aiBloggerConfig?.serp?.defaultLocation ||
+                location: resolveExternalSearchLocation(
+                    aiBloggerConfig?.serp?.defaultLocation,
+                    currentPost.brief.location,
                     settings.seo.defaultLocation,
+                ),
                 device: aiBloggerConfig?.serp?.device,
                 maxCompetitors: aiBloggerConfig?.serp?.maxCompetitors,
                 refreshWindowHours: aiBloggerConfig?.serp?.refreshWindowHours,
@@ -14796,10 +14993,11 @@ export async function retargetBlogStudioPostCannibalizationWithAIImpl(
                 apiKey: aiBloggerConfig?.serp?.apiKey,
                 fallbackApiKey: aiBloggerConfig?.serp?.fallbackApiKey,
                 fallbackEnabled: aiBloggerConfig?.serp?.fallbackEnabled ?? true,
-                location:
-                    currentPost.brief.location ||
-                    aiBloggerConfig?.serp?.defaultLocation ||
+                location: resolveExternalSearchLocation(
+                    aiBloggerConfig?.serp?.defaultLocation,
+                    currentPost.brief.location,
                     settings.seo.defaultLocation,
+                ),
                 device: aiBloggerConfig?.serp?.device,
                 maxCompetitors: aiBloggerConfig?.serp?.maxCompetitors,
                 refreshWindowHours: aiBloggerConfig?.serp?.refreshWindowHours,
@@ -15260,10 +15458,11 @@ export async function refreshBlogStudioPostGroundedResearchImpl(
         apiKey: aiBloggerConfig?.serp?.apiKey,
         fallbackApiKey: aiBloggerConfig?.serp?.fallbackApiKey,
         fallbackEnabled: aiBloggerConfig?.serp?.fallbackEnabled ?? true,
-        location:
-            currentPost.brief.location ||
-            aiBloggerConfig?.serp?.defaultLocation ||
-            settings.seo.defaultLocation,
+                location: resolveExternalSearchLocation(
+                    aiBloggerConfig?.serp?.defaultLocation,
+                    currentPost.brief.location,
+                    settings.seo.defaultLocation,
+                ),
         device: aiBloggerConfig?.serp?.device,
         maxCompetitors: aiBloggerConfig?.serp?.maxCompetitors,
         refreshWindowHours: aiBloggerConfig?.serp?.refreshWindowHours,
@@ -16324,14 +16523,14 @@ export async function generateBlogStudioDraftImpl(
                 // This gives website crawling effectively 300s without touching AI time.
 
                 const POLL_INTERVAL_MS  = 5_000;  // check MongoDB every 5s
-                const POLL_MAX_WAIT_MS  = 60_000; // wait up to 60s for precache
-                const FALLBACK_CRAWL_MS = 25_000; // emergency crawl if precache missed
+                const POLL_MAX_WAIT_MS  = shouldWaitForWebsitePrecache() ? 60_000 : 0;
                 const refreshWindowHours = crawlConfig?.refreshWindowHours ?? WEBSITE_CRAWL_DEFAULT_REFRESH_HOURS;
-                const configuredMaxPages = crawlConfig?.maxPages ?? 8;
+                const configuredMaxPages = getConfiguredWebsiteCrawlMaxPages(crawlConfig);
+                const FALLBACK_CRAWL_MS = getEmergencyWebsiteCrawlBudgetMs(configuredMaxPages);
 
                 // Step 1: poll MongoDB for the cache being filled by the precache function
                 const normalizedSourceUrl = normalizeWebsiteUrl(brief.sourceValue || "")?.toString() ?? "";
-                if (agency.id && normalizedSourceUrl) {
+                if (agency.id && normalizedSourceUrl && POLL_MAX_WAIT_MS > 0) {
                     const pollStart = Date.now();
                     while (!websiteIntelligence && Date.now() - pollStart < POLL_MAX_WAIT_MS) {
                         const cached = await getCachedWebsiteIntelligence(
@@ -16354,22 +16553,22 @@ export async function generateBlogStudioDraftImpl(
                     }
                 }
 
-                // Step 2: if still no cache (precache slow/missed), do short emergency crawl
-                // Use half the configured pages to save time under the 25s budget.
+                // Step 2: if still no cache (precache slow/missed), crawl directly.
+                // Respect the admin page depth even in the emergency path.
                 if (!websiteIntelligence) {
-                    const emergencyMaxPages = Math.max(Math.ceil(configuredMaxPages / 2), 2);
-                    console.warn(`[WORKER] Precache miss after ${POLL_MAX_WAIT_MS / 1000}s — attempting emergency crawl (${FALLBACK_CRAWL_MS / 1000}s timeout, ${emergencyMaxPages} pages)`);
+                    const emergencyMaxPages = configuredMaxPages;
+                    console.warn(`[WORKER] ${getEmergencyWebsiteCrawlLogPrefix(POLL_MAX_WAIT_MS)} -- attempting website crawl (${FALLBACK_CRAWL_MS / 1000}s timeout, up to ${emergencyMaxPages} configured pages)`);
                     websiteIntelligence = await Promise.race([
                         getAIBloggerWebsiteIntelligence(brief.sourceValue || "", {
                             agencyId: agency.id,
                             enabled: crawlConfig?.enabled ?? true,
                             maxPages: emergencyMaxPages,
-                            timeoutMs: Math.min(crawlConfig?.timeoutMs ?? 8000, 10000),
+                            timeoutMs: Math.min(Math.max(crawlConfig?.timeoutMs ?? 8000, 8000), 12000),
                             refreshWindowHours,
                             allowedPaths: crawlConfig?.allowedPaths,
                             blockedPaths: crawlConfig?.blockedPaths,
-                            totalBudgetMs: 20_000,
-                            maxConcurrency: 2,
+                            totalBudgetMs: Math.max(10_000, FALLBACK_CRAWL_MS - 5_000),
+                            maxConcurrency: getEmergencyWebsiteCrawlConcurrency(emergencyMaxPages),
                         }),
                         new Promise<null>((resolve) => setTimeout(() => resolve(null), FALLBACK_CRAWL_MS)),
                     ]);
@@ -16462,7 +16661,8 @@ export async function generateBlogStudioDraftImpl(
                 const targetUrl = brief.targetWebsiteUrl.trim();
                 const normalizedTargetUrl = normalizeWebsiteUrl(targetUrl)?.toString() ?? "";
                 const refreshWindowHours = crawlConfig?.refreshWindowHours ?? WEBSITE_CRAWL_DEFAULT_REFRESH_HOURS;
-                const configuredMaxPages = crawlConfig?.maxPages ?? 8;
+                const configuredMaxPages = getConfiguredWebsiteCrawlMaxPages(crawlConfig);
+                const FALLBACK_CRAWL_MS = getEmergencyWebsiteCrawlBudgetMs(configuredMaxPages);
 
                 // Check cache first — the site may have been crawled recently.
                 if (agency.id && normalizedTargetUrl) {
@@ -16477,22 +16677,22 @@ export async function generateBlogStudioDraftImpl(
                     }
                 }
 
-                // If no cache, do a direct crawl with a 25s safety timeout.
+                // If no cache, do a direct crawl with the configured page depth.
                 if (!websiteIntelligence) {
-                    const emergencyMaxPages = Math.max(Math.ceil(configuredMaxPages / 2), 2);
+                    const emergencyMaxPages = configuredMaxPages;
                     websiteIntelligence = await Promise.race([
                         getAIBloggerWebsiteIntelligence(targetUrl, {
                             agencyId: agency.id,
                             enabled: crawlConfig?.enabled ?? true,
                             maxPages: emergencyMaxPages,
-                            timeoutMs: Math.min(crawlConfig?.timeoutMs ?? 8000, 10000),
+                            timeoutMs: Math.min(Math.max(crawlConfig?.timeoutMs ?? 8000, 8000), 12000),
                             refreshWindowHours,
                             allowedPaths: crawlConfig?.allowedPaths,
                             blockedPaths: crawlConfig?.blockedPaths,
-                            totalBudgetMs: 20_000,
-                            maxConcurrency: 2,
+                            totalBudgetMs: Math.max(10_000, FALLBACK_CRAWL_MS - 5_000),
+                            maxConcurrency: getEmergencyWebsiteCrawlConcurrency(emergencyMaxPages),
                         }),
-                        new Promise<null>((resolve) => setTimeout(() => resolve(null), 25_000)),
+                        new Promise<null>((resolve) => setTimeout(() => resolve(null), FALLBACK_CRAWL_MS)),
                     ]);
                 }
 
@@ -16639,7 +16839,11 @@ export async function generateBlogStudioDraftImpl(
                     sourceValue: brief.sourceValue || "",
                     trendFocus: brief.trendFocus || "",
                     primaryKeyword: brief.primaryKeyword || "",
-                    location: brief.location || settings.seo.defaultLocation,
+                    location: resolveExternalSearchLocation(
+                        liveTrendsConfig.defaultLocation,
+                        brief.location,
+                        settings.seo.defaultLocation,
+                    ),
                     fallbackCandidates,
                 });
                 liveTrendsUsedFallbackKey = liveTrends.usedFallbackKey;
@@ -16680,7 +16884,11 @@ export async function generateBlogStudioDraftImpl(
                         websiteIntelligence,
                         serpConfig: aiBloggerConfig?.serp,
                         trendsConfig: liveTrendsConfig,
-                        location: brief.location || settings.seo.defaultLocation,
+                        location: resolveExternalSearchLocation(
+                            liveTrendsConfig.defaultLocation,
+                            brief.location,
+                            settings.seo.defaultLocation,
+                        ),
                         minimumFitScore: minimumWebsiteTrendFitScore,
                         recentTopicTexts: recentPostTitles,
                         runtimeConfig: mergedAIBloggerConfig.extractKeywords,
@@ -16806,7 +17014,11 @@ export async function generateBlogStudioDraftImpl(
                     websiteIntelligence,
                     serpConfig: aiBloggerConfig?.serp,
                     trendsConfig: liveTrendsConfig,
-                    location: brief.location || settings.seo.defaultLocation,
+                    location: resolveExternalSearchLocation(
+                        liveTrendsConfig.defaultLocation,
+                        brief.location,
+                        settings.seo.defaultLocation,
+                    ),
                     minimumFitScore: minimumWebsiteTrendFitScore,
                     recentTopicTexts: recentPostTitles,
                     runtimeConfig: mergedAIBloggerConfig.extractKeywords,
@@ -16847,7 +17059,11 @@ export async function generateBlogStudioDraftImpl(
                 websiteIntelligence,
                 serpConfig: aiBloggerConfig?.serp,
                 trendsConfig: liveTrendsConfig,
-                location: brief.location || settings.seo.defaultLocation,
+                location: resolveExternalSearchLocation(
+                    liveTrendsConfig?.defaultLocation,
+                    brief.location,
+                    settings.seo.defaultLocation,
+                ),
                 minimumFitScore: minimumWebsiteTrendFitScore,
                 recentTopicTexts: recentPostTitles,
                 runtimeConfig: mergedAIBloggerConfig.extractKeywords,
@@ -16914,7 +17130,11 @@ export async function generateBlogStudioDraftImpl(
                 recentTopicTexts: recentPostTitles,
                 serpConfig,
                 trendsConfig: liveTrendsConfig,
-                location: brief.location || settings.seo.defaultLocation,
+                location: resolveExternalSearchLocation(
+                    liveTrendsConfig?.defaultLocation,
+                    brief.location,
+                    settings.seo.defaultLocation,
+                ),
             });
         const discovery: TopicDiscoveryResult = {
             ...parsedDiscovery,
@@ -17089,12 +17309,16 @@ export async function generateBlogStudioDraftImpl(
                 apiKey: serpConfig?.apiKey,
                 fallbackApiKey: serpConfig?.fallbackApiKey,
                 fallbackEnabled: serpConfig?.fallbackEnabled ?? true,
-                location:
-                    brief.location ||
-                    serpConfig?.defaultLocation ||
+                location: resolveExternalSearchLocation(
+                    serpConfig?.defaultLocation,
+                    brief.location,
                     settings.seo.defaultLocation,
+                ),
                 device: serpConfig?.device,
-                maxCompetitors: serpConfig?.maxCompetitors,
+                maxCompetitors: resolveSerpMaxCompetitorsForGroundedResearch(
+                    serpConfig,
+                    aiBloggerConfig?.groundedResearch,
+                ),
                 refreshWindowHours: serpConfig?.refreshWindowHours,
                 trendsApiKey: liveTrendsConfig?.apiKey,
                 trendsFallbackApiKey: liveTrendsConfig?.fallbackApiKey,
@@ -17246,7 +17470,11 @@ export async function generateBlogStudioDraftImpl(
             try {
                 const groundedResearchResult = await getAIBloggerGroundedResearch(selectedTopicForRun, {
                     agencyId: agency.id,
-                    location: brief.location || settings.seo.defaultLocation,
+                    location: resolveExternalSearchLocation(
+                        aiBloggerConfig?.serp?.defaultLocation,
+                        brief.location,
+                        settings.seo.defaultLocation,
+                    ),
                     refreshWindowHours: aiBloggerConfig?.groundedResearch?.refreshWindowHours || 24,
                     sourceUrls: serpAnalysis?.topResultUrls,
                     groundedResearchConfig: aiBloggerConfig?.groundedResearch,
@@ -18922,12 +19150,18 @@ Rules:
                     );
                 }
             } catch (error) {
+                const finalCheckerMessage = getErrorMessage(error);
+                const shouldSkipCapacityFailure = isExternalAiCapacityError(error);
+                const finalCheckerFailureSummary = shouldSkipCapacityFailure
+                    ? buildFinalCheckerCapacitySkipSummary(error)
+                    : `Final checker failed: ${finalCheckerMessage}`;
+
                 blogLogError("FINAL-AI-CHECKER", "Final checker revision failed", error);
                 addRunStep(
                     "final-ai-checker",
                     "Final AI Checker",
-                    "failed",
-                    `Final checker failed: ${getErrorMessage(error)}`,
+                    shouldSkipCapacityFailure ? "skipped" : "failed",
+                    finalCheckerFailureSummary,
                     finalCheckerStepStartedAt,
                 );
 
@@ -18950,13 +19184,14 @@ Rules:
                             details: {},
                         },
                         {
-                            status: "failed",
-                            summary: "Final checker failed.",
+                            status: shouldSkipCapacityFailure ? "skipped" : "failed",
+                            summary: finalCheckerFailureSummary,
                             data: {
-                                error: getErrorMessage(error),
+                                error: finalCheckerMessage,
+                                nonFatalCapacityFailure: shouldSkipCapacityFailure,
                             },
                         },
-                        [getErrorMessage(error)]
+                        shouldSkipCapacityFailure ? undefined : [finalCheckerMessage]
                     );
                 }
             }
@@ -19674,13 +19909,13 @@ export async function runBlogStudioDraftResearchPhase(
 
             try {
                 const POLL_INTERVAL_MS = 5_000;
-                const POLL_MAX_WAIT_MS = 60_000;
-                const FALLBACK_CRAWL_MS = 25_000;
+                const POLL_MAX_WAIT_MS = shouldWaitForWebsitePrecache() ? 60_000 : 0;
                 const refreshWindowHours = crawlConfig?.refreshWindowHours ?? WEBSITE_CRAWL_DEFAULT_REFRESH_HOURS;
-                const configuredMaxPages = crawlConfig?.maxPages ?? 8;
+                const configuredMaxPages = getConfiguredWebsiteCrawlMaxPages(crawlConfig);
+                const FALLBACK_CRAWL_MS = getEmergencyWebsiteCrawlBudgetMs(configuredMaxPages);
                 const normalizedSourceUrl = normalizeWebsiteUrl(brief.sourceValue || "")?.toString() ?? "";
 
-                if (agency.id && normalizedSourceUrl) {
+                if (agency.id && normalizedSourceUrl && POLL_MAX_WAIT_MS > 0) {
                     const pollStart = Date.now();
                     while (!websiteIntelligence && Date.now() - pollStart < POLL_MAX_WAIT_MS) {
                         const cached = await getCachedWebsiteIntelligence(
@@ -19702,19 +19937,19 @@ export async function runBlogStudioDraftResearchPhase(
                 }
 
                 if (!websiteIntelligence) {
-                    const emergencyMaxPages = Math.max(Math.ceil(configuredMaxPages / 2), 2);
-                    console.warn(`[WORKER] Precache miss after ${POLL_MAX_WAIT_MS / 1000}s — attempting emergency crawl (${FALLBACK_CRAWL_MS / 1000}s timeout, ${emergencyMaxPages} pages)`);
+                    const emergencyMaxPages = configuredMaxPages;
+                    console.warn(`[WORKER] ${getEmergencyWebsiteCrawlLogPrefix(POLL_MAX_WAIT_MS)} -- attempting website crawl (${FALLBACK_CRAWL_MS / 1000}s timeout, up to ${emergencyMaxPages} configured pages)`);
                     websiteIntelligence = await Promise.race([
                         getAIBloggerWebsiteIntelligence(brief.sourceValue || "", {
                             agencyId: agency.id,
                             enabled: crawlConfig?.enabled ?? true,
                             maxPages: emergencyMaxPages,
-                            timeoutMs: Math.min(crawlConfig?.timeoutMs ?? 8000, 10000),
+                            timeoutMs: Math.min(Math.max(crawlConfig?.timeoutMs ?? 8000, 8000), 12000),
                             refreshWindowHours,
                             allowedPaths: crawlConfig?.allowedPaths,
                             blockedPaths: crawlConfig?.blockedPaths,
-                            totalBudgetMs: 20_000,
-                            maxConcurrency: 2,
+                            totalBudgetMs: Math.max(10_000, FALLBACK_CRAWL_MS - 5_000),
+                            maxConcurrency: getEmergencyWebsiteCrawlConcurrency(emergencyMaxPages),
                         }),
                         new Promise<null>((resolve) => setTimeout(() => resolve(null), FALLBACK_CRAWL_MS)),
                     ]);
@@ -19800,7 +20035,8 @@ export async function runBlogStudioDraftResearchPhase(
                 const targetUrl = brief.targetWebsiteUrl.trim();
                 const normalizedTargetUrl = normalizeWebsiteUrl(targetUrl)?.toString() ?? "";
                 const refreshWindowHours = crawlConfig?.refreshWindowHours ?? WEBSITE_CRAWL_DEFAULT_REFRESH_HOURS;
-                const configuredMaxPages = crawlConfig?.maxPages ?? 8;
+                const configuredMaxPages = getConfiguredWebsiteCrawlMaxPages(crawlConfig);
+                const FALLBACK_CRAWL_MS = getEmergencyWebsiteCrawlBudgetMs(configuredMaxPages);
 
                 if (agency.id && normalizedTargetUrl) {
                     const cached = await getCachedWebsiteIntelligence(
@@ -19815,20 +20051,20 @@ export async function runBlogStudioDraftResearchPhase(
                 }
 
                 if (!websiteIntelligence) {
-                    const emergencyMaxPages = Math.max(Math.ceil(configuredMaxPages / 2), 2);
+                    const emergencyMaxPages = configuredMaxPages;
                     websiteIntelligence = await Promise.race([
                         getAIBloggerWebsiteIntelligence(targetUrl, {
                             agencyId: agency.id,
                             enabled: crawlConfig?.enabled ?? true,
                             maxPages: emergencyMaxPages,
-                            timeoutMs: Math.min(crawlConfig?.timeoutMs ?? 8000, 10000),
+                            timeoutMs: Math.min(Math.max(crawlConfig?.timeoutMs ?? 8000, 8000), 12000),
                             refreshWindowHours,
                             allowedPaths: crawlConfig?.allowedPaths,
                             blockedPaths: crawlConfig?.blockedPaths,
-                            totalBudgetMs: 20_000,
-                            maxConcurrency: 2,
+                            totalBudgetMs: Math.max(10_000, FALLBACK_CRAWL_MS - 5_000),
+                            maxConcurrency: getEmergencyWebsiteCrawlConcurrency(emergencyMaxPages),
                         }),
-                        new Promise<null>((resolve) => setTimeout(() => resolve(null), 25_000)),
+                        new Promise<null>((resolve) => setTimeout(() => resolve(null), FALLBACK_CRAWL_MS)),
                     ]);
                 }
 
@@ -19973,7 +20209,11 @@ export async function runBlogStudioDraftResearchPhase(
                     sourceValue: brief.sourceValue || "",
                     trendFocus: brief.trendFocus || "",
                     primaryKeyword: brief.primaryKeyword || "",
-                    location: brief.location || settings.seo.defaultLocation,
+                    location: resolveExternalSearchLocation(
+                        liveTrendsConfig.defaultLocation,
+                        brief.location,
+                        settings.seo.defaultLocation,
+                    ),
                     fallbackCandidates,
                 });
                 liveTrendsUsedFallbackKey = liveTrends.usedFallbackKey;
@@ -20014,7 +20254,11 @@ export async function runBlogStudioDraftResearchPhase(
                         websiteIntelligence,
                         serpConfig: aiBloggerConfig?.serp,
                         trendsConfig: liveTrendsConfig,
-                        location: brief.location || settings.seo.defaultLocation,
+                        location: resolveExternalSearchLocation(
+                            liveTrendsConfig.defaultLocation,
+                            brief.location,
+                            settings.seo.defaultLocation,
+                        ),
                         minimumFitScore: minimumWebsiteTrendFitScore,
                         recentTopicTexts: recentPostTitles,
                         runtimeConfig: mergedAIBloggerConfig.extractKeywords,
@@ -20139,7 +20383,11 @@ export async function runBlogStudioDraftResearchPhase(
                     websiteIntelligence,
                     serpConfig: aiBloggerConfig?.serp,
                     trendsConfig: liveTrendsConfig,
-                    location: brief.location || settings.seo.defaultLocation,
+                    location: resolveExternalSearchLocation(
+                        liveTrendsConfig?.defaultLocation,
+                        brief.location,
+                        settings.seo.defaultLocation,
+                    ),
                     minimumFitScore: minimumWebsiteTrendFitScore,
                     recentTopicTexts: recentPostTitles,
                     runtimeConfig: mergedAIBloggerConfig.extractKeywords,
@@ -20180,7 +20428,11 @@ export async function runBlogStudioDraftResearchPhase(
                 websiteIntelligence,
                 serpConfig: aiBloggerConfig?.serp,
                 trendsConfig: liveTrendsConfig,
-                location: brief.location || settings.seo.defaultLocation,
+                location: resolveExternalSearchLocation(
+                    liveTrendsConfig?.defaultLocation,
+                    brief.location,
+                    settings.seo.defaultLocation,
+                ),
                 minimumFitScore: minimumWebsiteTrendFitScore,
                 recentTopicTexts: recentPostTitles,
                 runtimeConfig: mergedAIBloggerConfig.extractKeywords,
@@ -20247,7 +20499,11 @@ export async function runBlogStudioDraftResearchPhase(
                 recentTopicTexts: recentPostTitles,
                 serpConfig,
                 trendsConfig: liveTrendsConfig,
-                location: brief.location || settings.seo.defaultLocation,
+                location: resolveExternalSearchLocation(
+                    liveTrendsConfig?.defaultLocation,
+                    brief.location,
+                    settings.seo.defaultLocation,
+                ),
             });
         const discovery: TopicDiscoveryResult = {
             ...parsedDiscovery,
@@ -20420,12 +20676,16 @@ export async function runBlogStudioDraftResearchPhase(
                 apiKey: serpConfig?.apiKey,
                 fallbackApiKey: serpConfig?.fallbackApiKey,
                 fallbackEnabled: serpConfig?.fallbackEnabled ?? true,
-                location:
-                    brief.location ||
-                    serpConfig?.defaultLocation ||
+                location: resolveExternalSearchLocation(
+                    serpConfig?.defaultLocation,
+                    brief.location,
                     settings.seo.defaultLocation,
+                ),
                 device: serpConfig?.device,
-                maxCompetitors: serpConfig?.maxCompetitors,
+                maxCompetitors: resolveSerpMaxCompetitorsForGroundedResearch(
+                    serpConfig,
+                    aiBloggerConfig?.groundedResearch,
+                ),
                 refreshWindowHours: serpConfig?.refreshWindowHours,
                 trendsApiKey: liveTrendsConfig?.apiKey,
                 trendsFallbackApiKey: liveTrendsConfig?.fallbackApiKey,
@@ -20575,7 +20835,11 @@ export async function runBlogStudioDraftResearchPhase(
             try {
                 const groundedResearchResult = await getAIBloggerGroundedResearch(selectedTopicForRun, {
                     agencyId: agency.id,
-                    location: brief.location || settings.seo.defaultLocation,
+                    location: resolveExternalSearchLocation(
+                        aiBloggerConfig?.serp?.defaultLocation,
+                        brief.location,
+                        settings.seo.defaultLocation,
+                    ),
                     refreshWindowHours: aiBloggerConfig?.groundedResearch?.refreshWindowHours || 24,
                     sourceUrls: serpAnalysis?.topResultUrls,
                     groundedResearchConfig: aiBloggerConfig?.groundedResearch,
@@ -23238,11 +23502,14 @@ Rules:
                 }
             } catch (error) {
                 const finalCheckerMessage = getErrorMessage(error);
+                const shouldSkipCapacityFailure = isExternalAiCapacityError(error);
                 addRunStep(
                     "final-ai-checker",
                     "Final AI Checker",
-                    "failed",
-                    `Final AI checker failed: ${finalCheckerMessage}`,
+                    shouldSkipCapacityFailure ? "skipped" : "failed",
+                    shouldSkipCapacityFailure
+                        ? buildFinalCheckerCapacitySkipSummary(error)
+                        : `Final AI checker failed: ${finalCheckerMessage}`,
                     finalCheckerStartedAt,
                 );
             }
@@ -23756,10 +24023,11 @@ export async function publishBlogStudioPostImpl(
             apiKey: aiBloggerConfig?.serp?.apiKey,
             fallbackApiKey: aiBloggerConfig?.serp?.fallbackApiKey,
             fallbackEnabled: aiBloggerConfig?.serp?.fallbackEnabled ?? true,
-            location:
-                currentPost.brief.location ||
-                aiBloggerConfig?.serp?.defaultLocation ||
+            location: resolveExternalSearchLocation(
+                aiBloggerConfig?.serp?.defaultLocation,
+                currentPost.brief.location,
                 settings.seo.defaultLocation,
+            ),
             device: aiBloggerConfig?.serp?.device,
             maxCompetitors: aiBloggerConfig?.serp?.maxCompetitors,
             refreshWindowHours: aiBloggerConfig?.serp?.refreshWindowHours,

@@ -68,6 +68,7 @@ export async function executeProjectWriteTool(
                     actionType: "create",
                     entityType: "project",
                     entityId: newProject.id,
+                    beforeSnapshot: { agencyId: newProject.agencyId },
                     executedAt: new Date().toISOString(),
                 }],
             };

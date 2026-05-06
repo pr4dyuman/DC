@@ -44,7 +44,8 @@ export async function createUserImpl(user: Omit<User, "id" | "agencyId">, agency
     if (!user.name) throw new Error("Name is required");
     if (user.email) user.email = validateEmail(user.email);
     if (user.contactNumber) user.contactNumber = sanitizePhone(user.contactNumber);
-    if (user.password) await validatePasswordWithPolicy(user.password);
+    if (!user.password) throw new Error("Password is required");
+    await validatePasswordWithPolicy(user.password);
     if (user.jobTitle) user.jobTitle = sanitizeName(user.jobTitle, 100);
     const validGenders = ["Male", "Female", "Other"];
     if (user.gender && !validGenders.includes(user.gender)) user.gender = "Male";
@@ -88,9 +89,10 @@ export async function createUserImpl(user: Omit<User, "id" | "agencyId">, agency
     }
 
     await connectDB();
+    let created = false;
     try {
         await UserModel.create(newUser);
-        if (agency) await incrementAgencyUsage(agency.id, "users");
+        created = true;
     } catch (err: unknown) {
         const writeError = err as { code?: number; keyPattern?: { username?: number } };
         if (writeError?.code === 11000 && writeError?.keyPattern?.username) {
@@ -102,6 +104,7 @@ export async function createUserImpl(user: Omit<User, "id" | "agencyId">, agency
                 newUser.username = retryUsername;
                 try {
                     await UserModel.create(newUser);
+                    created = true;
                     break;
                 } catch (retryErr: unknown) {
                     const retryWriteError = retryErr as { code?: number };
@@ -112,6 +115,8 @@ export async function createUserImpl(user: Omit<User, "id" | "agencyId">, agency
             throw err;
         }
     }
+    if (!created) throw new Error("Failed to create user");
+    if (agency) await incrementAgencyUsage(agency.id, "users");
 
     try {
         if (newUser.email) {

@@ -7,6 +7,17 @@ import { Agency } from "./types";
 import { getSessionUser } from "./auth";
 import { isMongoConnectionIssue } from "./mongodb-connection";
 
+type AgencyUsageField = 'users' | 'projects' | 'clients' | 'storage' | 'monthlyInvoices';
+type AgencyLimitField = 'maxUsers' | 'maxProjects' | 'maxClients' | 'maxStorage' | 'maxMonthlyInvoices';
+
+const LIMIT_FIELD_BY_USAGE_FIELD: Record<AgencyUsageField, AgencyLimitField> = {
+    users: 'maxUsers',
+    projects: 'maxProjects',
+    clients: 'maxClients',
+    storage: 'maxStorage',
+    monthlyInvoices: 'maxMonthlyInvoices',
+};
+
 // Serialize Mongoose lean objects to plain JS objects (strips ObjectId, __v, etc.)
 function serialize<T>(doc: T): T {
     if (!doc) return doc;
@@ -150,7 +161,7 @@ export async function withAgencyId<T extends object>(
  */
 export async function checkAgencyLimit(
     agencyId: string,
-    limitType: 'users' | 'projects' | 'clients' | 'storage' | 'monthlyInvoices'
+    limitType: AgencyUsageField
 ): Promise<{ allowed: boolean; current: number; limit: number }> {
     try {
         await connectDB();
@@ -160,10 +171,7 @@ export async function checkAgencyLimit(
         }
 
         const current = agency.usage[limitType];
-        const limit = agency.limits[limitType === 'monthlyInvoices' ? 'maxMonthlyInvoices' :
-            limitType === 'users' ? 'maxUsers' :
-                limitType === 'projects' ? 'maxProjects' :
-                    limitType === 'clients' ? 'maxClients' : 'maxStorage'];
+        const limit = agency.limits[LIMIT_FIELD_BY_USAGE_FIELD[limitType]];
 
         // -1 means unlimited (enterprise plan)
         const allowed = limit === -1 || current < limit;
@@ -172,6 +180,63 @@ export async function checkAgencyLimit(
     } catch (error) {
         console.error('Error checking agency limit:', error);
         return { allowed: false, current: 0, limit: 0 };
+    }
+}
+
+/**
+ * Atomically reserve usage for workflows that create records in batches.
+ */
+export async function reserveAgencyUsage(
+    agencyId: string,
+    field: AgencyUsageField,
+    amount: number = 1
+): Promise<{ allowed: boolean; current: number; limit: number; requested: number }> {
+    try {
+        await connectDB();
+        if (amount <= 0) {
+            const limit = await checkAgencyLimit(agencyId, field);
+            return { ...limit, requested: amount };
+        }
+        if (!(await canSessionAccessAgency(agencyId))) {
+            return { allowed: false, current: 0, limit: 0, requested: amount };
+        }
+
+        const agency = await AgencyModel.findOne({ id: agencyId }).select("usage limits").lean() as Agency | null;
+        if (!agency) {
+            throw new Error('Agency not found');
+        }
+
+        const current = agency.usage?.[field] ?? 0;
+        const limit = agency.limits?.[LIMIT_FIELD_BY_USAGE_FIELD[field]] ?? 0;
+        if (limit !== -1 && current + amount > limit) {
+            return { allowed: false, current, limit, requested: amount };
+        }
+
+        const capacityFilter = limit === -1
+            ? {}
+            : {
+                $expr: {
+                    $lte: [
+                        { $add: [{ $ifNull: [`$usage.${field}`, 0] }, amount] },
+                        limit,
+                    ],
+                },
+            };
+
+        const result = await AgencyModel.updateOne(
+            { id: agencyId, ...capacityFilter },
+            { $inc: { [`usage.${field}`]: amount } }
+        );
+
+        if (result.modifiedCount === 0) {
+            const latest = await checkAgencyLimit(agencyId, field);
+            return { ...latest, allowed: false, requested: amount };
+        }
+
+        return { allowed: true, current: current + amount, limit, requested: amount };
+    } catch (error) {
+        console.error('Error reserving agency usage:', error);
+        return { allowed: false, current: 0, limit: 0, requested: amount };
     }
 }
 
@@ -217,7 +282,7 @@ export async function updateAgencyUsage(
  */
 export async function incrementAgencyUsage(
     agencyId: string,
-    field: 'users' | 'projects' | 'clients' | 'storage' | 'monthlyInvoices',
+    field: AgencyUsageField,
     amount: number = 1
 ): Promise<boolean> {
     try {
@@ -239,15 +304,25 @@ export async function incrementAgencyUsage(
  */
 export async function decrementAgencyUsage(
     agencyId: string,
-    field: 'users' | 'projects' | 'clients' | 'storage' | 'monthlyInvoices',
+    field: AgencyUsageField,
     amount: number = 1
 ): Promise<boolean> {
     try {
         await connectDB();
+        if (amount <= 0) return true;
         if (!(await canSessionAccessAgency(agencyId))) return false;
         await AgencyModel.updateOne(
             { id: agencyId },
-            { $inc: { [`usage.${field}`]: -amount } }
+            [{
+                $set: {
+                    [`usage.${field}`]: {
+                        $max: [
+                            0,
+                            { $subtract: [{ $ifNull: [`$usage.${field}`, 0] }, amount] },
+                        ],
+                    },
+                },
+            }]
         );
         return true;
     } catch (error) {

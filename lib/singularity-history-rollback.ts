@@ -7,12 +7,14 @@ import {
     TaskModel,
     ProjectModel,
     ClientModel,
+    UserModel,
     InvoiceModel,
     TransactionModel,
     ServiceModel,
     LeaveRequestModel,
 } from "./mongodb";
 import { getSessionUser } from "./auth";
+import { decrementAgencyUsage } from "./agency-context";
 import {
     type CheckpointAction,
     type ConflictInfo,
@@ -39,6 +41,7 @@ function getModelForEntity(entityType: CheckpointAction["entityType"]): Rollback
         case "task": return TaskModel as unknown as RollbackModel;
         case "project": return ProjectModel as unknown as RollbackModel;
         case "client": return ClientModel as unknown as RollbackModel;
+        case "user": return UserModel as unknown as RollbackModel;
         case "invoice": return InvoiceModel as unknown as RollbackModel;
         case "transaction": return TransactionModel as unknown as RollbackModel;
         case "service": return ServiceModel as unknown as RollbackModel;
@@ -237,9 +240,17 @@ async function rollbackAction(action: CheckpointAction) {
             const idsToDelete = action.createdEntityIds?.length
                 ? action.createdEntityIds
                 : [action.entityId];
+            let deletedCount = 0;
 
             for (const id of idsToDelete) {
-                await Model.deleteOne(buildAgencyScopedIdFilter(id, agencyId));
+                const result = await Model.deleteOne(buildAgencyScopedIdFilter(id, agencyId)) as { deletedCount?: number };
+                deletedCount += result.deletedCount || 0;
+            }
+            if (agencyId && deletedCount > 0) {
+                if (action.entityType === "user") await decrementAgencyUsage(agencyId, "users", deletedCount);
+                if (action.entityType === "client") await decrementAgencyUsage(agencyId, "clients", deletedCount);
+                if (action.entityType === "project") await decrementAgencyUsage(agencyId, "projects", deletedCount);
+                if (action.entityType === "invoice") await decrementAgencyUsage(agencyId, "monthlyInvoices", deletedCount);
             }
             break;
         }

@@ -6,13 +6,13 @@ import { decrementAgencyUsage } from "../agency-context";
 import { comparePassword } from "../auth";
 import {
     ActivityModel,
-    AgencyModel,
     AssetModel,
     ClientModel,
     InvoiceModel,
     MessageModel,
     NotificationModel,
     ProjectModel,
+    ServiceModel,
     TaskModel,
     TransactionModel,
     UserModel,
@@ -53,7 +53,7 @@ async function cleanupAssetFiles(assets: Array<Pick<Asset, "url" | "size">>, age
         }
 
         if (totalBytesFreed > 0) {
-            await AgencyModel.updateOne({ id: agencyId }, { $inc: { "usage.storage": -Math.round(totalBytesFreed) } });
+            await decrementAgencyUsage(agencyId, "storage", Math.round(totalBytesFreed));
         }
         console.log(`[${logLabel}] Cleaned up ${assets.length} files from storage`);
     } catch (storageErr) {
@@ -116,9 +116,11 @@ export async function permanentlyDeleteClientImpl(id: string, agencyId: string) 
         )));
     }
 
+    let deletedProjectInvoiceCount = 0;
     if (projectIds.length > 0) {
         const assets = await AssetModel.find({ projectId: { $in: projectIds }, agencyId }).select("url size").lean() as Array<Pick<Asset, "url" | "size">>;
         await cleanupAssetFiles(assets, agencyId, "permanentDeleteClient");
+        deletedProjectInvoiceCount = await InvoiceModel.countDocuments({ projectId: { $in: projectIds }, agencyId });
     }
 
     await Promise.all([
@@ -130,6 +132,7 @@ export async function permanentlyDeleteClientImpl(id: string, agencyId: string) 
         }),
         ...(projectIds.length > 0 ? [
             ProjectModel.deleteMany({ id: { $in: projectIds }, agencyId }),
+            ServiceModel.deleteMany({ projectId: { $in: projectIds }, agencyId }),
             TaskModel.deleteMany({ projectId: { $in: projectIds }, agencyId }),
             InvoiceModel.deleteMany({ projectId: { $in: projectIds }, agencyId }),
             TransactionModel.deleteMany({ projectId: { $in: projectIds }, agencyId }),
@@ -141,6 +144,9 @@ export async function permanentlyDeleteClientImpl(id: string, agencyId: string) 
     await decrementAgencyUsage(agencyId, "clients");
     if (projectIds.length > 0) {
         await decrementAgencyUsage(agencyId, "projects", projectIds.length);
+    }
+    if (deletedProjectInvoiceCount > 0) {
+        await decrementAgencyUsage(agencyId, "monthlyInvoices", deletedProjectInvoiceCount);
     }
 
     revalidatePath("/dashboard/clients");
@@ -176,11 +182,15 @@ export async function deleteProjectImpl(id: string, agencyId: string) {
     await connectDB();
 
     const project = await ProjectModel.findOne({ id, agencyId }).select("id name").lean() as { id: string; name: string } | null;
+    if (!project) throw new Error("Project not found");
+
     const assets = await AssetModel.find({ projectId: id, agencyId }).select("url size").lean() as Array<Pick<Asset, "url" | "size">>;
+    const deletedInvoiceCount = await InvoiceModel.countDocuments({ projectId: id, agencyId });
     await cleanupAssetFiles(assets, agencyId, "deleteProject");
 
     await Promise.all([
         ProjectModel.deleteOne({ id, agencyId }),
+        ServiceModel.deleteMany({ projectId: id, agencyId }),
         TaskModel.deleteMany({ projectId: id, agencyId }),
         AssetModel.deleteMany({ projectId: id, agencyId }),
         InvoiceModel.deleteMany({ projectId: id, agencyId }),
@@ -197,6 +207,9 @@ export async function deleteProjectImpl(id: string, agencyId: string) {
     ]);
 
     await decrementAgencyUsage(agencyId, "projects");
+    if (deletedInvoiceCount > 0) {
+        await decrementAgencyUsage(agencyId, "monthlyInvoices", deletedInvoiceCount);
+    }
     revalidatePath("/dashboard/projects");
     return true;
 }

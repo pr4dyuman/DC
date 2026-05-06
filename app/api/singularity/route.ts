@@ -44,17 +44,22 @@ export async function POST(req: NextRequest) {
         }
 
         const agency = await getCurrentAgency();
-        if (agency?.id) {
-            const hasAIAccess = await hasExplicitAIAccessSetting(
-                { id: session.userId, role: session.role },
-                agency.id
+        if (!agency?.id) {
+            return NextResponse.json(
+                { error: "Agency context required. Please select an agency and try again." },
+                { status: 400 }
             );
-            if (hasAIAccess === false) {
-                return NextResponse.json(
-                    { error: "AI access is disabled for this account." },
-                    { status: 403 }
-                );
-            }
+        }
+
+        const hasAIAccess = await hasExplicitAIAccessSetting(
+            { id: session.userId, role: session.role },
+            agency.id
+        );
+        if (hasAIAccess === false) {
+            return NextResponse.json(
+                { error: "AI access is disabled for this account." },
+                { status: 403 }
+            );
         }
         if (await checkTrialExpired(agency)) {
             return NextResponse.json(
@@ -183,13 +188,13 @@ export async function POST(req: NextRequest) {
                     fullPrompt,
                     filteredTools,
                     authenticatedUserId,
-                    agencyId: agency!.id,
+                    agencyId: agency.id,
                 });
             }
 
             return handleLiveAgentMode({
                 aiConfig: heavyConfig ?? agentConfig,
-                agencyId: agency!.id,
+                agencyId: agency.id,
                 authenticatedUserId,
                 modelId: agentModelId,
                 systemInstruction,
@@ -205,7 +210,7 @@ export async function POST(req: NextRequest) {
             aiConfig: heavyConfig ?? chatConfig,
             fullPrompt,
             images,
-            agencyId: agency!.id,
+            agencyId: agency.id,
             authenticatedUserId,
             modelId: chatModelId,
         });

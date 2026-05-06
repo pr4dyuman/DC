@@ -13,6 +13,7 @@ import type {
     AIProvider,
 } from "./types";
 import { AI_MODELS } from "./ai-models";
+import { sanitizeLocation } from "./ai-blogger-text-utils";
 
 export const AI_BLOGGER_STAGE_KEYS = [
     "extractKeywords",
@@ -335,8 +336,8 @@ function mergeTrendsConfig(stored: Partial<AIBloggerTrendsConfig> | undefined): 
         fallbackEnabled: stored?.fallbackEnabled ?? defaults.fallbackEnabled,
         fallbackToAi: stored?.fallbackToAi ?? defaults.fallbackToAi,
         defaultLocation:
-            typeof stored?.defaultLocation === "string" && stored.defaultLocation.trim().length > 0
-                ? stored.defaultLocation.trim().toLowerCase()
+            typeof stored?.defaultLocation === "string"
+                ? sanitizeLocation(stored.defaultLocation, defaults.defaultLocation)
                 : defaults.defaultLocation,
         trendFirstMode: stored?.trendFirstMode ?? defaults.trendFirstMode,
         maxTrendRequestsPerBlog:
@@ -397,8 +398,8 @@ function mergeSerpConfig(stored: Partial<AIBloggerSerpConfig> | undefined): AIBl
         enabled: stored?.enabled ?? defaults.enabled,
         fallbackEnabled: stored?.fallbackEnabled ?? defaults.fallbackEnabled,
         defaultLocation:
-            typeof stored?.defaultLocation === "string" && stored.defaultLocation.trim().length > 0
-                ? stored.defaultLocation.trim().toLowerCase()
+            typeof stored?.defaultLocation === "string"
+                ? sanitizeLocation(stored.defaultLocation, defaults.defaultLocation)
                 : defaults.defaultLocation,
         device: stored?.device === "mobile" ? "mobile" : defaults.device,
         maxCompetitors:

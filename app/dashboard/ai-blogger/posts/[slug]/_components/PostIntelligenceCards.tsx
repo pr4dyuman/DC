@@ -49,6 +49,10 @@ function getScoreTone(score?: number) {
     return "border-primary/25 bg-primary/8 text-primary";
 }
 
+function formatSearchLocationLabel(location?: string) {
+    return location?.trim() ? location.toUpperCase() : "GLOBAL";
+}
+
 const generationSourceLabels: Array<{
     key: keyof NonNullable<BlogStudioGenerationDiagnostics["sourceUsage"]>;
     label: string;
@@ -346,7 +350,7 @@ export function PostSerpSnapshotCard({
                                 Intent {serpAnalysis.intent}
                             </Badge>
                             <Badge variant="outline" className="rounded-full">
-                                {serpAnalysis.device} | {serpAnalysis.location.toUpperCase()}
+                                {serpAnalysis.device} | {formatSearchLocationLabel(serpAnalysis.location)}
                             </Badge>
                             <Badge variant="outline" className="rounded-full">
                                 {serpAnalysis.cacheStatus === "cached" ? "Cached SERP" : "Fresh SERP"}

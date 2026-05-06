@@ -106,13 +106,36 @@ export function normalizeQuery(query: string): string {
  * Empty string is valid and means "Global (Worldwide)" — SerpAPI omits geo/gl when empty.
  * Only undefined/null trigger the fallback.
  */
-export function sanitizeLocation(value: string | undefined, fallback = "us"): string {
+const GLOBAL_LOCATION_ALIASES = new Set(["global", "world", "worldwide", "all"]);
+
+export function sanitizeLocation(value: string | undefined | null, fallback = "us"): string {
     if (value === undefined || value === null) {
-        return fallback;
+        if (fallback === "") {
+            return "";
+        }
+
+        const fallbackValue = sanitizeText(fallback, 12, "us", true).toLowerCase();
+        return GLOBAL_LOCATION_ALIASES.has(fallbackValue) ? "" : fallbackValue || "us";
     }
     // Empty string = Global — preserve it as-is
-    if (value === "") {
+    const rawValue = value.trim();
+    if (rawValue === "") {
         return "";
     }
-    return (sanitizeText(value, 12, fallback, true) || fallback).toLowerCase();
+
+    const normalized = sanitizeText(rawValue, 12, "", true).toLowerCase();
+    if (GLOBAL_LOCATION_ALIASES.has(normalized)) {
+        return "";
+    }
+
+    if (normalized) {
+        return normalized;
+    }
+
+    return sanitizeLocation(undefined, fallback);
+}
+
+export function formatLocationLabel(value: string | undefined | null, fallback = "us"): string {
+    const location = sanitizeLocation(value, fallback);
+    return location ? location.toUpperCase() : "GLOBAL";
 }

@@ -6,6 +6,7 @@ import {
     sanitizeText,
     sanitizeStringArray,
     sanitizeLocation,
+    formatLocationLabel,
 } from "./ai-blogger-text-utils";
 
 export type AIBloggerKeywordTrendResult = {
@@ -610,7 +611,7 @@ function getTrendCategoryHints(fitHints: string[]) {
 }
 
 function buildTrendScanPlan(location: string, fitHints: string[], maxRequests: number) {
-    const primaryGeo = (location || "us").toUpperCase();
+    const primaryGeo = location ? location.toUpperCase() : "";
     const windows = [4, 24, 48, 168];
     const categoryHints = getTrendCategoryHints(fitHints);
     const plan: Array<{ geo: string; hours?: number; category?: string; onlyActive: boolean }> = [];
@@ -625,7 +626,7 @@ function buildTrendScanPlan(location: string, fitHints: string[], maxRequests: n
 
     plan.push({ geo: primaryGeo, hours: 48, onlyActive: false });
 
-    if (primaryGeo !== "US") {
+    if (primaryGeo && primaryGeo !== "US") {
         plan.push({ geo: "US", hours: 24, onlyActive: true });
         plan.push({ geo: "US", hours: 48, onlyActive: true });
     }
@@ -716,7 +717,7 @@ async function fetchDeepTrendFirstSignals(input: {
         if (scan.category) {
             categoriesScanned.add(scan.category);
         }
-        geoScanned.add(scan.geo);
+        geoScanned.add(scan.geo || "GLOBAL");
 
         try {
             const { data, usedFallbackKey: responseUsedFallbackKey } = await fetchSerpApiJson<unknown>(
@@ -978,7 +979,7 @@ function buildLiveTrendSummary(
 ) {
     const topTrend = viralTrends.find((trend) => trend.acceptedForTrendFirst) || viralTrends[0];
     if (!topTrend) {
-        return `No live Google Trends topics were ranked for ${location.toUpperCase()} via SerpAPI.`;
+        return `No live Google Trends topics were ranked for ${formatLocationLabel(location)} via SerpAPI.`;
     }
 
     const metrics = [
@@ -993,11 +994,11 @@ function buildLiveTrendSummary(
         ? ` Scanned ${scanStats.requestCount}/${scanStats.maxRequests} request(s), ${scanStats.acceptedCount} trend-first match(es).`
         : "";
 
-    return `Ranked ${viralTrends.length} Google Trends topics for ${location.toUpperCase()} by viral momentum and site fit via SerpAPI.${scanPart} Top: ${topTrend.topic} (${metrics.join(", ")}).`;
+    return `Ranked ${viralTrends.length} Google Trends topics for ${formatLocationLabel(location)} by viral momentum and site fit via SerpAPI.${scanPart} Top: ${topTrend.topic} (${metrics.join(", ")}).`;
 }
 
 export async function fetchAIBloggerTrendSignals(input: FetchTrendSignalsInput): Promise<AIBloggerTrendSignals> {
-    const location = sanitizeLocation(input.location, input.config.defaultLocation || "us");
+    const location = sanitizeLocation(input.location, input.config.defaultLocation ?? "us");
     const sourceValueHint = input.sourceMode === "website" && looksLikeUrl(input.sourceValue)
         ? ""
         : input.sourceValue;
@@ -1017,7 +1018,7 @@ export async function fetchAIBloggerTrendSignals(input: FetchTrendSignalsInput):
     if (input.config.trendFirstMode ?? true) {
         const deepScan = await fetchDeepTrendFirstSignals({
             config: input.config,
-            location: location || "us",
+            location,
             fitHints,
         });
         trendFirstFallbackStats = {
@@ -1130,7 +1131,7 @@ export async function fetchAIBloggerTrendSignals(input: FetchTrendSignalsInput):
         viralTrends: [],
         scanStats: trendFirstFallbackStats,
         summary: trendFirstFallbackStats
-            ? `Trend-first scan found no usable live topics after ${trendFirstFallbackStats.requestCount}/${trendFirstFallbackStats.maxRequests} request(s), then analyzed ${keywordResults.length} keyword candidates with Google Trends momentum and related queries for ${location.toUpperCase()} via SerpAPI.`
-            : `Analyzed ${keywordResults.length} keyword candidates with Google Trends momentum and related queries for ${location.toUpperCase()} via SerpAPI.`,
+            ? `Trend-first scan found no usable live topics after ${trendFirstFallbackStats.requestCount}/${trendFirstFallbackStats.maxRequests} request(s), then analyzed ${keywordResults.length} keyword candidates with Google Trends momentum and related queries for ${formatLocationLabel(location)} via SerpAPI.`
+            : `Analyzed ${keywordResults.length} keyword candidates with Google Trends momentum and related queries for ${formatLocationLabel(location)} via SerpAPI.`,
     };
 }

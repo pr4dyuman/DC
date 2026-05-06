@@ -4,6 +4,7 @@ import { executeFinanceTool } from "./singularity-tool-finance";
 import { executeManagementTool } from "./singularity-tool-management";
 import { executeProjectTaskTool, type ProjectTaskToolName } from "./singularity-tool-project-task";
 import { executeReadOnlyTool } from "./singularity-tool-read";
+import { runWithTaskEmailNotificationsSuppressed } from "./actions/task-email-context";
 import {
     ClientModel,
     InvoiceModel,
@@ -47,6 +48,16 @@ const SNAPSHOT_MODELS: Record<SnapshotEntityType, SnapshotModel> = {
     service: ServiceModel as unknown as SnapshotModel,
     leaveRequest: LeaveRequestModel as unknown as SnapshotModel,
 };
+
+const AI_TASK_EMAIL_SUPPRESSED_TOOLS = new Set<string>([
+    "create_task",
+    "update_task_status",
+    "edit_task",
+    "reassign_task",
+    "bulk_update_task_status",
+    "bulk_edit_tasks",
+    "bulk_create_tasks",
+]);
 
 const TOOL_PERMISSIONS: Record<string, RoleType[]> = {
     search_agency: ["admin", "manager", "employee", "client"],
@@ -96,7 +107,7 @@ const TOOL_PERMISSIONS: Record<string, RoleType[]> = {
 export interface RollbackAction {
     toolName: string;
     actionType: "create" | "update" | "delete";
-    entityType: "task" | "project" | "client" | "invoice" | "transaction" | "service" | "leaveRequest" | "comment";
+    entityType: "task" | "project" | "client" | "user" | "invoice" | "transaction" | "service" | "leaveRequest" | "comment";
     entityId: string;
     beforeSnapshot?: unknown;
     createdEntityIds?: string[];
@@ -179,6 +190,11 @@ export async function executeTool(
             case "bulk_update_task_status":
             case "bulk_edit_tasks":
             case "bulk_create_tasks":
+                if (AI_TASK_EMAIL_SUPPRESSED_TOOLS.has(name)) {
+                    return runWithTaskEmailNotificationsSuppressed(() =>
+                        executeProjectTaskTool(name as ProjectTaskToolName, args, userId, snapshotEntity)
+                    );
+                }
                 return executeProjectTaskTool(name as ProjectTaskToolName, args, userId, snapshotEntity);
 
             case "create_invoice":

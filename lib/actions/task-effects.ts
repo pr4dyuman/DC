@@ -23,6 +23,7 @@ import {
     getProjectSummary,
     type TaskEffectArgs,
 } from "./task-shared";
+import { shouldSuppressTaskEmailNotifications } from "./task-email-context";
 
 export async function handleTaskStatusChangeEffectsImpl({
     previousTask,
@@ -33,6 +34,7 @@ export async function handleTaskStatusChangeEffectsImpl({
     completedAt,
 }: TaskEffectArgs) {
     const activityTimestamp = completedAt ? new Date(completedAt).toISOString() : new Date().toISOString();
+    const suppressEmailNotifications = shouldSuppressTaskEmailNotifications();
 
     // When backdating a Done status: remove ALL existing "moved task to Done" activity entries
     // for this task BEFORE inserting the new backdated one. This ensures the heatmap
@@ -122,7 +124,7 @@ export async function handleTaskStatusChangeEffectsImpl({
     const taskEmailEvents = emailCats.taskEmailEvents || {};
     const eventKey = currentTask.status === "Done" ? "taskDone" : (currentTask.status === "In Progress" ? "taskInProgress" : null);
     const eventConfig = eventKey ? { ...DEFAULT_TASK_EMAIL_EVENTS[eventKey], ...taskEmailEvents[eventKey] } : null;
-    const shouldSendTaskEmail = emailCats.taskUpdates !== false && eventConfig?.enabled;
+    const shouldSendTaskEmail = !suppressEmailNotifications && emailCats.taskUpdates !== false && eventConfig?.enabled;
 
     if (shouldSendTaskEmail) {
         try {
@@ -202,24 +204,26 @@ export async function handleTaskStatusChangeEffectsImpl({
             })));
         }
 
-        try {
-            const client = project.clientId
-                ? await ClientModel.findOne({ id: project.clientId, agencyId: agency.id })
-                    .select("email name")
-                    .lean() as { email?: string; name?: string } | null
-                : null;
-            const adminEmails = admins.map((admin) => admin.email).filter(Boolean) as string[];
-            if (client?.email || adminEmails.length > 0) {
-                await sendProjectCompletedEmail({
-                    clientEmail: client?.email || "",
-                    adminEmails,
-                    clientName: client?.name || "",
-                    projectName: project.name,
-                    projectLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/projects/${project.id}`,
-                });
+        if (!suppressEmailNotifications) {
+            try {
+                const client = project.clientId
+                    ? await ClientModel.findOne({ id: project.clientId, agencyId: agency.id })
+                        .select("email name")
+                        .lean() as { email?: string; name?: string } | null
+                    : null;
+                const adminEmails = admins.map((admin) => admin.email).filter(Boolean) as string[];
+                if (client?.email || adminEmails.length > 0) {
+                    await sendProjectCompletedEmail({
+                        clientEmail: client?.email || "",
+                        adminEmails,
+                        clientName: client?.name || "",
+                        projectName: project.name,
+                        projectLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/projects/${project.id}`,
+                    });
+                }
+            } catch (emailError) {
+                console.error("[Email] Failed to send project completion email:", emailError);
             }
-        } catch (emailError) {
-            console.error("[Email] Failed to send project completion email:", emailError);
         }
     } else if (project && project.status === "Completed" && previousTask.status === "Done" && currentTask.status !== "Done") {
         await ProjectModel.updateOne(
@@ -256,7 +260,7 @@ export async function handleTaskAssignmentChangeEffectsImpl({
     const emailCats = getEmailCategories(agency);
     const taskEmailEvents = emailCats.taskEmailEvents || {};
     const createdEventConfig = { ...DEFAULT_TASK_EMAIL_EVENTS.taskCreated, ...taskEmailEvents.taskCreated };
-    const shouldSendTaskEmail = emailCats.taskUpdates !== false && createdEventConfig.enabled;
+    const shouldSendTaskEmail = !shouldSuppressTaskEmailNotifications() && emailCats.taskUpdates !== false && createdEventConfig.enabled;
 
     if (!shouldSendTaskEmail) return;
 

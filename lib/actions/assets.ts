@@ -1,7 +1,8 @@
 import { revalidatePath } from "next/cache";
 
 import type { Asset } from "../db";
-import { ActivityModel, AgencyModel, AssetModel, connectDB } from "../mongodb";
+import { decrementAgencyUsage } from "../agency-context";
+import { ActivityModel, AssetModel, connectDB } from "../mongodb";
 import { generateId } from "../utils-server";
 import { sanitizeMongoInput, sanitizeName, sanitizeString, sanitizeUpdates, sanitizeUrl } from "../validation";
 import { sanitizeDoc, sortByUploadedAtDesc } from "./shared";
@@ -98,10 +99,7 @@ export async function deleteProjectAssetImpl(assetId: string, agencyId: string, 
                             unit === "MB" ? amount * 1048576 :
                                 unit === "KB" ? amount * 1024 :
                                     amount;
-                    await AgencyModel.updateOne(
-                        { id: agencyId },
-                        { $inc: { "usage.storage": -Math.round(bytes) } }
-                    );
+                    await decrementAgencyUsage(agencyId, "storage", Math.round(bytes));
                 }
             }
         } catch (error) {

@@ -2,6 +2,7 @@ type RollbackEntityType =
     | "task"
     | "project"
     | "client"
+    | "user"
     | "invoice"
     | "transaction"
     | "service"

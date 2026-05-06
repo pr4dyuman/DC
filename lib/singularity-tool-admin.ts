@@ -28,7 +28,7 @@ export type AdminToolName =
 type RollbackAction = {
     toolName: string;
     actionType: "create" | "update" | "delete";
-    entityType: "task" | "project" | "client" | "invoice" | "transaction" | "service" | "leaveRequest" | "comment";
+    entityType: "task" | "project" | "client" | "user" | "invoice" | "transaction" | "service" | "leaveRequest" | "comment";
     entityId: string;
     beforeSnapshot?: unknown;
     createdEntityIds?: string[];
@@ -82,6 +82,10 @@ function getBulkInvoices(args: ToolArgs): BulkInvoiceInput[] {
     return Array.isArray(value)
         ? value.filter((entry): entry is BulkInvoiceInput => typeof entry === "object" && entry !== null)
         : [];
+}
+
+function generateTemporaryPassword() {
+    return `${crypto.randomBytes(12).toString("base64url")}Aa1!`;
 }
 
 function permissionDenied(summary: string): ToolExecutionResult {
@@ -164,20 +168,33 @@ export async function executeAdminTool(
 
             const invoiceId = getStringArg(args, "invoiceId");
             const invoiceSnapshot = await snapshotEntity("invoice", invoiceId);
-            await adminApproveInvoicePayment(invoiceId);
-
-            return {
-                success: true,
-                data: { invoiceId },
-                summary: "Invoice payment approved - now marked as Paid",
-                rollbackData: invoiceSnapshot ? [{
+            const paymentResult = await adminApproveInvoicePayment(invoiceId) as { transactionId?: string; transactionCreated?: boolean };
+            const rollbackData: RollbackAction[] = [];
+            if (invoiceSnapshot) {
+                rollbackData.push({
                     toolName: "approve_invoice_payment",
                     actionType: "update",
                     entityType: "invoice",
                     entityId: invoiceId,
                     beforeSnapshot: invoiceSnapshot,
                     executedAt: new Date().toISOString(),
-                }] : undefined,
+                });
+            }
+            if (paymentResult.transactionCreated && paymentResult.transactionId) {
+                rollbackData.push({
+                    toolName: "approve_invoice_payment",
+                    actionType: "create",
+                    entityType: "transaction",
+                    entityId: paymentResult.transactionId,
+                    executedAt: new Date().toISOString(),
+                });
+            }
+
+            return {
+                success: true,
+                data: { invoiceId },
+                summary: "Invoice payment approved - now marked as Paid",
+                rollbackData: rollbackData.length > 0 ? rollbackData : undefined,
             };
         }
 
@@ -220,25 +237,39 @@ export async function executeAdminTool(
             }
 
             const invoiceSnapshot = await snapshotEntity("invoice", invoiceId);
+            let paymentResult: { transactionId?: string; transactionCreated?: boolean } | undefined;
             try {
-                await updateInvoiceStatus(invoiceId, status);
+                paymentResult = await updateInvoiceStatus(invoiceId, status) as { transactionId?: string; transactionCreated?: boolean } | undefined;
             } catch (error: unknown) {
                 const message = error instanceof Error ? error.message : "Failed to update invoice status";
                 return { success: false, data: null, summary: message };
             }
-
-            return {
-                success: true,
-                data: { invoiceId, status },
-                summary: `Invoice status updated to "${status}"`,
-                rollbackData: invoiceSnapshot ? [{
+            const rollbackData: RollbackAction[] = [];
+            if (invoiceSnapshot) {
+                rollbackData.push({
                     toolName: "update_invoice_status",
                     actionType: "update",
                     entityType: "invoice",
                     entityId: invoiceId,
                     beforeSnapshot: invoiceSnapshot,
                     executedAt: new Date().toISOString(),
-                }] : undefined,
+                });
+            }
+            if (paymentResult?.transactionCreated && paymentResult.transactionId) {
+                rollbackData.push({
+                    toolName: "update_invoice_status",
+                    actionType: "create",
+                    entityType: "transaction",
+                    entityId: paymentResult.transactionId,
+                    executedAt: new Date().toISOString(),
+                });
+            }
+
+            return {
+                success: true,
+                data: { invoiceId, status },
+                summary: `Invoice status updated to "${status}"`,
+                rollbackData: rollbackData.length > 0 ? rollbackData : undefined,
             };
         }
 
@@ -250,6 +281,8 @@ export async function executeAdminTool(
 
             const invoices = getBulkInvoices(args);
             const createdIds: string[] = [];
+            const createdTransactionIds: string[] = [];
+            let createdInvoiceAgencyId: string | undefined;
 
             for (const invoice of invoices) {
                 const result = await createInvoice({
@@ -257,26 +290,46 @@ export async function executeAdminTool(
                     amount: invoice.amount ?? 0,
                     date: invoice.date || new Date().toISOString().split("T")[0],
                 });
+                createdInvoiceAgencyId ||= result.agencyId;
 
                 if (invoice.status && invoice.status !== "Pending") {
-                    await updateInvoiceStatus(result.id, invoice.status);
+                    const statusResult = await updateInvoiceStatus(result.id, invoice.status) as { transactionId?: string; transactionCreated?: boolean } | undefined;
+                    if (statusResult?.transactionCreated && statusResult.transactionId) {
+                        createdTransactionIds.push(statusResult.transactionId);
+                    }
                 }
 
                 createdIds.push(result.id);
+            }
+
+            const rollbackData: RollbackAction[] = [];
+            if (createdIds.length > 0) {
+                rollbackData.push({
+                    toolName: "bulk_create_invoices",
+                    actionType: "create",
+                    entityType: "invoice",
+                    entityId: createdIds[0],
+                    beforeSnapshot: createdInvoiceAgencyId ? { agencyId: createdInvoiceAgencyId } : undefined,
+                    createdEntityIds: createdIds,
+                    executedAt: new Date().toISOString(),
+                });
+            }
+            if (createdTransactionIds.length > 0) {
+                rollbackData.push({
+                    toolName: "bulk_create_invoices",
+                    actionType: "create",
+                    entityType: "transaction",
+                    entityId: createdTransactionIds[0],
+                    createdEntityIds: createdTransactionIds,
+                    executedAt: new Date().toISOString(),
+                });
             }
 
             return {
                 success: true,
                 data: { count: createdIds.length, ids: createdIds },
                 summary: `${createdIds.length} invoice(s) created`,
-                rollbackData: createdIds.length > 0 ? [{
-                    toolName: "bulk_create_invoices",
-                    actionType: "create",
-                    entityType: "invoice",
-                    entityId: createdIds[0],
-                    createdEntityIds: createdIds,
-                    executedAt: new Date().toISOString(),
-                }] : undefined,
+                rollbackData: rollbackData.length > 0 ? rollbackData : undefined,
             };
         }
 
@@ -316,7 +369,7 @@ export async function executeAdminTool(
                 return permissionDenied("AI Employee Creation permission is disabled. Enable it in Settings -> AI Settings.");
             }
 
-            const generatedPassword = getOptionalStringArg(args, "password") || crypto.randomBytes(16).toString("base64url");
+            const generatedPassword = getOptionalStringArg(args, "password") || generateTemporaryPassword();
             const role = (getOptionalStringArg(args, "role") || "employee") as User["role"];
             const employmentType = (getOptionalStringArg(args, "employmentType") || "Salary") as NonNullable<User["employmentType"]>;
             const createdAt = getOptionalStringArg(args, "createdAt");
@@ -333,7 +386,7 @@ export async function executeAdminTool(
 
             if (createdAt) {
                 await UserModel.updateOne(
-                    { id: newEmployee.id },
+                    { id: newEmployee.id, agencyId: newEmployee.agencyId },
                     { $set: { createdAt: new Date(createdAt).toISOString() } },
                     { timestamps: false }
                 );
@@ -352,8 +405,9 @@ export async function executeAdminTool(
                 rollbackData: [{
                     toolName: "create_employee",
                     actionType: "create",
-                    entityType: "task",
+                    entityType: "user",
                     entityId: newEmployee.id,
+                    beforeSnapshot: { agencyId: newEmployee.agencyId },
                     executedAt: new Date().toISOString(),
                 }],
             };

@@ -28,7 +28,7 @@ export interface ChatMessage {
 export interface CheckpointAction {
     toolName: string;
     actionType: 'create' | 'update' | 'delete';
-    entityType: 'task' | 'project' | 'client' | 'invoice' | 'transaction' | 'service' | 'leaveRequest' | 'comment';
+    entityType: 'task' | 'project' | 'client' | 'user' | 'invoice' | 'transaction' | 'service' | 'leaveRequest' | 'comment';
     entityId: string;
     beforeSnapshot?: Record<string, unknown>;
     createdEntityIds?: string[];

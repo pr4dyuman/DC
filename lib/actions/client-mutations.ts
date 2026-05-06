@@ -37,7 +37,8 @@ export async function createClientImpl(client: Omit<Client, "id" | "agencyId">, 
     if (!client.companyName) throw new Error("Company name is required");
     if (client.email) client.email = validateEmail(client.email);
     if (client.phone) client.phone = sanitizePhone(client.phone);
-    if (client.password) await validatePasswordWithPolicy(client.password);
+    if (!client.password) throw new Error("Password is required");
+    await validatePasswordWithPolicy(client.password);
 
     let username = client.username ? sanitizeUsername(client.username) : "";
     if (!username) {

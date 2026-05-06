@@ -266,6 +266,13 @@ function getSourceType(domain: string, url: string, title: string, description: 
         return "education";
     }
 
+    if (
+        /^(?:investors?|ir|press|newsroom)\./i.test(domain) ||
+        /\/(?:press|press-release|press-releases|newsroom|investors?|ir)(?:\/|$|-)/i.test(pathname)
+    ) {
+        return "official";
+    }
+
     if (/\b(news|press|magazine|journal|daily|times|wire)\b/.test(combined)) {
         return "news";
     }
@@ -898,6 +905,7 @@ async function getCachedGroundedResearch(
     normalizedQuery: string,
     location: string,
     refreshWindowHours: number,
+    minimumSourceCount = 1,
 ) {
     await connectDB();
 
@@ -918,6 +926,10 @@ async function getCachedGroundedResearch(
 
     const refreshWindowMs = refreshWindowHours * 60 * 60 * 1000;
     if (Date.now() - refreshedAtMs > refreshWindowMs) {
+        return null;
+    }
+
+    if ((snapshot.sources || []).length < minimumSourceCount) {
         return null;
     }
 
@@ -997,6 +1009,7 @@ export async function getAIBloggerGroundedResearch(
     const normalizedQuery = normalizeQuery(query);
     const location = sanitizeLocation(options.location);
     const refreshWindowHours = Math.min(Math.max(options.refreshWindowHours || 24, 1), 24 * 30);
+    const minimumCachedSources = (groundedResearchConfig?.maxSources || 5) >= 2 ? 2 : 1;
 
     if (options.agencyId && !options.bypassCache) {
         const cached = await getCachedGroundedResearch(
@@ -1004,6 +1017,7 @@ export async function getAIBloggerGroundedResearch(
             normalizedQuery,
             location,
             refreshWindowHours,
+            minimumCachedSources,
         );
 
         if (cached) {

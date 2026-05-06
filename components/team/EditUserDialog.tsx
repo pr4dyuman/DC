@@ -178,6 +178,11 @@ export function EditUserDialog({
                     }
                 }
             } else {
+                if (!formData.password) {
+                    setPasswordError("Password is required for new members");
+                    setSubmitting(false);
+                    return;
+                }
                 await createUser(formData);
             }
 

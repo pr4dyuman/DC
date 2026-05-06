@@ -10,7 +10,7 @@ type ToolExecutionResult = {
     rollbackData?: {
         toolName: string;
         actionType: "create" | "update" | "delete";
-        entityType: "task" | "project" | "client" | "invoice" | "transaction" | "service" | "leaveRequest" | "comment";
+        entityType: "task" | "project" | "client" | "user" | "invoice" | "transaction" | "service" | "leaveRequest" | "comment";
         entityId: string;
         beforeSnapshot?: unknown;
         createdEntityIds?: string[];
@@ -74,6 +74,7 @@ export async function executeFinanceTool(
                     actionType: "create",
                     entityType: "invoice",
                     entityId: newInvoice.id,
+                    beforeSnapshot: { agencyId: newInvoice.agencyId },
                     executedAt: new Date().toISOString(),
                 }],
             };

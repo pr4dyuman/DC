@@ -271,12 +271,16 @@ export function EditUserDialogForm({
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-muted-foreground">Reset Password</label>
+                                <label className="text-xs font-medium text-muted-foreground">{user ? "Reset Password" : "Password"}</label>
+                                {passwordError && (
+                                    <p className="text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded-md">{passwordError}</p>
+                                )}
                                 <input
                                     type="password"
                                     placeholder={user ? "Force reset" : "New Password"}
                                     value={formData.password || ""}
                                     onChange={(event) => setFormData((previous) => ({ ...previous, password: event.target.value }))}
+                                    required={!user}
                                     className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:ring-1 focus:ring-primary"
                                 />
                             </div>

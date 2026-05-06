@@ -16,7 +16,7 @@ export type DeleteToolName =
 type RollbackAction = {
     toolName: string;
     actionType: "create" | "update" | "delete";
-    entityType: "task" | "project" | "client" | "invoice" | "transaction" | "service" | "leaveRequest" | "comment";
+    entityType: "task" | "project" | "client" | "user" | "invoice" | "transaction" | "service" | "leaveRequest" | "comment";
     entityId: string;
     beforeSnapshot?: unknown;
     createdEntityIds?: string[];
