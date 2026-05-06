@@ -73,6 +73,8 @@ export async function POST(request: NextRequest) {
     // Revalidate cache
     const { revalidatePath } = await import("next/cache");
     revalidatePath("/blog");
+    revalidatePath(`/blog/${blog.slug}`);
+    revalidatePath("/sitemap.xml");
 
     return NextResponse.json(blog.toObject(), { status: 201 });
   } catch (error: unknown) {

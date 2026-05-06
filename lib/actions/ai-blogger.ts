@@ -921,8 +921,15 @@ const GOOGLE_SEARCH_CONSOLE_SCOPE = "https://www.googleapis.com/auth/webmasters.
 const DEFAULT_PROMPT_AGENCY_NAME = "Connected site";
 
 function revalidateAIBloggerRoute(pathSuffix = "") {
-    revalidatePath(`${AI_BLOGGER_DASHBOARD_BASE}${pathSuffix}`);
-    revalidatePath(AI_BLOGGER_SUPERADMIN_BASE);
+    try {
+        revalidatePath(`${AI_BLOGGER_DASHBOARD_BASE}${pathSuffix}`);
+        revalidatePath(AI_BLOGGER_SUPERADMIN_BASE);
+    } catch (error) {
+        console.warn("[AI-BLOGGER] Failed to revalidate AI Blogger route", {
+            pathSuffix,
+            error: error instanceof Error ? error.message : String(error),
+        });
+    }
 }
 
 function coerceTextValue(value: unknown, depth = 0): string {
@@ -1953,6 +1960,24 @@ function normalizePerformancePageUrl(value: string | undefined) {
         return `${url.protocol}//${url.host.toLowerCase()}${pathname}`;
     } catch {
         return normalized.replace(/\/+$/, "");
+    }
+}
+
+function normalizePerformancePageLookupKey(value: string | undefined) {
+    const normalized = normalizePerformancePageUrl(value);
+    if (!normalized) {
+        return "";
+    }
+
+    try {
+        const url = new URL(normalized);
+        const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+        const port = url.port ? `:${url.port}` : "";
+        const pathname = url.pathname === "/" ? "/" : url.pathname.replace(/\/+$/, "");
+
+        return `https://${hostname}${port}${pathname}`;
+    } catch {
+        return normalized.toLowerCase().replace(/^https?:\/\/www\./, "https://").replace(/^http:\/\//, "https://");
     }
 }
 
@@ -13000,17 +13025,23 @@ async function syncAgencyBlogStudioPerformanceImpl(
     }>>();
 
     const recordPageAggregate = (pageUrl: string, row: SearchConsoleAnalyticsRow) => {
+        const lookupKey = normalizePerformancePageLookupKey(pageUrl);
+        if (!lookupKey) {
+            return;
+        }
+
         const clicks = toFiniteMetric(row.clicks);
         const impressions = toFiniteMetric(row.impressions);
         const position = toFiniteMetric(row.position);
         const weight = impressions > 0 ? impressions : 1;
+        const currentAggregate = pageAggregates.get(lookupKey);
 
-        pageAggregates.set(pageUrl, {
-            pageUrl,
-            clicks,
-            impressions,
-            positionWeightedSum: position * weight,
-            positionWeight: weight,
+        pageAggregates.set(lookupKey, {
+            pageUrl: currentAggregate?.pageUrl || pageUrl,
+            clicks: (currentAggregate?.clicks || 0) + clicks,
+            impressions: (currentAggregate?.impressions || 0) + impressions,
+            positionWeightedSum: (currentAggregate?.positionWeightedSum || 0) + position * weight,
+            positionWeight: (currentAggregate?.positionWeight || 0) + weight,
         });
     };
 
@@ -13030,11 +13061,16 @@ async function syncAgencyBlogStudioPerformanceImpl(
             return;
         }
 
+        const lookupKey = normalizePerformancePageLookupKey(pageUrl);
+        if (!lookupKey) {
+            return;
+        }
+
         const clicks = toFiniteMetric(row.clicks);
         const impressions = toFiniteMetric(row.impressions);
         const position = toFiniteMetric(row.position);
         const weight = impressions > 0 ? impressions : 1;
-        const pageBuckets = container.get(pageUrl) || new Map<string, {
+        const pageBuckets = container.get(lookupKey) || new Map<string, {
             label: string;
             clicks: number;
             impressions: number;
@@ -13054,7 +13090,7 @@ async function syncAgencyBlogStudioPerformanceImpl(
         currentBucket.positionWeightedSum += position * weight;
         currentBucket.positionWeight += weight;
         pageBuckets.set(label, currentBucket);
-        container.set(pageUrl, pageBuckets);
+        container.set(lookupKey, pageBuckets);
     };
 
     for (const row of pageRows) {
@@ -13125,7 +13161,8 @@ async function syncAgencyBlogStudioPerformanceImpl(
 
     for (const post of publishedPosts) {
         const pageUrl = getBlogStudioPublishedPageUrl(post);
-        const aggregate = pageAggregates.get(pageUrl);
+        const pageLookupKey = normalizePerformancePageLookupKey(pageUrl);
+        const aggregate = pageAggregates.get(pageLookupKey);
         const existingSnapshot = existingSnapshotsByPostId.get(post.id);
         const impressions = aggregate?.impressions || 0;
         const clicks = aggregate?.clicks || 0;
@@ -13134,8 +13171,8 @@ async function syncAgencyBlogStudioPerformanceImpl(
             aggregate && aggregate.positionWeight > 0
                 ? aggregate.positionWeightedSum / aggregate.positionWeight
                 : 0;
-        const topQueries = queryAggregates.has(pageUrl)
-            ? Array.from((queryAggregates.get(pageUrl) || new Map()).values())
+        const topQueries = queryAggregates.has(pageLookupKey)
+            ? Array.from((queryAggregates.get(pageLookupKey) || new Map()).values())
                 .sort((left, right) => {
                     if (right.impressions !== left.impressions) {
                         return right.impressions - left.impressions;
@@ -13154,8 +13191,8 @@ async function syncAgencyBlogStudioPerformanceImpl(
                             : 0,
                 }))
             : [];
-        const topCountries = buildPerformanceBreakdownSnapshots(countryAggregates.get(pageUrl), 5);
-        const topDevices = buildPerformanceBreakdownSnapshots(deviceAggregates.get(pageUrl), 4);
+        const topCountries = buildPerformanceBreakdownSnapshots(countryAggregates.get(pageLookupKey), 5);
+        const topDevices = buildPerformanceBreakdownSnapshots(deviceAggregates.get(pageLookupKey), 4);
 
         await BlogStudioPerformanceSnapshotModel.findOneAndUpdate(
             {

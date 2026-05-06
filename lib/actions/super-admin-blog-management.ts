@@ -4,7 +4,12 @@ import dbConnect from "@/lib/marketing-db";
 import Blog from "@/models/marketing/Blog";
 import mongoose from "mongoose";
 import { logBlogAuditChange } from "@/lib/blog-audit-log";
+import {
+  buildDeletedBlogHrefCandidates,
+  stripDeletedBlogLinksFromContent,
+} from "@/lib/marketing-blog-delete-cleanup";
 import { normalizeMarketingCanonicalUrl } from "@/lib/marketing-blog-utils";
+import { BlogStudioPostModel, connectDB as connectPrimaryDb } from "@/lib/mongodb";
 import { verifySuperAdmin } from "./super-admin-shared";
 
 /**
@@ -14,6 +19,7 @@ export interface BlogDocument {
   _id: string;
   title: string;
   slug: string;
+  sourcePostId?: string;
   content: string;
   image: string;
   imageAlt?: string;
@@ -132,6 +138,7 @@ function serializeBlogDocument(doc: StoredBlogDocument): BlogDocument {
     _id: typeof doc._id === "string" ? doc._id : doc._id.toString(),
     title: doc.title,
     slug: doc.slug,
+    sourcePostId: doc.sourcePostId,
     content: doc.content,
     image: doc.image,
     imageAlt: doc.imageAlt,
@@ -160,6 +167,189 @@ function serializeBlogDocument(doc: StoredBlogDocument): BlogDocument {
  */
 function escapeRegexChars(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+type DeletedBlogCleanupDocument = Pick<
+  StoredBlogDocument,
+  "_id" | "title" | "slug" | "sourcePostId" | "canonicalUrl" | "content" | "internalLinks"
+>;
+
+function toObjectIdString(value: mongoose.Types.ObjectId | string) {
+  return typeof value === "string" ? value : value.toString();
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+async function revalidateBlogPublicPaths(slugs: Iterable<string> = []) {
+  const { revalidatePath } = await import("next/cache");
+  const uniqueSlugs = new Set<string>();
+
+  for (const slug of slugs) {
+    const normalizedSlug = slug?.trim();
+    if (normalizedSlug) {
+      uniqueSlugs.add(normalizedSlug);
+    }
+  }
+
+  revalidatePath("/blog");
+  revalidatePath("/sitemap.xml");
+  for (const slug of uniqueSlugs) {
+    revalidatePath(`/blog/${slug}`);
+  }
+}
+
+async function cleanupDeletedBlogReferences(deletedBlogs: DeletedBlogCleanupDocument[]) {
+  const deletedSlugs = Array.from(
+    new Set(deletedBlogs.map((blog) => blog.slug).filter(isNonEmptyString)),
+  );
+  const hrefCandidates = Array.from(
+    new Set(
+      deletedBlogs.flatMap((blog) =>
+        buildDeletedBlogHrefCandidates({
+          slug: blog.slug,
+          canonicalUrl: blog.canonicalUrl,
+        }),
+      ),
+    ),
+  );
+  const changedSlugs = new Set<string>();
+  const referenceConditions: Record<string, unknown>[] = [];
+
+  if (hrefCandidates.length > 0) {
+    referenceConditions.push({ "internalLinks.href": { $in: hrefCandidates } });
+  }
+
+  if (deletedSlugs.length > 0) {
+    referenceConditions.push({ "internalLinks.targetPostSlug": { $in: deletedSlugs } });
+  }
+
+  if (referenceConditions.length > 0) {
+    const referencedBlogs = (await Blog.find({ $or: referenceConditions })
+      .select("slug")
+      .lean()
+      .exec()) as Array<{ slug?: string }>;
+
+    for (const blog of referencedBlogs) {
+      if (blog.slug) {
+        changedSlugs.add(blog.slug);
+      }
+    }
+
+    if (hrefCandidates.length > 0) {
+      await Blog.updateMany(
+        {},
+        { $pull: { internalLinks: { href: { $in: hrefCandidates } } } },
+      ).exec();
+    }
+
+    if (deletedSlugs.length > 0) {
+      await Blog.updateMany(
+        {},
+        { $pull: { internalLinks: { targetPostSlug: { $in: deletedSlugs } } } },
+      ).exec();
+    }
+  }
+
+  if (hrefCandidates.length === 0) {
+    return Array.from(changedSlugs);
+  }
+
+  const remainingBlogs = (await Blog.find()
+    .select("_id slug content")
+    .lean()
+    .exec()) as Array<{
+    _id: mongoose.Types.ObjectId | string;
+    slug?: string;
+    content?: string;
+  }>;
+
+  const contentUpdates = [];
+  for (const blog of remainingBlogs) {
+    const currentContent = typeof blog.content === "string" ? blog.content : "";
+    const cleanedContent = stripDeletedBlogLinksFromContent(currentContent, hrefCandidates);
+
+    if (cleanedContent !== currentContent) {
+      contentUpdates.push({
+        updateOne: {
+          filter: { _id: blog._id },
+          update: { $set: { content: cleanedContent, updatedAt: new Date() } },
+        },
+      });
+
+      if (blog.slug) {
+        changedSlugs.add(blog.slug);
+      }
+    }
+  }
+
+  if (contentUpdates.length > 0) {
+    await Blog.bulkWrite(contentUpdates);
+  }
+
+  return Array.from(changedSlugs);
+}
+
+async function markDeletedPublicBlogsInAiBlogger(deletedBlogs: DeletedBlogCleanupDocument[]) {
+  const sourcePostIds = Array.from(
+    new Set(deletedBlogs.map((blog) => blog.sourcePostId).filter(isNonEmptyString)),
+  );
+  const deletedSlugs = Array.from(
+    new Set(deletedBlogs.map((blog) => blog.slug).filter(isNonEmptyString)),
+  );
+  const deletedEntryIds = Array.from(
+    new Set(deletedBlogs.map((blog) => toObjectIdString(blog._id)).filter(Boolean)),
+  );
+  const sourceObjectIds = sourcePostIds
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+  const filters: Record<string, unknown>[] = [];
+
+  if (sourcePostIds.length > 0) {
+    filters.push({ id: { $in: sourcePostIds } });
+  }
+
+  if (sourceObjectIds.length > 0) {
+    filters.push({ _id: { $in: sourceObjectIds } });
+  }
+
+  if (deletedSlugs.length > 0) {
+    filters.push({ publishedEntrySlug: { $in: deletedSlugs } });
+  }
+
+  if (deletedEntryIds.length > 0) {
+    filters.push({ publishedEntryId: { $in: deletedEntryIds } });
+  }
+
+  if (filters.length === 0) {
+    return;
+  }
+
+  try {
+    await connectPrimaryDb();
+    await BlogStudioPostModel.updateMany(
+      { $or: filters },
+      {
+        $set: {
+          status: "SEO Review",
+          deliveryStatus: "failed",
+          deliveryError: "Public marketing blog was deleted in super-admin blog management.",
+          updatedAt: new Date().toISOString(),
+          updatedBy: "super-admin-blog-delete",
+        },
+        $unset: {
+          publishedEntryId: 1,
+          publishedEntrySlug: 1,
+          publishedTargetUrl: 1,
+          publishedAt: 1,
+          publishedMetadataValidatedAt: 1,
+        },
+      },
+    ).exec();
+  } catch (error) {
+    console.warn("Failed to sync deleted public blog state back to AI Blogger:", error);
+  }
 }
 
 interface PaginatedBlogsResult {
@@ -325,7 +515,10 @@ export async function updateBlog(
       throw new Error("Invalid blog ID");
     }
 
-    const currentBlog = await Blog.findById(id).select("slug canonicalUrl").lean().exec();
+    const currentBlog = (await Blog.findById(id)
+      .select("slug canonicalUrl status")
+      .lean()
+      .exec()) as Pick<StoredBlogDocument, "slug" | "canonicalUrl" | "status"> | null;
     if (!currentBlog) {
       throw new Error("Blog not found");
     }
@@ -378,10 +571,7 @@ export async function updateBlog(
       throw new Error("Blog not found");
     }
 
-    // Revalidate cache for public blog page
-    const { revalidatePath } = await import("next/cache");
-    revalidatePath(`/blog/${blog.slug}`);
-    revalidatePath("/blog");
+    await revalidateBlogPublicPaths([currentBlog.slug, blog.slug]);
 
     // Log audit change
     const changedFields = Object.keys(updates);
@@ -421,11 +611,13 @@ export async function deleteBlog(id: string): Promise<void> {
       throw new Error("Invalid blog ID");
     }
 
-    const blog = await Blog.findByIdAndDelete(id).lean().exec();
+    const blog = (await Blog.findById(id).lean().exec()) as DeletedBlogCleanupDocument | null;
 
     if (!blog) {
       throw new Error("Blog not found");
     }
+
+    await Blog.deleteOne({ _id: id }).exec();
 
     // Log audit change
     await logBlogAuditChange(
@@ -434,10 +626,9 @@ export async function deleteBlog(id: string): Promise<void> {
       `Deleted blog: ${blog.title}`
     );
 
-    // Revalidate cache
-    const { revalidatePath } = await import("next/cache");
-    revalidatePath(`/blog/${blog.slug}`);
-    revalidatePath("/blog");
+    const changedSlugs = await cleanupDeletedBlogReferences([blog]);
+    await markDeletedPublicBlogsInAiBlogger([blog]);
+    await revalidateBlogPublicPaths([blog.slug, ...changedSlugs]);
   } catch (error) {
     console.error("Error deleting blog:", error);
     throw error;
@@ -565,22 +756,34 @@ export async function bulkDeleteBlogs(ids: string[]): Promise<{ deletedCount: nu
       throw new Error("No valid blog IDs provided");
     }
 
+    const objectIds = validIds.map((id) => new mongoose.Types.ObjectId(id));
+    const blogs = (await Blog.find({
+      _id: { $in: objectIds },
+    })
+      .lean()
+      .exec()) as DeletedBlogCleanupDocument[];
+
+    if (blogs.length === 0) {
+      throw new Error("No blogs found for deletion");
+    }
+
     const result = await Blog.deleteMany({
-      _id: { $in: validIds.map((id) => new mongoose.Types.ObjectId(id)) },
+      _id: { $in: objectIds },
     }).exec();
 
     // Log audit changes for each deleted blog
-    for (const id of validIds) {
+    for (const blog of blogs) {
+      const blogId = toObjectIdString(blog._id);
       await logBlogAuditChange(
-        id,
+        blogId,
         "delete",
-        "Bulk deleted"
+        `Bulk deleted blog: ${blog.title}`
       );
     }
 
-    // Revalidate cache
-    const { revalidatePath } = await import("next/cache");
-    revalidatePath("/blog");
+    const changedSlugs = await cleanupDeletedBlogReferences(blogs);
+    await markDeletedPublicBlogsInAiBlogger(blogs);
+    await revalidateBlogPublicPaths([...blogs.map((blog) => blog.slug), ...changedSlugs]);
 
     return { deletedCount: result.deletedCount };
   } catch (error) {
@@ -606,6 +809,12 @@ export async function bulkUpdateBlogStatus(
       throw new Error("No valid blog IDs provided");
     }
 
+    const objectIds = validIds.map((id) => new mongoose.Types.ObjectId(id));
+    const blogs = (await Blog.find({ _id: { $in: objectIds } })
+      .select("slug")
+      .lean()
+      .exec()) as Array<{ slug?: string }>;
+
     const update: Record<string, unknown> = { status };
     if (status === "published") {
       update.publishedAt = new Date();
@@ -614,7 +823,7 @@ export async function bulkUpdateBlogStatus(
     }
 
     const result = await Blog.updateMany(
-      { _id: { $in: validIds.map((id) => new mongoose.Types.ObjectId(id)) } },
+      { _id: { $in: objectIds } },
       { $set: update }
     ).exec();
 
@@ -627,9 +836,7 @@ export async function bulkUpdateBlogStatus(
       );
     }
 
-    // Revalidate cache
-    const { revalidatePath } = await import("next/cache");
-    revalidatePath("/blog");
+    await revalidateBlogPublicPaths(blogs.map((blog) => blog.slug || ""));
 
     return { modifiedCount: result.modifiedCount };
   } catch (error) {
