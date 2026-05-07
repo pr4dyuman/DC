@@ -7,6 +7,9 @@ import { getAIBloggerDashboardContext } from "@/lib/ai-blogger-dashboard";
 import { isMongoConnectionIssue } from "@/lib/mongodb-connection";
 import { getAgencyAIBloggerConfigServer } from "@/lib/utils-server";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function AIBloggerGeneratePage() {
     try {
         const { access, agency } = await getAIBloggerDashboardContext();

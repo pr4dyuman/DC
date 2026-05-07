@@ -1409,6 +1409,20 @@ function buildWebsiteAuthorityProfile(input: {
     const commercialPages = input.priorityPages.filter((page) =>
         isCommercialPriorityCategory(page.pageCategory),
     );
+    const supportingPages = input.priorityPages.filter((page) =>
+        ["blog", "faq", "case-study", "industry"].includes(page.pageCategory),
+    );
+    const commercialAuthorityText = [
+        ...commercialPages.flatMap((page) => [
+            page.title,
+            page.description,
+            page.excerpt,
+            ...page.highlights,
+            ...page.serviceSignals,
+            ...page.proofSignals,
+        ]),
+        ...input.serviceSignals,
+    ];
     const authoritySourceText = [
         ...input.pageTitles,
         ...input.topicHints,
@@ -1434,23 +1448,24 @@ function buildWebsiteAuthorityProfile(input: {
         120,
     );
     const authorityLanes = uniqueStrings(
-        [
-            ...coreOffers,
-            ...commercialPages.flatMap((page) => [
-                page.description,
-                page.excerpt,
-                ...page.highlights,
-            ]),
-            ...input.topicHints,
-        ].filter(isMeaningfulTopicHint),
+        (commercialPages.length > 0
+            ? [
+                ...coreOffers,
+                ...commercialAuthorityText,
+            ]
+            : [
+                ...coreOffers,
+                ...input.topicHints,
+            ]).filter(isMeaningfulTopicHint),
         18,
         140,
     );
     const adjacentLanes = uniqueStrings(
         [
             ...input.faqQuestions,
-            ...input.topicHints,
-            ...input.pageTitles,
+            ...supportingPages.flatMap((page) => [page.title, page.description]),
+            ...(commercialPages.length > 0 ? [] : input.topicHints),
+            ...(commercialPages.length > 0 ? [] : input.pageTitles),
         ].filter(isMeaningfulTopicHint),
         14,
         140,
@@ -1462,10 +1477,8 @@ function buildWebsiteAuthorityProfile(input: {
     }));
     const contentClusters = uniqueStrings(
         [
-            ...input.priorityPages
-                .filter((page) => ["blog", "faq", "case-study", "industry"].includes(page.pageCategory))
-                .flatMap((page) => [page.title, page.description]),
-            ...input.topicHints,
+            ...supportingPages.flatMap((page) => [page.title, page.description]),
+            ...(commercialPages.length > 0 ? [] : input.topicHints),
         ].filter(isMeaningfulTopicHint),
         16,
         140,
@@ -1840,7 +1853,26 @@ export async function getAIBloggerWebsiteIntelligence(
     const faqQuestions = uniqueStrings(rankedPages.flatMap((page) => page.faqQuestions), 20, 180);
     const priorityPaths = buildPriorityPaths(rankedPages);
     const priorityPages = buildPriorityPages(rankedPages);
-    const serviceSignals = uniqueStrings(rankedPages.flatMap((page) => page.serviceSignals), 20, 140);
+    const commercialPriorityPages = priorityPages.filter((page) =>
+        isCommercialPriorityCategory(page.pageCategory),
+    );
+    const commercialServiceSignals = uniqueStrings(
+        commercialPriorityPages.flatMap((page) => page.serviceSignals),
+        20,
+        140,
+    );
+    const serviceSignals = uniqueStrings(
+        commercialServiceSignals.length > 0
+            ? [
+                ...commercialServiceSignals,
+                ...rankedPages
+                    .filter((page) => !isBlogPath(new URL(page.url).pathname.toLowerCase() || "/"))
+                    .flatMap((page) => page.serviceSignals),
+            ]
+            : rankedPages.flatMap((page) => page.serviceSignals),
+        20,
+        140,
+    );
     const ctaPatterns = uniqueStrings(rankedPages.flatMap((page) => page.ctaPatterns), 16, 140);
     const proofSignals = uniqueStrings(rankedPages.flatMap((page) => page.proofSignals), 16, 160);
 

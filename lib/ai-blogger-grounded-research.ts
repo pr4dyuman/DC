@@ -47,6 +47,7 @@ export type GroundedSourceFetchDiagnostic = {
     sourceType?: BlogStudioExternalSourceType;
     trustLevel?: BlogStudioExternalSourceTrustLevel;
     freshness?: BlogStudioExternalSourceFreshness;
+    queryAlignmentScore?: number;
 };
 
 const BOT_BLOCK_SIGNATURES = [
@@ -444,6 +445,136 @@ function buildGroundedResearchSummary(query: string, sources: BlogStudioExternal
     );
 }
 
+const GROUNDED_SOURCE_QUERY_STOPWORDS = new Set([
+    "about",
+    "after",
+    "also",
+    "best",
+    "blog",
+    "case",
+    "complete",
+    "example",
+    "examples",
+    "explained",
+    "for",
+    "from",
+    "guide",
+    "guides",
+    "how",
+    "into",
+    "latest",
+    "learn",
+    "new",
+    "news",
+    "report",
+    "reports",
+    "strategy",
+    "strategies",
+    "study",
+    "the",
+    "tips",
+    "trends",
+    "ultimate",
+    "using",
+    "what",
+    "when",
+    "where",
+    "which",
+    "why",
+    "with",
+]);
+
+const MIN_QUERY_ALIGNMENT_FOR_FRESHNESS_OVERRIDE = 48;
+const MIN_QUERY_ALIGNMENT_FOR_CACHED_SOURCE = 36;
+
+function normalizeGroundedToken(token: string) {
+    const normalized = token.toLowerCase().trim();
+
+    if (normalized.endsWith("ies") && normalized.length > 4) {
+        return `${normalized.slice(0, -3)}y`;
+    }
+
+    if (normalized.endsWith("s") && normalized.length > 4) {
+        return normalized.slice(0, -1);
+    }
+
+    return normalized;
+}
+
+function tokenizeGroundedSourceText(value: string) {
+    return Array.from(
+        new Set(
+            (value.toLowerCase().match(/[a-z0-9]+/g) || [])
+                .map(normalizeGroundedToken)
+                .filter((token) =>
+                    (token.length >= 3 || /^20\d{2}$/.test(token)) &&
+                    !GROUNDED_SOURCE_QUERY_STOPWORDS.has(token) &&
+                    !/^20\d{2}$/.test(token)
+                ),
+        ),
+    );
+}
+
+function scoreGroundedTokenOverlap(query: string, value: string) {
+    const queryTokens = tokenizeGroundedSourceText(query);
+    if (queryTokens.length === 0) {
+        return 0;
+    }
+
+    const valueTokens = new Set(tokenizeGroundedSourceText(value));
+    if (valueTokens.size === 0) {
+        return 0;
+    }
+
+    let matches = 0;
+    for (const token of queryTokens) {
+        if (valueTokens.has(token)) {
+            matches += 1;
+        }
+    }
+
+    return Math.round((matches / queryTokens.length) * 100);
+}
+
+function clampGroundedScore(value: number) {
+    if (!Number.isFinite(value)) {
+        return 0;
+    }
+
+    return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function scoreGroundedSourceQueryAlignment(source: BlogStudioExternalSource, query?: string) {
+    const normalizedQuery = sanitizeText(query || "", 180);
+    if (!normalizedQuery) {
+        return 0;
+    }
+
+    const urlText = (() => {
+        try {
+            const parsed = new URL(source.url);
+            return `${parsed.hostname.replace(/^www\./, "").replace(/[.-]+/g, " ")} ${parsed.pathname.replace(/[/-]+/g, " ")}`;
+        } catch {
+            return source.url;
+        }
+    })();
+    const titleScore = scoreGroundedTokenOverlap(normalizedQuery, source.title);
+    const urlScore = scoreGroundedTokenOverlap(normalizedQuery, urlText);
+    const summaryScore = scoreGroundedTokenOverlap(normalizedQuery, source.summary);
+    const claimsScore = scoreGroundedTokenOverlap(normalizedQuery, source.keyClaims.join(" "));
+    const compactQuery = tokenizeGroundedSourceText(normalizedQuery).join(" ");
+    const compactTitle = tokenizeGroundedSourceText(source.title).join(" ");
+    const exactTitleBoost = compactQuery && compactTitle.includes(compactQuery) ? 12 : 0;
+
+    return clampGroundedScore(
+        (titleScore * 0.46) +
+        (urlScore * 0.22) +
+        (summaryScore * 0.24) +
+        (claimsScore * 0.08) +
+        exactTitleBoost,
+    );
+}
+
 function buildFetchHeaders(userAgent: string) {
     return {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -711,7 +842,7 @@ function applyGroundedResearchFilters(
     config: Pick<
         AIBloggerConfig["groundedResearch"],
         "allowedSourceTypes" | "trustPreference" | "freshnessPreference" | "maxSources"
-    >,
+    > & { query?: string },
 ) {
     const allowedSourceTypes = new Set(config.allowedSourceTypes);
     const trustRank: Record<BlogStudioExternalSourceTrustLevel, number> = {
@@ -738,7 +869,11 @@ function applyGroundedResearchFilters(
         })
         .filter((source) => {
             if (config.freshnessPreference === "recent-first") {
-                return source.freshness === "current" || source.freshness === "recent";
+                return (
+                    source.freshness === "current" ||
+                    source.freshness === "recent" ||
+                    scoreGroundedSourceQueryAlignment(source, config.query) >= MIN_QUERY_ALIGNMENT_FOR_FRESHNESS_OVERRIDE
+                );
             }
 
             if (config.freshnessPreference === "evergreen-ok") {
@@ -748,7 +883,11 @@ function applyGroundedResearchFilters(
             return true;
         })
         .sort((left, right) => {
+            const leftAlignment = scoreGroundedSourceQueryAlignment(left, config.query);
+            const rightAlignment = scoreGroundedSourceQueryAlignment(right, config.query);
+
             return (
+                rightAlignment - leftAlignment ||
                 trustRank[right.trustLevel] - trustRank[left.trustLevel] ||
                 freshnessRank[right.freshness] - freshnessRank[left.freshness]
             );
@@ -756,7 +895,7 @@ function applyGroundedResearchFilters(
         .slice(0, config.maxSources);
 }
 
-function compareGroundedSources(left: BlogStudioExternalSource, right: BlogStudioExternalSource) {
+function compareGroundedSources(left: BlogStudioExternalSource, right: BlogStudioExternalSource, query?: string) {
     const trustRank: Record<BlogStudioExternalSourceTrustLevel, number> = {
         high: 3,
         medium: 2,
@@ -769,8 +908,11 @@ function compareGroundedSources(left: BlogStudioExternalSource, right: BlogStudi
         unknown: 2,
         dated: 1,
     };
+    const leftAlignment = scoreGroundedSourceQueryAlignment(left, query);
+    const rightAlignment = scoreGroundedSourceQueryAlignment(right, query);
 
     return (
+        rightAlignment - leftAlignment ||
         trustRank[right.trustLevel] - trustRank[left.trustLevel] ||
         freshnessRank[right.freshness] - freshnessRank[left.freshness] ||
         right.keyClaims.length - left.keyClaims.length
@@ -781,6 +923,7 @@ function mergeGroundedSources(
     primarySources: BlogStudioExternalSource[],
     supplementalSources: BlogStudioExternalSource[],
     maxSources: number,
+    query?: string,
 ) {
     const merged = new Map<string, BlogStudioExternalSource>();
 
@@ -791,14 +934,14 @@ function mergeGroundedSources(
     }
 
     return Array.from(merged.values())
-        .sort(compareGroundedSources)
+        .sort((left, right) => compareGroundedSources(left, right, query))
         .slice(0, maxSources);
 }
 
 type GroundedResearchFilterConfig = Pick<
     AIBloggerConfig["groundedResearch"],
     "allowedSourceTypes" | "trustPreference" | "freshnessPreference" | "maxSources"
->;
+> & { query?: string };
 
 function getGroundedSourceFilterReasons(
     source: BlogStudioExternalSource,
@@ -818,7 +961,8 @@ function getGroundedSourceFilterReasons(
     if (
         config.freshnessPreference === "recent-first" &&
         source.freshness !== "current" &&
-        source.freshness !== "recent"
+        source.freshness !== "recent" &&
+        scoreGroundedSourceQueryAlignment(source, config.query) < MIN_QUERY_ALIGNMENT_FOR_FRESHNESS_OVERRIDE
     ) {
         reasons.push(`freshness ${source.freshness} is outside recent-first setting`);
     }
@@ -840,7 +984,7 @@ function applyGroundedResearchAuthorityRecovery(
         .filter((source) => allowedSourceTypes.has(source.type))
         .filter((source) => source.trustLevel !== "low")
         .filter((source) => source.freshness !== "dated")
-        .sort(compareGroundedSources)
+        .sort((left, right) => compareGroundedSources(left, right, config.query))
         .slice(0, config.maxSources);
 }
 
@@ -884,6 +1028,7 @@ function attachGroundedFilterDiagnostics(
             sourceType: source.type,
             trustLevel: source.trustLevel,
             freshness: source.freshness,
+            queryAlignmentScore: scoreGroundedSourceQueryAlignment(source, config.query),
         };
     });
 }
@@ -907,6 +1052,7 @@ function toGroundedResearch(
 
 async function getCachedGroundedResearch(
     agencyId: string,
+    query: string,
     normalizedQuery: string,
     location: string,
     refreshWindowHours: number,
@@ -935,6 +1081,14 @@ async function getCachedGroundedResearch(
     }
 
     if ((snapshot.sources || []).length < minimumSourceCount) {
+        return null;
+    }
+
+    const bestQueryAlignment = Math.max(
+        0,
+        ...(snapshot.sources || []).map((source) => scoreGroundedSourceQueryAlignment(source, query)),
+    );
+    if (query && bestQueryAlignment < MIN_QUERY_ALIGNMENT_FOR_CACHED_SOURCE) {
         return null;
     }
 
@@ -1019,6 +1173,7 @@ export async function getAIBloggerGroundedResearch(
     if (options.agencyId && !options.bypassCache) {
         const cached = await getCachedGroundedResearch(
             options.agencyId,
+            query,
             normalizedQuery,
             location,
             refreshWindowHours,
@@ -1048,6 +1203,7 @@ export async function getAIBloggerGroundedResearch(
         trustPreference: groundedResearchConfig?.trustPreference || "balanced",
         freshnessPreference: groundedResearchConfig?.freshnessPreference || "balanced",
         maxSources: groundedResearchConfig?.maxSources || 5,
+        query,
     };
 
     let sources = applyGroundedResearchFilters(fetchedSources, filterConfig);
@@ -1079,11 +1235,11 @@ export async function getAIBloggerGroundedResearch(
         const supplementalSources = fetchedSources
             .filter((source) => !selectedUrls.has(source.url))
             .filter((source) => resolvedAllowedSourceTypes.includes(source.type) || source.trustLevel !== "low")
-            .sort(compareGroundedSources)
+            .sort((left, right) => compareGroundedSources(left, right, query))
             .slice(0, minimumDesiredSources - sources.length);
 
         if (supplementalSources.length > 0) {
-            sources = mergeGroundedSources(sources, supplementalSources, filterConfig.maxSources);
+            sources = mergeGroundedSources(sources, supplementalSources, filterConfig.maxSources, query);
         }
     }
 
