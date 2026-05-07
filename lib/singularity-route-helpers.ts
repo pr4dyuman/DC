@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { AIConfig, AIPermissions } from "@/lib/types";
+import type { MultimodalPart } from "@/lib/ai-provider-shared";
 import type { LiveCallbacks, LiveServerMessage } from "@google/genai";
 
 const TOOL_PERMISSION_FLAGS: Record<string, keyof AIPermissions> = {
@@ -17,6 +18,18 @@ const TOOL_PERMISSION_FLAGS: Record<string, keyof AIPermissions> = {
     delete_transaction: "canDelete",
     delete_service: "canDelete",
 };
+
+const MAX_MESSAGE_CHARS = 50_000;
+const MAX_HISTORY_MESSAGES = 200;
+const MAX_HISTORY_CHARS = 250_000;
+const MAX_IMAGES = 4;
+const MAX_DOCUMENTS = 4;
+const MAX_IMAGE_BASE64_CHARS = Math.ceil(10 * 1024 * 1024 * 4 / 3) + 1024;
+const MAX_DOCUMENT_BASE64_CHARS = Math.ceil(20 * 1024 * 1024 * 4 / 3) + 1024;
+const MAX_DOCUMENT_TEXT_CHARS = 100_000;
+const MAX_TOTAL_DOCUMENT_TEXT_CHARS = MAX_DOCUMENTS * MAX_DOCUMENT_TEXT_CHARS;
+const MAX_FILENAME_CHARS = 255;
+const MAX_MIME_TYPE_CHARS = 120;
 
 type GenerateContentFn = (
     config: AIConfig,
@@ -69,6 +82,75 @@ export function normalizeSingularityRequestBody(requestBody: Partial<Singularity
     };
 }
 
+export function validateSingularityPayloadLimits({
+    history,
+    message,
+    images,
+    documents,
+}: {
+    history: SingularityHistoryMessage[];
+    message: string;
+    images: UploadedImage[];
+    documents: UploadedDocument[];
+}): string | null {
+    if (message.length > MAX_MESSAGE_CHARS) {
+        return `Message too long (max ${MAX_MESSAGE_CHARS.toLocaleString()} characters)`;
+    }
+
+    if (history.length > MAX_HISTORY_MESSAGES) {
+        return `Too many history messages (max ${MAX_HISTORY_MESSAGES})`;
+    }
+
+    const historyChars = history.reduce((total, entry) => {
+        const content = typeof entry.content === "string" ? entry.content : "";
+        return total + content.length;
+    }, 0);
+    if (historyChars + message.length > MAX_HISTORY_CHARS) {
+        return `Conversation context too large (max ${MAX_HISTORY_CHARS.toLocaleString()} characters)`;
+    }
+
+    if (images.length > MAX_IMAGES) {
+        return `Too many images (max ${MAX_IMAGES})`;
+    }
+    for (const image of images) {
+        if (typeof image.mimeType !== "string" || image.mimeType.length > MAX_MIME_TYPE_CHARS || !image.mimeType.startsWith("image/")) {
+            return "Invalid image attachment type";
+        }
+        if (typeof image.base64 !== "string" || image.base64.length === 0 || image.base64.length > MAX_IMAGE_BASE64_CHARS) {
+            return "Image attachment is missing or too large";
+        }
+    }
+
+    if (documents.length > MAX_DOCUMENTS) {
+        return `Too many documents (max ${MAX_DOCUMENTS})`;
+    }
+
+    let totalDocumentTextChars = 0;
+    for (const doc of documents) {
+        if (doc.fileName && doc.fileName.length > MAX_FILENAME_CHARS) {
+            return "Document filename is too long";
+        }
+        if (doc.mimeType && doc.mimeType.length > MAX_MIME_TYPE_CHARS) {
+            return "Document MIME type is too long";
+        }
+        if (doc.textContent) {
+            totalDocumentTextChars += doc.textContent.length;
+            if (doc.textContent.length > MAX_DOCUMENT_TEXT_CHARS) {
+                return `Document text is too large (max ${MAX_DOCUMENT_TEXT_CHARS.toLocaleString()} characters per document)`;
+            }
+        }
+        if (doc.base64 && doc.base64.length > MAX_DOCUMENT_BASE64_CHARS) {
+            return "Document attachment is too large";
+        }
+    }
+
+    if (totalDocumentTextChars > MAX_TOTAL_DOCUMENT_TEXT_CHARS) {
+        return "Uploaded document text is too large";
+    }
+
+    return null;
+}
+
 export function buildConversationPrompt(history: SingularityHistoryMessage[], message: string) {
     let fullPrompt = "";
 
@@ -81,6 +163,42 @@ export function buildConversationPrompt(history: SingularityHistoryMessage[], me
 
     fullPrompt += `User: ${message}`;
     return fullPrompt;
+}
+
+export function buildSingularityMultimodalParts(
+    prompt: string,
+    images: UploadedImage[] = [],
+    documents: UploadedDocument[] = []
+): MultimodalPart[] {
+    const parts: MultimodalPart[] = [{ text: prompt }];
+
+    for (const image of images) {
+        if (!image.mimeType || !image.base64) continue;
+        parts.push({
+            inlineData: {
+                mimeType: image.mimeType,
+                data: image.base64,
+            },
+        });
+    }
+
+    for (const doc of documents) {
+        if (doc.mimeType === "application/pdf" && doc.base64) {
+            parts.push({
+                inlineData: {
+                    mimeType: "application/pdf",
+                    data: doc.base64,
+                },
+            });
+        }
+    }
+
+    return parts;
+}
+
+export function hasInlineAttachments(images: UploadedImage[] = [], documents: UploadedDocument[] = []) {
+    return images.some((image) => Boolean(image.mimeType && image.base64))
+        || documents.some((doc) => doc.mimeType === "application/pdf" && Boolean(doc.base64));
 }
 
 export function getErrorMessage(error: unknown, fallback = "Unknown error"): string {

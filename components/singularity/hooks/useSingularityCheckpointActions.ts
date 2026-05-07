@@ -17,7 +17,7 @@ type UseSingularityCheckpointActionsParams = {
     messagesRef: React.MutableRefObject<Message[]>;
     sessionIdRef: React.MutableRefObject<string | null>;
     setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-    saveMessages: (msgs: Message[], sid: string | null) => Promise<void>;
+    saveMessages: (msgs: Message[], sid: string | null, options?: { allowEmpty?: boolean }) => Promise<void>;
 };
 
 export function useSingularityCheckpointActions({

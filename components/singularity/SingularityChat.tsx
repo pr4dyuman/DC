@@ -173,7 +173,7 @@ export function SingularityChat({ userId, agencyName = 'Agency OS', role }: { us
         setCheckpoints([]);
         // Persist the cleared state to DB
         if (sessionId) {
-            saveMessages([], sessionId);
+            saveMessages([], sessionId, { allowEmpty: true });
         }
         setDeleteConfirmModal(null);
     };
@@ -454,11 +454,19 @@ export function SingularityChat({ userId, agencyName = 'Agency OS', role }: { us
                 ));
             }
         } catch (error) {
+            const errorName = typeof error === 'object' && error !== null && 'name' in error
+                ? String((error as { name?: unknown }).name)
+                : '';
+            const isAbortError = errorName === 'AbortError';
+            if (isAbortError) {
+                return;
+            }
             console.error(error);
             setMessages(prev => prev.map(m =>
                 m.id === msgId ? { ...m, content: "I encountered an error. Please try again.", isStreaming: false } : m
             ));
         } finally {
+            abortControllerRef.current = null;
             setIsLoading(false);
             setStreamingPhase('idle');
             inputRef.current?.focus();

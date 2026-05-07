@@ -1,10 +1,12 @@
 import type { AIConfig } from "@/lib/types";
 import {
+    buildSingularityMultimodalParts,
     checkAndContinue,
     createEventStreamResponse,
     getErrorMessage,
     getLiveEventMessage,
     getOutputTranscriptionText,
+    hasInlineAttachments,
     isTooShort,
 } from "@/lib/singularity-route-helpers";
 import type { Part as LivePart, LiveConnectParameters, LiveServerMessage } from "@google/genai";
@@ -14,10 +16,18 @@ type ChatImageInput = {
     base64?: string;
 };
 
+type ChatDocumentInput = {
+    fileName?: string;
+    mimeType?: string;
+    base64?: string;
+    textContent?: string;
+};
+
 type ChatModeOptions = {
     aiConfig: AIConfig;
     fullPrompt: string;
     images?: ChatImageInput[];
+    documents?: ChatDocumentInput[];
     agencyId: string;
     authenticatedUserId: string;
     modelId: string;
@@ -26,13 +36,20 @@ type ChatModeOptions = {
 async function handleNonLiveChatMode({
     aiConfig,
     fullPrompt,
+    images,
+    documents,
     agencyId,
     authenticatedUserId,
     modelId,
 }: ChatModeOptions): Promise<Response> {
-    const { generateContent } = await import("@/lib/ai-provider");
+    const { generateContent, generateContentWithParts } = await import("@/lib/ai-provider");
     const { logAIUsage } = await import("@/lib/ai-usage");
-    const { text: result, tokens } = await generateContent(aiConfig, fullPrompt);
+    const { text: result, tokens } = hasInlineAttachments(images, documents)
+        ? await generateContentWithParts(
+            aiConfig,
+            buildSingularityMultimodalParts(fullPrompt, images, documents)
+        )
+        : await generateContent(aiConfig, fullPrompt);
 
     logAIUsage({
         agencyId,
@@ -79,6 +96,7 @@ async function handleLiveChatMode({
     aiConfig,
     fullPrompt,
     images,
+    documents,
     agencyId,
     authenticatedUserId,
     modelId,
@@ -91,6 +109,7 @@ async function handleLiveChatMode({
     const stream = new ReadableStream({
         async start(controller) {
             try {
+                let done = false;
                 const liveChatConnectConfig: LiveConnectParameters = {
                     model: `models/${modelId}`,
                     config: {
@@ -107,6 +126,7 @@ async function handleLiveChatMode({
                         onmessage: (msg) => messageQueue.push(msg),
                         onerror: (event) => {
                             console.error("[Singularity Stream] Error:", getLiveEventMessage(event));
+                            done = true;
                             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", text: "Connection error" })}\n\n`));
                         },
                         onclose: () => { },
@@ -126,6 +146,18 @@ async function handleLiveChatMode({
                         });
                     }
                 }
+                if (documents && documents.length > 0) {
+                    for (const doc of documents) {
+                        if (doc.mimeType === "application/pdf" && doc.base64) {
+                            parts.push({
+                                inlineData: {
+                                    mimeType: "application/pdf",
+                                    data: doc.base64,
+                                },
+                            });
+                        }
+                    }
+                }
 
                 parts.push({ text: fullPrompt });
 
@@ -133,12 +165,15 @@ async function handleLiveChatMode({
                     turns: [{ role: "user", parts }],
                 });
 
-                let done = false;
                 let liveChatAccumulatedText = "";
                 const timeout = setTimeout(() => { done = true; }, 60000);
 
-                const waitMsg = (): Promise<LiveServerMessage> => new Promise((resolve) => {
+                const waitMsg = (): Promise<LiveServerMessage | null> => new Promise((resolve) => {
                     const check = () => {
+                        if (done) {
+                            resolve(null);
+                            return;
+                        }
                         const msg = messageQueue.shift();
                         if (msg) resolve(msg);
                         else setTimeout(check, 50);
@@ -148,6 +183,7 @@ async function handleLiveChatMode({
 
                 while (!done) {
                     const msg = await waitMsg();
+                    if (!msg) break;
 
                     if (msg.serverContent?.modelTurn?.parts) {
                         for (const part of msg.serverContent.modelTurn.parts) {

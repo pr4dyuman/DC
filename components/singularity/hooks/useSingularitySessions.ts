@@ -34,7 +34,11 @@ type UseSingularitySessionsParams = {
     pendingRollbackRef: React.MutableRefObject<CheckpointAction[]>;
 };
 
-function buildSavePayload(msgs: Message[], sid: string): string | null {
+type SaveMessagesOptions = {
+    allowEmpty?: boolean;
+};
+
+function buildSavePayload(msgs: Message[], sid: string, options: SaveMessagesOptions = {}): string | null {
     const persistable = msgs
         .filter((message) => !message.isStreaming)
         .map((message) => ({
@@ -53,7 +57,7 @@ function buildSavePayload(msgs: Message[], sid: string): string | null {
             timestamp: message.timestamp instanceof Date ? message.timestamp.toISOString() : message.timestamp,
         }));
 
-    if (persistable.length === 0) {
+    if (persistable.length === 0 && !options.allowEmpty) {
         return null;
     }
 
@@ -217,12 +221,12 @@ export function useSingularitySessions({
         setDeleteConfirmModal(null);
     }, [deleteConfirmModal, newChat, sessionId]);
 
-    const saveMessages = useCallback(async (msgs: Message[], sid: string | null) => {
+    const saveMessages = useCallback(async (msgs: Message[], sid: string | null, options: SaveMessagesOptions = {}) => {
         if (!sid || !userId) {
             return;
         }
 
-        const payload = buildSavePayload(msgs, sid);
+        const payload = buildSavePayload(msgs, sid, options);
         if (!payload) {
             return;
         }

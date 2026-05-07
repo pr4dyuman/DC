@@ -13,6 +13,11 @@ type SingularityChatMessageDoc = {
     content: string;
     thinking?: string;
     images?: string[];
+    attachments?: {
+        fileName?: string;
+        fileType?: "image" | "document";
+        mimeType?: string;
+    }[];
     toolActions?: SingularityToolActionDoc[];
     timestamp: string;
 };
@@ -31,7 +36,7 @@ type SingularityChatSessionDoc = {
 type SingularityCheckpointActionDoc = {
     toolName: string;
     actionType: "create" | "update" | "delete";
-    entityType: "task" | "project" | "client" | "invoice" | "transaction" | "service" | "leaveRequest" | "comment";
+    entityType: "task" | "project" | "client" | "user" | "invoice" | "transaction" | "service" | "leaveRequest" | "comment";
     entityId: string;
     beforeSnapshot?: Record<string, unknown>;
     createdEntityIds?: string[];
@@ -54,6 +59,12 @@ const SingularityChatMessageSchema = new Schema({
     content: { type: String, default: "" },
     thinking: { type: String },
     images: [{ type: String }],
+    attachments: [{
+        fileName: { type: String },
+        fileType: { type: String, enum: ["image", "document"] },
+        mimeType: { type: String },
+        _id: false,
+    }],
     toolActions: [{
         name: { type: String },
         displayName: { type: String },
@@ -81,7 +92,7 @@ SingularityChatSessionSchema.index({ userId: 1, updatedAt: -1 });
 const CheckpointActionSchema = new Schema({
     toolName: { type: String, required: true },
     actionType: { type: String, enum: ["create", "update", "delete"], required: true },
-    entityType: { type: String, enum: ["task", "project", "client", "invoice", "transaction", "service", "leaveRequest", "comment"], required: true },
+    entityType: { type: String, enum: ["task", "project", "client", "user", "invoice", "transaction", "service", "leaveRequest", "comment"], required: true },
     entityId: { type: String, required: true },
     beforeSnapshot: { type: Schema.Types.Mixed },
     createdEntityIds: [{ type: String }],

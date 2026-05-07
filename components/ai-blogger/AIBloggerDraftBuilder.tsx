@@ -247,6 +247,11 @@ const AI_PIPELINE_STEPS: PipelineStepDefinition[] = [
         icon: ShieldCheck,
     },
     {
+        key: "quality-repair",
+        label: "Quality Repair",
+        icon: ShieldCheck,
+    },
+    {
         key: "quality-review",
         label: "SEO Quality Gate",
         icon: Check,
@@ -420,11 +425,20 @@ const PIPELINE_STAGE_COPY: Record<string, PipelineStageCopy> = {
         failed: "AI draft check needs attention.",
         legacyLabels: ["Final AI Checker"],
     },
+    "quality-repair": {
+        title: "Quality Repair",
+        pending: "Waiting to see whether the final draft needs repair.",
+        active: "Repairing final quality blockers before the SEO quality gate.",
+        completed: "Quality repair completed or confirmed the current draft is stronger.",
+        skipped: "No repair was needed, or repair could not complete safely.",
+        failed: "Quality repair needs attention.",
+        legacyLabels: ["Quality Repair"],
+    },
     "quality-review": {
         title: "SEO Quality Gate",
         pending: "Waiting to score the final article against the SEO strategy.",
         active: "Scoring search intent, original asset execution, proof, cluster fit, structure, and conversion path.",
-        completed: "The final SEO quality gate passed.",
+        completed: "The final SEO quality gate completed.",
         skipped: "The SEO quality gate was skipped.",
         failed: "The final article did not pass the SEO quality gate.",
         legacyLabels: ["Quality Review"],

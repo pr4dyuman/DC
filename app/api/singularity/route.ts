@@ -18,6 +18,7 @@ import {
     filterToolsByPermissions as filterToolsByPermissionsHelper,
     getErrorMessage,
     normalizeSingularityRequestBody,
+    validateSingularityPayloadLimits,
     type SingularityRequestBody,
 } from "@/lib/singularity-route-helpers";
 import { validateCsrfOrigin } from "@/lib/validation";
@@ -73,10 +74,11 @@ export async function POST(req: NextRequest) {
             normalizeSingularityRequestBody(requestBody);
         const authenticatedUserId = session.userId;
 
-        if (typeof message === "string" && message.length > 50000) {
+        const payloadError = validateSingularityPayloadLimits({ history, message, images, documents });
+        if (payloadError) {
             return NextResponse.json(
-                { error: "Message too long (max 50,000 characters)" },
-                { status: 400 }
+                { error: payloadError },
+                { status: 413 }
             );
         }
 
@@ -189,6 +191,8 @@ export async function POST(req: NextRequest) {
                     filteredTools,
                     authenticatedUserId,
                     agencyId: agency.id,
+                    images,
+                    documents,
                 });
             }
 
@@ -210,6 +214,7 @@ export async function POST(req: NextRequest) {
             aiConfig: heavyConfig ?? chatConfig,
             fullPrompt,
             images,
+            documents,
             agencyId: agency.id,
             authenticatedUserId,
             modelId: chatModelId,

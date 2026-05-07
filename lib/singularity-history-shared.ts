@@ -15,6 +15,11 @@ export interface ChatMessage {
     content: string;
     thinking?: string;
     images?: string[];
+    attachments?: {
+        fileName: string;
+        fileType: 'image' | 'document';
+        mimeType?: string;
+    }[];
     toolActions?: {
         name: string;
         displayName: string;

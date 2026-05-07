@@ -1,10 +1,12 @@
 import { getToolDisplayName, SINGULARITY_TOOL_DECLARATIONS } from "@/lib/singularity-tool-defs";
 import {
+    buildSingularityMultimodalParts,
     checkAndContinue,
     createEventStreamResponse,
     getErrorMessage,
     getLiveEventMessage,
     getOutputTranscriptionText,
+    hasInlineAttachments,
     isTooShort,
     toToolArgs,
 } from "@/lib/singularity-route-helpers";
@@ -28,6 +30,8 @@ type NonLiveAgentOptions = {
     filteredTools: typeof SINGULARITY_TOOL_DECLARATIONS;
     authenticatedUserId: string;
     agencyId: string;
+    images?: AgentImageInput[];
+    documents?: AgentDocumentInput[];
 };
 
 type AgentImageInput = {
@@ -38,6 +42,8 @@ type AgentImageInput = {
 type AgentDocumentInput = {
     mimeType?: string;
     base64?: string;
+    fileName?: string;
+    textContent?: string;
 };
 
 type LiveAgentOptions = {
@@ -61,6 +67,8 @@ export async function handleNonLiveAgentMode({
     filteredTools,
     authenticatedUserId,
     agencyId,
+    images,
+    documents,
 }: NonLiveAgentOptions): Promise<Response> {
     // Non-Gemini providers (Groq, OpenAI, NVIDIA, GitHub) use the OpenAI tool-calling format
     if (aiConfig.provider !== "gemini") {
@@ -90,7 +98,10 @@ export async function handleNonLiveAgentMode({
             try {
                 const MAX_TOOL_ROUNDS = 25;
 
-                const initialResult = await chat.sendMessage(fullPrompt);
+                const initialMessage = hasInlineAttachments(images, documents)
+                    ? buildSingularityMultimodalParts(fullPrompt, images, documents)
+                    : fullPrompt;
+                const initialResult = await chat.sendMessage(initialMessage);
                 let responseParts = (initialResult.response.candidates?.[0]?.content?.parts ?? []) as GenerativePart[];
 
                 for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {

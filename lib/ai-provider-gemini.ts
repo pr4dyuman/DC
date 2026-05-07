@@ -96,10 +96,15 @@ export async function liveGenerateContent(
 
     const ai = new GoogleGenAI({ apiKey: config.apiKey });
     const messageQueue: LiveServerMessage[] = [];
+    let done = false;
 
-    const waitMessage = (): Promise<LiveServerMessage> => {
+    const waitMessage = (): Promise<LiveServerMessage | null> => {
         return new Promise((resolve) => {
             const check = () => {
+                if (done) {
+                    resolve(null);
+                    return;
+                }
                 const message = messageQueue.shift();
                 if (message) resolve(message);
                 else setTimeout(check, 100);
@@ -124,7 +129,10 @@ export async function liveGenerateContent(
         callbacks: {
             onopen: () => console.log("[Gemini Live] Connected"),
             onmessage: (message: LiveServerMessage) => messageQueue.push(message),
-            onerror: (event) => console.error("[Gemini Live] Error:", event?.message || event),
+            onerror: (event) => {
+                done = true;
+                console.error("[Gemini Live] Error:", event?.message || event);
+            },
             onclose: (event) => console.log("[Gemini Live] Closed:", event?.reason || ""),
         },
     });
@@ -134,7 +142,6 @@ export async function liveGenerateContent(
 
     let transcriptText = "";
     let thoughtText = "";
-    let done = false;
 
     const timeoutId = setTimeout(() => {
         console.error("[Gemini Live] Timeout after 60s");
@@ -143,6 +150,7 @@ export async function liveGenerateContent(
 
     while (!done) {
         const message = await waitMessage();
+        if (!message) break;
 
         const transcriptChunk = message.serverContent?.outputTranscription?.text;
         if (transcriptChunk) {

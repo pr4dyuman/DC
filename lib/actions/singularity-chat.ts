@@ -41,9 +41,14 @@ export async function singularityChatImpl(
         const { GoogleGenAI, Modality } = await import("@google/genai");
         const ai = new GoogleGenAI({ apiKey: aiConfig.apiKey });
         const messageQueue: LiveMessage[] = [];
+        let done = false;
 
-        const waitMsg = (): Promise<LiveMessage> => new Promise((resolve) => {
+        const waitMsg = (): Promise<LiveMessage | null> => new Promise((resolve) => {
             const check = () => {
+                if (done) {
+                    resolve(null);
+                    return;
+                }
                 const message = messageQueue.shift();
                 if (message) resolve(message);
                 else setTimeout(check, 100);
@@ -65,7 +70,10 @@ export async function singularityChatImpl(
             callbacks: {
                 onopen: () => { },
                 onmessage: (message) => messageQueue.push(message),
-                onerror: (error) => console.error("[Singularity] Error:", getErrorMessage(error)),
+                onerror: (error) => {
+                    done = true;
+                    console.error("[Singularity] Error:", getErrorMessage(error));
+                },
                 onclose: () => { },
             },
         });
@@ -74,11 +82,11 @@ export async function singularityChatImpl(
 
         let transcriptText = "";
         let thoughtText = "";
-        let done = false;
         const timeout = setTimeout(() => { done = true; }, 60000);
 
         while (!done) {
             const message = await waitMsg();
+            if (!message) break;
             if (message.serverContent?.outputTranscription?.text) {
                 transcriptText += message.serverContent.outputTranscription.text;
             }

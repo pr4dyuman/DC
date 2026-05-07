@@ -78,6 +78,7 @@ const TOOL_PERMISSIONS: Record<string, RoleType[]> = {
     add_task_comment: ["admin", "manager", "employee", "client"],
     bulk_create_tasks: ["admin", "manager"],
     bulk_update_task_status: ["admin", "manager"],
+    bulk_edit_tasks: ["admin", "manager"],
     create_project: ["admin", "manager"],
     update_project: ["admin", "manager"],
     create_invoice: ["admin", "manager"],
