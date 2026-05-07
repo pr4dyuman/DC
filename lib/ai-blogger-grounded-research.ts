@@ -221,6 +221,11 @@ function normalizeIsoDate(value: string | undefined) {
         return undefined;
     }
 
+    const maxFutureMs = 48 * 60 * 60 * 1000;
+    if (normalizedDate.getTime() > Date.now() + maxFutureMs) {
+        return undefined;
+    }
+
     return normalizedDate.toISOString();
 }
 
