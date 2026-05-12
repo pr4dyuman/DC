@@ -592,13 +592,40 @@ export type SearchConsoleMetricsDataImpl = {
     }>;
 };
 
+type SearchConsolePostStatusRow = {
+    status?: string;
+};
+
+type SearchConsolePerformanceSnapshotRow = {
+    postId?: string;
+    clicks?: number;
+    impressions?: number;
+    ctr?: number;
+    position?: number;
+};
+
+type SearchConsoleSyncRunRow = {
+    _id?: { toString: () => string };
+    status?: string;
+    postsEvaluated?: number;
+    snapshotsStored?: number;
+    completedAt?: string;
+    summary?: string;
+};
+
+function normalizeSearchConsoleSyncRunStatus(value: unknown): "synced" | "failed" | "skipped" {
+    return value === "synced" || value === "failed" || value === "skipped"
+        ? value
+        : "skipped";
+}
+
 export async function getAgencySearchConsoleMetricsImpl(agencyId: string): Promise<SearchConsoleMetricsDataImpl> {
     await verifySuperAdmin();
     await connectDB();
 
     // Get all posts for this agency
     const { BlogStudioPostModel } = await import("../mongodb");
-    const allPosts = await BlogStudioPostModel.find({ agencyId }).select("id status").lean() as any[];
+    const allPosts = await BlogStudioPostModel.find({ agencyId }).select("id status").lean() as SearchConsolePostStatusRow[];
     const totalPosts = allPosts.length;
     const publishedPosts = allPosts.filter((p) => p.status === "Published").length;
 
@@ -607,7 +634,7 @@ export async function getAgencySearchConsoleMetricsImpl(agencyId: string): Promi
         agencyId,
     })
         .sort({ refreshedAt: -1 })
-        .lean() as any[];
+        .lean() as SearchConsolePerformanceSnapshotRow[];
 
     const uniquePostsWithSnapshots = new Set(snapshots.map((s) => s.postId));
     const snapshotsCoverage = uniquePostsWithSnapshots.size;
@@ -638,15 +665,15 @@ export async function getAgencySearchConsoleMetricsImpl(agencyId: string): Promi
     })
         .sort({ completedAt: -1 })
         .limit(10)
-        .lean() as any[];
+        .lean() as SearchConsoleSyncRunRow[];
 
     const lastSyncRun = syncRuns[0];
     const lastSyncAt = lastSyncRun?.completedAt || null;
     const lastSyncStatus = lastSyncRun?.status === "synced" ? "success" : lastSyncRun?.status === "failed" ? "failed" : null;
 
-    const syncRunsSample = syncRuns.map((run: any) => ({
+    const syncRunsSample = syncRuns.map((run) => ({
         id: run._id?.toString() || "",
-        status: run.status || "skipped",
+        status: normalizeSearchConsoleSyncRunStatus(run.status),
         postsEvaluated: run.postsEvaluated || 0,
         snapshotsStored: run.snapshotsStored || 0,
         completedAt: run.completedAt || new Date().toISOString(),
@@ -670,4 +697,3 @@ export async function getAgencySearchConsoleMetricsImpl(agencyId: string): Promi
 // =============================================================================
 // SEARCH CONSOLE CONFIG MANAGEMENT - DEPRECATED (Use OAuth instead)
 // =============================================================================
-

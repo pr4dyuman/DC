@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const AI_BLOGGER_WORD_COUNT_EVENT = "ai-blogger:word-count-updated";
 
@@ -25,11 +25,14 @@ export function publishAIBloggerWordCount(postId: string, wordCount: number) {
 }
 
 function useAIBloggerLiveWordCount(postId: string, initialWordCount: number) {
-    const [wordCount, setWordCount] = useState(Math.max(0, Math.round(initialWordCount || 0)));
-
-    useEffect(() => {
-        setWordCount(Math.max(0, Math.round(initialWordCount || 0)));
-    }, [initialWordCount, postId]);
+    const initialDisplayWordCount = useMemo(
+        () => Math.max(0, Math.round(initialWordCount || 0)),
+        [initialWordCount],
+    );
+    const [liveWordCount, setLiveWordCount] = useState<{
+        postId: string;
+        wordCount: number;
+    } | null>(null);
 
     useEffect(() => {
         if (typeof window === "undefined") {
@@ -42,7 +45,10 @@ function useAIBloggerLiveWordCount(postId: string, initialWordCount: number) {
                 return;
             }
 
-            setWordCount(Math.max(0, Math.round(detail.wordCount || 0)));
+            setLiveWordCount({
+                postId,
+                wordCount: Math.max(0, Math.round(detail.wordCount || 0)),
+            });
         };
 
         window.addEventListener(AI_BLOGGER_WORD_COUNT_EVENT, handleUpdate as EventListener);
@@ -51,7 +57,9 @@ function useAIBloggerLiveWordCount(postId: string, initialWordCount: number) {
         };
     }, [postId]);
 
-    return wordCount;
+    return liveWordCount?.postId === postId
+        ? liveWordCount.wordCount
+        : initialDisplayWordCount;
 }
 
 export function AIBloggerLiveWordCount({

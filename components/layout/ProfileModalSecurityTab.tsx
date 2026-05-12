@@ -57,11 +57,11 @@ export function ProfileModalSecurityTab({
                 </h4>
                 <div className="space-y-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="current-password">Current Password</Label>
+                        <Label htmlFor="profile-current-password">Current Password</Label>
                         <div className="relative">
                             <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
-                                id="current-password"
+                                id="profile-current-password"
                                 type={showCurrentPassword ? "text" : "password"}
                                 value={currentPassword}
                                 onChange={(event) => onCurrentPasswordChange(event.target.value)}
@@ -81,10 +81,10 @@ export function ProfileModalSecurityTab({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="new-password">New Password</Label>
+                            <Label htmlFor="profile-new-password">New Password</Label>
                             <div className="relative">
                                 <Input
-                                    id="new-password"
+                                    id="profile-new-password"
                                     type={showNewPassword ? "text" : "password"}
                                     value={newPassword}
                                     onChange={(event) => onNewPasswordChange(event.target.value)}
@@ -101,10 +101,10 @@ export function ProfileModalSecurityTab({
                             </div>
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="confirm-password">Confirm Password</Label>
+                            <Label htmlFor="profile-confirm-password">Confirm Password</Label>
                             <div className="relative">
                                 <Input
-                                    id="confirm-password"
+                                    id="profile-confirm-password"
                                     type={showConfirmPassword ? "text" : "password"}
                                     value={confirmPassword}
                                     onChange={(event) => onConfirmPasswordChange(event.target.value)}

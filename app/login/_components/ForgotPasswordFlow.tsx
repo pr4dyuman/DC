@@ -247,13 +247,13 @@ export default function ForgotPasswordFlow({
             {forgotStep === "password" && (
                 <form onSubmit={onResetPassword} className="space-y-6">
                     <div>
-                        <label className="block text-sm font-glacial-bold uppercase tracking-wider text-gray-300 mb-2" htmlFor="new-password">
+                        <label className="block text-sm font-glacial-bold uppercase tracking-wider text-gray-300 mb-2" htmlFor="forgot-new-password">
                             New Password
                         </label>
                         <div className="relative">
                             <input
                                 className="w-full bg-transparent border-2 border-white/20 px-4 py-3 text-white placeholder-gray-500 focus:border-[#F5EE30] focus:outline-none transition-colors duration-300 pr-12"
-                                id="new-password"
+                                id="forgot-new-password"
                                 type={showNewPassword ? "text" : "password"}
                                 placeholder="••••••••"
                                 value={forgotNewPassword}
@@ -275,13 +275,13 @@ export default function ForgotPasswordFlow({
                     </div>
 
                     <div>
-                        <label className="block text-sm font-glacial-bold uppercase tracking-wider text-gray-300 mb-2" htmlFor="confirm-password">
+                        <label className="block text-sm font-glacial-bold uppercase tracking-wider text-gray-300 mb-2" htmlFor="forgot-confirm-password">
                             Confirm Password
                         </label>
                         <div className="relative">
                             <input
                                 className="w-full bg-transparent border-2 border-white/20 px-4 py-3 text-white placeholder-gray-500 focus:border-[#F5EE30] focus:outline-none transition-colors duration-300 pr-12"
-                                id="confirm-password"
+                                id="forgot-confirm-password"
                                 type={showConfirmPassword ? "text" : "password"}
                                 placeholder="••••••••"
                                 value={forgotConfirmPassword}

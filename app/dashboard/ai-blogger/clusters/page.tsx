@@ -12,37 +12,36 @@ export const metadata = {
     description: "Visualize and manage pillar post clusters and topic relationships",
 };
 
+async function loadClusterDashboardPageData() {
+    const { access, agency } = await getAIBloggerDashboardContext();
+
+    if (!access.canAccess) {
+        return { access, analysis: null };
+    }
+
+    await connectDB();
+
+    // Fetch all published posts with cluster info
+    const posts = await BlogStudioPostModel.find({
+        agencyId: agency.id,
+        status: "Published",
+    })
+        .select(
+            "id slug title status publishedAt publishedEntrySlug wordCount seoScore contentClusterId parentTopicSlug internalLinks"
+        )
+        .lean();
+
+    // Analyze clusters
+    const analysis = analyzeBlogStudioClusters(posts);
+
+    return { access, analysis };
+}
+
 export default async function ClusterDashboardPage() {
+    let pageData: Awaited<ReturnType<typeof loadClusterDashboardPageData>>;
+
     try {
-        const { access, agency } = await getAIBloggerDashboardContext();
-
-        if (!access.canAccess) {
-            return <AIBloggerLockedState access={access} />;
-        }
-
-        await connectDB();
-
-        // Fetch all published posts with cluster info
-        const posts = await BlogStudioPostModel.find({
-            agencyId: agency.id,
-            status: "Published",
-        })
-            .select(
-                "id slug title status publishedAt publishedEntrySlug wordCount seoScore contentClusterId parentTopicSlug internalLinks"
-            )
-            .lean();
-
-        // Analyze clusters
-        const analysis = analyzeBlogStudioClusters(posts);
-
-        return (
-            <div className="flex flex-col gap-6">
-                <div>
-                    <AIBloggerBreadcrumb items={[{ label: "AI Blogger" }, { label: "Clusters" }]} />
-                </div>
-                <ClusterDashboard analysis={analysis} />
-            </div>
-        );
+        pageData = await loadClusterDashboardPageData();
     } catch (error) {
         if (!isMongoConnectionIssue(error)) {
             throw error;
@@ -55,4 +54,17 @@ export default async function ClusterDashboardPage() {
             />
         );
     }
+
+    if (!pageData.access.canAccess || !pageData.analysis) {
+        return <AIBloggerLockedState access={pageData.access} />;
+    }
+
+    return (
+        <div className="flex flex-col gap-6">
+            <div>
+                <AIBloggerBreadcrumb items={[{ label: "AI Blogger" }, { label: "Clusters" }]} />
+            </div>
+            <ClusterDashboard analysis={pageData.analysis} />
+        </div>
+    );
 }

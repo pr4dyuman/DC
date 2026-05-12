@@ -4,7 +4,9 @@ import type { Task, User } from "../db";
 import { ClientModel, ProjectModel, ServiceModel, TaskModel, UserModel, connectDB } from "../mongodb";
 import { sanitizeDoc, withAgencyIdFallback } from "./shared";
 import {
+    buildNormalizedProjectServiceConfigs,
     buildProjectServiceLookupQuery,
+    getActiveProjectServiceDocs,
     hydrateProjectsWithCurrentClients,
     mapProjectServicesByProjectId,
     normalizeProjectServiceRefs,
@@ -61,19 +63,29 @@ function normalizeProjectsWithCurrentServices<T extends ProjectLike>(projects: T
     const servicesByProjectId = mapProjectServicesByProjectId(projects, services);
 
     return projects.map((project) => {
+        const projectServices = servicesByProjectId.get(project.id) || [];
+        const activeServices = getActiveProjectServiceDocs(project.services, projectServices);
         const normalizedServices = normalizeProjectServiceRefs(
             project.services,
-            servicesByProjectId.get(project.id) || []
+            projectServices
         );
+        const normalizedServiceConfigs = activeServices.length > 0
+            ? buildNormalizedProjectServiceConfigs(activeServices, project.serviceConfigs)
+            : project.serviceConfigs;
 
         const currentServices = Array.isArray(project.services) ? project.services : [];
-        if (JSON.stringify(currentServices) === JSON.stringify(normalizedServices)) {
+        const currentServiceConfigs = Array.isArray(project.serviceConfigs) ? project.serviceConfigs : undefined;
+        if (
+            JSON.stringify(currentServices) === JSON.stringify(normalizedServices)
+            && JSON.stringify(currentServiceConfigs) === JSON.stringify(normalizedServiceConfigs)
+        ) {
             return project;
         }
 
         return {
             ...project,
             services: normalizedServices,
+            serviceConfigs: normalizedServiceConfigs,
         };
     });
 }

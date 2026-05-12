@@ -7,6 +7,7 @@ import {
     Dialog,
     DialogContent,
     DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
 import { Task, Comment, UserPermissions, getDefaultUserPermissionsForRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -105,6 +106,7 @@ export function ViewTaskModal({
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogContent className="max-w-[95vw] sm:max-w-3xl p-0 gap-0 overflow-hidden border-none shadow-2xl bg-background max-h-[90dvh] flex flex-col">
+                <DialogTitle className="sr-only">{task.title}</DialogTitle>
 
                 <DialogHeader className="p-6 pb-4 border-b border-border bg-background shrink-0">
                     <ViewTaskModalHeader

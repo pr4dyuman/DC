@@ -80,88 +80,89 @@ function normalizeSortOrder(value: string): BlogStudioPostSortOrder {
     return value === "asc" ? "asc" : "desc";
 }
 
+async function loadAIBloggerPostsPageData(
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>,
+) {
+    const [{ access, agency }, resolvedParams] = await Promise.all([
+        getAIBloggerDashboardContext(),
+        searchParams,
+    ]);
+
+    if (!access.canAccess) {
+        return { access, postsPage: null, statusSummary: null };
+    }
+
+    const query = readStringParam(resolvedParams.q).trim();
+    const filter = normalizeFilter(readStringParam(resolvedParams.filter, "all"));
+    const page = normalizePage(readStringParam(resolvedParams.page, "1"));
+    const targetType = readStringParam(resolvedParams.targetType);
+    const sourceMode = readStringParam(resolvedParams.sourceMode);
+    const searchIntent = readStringParam(resolvedParams.searchIntent);
+    const contentType = readStringParam(resolvedParams.contentType);
+    const needsAttention = readStringParam(resolvedParams.needsAttention) === "true";
+    const refreshReason = normalizeRefreshReason(readStringParam(resolvedParams.refreshReason));
+    const refreshSort = normalizeRefreshSort(readStringParam(resolvedParams.refreshSort, "refresh-score"));
+    const sortBy = normalizeSortBy(readStringParam(resolvedParams.sortBy, "updatedAt"));
+    const sortOrder = normalizeSortOrder(readStringParam(resolvedParams.sortOrder, "desc"));
+
+    const [overview, postsPage] = await Promise.all([
+        getBlogStudioOverviewImpl(agency.id, agency.name),
+        listBlogStudioPostsPageImpl(agency.id, agency.name, {
+            query,
+            filter,
+            page,
+            pageSize: 12,
+            targetType,
+            sourceMode,
+            searchIntent,
+            contentType,
+            needsAttention,
+            refreshReason: refreshReason || undefined,
+            refreshSort,
+            sortBy,
+            sortOrder,
+        }),
+    ]);
+
+    const statusSummary = [
+        {
+            label: "Draft Queue",
+            value: overview.statusCounts.Draft + overview.statusCounts.Research,
+            status: "Draft" as const,
+            tone: "primary" as const,
+        },
+        {
+            label: "SEO Review",
+            value: overview.statusCounts["SEO Review"],
+            status: "SEO Review" as const,
+            tone: "violet" as const,
+        },
+        {
+            label: "Approved",
+            value: overview.statusCounts.Approved,
+            status: "Approved" as const,
+            tone: "emerald" as const,
+        },
+        {
+            label: "Scheduled",
+            value: overview.statusCounts.Scheduled,
+            status: "Scheduled" as const,
+            tone: "blue" as const,
+        },
+    ];
+
+    return { access, postsPage, statusSummary };
+}
+
 export default async function AIBloggerPostsPage({
     searchParams,
 }: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+    let pageData: Awaited<ReturnType<typeof loadAIBloggerPostsPageData>>;
+
     try {
-        const [{ access, agency }, resolvedParams] = await Promise.all([
-            getAIBloggerDashboardContext(),
-            searchParams,
-        ]);
-
-        if (!access.canAccess) {
-            return <AIBloggerLockedState access={access} />;
-        }
-
-        const query = readStringParam(resolvedParams.q).trim();
-        const filter = normalizeFilter(readStringParam(resolvedParams.filter, "all"));
-        const page = normalizePage(readStringParam(resolvedParams.page, "1"));
-        const targetType = readStringParam(resolvedParams.targetType);
-        const sourceMode = readStringParam(resolvedParams.sourceMode);
-        const searchIntent = readStringParam(resolvedParams.searchIntent);
-        const contentType = readStringParam(resolvedParams.contentType);
-        const needsAttention = readStringParam(resolvedParams.needsAttention) === "true";
-        const refreshReason = normalizeRefreshReason(readStringParam(resolvedParams.refreshReason));
-        const refreshSort = normalizeRefreshSort(readStringParam(resolvedParams.refreshSort, "refresh-score"));
-        const sortBy = normalizeSortBy(readStringParam(resolvedParams.sortBy, "updatedAt"));
-        const sortOrder = normalizeSortOrder(readStringParam(resolvedParams.sortOrder, "desc"));
-
-        const [overview, postsPage] = await Promise.all([
-            getBlogStudioOverviewImpl(agency.id, agency.name),
-            listBlogStudioPostsPageImpl(agency.id, agency.name, {
-                query,
-                filter,
-                page,
-                pageSize: 12,
-                targetType,
-                sourceMode,
-                searchIntent,
-                contentType,
-                needsAttention,
-                refreshReason: refreshReason || undefined,
-                refreshSort,
-                sortBy,
-                sortOrder,
-            }),
-        ]);
-
-        const statusSummary = [
-            {
-                label: "Draft Queue",
-                value: overview.statusCounts.Draft + overview.statusCounts.Research,
-                status: "Draft" as const,
-                tone: "primary" as const,
-            },
-            {
-                label: "SEO Review",
-                value: overview.statusCounts["SEO Review"],
-                status: "SEO Review" as const,
-                tone: "violet" as const,
-            },
-            {
-                label: "Approved",
-                value: overview.statusCounts.Approved,
-                status: "Approved" as const,
-                tone: "emerald" as const,
-            },
-            {
-                label: "Scheduled",
-                value: overview.statusCounts.Scheduled,
-                status: "Scheduled" as const,
-                tone: "blue" as const,
-            },
-        ];
-
-        return (
-            <>
-                <div className="space-y-3">
-                    <AIBloggerBreadcrumb items={[{ label: "AI Blogger" }, { label: "Posts" }]} />
-                </div>
-                <AIBloggerPostsWorkspace postsPage={postsPage} statusSummary={statusSummary} />
-            </>
-        );
+        pageData = await loadAIBloggerPostsPageData(searchParams);
     } catch (error) {
         if (!isMongoConnectionIssue(error)) {
             throw error;
@@ -174,4 +175,17 @@ export default async function AIBloggerPostsPage({
             />
         );
     }
+
+    if (!pageData.access.canAccess || !pageData.postsPage || !pageData.statusSummary) {
+        return <AIBloggerLockedState access={pageData.access} />;
+    }
+
+    return (
+        <>
+            <div className="space-y-3">
+                <AIBloggerBreadcrumb items={[{ label: "AI Blogger" }, { label: "Posts" }]} />
+            </div>
+            <AIBloggerPostsWorkspace postsPage={pageData.postsPage} statusSummary={pageData.statusSummary} />
+        </>
+    );
 }

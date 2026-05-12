@@ -337,17 +337,47 @@ export function hydrateProjectsWithCurrentServiceNames<T extends { id: string; s
     });
 }
 
+function getProjectServiceConfigScore(config: ProjectServiceConfigSnapshot | undefined): number {
+    const paymentConfig = config?.paymentConfig;
+    if (!paymentConfig) return 0;
+
+    let score = 1;
+    if (!paymentConfig.paymentDetailsLater) score += 4;
+    if ((paymentConfig.installmentAmount ?? 0) > 0) score += 4;
+    if ((paymentConfig.monthlyAmount ?? 0) > 0) score += 4;
+    if ((paymentConfig.installments ?? 0) > 1) score += 1;
+    if (paymentConfig.firstPaymentDate || paymentConfig.billingStartDate) score += 2;
+    if (Array.isArray(paymentConfig.installmentDates) && paymentConfig.installmentDates.some(Boolean)) score += 2;
+    return score;
+}
+
 function findMatchingProjectServiceConfig(
     configs: ProjectServiceConfigSnapshot[] | undefined,
     service: ProjectServiceSnapshot
 ): ProjectServiceConfigSnapshot | undefined {
-    return (configs || []).find((config) => {
-        const rawServiceId = String(config?.serviceId || "");
-        const rawName = String(config?.name || "");
-        return rawServiceId === service.id
-            || rawServiceId.toLowerCase() === service.name.toLowerCase()
-            || rawName.toLowerCase() === service.name.toLowerCase();
-    });
+    const serviceIdKey = String(service.id || "").toLowerCase();
+    const serviceNameKey = String(service.name || "").toLowerCase();
+    let bestConfig: ProjectServiceConfigSnapshot | undefined;
+    let bestScore = -1;
+
+    for (const config of configs || []) {
+        const rawServiceIdKey = String(config?.serviceId || "").toLowerCase();
+        const rawNameKey = String(config?.name || "").toLowerCase();
+        const matches = rawServiceIdKey === serviceIdKey
+            || rawServiceIdKey === serviceNameKey
+            || rawNameKey === serviceNameKey
+            || rawNameKey === serviceIdKey;
+
+        if (!matches) continue;
+
+        const score = getProjectServiceConfigScore(config);
+        if (score > bestScore) {
+            bestConfig = config;
+            bestScore = score;
+        }
+    }
+
+    return bestConfig;
 }
 
 export function buildNormalizedProjectServiceConfigs(

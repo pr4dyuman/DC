@@ -43,12 +43,12 @@ export default function LoginPanel({
 
             <form onSubmit={onSubmit} className="space-y-6">
                 <div>
-                    <label className="block text-sm font-glacial-bold uppercase tracking-wider text-gray-300 mb-2" htmlFor="email">
+                    <label className="block text-sm font-glacial-bold uppercase tracking-wider text-gray-300 mb-2" htmlFor="login-email">
                         Email
                     </label>
                     <input
                         className="w-full bg-transparent border-2 border-white/20 px-4 py-3 text-white placeholder-gray-500 focus:border-[#F5EE30] focus:outline-none transition-colors duration-300"
-                        id="email"
+                        id="login-email"
                         type="email"
                         placeholder="name@example.com"
                         value={email}
@@ -59,7 +59,7 @@ export default function LoginPanel({
 
                 <div>
                     <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-glacial-bold uppercase tracking-wider text-gray-300" htmlFor="password">
+                        <label className="block text-sm font-glacial-bold uppercase tracking-wider text-gray-300" htmlFor="login-password">
                             Password
                         </label>
                         <button
@@ -74,7 +74,7 @@ export default function LoginPanel({
                     <div className="relative">
                         <input
                             className="w-full bg-transparent border-2 border-white/20 px-4 py-3 text-white placeholder-gray-500 focus:border-[#F5EE30] focus:outline-none transition-colors duration-300 pr-12"
-                            id="password"
+                            id="login-password"
                             type={showPassword ? "text" : "password"}
                             placeholder="••••••••"
                             value={password}

@@ -11,30 +11,31 @@ export const metadata = {
     description: "Manage and prioritize published posts that need performance optimization",
 };
 
+async function loadRefreshQueueDashboardPageData(
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>,
+) {
+    const { access, agency } = await getAIBloggerDashboardContext();
+
+    if (!access.canAccess) {
+        return { access, overview: null };
+    }
+
+    await searchParams;
+
+    const overview = await getBlogStudioOverviewImpl(agency.id, agency.name);
+
+    return { access, overview };
+}
+
 export default async function RefreshQueueDashboardPage({
     searchParams,
 }: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+    let pageData: Awaited<ReturnType<typeof loadRefreshQueueDashboardPageData>>;
+
     try {
-        const { access, agency } = await getAIBloggerDashboardContext();
-
-        if (!access.canAccess) {
-            return <AIBloggerLockedState access={access} />;
-        }
-
-        await searchParams;
-
-        const overview = await getBlogStudioOverviewImpl(agency.id, agency.name);
-
-        return (
-            <>
-                <div className="space-y-3 mb-6">
-                    <AIBloggerBreadcrumb items={[{ label: "AI Blogger" }, { label: "Refresh Queue" }]} />
-                </div>
-                <RefreshQueuePage refreshQueue={overview.refreshQueue} syncStatus={overview.syncStatus} />
-            </>
-        );
+        pageData = await loadRefreshQueueDashboardPageData(searchParams);
     } catch (error) {
         if (!isMongoConnectionIssue(error)) {
             throw error;
@@ -47,4 +48,17 @@ export default async function RefreshQueueDashboardPage({
             />
         );
     }
+
+    if (!pageData.access.canAccess || !pageData.overview) {
+        return <AIBloggerLockedState access={pageData.access} />;
+    }
+
+    return (
+        <>
+            <div className="space-y-3 mb-6">
+                <AIBloggerBreadcrumb items={[{ label: "AI Blogger" }, { label: "Refresh Queue" }]} />
+            </div>
+            <RefreshQueuePage refreshQueue={pageData.overview.refreshQueue} syncStatus={pageData.overview.syncStatus} />
+        </>
+    );
 }

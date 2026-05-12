@@ -9,22 +9,23 @@ import * as path from "path";
 
 type StepStatus = "pending" | "in-progress" | "completed" | "failed" | "skipped";
 type StepCompletionStatus = "completed" | "failed" | "skipped";
+type LogRecord = Record<string, unknown>;
 
 export interface StepLog {
   stepNumber: number;
   stepName: string;
   status: StepStatus;
-  input: Record<string, any>;
+  input: LogRecord;
   process: {
     startedAt: string;
     completedAt?: string;
     durationMs?: number;
-    details: Record<string, any>;
+    details: LogRecord;
   };
   output: {
     summary: string;
-    data?: Record<string, any>;
-    metrics?: Record<string, any>;
+    data?: LogRecord;
+    metrics?: LogRecord;
     rawText?: string;
   };
   errors?: string[];
@@ -168,8 +169,10 @@ export class AIBloggerGenerationLogger {
     };
 
     for (const step of run.steps) {
-      nextMetrics.totalTokensIn += step.output.metrics?.tokensIn ?? 0;
-      nextMetrics.totalTokensOut += step.output.metrics?.tokensOut ?? 0;
+      const tokensIn = step.output.metrics?.tokensIn;
+      const tokensOut = step.output.metrics?.tokensOut;
+      nextMetrics.totalTokensIn += typeof tokensIn === "number" ? tokensIn : 0;
+      nextMetrics.totalTokensOut += typeof tokensOut === "number" ? tokensOut : 0;
 
       switch (step.status) {
         case "completed":
@@ -384,17 +387,17 @@ export class AIBloggerGenerationLogger {
   async logStep(
     stepNumber: number,
     stepName: string,
-    input: Record<string, any>,
+    input: LogRecord,
     process: {
       startedAt: string;
       completedAt: string;
       durationMs: number;
-      details?: Record<string, any>;
+      details?: LogRecord;
     },
     output: {
       summary: string;
-      data?: Record<string, any>;
-      metrics?: Record<string, any>;
+      data?: LogRecord;
+      metrics?: LogRecord;
       rawText?: string;
       status?: StepCompletionStatus;
     },

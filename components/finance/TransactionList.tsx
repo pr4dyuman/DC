@@ -240,9 +240,9 @@ export function TransactionList({ transactions, title = "Recent Transactions", i
                         <form onSubmit={handleConfirmDelete}>
                             <div className="grid gap-4 py-4">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="password">Admin Password</Label>
+                                    <Label htmlFor="transaction-delete-password">Admin Password</Label>
                                     <Input
-                                        id="password"
+                                        id="transaction-delete-password"
                                         type="password"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}

@@ -89,11 +89,11 @@ export function SecuritySettings() {
             <CardContent>
                 <form onSubmit={handleUpdate} className="space-y-4 max-w-md">
                     <div className="space-y-2">
-                        <Label htmlFor="current-password">Current Password</Label>
+                        <Label htmlFor="settings-current-password">Current Password</Label>
                         <div className="relative">
                             <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
-                                id="current-password"
+                                id="settings-current-password"
                                 type={showCurrent ? "text" : "password"}
                                 placeholder="Enter current password"
                                 value={currentPassword}
@@ -113,11 +113,11 @@ export function SecuritySettings() {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="new-password">New Password</Label>
+                        <Label htmlFor="settings-new-password">New Password</Label>
                         <div className="relative">
                             <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
-                                id="new-password"
+                                id="settings-new-password"
                                 type={showNew ? "text" : "password"}
                                 placeholder="Enter new password"
                                 value={password}
@@ -153,11 +153,11 @@ export function SecuritySettings() {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="confirm-password">Confirm Password</Label>
+                        <Label htmlFor="settings-confirm-password">Confirm Password</Label>
                         <div className="relative">
                             <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
-                                id="confirm-password"
+                                id="settings-confirm-password"
                                 type={showConfirm ? "text" : "password"}
                                 placeholder="Confirm new password"
                                 value={confirmPassword}

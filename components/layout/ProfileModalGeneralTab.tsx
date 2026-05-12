@@ -91,18 +91,18 @@ export function ProfileModalGeneralTab({
 
                 <div className="flex-1 min-w-0 space-y-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="name">Full Name</Label>
+                        <Label htmlFor="profile-name">Full Name</Label>
                         <Input
-                            id="name"
+                            id="profile-name"
                             value={name}
                             onChange={(event) => onNameChange(event.target.value)}
                             required
                         />
                     </div>
                     <div className="grid gap-2">
-                        <Label htmlFor="email">Email Address</Label>
+                        <Label htmlFor="profile-email">Email Address</Label>
                         <Input
-                            id="email"
+                            id="profile-email"
                             type="email"
                             value={email}
                             onChange={(event) => onEmailChange(event.target.value)}

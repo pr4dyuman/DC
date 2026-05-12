@@ -5989,7 +5989,7 @@ function buildWebsiteSupportingContentHints(websiteIntelligence: AIBloggerWebsit
         [
             ...(websiteIntelligence.authorityProfile?.contentClusters || []),
             ...(websiteIntelligence.authorityProfile?.adjacentLanes || []),
-            ...(hasCommercialAuthority ? [] : websiteIntelligence.topicHints),
+            ...(websiteIntelligence.topicHints || []),
             ...(hasCommercialAuthority ? [] : websiteIntelligence.pageTitles),
             ...(websiteIntelligence.faqQuestions || []).slice(0, 8),
         ].filter((hint) => isUsableAuthoritySeed(hint, websiteIntelligence)),
@@ -6380,12 +6380,18 @@ export function assessTrendAgainstWebsite(
         reasons.push("no service or money-page evidence matched");
     }
 
+    const hasServiceAndTopicEvidence =
+        coreGroupMatches.includes("services") &&
+        groupMatches.includes("topics") &&
+        matchedCoreTokens.length >= 2 &&
+        contextOverlap >= 35;
     const accepted =
         score >= minimumFitScore &&
         topicOverlap >= 18 &&
         contextOverlap >= 18 &&
         (
             coreGroupMatches.length >= 2 ||
+            hasServiceAndTopicEvidence ||
             exactPhraseMatch ||
             (exactEntityMatch && coreGroupMatches.length >= 1)
         ) &&
@@ -6992,7 +6998,8 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
     }
 
     const oauth = input.settings.searchConsoleOAuth;
-    if (!canAttemptSearchConsoleOAuth(oauth)) {
+    const selectedDomain = oauth?.selectedDomain?.trim() || "";
+    if (!oauth || !canAttemptSearchConsoleOAuth(oauth) || !selectedDomain) {
         return null;
     }
 
@@ -7000,7 +7007,7 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
         refreshToken: oauth.refreshToken || "",
         accessToken: oauth.accessToken || "",
         expiresAt: oauth.accessTokenExpiresAt || 0,
-        selectedDomain: oauth.selectedDomain || "",
+        selectedDomain,
     });
 
     if (!accessToken) {
@@ -7010,7 +7017,7 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
     const windows = getSearchConsoleTrendWindows();
     const [currentRows, previousRows] = await Promise.all([
         querySearchConsoleAnalytics(
-            oauth.selectedDomain,
+            selectedDomain,
             accessToken,
             windows.currentStart,
             windows.currentEnd,
@@ -7018,7 +7025,7 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
             SEARCH_CONSOLE_TREND_ROW_LIMIT,
         ),
         querySearchConsoleAnalytics(
-            oauth.selectedDomain,
+            selectedDomain,
             accessToken,
             windows.previousStart,
             windows.previousEnd,

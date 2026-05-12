@@ -7,7 +7,9 @@ import { sanitizeMongoInput } from "../validation";
 import { InvoiceModel, ProjectModel, ServiceModel, connectDB } from "../mongodb";
 import { generateId } from "../utils-server";
 import {
+    buildNormalizedProjectServiceConfigs,
     buildProjectServiceLookupQuery,
+    getActiveProjectServiceDocs,
     mapProjectServicesByProjectId,
     type ProjectServiceOwnerSnapshot,
     type ProjectServiceSnapshot,
@@ -41,30 +43,9 @@ export async function updateProjectPaymentImpl(
     const canonicalService = idMap.get(String(serviceId)) || nameMap.get(String(serviceId).toLowerCase());
     if (!canonicalService) throw new Error("Service not found for this project");
 
-    const normalizedServices = Array.isArray(projectDoc?.services)
-        ? Array.from(new Set(projectDoc.services.map((rawSvc) => {
-            const rawValue = String(rawSvc || "");
-            if (idMap.has(rawValue)) return rawValue;
-            const byName = nameMap.get(rawValue.toLowerCase());
-            return byName ? String(byName.id) : rawValue;
-        })))
-        : [];
-
-    const normalizedServiceConfigs = Array.isArray(projectDoc?.serviceConfigs)
-        ? projectDoc.serviceConfigs.map((cfg) => {
-            const rawServiceId = String(cfg?.serviceId || "");
-            const rawName = String(cfg?.name || "");
-            const fromId = idMap.get(rawServiceId);
-            const fromName = nameMap.get(rawServiceId.toLowerCase()) || nameMap.get(rawName.toLowerCase());
-            const resolved = fromId || fromName;
-            if (!resolved) return cfg;
-            return {
-                ...cfg,
-                serviceId: String(resolved.id),
-                name: String(resolved.name),
-            };
-        })
-        : [];
+    const activeProjectServices = getActiveProjectServiceDocs(projectDoc.services, resolvedProjectServices);
+    const normalizedServices = activeProjectServices.map((service) => String(service.id));
+    const normalizedServiceConfigs = buildNormalizedProjectServiceConfigs(activeProjectServices, projectDoc.serviceConfigs);
 
     if (projectDoc) {
         const servicesChanged = JSON.stringify(projectDoc.services || []) !== JSON.stringify(normalizedServices);

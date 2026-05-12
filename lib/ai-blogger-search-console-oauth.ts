@@ -13,6 +13,18 @@ interface OAuthConfig {
     selectedDomain: string;
 }
 
+type SearchConsoleAnalyticsRow = {
+    keys?: string[];
+    clicks?: number;
+    impressions?: number;
+    ctr?: number;
+    position?: number;
+};
+
+type SearchConsoleAnalyticsResponse = {
+    rows?: SearchConsoleAnalyticsRow[];
+};
+
 function normalizeSearchConsolePropertyUrl(value: string) {
     const trimmed = value.trim();
     if (!trimmed) {
@@ -115,17 +127,15 @@ export async function refreshGoogleOAuthToken(
  */
 export async function getValidSearchConsoleAccessToken(
     agencyId: string,
-    encryptedOAuthConfig: {
-        refreshToken: string;
-        accessToken: string;
-        expiresAt: number;
-        selectedDomain: string;
-    }
+    encryptedOAuthConfig: OAuthConfig
 ): Promise<string | null> {
     try {
         // Decrypt tokens
         const refreshToken = decryptApiKey(encryptedOAuthConfig.refreshToken);
         const accessToken = decryptApiKey(encryptedOAuthConfig.accessToken);
+        if (!refreshToken || !accessToken) {
+            return null;
+        }
 
         // Check if token needs refresh
         if (Date.now() > encryptedOAuthConfig.expiresAt - 300000) {
@@ -197,7 +207,7 @@ export async function fetchSearchConsoleData(
             return null;
         }
 
-        const queriesData = await queriesRes.json();
+        const queriesData = await queriesRes.json() as SearchConsoleAnalyticsResponse;
 
         // Fetch by country
         const countriesRes = await fetch(
@@ -218,7 +228,9 @@ export async function fetchSearchConsoleData(
             }
         );
 
-        const countriesData = countriesRes.ok ? await countriesRes.json() : { rows: [] };
+        const countriesData: SearchConsoleAnalyticsResponse = countriesRes.ok
+            ? await countriesRes.json() as SearchConsoleAnalyticsResponse
+            : { rows: [] };
 
         // Fetch by device
         const devicesRes = await fetch(
@@ -239,27 +251,29 @@ export async function fetchSearchConsoleData(
             }
         );
 
-        const devicesData = devicesRes.ok ? await devicesRes.json() : { rows: [] };
+        const devicesData: SearchConsoleAnalyticsResponse = devicesRes.ok
+            ? await devicesRes.json() as SearchConsoleAnalyticsResponse
+            : { rows: [] };
 
         return {
-            topQueries: (queriesData.rows || []).map((row: any) => ({
-                query: row.keys[0],
-                clicks: row.clicks,
-                impressions: row.impressions,
-                ctr: row.ctr,
-                position: row.position,
+            topQueries: (queriesData.rows || []).map((row) => ({
+                query: row.keys?.[0] || "",
+                clicks: row.clicks ?? 0,
+                impressions: row.impressions ?? 0,
+                ctr: row.ctr ?? 0,
+                position: row.position ?? 0,
             })),
-            topCountries: (countriesData.rows || []).map((row: any) => ({
-                country: row.keys[0],
-                clicks: row.clicks,
-                impressions: row.impressions,
-                ctr: row.ctr,
+            topCountries: (countriesData.rows || []).map((row) => ({
+                country: row.keys?.[0] || "",
+                clicks: row.clicks ?? 0,
+                impressions: row.impressions ?? 0,
+                ctr: row.ctr ?? 0,
             })),
-            topDevices: (devicesData.rows || []).map((row: any) => ({
-                device: row.keys[0],
-                clicks: row.clicks,
-                impressions: row.impressions,
-                ctr: row.ctr,
+            topDevices: (devicesData.rows || []).map((row) => ({
+                device: row.keys?.[0] || "",
+                clicks: row.clicks ?? 0,
+                impressions: row.impressions ?? 0,
+                ctr: row.ctr ?? 0,
             })),
         };
     } catch (error) {

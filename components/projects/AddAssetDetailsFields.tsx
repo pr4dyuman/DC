@@ -41,9 +41,9 @@ export function AddAssetDetailsFields({
         <>
             <div className={inputMode === "file" ? "hidden" : "block"}>
                 <div className="space-y-2">
-                    <Label htmlFor="url">URL / Link</Label>
+                    <Label htmlFor="asset-url">URL / Link</Label>
                     <Input
-                        id="url"
+                        id="asset-url"
                         value={url}
                         onChange={(event) => onUrlChange(event.target.value)}
                         placeholder="https://github.com/..."
@@ -53,8 +53,8 @@ export function AddAssetDetailsFields({
             </div>
 
             <div className="space-y-2">
-                <Label htmlFor="type">Type</Label>
-                <Select value={type} onValueChange={(value: AssetType) => onTypeChange(value)}>
+                <Label htmlFor="asset-type">Type</Label>
+                <Select id="asset-type" value={type} onValueChange={(value: AssetType) => onTypeChange(value)}>
                     <SelectTrigger>
                         <SelectValue placeholder="Select type" />
                     </SelectTrigger>
@@ -79,9 +79,9 @@ export function AddAssetDetailsFields({
             </div>
 
             <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="asset-name">Name</Label>
                 <Input
-                    id="name"
+                    id="asset-name"
                     value={name}
                     onChange={(event) => onNameChange(event.target.value)}
                     placeholder="e.g. Project Specs"
@@ -90,9 +90,9 @@ export function AddAssetDetailsFields({
             </div>
 
             <div className="space-y-2">
-                <Label htmlFor="description">Description (Optional)</Label>
+                <Label htmlFor="asset-description">Description (Optional)</Label>
                 <Textarea
-                    id="description"
+                    id="asset-description"
                     value={description}
                     onChange={(event) => onDescriptionChange(event.target.value)}
                     placeholder="Brief description..."

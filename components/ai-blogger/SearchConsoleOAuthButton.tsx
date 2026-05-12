@@ -236,7 +236,7 @@ export function SearchConsoleOAuthButton({
                     <div>
                         <p className="text-sm font-medium">Google Search Console</p>
                         <p className="text-xs text-muted-foreground">
-                            Connect to track your blog's Search Console metrics
+                            Connect to track your blog&apos;s Search Console metrics
                         </p>
                     </div>
                     <Badge variant="outline">{disconnectedStatusLabel}</Badge>
@@ -276,7 +276,7 @@ export function SearchConsoleOAuthButton({
                     <DialogHeader>
                         <DialogTitle>Select Search Console Domain</DialogTitle>
                         <DialogDescription>
-                            Choose which domain's Search Console metrics you want to track
+                            Choose which domain&apos;s Search Console metrics you want to track
                         </DialogDescription>
                     </DialogHeader>
 

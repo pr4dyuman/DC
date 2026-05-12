@@ -83,7 +83,7 @@ export function SearchConsoleConfigSection({
                 <p className="text-sm text-muted-foreground">
                     Configure Search Console credentials globally. All agencies will use this configuration to sync performance data.
                     <br />
-                    <strong>Note:</strong> Users only see performance data for their own agency's blogs - data is automatically scoped by agency.
+                    <strong>Note:</strong> Users only see performance data for their own agency&apos;s blogs - data is automatically scoped by agency.
                 </p>
             </div>
 

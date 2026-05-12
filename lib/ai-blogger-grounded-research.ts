@@ -958,11 +958,13 @@ function getGroundedSourceFilterReasons(
         reasons.push(`trust level ${source.trustLevel} is below high-only setting`);
     }
 
+    const freshnessHasQueryAlignmentOverride =
+        scoreGroundedSourceQueryAlignment(source, config.query) >= MIN_QUERY_ALIGNMENT_FOR_FRESHNESS_OVERRIDE;
     if (
         config.freshnessPreference === "recent-first" &&
         source.freshness !== "current" &&
         source.freshness !== "recent" &&
-        scoreGroundedSourceQueryAlignment(source, config.query) < MIN_QUERY_ALIGNMENT_FOR_FRESHNESS_OVERRIDE
+        (!freshnessHasQueryAlignmentOverride || reasons.length > 0)
     ) {
         reasons.push(`freshness ${source.freshness} is outside recent-first setting`);
     }
