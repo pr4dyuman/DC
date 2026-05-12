@@ -2,17 +2,15 @@ import "server-only";
 
 import { DEFAULT_TASK_EMAIL_EVENTS } from "../email-constants";
 import {
-    sendProjectCompletedEmail,
     sendTaskAssignedEmail,
     sendTaskStatusChangedEmail,
 } from "../brevo-mail";
-import type { Task, User } from "../db";
+import type { User } from "../db";
 import {
     ActivityModel,
     ClientModel,
     NotificationModel,
     ProjectModel,
-    TaskModel,
     UserModel,
 } from "../mongodb";
 import { generateId } from "../utils-server";
@@ -164,68 +162,14 @@ export async function handleTaskStatusChangeEffectsImpl({
         }
     }
 
-    const projectTasks = await TaskModel.find({ projectId: currentTask.projectId, agencyId: agency.id }).lean() as Task[];
+    // NOTE: We intentionally do NOT auto-complete the project when all tasks are "Done".
+    // Clients can add more tasks in the future, so project completion should only
+    // happen manually (via project status change), not automatically.
+
     const project = await getProjectSummary(agency.id, currentTask.projectId);
-    const allDone = projectTasks.length > 0 && projectTasks.every((task) => task.status === "Done");
 
-    if (project && allDone && ["Active", "On Hold"].includes(project.status || "")) {
-        await ProjectModel.updateOne(
-            { id: currentTask.projectId, agencyId: agency.id },
-            {
-                $set: { status: "Completed" },
-                $unset: { clientArchiveHold: "", clientArchiveHoldAt: "" },
-            }
-        );
-
-        if (project.clientId && await isNotifEnabled("project")) {
-            await NotificationModel.create({
-                id: generateId(),
-                agencyId: agency.id,
-                userId: project.clientId,
-                message: `Project "${project.name}" has been completed! All tasks are done.`,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: `/dashboard/projects/${project.id}`,
-            });
-        }
-
-        const admins = await UserModel.find({ agencyId: agency.id, role: "admin" })
-            .select("id email")
-            .lean() as Array<Pick<User, "id" | "email">>;
-        if (await isNotifEnabled("project")) {
-            await NotificationModel.insertMany(admins.map((admin) => ({
-                id: generateId(),
-                agencyId: agency.id,
-                userId: admin.id,
-                message: `Project "${project.name}" auto-completed - all tasks done`,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: `/dashboard/projects/${project.id}`,
-            })));
-        }
-
-        if (!suppressEmailNotifications) {
-            try {
-                const client = project.clientId
-                    ? await ClientModel.findOne({ id: project.clientId, agencyId: agency.id })
-                        .select("email name")
-                        .lean() as { email?: string; name?: string } | null
-                    : null;
-                const adminEmails = admins.map((admin) => admin.email).filter(Boolean) as string[];
-                if (client?.email || adminEmails.length > 0) {
-                    await sendProjectCompletedEmail({
-                        clientEmail: client?.email || "",
-                        adminEmails,
-                        clientName: client?.name || "",
-                        projectName: project.name,
-                        projectLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/projects/${project.id}`,
-                    });
-                }
-            } catch (emailError) {
-                console.error("[Email] Failed to send project completion email:", emailError);
-            }
-        }
-    } else if (project && project.status === "Completed" && previousTask.status === "Done" && currentTask.status !== "Done") {
+    // If a project was manually marked "Completed" but a task is re-opened, revert to "Active"
+    if (project && project.status === "Completed" && previousTask.status === "Done" && currentTask.status !== "Done") {
         await ProjectModel.updateOne(
             { id: currentTask.projectId, agencyId: agency.id },
             {

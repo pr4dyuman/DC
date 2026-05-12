@@ -16,6 +16,8 @@ export async function sendEmail({ to, toName, subject, htmlContent }: SendEmailO
     const apiKey = process.env.BREVO_API_KEY;
     const senderEmail = process.env.BREVO_SENDER_EMAIL;
     const senderName = process.env.BREVO_SENDER_NAME || "Digital Corvids";
+    const replyToEmail = process.env.BREVO_REPLY_TO_EMAIL;
+    const replyToName = process.env.BREVO_REPLY_TO_NAME;
 
     if (!apiKey || !senderEmail) {
         console.error("Brevo: Missing API key or sender email in .env");
@@ -23,6 +25,10 @@ export async function sendEmail({ to, toName, subject, htmlContent }: SendEmailO
     }
 
     try {
+        const replyTo = replyToEmail
+            ? { email: replyToEmail, ...(replyToName && { name: replyToName }) }
+            : undefined;
+
         const response = await fetch(BREVO_API_URL, {
             method: "POST",
             headers: {
@@ -32,6 +38,7 @@ export async function sendEmail({ to, toName, subject, htmlContent }: SendEmailO
             },
             body: JSON.stringify({
                 sender: { name: senderName, email: senderEmail },
+                ...(replyTo && { replyTo }),
                 to: [{ email: to, name: toName || to }],
                 subject,
                 htmlContent,
@@ -151,4 +158,3 @@ export async function sendPasswordResetOtpEmail(email: string, otp: string): Pro
 </html>`,
     });
 }
-

@@ -18,6 +18,8 @@ export async function sendEmail({ to, templateId, params, subject }: EmailParams
     const BREVO_API_KEY = process.env.BREVO_API_KEY;
     const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL;
     const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME;
+    const BREVO_REPLY_TO_EMAIL = process.env.BREVO_REPLY_TO_EMAIL;
+    const BREVO_REPLY_TO_NAME = process.env.BREVO_REPLY_TO_NAME;
 
     if (!BREVO_API_KEY || !BREVO_SENDER_EMAIL || !BREVO_SENDER_NAME) {
       console.warn("[Brevo] Email service not configured. Skipping email send.");
@@ -42,6 +44,10 @@ export async function sendEmail({ to, templateId, params, subject }: EmailParams
 
     const recipients = Array.isArray(to) ? to.map((email) => ({ email })) : [{ email: to }];
 
+    const replyTo = BREVO_REPLY_TO_EMAIL
+      ? { email: BREVO_REPLY_TO_EMAIL, ...(BREVO_REPLY_TO_NAME && { name: BREVO_REPLY_TO_NAME }) }
+      : undefined;
+
     const response = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: {
@@ -54,6 +60,7 @@ export async function sendEmail({ to, templateId, params, subject }: EmailParams
           name: BREVO_SENDER_NAME,
           email: BREVO_SENDER_EMAIL,
         },
+        ...(replyTo && { replyTo }),
         to: recipients,
         templateId,
         params,
