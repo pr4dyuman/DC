@@ -147,27 +147,38 @@ export default function EmployeeProfilePage({ username }: { username: string }) 
                     setLeaveRequests([]);
                     setContributionHistory([]);
                 } else {
+                    setClientCreatedTasks([]);
                     userTasks = await getUserTasks(userData.id);
                     setTasks(userTasks);
                     projects = await getUserProjects(userData.id) as Project[];
 
-                    const leaves = await getLeaveRequests(userData.id);
-                    setLeaveRequests(leaves);
+                    const canViewLeaveData =
+                        currentSessionId === userData.id ||
+                        currentUser?.role === 'admin' ||
+                        currentUser?.role === 'manager';
 
-                    const approvedLeaves = leaves.filter(l => l.status === 'Approved');
-                    const dates: string[] = [];
-                    approvedLeaves.forEach(leave => {
-                        const current = new Date(leave.startDate);
-                        const end = new Date(leave.endDate);
-                        while (current <= end) {
-                            dates.push(current.toISOString().split('T')[0]);
-                            current.setDate(current.getDate() + 1);
-                        }
-                    });
+                    if (canViewLeaveData) {
+                        const leaves = await getLeaveRequests(userData.id);
+                        setLeaveRequests(leaves);
+
+                        const approvedLeaves = leaves.filter(l => l.status === 'Approved');
+                        const dates: string[] = [];
+                        approvedLeaves.forEach(leave => {
+                            const current = new Date(leave.startDate);
+                            const end = new Date(leave.endDate);
+                            while (current <= end) {
+                                dates.push(current.toISOString().split('T')[0]);
+                                current.setDate(current.getDate() + 1);
+                            }
+                        });
+                        setLeaveDates(dates);
+                    } else {
+                        setLeaveRequests([]);
+                        setLeaveDates([]);
+                    }
 
                     const history = await getUserContributionHistory(userData.id);
                     setContributionHistory(history);
-                    setLeaveDates(dates);
 
                     userActivities = await getUserActivity(userData.id);
                 }
@@ -211,6 +222,19 @@ export default function EmployeeProfilePage({ username }: { username: string }) 
         window.history.replaceState({}, '', url.pathname + url.search);
     }, []);
 
+    const canViewLeavesForLoadedUser = Boolean(user && user.role !== 'client' && (isSelf || currentUserRole === 'admin' || currentUserRole === 'manager'));
+
+    useEffect(() => {
+        if (activeTab !== 'leaves' || !user || canViewLeavesForLoadedUser || typeof window === 'undefined') {
+            return;
+        }
+
+        setActiveTab('overview');
+        const url = new URL(window.location.href);
+        url.searchParams.delete('tab');
+        window.history.replaceState({}, '', url.pathname + url.search);
+    }, [activeTab, canViewLeavesForLoadedUser, user]);
+
     if (loading) {
         return <EmployeeProfileSkeleton />;
     }
@@ -244,6 +268,8 @@ export default function EmployeeProfilePage({ username }: { username: string }) 
     const lastActiveText = fmt.presence(user.lastActiveAt);
     const isOnline = lastActiveText === "Online";
     const joinedText = user.createdAt ? fmt.monthYear(user.createdAt) : null;
+    const canViewLeavesTab = canViewLeavesForLoadedUser;
+    const tabsListClassName = `w-full h-auto grid ${canViewLeavesTab ? 'grid-cols-2 lg:grid-cols-5' : 'grid-cols-2 lg:grid-cols-4'} gap-2 bg-secondary border border-border p-2 rounded-lg`;
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-10">
@@ -315,7 +341,7 @@ export default function EmployeeProfilePage({ username }: { username: string }) 
 
             {/* Content Tabs */}
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-                <TabsList className="w-full h-auto grid grid-cols-2 lg:grid-cols-5 gap-2 bg-secondary border border-border p-2 rounded-lg">
+                <TabsList className={tabsListClassName}>
                     <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-sm py-2">
                         Overview
                     </TabsTrigger>
@@ -328,7 +354,7 @@ export default function EmployeeProfilePage({ username }: { username: string }) 
                     <TabsTrigger value="activity" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-sm py-2">
                         Activity
                     </TabsTrigger>
-                    {user.role !== 'client' && (
+                    {canViewLeavesTab && (
                         <TabsTrigger value="leaves" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-sm py-2">
                             Leaves
                         </TabsTrigger>
@@ -385,7 +411,7 @@ export default function EmployeeProfilePage({ username }: { username: string }) 
                     activitySentinelRef={activitySentinelRef}
                 />
 
-                {user.role !== 'client' && (
+                {canViewLeavesTab && (
                     <EmployeeProfileLeavesTab
                         isSelf={isSelf}
                         userName={user.name}

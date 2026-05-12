@@ -17,7 +17,9 @@ const REDACTED_USER_FIELDS = [
     "pendingAdharCardImage",
     "pendingPanCardImage",
     "contracts",
+    "pendingContracts",
     "otherDocuments",
+    "pendingOtherDocuments",
 ] as const;
 
 function redactSensitiveUserFields<T extends Record<string, unknown>>(value: T, includePassword = false) {
@@ -57,7 +59,11 @@ export async function getUserImpl(actor: UserQueryActor, agencyId: string | unde
     const targetUser = await resolveUserOrClient(id, agencyId);
     if (!targetUser || !actor) return undefined;
 
-    if (isAdminOrManager(actor) || actor.id === id) {
+    if (actor.role === "client" && actor.id !== targetUser.id) {
+        return undefined;
+    }
+
+    if (isAdminOrManager(actor) || actor.id === targetUser.id) {
         return sanitizeDoc(targetUser) as User;
     }
 
@@ -67,6 +73,10 @@ export async function getUserImpl(actor: UserQueryActor, agencyId: string | unde
 export async function getUserByUsernameImpl(actor: UserQueryActor, agencyId: string | undefined, username: string) {
     const user = await resolveUserOrClient(username, agencyId);
     if (!user || !actor) return undefined;
+
+    if (actor.role === "client" && actor.id !== user.id) {
+        return undefined;
+    }
 
     if (isAdminOrManager(actor) || actor.id === user.id) {
         return sanitizeDoc(user) as User;

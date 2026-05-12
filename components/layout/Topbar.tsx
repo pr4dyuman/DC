@@ -161,6 +161,11 @@ export function Topbar({
 
     if (!user) return null;
 
+    const profileSlug = encodeURIComponent(user.username || user.id);
+    const profileHref = user.role === "client"
+        ? `/dashboard/clients/${profileSlug}`
+        : `/dashboard/team/${profileSlug}`;
+
     return (
         <>
             <div className="h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-3 sm:px-6 flex items-center justify-between gap-3 z-10">
@@ -233,15 +238,11 @@ export function Topbar({
                                     </div>
                                 </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                    className="cursor-pointer"
-                                    onSelect={(event) => {
-                                        event.preventDefault();
-                                        setProfileOpen(true);
-                                    }}
-                                >
-                                    <UserIcon className="mr-2 h-4 w-4" />
-                                    <span>My Profile</span>
+                                <DropdownMenuItem asChild>
+                                    <Link href={profileHref} className="cursor-pointer">
+                                        <UserIcon className="mr-2 h-4 w-4" />
+                                        <span>My Profile</span>
+                                    </Link>
                                 </DropdownMenuItem>
                                 {user.role === 'admin' && (
                                     <DropdownMenuItem asChild>
@@ -251,14 +252,13 @@ export function Topbar({
                                         </Link>
                                     </DropdownMenuItem>
                                 )}
-                                {user.role !== 'client' && (
-                                    <DropdownMenuItem asChild>
-                                        <Link href="/dashboard/settings" className="cursor-pointer">
-                                            <Settings className="mr-2 h-4 w-4" />
-                                            <span>Settings</span>
-                                        </Link>
-                                    </DropdownMenuItem>
-                                )}
+                                <DropdownMenuItem
+                                    className="cursor-pointer"
+                                    onSelect={() => setProfileOpen(true)}
+                                >
+                                    <Settings className="mr-2 h-4 w-4" />
+                                    <span>Settings</span>
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="text-red-600 focus:text-red-600 cursor-pointer" onClick={async () => {
                                     await logout();

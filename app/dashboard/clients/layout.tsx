@@ -10,7 +10,10 @@ export default async function ClientsLayout({
     const user = await getCurrentUser();
     if (!user) redirect("/login");
 
-    if (!isDashboardRouteAllowed(user.role, "/dashboard/clients")) {
+    const canAccessClientsSegment =
+        user.role === "client" || isDashboardRouteAllowed(user.role, "/dashboard/clients");
+
+    if (!canAccessClientsSegment) {
         redirect("/dashboard");
     }
 

@@ -36,11 +36,15 @@ function normalizePathname(pathname: string) {
 export function isDashboardRouteAllowed(role: string | null | undefined, pathname: string): boolean {
     if (!role) return false;
 
+    const normalizedPathname = normalizePathname(pathname);
+    if (role === "client" && normalizedPathname.startsWith("/dashboard/clients/")) {
+        return true;
+    }
+
     const allowedRoutes = DASHBOARD_ROUTE_ACCESS[role];
     if (!allowedRoutes) return false;
     if (allowedRoutes.includes("*")) return true;
 
-    const normalizedPathname = normalizePathname(pathname);
     return allowedRoutes.some((route) => {
         if (route === "/dashboard") {
             return normalizedPathname === route;

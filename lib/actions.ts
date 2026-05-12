@@ -418,10 +418,39 @@ export async function getProjects(offset = 0, limit = 1000) {
     );
 }
 
+const INTERNAL_PROFILE_ROLES = new Set(["admin", "manager", "employee"]);
+
+function isPrivilegedProfileViewer(role?: string) {
+    return role === "admin" || role === "manager" || role === "superadmin";
+}
+
+function isInternalProfileRole(role?: string) {
+    return !!role && INTERNAL_PROFILE_ROLES.has(role);
+}
+
+async function requireUserOperationalProfileAccess(
+    caller: { id: string; role: string },
+    agencyId: string,
+    targetUserId: string,
+    resourceLabel: string,
+) {
+    if (isPrivilegedProfileViewer(caller.role) || caller.id === targetUserId) {
+        return;
+    }
+
+    const targetUser = await resolveUserOrClient(targetUserId, agencyId);
+    if (caller.role === "employee" && isInternalProfileRole(targetUser?.role)) {
+        return;
+    }
+
+    throw new Error(`Unauthorized: You do not have permission to view this user's ${resourceLabel}.`);
+}
+
 export async function getUserProjects(userId: string) {
-    await requireAuth();
+    const caller = await requireAuth();
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
+    await requireUserOperationalProfileAccess(caller, agencyFilter.agencyId, userId, "projects");
     return getUserProjectsImpl(agencyFilter.agencyId, userId);
 }
 
@@ -505,13 +534,9 @@ export async function getUserByUsername(username: string) {
 
 export async function getUserTasks(userId: string, offset = 0, limit = 1000) {
     const caller = await requireAuth();
-    // S3 fix: IDOR protection — non-admin users can only access their own tasks
-    const isPrivileged = caller.role === 'admin' || caller.role === 'manager';
-    if (!isPrivileged && caller.id !== userId) {
-        throw new Error('Unauthorized: You can only view your own tasks.');
-    }
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
+    await requireUserOperationalProfileAccess(caller, agencyFilter.agencyId, userId, "tasks");
     return getUserTasksImpl(agencyFilter.agencyId, userId, offset, limit);
 }
 
@@ -554,25 +579,17 @@ export async function getClientCreatedTasks(userId: string) {
 
 export async function getUserActivity(userId: string) {
     const caller = await requireAuth();
-    // S3 fix: IDOR protection — non-admin users can only access their own activity
-    const isPrivileged = caller.role === 'admin' || caller.role === 'manager';
-    if (!isPrivileged && caller.id !== userId) {
-        throw new Error('Unauthorized: You can only view your own activity.');
-    }
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
+    await requireUserOperationalProfileAccess(caller, agencyFilter.agencyId, userId, "activity");
     return getUserActivityImpl(agencyFilter.agencyId, userId);
 }
 
 export async function getUserContributionHistory(userId: string) {
     const caller = await requireAuth();
-    // S3 fix: IDOR protection — non-admin users can only access their own contributions
-    const isPrivileged = caller.role === 'admin' || caller.role === 'manager';
-    if (!isPrivileged && caller.id !== userId) {
-        throw new Error('Unauthorized: You can only view your own contribution history.');
-    }
     const agency = await getCurrentAgency();
     const agencyFilter = requireAgencyFilter(agency);
+    await requireUserOperationalProfileAccess(caller, agencyFilter.agencyId, userId, "contribution history");
     return getUserContributionHistoryImpl(agencyFilter.agencyId, userId);
 }
 
