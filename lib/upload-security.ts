@@ -265,7 +265,7 @@ export async function reserveAgencyStorageAfterUpload(agencyId: string, fileSize
     await connectDB();
 
     const agency = await AgencyModel.findOne({ id: agencyId })
-        .select("limits usage")
+        .select("id limits usage")
         .lean() as UploadAgencyContext;
 
     if (!agency?.id) {

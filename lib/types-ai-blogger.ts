@@ -878,6 +878,8 @@ export type BlogStudioRefreshReporting = {
 export type BlogStudioFetchTrendsSource =
     | "live-google-trends"
     | "live-google-trends-fallback-key"
+    | "search-console-rising"
+    | "free-internet-trend-research"
     | "internet-trend-research"
     | "ai-only-discovery"
     | "ai-fallback-after-live-failure";
