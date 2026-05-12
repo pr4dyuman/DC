@@ -2803,6 +2803,25 @@ function normalizeSearchConsoleOAuthStatus(value: unknown): "not-connected" | "c
     return "not-connected";
 }
 
+function canAttemptSearchConsoleOAuth(value: {
+    enabled?: boolean;
+    selectedDomain?: string;
+    authStatus?: unknown;
+    refreshToken?: string;
+} | null | undefined) {
+    if (!value?.enabled || !value.selectedDomain?.trim()) {
+        return false;
+    }
+
+    const status = normalizeSearchConsoleOAuthStatus(value.authStatus);
+
+    if (status === "configured") {
+        return true;
+    }
+
+    return status === "token-expired" && Boolean(value.refreshToken);
+}
+
 function decryptWebhookSecret(value: string | undefined) {
     const normalized = sanitizeText(value, 4000);
     if (!normalized) {
@@ -6973,11 +6992,7 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
     }
 
     const oauth = input.settings.searchConsoleOAuth;
-    if (
-        !oauth?.enabled ||
-        !oauth.selectedDomain?.trim() ||
-        normalizeSearchConsoleOAuthStatus(oauth.authStatus) !== "configured"
-    ) {
+    if (!canAttemptSearchConsoleOAuth(oauth)) {
         return null;
     }
 
@@ -10666,6 +10681,52 @@ function formatFetchTrendsDiagnosticsLabel(
     return "AI-only discovery";
 }
 
+function formatTopicSourcePipelineNote(input: {
+    fetchTrendsSource: BlogStudioFetchTrendsSource;
+    selectedTopic: string;
+    trendSignals?: AIBloggerTrendSignals | null;
+}) {
+    const sourceLabel = formatFetchTrendsDiagnosticsLabel(input.fetchTrendsSource, input.trendSignals);
+    const selectedTopic = sanitizeText(input.selectedTopic, 120);
+
+    if (input.fetchTrendsSource === "live-google-trends" || input.fetchTrendsSource === "live-google-trends-fallback-key") {
+        return sanitizeText(
+            `Topic source: ${sourceLabel}. Selected from accepted live Google Trends demand: ${selectedTopic}.`,
+            240,
+        );
+    }
+
+    if (input.fetchTrendsSource === "search-console-rising") {
+        return sanitizeText(
+            `Topic source: Search Console rising queries. Selected rising website-fit query/topic: ${selectedTopic}.`,
+            240,
+        );
+    }
+
+    if (input.fetchTrendsSource === "free-internet-trend-research") {
+        return sanitizeText(
+            `Topic source: free internet trend research. Selected website-fit trending topic: ${selectedTopic}.`,
+            240,
+        );
+    }
+
+    if (input.fetchTrendsSource === "internet-trend-research") {
+        return sanitizeText(
+            `Topic source: internet/search trend research. Selected website-fit SEO opportunity: ${selectedTopic}.`,
+            240,
+        );
+    }
+
+    if (input.fetchTrendsSource === "ai-fallback-after-live-failure") {
+        return sanitizeText(
+            `Topic source: website-led AI fallback after live trend/search source was unavailable. Selected: ${selectedTopic}.`,
+            240,
+        );
+    }
+
+    return sanitizeText(`Topic source: AI topic discovery. Selected: ${selectedTopic}.`, 240);
+}
+
 function getTrendDiscoveryLogLabel(trendSignals: AIBloggerTrendSignals) {
     if (trendSignals.mode === "keyword-analysis" && trendSignals.scanStats?.fallbackUsed) {
         return "DISCOVERY (trend-scan-fallback)";
@@ -14255,11 +14316,7 @@ export async function getBlogStudioPerformanceSyncStatusImpl(
         ? lastRun.completedAt
         : latestSnapshot?.refreshedAt || null;
     const lastFailureAt = latestFailedRun?.completedAt || null;
-    const hasValidConfig = Boolean(
-        oauthConfig?.enabled &&
-        oauthConfig?.selectedDomain?.trim() &&
-        oauthConfig?.authStatus === "configured",
-    );
+    const hasValidConfig = canAttemptSearchConsoleOAuth(oauthConfig);
     const latestSnapshotAt = latestSnapshot?.refreshedAt || null;
     const syncWindowMs = 24 * 60 * 60 * 1000; // 24 hours for OAuth
     const latestSnapshotMs = latestSnapshotAt ? new Date(latestSnapshotAt).getTime() : Number.NaN;
@@ -14397,11 +14454,7 @@ async function syncAgencyBlogStudioPerformanceImpl(
         return result;
     }
 
-    if (
-        !oauthConfig?.enabled ||
-        !oauthConfig?.selectedDomain?.trim() ||
-        oauthConfig?.authStatus !== "configured"
-    ) {
+    if (!canAttemptSearchConsoleOAuth(oauthConfig)) {
         const result: BlogStudioPerformanceSyncAgencyResult = {
             agencyId,
             status: "skipped",
@@ -14409,7 +14462,7 @@ async function syncAgencyBlogStudioPerformanceImpl(
             snapshotsStored: 0,
             refreshReadyCount: 0,
             refreshReadyPostSlugs: [],
-            summary: `Skipped ${agencyId}: Google Search Console OAuth is not connected. Please connect in AI Blogger settings.`,
+            summary: `Skipped ${agencyId}: Google Search Console OAuth is not connected or has no refresh token. Please reconnect in AI Blogger settings.`,
         };
         await recordBlogStudioPerformanceSyncRun({
             ...result,
@@ -18924,7 +18977,21 @@ export async function generateBlogStudioDraftImpl(
             discovery.sourceSummary || topicSelection.serpSelectionSummary || topicSelection.selectionSummary || discoverySummary,
             320,
         );
+        const topicSourceNote = formatTopicSourcePipelineNote({
+            fetchTrendsSource,
+            selectedTopic: selectedTopicForRun,
+            trendSignals: capturedTrendSignals,
+        });
+        if (jobId) {
+            void emitPipelineEvent(jobId, {
+                type: "log",
+                step: "fetch-trends",
+                label: "Topic Source",
+                message: topicSourceNote,
+            });
+        }
         const discoveryNotes = [
+            topicSourceNote,
             finalDiscoverySummary,
             `Selected: ${selectedTopicForRun}`,
             topicSelection.selectionSummary,
@@ -18973,6 +19040,7 @@ export async function generateBlogStudioDraftImpl(
                     data: {
                         candidateTopics: discovery.candidateTopics,
                         selectedTopic: selectedTopicForRun,
+                        topicSourceNote,
                         relatedQueries: discovery.relatedQueries,
                         sourceSummary: discovery.sourceSummary,
                         selectionSummary: topicSelection.selectionSummary,
@@ -22656,7 +22724,21 @@ export async function runBlogStudioDraftResearchPhase(
             discovery.sourceSummary || topicSelection.serpSelectionSummary || topicSelection.selectionSummary || discoverySummary,
             320,
         );
+        const topicSourceNote = formatTopicSourcePipelineNote({
+            fetchTrendsSource,
+            selectedTopic: selectedTopicForRun,
+            trendSignals: capturedTrendSignals,
+        });
+        if (jobId) {
+            void emitPipelineEvent(jobId, {
+                type: "log",
+                step: "fetch-trends",
+                label: "Topic Source",
+                message: topicSourceNote,
+            });
+        }
         const discoveryNotes = [
+            topicSourceNote,
             finalDiscoverySummary,
             `Selected: ${selectedTopicForRun}`,
             topicSelection.selectionSummary,
@@ -22705,6 +22787,7 @@ export async function runBlogStudioDraftResearchPhase(
                     data: {
                         candidateTopics: discovery.candidateTopics,
                         selectedTopic: selectedTopicForRun,
+                        topicSourceNote,
                         relatedQueries: discovery.relatedQueries,
                         sourceSummary: discovery.sourceSummary,
                         selectionSummary: topicSelection.selectionSummary,
