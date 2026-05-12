@@ -133,7 +133,10 @@ export async function getScopedProjectIdsForCurrentUser(agencyId: string): Promi
         });
     }
 
-    return await TaskModel.distinct('projectId', { assigneeId: currentUser.id, agencyId });
+    return await TaskModel.distinct('projectId', {
+        agencyId,
+        $or: [{ assigneeId: currentUser.id }, { assigneeIds: currentUser.id }],
+    });
 }
 
 export async function canCurrentUserAccessProject(projectId: string, agencyId: string): Promise<boolean> {
@@ -151,7 +154,11 @@ export async function canCurrentUserAccessProject(projectId: string, agencyId: s
         });
     }
 
-    return !!await TaskModel.exists({ projectId, agencyId, assigneeId: currentUser.id });
+    return !!await TaskModel.exists({
+        projectId,
+        agencyId,
+        $or: [{ assigneeId: currentUser.id }, { assigneeIds: currentUser.id }],
+    });
 }
 
 export async function hasExplicitAIAccessSetting(

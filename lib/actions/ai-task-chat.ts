@@ -6,6 +6,7 @@ import { generateContentWithChat } from "../ai-provider";
 import { getResolvedFeatureConfig, resolveModel } from "../ai-provider-shared";
 import { logAIUsage } from "../ai-usage";
 import { createSession } from "../live-session";
+import { getTaskAssigneeIds } from "../task-assignees";
 import { AssetModel, TaskModel, UserModel, connectDB } from "../mongodb";
 
 export type ChatMessage = {
@@ -28,8 +29,10 @@ function buildChatSystemInstruction(
     const allProjectTasks = data.tasks.filter((task) => task.projectId === projectId);
     const tasksSummary = allProjectTasks.slice(0, 15)
         .map((task) => {
-            const assignee = data.users.find((user) => user.id === task.assigneeId);
-            return `- ${task.title} (${task.status}) [${assignee?.name || "Unassigned"}]`;
+            const assigneeNames = getTaskAssigneeIds(task)
+                .map((assigneeId) => data.users.find((user) => user.id === assigneeId)?.name)
+                .filter(Boolean);
+            return `- ${task.title} (${task.status}) [${assigneeNames.length > 0 ? assigneeNames.join(", ") : "Unassigned"}]`;
         }).join("\n");
 
     const projectAssets = data.assets.filter((asset) => asset.projectId === projectId && asset.aiEnabled);

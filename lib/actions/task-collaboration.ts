@@ -5,6 +5,7 @@ import { sendTaskCommentEmail } from "../brevo-mail";
 import { extractMentionedUserIds } from "../mention-utils";
 import type { Task, UserPermissions } from "../db";
 import { NotificationModel, ActivityModel, TaskModel, UserModel, connectDB } from "../mongodb";
+import { getTaskAssigneeIds } from "../task-assignees";
 import { sanitizeString } from "../validation";
 import { generateId, resolveUserOrClient } from "../utils-server";
 import { isNotifEnabled } from "./shared";
@@ -100,7 +101,7 @@ export async function addCommentImpl(
             const commenterUser = await getAgencyUser(agency.id, userId);
             if (commenterUser) {
                 const participantIds = new Set<string>();
-                if (task.assigneeId) participantIds.add(task.assigneeId);
+                getTaskAssigneeIds(task).forEach((assigneeId) => participantIds.add(assigneeId));
                 if (task.createdBy) participantIds.add(task.createdBy);
                 task.comments?.forEach((comment) => participantIds.add(comment.userId));
                 participantIds.delete(userId);
@@ -129,7 +130,7 @@ export async function addCommentImpl(
     try {
         if (await isNotifEnabled("task")) {
             const participantIds = new Set<string>();
-            if (task.assigneeId) participantIds.add(task.assigneeId);
+            getTaskAssigneeIds(task).forEach((assigneeId) => participantIds.add(assigneeId));
             if (task.createdBy) participantIds.add(task.createdBy);
             task.comments?.forEach((comment) => participantIds.add(comment.userId));
             participantIds.delete(userId);
@@ -157,7 +158,7 @@ export async function addCommentImpl(
         const filteredMentionIds = mentionedIds.filter((mentionedId) => mentionedId !== userId);
         if (filteredMentionIds.length > 0 && await isNotifEnabled("task")) {
             const alreadyNotified = new Set<string>();
-            if (task.assigneeId) alreadyNotified.add(task.assigneeId);
+            getTaskAssigneeIds(task).forEach((assigneeId) => alreadyNotified.add(assigneeId));
             if (task.createdBy) alreadyNotified.add(task.createdBy);
             task.comments?.forEach((comment) => alreadyNotified.add(comment.userId));
             alreadyNotified.delete(userId);

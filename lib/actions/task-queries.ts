@@ -8,7 +8,7 @@ type SettingsSnapshot = {
     userPermissions?: Record<string, UserPermissions>;
 };
 
-type ProjectTaskSummary = Pick<Task, "projectId" | "status" | "assigneeId">;
+type ProjectTaskSummary = Pick<Task, "projectId" | "status" | "assigneeId" | "assigneeIds">;
 
 async function getPermissionSubjectRole(agencyId: string, userId: string) {
     const user = await UserModel.findOne({ id: userId, agencyId })
@@ -49,7 +49,7 @@ export async function getAllProjectTasksImpl(agencyId: string, scopedProjectIds:
         : { agencyId, projectId: { $in: scopedProjectIds || [] } };
 
     const tasks = await TaskModel.find(taskQuery)
-        .select("projectId status assigneeId")
+        .select("projectId status assigneeId assigneeIds")
         .lean() as ProjectTaskSummary[];
 
     return tasks.map((task) => sanitizeDoc(task) as Task);

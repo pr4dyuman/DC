@@ -188,6 +188,7 @@ const TaskSchema = new Schema<Task>({
     status: { type: String, enum: ['Todo', 'In Progress', 'Review', 'Done'], required: true },
     priority: { type: String, enum: ['Low', 'Medium', 'High'] },
     assigneeId: { type: String, default: "" },
+    assigneeIds: [{ type: String }],
     dueDate: { type: String },
     startDate: { type: String },
     category: { type: String },
@@ -200,6 +201,7 @@ const TaskSchema = new Schema<Task>({
 TaskSchema.index({ projectId: 1 });
 TaskSchema.index({ agencyId: 1, status: 1 });           // Compound: agency + status
 TaskSchema.index({ agencyId: 1, assigneeId: 1 });       // Compound: agency + assignee
+TaskSchema.index({ agencyId: 1, assigneeIds: 1 });      // Compound: agency + multi-assignee
 TaskSchema.index({ createdBy: 1 });
 
 // Invoice Schema

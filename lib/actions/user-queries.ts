@@ -78,7 +78,10 @@ export async function getUserByUsernameImpl(actor: UserQueryActor, agencyId: str
 export async function getUserTasksImpl(agencyId: string, userId: string, offset = 0, limit = 1000) {
     await connectDB();
 
-    const tasksRaw = await TaskModel.find({ assigneeId: userId, agencyId }).lean();
+    const tasksRaw = await TaskModel.find({
+        agencyId,
+        $or: [{ assigneeId: userId }, { assigneeIds: userId }],
+    }).lean();
     const projectIds = [...new Set(tasksRaw.map((task) => task.projectId))];
     const validProjects = await ProjectModel.find({ id: { $in: projectIds }, agencyId }).select("id").lean() as Array<Pick<Project, "id">>;
     const validProjectIdSet = new Set(validProjects.map((project) => project.id));

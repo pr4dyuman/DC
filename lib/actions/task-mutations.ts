@@ -7,6 +7,13 @@ import {
 } from "../brevo-mail";
 import { DEFAULT_TASK_EMAIL_EVENTS } from "../email-constants";
 import { sanitizeMongoInput, sanitizeName, sanitizeString, sanitizeUpdates } from "../validation";
+import {
+    areTaskAssigneeIdsEqual,
+    buildTaskAssigneeUpdate,
+    getPrimaryTaskAssigneeId,
+    getTaskAssigneeIds,
+    normalizeTaskAssigneeIds,
+} from "../task-assignees";
 import { generateId } from "../utils-server";
 import {
     ActivityModel,
@@ -29,7 +36,6 @@ import {
 } from "./projects-shared";
 import {
     type CommentAgencyContext,
-    getAgencyUser,
     getEmailCategories,
     getProjectSummary,
     type TaskEffectRecord,
@@ -48,7 +54,7 @@ async function ensureProjectServiceReferenceForTask(
     projectId: string,
     agencyId: string,
     rawServiceRef: string,
-    assigneeId?: string
+    assigneeIds?: string[]
 ): Promise<ProjectServiceSnapshot | null> {
     const normalizedServiceRef = sanitizeName(String(rawServiceRef || ""), 200);
     if (!normalizedServiceRef) return null;
@@ -80,17 +86,18 @@ async function ensureProjectServiceReferenceForTask(
             agencyId,
             name: normalizedServiceRef,
             projectId,
-            employees: assigneeId ? [assigneeId] : [],
+            employees: assigneeIds || [],
         };
         await ServiceModel.create(resolvedService);
         existingServices.push(resolvedService);
-    } else if (assigneeId) {
-        // Add assignee to existing service if not already a member
+    } else if (assigneeIds && assigneeIds.length > 0) {
+        // Add assignees to existing service if they are not already members.
         const currentEmployees = resolvedService.employees || [];
-        if (!currentEmployees.includes(assigneeId)) {
+        const missingAssigneeIds = assigneeIds.filter((assigneeId) => !currentEmployees.includes(assigneeId));
+        if (missingAssigneeIds.length > 0) {
             await ServiceModel.updateOne(
                 { id: resolvedService.id, agencyId },
-                { $addToSet: { employees: assigneeId } }
+                { $addToSet: { employees: { $each: missingAssigneeIds } } }
             );
         }
     }
@@ -130,18 +137,22 @@ export async function createTaskImpl(
         task.description = sanitizeString(task.description, 10000);
     }
     if (!task.projectId) throw new Error("Project is required");
-    task.assigneeId = typeof task.assigneeId === "string" ? task.assigneeId.trim() : "";
+    const normalizedAssigneeIds = normalizeTaskAssigneeIds(task.assigneeIds, task.assigneeId);
+    task.assigneeIds = normalizedAssigneeIds;
+    task.assigneeId = getPrimaryTaskAssigneeId(normalizedAssigneeIds);
 
     const projectExists = await ProjectModel.exists({ id: task.projectId, agencyId: agency.id });
     if (!projectExists) throw new Error(`Project with ID ${task.projectId} not found`);
 
-    if (task.assigneeId) {
-        const userExists = await UserModel.exists({ id: task.assigneeId, agencyId: agency.id });
-        if (!userExists) throw new Error(`User with ID ${task.assigneeId} not found`);
+    if (normalizedAssigneeIds.length > 0) {
+        const existingUserCount = await UserModel.countDocuments({ id: { $in: normalizedAssigneeIds }, agencyId: agency.id });
+        if (existingUserCount !== normalizedAssigneeIds.length) {
+            throw new Error("One or more assignees were not found");
+        }
     }
 
     if (task.category) {
-        const canonicalService = await ensureProjectServiceReferenceForTask(task.projectId, agency.id, task.category, task.assigneeId);
+        const canonicalService = await ensureProjectServiceReferenceForTask(task.projectId, agency.id, task.category, normalizedAssigneeIds);
         if (canonicalService?.name) task.category = canonicalService.name;
     }
 
@@ -174,20 +185,27 @@ export async function createTaskImpl(
 
     if (shouldSendTaskEmail) {
         try {
-            const assignee = task.assigneeId ? await getAgencyUser(agency.id, task.assigneeId) : null;
+            const assignees = normalizedAssigneeIds.length > 0
+                ? await UserModel.find({ id: { $in: normalizedAssigneeIds }, agencyId: agency.id })
+                    .select("id name email")
+                    .lean() as Array<Pick<User, "id" | "name" | "email">>
+                : [];
             const project = await getProjectSummary(agency.id, task.projectId);
 
-            if (createdEventConfig.notifyAssignee && task.assigneeId && assignee?.email && project) {
-                await sendTaskAssignedEmail({
-                    assigneeEmail: assignee.email,
-                    assigneeName: assignee.name,
-                    taskTitle: task.title,
-                    taskDescription: task.description || "",
-                    projectName: project.name,
-                    dueDate: task.dueDate || "",
-                    priority: task.priority || "Medium",
-                    taskLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/projects/${task.projectId}?task=${newTask.id}`,
-                });
+            if (createdEventConfig.notifyAssignee && project) {
+                for (const assignee of assignees) {
+                    if (!assignee.email) continue;
+                    await sendTaskAssignedEmail({
+                        assigneeEmail: assignee.email,
+                        assigneeName: assignee.name,
+                        taskTitle: task.title,
+                        taskDescription: task.description || "",
+                        projectName: project.name,
+                        dueDate: task.dueDate || "",
+                        priority: task.priority || "Medium",
+                        taskLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/projects/${task.projectId}?task=${newTask.id}`,
+                    });
+                }
             }
 
             if (createdEventConfig.notifyClient && project?.clientId) {
@@ -212,23 +230,23 @@ export async function createTaskImpl(
         }
     }
 
-    if (task.assigneeId && await isNotifEnabled("task")) {
-        await NotificationModel.create({
+    if (normalizedAssigneeIds.length > 0 && await isNotifEnabled("task")) {
+        await NotificationModel.insertMany(normalizedAssigneeIds.map((assigneeId) => ({
             id: generateId(),
             agencyId: agency.id,
-            userId: task.assigneeId,
+            userId: assigneeId,
             message: `You've been assigned a new task: "${task.title}"`,
             read: false,
             timestamp: new Date().toISOString(),
             link: `/dashboard/projects/${task.projectId}?task=${newTask.id}`,
-        });
+        })));
     }
 
     const adminsForNewTask = await UserModel.find({ agencyId: agency.id, role: { $in: ["admin", "manager"] } })
         .select("id")
         .lean() as Array<Pick<User, "id">>;
     const adminNewTaskNotifs = adminsForNewTask
-        .filter((admin) => admin.id !== currentUser.id)
+        .filter((admin) => admin.id !== currentUser.id && !normalizedAssigneeIds.includes(admin.id))
         .map((admin) => ({
             id: generateId(),
             agencyId: agency.id,
@@ -312,9 +330,13 @@ export async function updateTaskImpl(
     if (updates.title) updates.title = sanitizeName(updates.title, 500);
     if (typeof updates.category === "string") updates.category = sanitizeName(updates.category, 200) || undefined;
     if (updates.description) updates.description = sanitizeString(updates.description, 10000);
-    const requestedAssigneeChange = Object.prototype.hasOwnProperty.call(updates, "assigneeId");
+    const requestedAssigneeChange =
+        Object.prototype.hasOwnProperty.call(updates, "assigneeId") ||
+        Object.prototype.hasOwnProperty.call(updates, "assigneeIds");
     if (requestedAssigneeChange) {
-        updates.assigneeId = typeof updates.assigneeId === "string" ? updates.assigneeId.trim() : "";
+        const assigneeUpdate = buildTaskAssigneeUpdate(updates.assigneeIds, updates.assigneeId);
+        updates.assigneeIds = assigneeUpdate.assigneeIds;
+        updates.assigneeId = assigneeUpdate.assigneeId;
     }
 
     if (updates.status === "Done" && !permissions.canMarkDone) {
@@ -329,15 +351,21 @@ export async function updateTaskImpl(
         const projectExists = await ProjectModel.exists({ id: updates.projectId, agencyId: agency.id });
         if (!projectExists) throw new Error(`Project with ID ${updates.projectId} not found`);
     }
-    if (updates.assigneeId) {
-        const userExists = await UserModel.exists({ id: updates.assigneeId, agencyId: agency.id });
-        if (!userExists) throw new Error(`User with ID ${updates.assigneeId} not found`);
+    if (requestedAssigneeChange && updates.assigneeIds && updates.assigneeIds.length > 0) {
+        const existingUserCount = await UserModel.countDocuments({ id: { $in: updates.assigneeIds }, agencyId: agency.id });
+        if (existingUserCount !== updates.assigneeIds.length) {
+            throw new Error("One or more assignees were not found");
+        }
     }
 
     const task = await TaskModel.findOne({ id: taskId, agencyId: agency.id }).lean() as Task | null;
     if (!task) throw new Error("Task not found");
+    const previousAssigneeIds = getTaskAssigneeIds(task);
+    const nextAssigneeIds = requestedAssigneeChange
+        ? normalizeTaskAssigneeIds(updates.assigneeIds, updates.assigneeId)
+        : previousAssigneeIds;
 
-    if (requestedAssigneeChange && updates.assigneeId !== task.assigneeId) {
+    if (requestedAssigneeChange && !areTaskAssigneeIdsEqual(nextAssigneeIds, previousAssigneeIds)) {
         const canReassignTask = currentUser.role === "admin" || currentUser.role === "manager";
         if (!canReassignTask) {
             throw new Error("Unauthorized: Only admins and managers can change task assignees.");
@@ -349,8 +377,7 @@ export async function updateTaskImpl(
         ? updates.category
         : (updates.projectId ? task.category : undefined);
     if (targetProjectId && categoryToSync) {
-        const resolvedAssigneeId = Object.prototype.hasOwnProperty.call(updates, "assigneeId") ? updates.assigneeId : task.assigneeId;
-        const canonicalService = await ensureProjectServiceReferenceForTask(targetProjectId, agency.id, categoryToSync, resolvedAssigneeId);
+        const canonicalService = await ensureProjectServiceReferenceForTask(targetProjectId, agency.id, categoryToSync, nextAssigneeIds);
         if (canonicalService?.name) {
             updates.category = canonicalService.name;
         }
@@ -366,7 +393,8 @@ export async function updateTaskImpl(
         ...updates,
         id: task.id,
         projectId: targetProjectId,
-        assigneeId: Object.prototype.hasOwnProperty.call(updates, "assigneeId") ? updates.assigneeId : task.assigneeId,
+        assigneeIds: nextAssigneeIds,
+        assigneeId: getPrimaryTaskAssigneeId(nextAssigneeIds),
         title: typeof updates.title === "string" ? updates.title : task.title,
         category: Object.prototype.hasOwnProperty.call(updates, "category") ? updates.category : task.category,
         description: Object.prototype.hasOwnProperty.call(updates, "description") ? updates.description : task.description,
@@ -377,7 +405,7 @@ export async function updateTaskImpl(
 
     const changedKeys = Object.keys(updates);
     const hasStatusChange = typeof updates.status === "string" && updates.status !== task.status;
-    const hasAssigneeChange = Object.prototype.hasOwnProperty.call(updates, "assigneeId") && updates.assigneeId !== task.assigneeId;
+    const hasAssigneeChange = requestedAssigneeChange && !areTaskAssigneeIdsEqual(nextAssigneeIds, previousAssigneeIds);
 
     if (hasStatusChange) {
         await handleTaskStatusChangeEffectsImpl({

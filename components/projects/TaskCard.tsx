@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Task, UserPermissions, getDefaultUserPermissionsForRole } from "@/lib/types";
 import { Sparkles, Calendar, ArrowRightLeft } from "lucide-react";
 import { toLocalCalendarDay } from "@/lib/date-utils";
+import { getTaskAssigneeIds } from "@/lib/task-assignees";
 import { AIExplanationModal } from "./AIExplanationModal";
 import { TaskCardAssigneeMenu } from "./TaskCardAssigneeMenu";
 import { TaskCardStatusSheet } from "./TaskCardStatusSheet";
@@ -129,7 +130,13 @@ export function TaskCard({
 
     const assigneeOptions = loadedAssigneeOptions ?? defaultAssigneeOptions;
     const assigneeLookup = assigneeOptions.length > 0 ? assigneeOptions : users;
-    const assignee = assigneeLookup.find((user) => user.id === task.assigneeId);
+    const assigneeIds = getTaskAssigneeIds(task);
+    const assignees = assigneeIds
+        .map((assigneeId) => assigneeLookup.find((user) => user.id === assigneeId))
+        .filter((user): user is TaskAssignee => Boolean(user));
+    const assigneeLabel = assignees.length > 0
+        ? assignees.map((assignee) => assignee.name).join(", ")
+        : "Unassigned";
 
     const handlePriorityClick = (event: React.MouseEvent) => {
         event.stopPropagation();
@@ -147,17 +154,33 @@ export function TaskCard({
         });
     };
 
-    const handleAssigneeChange = (userId: string) => {
-        setShowAssigneeMenu(false);
+    const handleAssigneeToggle = (userId: string) => {
         if (!canReassignTask) return;
-        const previousAssignee = task.assigneeId;
-        onQuickEdit?.(task.id, { assigneeId: userId });
+        const previousAssigneeIds = assigneeIds;
+        const nextAssigneeIds = previousAssigneeIds.includes(userId)
+            ? previousAssigneeIds.filter((id) => id !== userId)
+            : [...previousAssigneeIds, userId];
+        onQuickEdit?.(task.id, { assigneeIds: nextAssigneeIds, assigneeId: nextAssigneeIds[0] || "" });
         startTransition(async () => {
             try {
-                await updateTask(task.id, { assigneeId: userId });
+                await updateTask(task.id, { assigneeIds: nextAssigneeIds, assigneeId: nextAssigneeIds[0] || "" });
             } catch {
-                onQuickEdit?.(task.id, { assigneeId: previousAssignee });
-                toast.error("Failed to update assignee");
+                onQuickEdit?.(task.id, { assigneeIds: previousAssigneeIds, assigneeId: previousAssigneeIds[0] || "" });
+                toast.error("Failed to update assignees");
+            }
+        });
+    };
+
+    const handleAssigneeClear = () => {
+        if (!canReassignTask) return;
+        const previousAssigneeIds = assigneeIds;
+        onQuickEdit?.(task.id, { assigneeIds: [], assigneeId: "" });
+        startTransition(async () => {
+            try {
+                await updateTask(task.id, { assigneeIds: [], assigneeId: "" });
+            } catch {
+                onQuickEdit?.(task.id, { assigneeIds: previousAssigneeIds, assigneeId: previousAssigneeIds[0] || "" });
+                toast.error("Failed to update assignees");
             }
         });
     };
@@ -227,33 +250,42 @@ export function TaskCard({
                                         if (canReassignTask && users.length > 0) setShowAssigneeMenu((previous) => !previous);
                                     }}
                                     className={`flex items-center gap-2 min-w-0 ${canReassignTask ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}
-                                    title={canReassignTask ? "Click to change assignee" : assignee?.name || "Unassigned"}
+                                    title={canReassignTask ? "Click to change assignees" : assigneeLabel}
                                 >
-                                    <Avatar className={`h-5 w-5 border border-border transition-all ${canReassignTask ? "group-hover:ring-1 group-hover:ring-primary" : ""}`}>
-                                        <AvatarImage src={assignee?.avatar} />
-                                        <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-medium">
-                                            {assignee ? assignee.name.substring(0, 2).toUpperCase() : "?"}
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    <div className="flex -space-x-1 shrink-0">
+                                        {assignees.length > 0 ? assignees.slice(0, 3).map((assignee) => (
+                                            <Avatar key={assignee.id} className={`h-5 w-5 border border-background transition-all ${canReassignTask ? "group-hover:ring-1 group-hover:ring-primary" : ""}`}>
+                                                <AvatarImage src={assignee.avatar} />
+                                                <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-medium">
+                                                    {assignee.name.substring(0, 2).toUpperCase()}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                        )) : (
+                                            <Avatar className={`h-5 w-5 border border-border transition-all ${canReassignTask ? "group-hover:ring-1 group-hover:ring-primary" : ""}`}>
+                                                <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-medium">?</AvatarFallback>
+                                            </Avatar>
+                                        )}
+                                    </div>
                                     <span className="text-xs text-muted-foreground font-medium truncate">
-                                        {assignee ? (
+                                        {assignees.length === 1 ? (
                                             <>
-                                                {assignee.name}
-                                                {(assignee.jobTitle || (assignee.role && ["admin", "manager", "client"].includes(assignee.role.toLowerCase()))) && (
+                                                {assignees[0].name}
+                                                {(assignees[0].jobTitle || (assignees[0].role && ["admin", "manager", "client"].includes(assignees[0].role.toLowerCase()))) && (
                                                     <span className="text-yellow-600 dark:text-yellow-500 ml-1">
-                                                        ({assignee.jobTitle || (assignee.role ? assignee.role.charAt(0).toUpperCase() + assignee.role.slice(1) : "")})
+                                                        ({assignees[0].jobTitle || (assignees[0].role ? assignees[0].role.charAt(0).toUpperCase() + assignees[0].role.slice(1) : "")})
                                                     </span>
                                                 )}
                                             </>
-                                        ) : "Unassigned"}
+                                        ) : assignees.length > 1 ? `${assignees.length} assignees` : "Unassigned"}
                                     </span>
                                 </button>
 
                                 <TaskCardAssigneeMenu
                                     open={showAssigneeMenu}
                                     assigneeOptions={assigneeOptions}
-                                    currentAssigneeId={task.assigneeId}
-                                    onSelect={handleAssigneeChange}
+                                    currentAssigneeIds={assigneeIds}
+                                    onToggle={handleAssigneeToggle}
+                                    onClear={handleAssigneeClear}
                                 />
                             </div>
 

@@ -297,7 +297,7 @@ export function EditUserDialog({
                         "All salary/payment transactions linked to this user",
                         "Leave requests and attendance records",
                         "Notifications",
-                        "Tasks will be unassigned (not deleted)",
+                        "User will be removed from assigned tasks (tasks are not deleted)",
                     ]}
                     onConfirm={handlePermanentDelete}
                 />

@@ -118,6 +118,7 @@ export type Task = {
     status: "Todo" | "In Progress" | "Review" | "Done";
     priority?: "Low" | "Medium" | "High";
     assigneeId: string;
+    assigneeIds?: string[];
     dueDate?: string;
     startDate?: string;
     category?: string;

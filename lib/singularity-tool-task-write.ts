@@ -14,10 +14,12 @@ import {
     getOptionalNumberArg,
     getOptionalStringArg,
     getStringArg,
+    getStringArrayArg,
     type SnapshotEntity,
     type ToolArgs,
     type ToolExecutionResult,
 } from "./singularity-tool-project-task-shared";
+import { normalizeTaskAssigneeIds } from "./task-assignees";
 import type { Task } from "./types";
 
 export type TaskWriteToolName =
@@ -40,10 +42,11 @@ export async function executeTaskWriteTool(
     switch (name) {
         case "create_task": {
             let assigneeId = getStringArg(args, "assigneeId");
+            let assigneeIds = normalizeTaskAssigneeIds(getStringArrayArg(args, "assigneeIds"), assigneeId);
             let assigneeName = "";
             let autoAssigned = false;
 
-            if (!assigneeId) {
+            if (assigneeIds.length === 0) {
                 const allUsers = await getUsers();
                 const teamMembers = allUsers.filter((user) => user.role !== "client");
 
@@ -57,15 +60,20 @@ export async function executeTaskWriteTool(
                     );
                     workloads.sort((a, b) => a.activeTasks - b.activeTasks);
                     assigneeId = workloads[0].id;
+                    assigneeIds = [assigneeId];
                     assigneeName = workloads[0].name;
                     autoAssigned = true;
                 } else {
                     assigneeId = userId;
+                    assigneeIds = [assigneeId];
                     assigneeName = "you";
                 }
             } else {
-                const assignee = await getUser(assigneeId).catch(() => null);
-                assigneeName = assignee?.name || assigneeId;
+                assigneeId = assigneeIds[0] || "";
+                const assigneeNames = await Promise.all(
+                    assigneeIds.map(async (id) => (await getUser(id).catch(() => null))?.name || id)
+                );
+                assigneeName = assigneeNames.join(", ");
             }
 
             const dueDate = getOptionalStringArg(args, "dueDate") || new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
@@ -76,6 +84,7 @@ export async function executeTaskWriteTool(
                 title: getStringArg(args, "title"),
                 description: getStringArg(args, "description"),
                 assigneeId,
+                assigneeIds,
                 category: getStringArg(args, "category"),
                 priority: (getOptionalStringArg(args, "priority") as Task["priority"] | undefined) || "Medium",
                 dueDate,
@@ -120,7 +129,7 @@ export async function executeTaskWriteTool(
             const category = getStringArg(args, "category") || "none";
             return {
                 success: true,
-                data: { id: newTask.id, title: newTask.title, projectId: newTask.projectId, assigneeId, assigneeName },
+                data: { id: newTask.id, title: newTask.title, projectId: newTask.projectId, assigneeId, assigneeIds, assigneeName },
                 summary: `Task "${newTask.title}" created - ${assignInfo}, category: ${category}, due: ${dueDate}`,
                 rollbackData: [{
                     toolName: "create_task",
@@ -215,15 +224,21 @@ export async function executeTaskWriteTool(
 
         case "reassign_task": {
             const taskId = getStringArg(args, "taskId");
-            const assigneeId = getStringArg(args, "assigneeId");
-            const newAssignee = await getUser(assigneeId).catch(() => null);
-            const newAssigneeName = newAssignee?.name || assigneeId;
+            const assigneeIds = normalizeTaskAssigneeIds(getStringArrayArg(args, "assigneeIds"), getStringArg(args, "assigneeId"));
+            if (assigneeIds.length === 0) {
+                return { success: false, data: null, summary: "No assignee specified" };
+            }
+            const assigneeId = assigneeIds[0] || "";
+            const newAssigneeNames = await Promise.all(
+                assigneeIds.map(async (id) => (await getUser(id).catch(() => null))?.name || id)
+            );
+            const newAssigneeName = newAssigneeNames.join(", ");
 
             const reassignSnapshot = await snapshotEntity("task", taskId);
-            await updateTask(taskId, { assigneeId });
+            await updateTask(taskId, { assigneeId, assigneeIds });
             return {
                 success: true,
-                data: { taskId, newAssigneeId: assigneeId, newAssigneeName },
+                data: { taskId, newAssigneeId: assigneeId, newAssigneeIds: assigneeIds, newAssigneeName },
                 summary: `Task reassigned to ${newAssigneeName}`,
                 rollbackData: reassignSnapshot ? [{
                     toolName: "reassign_task",

@@ -6,6 +6,7 @@ import { CreateProjectWizard } from "@/components/projects/CreateProjectWizard";
 import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 import { toLocalCalendarDay } from "@/lib/date-utils";
 import { Project, Task } from "@/lib/types";
+import { getTaskAssigneeIds } from "@/lib/task-assignees";
 import type { CurrentUserResult } from "@/lib/actions";
 import { ProjectSummaryCard } from "./ProjectSummaryCard";
 import { ProjectSummaryRow } from "./ProjectSummaryRow";
@@ -56,7 +57,7 @@ export function ProjectsContent({
             const pct = total > 0 ? Math.round((done / total) * 100) : 0;
             const due = toLocalCalendarDay(project.dueDate);
             const isOverdue = !!due && due < today && project.status !== "Completed";
-            const assigneeIds = [...new Set(projectTasks.map((task) => task.assigneeId).filter(Boolean))] as string[];
+            const assigneeIds = [...new Set(projectTasks.flatMap((task) => getTaskAssigneeIds(task)))];
             const totalAssignees = assigneeIds.length;
             const assignees = assigneeIds
                 .slice(0, 3)

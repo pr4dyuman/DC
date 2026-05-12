@@ -162,10 +162,16 @@ export async function permanentlyDeleteUserImpl(id: string, agencyId: string) {
         UserModel.deleteOne({ id, agencyId }),
         NotificationModel.deleteMany({ userId: id, agencyId }),
         LeaveRequestModel.deleteMany({ userId: id, agencyId }),
-        TaskModel.updateMany(
-            { assigneeId: id, agencyId },
-            { $set: { assigneeId: "" } }
-        ),
+        (async () => {
+            await TaskModel.updateMany(
+                { assigneeIds: id, agencyId },
+                { $pull: { assigneeIds: id } }
+            );
+            await TaskModel.updateMany(
+                { assigneeId: id, agencyId },
+                [{ $set: { assigneeId: { $ifNull: [{ $arrayElemAt: ["$assigneeIds", 0] }, ""] } } }]
+            );
+        })(),
         TransactionModel.deleteMany({ userId: id, agencyId }),
         MessageModel.deleteMany({
             agencyId,

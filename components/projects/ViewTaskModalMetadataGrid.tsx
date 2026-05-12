@@ -10,13 +10,13 @@ import type { TaskAssignee } from "./view-task-modal-shared";
 
 type ViewTaskModalMetadataGridProps = {
     task: Task;
-    assignee?: TaskAssignee;
+    assignees?: TaskAssignee[];
     createdByName?: string;
 };
 
 export function ViewTaskModalMetadataGrid({
     task,
-    assignee,
+    assignees = [],
     createdByName,
 }: ViewTaskModalMetadataGridProps) {
     const fmt = useDateFormat();
@@ -33,21 +33,29 @@ export function ViewTaskModalMetadataGrid({
                     <div className="p-1.5 bg-background rounded-md border border-border shadow-sm">
                         <User className="w-3.5 h-3.5 text-muted-foreground" />
                     </div>
-                    <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Assignee</label>
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Assignees</label>
                 </div>
                 <div className="flex items-center gap-3 pl-1">
-                    <Avatar className="h-9 w-9 border-2 border-background shadow-sm">
-                        <AvatarImage src={assignee?.avatar} />
-                        <AvatarFallback className="bg-indigo-500/10 text-indigo-600 text-xs font-bold">
-                            {assignee?.name?.substring(0, 2).toUpperCase() || "?"}
-                        </AvatarFallback>
-                    </Avatar>
+                    <div className="flex -space-x-2 shrink-0">
+                        {assignees.length > 0 ? assignees.slice(0, 3).map((assignee) => (
+                            <Avatar key={assignee.id} className="h-9 w-9 border-2 border-background shadow-sm">
+                                <AvatarImage src={assignee.avatar} />
+                                <AvatarFallback className="bg-indigo-500/10 text-indigo-600 text-xs font-bold">
+                                    {assignee.name?.substring(0, 2).toUpperCase() || "?"}
+                                </AvatarFallback>
+                            </Avatar>
+                        )) : (
+                            <Avatar className="h-9 w-9 border-2 border-background shadow-sm">
+                                <AvatarFallback className="bg-indigo-500/10 text-indigo-600 text-xs font-bold">?</AvatarFallback>
+                            </Avatar>
+                        )}
+                    </div>
                     <div className="flex flex-col">
                         <span className="text-sm font-semibold text-foreground leading-none mb-1">
-                            {assignee ? assignee.name : "Unassigned"}
+                            {assignees.length > 0 ? assignees.map((assignee) => assignee.name).join(", ") : "Unassigned"}
                         </span>
                         <span className="text-[11px] text-muted-foreground truncate max-w-[120px]">
-                            {assignee?.jobTitle || assignee?.email || ""}
+                            {assignees.length === 1 ? assignees[0].jobTitle || assignees[0].email || "" : assignees.length > 1 ? `${assignees.length} people` : ""}
                         </span>
                     </div>
                 </div>

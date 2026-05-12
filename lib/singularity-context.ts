@@ -12,13 +12,14 @@ import {
 import { fmtDate } from "./date-utils";
 import { formatCurrency } from "./currency";
 import { getDefaultCurrency } from "./actions/super-admin";
+import { getTaskAssigneeIds } from "./task-assignees";
 import type { Activity, Client, Project, Service, Task, User } from "./types";
 
 type ContextProject = Pick<Project, "id" | "name" | "status" | "client">;
 type ContextClient = Pick<Client, "id" | "name" | "companyName" | "email">;
 type ContextUser = Pick<User, "id" | "name" | "role" | "jobTitle" | "email">;
 type ContextService = Pick<Service, "name" | "employees">;
-type ContextTask = Pick<Task, "id" | "title" | "status" | "priority" | "assigneeId" | "category" | "dueDate">;
+type ContextTask = Pick<Task, "id" | "title" | "status" | "priority" | "assigneeId" | "assigneeIds" | "category" | "dueDate">;
 type ContextActivity = Pick<Activity, "user" | "action" | "target" | "timestamp">;
 type FinanceSnapshot = Awaited<ReturnType<typeof getFinanceStats>>;
 type CurrentUserSummary = { id?: string; name?: string; role?: string } | null;
@@ -121,9 +122,10 @@ export async function buildSingularityContext(userId: string): Promise<string> {
                     if (activeTasks.length > 0) {
                         line += "\n  Active tasks:";
                         for (const task of activeTasks) {
-                            const assignee = userMap.get(task.assigneeId);
-                            const assigneeName = assignee ? assignee.name : "Unassigned";
-                            line += `\n    - "${task.title}" (ID: "${task.id}") | ${task.status} | Priority: ${task.priority || "Medium"} | Assigned: ${assigneeName} | Category: ${task.category || "None"} | Due: ${task.dueDate || "No date"}`;
+                            const assigneeNames = getTaskAssigneeIds(task)
+                                .map((assigneeId) => userMap.get(assigneeId)?.name)
+                                .filter(Boolean);
+                            line += `\n    - "${task.title}" (ID: "${task.id}") | ${task.status} | Priority: ${task.priority || "Medium"} | Assigned: ${assigneeNames.length > 0 ? assigneeNames.join(", ") : "Unassigned"} | Category: ${task.category || "None"} | Due: ${task.dueDate || "No date"}`;
                         }
                     }
 
@@ -228,6 +230,7 @@ ${activitySection}
 
 WARNING: ASSIGNING TASKS - SMART AUTO-ASSIGN:
 - If the user says "assign to [name]", look up that person's exact assigneeId from the QUICK LOOKUP TABLE.
+- If the user names multiple people, pass all of their IDs in assigneeIds. Keep assigneeId as the first person only for backward compatibility.
 - If the user does NOT specify who to assign to, you MUST auto-assign to the team member with the FEWEST active tasks (Todo + In Progress + Review). Check the TEAM MEMBERS & WORKLOAD section to find who has the least work. NEVER default to the admin or the current user - always pick the least busy developer/employee.
 - After assigning, ALWAYS confirm by name who it was assigned to and why (e.g. "Assigned to Rahul - he currently has the fewest active tasks").
 
@@ -276,7 +279,7 @@ WARNING: RESPONSE FORMATTING - CRITICAL:
 - ALWAYS end every response with proper sentence-ending punctuation (. ! or ?).
 
 GENERAL:
-- When creating a task, ALWAYS set: assigneeId, category (from services list), priority, and dueDate.
+- When creating a task, ALWAYS set: assigneeId or assigneeIds, category (from services list), priority, and dueDate.
 - If the user doesn't specify a category, pick the most appropriate one from the services list.
 - If the user refers to a project/person by name, match it to the correct ID from the QUICK LOOKUP TABLE.
 - Be professional, concise, and helpful. Use markdown formatting.

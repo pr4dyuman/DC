@@ -11,6 +11,7 @@ import {
     getUserTasks,
     globalSearch,
 } from "./actions";
+import { getTaskAssigneeIds } from "./task-assignees";
 import type { Activity, Comment, Invoice, Task, User } from "./types";
 
 type RoleType = "admin" | "manager" | "employee" | "client";
@@ -64,11 +65,19 @@ export async function executeReadOnlyTool(
         case "get_project_tasks": {
             const projectId = getStringArg(args, "projectId");
             const tasks = await getTasks(projectId);
+            const summarizeTask = (task: Task) => ({
+                id: task.id,
+                title: task.title,
+                priority: task.priority,
+                assigneeId: task.assigneeId,
+                assigneeIds: getTaskAssigneeIds(task),
+                dueDate: task.dueDate,
+            });
             const grouped = {
-                Todo: tasks.filter((task) => task.status === "Todo").map((task) => ({ id: task.id, title: task.title, priority: task.priority, assigneeId: task.assigneeId, dueDate: task.dueDate })),
-                "In Progress": tasks.filter((task) => task.status === "In Progress").map((task) => ({ id: task.id, title: task.title, priority: task.priority, assigneeId: task.assigneeId, dueDate: task.dueDate })),
-                Review: tasks.filter((task) => task.status === "Review").map((task) => ({ id: task.id, title: task.title, priority: task.priority, assigneeId: task.assigneeId, dueDate: task.dueDate })),
-                Done: tasks.filter((task) => task.status === "Done").map((task) => ({ id: task.id, title: task.title, priority: task.priority, assigneeId: task.assigneeId, dueDate: task.dueDate })),
+                Todo: tasks.filter((task) => task.status === "Todo").map(summarizeTask),
+                "In Progress": tasks.filter((task) => task.status === "In Progress").map(summarizeTask),
+                Review: tasks.filter((task) => task.status === "Review").map(summarizeTask),
+                Done: tasks.filter((task) => task.status === "Done").map(summarizeTask),
             };
             return {
                 success: true,

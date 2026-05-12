@@ -9,7 +9,10 @@ export type TaskMutationUser = TaskMutationActor & {
 };
 export type EmailCategorySettings = NonNullable<Agency["settings"]["emailCategories"]>;
 export type CommentAgencyContext = Pick<Agency, "id" | "settings">;
-export type TaskEffectRecord = Omit<Task, "assigneeId"> & { assigneeId?: string };
+export type TaskEffectRecord = Omit<Task, "assigneeId" | "assigneeIds"> & {
+    assigneeId?: string;
+    assigneeIds?: string[];
+};
 export type TaskEffectArgs = {
     previousTask: TaskEffectRecord;
     currentTask: TaskEffectRecord;

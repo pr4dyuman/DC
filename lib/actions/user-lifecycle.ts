@@ -17,8 +17,12 @@ export async function deleteUserImpl(id: string, agencyId?: string) {
         { $set: { archived: true, archivedAt: new Date().toISOString() } }
     );
     await TaskModel.updateMany(
+        { assigneeIds: id, agencyId, status: { $ne: "Done" } },
+        { $pull: { assigneeIds: id } }
+    );
+    await TaskModel.updateMany(
         { assigneeId: id, agencyId, status: { $ne: "Done" } },
-        { $set: { assigneeId: "" } }
+        [{ $set: { assigneeId: { $ifNull: [{ $arrayElemAt: ["$assigneeIds", 0] }, ""] } } }]
     );
     await NotificationModel.deleteMany({ userId: id, agencyId });
     if (agencyId) await decrementAgencyUsage(agencyId, "users");

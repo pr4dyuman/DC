@@ -17,6 +17,7 @@ import {
     connectDB,
 } from "../mongodb";
 import { dateKeyTz, isDateOnlyString, toLocalCalendarDay } from "@/lib/date-utils";
+import { getTaskAssigneeIds } from "../task-assignees";
 import { sanitizeName, sanitizeUrl } from "../validation";
 import { sanitizeDoc, sortByDateDesc, withAgencyIdFallback } from "./shared";
 import { buildClientFinanceSummary } from "./finance-shared";
@@ -118,7 +119,7 @@ export async function getDashboardMetricsImpl(agencyId: string, timezone?: strin
         InvoiceModel.find({ agencyId, status: { $in: ["Pending", "Overdue", "Processing"] } }).lean() as Promise<Invoice[]>,
         ProjectModel.countDocuments({ agencyId, status: "Active" }),
         ProjectModel.find({ agencyId }).select("id").lean() as Promise<Array<Pick<Project, "id">>>,
-        TaskModel.find({ agencyId }).select("status priority projectId assigneeId").lean() as Promise<Array<Pick<Task, "status" | "priority" | "projectId" | "assigneeId">>>,
+        TaskModel.find({ agencyId }).select("status priority projectId assigneeId assigneeIds").lean() as Promise<Array<Pick<Task, "status" | "priority" | "projectId" | "assigneeId" | "assigneeIds">>>,
         UserModel.find({ agencyId }).select("id role").lean() as Promise<Array<Pick<User, "id" | "role">>>,
         LeaveRequestModel.countDocuments({ agencyId, status: "Pending" }),
     ]);
@@ -148,7 +149,7 @@ export async function getDashboardMetricsImpl(agencyId: string, timezone?: strin
     const utilization = totalTasks > 0 ? Math.round((activeTasks.length / totalTasks) * 100) : 0;
     const teamMembersList = allUsers.filter((user) => user.role !== "client");
     const totalMembers = teamMembersList.length;
-    const assignedMemberIds = new Set(activeTasks.map((task) => task.assigneeId).filter(Boolean));
+    const assignedMemberIds = new Set(activeTasks.flatMap((task) => getTaskAssigneeIds(task)));
     const assignedMembers = [...assignedMemberIds].filter((id) => teamMembersList.some((user) => user.id === id)).length;
 
     return {
@@ -328,7 +329,10 @@ export async function getEmployeeDashboardDataImpl(actor: DashboardActor, userId
     await connectDB();
 
     const [tasks, user, leaveRequests] = await Promise.all([
-        TaskModel.find({ assigneeId: userId, agencyId }).lean() as Promise<Task[]>,
+        TaskModel.find({
+            agencyId,
+            $or: [{ assigneeId: userId }, { assigneeIds: userId }],
+        }).lean() as Promise<Task[]>,
         UserModel.findOne({ id: userId, agencyId }).select("-password").lean(),
         LeaveRequestModel.find({ userId, agencyId }).sort({ createdAt: -1 }).limit(5).lean(),
     ]);

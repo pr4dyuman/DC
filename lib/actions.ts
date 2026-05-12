@@ -312,8 +312,9 @@ export async function getSuperAdmins() {
 
 export type SearchResult = SearchActionResult;
 export type { CurrentUserResult } from "./actions/access";
-type TaskEffectRecord = Omit<Task, 'assigneeId'> & {
+type TaskEffectRecord = Omit<Task, 'assigneeId' | 'assigneeIds'> & {
     assigneeId?: string;
+    assigneeIds?: string[];
 };
 
 async function getAccessibleTaskOrThrow(taskId: string, agencyId: string) {

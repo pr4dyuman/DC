@@ -5,6 +5,7 @@ import type { AIConfig } from "../types";
 import { generateContent, generateContentWithParts } from "../ai-provider";
 import { getResolvedFeatureConfig } from "../ai-provider-shared";
 import { logAIUsage } from "../ai-usage";
+import { getTaskAssigneeIds } from "../task-assignees";
 import { AssetModel, ProjectModel, ServiceModel, TaskModel, UserModel, connectDB } from "../mongodb";
 import { getErrorMessage } from "./shared";
 import {
@@ -139,11 +140,12 @@ export async function explainTaskImpl(
     const task = await TaskModel.findOne({ id: taskId, agencyId }).lean() as Task | null;
     if (!task) throw new Error("Task not found");
 
-    const [project, assignee, allProjectTasks, projectAssetsRaw] = await Promise.all([
+    const targetAssigneeIds = getTaskAssigneeIds(task);
+    const [project, assignees, allProjectTasks, projectAssetsRaw] = await Promise.all([
         ProjectModel.findOne({ id: task.projectId, agencyId }).lean() as Promise<ProjectLike | null>,
-        task.assigneeId
-            ? UserModel.findOne({ id: task.assigneeId, agencyId }).select("-password").lean() as Promise<Pick<User, "name"> | null>
-            : Promise.resolve(null),
+        targetAssigneeIds.length > 0
+            ? UserModel.find({ id: { $in: targetAssigneeIds }, agencyId }).select("-password").lean() as Promise<Array<Pick<User, "id" | "name">>>
+            : Promise.resolve([]),
         TaskModel.find({ projectId: task.projectId, agencyId }).lean() as Promise<Task[]>,
         AssetModel.find({ projectId: task.projectId, aiEnabled: true, agencyId }).lean() as Promise<Asset[]>,
     ]);
@@ -158,15 +160,19 @@ export async function explainTaskImpl(
         ? mapProjectServicesByProjectId([project], projectServices).get(project.id) || []
         : [];
 
-    const userIds = [...new Set(allProjectTasks.map((projectTask) => projectTask.assigneeId).filter((id): id is string => Boolean(id)))];
+    const userIds = [...new Set(allProjectTasks.flatMap((projectTask) => getTaskAssigneeIds(projectTask)))];
     const users = await UserModel.find({ id: { $in: userIds }, agencyId }).select("-password").lean() as Array<Pick<User, "id" | "name">>;
     const userMap = Object.fromEntries(users.map((user) => [user.id, user.name] as const));
+    const getAssigneeNames = (projectTask: Task) => {
+        const names = getTaskAssigneeIds(projectTask).map((assigneeId) => userMap[assigneeId]).filter(Boolean);
+        return names.length > 0 ? names.join(", ") : "Unassigned";
+    };
 
     const tasksByStatus: Record<Task["status"], string[]> = {
-        Todo: allProjectTasks.filter((projectTask) => projectTask.status === "Todo").map((projectTask) => `- ${projectTask.title} (${userMap[projectTask.assigneeId] || "Unassigned"})`),
-        "In Progress": allProjectTasks.filter((projectTask) => projectTask.status === "In Progress").map((projectTask) => `- ${projectTask.title} (${userMap[projectTask.assigneeId] || "Unassigned"})`),
-        Review: allProjectTasks.filter((projectTask) => projectTask.status === "Review").map((projectTask) => `- ${projectTask.title} (${userMap[projectTask.assigneeId] || "Unassigned"})`),
-        Done: allProjectTasks.filter((projectTask) => projectTask.status === "Done").map((projectTask) => `- ${projectTask.title} (${userMap[projectTask.assigneeId] || "Unassigned"})`),
+        Todo: allProjectTasks.filter((projectTask) => projectTask.status === "Todo").map((projectTask) => `- ${projectTask.title} (${getAssigneeNames(projectTask)})`),
+        "In Progress": allProjectTasks.filter((projectTask) => projectTask.status === "In Progress").map((projectTask) => `- ${projectTask.title} (${getAssigneeNames(projectTask)})`),
+        Review: allProjectTasks.filter((projectTask) => projectTask.status === "Review").map((projectTask) => `- ${projectTask.title} (${getAssigneeNames(projectTask)})`),
+        Done: allProjectTasks.filter((projectTask) => projectTask.status === "Done").map((projectTask) => `- ${projectTask.title} (${getAssigneeNames(projectTask)})`),
     };
 
     const boardSummary = `
@@ -190,7 +196,7 @@ export async function explainTaskImpl(
             description: task.description,
             status: task.status,
             priority: task.priority,
-            assignee: assignee ? assignee.name : "Unassigned",
+            assignee: assignees.length > 0 ? assignees.map((assignee) => assignee.name).join(", ") : "Unassigned",
             dueDate: task.dueDate,
         },
         project: project ? {

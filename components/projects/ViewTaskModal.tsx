@@ -13,6 +13,7 @@ import { Task, Comment, UserPermissions, getDefaultUserPermissionsForRole } from
 import { Button } from "@/components/ui/button";
 import { addComment } from "@/lib/actions";
 import { toLocalCalendarDay } from "@/lib/date-utils";
+import { getTaskAssigneeIds } from "@/lib/task-assignees";
 import { Pencil } from "lucide-react";
 import { ViewTaskModalComments } from "./ViewTaskModalComments";
 import { ViewTaskModalDescription } from "./ViewTaskModalDescription";
@@ -48,7 +49,9 @@ export function ViewTaskModal({
     currentUserRole,
 }: ViewTaskModalProps) {
     const fmt = useDateFormat();
-    const assignee = users.find((user) => user.id === task.assigneeId);
+    const assignees = getTaskAssigneeIds(task)
+        .map((assigneeId) => users.find((user) => user.id === assigneeId))
+        .filter((user): user is TaskAssignee => Boolean(user));
     const currentUser: ViewTaskCurrentUser = users.find((user) => user.id === currentUserId) || {
         id: currentUserId || "",
         name: "You",
@@ -120,7 +123,7 @@ export function ViewTaskModal({
                 <div className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar">
                     <ViewTaskModalMetadataGrid
                         task={task}
-                        assignee={assignee}
+                        assignees={assignees}
                         createdByName={createdByName}
                     />
 

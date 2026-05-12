@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { Task, User, UserPermissions, getDefaultUserPermissionsForRole } from "@/lib/types";
 import { toast } from "sonner";
 import { DateTimeInput } from "@/components/ui/DateTimeInput";
+import { getTaskAssigneeIds } from "@/lib/task-assignees";
 
 type TaskAssignee = Pick<User, "id" | "name" | "avatar" | "jobTitle" | "role">;
 type ProjectServiceOption = { id: string; name: string };
@@ -33,7 +34,7 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId,
     const [description, setDescription] = useState(task.description || "");
     const [dueDate, setDueDate] = useState(task.dueDate || "");
     const [status, setStatus] = useState(task.status);
-    const [assigneeId, setAssigneeId] = useState(task.assigneeId);
+    const [assigneeIds, setAssigneeIds] = useState<string[]>(() => getTaskAssigneeIds(task));
     const [category, setCategory] = useState(task.category || "");
     const [priority, setPriority] = useState<Task['priority']>(task.priority || "Medium");
     const [estimatedHours, setEstimatedHours] = useState<number>(task.estimatedHours || 0);
@@ -45,12 +46,20 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId,
         if (open) {
             // Reset confirm delete state when reopened
             setConfirmDelete(false);
+            setTitle(task.title);
+            setDescription(task.description || "");
+            setDueDate(task.dueDate || "");
+            setStatus(task.status);
+            setAssigneeIds(getTaskAssigneeIds(task));
+            setCategory(task.category || "");
+            setPriority(task.priority || "Medium");
+            setEstimatedHours(task.estimatedHours || 0);
             Promise.all([getUsers(), getProjectServices(task.projectId)]).then(([u, s]) => {
                 setUsers(u);
                 setServices(s);
             });
         }
-    }, [open, task.projectId]);
+    }, [open, task]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -60,7 +69,8 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId,
                 title,
                 description,
                 status: status as Task['status'],
-                assigneeId,
+                assigneeId: assigneeIds[0] || "",
+                assigneeIds,
                 category,
                 priority,
                 dueDate: dueDate || undefined,
@@ -98,6 +108,13 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId,
 
     const inputCls = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-ring";
     const labelCls = "text-sm font-medium text-foreground";
+    const toggleAssignee = (userId: string) => {
+        setAssigneeIds((current) =>
+            current.includes(userId)
+                ? current.filter((id) => id !== userId)
+                : [...current, userId]
+        );
+    };
 
     return (
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setConfirmDelete(false); }}>
@@ -130,10 +147,32 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId,
                         </div>
                         <div className="space-y-1.5">
                             <label className={labelCls}>Assign To</label>
-                            <select disabled={!canEdit || !canReassignTask} value={assigneeId} onChange={e => setAssigneeId(e.target.value)} className={inputCls}>
-                                <option value="">Unassigned</option>
-                                {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.jobTitle || u.role})</option>)}
-                            </select>
+                            <div className={`rounded-md border border-input bg-background p-1 max-h-32 overflow-y-auto ${!canEdit || !canReassignTask ? "opacity-50 pointer-events-none" : ""}`}>
+                                {users.length === 0 ? (
+                                    <div className="px-2 py-2 text-xs text-muted-foreground">No team members</div>
+                                ) : users.map((user) => (
+                                    <label key={user.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-muted">
+                                        <input
+                                            type="checkbox"
+                                            checked={assigneeIds.includes(user.id)}
+                                            onChange={() => toggleAssignee(user.id)}
+                                            className="h-3.5 w-3.5 accent-primary"
+                                        />
+                                        <span className="min-w-0 flex-1 truncate">
+                                            {user.name} <span className="text-muted-foreground">({user.jobTitle || user.role})</span>
+                                        </span>
+                                    </label>
+                                ))}
+                                {assigneeIds.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setAssigneeIds([])}
+                                        className="mt-1 w-full rounded px-2 py-1 text-left text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                                    >
+                                        Clear assignees
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
 

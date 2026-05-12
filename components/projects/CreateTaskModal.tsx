@@ -9,6 +9,7 @@ import { Plus, Loader2, Sparkles, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DateTimeInput } from "@/components/ui/DateTimeInput";
+import { normalizeTaskAssigneeIds } from "@/lib/task-assignees";
 
 type TaskPriority = 'Low' | 'Medium' | 'High';
 type TaskAssignee = {
@@ -41,7 +42,7 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [dueDate, setDueDate] = useState("");
-    const [assigneeId, setAssigneeId] = useState(defaultAssignee);
+    const [assigneeIds, setAssigneeIds] = useState<string[]>(() => normalizeTaskAssigneeIds(undefined, defaultAssignee));
     const [category, setCategory] = useState("");
     const [priority, setPriority] = useState<TaskPriority>("Medium");
     const [estimatedHours, setEstimatedHours] = useState<number>(0);
@@ -63,7 +64,11 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                 })));
                 if (currentUser) setCurrentUserId(currentUser.id);
                 setCategory((prev) => prev || loadedServices[0]?.name || "");
-                setAssigneeId((prev) => prev || loadedUsers[0]?.id || "");
+                setAssigneeIds((prev) => {
+                    if (prev.length > 0) return prev;
+                    const fallbackId = defaultAssignee || loadedUsers[0]?.id || "";
+                    return normalizeTaskAssigneeIds(undefined, fallbackId);
+                });
             })
             .catch(() => {
                 if (!cancelled) {
@@ -74,12 +79,13 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
         return () => {
             cancelled = true;
         };
-    }, [open, projectId]);
+    }, [defaultAssignee, open, projectId]);
 
     const resetForm = () => {
         setTitle("");
         setDescription("");
         setDueDate("");
+        setAssigneeIds(normalizeTaskAssigneeIds(undefined, defaultAssignee));
         setCategory("");
         setPriority("Medium");
         setEstimatedHours(0);
@@ -95,7 +101,8 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                 title,
                 description,
                 status: "Todo",
-                assigneeId,
+                assigneeId: assigneeIds[0] || "",
+                assigneeIds,
                 category,
                 priority,
                 dueDate: dueDate || undefined,
@@ -114,6 +121,13 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
 
     const inputCls = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
     const labelCls = "text-sm font-medium text-foreground";
+    const toggleAssignee = (userId: string) => {
+        setAssigneeIds((current) =>
+            current.includes(userId)
+                ? current.filter((id) => id !== userId)
+                : [...current, userId]
+        );
+    };
 
     return (
         <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
@@ -152,10 +166,32 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
                             </div>
                             <div className="space-y-1.5">
                                 <label className={labelCls}>Assign To</label>
-                                <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)} className={inputCls}>
-                                    <option value="">Unassigned</option>
-                                    {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.jobTitle || u.role})</option>)}
-                                </select>
+                                <div className="rounded-md border border-input bg-background p-1 max-h-32 overflow-y-auto">
+                                    {users.length === 0 ? (
+                                        <div className="px-2 py-2 text-xs text-muted-foreground">No team members</div>
+                                    ) : users.map((user) => (
+                                        <label key={user.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-muted">
+                                            <input
+                                                type="checkbox"
+                                                checked={assigneeIds.includes(user.id)}
+                                                onChange={() => toggleAssignee(user.id)}
+                                                className="h-3.5 w-3.5 accent-primary"
+                                            />
+                                            <span className="min-w-0 flex-1 truncate">
+                                                {user.name} <span className="text-muted-foreground">({user.jobTitle || user.role})</span>
+                                            </span>
+                                        </label>
+                                    ))}
+                                    {assigneeIds.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setAssigneeIds([])}
+                                            className="mt-1 w-full rounded px-2 py-1 text-left text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        >
+                                            Clear assignees
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
 

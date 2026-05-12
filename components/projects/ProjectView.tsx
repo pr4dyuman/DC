@@ -18,6 +18,7 @@ import { AddAssetModal } from "@/components/projects/AddAssetModal";
 import { PaymentSettingsCard } from "@/components/projects/PaymentSettingsCard";
 import { ProjectServices } from "@/components/projects/ProjectServices";
 import { toLocalCalendarDay } from "@/lib/date-utils";
+import { getTaskAssigneeIds } from "@/lib/task-assignees";
 import type { CurrentUserResult } from "@/lib/actions";
 
 type ProjectViewProps = {
@@ -178,11 +179,14 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
                             {showTeamHours && (() => {
                                 const memberMap = new Map<string, { total: number; completed: number }>();
                                 tasks.forEach(t => {
-                                    if (!t.estimatedHours || t.estimatedHours <= 0 || !t.assigneeId) return;
-                                    if (!memberMap.has(t.assigneeId)) memberMap.set(t.assigneeId, { total: 0, completed: 0 });
-                                    const entry = memberMap.get(t.assigneeId)!;
-                                    entry.total += t.estimatedHours;
-                                    if (t.status === 'Done') entry.completed += t.estimatedHours;
+                                    if (!t.estimatedHours || t.estimatedHours <= 0) return;
+                                    const assigneeIds = getTaskAssigneeIds(t);
+                                    assigneeIds.forEach((assigneeId) => {
+                                        if (!memberMap.has(assigneeId)) memberMap.set(assigneeId, { total: 0, completed: 0 });
+                                        const entry = memberMap.get(assigneeId)!;
+                                        entry.total += t.estimatedHours || 0;
+                                        if (t.status === 'Done') entry.completed += t.estimatedHours || 0;
+                                    });
                                 });
                                 const memberArr = Array.from(memberMap.entries())
                                     .map(([id, data]) => ({ id, ...data, user: users.find(u => u.id === id) }))

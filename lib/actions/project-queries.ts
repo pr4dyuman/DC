@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Task, User } from "../db";
+import { getTaskAssigneeIds } from "../task-assignees";
 import { ClientModel, ProjectModel, ServiceModel, TaskModel, UserModel, connectDB } from "../mongodb";
 import { sanitizeDoc, withAgencyIdFallback } from "./shared";
 import {
@@ -27,6 +28,7 @@ type ProjectDirectoryProject = {
 
 type ProjectDirectoryTask = {
     assigneeId?: string;
+    assigneeIds?: string[];
     createdBy?: string;
     comments?: Array<{ userId?: string }>;
 };
@@ -138,7 +140,10 @@ export async function getUserProjectsImpl(agencyId: string, userId: string) {
         return normalizedProjects.map((project) => withAgencyIdFallback(sanitizeDoc(project) as ProjectLike & { agencyId?: string }, agencyId));
     }
 
-    const taskProjectIds = await TaskModel.distinct("projectId", { assigneeId: userId, agencyId });
+    const taskProjectIds = await TaskModel.distinct("projectId", {
+        agencyId,
+        $or: [{ assigneeId: userId }, { assigneeIds: userId }],
+    });
     const projects = await ProjectModel.find({ id: { $in: taskProjectIds }, agencyId }).lean() as ProjectLike[];
     const hydratedProjects = await hydrateProjectsWithCurrentClients(projects, agencyId);
     const serviceLookupQuery = buildProjectServiceLookupQuery(hydratedProjects);
@@ -186,7 +191,7 @@ export async function getProjectDirectoryUsersImpl(agencyId: string, projectId: 
 
     const [project, tasks, services] = await Promise.all([
         ProjectModel.findOne({ id: projectId, agencyId }).select("id clientId clientIds").lean() as Promise<ProjectDirectoryProject | null>,
-        TaskModel.find({ projectId, agencyId }).select("assigneeId createdBy comments").lean() as Promise<ProjectDirectoryTask[]>,
+        TaskModel.find({ projectId, agencyId }).select("assigneeId assigneeIds createdBy comments").lean() as Promise<ProjectDirectoryTask[]>,
         ServiceModel.find({ projectId, agencyId }).select("employees").lean() as Promise<ProjectDirectoryService[]>,
     ]);
 
@@ -196,7 +201,7 @@ export async function getProjectDirectoryUsersImpl(agencyId: string, projectId: 
     if (sessionUserId) directoryUserIds.add(sessionUserId);
 
     tasks.forEach((task) => {
-        if (task.assigneeId) directoryUserIds.add(task.assigneeId);
+        getTaskAssigneeIds(task).forEach((assigneeId) => directoryUserIds.add(assigneeId));
         if (task.createdBy) directoryUserIds.add(task.createdBy);
         task.comments?.forEach((comment) => {
             if (comment?.userId) directoryUserIds.add(comment.userId);

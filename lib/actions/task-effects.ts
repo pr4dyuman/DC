@@ -14,9 +14,9 @@ import {
     UserModel,
 } from "../mongodb";
 import { generateId } from "../utils-server";
+import { getTaskAssigneeIds } from "../task-assignees";
 import { isNotifEnabled } from "./shared";
 import {
-    getAgencyUser,
     getEmailCategories,
     getProjectSummary,
     type TaskEffectArgs,
@@ -68,20 +68,26 @@ export async function handleTaskStatusChangeEffectsImpl({
     });
 
     const projectForNotif = await getProjectSummary(agency.id, currentTask.projectId);
+    const currentAssigneeIds = getTaskAssigneeIds(currentTask);
     if (await isNotifEnabled("task")) {
         const notifiedUserIds = new Set<string>();
 
-        if (currentTask.assigneeId && currentTask.assigneeId !== userId) {
-            await NotificationModel.create({
-                id: generateId(),
-                agencyId: agency.id,
-                userId: currentTask.assigneeId,
-                message: `${userName} moved your task "${currentTask.title}" to ${currentTask.status}`,
-                read: false,
-                timestamp: new Date().toISOString(),
-                link: `/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`,
+        const assigneeNotifs = currentAssigneeIds
+            .filter((assigneeId) => assigneeId !== userId)
+            .map((assigneeId) => {
+                notifiedUserIds.add(assigneeId);
+                return {
+                    id: generateId(),
+                    agencyId: agency.id,
+                    userId: assigneeId,
+                    message: `${userName} moved your task "${currentTask.title}" to ${currentTask.status}`,
+                    read: false,
+                    timestamp: new Date().toISOString(),
+                    link: `/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`,
+                };
             });
-            notifiedUserIds.add(currentTask.assigneeId);
+        if (assigneeNotifs.length > 0) {
+            await NotificationModel.insertMany(assigneeNotifs);
         }
 
         const adminsForTask = await UserModel.find({ agencyId: agency.id, role: { $in: ["admin", "manager"] } })
@@ -126,18 +132,23 @@ export async function handleTaskStatusChangeEffectsImpl({
 
     if (shouldSendTaskEmail) {
         try {
-            if (eventConfig?.notifyAssignee && currentTask.assigneeId && currentTask.assigneeId !== userId) {
-                const assignee = await getAgencyUser(agency.id, currentTask.assigneeId);
-                if (assignee?.email) {
-                    await sendTaskStatusChangedEmail({
-                        recipientEmail: assignee.email,
-                        recipientName: assignee.name,
-                        taskTitle: currentTask.title,
-                        oldStatus: previousTask.status,
-                        newStatus: currentTask.status,
-                        updatedBy: userName,
-                        taskLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`,
-                    });
+            if (eventConfig?.notifyAssignee && currentAssigneeIds.length > 0) {
+                const assignees = await UserModel.find({
+                    id: { $in: currentAssigneeIds.filter((assigneeId) => assigneeId !== userId) },
+                    agencyId: agency.id,
+                }).select("id name email").lean() as Array<Pick<User, "id" | "name" | "email">>;
+                for (const assignee of assignees) {
+                    if (assignee?.email) {
+                        await sendTaskStatusChangedEmail({
+                            recipientEmail: assignee.email,
+                            recipientName: assignee.name,
+                            taskTitle: currentTask.title,
+                            oldStatus: previousTask.status,
+                            newStatus: currentTask.status,
+                            updatedBy: userName,
+                            taskLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`,
+                        });
+                    }
                 }
             }
 
@@ -187,18 +198,26 @@ export async function handleTaskAssignmentChangeEffectsImpl({
     userName,
     userId,
 }: Omit<TaskEffectArgs, "completedAt">) {
-    if (!currentTask.assigneeId || currentTask.assigneeId === previousTask.assigneeId) return;
+    const previousAssigneeIds = getTaskAssigneeIds(previousTask);
+    const currentAssigneeIds = getTaskAssigneeIds(currentTask);
+    const newAssigneeIds = currentAssigneeIds.filter((assigneeId) => !previousAssigneeIds.includes(assigneeId));
+    if (newAssigneeIds.length === 0) return;
 
-    if (await isNotifEnabled("task") && currentTask.assigneeId !== userId) {
-        await NotificationModel.create({
-            id: generateId(),
-            agencyId: agency.id,
-            userId: currentTask.assigneeId,
-            message: `${userName} assigned you the task "${currentTask.title}"`,
-            read: false,
-            timestamp: new Date().toISOString(),
-            link: `/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`,
-        });
+    if (await isNotifEnabled("task")) {
+        const assignmentNotifs = newAssigneeIds
+            .filter((assigneeId) => assigneeId !== userId)
+            .map((assigneeId) => ({
+                id: generateId(),
+                agencyId: agency.id,
+                userId: assigneeId,
+                message: `${userName} assigned you the task "${currentTask.title}"`,
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: `/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`,
+            }));
+        if (assignmentNotifs.length > 0) {
+            await NotificationModel.insertMany(assignmentNotifs);
+        }
     }
 
     const emailCats = getEmailCategories(agency);
@@ -210,19 +229,26 @@ export async function handleTaskAssignmentChangeEffectsImpl({
 
     try {
         const project = await getProjectSummary(agency.id, currentTask.projectId);
-        const assignee = currentTask.assigneeId ? await getAgencyUser(agency.id, currentTask.assigneeId) : null;
+        const assignees = newAssigneeIds.length > 0
+            ? await UserModel.find({ id: { $in: newAssigneeIds }, agencyId: agency.id })
+                .select("id name email")
+                .lean() as Array<Pick<User, "id" | "name" | "email">>
+            : [];
 
-        if (createdEventConfig.notifyAssignee && assignee?.email && project) {
-            await sendTaskAssignedEmail({
-                assigneeEmail: assignee.email,
-                assigneeName: assignee.name,
-                taskTitle: currentTask.title,
-                taskDescription: currentTask.description || "",
-                projectName: project.name,
-                dueDate: currentTask.dueDate || "",
-                priority: currentTask.priority || "Medium",
-                taskLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`,
-            });
+        if (createdEventConfig.notifyAssignee && project) {
+            for (const assignee of assignees) {
+                if (!assignee.email) continue;
+                await sendTaskAssignedEmail({
+                    assigneeEmail: assignee.email,
+                    assigneeName: assignee.name,
+                    taskTitle: currentTask.title,
+                    taskDescription: currentTask.description || "",
+                    projectName: project.name,
+                    dueDate: currentTask.dueDate || "",
+                    priority: currentTask.priority || "Medium",
+                    taskLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`,
+                });
+            }
         }
 
         if (createdEventConfig.notifyClient && project?.clientId) {

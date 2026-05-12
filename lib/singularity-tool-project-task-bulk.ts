@@ -17,6 +17,7 @@ import {
     type ToolArgs,
     type ToolExecutionResult,
 } from "./singularity-tool-project-task-shared";
+import { normalizeTaskAssigneeIds } from "./task-assignees";
 import type { Project, Task } from "./types";
 export type ProjectTaskBulkToolName =
     | "bulk_update_task_status"
@@ -29,6 +30,7 @@ type BulkTaskInput = {
     title: string;
     description?: string;
     assigneeId?: string;
+    assigneeIds?: string[];
     category?: string;
     priority?: Task["priority"];
     dueDate?: string;
@@ -323,11 +325,16 @@ export async function executeProjectTaskBulkTool(
 
             for (const task of tasks) {
                 try {
-                    let assigneeId = task.assigneeId || "";
-                    if (!assigneeId && workloads.length > 0) {
+                    let assigneeIds = normalizeTaskAssigneeIds(task.assigneeIds, task.assigneeId);
+                    let assigneeId = assigneeIds[0] || "";
+                    if (assigneeIds.length === 0 && workloads.length > 0) {
                         workloads.sort((a, b) => (a.activeTasks + a.assigned) - (b.activeTasks + b.assigned));
                         assigneeId = workloads[0].id;
+                        assigneeIds = [assigneeId];
                         workloads[0].assigned++;
+                    } else if (assigneeIds.length === 0) {
+                        assigneeId = userId;
+                        assigneeIds = [userId];
                     }
 
                     let dueDateStr = task.dueDate || "";
@@ -346,6 +353,7 @@ export async function executeProjectTaskBulkTool(
                         title: task.title,
                         description: task.description || "",
                         assigneeId: assigneeId || userId,
+                        assigneeIds: assigneeIds.length > 0 ? assigneeIds : [userId],
                         category: task.category || "",
                         priority: task.priority || "Medium",
                         dueDate: dueDateStr,
@@ -379,7 +387,9 @@ export async function executeProjectTaskBulkTool(
                         );
                     }
 
-                    const assigneeName = userNameMap.get(assigneeId) || "Unassigned";
+                    const assigneeName = assigneeIds.length > 0
+                        ? assigneeIds.map((id) => userNameMap.get(id) || id).join(", ")
+                        : "Unassigned";
                     createdTasks.push({
                         id: newTask.id,
                         title: task.title,
