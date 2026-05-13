@@ -137,6 +137,7 @@ export type Notification = {
     read: boolean;
     timestamp: string;
     link?: string;
+    eventKey?: string;
 };
 
 export type Activity = {

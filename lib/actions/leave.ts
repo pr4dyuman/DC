@@ -9,10 +9,11 @@ import {
     sendLeaveRejectedEmail,
     sendLeaveRequestedEmail,
 } from "../brevo-mail";
-import { ActivityModel, LeaveRequestModel, NotificationModel, UserModel, connectDB } from "../mongodb";
+import { ActivityModel, LeaveRequestModel, UserModel, connectDB } from "../mongodb";
 import { generateId } from "../utils-server";
 import { sanitizeMongoInput, sanitizeString } from "../validation";
 import { isNotifEnabled, sanitizeDoc } from "./shared";
+import { createNotification, createNotifications } from "./notification-service";
 
 type LeaveActor = {
     id: string;
@@ -114,8 +115,7 @@ export async function requestLeaveImpl(currentUser: LeaveActor, agencyId: string
 
     const adminUsers = await UserModel.find({ agencyId, role: "admin" }).select("-password").lean() as Array<Pick<User, "id" | "email">>;
     if (await isNotifEnabled("leave")) {
-        await NotificationModel.insertMany(adminUsers.map((admin) => ({
-            id: generateId(),
+        await createNotifications(adminUsers.map((admin) => ({
             agencyId,
             userId: admin.id,
             message: `${currentUser.name} requested ${nextLeaveData.type} leave (${daysDiff} day${daysDiff > 1 ? "s" : ""})`,
@@ -173,8 +173,7 @@ export async function approveLeaveRequestImpl(currentUser: LeaveActor, agencyId:
     const employee = await UserModel.findOne({ id: leaveRequest.userId, agencyId }).select("-password").lean() as Pick<User, "name" | "email"> | null;
 
     if (employee && await isNotifEnabled("leave")) {
-        await NotificationModel.create({
-            id: generateId(),
+        await createNotification({
             agencyId,
             userId: leaveRequest.userId,
             message: `Your ${leaveRequest.type} leave request (${daysDiff} day${daysDiff > 1 ? "s" : ""}) has been approved by ${currentUser.name}`,
@@ -241,8 +240,7 @@ export async function rejectLeaveRequestImpl(
             ? `Your ${leaveRequest.type} leave request (${daysDiff} day${daysDiff > 1 ? "s" : ""}) was rejected by ${currentUser.name}. Reason: ${nextRejectionReason}`
             : `Your ${leaveRequest.type} leave request (${daysDiff} day${daysDiff > 1 ? "s" : ""}) was rejected by ${currentUser.name}`;
 
-        await NotificationModel.create({
-            id: generateId(),
+        await createNotification({
             agencyId,
             userId: leaveRequest.userId,
             message,
@@ -311,8 +309,7 @@ export async function cancelLeaveRequestImpl(currentUser: LeaveActor, agencyId: 
     if (currentUser.role !== "admin") {
         const adminUsers = await UserModel.find({ agencyId, role: "admin" }).select("-password").lean() as Array<Pick<User, "id" | "email">>;
         if (await isNotifEnabled("leave")) {
-            await NotificationModel.insertMany(adminUsers.map((admin) => ({
-                id: generateId(),
+            await createNotifications(adminUsers.map((admin) => ({
                 agencyId,
                 userId: admin.id,
                 message: `${currentUser.name} cancelled their ${leaveRequest.type} leave request`,
@@ -400,8 +397,7 @@ export async function updateLeaveStatusImpl(
 
     const userDoc = await UserModel.findOne({ id: request.userId, agencyId }).select("-password").lean() as Pick<User, "username"> | null;
     if (await isNotifEnabled("leave")) {
-        await NotificationModel.create({
-            id: generateId(),
+        await createNotification({
             agencyId,
             userId: request.userId,
             message: `Your leave request for ${fmtDate(request.startDate, "UTC", "en-US")} has been ${status}`,

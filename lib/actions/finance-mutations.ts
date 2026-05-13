@@ -13,7 +13,6 @@ import { generateId } from "../utils-server";
 import { sanitizeMongoInput, sanitizeName, sanitizeString } from "../validation";
 import {
     ActivityModel,
-    NotificationModel,
     ProjectModel,
     TransactionModel,
     UserModel,
@@ -27,6 +26,7 @@ import {
     getProjectDoc,
 } from "./finance-mutation-shared";
 import { isNotifEnabled } from "./shared";
+import { createNotification } from "./notification-service";
 export {
     adminApproveInvoicePaymentImpl,
     adminRejectInvoicePaymentImpl,
@@ -100,8 +100,7 @@ export async function createTransactionImpl(
 
     if (newTransaction.category === "Salary" && newTransaction.userId && newTransaction.type === "expense") {
         if (await isNotifEnabled("salary")) {
-            await NotificationModel.create({
-                id: generateId(),
+            await createNotification({
                 agencyId: agency.id,
                 userId: newTransaction.userId,
                 message: `Salary Payment Received: ${formatCurrency(newTransaction.amount, await getDefaultCurrency())} `,
@@ -243,8 +242,7 @@ export async function createRefundImpl(refund: RefundInput, agency: AgencyContex
     });
 
     if (project.clientId && await isNotifEnabled("refund")) {
-        await NotificationModel.create({
-            id: generateId(),
+        await createNotification({
             agencyId: agency.id,
             userId: project.clientId,
             message: `Refund of ${formatCurrency(refund.amount, await getDefaultCurrency())} has been issued for ${project.name}`,

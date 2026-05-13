@@ -10,11 +10,11 @@ import {
     ActivityModel,
     ClientModel,
     InvoiceModel,
-    NotificationModel,
     ProjectModel,
     ServiceModel,
 } from "../mongodb";
 import { isNotifEnabled, sanitizeDoc } from "./shared";
+import { createNotifications } from "./notification-service";
 import {
     resolveProjectClientFields,
     type ProjectLike,
@@ -288,9 +288,8 @@ export async function createProjectImpl(
         ...(newProject.clientId && !((newProject as { clientIds?: string[] }).clientIds || []).includes(newProject.clientId) ? [newProject.clientId] : []),
     ];
     if (linkedClientIds.length > 0 && newInvoices.length > 0 && await isNotifEnabled("invoice")) {
-        await NotificationModel.insertMany(
+        await createNotifications(
             linkedClientIds.map((cid) => ({
-                id: generateId(),
                 agencyId,
                 userId: cid,
                 message: `${newInvoices.length} pending invoice(s) for project: ${project.name}`,

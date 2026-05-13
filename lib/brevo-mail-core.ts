@@ -2,6 +2,7 @@ import { EMAIL_TEMPLATES, TEMPLATE_TO_CATEGORY, DEFAULT_EMAIL_CATEGORIES } from 
 import { getCurrentAgency } from "./agency-context";
 import { formatCurrency } from "./currency";
 import { getDefaultCurrency } from "./actions/super-admin";
+import { getEffectiveEmailSettings } from "./email-policy";
 
 export type TemplateParams = Record<string, string | number | boolean | null | undefined>;
 type EmailCategoryKey = keyof typeof DEFAULT_EMAIL_CATEGORIES;
@@ -11,9 +12,10 @@ interface EmailParams {
   templateId: number;
   params: TemplateParams;
   subject?: string;
+  agencyId?: string;
 }
 
-export async function sendEmail({ to, templateId, params, subject }: EmailParams): Promise<boolean> {
+export async function sendEmail({ to, templateId, params, subject, agencyId }: EmailParams): Promise<boolean> {
   try {
     const BREVO_API_KEY = process.env.BREVO_API_KEY;
     const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL;
@@ -26,23 +28,36 @@ export async function sendEmail({ to, templateId, params, subject }: EmailParams
       return false;
     }
 
-    const agency = await getCurrentAgency();
-    if (agency?.settings?.emailNotificationsEnabled === false) {
-      console.warn("[Brevo] Email sending is globally disabled via settings.");
+    const agency = agencyId ? null : await getCurrentAgency();
+    const emailSettings = await getEffectiveEmailSettings({ agency, agencyId });
+    if (!emailSettings.platformEnabled) {
+      console.warn("[Brevo] Email sending is disabled by platform email settings.");
+      return true;
+    }
+
+    if (!emailSettings.agencyEnabled) {
+      console.warn("[Brevo] Email sending is disabled for this agency.");
       return true;
     }
 
     const category = TEMPLATE_TO_CATEGORY[templateId];
     if (category) {
-      const categories = (agency?.settings?.emailCategories || {}) as Partial<Record<EmailCategoryKey, boolean>>;
-      const isEnabled = categories[category as EmailCategoryKey] ?? DEFAULT_EMAIL_CATEGORIES[category as EmailCategoryKey];
+      const isEnabled = emailSettings.categories[category as EmailCategoryKey] ?? DEFAULT_EMAIL_CATEGORIES[category as EmailCategoryKey];
       if (!isEnabled) {
         console.log(`[Brevo] Email category "${category}" is disabled. Skipping template ${templateId}.`);
         return true;
       }
     }
 
-    const recipients = Array.isArray(to) ? to.map((email) => ({ email })) : [{ email: to }];
+    const recipients = (Array.isArray(to) ? to : [to])
+      .map((email) => String(email || "").trim())
+      .filter(Boolean)
+      .map((email) => ({ email }));
+
+    if (recipients.length === 0) {
+      console.warn(`[Brevo] No recipients provided. Skipping template ${templateId}.`);
+      return true;
+    }
 
     const replyTo = BREVO_REPLY_TO_EMAIL
       ? { email: BREVO_REPLY_TO_EMAIL, ...(BREVO_REPLY_TO_NAME && { name: BREVO_REPLY_TO_NAME }) }

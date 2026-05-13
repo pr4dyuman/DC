@@ -8,6 +8,7 @@ import bcrypt from "bcryptjs";
 import { sanitizeName, sanitizeString, sanitizePhone, validateEmail, validatePassword, validateStrongPassword } from "../validation";
 import { mergeAIBloggerConfig } from "../ai-blogger-config";
 import { sanitizeLocation } from "../ai-blogger-text-utils";
+import { getDefaultAgencyEmailSettings } from "../email-policy";
 import { getBlogStudioOverviewImpl } from "./ai-blogger";
 import {
     getAgencyAIBloggerConfigSuperAdminImpl,
@@ -143,6 +144,7 @@ export async function createAgency(data: {
 
     // Get plan defaults
     const planDefaults = AGENCY_PLANS[data.plan];
+    const emailSettings = await getDefaultAgencyEmailSettings();
 
     // Generate unique slug
     const baseSlug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -187,7 +189,8 @@ export async function createAgency(data: {
             allowClientRegistration: false,
             requireEmailVerification: false,
             enableTwoFactor: false,
-            emailNotificationsEnabled: true
+            emailNotificationsEnabled: emailSettings.emailNotificationsEnabled,
+            emailCategories: emailSettings.emailCategories
         },
         createdAt: data.createdAt && !isNaN(new Date(data.createdAt).getTime()) ? new Date(data.createdAt).toISOString() : new Date().toISOString(),
         updatedAt: new Date().toISOString(),

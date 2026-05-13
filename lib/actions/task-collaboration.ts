@@ -2,17 +2,19 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 import { sendTaskCommentEmail } from "../brevo-mail";
+import { getEffectiveEmailSettings } from "../email-policy";
 import { extractMentionedUserIds } from "../mention-utils";
+import { getNotificationPreview } from "../notification-text";
 import type { Task, UserPermissions } from "../db";
-import { NotificationModel, ActivityModel, TaskModel, UserModel, connectDB } from "../mongodb";
+import { NotificationModel, ActivityModel, ClientModel, ProjectModel, TaskModel, UserModel, connectDB } from "../mongodb";
 import { getTaskAssigneeIds } from "../task-assignees";
 import { sanitizeString } from "../validation";
 import { generateId, resolveUserOrClient } from "../utils-server";
 import { isNotifEnabled } from "./shared";
+import { createNotifications } from "./notification-service";
 import {
     type CommentAgencyContext,
     getAgencyUser,
-    getEmailCategories,
     type TaskMutationActor,
 } from "./task-shared";
 
@@ -93,8 +95,8 @@ export async function addCommentImpl(
         timestamp: new Date().toISOString(),
     });
 
-    const emailCats = getEmailCategories(agency);
-    const shouldSendTaskEmail = emailCats.taskUpdates !== false;
+    const emailSettings = await getEffectiveEmailSettings({ agency });
+    const shouldSendTaskEmail = emailSettings.enabled && emailSettings.categories.taskUpdates;
 
     if (shouldSendTaskEmail) {
         try {
@@ -135,59 +137,72 @@ export async function addCommentImpl(
             task.comments?.forEach((comment) => participantIds.add(comment.userId));
             participantIds.delete(userId);
 
-            if (participantIds.size > 0) {
-                const commenterDoc = await getAgencyUser(agency.id, userId);
-                const commenterName = commenterDoc?.name || "Someone";
-                await NotificationModel.insertMany([...participantIds].map((participantId) => ({
-                    id: generateId(),
+            const mentionedIds = extractMentionedUserIds(text).filter((mentionedId) => mentionedId !== userId);
+            const commenterDoc = await resolveUserOrClient(userId, agency.id);
+            const commenterName = commenterDoc?.name || "Someone";
+            const link = `/dashboard/projects/${task.projectId}?task=${taskId}`;
+            const timestamp = new Date().toISOString();
+            const recipientNotifications = new Map<string, {
+                agencyId: string;
+                userId: string;
+                message: string;
+                read: false;
+                timestamp: string;
+                link: string;
+            }>();
+
+            const commentPreview = getNotificationPreview(text);
+            for (const participantId of participantIds) {
+                recipientNotifications.set(participantId, {
                     agencyId: agency.id,
                     userId: participantId,
-                    message: `${commenterName} commented on "${task.title}": ${text.substring(0, 80)}${text.length > 80 ? "..." : ""}`,
+                    message: `${commenterName} commented on "${task.title}": ${commentPreview}`,
                     read: false,
-                    timestamp: new Date().toISOString(),
-                    link: `/dashboard/projects/${task.projectId}?task=${taskId}`,
-                })));
+                    timestamp,
+                    link,
+                });
             }
-        }
-    } catch (notifError) {
-        console.error("[Notification] Failed to create comment notifications:", notifError);
-    }
 
-    try {
-        const mentionedIds = extractMentionedUserIds(text);
-        const filteredMentionIds = mentionedIds.filter((mentionedId) => mentionedId !== userId);
-        if (filteredMentionIds.length > 0 && await isNotifEnabled("task")) {
-            const alreadyNotified = new Set<string>();
-            getTaskAssigneeIds(task).forEach((assigneeId) => alreadyNotified.add(assigneeId));
-            if (task.createdBy) alreadyNotified.add(task.createdBy);
-            task.comments?.forEach((comment) => alreadyNotified.add(comment.userId));
-            alreadyNotified.delete(userId);
+            if (mentionedIds.length > 0) {
+                const [projectForMentions, validUsers, validClients] = await Promise.all([
+                    ProjectModel.findOne({ id: task.projectId, agencyId: agency.id })
+                        .select("clientId clientIds")
+                        .lean() as Promise<{ clientId?: string; clientIds?: string[] } | null>,
+                    UserModel.find({ id: { $in: mentionedIds }, agencyId: agency.id, archived: { $ne: true } })
+                        .select("id")
+                        .lean() as Promise<Array<{ id: string }>>,
+                    ClientModel.find({ id: { $in: mentionedIds }, agencyId: agency.id, archived: { $ne: true } })
+                        .select("id")
+                        .lean() as Promise<Array<{ id: string }>>,
+                ]);
+                const linkedClientIds = new Set([
+                    ...(projectForMentions?.clientIds || []),
+                    ...(projectForMentions?.clientId ? [projectForMentions.clientId] : []),
+                ]);
+                const validMentionIds = new Set([
+                    ...validUsers.map((user) => user.id),
+                    ...validClients.map((client) => client.id).filter((clientId) => linkedClientIds.has(clientId)),
+                ]);
 
-            const newMentionIds = filteredMentionIds.filter((mentionedId) => !alreadyNotified.has(mentionedId));
-            if (newMentionIds.length > 0) {
-                const validUsers = await UserModel.find({ id: { $in: newMentionIds }, agencyId: agency.id })
-                    .select("id")
-                    .lean() as Array<{ id: string }>;
-                const validIds = new Set(validUsers.map((user) => user.id));
-                const verifiedIds = newMentionIds.filter((mentionedId) => validIds.has(mentionedId));
-
-                if (verifiedIds.length > 0) {
-                    const commenterDoc = await getAgencyUser(agency.id, userId);
-                    const commenterName = commenterDoc?.name || "Someone";
-                    await NotificationModel.insertMany(verifiedIds.map((mentionedId) => ({
-                        id: generateId(),
+                for (const mentionedId of mentionedIds) {
+                    if (!validMentionIds.has(mentionedId)) continue;
+                    recipientNotifications.set(mentionedId, {
                         agencyId: agency.id,
                         userId: mentionedId,
                         message: `${commenterName} mentioned you in a comment on "${task.title}"`,
                         read: false,
-                        timestamp: new Date().toISOString(),
-                        link: `/dashboard/projects/${task.projectId}?task=${taskId}`,
-                    })));
+                        timestamp,
+                        link,
+                    });
                 }
             }
+
+            if (recipientNotifications.size > 0) {
+                await createNotifications([...recipientNotifications.values()], { dedupeWindowMs: 10 * 60 * 1000 });
+            }
         }
-    } catch (mentionError) {
-        console.error("[Notification] Failed to create mention notifications:", mentionError);
+    } catch (notifError) {
+        console.error("[Notification] Failed to create comment notifications:", notifError);
     }
 
     revalidatePath("/dashboard/projects/[id]", "page");

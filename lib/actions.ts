@@ -259,21 +259,21 @@ export async function verifyAgentPassword(password: string): Promise<{ success: 
 }
 
 export async function updateEmailSettings(enabled: boolean) {
-    await requireRole('admin', 'manager');
+    await requireRole('admin');
     const agency = await getCurrentAgency();
     if (!agency) throw new Error("Unauthorized");
     return updateEmailSettingsImpl(enabled, agency.id);
 }
 
 export async function updateEmailCategorySettings(categories: Record<string, boolean>) {
-    await requireRole('admin', 'manager');
+    await requireRole('admin');
     const agency = await getCurrentAgency();
     if (!agency) throw new Error("Unauthorized");
     return updateEmailCategorySettingsImpl(categories, agency.id);
 }
 
 export async function updateTaskEmailEvents(events: Record<string, Record<string, boolean>>) {
-    await requireRole('admin', 'manager');
+    await requireRole('admin');
     const agency = await getCurrentAgency();
     if (!agency) throw new Error("Unauthorized");
     return updateTaskEmailEventsImpl(events, agency.id);

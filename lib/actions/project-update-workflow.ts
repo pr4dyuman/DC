@@ -6,13 +6,13 @@ import { generateId } from "../utils-server";
 import { sanitizeName, sanitizeString, sanitizeUpdates } from "../validation";
 import {
     ClientModel,
-    NotificationModel,
     ProjectModel,
     ServiceModel,
     TaskModel,
     connectDB,
 } from "../mongodb";
 import { isNotifEnabled } from "./shared";
+import { createNotifications } from "./notification-service";
 import {
     buildProjectServiceLookupQuery,
     buildNormalizedProjectServiceConfigs,
@@ -190,9 +190,8 @@ export async function updateProjectImpl(
             ...(oldProject.clientId && !((oldProject as { clientIds?: string[] }).clientIds || []).includes(oldProject.clientId) ? [oldProject.clientId] : []),
         ];
         if (notifyClientIds.length > 0) {
-            await NotificationModel.insertMany(
+            await createNotifications(
                 notifyClientIds.map((cid) => ({
-                    id: generateId(),
                     agencyId,
                     userId: cid,
                     message: `Project "${oldProject.name}" ${statusMessages[updates.status!] || `status updated to ${updates.status}`}`,

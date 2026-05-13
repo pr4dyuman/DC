@@ -42,7 +42,7 @@ const templates = [
       <p>We are excited to start working on your new project, <span class="highlight">{{params.PROJECT_NAME}}</span>!</p>
       <p><strong>Project Details:</strong></p>
       <ul>
-        <li>Budget: ₹{{params.BUDGET}}</li>
+        <li>Budget: {{params.BUDGET}}</li>
         <li>Payment Plan: {{params.PAYMENT_PLAN}}</li>
         <li>Invoices: {{params.INVOICE_COUNT}}</li>
       </ul>
@@ -270,7 +270,7 @@ const templates = [
     <div class="content">
       <p>Hello {{params.CLIENT_NAME}},</p>
       <p>A new invoice has been generated for project <strong>{{params.PROJECT_NAME}}</strong>.</p>
-      <div class="amount">₹{{params.AMOUNT}}</div>
+      <div class="amount">{{params.AMOUNT}}</div>
       <p style="text-align: center;">Due Date: {{params.DUE_DATE}}</p>
       <center><a href="{{params.FINANCE_LINK}}" class="button">Pay Now</a></center>
     </div>
@@ -305,7 +305,7 @@ const templates = [
     </div>
     <div class="content">
       <p>Hello Admin,</p>
-      <p><strong>{{params.CLIENT_NAME}}</strong> has submitted a payment of <strong>₹{{params.AMOUNT}}</strong> for project <strong>{{params.PROJECT_NAME}}</strong>.</p>
+      <p><strong>{{params.CLIENT_NAME}}</strong> has submitted a payment of <strong>{{params.AMOUNT}}</strong> for project <strong>{{params.PROJECT_NAME}}</strong>.</p>
       <p>Please review and approve this transaction.</p>
       <center><a href="{{params.FINANCE_LINK}}" class="button">Review Payment</a></center>
     </div>
@@ -340,7 +340,7 @@ const templates = [
     </div>
     <div class="content">
       <p>Hello {{params.CLIENT_NAME}},</p>
-      <p>Your payment of <strong>₹{{params.AMOUNT}}</strong> for project <strong>{{params.PROJECT_NAME}}</strong> has been successfully approved.</p>
+      <p>Your payment of <strong>{{params.AMOUNT}}</strong> for project <strong>{{params.PROJECT_NAME}}</strong> has been successfully approved.</p>
       <p>Thank you for your prompt payment!</p>
       <center><a href="{{params.FINANCE_LINK}}" class="button">View Receipt</a></center>
     </div>
@@ -375,7 +375,7 @@ const templates = [
     </div>
     <div class="content">
       <p>Hello {{params.CLIENT_NAME}},</p>
-      <p>Your payment of <strong>₹{{params.AMOUNT}}</strong> for project <strong>{{params.PROJECT_NAME}}</strong> was not approved.</p>
+      <p>Your payment of <strong>{{params.AMOUNT}}</strong> for project <strong>{{params.PROJECT_NAME}}</strong> was not approved.</p>
       <p><strong>Reason:</strong> {{params.REJECTION_REASON}}</p>
       <p>Please check the details and try again.</p>
       <center><a href="{{params.FINANCE_LINK}}" class="button">Try Again</a></center>
@@ -487,7 +487,7 @@ const templates = [
     </div>
     <div class="content">
       <p>Hello {{params.EMPLOYEE_NAME}},</p>
-      <p>Your leave request ({params.START_DATE}} to {{params.END_DATE}}) has not been approved.</p>
+      <p>Your leave request ({{params.START_DATE}} to {{params.END_DATE}}) has not been approved.</p>
       <p><strong>Reason:</strong> {{params.REJECTION_REASON}}</p>
       <p>Please contact your manager for more details.</p>
       <center><a href="{{params.TEAM_LINK}}" class="button">View Status</a></center>
@@ -557,7 +557,7 @@ const templates = [
     </div>
     <div class="content">
       <p>Hello {{params.EMPLOYEE_NAME}},</p>
-      <p>Your salary of <strong>₹{{params.AMOUNT}}</strong> for the month of <strong>{{params.MONTH}}</strong> has been processed on {{params.PAYMENT_DATE}}.</p>
+      <p>Your salary of <strong>{{params.AMOUNT}}</strong> for the month of <strong>{{params.MONTH}}</strong> has been processed on {{params.PAYMENT_DATE}}.</p>
       <center><a href="{{params.FINANCE_LINK}}" class="button">View Payslip</a></center>
     </div>
     <div class="footer">
@@ -591,7 +591,7 @@ const templates = [
     </div>
     <div class="content">
       <p>Hello {{params.CLIENT_NAME}},</p>
-      <p>A refund of <strong>₹{{params.AMOUNT}}</strong> has been issued for the project <strong>{{params.PROJECT_NAME}}</strong>.</p>
+      <p>A refund of <strong>{{params.AMOUNT}}</strong> has been issued for the project <strong>{{params.PROJECT_NAME}}</strong>.</p>
       <p><strong>Reason:</strong> {{params.REFUND_REASON}}</p>
       <center><a href="{{params.PROJECT_LINK}}" class="button">View Details</a></center>
     </div>
@@ -696,12 +696,11 @@ const templates = [
     <div class="content">
       <p>Hello {{params.CLIENT_NAME}},</p>
       <p>Welcome to <strong>{{params.AGENCY_NAME}}</strong>! Your client account has been created successfully.</p>
-      <p>Here are your login credentials:</p>
+      <p>Your portal access is ready. Use your username below to sign in.</p>
       <div class="credentials">
         <p><strong>Username:</strong> {{params.USERNAME}}</p>
-        <p><strong>Password:</strong> {{params.PASSWORD}}</p>
       </div>
-      <p><em>Please change your password after your first login.</em></p>
+      <p><em>If you do not know your password, use the password reset flow on the login page.</em></p>
       <center><a href="{{params.DASHBOARD_LINK}}" class="button">Login to Dashboard</a></center>
     </div>
     <div class="footer">
@@ -737,13 +736,98 @@ const templates = [
     <div class="content">
       <p>Hello {{params.EMPLOYEE_NAME}},</p>
       <p>Welcome to <strong>{{params.AGENCY_NAME}}</strong>! Your employee account has been set up with the role: <strong>{{params.ROLE}}</strong>.</p>
-      <p>Here are your login credentials:</p>
+      <p>Your workspace access is ready. Use your username below to sign in.</p>
       <div class="credentials">
         <p><strong>Username:</strong> {{params.USERNAME}}</p>
-        <p><strong>Password:</strong> {{params.PASSWORD}}</p>
       </div>
-      <p><em>Please change your password after your first login.</em></p>
+      <p><em>If you do not know your password, use the password reset flow on the login page.</em></p>
       <center><a href="{{params.DASHBOARD_LINK}}" class="button">Login to Dashboard</a></center>
+    </div>
+    <div class="footer">
+      <p>&copy; Agency OS. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>`
+  },
+  {
+    name: 'AI Blogger Schedule Failed',
+    subject: 'AI Blogger Alert: {{params.scheduleName}} failed',
+    key: 'AI_BLOGGER_SCHEDULE_FAILED',
+    htmlContent: `<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f9fafb; margin: 0; padding: 0; }
+  .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); overflow: hidden; }
+  .header { background-color: #ef4444; padding: 24px; text-align: center; }
+  .header h1 { color: #ffffff; margin: 0; font-size: 24px; font-weight: 600; }
+  .content { padding: 32px; color: #374151; line-height: 1.6; }
+  .alert { background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 16px 0; }
+  .meta { background-color: #f3f4f6; padding: 16px; border-radius: 6px; margin: 16px 0; }
+  .footer { background-color: #f3f4f6; padding: 24px; text-align: center; font-size: 12px; color: #9ca3af; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>AI Blogger Schedule Failed</h1>
+    </div>
+    <div class="content">
+      <p>Hello,</p>
+      <p>The AI Blogger schedule <strong>{{params.scheduleName}}</strong> for <strong>{{params.agencyName}}</strong> failed.</p>
+      <div class="alert">
+        <p><strong>Error:</strong> {{params.errorMessage}}</p>
+        <p><strong>Last Error:</strong> {{params.lastError}}</p>
+        <p><strong>Severity:</strong> {{params.severity}}</p>
+      </div>
+      <div class="meta">
+        <p><strong>Failures:</strong> {{params.failureCount}} / {{params.maxRetries}}</p>
+        <p><strong>Failed At:</strong> {{params.failedAt}}</p>
+        <p><strong>Post:</strong> {{params.postTitle}}</p>
+        <p><strong>Webhook:</strong> {{params.webhookUrl}}</p>
+      </div>
+      <p>{{params.action}}</p>
+      <p>{{params.message}}</p>
+    </div>
+    <div class="footer">
+      <p>&copy; Agency OS. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>`
+  },
+  {
+    name: 'AI Blogger Schedule Paused',
+    subject: 'AI Blogger Schedule Paused: {{params.scheduleName}}',
+    key: 'AI_BLOGGER_SCHEDULE_PAUSED',
+    htmlContent: `<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f9fafb; margin: 0; padding: 0; }
+  .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); overflow: hidden; }
+  .header { background-color: #f97316; padding: 24px; text-align: center; }
+  .header h1 { color: #ffffff; margin: 0; font-size: 24px; font-weight: 600; }
+  .content { padding: 32px; color: #374151; line-height: 1.6; }
+  .meta { background-color: #fff7ed; border-left: 4px solid #f97316; padding: 16px; margin: 16px 0; }
+  .footer { background-color: #f3f4f6; padding: 24px; text-align: center; font-size: 12px; color: #9ca3af; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>AI Blogger Schedule Paused</h1>
+    </div>
+    <div class="content">
+      <p>Hello,</p>
+      <p>The AI Blogger schedule <strong>{{params.scheduleName}}</strong> for <strong>{{params.agencyName}}</strong> was auto-paused after repeated failures.</p>
+      <div class="meta">
+        <p><strong>Consecutive Failures:</strong> {{params.consecutiveFailures}} / {{params.maxRetries}}</p>
+        <p><strong>Paused At:</strong> {{params.pausedAt}}</p>
+        <p><strong>Last Error:</strong> {{params.lastError}}</p>
+      </div>
+      <p>Please review the schedule configuration before enabling it again.</p>
     </div>
     <div class="footer">
       <p>&copy; Agency OS. All rights reserved.</p>

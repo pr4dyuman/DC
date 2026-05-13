@@ -9,6 +9,7 @@ import { generateId } from "../utils-server";
 import { sanitizeMongoInput, sanitizeName, sanitizePhone, sanitizeUpdates, sanitizeUsername, validateEmail } from "../validation";
 import { isNotifEnabled, sanitizeDoc, validatePasswordWithPolicy } from "./shared";
 import { ClientModel, NotificationModel, ProjectModel, UserModel, connectDB } from "../mongodb";
+import { createNotification } from "./notification-service";
 
 type AgencyContext = Pick<Agency, "id" | "name"> | null;
 
@@ -122,8 +123,7 @@ export async function createClientImpl(client: Omit<Client, "id" | "agencyId">, 
 
     try {
         if (await isNotifEnabled("welcome")) {
-            await NotificationModel.create({
-                id: generateId(),
+            await createNotification({
                 agencyId: agency?.id,
                 userId: newClient.id,
                 message: `Welcome, ${newClient.name}! Your client portal is ready. Check your projects and invoices here.`,

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { DEFAULT_TASK_EMAIL_EVENTS } from "../email-constants";
+import { getEffectiveEmailSettings } from "../email-policy";
 import {
     sendTaskAssignedEmail,
     sendTaskStatusChangedEmail,
@@ -9,7 +9,6 @@ import type { User } from "../db";
 import {
     ActivityModel,
     ClientModel,
-    NotificationModel,
     ProjectModel,
     UserModel,
 } from "../mongodb";
@@ -17,11 +16,11 @@ import { generateId } from "../utils-server";
 import { getTaskAssigneeIds } from "../task-assignees";
 import { isNotifEnabled } from "./shared";
 import {
-    getEmailCategories,
     getProjectSummary,
     type TaskEffectArgs,
 } from "./task-shared";
 import { shouldSuppressTaskEmailNotifications } from "./task-email-context";
+import { createNotifications } from "./notification-service";
 
 export async function handleTaskStatusChangeEffectsImpl({
     previousTask,
@@ -77,7 +76,6 @@ export async function handleTaskStatusChangeEffectsImpl({
             .map((assigneeId) => {
                 notifiedUserIds.add(assigneeId);
                 return {
-                    id: generateId(),
                     agencyId: agency.id,
                     userId: assigneeId,
                     message: `${userName} moved your task "${currentTask.title}" to ${currentTask.status}`,
@@ -85,9 +83,9 @@ export async function handleTaskStatusChangeEffectsImpl({
                     timestamp: new Date().toISOString(),
                     link: `/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`,
                 };
-            });
+        });
         if (assigneeNotifs.length > 0) {
-            await NotificationModel.insertMany(assigneeNotifs);
+            await createNotifications(assigneeNotifs, { dedupeWindowMs: 10 * 60 * 1000 });
         }
 
         const adminsForTask = await UserModel.find({ agencyId: agency.id, role: { $in: ["admin", "manager"] } })
@@ -98,7 +96,6 @@ export async function handleTaskStatusChangeEffectsImpl({
             .map((admin) => {
                 notifiedUserIds.add(admin.id);
                 return {
-                    id: generateId(),
                     agencyId: agency.id,
                     userId: admin.id,
                     message: `${userName} moved task "${currentTask.title}" to ${currentTask.status}`,
@@ -106,29 +103,38 @@ export async function handleTaskStatusChangeEffectsImpl({
                     timestamp: new Date().toISOString(),
                     link: `/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`,
                 };
-            });
+        });
         if (adminNotifs.length > 0) {
-            await NotificationModel.insertMany(adminNotifs);
+            await createNotifications(adminNotifs, { dedupeWindowMs: 10 * 60 * 1000 });
         }
 
-        if (projectForNotif?.clientId && !notifiedUserIds.has(projectForNotif.clientId)) {
-            await NotificationModel.create({
-                id: generateId(),
+        const linkedClientIds = new Set([
+            ...(projectForNotif?.clientIds || []),
+            ...(projectForNotif?.clientId ? [projectForNotif.clientId] : []),
+        ]);
+        const clientNotifs = [...linkedClientIds]
+            .filter((clientId) => !notifiedUserIds.has(clientId))
+            .map((clientId) => ({
                 agencyId: agency.id,
-                userId: projectForNotif.clientId,
+                userId: clientId,
                 message: `Task "${currentTask.title}" has been moved to ${currentTask.status}`,
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: `/dashboard/projects/${currentTask.projectId}`,
-            });
+        }));
+        if (clientNotifs.length > 0) {
+            await createNotifications(clientNotifs, { dedupeWindowMs: 10 * 60 * 1000 });
         }
     }
 
-    const emailCats = getEmailCategories(agency);
-    const taskEmailEvents = emailCats.taskEmailEvents || {};
+    const emailSettings = await getEffectiveEmailSettings({ agency });
     const eventKey = currentTask.status === "Done" ? "taskDone" : (currentTask.status === "In Progress" ? "taskInProgress" : null);
-    const eventConfig = eventKey ? { ...DEFAULT_TASK_EMAIL_EVENTS[eventKey], ...taskEmailEvents[eventKey] } : null;
-    const shouldSendTaskEmail = !suppressEmailNotifications && emailCats.taskUpdates !== false && eventConfig?.enabled;
+    const eventConfig = eventKey ? emailSettings.taskEmailEvents[eventKey] : null;
+    const shouldSendTaskEmail =
+        !suppressEmailNotifications &&
+        emailSettings.enabled &&
+        emailSettings.categories.taskUpdates &&
+        eventConfig?.enabled;
 
     if (shouldSendTaskEmail) {
         try {
@@ -207,23 +213,25 @@ export async function handleTaskAssignmentChangeEffectsImpl({
         const assignmentNotifs = newAssigneeIds
             .filter((assigneeId) => assigneeId !== userId)
             .map((assigneeId) => ({
-                id: generateId(),
                 agencyId: agency.id,
                 userId: assigneeId,
                 message: `${userName} assigned you the task "${currentTask.title}"`,
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: `/dashboard/projects/${currentTask.projectId}?task=${currentTask.id}`,
-            }));
+        }));
         if (assignmentNotifs.length > 0) {
-            await NotificationModel.insertMany(assignmentNotifs);
+            await createNotifications(assignmentNotifs, { dedupeWindowMs: 10 * 60 * 1000 });
         }
     }
 
-    const emailCats = getEmailCategories(agency);
-    const taskEmailEvents = emailCats.taskEmailEvents || {};
-    const createdEventConfig = { ...DEFAULT_TASK_EMAIL_EVENTS.taskCreated, ...taskEmailEvents.taskCreated };
-    const shouldSendTaskEmail = !shouldSuppressTaskEmailNotifications() && emailCats.taskUpdates !== false && createdEventConfig.enabled;
+    const emailSettings = await getEffectiveEmailSettings({ agency });
+    const createdEventConfig = emailSettings.taskEmailEvents.taskCreated;
+    const shouldSendTaskEmail =
+        !shouldSuppressTaskEmailNotifications() &&
+        emailSettings.enabled &&
+        emailSettings.categories.taskUpdates &&
+        createdEventConfig.enabled;
 
     if (!shouldSendTaskEmail) return;
 

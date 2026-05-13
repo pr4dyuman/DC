@@ -5,7 +5,7 @@ import type { Task, User, UserPermissions } from "../db";
 import {
     sendTaskAssignedEmail,
 } from "../brevo-mail";
-import { DEFAULT_TASK_EMAIL_EVENTS } from "../email-constants";
+import { getEffectiveEmailSettings } from "../email-policy";
 import { sanitizeMongoInput, sanitizeName, sanitizeString, sanitizeUpdates } from "../validation";
 import {
     areTaskAssigneeIdsEqual,
@@ -18,7 +18,6 @@ import { generateId } from "../utils-server";
 import {
     ActivityModel,
     ClientModel,
-    NotificationModel,
     ProjectModel,
     ServiceModel,
     TaskModel,
@@ -36,7 +35,6 @@ import {
 } from "./projects-shared";
 import {
     type CommentAgencyContext,
-    getEmailCategories,
     getProjectSummary,
     type TaskEffectRecord,
     type TaskMutationActor,
@@ -47,6 +45,7 @@ import {
     handleTaskStatusChangeEffectsImpl,
 } from "./task-effects";
 import { shouldSuppressTaskEmailNotifications } from "./task-email-context";
+import { createNotifications } from "./notification-service";
 
 export { addCommentImpl, deleteTaskImpl } from "./task-collaboration";
 
@@ -178,10 +177,13 @@ export async function createTaskImpl(
     });
 
     const suppressEmailNotifications = shouldSuppressTaskEmailNotifications();
-    const emailCats = getEmailCategories(agency);
-    const taskEmailEvents = emailCats.taskEmailEvents || {};
-    const createdEventConfig = { ...DEFAULT_TASK_EMAIL_EVENTS.taskCreated, ...taskEmailEvents.taskCreated };
-    const shouldSendTaskEmail = !suppressEmailNotifications && emailCats.taskUpdates !== false && createdEventConfig.enabled;
+    const emailSettings = await getEffectiveEmailSettings({ agency });
+    const createdEventConfig = emailSettings.taskEmailEvents.taskCreated;
+    const shouldSendTaskEmail =
+        !suppressEmailNotifications &&
+        emailSettings.enabled &&
+        emailSettings.categories.taskUpdates &&
+        createdEventConfig.enabled;
 
     if (shouldSendTaskEmail) {
         try {
@@ -231,15 +233,14 @@ export async function createTaskImpl(
     }
 
     if (normalizedAssigneeIds.length > 0 && await isNotifEnabled("task")) {
-        await NotificationModel.insertMany(normalizedAssigneeIds.map((assigneeId) => ({
-            id: generateId(),
+        await createNotifications(normalizedAssigneeIds.map((assigneeId) => ({
             agencyId: agency.id,
             userId: assigneeId,
             message: `You've been assigned a new task: "${task.title}"`,
             read: false,
             timestamp: new Date().toISOString(),
             link: `/dashboard/projects/${task.projectId}?task=${newTask.id}`,
-        })));
+        })), { dedupeWindowMs: 10 * 60 * 1000 });
     }
 
     const adminsForNewTask = await UserModel.find({ agencyId: agency.id, role: { $in: ["admin", "manager"] } })
@@ -248,7 +249,6 @@ export async function createTaskImpl(
     const adminNewTaskNotifs = adminsForNewTask
         .filter((admin) => admin.id !== currentUser.id && !normalizedAssigneeIds.includes(admin.id))
         .map((admin) => ({
-            id: generateId(),
             agencyId: agency.id,
             userId: admin.id,
             message: `${currentUser.name} created a new task: "${task.title}"`,
@@ -257,7 +257,7 @@ export async function createTaskImpl(
             link: `/dashboard/projects/${task.projectId}?task=${newTask.id}`,
         }));
     if (adminNewTaskNotifs.length > 0 && await isNotifEnabled("task")) {
-        await NotificationModel.insertMany(adminNewTaskNotifs);
+        await createNotifications(adminNewTaskNotifs, { dedupeWindowMs: 10 * 60 * 1000 });
     }
 
     revalidatePath("/dashboard/projects/[id]", "page");
@@ -299,6 +299,11 @@ export async function updateTaskStatusImpl(
         { returnDocument: "before", lean: true, timestamps: completedAt ? false : true }
     ) as Task | null;
     if (!task) throw new Error("Task not found");
+    if (task.status === status) {
+        revalidatePath("/dashboard/projects/[id]", "page");
+        revalidatePath("/dashboard/projects");
+        return;
+    }
 
     const currentTask: TaskEffectRecord = {
         ...task,

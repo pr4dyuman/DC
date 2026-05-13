@@ -3,6 +3,8 @@
  * Uses the Brevo REST API v3 to send emails.
  */
 
+import { isPlatformEmailGloballyEnabled } from "./email-policy";
+
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
 interface SendEmailOptions {
@@ -25,6 +27,11 @@ export async function sendEmail({ to, toName, subject, htmlContent }: SendEmailO
     }
 
     try {
+        if (!(await isPlatformEmailGloballyEnabled())) {
+            console.warn("Brevo: Platform email service is disabled. Skipping raw transactional email.");
+            return { success: true };
+        }
+
         const replyTo = replyToEmail
             ? { email: replyToEmail, ...(replyToName && { name: replyToName }) }
             : undefined;

@@ -9,6 +9,7 @@ import { Loader2, Activity } from "lucide-react";
 import { Notification } from "@/lib/types";
 import { useDateFormat } from "@/context/TimezoneContext";
 import { toast } from "sonner";
+import { stripNotificationMentionMarkup } from "@/lib/notification-text";
 
 interface ClientNotificationsListProps {
     initialNotifications: Notification[];
@@ -32,7 +33,13 @@ export function ClientNotificationsList({ initialNotifications, userId }: Client
             if (newNotifications.length < 5) {
                 setHasMore(false);
             }
-            setNotifications((prev) => [...prev, ...newNotifications]);
+            setNotifications((prev) => {
+                const existingIds = new Set(prev.map((notification) => notification.id));
+                return [
+                    ...prev,
+                    ...newNotifications.filter((notification) => !existingIds.has(notification.id)),
+                ];
+            });
             setOffset((prev) => prev + 5);
         } catch (error) {
             console.error("Failed to load more notifications", error);
@@ -64,13 +71,13 @@ export function ClientNotificationsList({ initialNotifications, userId }: Client
                         <div className="text-center py-8 text-muted-foreground">No new notifications.</div>
                     ) : (
                         <div className="space-y-4">
-                            {notifications.map((n, i) => (
-                                <div key={i} className="flex gap-4 items-start p-3 rounded-lg hover:bg-muted/50 transition">
+                            {notifications.map((n) => (
+                                <div key={n.id} className="flex gap-4 items-start p-3 rounded-lg hover:bg-muted/50 transition">
                                     <div className="bg-indigo-500/10 p-2 rounded-full mt-1">
                                         <Activity className="w-4 h-4 text-indigo-400" />
                                     </div>
                                     <div>
-                                        <p className="text-sm text-foreground">{n.message}</p>
+                                        <p className="text-sm text-foreground">{stripNotificationMentionMarkup(n.message)}</p>
                                         <p className="text-xs text-muted-foreground mt-1">
                                             {fmt.date(n.timestamp)}
                                         </p>

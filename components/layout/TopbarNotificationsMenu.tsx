@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 import { useDateFormat } from "@/context/TimezoneContext";
 import type { Notification } from "@/lib/types";
+import { stripNotificationMentionMarkup } from "@/lib/notification-text";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -78,7 +79,7 @@ export function TopbarNotificationsMenu({
                                 >
                                     <div className="flex items-start justify-between gap-2">
                                         <p className={`min-w-0 break-words text-sm ${!notification.read ? "font-medium" : "text-muted-foreground"}`}>
-                                            {notification.message}
+                                            {stripNotificationMentionMarkup(notification.message)}
                                         </p>
                                         {!notification.read && (
                                             <div className="h-2 w-2 shrink-0 rounded-full bg-blue-500 mt-1.5" />

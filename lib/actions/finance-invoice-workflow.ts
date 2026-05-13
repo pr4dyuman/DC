@@ -9,7 +9,6 @@ import { generateId } from "../utils-server";
 import { sanitizeMongoInput, sanitizeString } from "../validation";
 import {
     InvoiceModel,
-    NotificationModel,
     TransactionModel,
     UserModel,
     connectDB,
@@ -17,6 +16,7 @@ import {
 import { getDefaultCurrency } from "./super-admin";
 import { type AgencyContext, type FinanceActor, getClientDoc, getProjectDoc } from "./finance-mutation-shared";
 import { isNotifEnabled, sanitizeDoc } from "./shared";
+import { createNotifications } from "./notification-service";
 
 function getProjectClientIds(project: { clientId?: string; clientIds?: string[] } | null | undefined) {
     const ids = new Set<string>();
@@ -150,8 +150,7 @@ export async function clientMarkInvoiceAsPaidImpl(
     const admins = await UserModel.find({ agencyId, role: "admin" }).select("-password").lean() as Array<Pick<User, "id" | "email">>;
     const currency = await getDefaultCurrency();
     if (await isNotifEnabled("invoice")) {
-        await NotificationModel.insertMany(admins.map((admin) => ({
-            id: generateId(),
+        await createNotifications(admins.map((admin) => ({
             agencyId,
             userId: admin.id,
             message: `${currentUser.name} marked invoice ${formatCurrency(invoice.amount, currency)} as paid - Awaiting approval`,
@@ -192,8 +191,7 @@ export async function adminApproveInvoicePaymentImpl(invoiceId: string, agencyId
 
     if (clientIds.length > 0 && await isNotifEnabled("invoice")) {
         const currency = await getDefaultCurrency();
-        await NotificationModel.insertMany(clientIds.map((clientId) => ({
-            id: generateId(),
+        await createNotifications(clientIds.map((clientId) => ({
             agencyId,
             userId: clientId,
             message: `Payment approved! ${formatCurrency(invoice.amount, currency)} received for ${projectName}`,
@@ -241,8 +239,7 @@ export async function adminRejectInvoicePaymentImpl(invoiceId: string, agencyId:
         const message = reason
             ? `Payment rejected: ${reason}. Please mark as paid again.`
             : `Payment rejected for ${formatCurrency(invoice.amount, await getDefaultCurrency())}. Please mark as paid again.`;
-        await NotificationModel.insertMany(clientIds.map((clientId) => ({
-            id: generateId(),
+        await createNotifications(clientIds.map((clientId) => ({
             agencyId,
             userId: clientId,
             message,
@@ -349,8 +346,7 @@ export async function createInvoiceImpl(
 
     if (clientIds.length > 0 && await isNotifEnabled("invoice")) {
         const currency = await getDefaultCurrency();
-        await NotificationModel.insertMany(clientIds.map((clientId) => ({
-            id: generateId(),
+        await createNotifications(clientIds.map((clientId) => ({
             agencyId: agency.id,
             userId: clientId,
             message: `New Invoice Generated: ${formatCurrency(invoice.amount, currency)}`,

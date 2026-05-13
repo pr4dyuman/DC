@@ -268,11 +268,15 @@ const NotificationSchema = new Schema<Notification>({
     message: { type: String, required: true },
     read: { type: Boolean, required: true, default: false },
     timestamp: { type: String, required: true },
-    link: { type: String }
+    link: { type: String },
+    eventKey: { type: String }
 }, { timestamps: true });
 
 // Note: id already has index from unique constraint
 NotificationSchema.index({ agencyId: 1, userId: 1, read: 1 }); // Compound: agency + user + read status
+NotificationSchema.index({ agencyId: 1, userId: 1, timestamp: -1 });
+NotificationSchema.index({ agencyId: 1, userId: 1, read: 1, timestamp: -1 });
+NotificationSchema.index({ agencyId: 1, userId: 1, eventKey: 1 });
 
 // Activity Schema
 const ActivitySchema = new Schema<Activity>({

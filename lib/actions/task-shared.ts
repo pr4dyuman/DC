@@ -7,7 +7,6 @@ export type TaskMutationActor = Pick<User, "id" | "name">;
 export type TaskMutationUser = TaskMutationActor & {
     role: User["role"] | "superadmin";
 };
-export type EmailCategorySettings = NonNullable<Agency["settings"]["emailCategories"]>;
 export type CommentAgencyContext = Pick<Agency, "id" | "settings">;
 export type TaskEffectRecord = Omit<Task, "assigneeId" | "assigneeIds"> & {
     assigneeId?: string;
@@ -22,10 +21,6 @@ export type TaskEffectArgs = {
     completedAt?: string;
 };
 
-export function getEmailCategories(agency: CommentAgencyContext): Partial<EmailCategorySettings> {
-    return agency.settings?.emailCategories || {};
-}
-
 export async function getAgencyUser(agencyId: string, userId: string) {
     return UserModel.findOne({ id: userId, agencyId })
         .select("id name email")
@@ -34,6 +29,6 @@ export async function getAgencyUser(agencyId: string, userId: string) {
 
 export async function getProjectSummary(agencyId: string, projectId: string) {
     return ProjectModel.findOne({ id: projectId, agencyId })
-        .select("id name clientId slug status")
-        .lean() as Promise<{ id: string; name: string; clientId?: string; slug?: string; status?: string } | null>;
+        .select("id name clientId clientIds slug status")
+        .lean() as Promise<{ id: string; name: string; clientId?: string; clientIds?: string[]; slug?: string; status?: string } | null>;
 }

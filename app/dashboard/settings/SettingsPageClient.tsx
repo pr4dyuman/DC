@@ -224,11 +224,13 @@ export default function SettingsPage() {
                         loading={agencySettingsLoading}
                         onSaved={loadAgencySettings}
                     />
-                    <EmailSettings
-                        initialEnabled={agencySettings?.emailNotificationsEnabled ?? true}
-                        initialCategories={agencySettings?.emailCategories}
-                        loading={agencySettingsLoading}
-                    />
+                    {currentRole === 'admin' && (
+                        <EmailSettings
+                            initialEnabled={agencySettings?.emailNotificationsEnabled ?? true}
+                            initialCategories={agencySettings?.emailCategories}
+                            loading={agencySettingsLoading}
+                        />
+                    )}
                 </div>
             </SectionAccordion>
         </div>

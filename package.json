@@ -9,6 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "audit:email-templates": "node scripts/audit-email-templates.mjs",
     "lint": "eslint"
   },
   "dependencies": {

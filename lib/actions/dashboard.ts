@@ -33,6 +33,17 @@ type DashboardActor = {
     timezone?: string;
 };
 
+const NOTIFICATION_RETENTION_DAYS = 30;
+
+async function cleanupExpiredNotifications(agencyId: string, userId: string) {
+    const cutoff = new Date(Date.now() - NOTIFICATION_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    await NotificationModel.deleteMany({
+        agencyId,
+        userId,
+        timestamp: { $lt: cutoff },
+    });
+}
+
 type DashboardSettingsSnapshot = {
     systemName?: string;
     logo?: string;
@@ -274,6 +285,7 @@ export async function getClientDashboardDataImpl(actor: DashboardActor, clientId
     }
 
     await connectDB();
+    await cleanupExpiredNotifications(agencyId, clientId);
 
     const clientProjects = await ProjectModel.find({
         agencyId,
@@ -287,7 +299,7 @@ export async function getClientDashboardDataImpl(actor: DashboardActor, clientId
         TransactionModel.find({ projectId: { $in: projectIds }, agencyId }).lean() as Promise<Transaction[]>,
         TaskModel.find({ projectId: { $in: projectIds }, agencyId }).lean() as Promise<Task[]>,
         AssetModel.find({ projectId: { $in: projectIds }, agencyId }).lean() as Promise<Asset[]>,
-        NotificationModel.find({ userId: clientId, agencyId }).sort({ timestamp: -1 }).limit(5).lean() as Promise<Notification[]>,
+        NotificationModel.find({ userId: clientId, agencyId }).sort({ timestamp: -1, _id: -1 }).limit(5).lean() as Promise<Notification[]>,
         serviceLookupQuery
             ? ServiceModel.find({ agencyId, ...serviceLookupQuery })
                 .select("id name projectId employees agencyId")
@@ -362,9 +374,10 @@ export async function getNotificationsImpl(
     }
 
     await connectDB();
+    await cleanupExpiredNotifications(agencyId, userId);
 
     const notifications = await NotificationModel.find({ userId, agencyId })
-        .sort({ timestamp: -1 })
+        .sort({ timestamp: -1, _id: -1 })
         .skip(offset)
         .limit(limit)
         .lean();
@@ -378,6 +391,7 @@ export async function getUnreadNotificationCountImpl(actor: DashboardActor, agen
     }
 
     await connectDB();
+    await cleanupExpiredNotifications(agencyId, userId);
     return NotificationModel.countDocuments({ userId, read: false, agencyId });
 }
 

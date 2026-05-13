@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import type { Agency, Client, User } from "../db";
 import { checkAgencyLimit, incrementAgencyUsage, withAgencyId } from "../agency-context";
 import { comparePassword, hashPassword } from "../auth";
-import { sendEmployeeAccountCreatedEmail } from "../brevo-mail";
+import {
+    sendDocumentUpdateRequestedEmail,
+    sendDocumentUpdateResponseEmail,
+    sendEmployeeAccountCreatedEmail,
+} from "../brevo-mail";
 import { generateId } from "../utils-server";
 import {
     sanitizeMongoInput,
@@ -16,7 +20,6 @@ import {
 } from "../validation";
 import {
     ClientModel,
-    NotificationModel,
     SuperAdminModel,
     UserModel,
     connectDB,
@@ -26,6 +29,7 @@ import {
     requireAgencyFilter,
     validatePasswordWithPolicy,
 } from "./shared";
+import { createNotification, createNotifications } from "./notification-service";
 
 type UserMutationCaller = Pick<User, "id" | "name"> & {
     role: User["role"] | "superadmin";
@@ -37,6 +41,30 @@ type UserSession = {
     userId: string;
     role: User["role"] | "superadmin";
 };
+
+function getDocumentTypeLabel(type: DocumentUpdateType): string {
+    switch (type) {
+        case "adhar":
+            return "Aadhaar card";
+        case "pan":
+            return "PAN card";
+        case "contracts":
+            return "contracts";
+        case "other":
+            return "other documents";
+        case "both":
+            return "identity documents";
+    }
+}
+
+function getRequestedDocumentTypeLabel(updates: Partial<User>): string {
+    const requestedTypes: string[] = [];
+    if (updates.adharCardImage) requestedTypes.push("Aadhaar card");
+    if (updates.panCardImage) requestedTypes.push("PAN card");
+    if (updates.contracts) requestedTypes.push("contracts");
+    if (updates.otherDocuments) requestedTypes.push("other documents");
+    return requestedTypes.length > 0 ? requestedTypes.join(", ") : "documents";
+}
 
 export async function createUserImpl(user: Omit<User, "id" | "agencyId">, agency: Agency | null) {
     user = sanitizeMongoInput(user);
@@ -135,8 +163,7 @@ export async function createUserImpl(user: Omit<User, "id" | "agencyId">, agency
 
     try {
         if (await isNotifEnabled("welcome")) {
-            await NotificationModel.create({
-                id: generateId(),
+            await createNotification({
                 agencyId: agency?.id,
                 userId: newUser.id,
                 message: `Welcome to the team, ${newUser.name}! Your account has been set up. Explore your dashboard to get started.`,
@@ -303,23 +330,40 @@ export async function updateUserImpl(
         await ClientModel.updateOne({ id, ...agencyFilter }, { $set: finalUpdates });
     }
 
-    if (notifyAdmin && await isNotifEnabled("document")) {
-        const admins = await UserModel.find({ ...agencyFilter, $or: [{ role: "admin" }, { role: "manager" }] }).select("-password").lean();
+    if (notifyAdmin) {
+        const admins = await UserModel.find({ ...agencyFilter, $or: [{ role: "admin" }, { role: "manager" }] }).select("-password").lean() as User[];
         const currentUserDoc = (
             await UserModel.findOne({ id, ...agencyFilter }).select("name").lean() as Pick<User, "name"> | null
         ) || (
             await ClientModel.findOne({ id, ...agencyFilter }).select("name").lean() as Pick<Client, "name"> | null
         );
 
-        await NotificationModel.insertMany(admins.map((admin) => ({
-            id: generateId(),
-            agencyId: agency?.id,
-            userId: admin.id,
-            message: `${currentUserDoc?.name || "User"} has requested to update their identity documents.`,
-            read: false,
-            timestamp: new Date().toISOString(),
-            link: `/dashboard/team?edit=${id}`,
-        })));
+        if (await isNotifEnabled("document")) {
+            await createNotifications(admins.map((admin) => ({
+                agencyId: agency?.id,
+                userId: admin.id,
+                message: `${currentUserDoc?.name || "User"} has requested to update their identity documents.`,
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: `/dashboard/team?edit=${id}`,
+            })));
+        }
+
+        const adminEmails = admins
+            .map((admin) => admin.email)
+            .filter((email): email is string => Boolean(email));
+        if (adminEmails.length > 0) {
+            try {
+                await sendDocumentUpdateRequestedEmail({
+                    adminEmails,
+                    employeeName: currentUserDoc?.name || "User",
+                    documentType: getRequestedDocumentTypeLabel(updates),
+                    teamLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/team?edit=${id}`,
+                });
+            } catch (emailError) {
+                console.error("[Email] Failed to send document update request email:", emailError);
+            }
+        }
     }
 
     revalidatePath("/dashboard/team");
@@ -380,14 +424,27 @@ export async function approveDocumentUpdateImpl(
         : `Your document update request for ${type === "both" ? "documents" : type.toUpperCase()} has been REJECTED.`;
 
     if (await isNotifEnabled("document")) {
-        await NotificationModel.create({
-            id: generateId(),
+        await createNotification({
             agencyId,
             userId,
             message,
             read: false,
             timestamp: new Date().toISOString(),
         });
+    }
+
+    if (user.email) {
+        try {
+            await sendDocumentUpdateResponseEmail({
+                employeeEmail: user.email,
+                employeeName: user.name,
+                documentType: getDocumentTypeLabel(type),
+                approved: approve,
+                profileLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/settings`,
+            });
+        } catch (emailError) {
+            console.error("[Email] Failed to send document update response email:", emailError);
+        }
     }
 
     revalidatePath("/dashboard/team");
@@ -406,8 +463,7 @@ export async function adminResetPasswordImpl(
     await UserModel.updateOne({ id, agencyId }, { $set: { password: hashedPassword } });
 
     if (await isNotifEnabled("security")) {
-        await NotificationModel.create({
-            id: generateId(),
+        await createNotification({
             agencyId,
             userId: id,
             message: `Your password was reset by ${currentUser.name}. If you did not request this, please contact your admin immediately.`,

@@ -6,6 +6,7 @@ import { comparePassword } from "../auth";
 import { sanitizeColor, sanitizeName, sanitizeUrl } from "../validation";
 import type { AIConfig, AIPermissions } from "../types";
 import { DEFAULT_AI_PERMISSIONS } from "../types";
+import { EMAIL_CATEGORY_KEYS, TASK_EMAIL_EVENT_KEYS, getEffectiveEmailSettings } from "../email-policy";
 import {
     AgencyModel,
     ClientModel,
@@ -24,6 +25,7 @@ type SystemCurrencySettings = {
 
 export async function getAgencySettingsImpl(agency: Agency | null) {
     if (!agency) return null;
+    const effectiveEmailSettings = await getEffectiveEmailSettings({ agency });
 
     // Agency-specific currency takes priority; fall back to system default, then USD
     let fallbackCurrency = "USD";
@@ -46,7 +48,10 @@ export async function getAgencySettingsImpl(agency: Agency | null) {
         secondaryColor: agency.secondaryColor,
         currency: agency.settings?.currency || fallbackCurrency,
         emailNotificationsEnabled: agency.settings?.emailNotificationsEnabled ?? true,
-        emailCategories: agency.settings?.emailCategories || {},
+        emailCategories: {
+            ...effectiveEmailSettings.categories,
+            taskEmailEvents: effectiveEmailSettings.taskEmailEvents,
+        },
     };
 }
 
@@ -113,19 +118,9 @@ export async function updateEmailSettingsImpl(enabled: boolean, agencyId: string
 
 export async function updateEmailCategorySettingsImpl(categories: Record<string, boolean>, agencyId: string) {
     const updates: Record<string, boolean> = {};
-    const validCategories = [
-        "accountCreation",
-        "invoicePayment",
-        "salaryPayroll",
-        "refund",
-        "projectUpdates",
-        "taskUpdates",
-        "leaveManagement",
-        "documentApproval",
-    ];
 
     for (const [key, value] of Object.entries(categories)) {
-        if (validCategories.includes(key) && typeof value === "boolean") {
+        if ((EMAIL_CATEGORY_KEYS as string[]).includes(key) && typeof value === "boolean") {
             updates[`settings.emailCategories.${key}`] = value;
         }
     }
@@ -142,12 +137,11 @@ export async function updateEmailCategorySettingsImpl(categories: Record<string,
 }
 
 export async function updateTaskEmailEventsImpl(events: Record<string, Record<string, boolean>>, agencyId: string) {
-    const validEvents = ["taskCreated", "taskInProgress", "taskDone"];
     const validFields = ["enabled", "notifyAssignee", "notifyClient"];
     const updates: Record<string, boolean> = {};
 
     for (const [eventKey, fields] of Object.entries(events)) {
-        if (!validEvents.includes(eventKey) || typeof fields !== "object") continue;
+        if (!(TASK_EMAIL_EVENT_KEYS as string[]).includes(eventKey) || typeof fields !== "object") continue;
         for (const [field, value] of Object.entries(fields)) {
             if (validFields.includes(field) && typeof value === "boolean") {
                 updates[`settings.emailCategories.taskEmailEvents.${eventKey}.${field}`] = value;

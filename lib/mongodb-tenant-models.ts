@@ -40,6 +40,7 @@ const EmailCategoriesSchema = new Schema({
     taskUpdates: { type: Boolean, default: false },
     leaveManagement: { type: Boolean, default: false },
     documentApproval: { type: Boolean, default: false },
+    aiBloggerAlerts: { type: Boolean, default: true },
     taskEmailPriorities: { type: Schema.Types.Mixed, default: undefined },
     taskEmailEvents: { type: TaskEmailEventsSchema, default: () => ({}) },
 }, { _id: false });

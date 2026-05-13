@@ -8,6 +8,7 @@ import { cookies } from 'next/headers';
 import { signToken, verifyToken } from '@/lib/auth-utils';
 import { verifyOtp } from './send-otp/route';
 import { getPublicSecuritySettings } from '@/lib/actions/super-admin';
+import { getDefaultAgencyEmailSettings } from '@/lib/email-policy';
 
 // Safe image MIME types — SVG is intentionally excluded (can contain embedded scripts)
 const ALLOWED_LOGO_MIME_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
@@ -199,6 +200,7 @@ export async function POST(request: Request) {
         // Get default AI config for trial agencies (if configured by super-admin)
         const { getDefaultAiConfigForSignupImpl } = await import('@/lib/actions/super-admin-queries');
         const defaultAiConfig = await getDefaultAiConfigForSignupImpl();
+        const emailSettings = await getDefaultAgencyEmailSettings();
 
         await AgencyModel.create({
             id: agencyId,
@@ -228,7 +230,8 @@ export async function POST(request: Request) {
                 allowClientRegistration: false,
                 requireEmailVerification: true,
                 enableTwoFactor: false,
-                emailNotificationsEnabled: true
+                emailNotificationsEnabled: emailSettings.emailNotificationsEnabled,
+                emailCategories: emailSettings.emailCategories
             },
             // Apply default AI config if configured by super-admin
             ...(defaultAiConfig ? { aiConfig: defaultAiConfig } : {}),

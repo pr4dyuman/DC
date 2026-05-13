@@ -34,6 +34,7 @@ export async function notifyScheduleFailed(
         const success = await sendEmail({
             to: recipients,
             templateId: EMAIL_TEMPLATES.AI_BLOGGER_SCHEDULE_FAILED,
+            agencyId: schedule.agencyId,
             params: {
                 scheduleName: schedule.name,
                 agencyName,
@@ -78,6 +79,7 @@ export async function notifySchedulePaused(
         const success = await sendEmail({
             to: recipients,
             templateId: EMAIL_TEMPLATES.AI_BLOGGER_SCHEDULE_PAUSED,
+            agencyId: schedule.agencyId,
             params: {
                 scheduleName: schedule.name,
                 agencyName,
@@ -100,6 +102,7 @@ export async function notifySchedulePaused(
  * ENHANCEMENT: Added prominent webhook failure alert system
  */
 export async function notifyWebhookDeliveryFailed(
+    agencyId: string,
     agencyName: string,
     postTitle: string,
     webhookUrl: string,
@@ -126,6 +129,7 @@ export async function notifyWebhookDeliveryFailed(
         const success = await sendEmail({
             to: recipients,
             templateId: EMAIL_TEMPLATES.AI_BLOGGER_SCHEDULE_FAILED,
+            agencyId,
             params: {
                 agencyName,
                 postTitle: postTitle.slice(0, 100),
@@ -159,6 +163,7 @@ export async function notifyWebhookDeliveryFailed(
  * Sends an email notification when webhook delivery recovers after failures
  */
 export async function notifyWebhookDeliveryRecovered(
+    agencyId: string,
     agencyName: string,
     postTitle: string,
     webhookUrl: string,
@@ -181,6 +186,7 @@ export async function notifyWebhookDeliveryRecovered(
         const success = await sendEmail({
             to: recipients,
             templateId: EMAIL_TEMPLATES.AI_BLOGGER_SCHEDULE_FAILED,  // Fallback template
+            agencyId,
             params: {
                 agencyName,
                 postTitle: postTitle.slice(0, 100),
