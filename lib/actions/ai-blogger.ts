@@ -6209,6 +6209,19 @@ function hasLocalInstitutionIncidentRisk(topic: string, trendContext: string) {
     return isLocalInstitution && hasSafetyIncident;
 }
 
+function hasCompanyLaborNewsRisk(topic: string, trendContext: string) {
+    const normalized = sanitizeText(`${topic} ${trendContext}`, 900).toLowerCase();
+    return /\b(?:layoffs?|laid off|job cuts?|workforce cuts?|headcount reduction|restructuring|hiring freeze|mass firing|fired|firings?|terminations?|unemployment|strike|strikes|union|labor dispute|labour dispute)\b/.test(normalized);
+}
+
+function websiteSupportsCompanyLaborNewsLane(
+    websiteIntelligence: AIBloggerWebsiteIntelligence | null,
+    brief: BlogStudioBrief,
+) {
+    const websiteText = getWebsiteCategoryAlignmentText(websiteIntelligence, brief);
+    return /\b(?:hr|human resources|recruiting|recruitment|staffing|talent acquisition|jobs?|careers?|workforce|employee|employees|employer brand|employer branding|internal communications?|corporate communications?|public relations|pr agency|crisis communications?|reputation management|legal|employment law|labor law|labour law|news|journalism|finance|investor relations|business intelligence)\b/i.test(websiteText);
+}
+
 function buildWebsiteTrendFitGroups(
     websiteIntelligence: AIBloggerWebsiteIntelligence | null,
     brief: BlogStudioBrief,
@@ -6481,6 +6494,10 @@ export function assessTrendAgainstWebsite(
         hasLocalInstitutionIncidentRisk(trend.topic, trendContext) &&
         meaningfulCoreTokens.length < 2 &&
         !exactPhraseMatch;
+    const companyLaborNewsRisk =
+        hasCompanyLaborNewsRisk(trend.topic, trendContext) &&
+        !websiteSupportsCompanyLaborNewsLane(websiteIntelligence, brief) &&
+        !hasExplicitWebsiteOfferTrendIntent(trendContext, websiteIntelligence, brief);
     const requiresCommercialEvidence = isCommercialWebsiteTrendContext(websiteIntelligence);
     const hasCommercialTrendEvidence =
         (commercialOverlap >= 18 && !genericOffLaneBridgeRisk) ||
@@ -6500,6 +6517,7 @@ export function assessTrendAgainstWebsite(
         (offTopicCategoryMismatch ? -28 : 0) +
         (genericOffLaneBridgeRisk ? -32 : 0) +
         (localInstitutionIncidentRisk ? -35 : 0) +
+        (companyLaborNewsRisk ? -35 : 0) +
         (requiresCommercialEvidence && !hasCommercialTrendEvidence ? -22 : 0),
     );
 
@@ -6557,6 +6575,10 @@ export function assessTrendAgainstWebsite(
         reasons.push("local institution incident trend needs explicit site fit");
     }
 
+    if (companyLaborNewsRisk) {
+        reasons.push("company or labor-news trend needs explicit HR, recruiting, PR, legal, finance, or employer-branding site fit");
+    }
+
     if (requiresCommercialEvidence && !hasCommercialTrendEvidence) {
         reasons.push("no service or money-page evidence matched");
     }
@@ -6585,7 +6607,8 @@ export function assessTrendAgainstWebsite(
         (!requiresCommercialEvidence || hasCommercialTrendEvidence) &&
         !offTopicCategoryMismatch &&
         !genericOffLaneBridgeRisk &&
-        !localInstitutionIncidentRisk;
+        !localInstitutionIncidentRisk &&
+        !companyLaborNewsRisk;
 
     if (!accepted) {
         reasons.push(
@@ -11470,6 +11493,7 @@ Rules:
 - Generic bridge words alone are not enough website fit: video, viral, content, social, digital, media, story, storytelling, brand, creative, marketing, or online.
 - If source mode is website, prefer topics that a direct visitor to the site would still find useful without knowing the trend. Reject trend-chasing, gossip, incident, entertainment, school, sports, finance, or YMYL angles unless the site clearly has authority and a useful service-led reason to cover them.
 - For incident/news/sports/entertainment trends, select a topic only when the website explicitly serves that lane or the trend context itself contains a real service/product/category phrase from the crawled website intelligence.
+- For company layoffs, firings, hiring freezes, strikes, or labor-news trends, select a topic only when the website explicitly serves HR, recruiting, employer branding, crisis communications, PR, legal, finance, or business-news audiences. Do not convert these into generic B2B marketing or video-production lessons.
 - If a row is marked "trend-first match", use it as evidence, but selectedTopic should still be the best SEO article angle, not automatically the raw trend text.
 - Do not select a very viral topic when its site-fit score is weak; prefer the strongest viral trend that genuinely matches the website, source value, trend focus, or primary keyword.
 - For each topic, optimize for useful reader outcome, SERP gap, original value potential, and conversion path. Do not pick topics just because they can be loosely connected with brand language.
