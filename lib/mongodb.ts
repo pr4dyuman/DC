@@ -259,6 +259,7 @@ const ServiceSchema = new Schema<Service>({
 
 // Note: id already has index from unique constraint
 ServiceSchema.index({ agencyId: 1, projectId: 1, name: 1 }, { unique: true });
+ServiceSchema.index({ agencyId: 1, employees: 1, projectId: 1 });
 
 // Notification Schema
 const NotificationSchema = new Schema<Notification>({
@@ -314,6 +315,7 @@ const AssetSchema = new Schema<Asset>({
 
 // Note: id already has index from unique constraint
 AssetSchema.index({ projectId: 1 });
+AssetSchema.index({ agencyId: 1, projectId: 1, uploadedAt: -1 });
 
 // Message Schema
 const MessageSchema = new Schema<Message>({

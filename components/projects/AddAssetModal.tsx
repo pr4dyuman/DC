@@ -85,7 +85,12 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
         return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
     };
 
-    const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt"];
+    const ALLOWED_EXTENSIONS = [
+        ".jpg", ".jpeg", ".png", ".gif", ".webp",
+        ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt",
+        ".md", ".json", ".html", ".css", ".js", ".ts", ".tsx", ".jsx", ".py",
+        ".zip", ".rar",
+    ];
     const MAX_SIZE = 50 * 1024 * 1024;
 
     const validateFile = (selectedFile: File): { valid: boolean; error?: string } => {
@@ -182,6 +187,7 @@ export function AddAssetModal({ projectId }: AddAssetModalProps) {
                 } else {
                     const uploadFormData = new FormData();
                     uploadFormData.append("file", file);
+                    uploadFormData.append("projectId", projectId);
 
                     uploadUrl = await new Promise<string>((resolve, reject) => {
                         const xhr = new XMLHttpRequest();

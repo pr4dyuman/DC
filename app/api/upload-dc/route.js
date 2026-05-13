@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { getSessionUser } from '@/lib/auth';
 import { getCurrentAgency, checkTrialExpired } from '@/lib/agency-context';
+import { canCurrentUserAccessProject } from '@/lib/actions/access';
 import {
   assertAgencyCanUpload,
   assertAllowedUploadExtension,
@@ -33,9 +34,17 @@ export async function POST(req) {
 
     const formData = await req.formData();
     const file = formData.get('file');
+    const projectId = String(formData.get('projectId') || '').trim();
 
     if (!file || typeof file === 'string') {
       return NextResponse.json({ success: false, error: 'No file received' }, { status: 400 });
+    }
+
+    if (projectId) {
+      const canAccess = await canCurrentUserAccessProject(projectId, agency.id);
+      if (!canAccess) {
+        return NextResponse.json({ success: false, error: 'Unauthorized: You cannot upload files to this project.' }, { status: 403 });
+      }
     }
 
     try {

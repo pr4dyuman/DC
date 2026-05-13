@@ -39,7 +39,7 @@ export function AddAssetSecureUploadPanel({
                             id="file"
                             type="file"
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                            accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                            accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md,.json,.html,.css,.js,.ts,.tsx,.jsx,.py,.zip,.rar"
                             onChange={onFileChange}
                             required={inputMode === "file"}
                         />
@@ -50,7 +50,7 @@ export function AddAssetSecureUploadPanel({
                             ) : (
                                 <>
                                     <span className="text-sm font-medium">Click to upload or drag and drop</span>
-                                    <span className="text-xs text-muted-foreground">Images, PDF, DOC, XLS, CSV, TXT - Max 50MB</span>
+                                    <span className="text-xs text-muted-foreground">Images, docs, code, ZIP, CSV, TXT - Max 50MB</span>
                                 </>
                             )}
                         </div>

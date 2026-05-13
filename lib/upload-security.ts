@@ -6,6 +6,8 @@ import { deleteFile } from "./storage";
 export const ALLOWED_UPLOAD_EXTENSIONS = new Set([
     ".jpg", ".jpeg", ".png", ".gif", ".webp",
     ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt",
+    ".md", ".json", ".html", ".css", ".js", ".ts", ".tsx", ".jsx", ".py",
+    ".zip", ".rar",
 ]);
 
 export const MAX_UPLOAD_FILE_SIZE = 50 * 1024 * 1024;
@@ -24,6 +26,17 @@ export const UPLOAD_MIME_TYPES: Record<string, string> = {
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ".csv": "text/csv",
     ".txt": "text/plain",
+    ".md": "text/markdown",
+    ".json": "application/json",
+    ".html": "text/html",
+    ".css": "text/css",
+    ".js": "text/javascript",
+    ".ts": "text/plain",
+    ".tsx": "text/plain",
+    ".jsx": "text/plain",
+    ".py": "text/x-python",
+    ".zip": "application/zip",
+    ".rar": "application/vnd.rar",
 };
 
 const DIRECT_UPLOAD_ALLOWED_CONTENT_TYPES: Record<string, string[]> = {
@@ -39,6 +52,17 @@ const DIRECT_UPLOAD_ALLOWED_CONTENT_TYPES: Record<string, string[]> = {
     ".xlsx": ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
     ".csv": ["text/csv", "application/csv", "application/vnd.ms-excel"],
     ".txt": ["text/plain"],
+    ".md": ["text/markdown", "text/plain"],
+    ".json": ["application/json", "text/json", "text/plain"],
+    ".html": ["text/html", "text/plain"],
+    ".css": ["text/css", "text/plain"],
+    ".js": ["text/javascript", "application/javascript", "text/plain"],
+    ".ts": ["video/mp2t", "text/plain"],
+    ".tsx": ["text/plain"],
+    ".jsx": ["text/plain", "text/javascript", "application/javascript"],
+    ".py": ["text/x-python", "text/plain"],
+    ".zip": ["application/zip", "application/x-zip-compressed"],
+    ".rar": ["application/vnd.rar", "application/x-rar-compressed", "application/octet-stream"],
 };
 
 const IMAGE_MAGIC: Record<string, number[] | null> = {

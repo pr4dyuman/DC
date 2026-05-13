@@ -6,6 +6,7 @@ import {
     ClientModel,
     ProjectModel,
     SettingsModel,
+    ServiceModel,
     SuperAdminModel,
     TaskModel,
     UserModel,
@@ -120,6 +121,21 @@ export function toActionActor(user: ActionActor): ActionActor {
     };
 }
 
+async function getEmployeeProjectIds(agencyId: string, userId: string) {
+    const [taskProjectIds, serviceProjectIds] = await Promise.all([
+        TaskModel.distinct('projectId', {
+            agencyId,
+            $or: [{ assigneeId: userId }, { assigneeIds: userId }],
+        }),
+        ServiceModel.distinct('projectId', {
+            agencyId,
+            employees: userId,
+        }),
+    ]);
+
+    return [...new Set([...taskProjectIds, ...serviceProjectIds].filter(Boolean))];
+}
+
 export async function getScopedProjectIdsForCurrentUser(agencyId: string): Promise<string[] | null> {
     const currentUser = await requireAuth();
     if (currentUser.role === 'admin' || currentUser.role === 'manager' || currentUser.role === 'superadmin') {
@@ -133,10 +149,7 @@ export async function getScopedProjectIdsForCurrentUser(agencyId: string): Promi
         });
     }
 
-    return await TaskModel.distinct('projectId', {
-        agencyId,
-        $or: [{ assigneeId: currentUser.id }, { assigneeIds: currentUser.id }],
-    });
+    return getEmployeeProjectIds(agencyId, currentUser.id);
 }
 
 export async function canCurrentUserAccessProject(projectId: string, agencyId: string): Promise<boolean> {
@@ -154,11 +167,20 @@ export async function canCurrentUserAccessProject(projectId: string, agencyId: s
         });
     }
 
-    return !!await TaskModel.exists({
-        projectId,
-        agencyId,
-        $or: [{ assigneeId: currentUser.id }, { assigneeIds: currentUser.id }],
-    });
+    const [taskAccess, serviceAccess] = await Promise.all([
+        TaskModel.exists({
+            projectId,
+            agencyId,
+            $or: [{ assigneeId: currentUser.id }, { assigneeIds: currentUser.id }],
+        }),
+        ServiceModel.exists({
+            projectId,
+            agencyId,
+            employees: currentUser.id,
+        }),
+    ]);
+
+    return Boolean(taskAccess || serviceAccess);
 }
 
 export async function hasExplicitAIAccessSetting(

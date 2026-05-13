@@ -4,7 +4,7 @@ import type { Asset } from "../db";
 import { decrementAgencyUsage } from "../agency-context";
 import { ActivityModel, AssetModel, connectDB } from "../mongodb";
 import { generateId } from "../utils-server";
-import { sanitizeMongoInput, sanitizeName, sanitizeString, sanitizeUpdates, sanitizeUrl } from "../validation";
+import { sanitizeMongoInput, sanitizeName, sanitizeString, sanitizeUpdates, sanitizeUrl, validateId } from "../validation";
 import { sanitizeDoc, sortByUploadedAtDesc } from "./shared";
 
 type AssetActor = {
@@ -17,11 +17,24 @@ type AddProjectAssetInput = Omit<Asset, "id" | "uploadedAt" | "agencyId" | "uplo
 };
 
 const MAX_ASSET_CONTENT_LENGTH = 200_000;
+const ASSET_TYPES = new Set<Asset["type"]>(["image", "file", "code", "zip", "folder", "link"]);
 
 function sanitizeAssetContent(content: unknown) {
     if (typeof content !== "string") return undefined;
     const sanitized = sanitizeString(content, MAX_ASSET_CONTENT_LENGTH);
     return sanitized || undefined;
+}
+
+function sanitizeAssetContentUpdate(content: unknown) {
+    if (typeof content !== "string") return undefined;
+    return sanitizeString(content, MAX_ASSET_CONTENT_LENGTH);
+}
+
+function normalizeAssetType(type: unknown): Asset["type"] {
+    if (typeof type === "string" && ASSET_TYPES.has(type as Asset["type"])) {
+        return type as Asset["type"];
+    }
+    throw new Error("Invalid asset type");
 }
 
 export async function getProjectAssetsImpl(projectId: string, agencyId: string) {
@@ -36,10 +49,14 @@ export async function addProjectAssetImpl(
     actor: NonNullable<AssetActor>
 ) {
     const nextAsset = sanitizeMongoInput(asset) as AddProjectAssetInput;
+    nextAsset.projectId = validateId(nextAsset.projectId);
     nextAsset.name = sanitizeName(nextAsset.name, 500);
     if (!nextAsset.name) throw new Error("Asset name is required");
+    nextAsset.type = normalizeAssetType(nextAsset.type);
     if (nextAsset.description) nextAsset.description = sanitizeString(nextAsset.description, 2000);
     if (nextAsset.url) nextAsset.url = sanitizeUrl(nextAsset.url);
+    if (!nextAsset.url) throw new Error("Asset URL is required");
+    if (nextAsset.size) nextAsset.size = sanitizeString(nextAsset.size, 100) || undefined;
     nextAsset.content = sanitizeAssetContent(nextAsset.content);
 
     const forbiddenExtensions = [".exe", ".bat", ".cmd", ".sh", ".vbs", ".msi", ".jar", ".com", ".scr", ".pif"];
@@ -69,6 +86,7 @@ export async function addProjectAssetImpl(
     });
 
     revalidatePath(`/dashboard/projects/${nextAsset.projectId}`);
+    revalidatePath("/dashboard/projects/[slug]", "page");
     return newAsset;
 }
 
@@ -118,6 +136,8 @@ export async function deleteProjectAssetImpl(assetId: string, agencyId: string, 
     });
 
     revalidatePath("/dashboard/projects/[id]", "page");
+    revalidatePath("/dashboard/projects/[slug]", "page");
+    revalidatePath(`/dashboard/projects/${asset.projectId}`);
 }
 
 export async function updateProjectAssetImpl(
@@ -126,14 +146,36 @@ export async function updateProjectAssetImpl(
     agencyId: string,
     actor: AssetActor
 ) {
-    const nextUpdates = sanitizeUpdates(updates) as Partial<Asset>;
-    if (nextUpdates.name) nextUpdates.name = sanitizeName(nextUpdates.name, 500);
-    if (nextUpdates.description) nextUpdates.description = sanitizeString(nextUpdates.description, 2000);
-    if (nextUpdates.url) nextUpdates.url = sanitizeUrl(nextUpdates.url);
+    const rawUpdates = sanitizeUpdates(updates) as Partial<Asset>;
 
     await connectDB();
     const asset = await AssetModel.findOne({ id: assetId, agencyId }).lean() as Asset | null;
     if (!asset) throw new Error("Asset not found");
+
+    const nextUpdates: Partial<Asset> = {};
+    if (Object.prototype.hasOwnProperty.call(rawUpdates, "name")) {
+        const name = sanitizeName(rawUpdates.name || "", 500);
+        if (!name) throw new Error("Asset name is required");
+        nextUpdates.name = name;
+    }
+    if (Object.prototype.hasOwnProperty.call(rawUpdates, "description")) {
+        nextUpdates.description = rawUpdates.description
+            ? sanitizeString(rawUpdates.description, 2000)
+            : "";
+    }
+    if (Object.prototype.hasOwnProperty.call(rawUpdates, "url")) {
+        const url = rawUpdates.url ? sanitizeUrl(rawUpdates.url) : "";
+        if (!url) throw new Error("Asset URL is required");
+        nextUpdates.url = url;
+    }
+    if (Object.prototype.hasOwnProperty.call(rawUpdates, "content")) {
+        nextUpdates.content = sanitizeAssetContentUpdate(rawUpdates.content);
+    }
+    if (Object.prototype.hasOwnProperty.call(rawUpdates, "aiEnabled")) {
+        nextUpdates.aiEnabled = Boolean(rawUpdates.aiEnabled);
+    }
+
+    if (Object.keys(nextUpdates).length === 0) return sanitizeDoc(asset);
 
     await AssetModel.updateOne({ id: assetId, agencyId }, { $set: nextUpdates });
     await ActivityModel.create({
@@ -147,10 +189,16 @@ export async function updateProjectAssetImpl(
     });
 
     revalidatePath("/dashboard/projects/[id]", "page");
+    revalidatePath("/dashboard/projects/[slug]", "page");
+    revalidatePath(`/dashboard/projects/${asset.projectId}`);
 }
 
 export async function toggleAssetAIImpl(assetId: string, enabled: boolean, agencyId: string) {
     await connectDB();
+    const asset = await AssetModel.findOne({ id: assetId, agencyId }).select("projectId").lean() as Pick<Asset, "projectId"> | null;
+    if (!asset) throw new Error("Asset not found");
     await AssetModel.updateOne({ id: assetId, agencyId }, { $set: { aiEnabled: enabled } });
     revalidatePath("/dashboard/projects/[id]", "page");
+    revalidatePath("/dashboard/projects/[slug]", "page");
+    revalidatePath(`/dashboard/projects/${asset.projectId}`);
 }

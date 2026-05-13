@@ -9,6 +9,7 @@ import { useDateFormat } from "@/context/TimezoneContext";
 
 interface AssetCardProps {
     asset: Asset;
+    canEdit?: boolean;
     onDelete?: (id: string) => void;
 }
 
@@ -34,12 +35,14 @@ const getTypeLabel = (type: Asset['type']) => {
     }
 };
 
-export function AssetCard({ asset, onDelete }: AssetCardProps) {
+export function AssetCard({ asset, canEdit = false, onDelete }: AssetCardProps) {
     const fmt = useDateFormat();
     const [viewerOpen, setViewerOpen] = useState(false);
+    const hasUrl = typeof asset.url === "string" && asset.url.trim().length > 0;
+    const isExternalUrl = hasUrl && /^https?:\/\//i.test(asset.url);
 
     // Can view images and text/code files
-    const canView = asset.type === 'image' || asset.type === 'code' || asset.type === 'file';
+    const canView = (asset.type === 'image' && hasUrl) || asset.type === 'code' || asset.type === 'file';
 
     return (
         <>
@@ -102,17 +105,19 @@ export function AssetCard({ asset, onDelete }: AssetCardProps) {
                         </Button>
                     )}
 
-                    <a href={asset.url} target="_blank" rel="noopener noreferrer" download={!asset.url.startsWith('http')}>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-primary"
-                            aria-label={`Download ${asset.name}`}
-                            title="Download"
-                        >
-                            <DownloadIcon className="h-4 w-4" />
-                        </Button>
-                    </a>
+                    {hasUrl && (
+                        <a href={asset.url} target="_blank" rel="noopener noreferrer" download={!isExternalUrl}>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                aria-label={`Download ${asset.name}`}
+                                title="Download"
+                            >
+                                <DownloadIcon className="h-4 w-4" />
+                            </Button>
+                        </a>
+                    )}
 
                     {onDelete && (
                         <DropdownMenu>
@@ -137,7 +142,7 @@ export function AssetCard({ asset, onDelete }: AssetCardProps) {
                     )}
                 </div>
             </div>
-            <AssetViewerModal asset={asset} open={viewerOpen} onClose={() => setViewerOpen(false)} />
+            <AssetViewerModal asset={asset} open={viewerOpen} canEdit={canEdit} onClose={() => setViewerOpen(false)} />
         </>
     );
 }

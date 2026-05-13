@@ -140,11 +140,18 @@ export async function getUserProjectsImpl(agencyId: string, userId: string) {
         return normalizedProjects.map((project) => withAgencyIdFallback(sanitizeDoc(project) as ProjectLike & { agencyId?: string }, agencyId));
     }
 
-    const taskProjectIds = await TaskModel.distinct("projectId", {
-        agencyId,
-        $or: [{ assigneeId: userId }, { assigneeIds: userId }],
-    });
-    const projects = await ProjectModel.find({ id: { $in: taskProjectIds }, agencyId }).lean() as ProjectLike[];
+    const [taskProjectIds, serviceProjectIds] = await Promise.all([
+        TaskModel.distinct("projectId", {
+            agencyId,
+            $or: [{ assigneeId: userId }, { assigneeIds: userId }],
+        }),
+        ServiceModel.distinct("projectId", {
+            agencyId,
+            employees: userId,
+        }),
+    ]);
+    const projectIds = Array.from(new Set([...taskProjectIds, ...serviceProjectIds].filter(Boolean)));
+    const projects = await ProjectModel.find({ id: { $in: projectIds }, agencyId }).lean() as ProjectLike[];
     const hydratedProjects = await hydrateProjectsWithCurrentClients(projects, agencyId);
     const serviceLookupQuery = buildProjectServiceLookupQuery(hydratedProjects);
     const services = serviceLookupQuery

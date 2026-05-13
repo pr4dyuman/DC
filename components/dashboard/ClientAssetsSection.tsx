@@ -13,7 +13,7 @@ interface ClientAssetsSectionProps {
 
 export function ClientAssetsSection({ assets, projects }: ClientAssetsSectionProps) {
     const fmt = useDateFormat();
-    const recentAssets = assets
+    const recentAssets = [...assets]
         .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
         .slice(0, 10);
 
@@ -80,11 +80,13 @@ export function ClientAssetsSection({ assets, projects }: ClientAssetsSectionPro
                                     No assets uploaded yet
                                 </div>
                             ) : (
-                                recentAssets.map((asset) => (
-                                    <div
-                                        key={asset.id}
-                                        className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition group"
-                                    >
+                                recentAssets.map((asset) => {
+                                    const hasUrl = typeof asset.url === "string" && asset.url.trim().length > 0;
+                                    return (
+                                        <div
+                                            key={asset.id}
+                                            className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition group"
+                                        >
                                         <div className="flex-shrink-0">
                                             {getAssetIcon(asset.type)}
                                         </div>
@@ -97,18 +99,21 @@ export function ClientAssetsSection({ assets, projects }: ClientAssetsSectionPro
                                                 {asset.size} • {fmt.date(asset.uploadedAt)}
                                             </p>
                                         </div>
-                                        <a
-                                            href={asset.url}
-                                            download
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition p-2 hover:bg-white/10 rounded"
-                                            title="Download"
-                                        >
-                                            <Download className="h-4 w-4" />
-                                        </a>
-                                    </div>
-                                ))
+                                        {hasUrl && (
+                                            <a
+                                                href={asset.url}
+                                                download={!/^https?:\/\//i.test(asset.url)}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition p-2 hover:bg-white/10 rounded"
+                                                title="Download"
+                                            >
+                                                <Download className="h-4 w-4" />
+                                            </a>
+                                        )}
+                                        </div>
+                                    );
+                                })
                             )}
                         </div>
                     </ScrollArea>

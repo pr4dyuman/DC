@@ -52,6 +52,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
 
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager';
     const canAddAssets = currentUser?.role === 'admin' || currentUser?.role === 'manager' || currentUser?.role === 'employee';
+    const canEditAssets = isAdmin;
     const canDeleteAssets = isAdmin;
 
     return (
@@ -289,7 +290,7 @@ export function ProjectView({ project, tasks, users, transactions, assets, categ
 
                 <TabsContent value="assets" className="flex-1 overflow-auto data-[state=inactive]:hidden no-scrollbar">
                     <div className="space-y-4 p-1">
-                        <AssetList assets={assets} canDelete={canDeleteAssets} />
+                        <AssetList assets={assets} canDelete={canDeleteAssets} canEdit={canEditAssets} />
                     </div>
                 </TabsContent>
 

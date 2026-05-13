@@ -13,17 +13,18 @@ import { toast } from "sonner";
 interface AssetViewerModalProps {
     asset: Asset;
     open: boolean;
+    canEdit?: boolean;
     onClose: () => void;
 }
 
-export function AssetViewerModal({ asset, open, onClose }: AssetViewerModalProps) {
+export function AssetViewerModal({ asset, open, canEdit = false, onClose }: AssetViewerModalProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [content, setContent] = useState(asset.content || "");
     const [loading, setLoading] = useState(false);
     const router = useRouter();
 
     const canViewImage = asset.type === 'image';
-    const canEditText = ['file', 'code'].includes(asset.type) && asset.content !== undefined;
+    const canEditText = canEdit && ['file', 'code'].includes(asset.type) && asset.content !== undefined;
 
     const handleSave = async () => {
         setLoading(true);
