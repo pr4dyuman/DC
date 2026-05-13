@@ -26,7 +26,7 @@ import {
     getProjectDoc,
 } from "./finance-mutation-shared";
 import { isNotifEnabled } from "./shared";
-import { createNotification } from "./notification-service";
+import { createNotification, createNotifications } from "./notification-service";
 export {
     adminApproveInvoicePaymentImpl,
     adminRejectInvoicePaymentImpl,
@@ -34,6 +34,13 @@ export {
     createInvoiceImpl,
     updateInvoiceStatusImpl,
 } from "./finance-invoice-workflow";
+
+function getProjectClientIds(project: { clientId?: string; clientIds?: string[] } | null | undefined): string[] {
+    return [
+        ...(project?.clientIds || []),
+        ...(project?.clientId && !(project.clientIds || []).includes(project.clientId) ? [project.clientId] : []),
+    ].filter(Boolean);
+}
 
 export async function createTransactionImpl(
     transaction: Omit<Transaction, "id" | "status" | "agencyId"> & { status?: Transaction["status"] },
@@ -107,6 +114,7 @@ export async function createTransactionImpl(
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: "/dashboard/finance",
+                eventKey: `salary-paid:${newTransaction.id}:${newTransaction.userId}`,
             });
         }
         try {
@@ -241,20 +249,24 @@ export async function createRefundImpl(refund: RefundInput, agency: AgencyContex
         timestamp: new Date().toISOString(),
     });
 
-    if (project.clientId && await isNotifEnabled("refund")) {
-        await createNotification({
+    const linkedClientIds = getProjectClientIds(project);
+    if (linkedClientIds.length > 0 && await isNotifEnabled("refund")) {
+        const currency = await getDefaultCurrency();
+        await createNotifications(linkedClientIds.map((clientId) => ({
             agencyId: agency.id,
-            userId: project.clientId,
-            message: `Refund of ${formatCurrency(refund.amount, await getDefaultCurrency())} has been issued for ${project.name}`,
+            userId: clientId,
+            message: `Refund of ${formatCurrency(refund.amount, currency)} has been issued for ${project.name}`,
             read: false,
             timestamp: new Date().toISOString(),
             link: `/dashboard/projects/${project.slug || project.id}`,
-        });
+            eventKey: `refund-issued:${newRefund.id}:${clientId}`,
+        })));
     }
 
     try {
-        const client = project.clientId ? await getClientDoc(agency.id, project.clientId) : null;
-        if (client?.email) {
+        for (const clientId of linkedClientIds) {
+            const client = await getClientDoc(agency.id, clientId);
+            if (!client?.email) continue;
             await sendRefundIssuedEmail({
                 clientEmail: client.email,
                 clientName: client.name,

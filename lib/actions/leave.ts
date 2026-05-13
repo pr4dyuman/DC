@@ -28,9 +28,19 @@ type LeaveQuery = {
 };
 
 type LeaveInput = Omit<LeaveRequest, "id" | "status" | "createdAt" | "agencyId">;
+type LeaveReviewer = Pick<User, "id" | "email">;
 
 function getAppUrl() {
     return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+}
+
+async function getLeaveReviewers(agencyId: string, excludeUserId?: string): Promise<LeaveReviewer[]> {
+    const query: { agencyId: string; role: { $in: string[] }; id?: { $ne: string } } = {
+        agencyId,
+        role: { $in: ["admin", "manager"] },
+    };
+    if (excludeUserId) query.id = { $ne: excludeUserId };
+    return UserModel.find(query).select("id email").lean() as Promise<LeaveReviewer[]>;
 }
 
 function calculateRequestedDays(startDateIso: string, endDateIso: string) {
@@ -113,15 +123,16 @@ export async function requestLeaveImpl(currentUser: LeaveActor, agencyId: string
     await connectDB();
     await LeaveRequestModel.create(newLeaveRequest);
 
-    const adminUsers = await UserModel.find({ agencyId, role: "admin" }).select("-password").lean() as Array<Pick<User, "id" | "email">>;
+    const reviewers = await getLeaveReviewers(agencyId, currentUser.id);
     if (await isNotifEnabled("leave")) {
-        await createNotifications(adminUsers.map((admin) => ({
+        await createNotifications(reviewers.map((reviewer) => ({
             agencyId,
-            userId: admin.id,
+            userId: reviewer.id,
             message: `${currentUser.name} requested ${nextLeaveData.type} leave (${daysDiff} day${daysDiff > 1 ? "s" : ""})`,
             read: false,
             timestamp: new Date().toISOString(),
             link: "/dashboard/team",
+            eventKey: `leave-requested:${newLeaveRequest.id}:${reviewer.id}`,
         })));
     }
 
@@ -136,7 +147,7 @@ export async function requestLeaveImpl(currentUser: LeaveActor, agencyId: string
     });
 
     try {
-        const adminEmails = adminUsers.map((admin) => admin.email).filter(Boolean) as string[];
+        const adminEmails = reviewers.map((reviewer) => reviewer.email).filter(Boolean) as string[];
         if (adminEmails.length > 0) {
             await sendLeaveRequestedEmail({
                 adminEmails,
@@ -180,6 +191,7 @@ export async function approveLeaveRequestImpl(currentUser: LeaveActor, agencyId:
             read: false,
             timestamp: new Date().toISOString(),
             link: "/dashboard/team",
+            eventKey: `leave-approved:${leaveRequestId}:${leaveRequest.userId}`,
         });
     }
 
@@ -247,6 +259,7 @@ export async function rejectLeaveRequestImpl(
             read: false,
             timestamp: new Date().toISOString(),
             link: "/dashboard/team",
+            eventKey: `leave-rejected:${leaveRequestId}:${leaveRequest.userId}`,
         });
     }
 
@@ -306,25 +319,34 @@ export async function cancelLeaveRequestImpl(currentUser: LeaveActor, agencyId: 
         timestamp: new Date().toISOString(),
     });
 
-    if (currentUser.role !== "admin") {
-        const adminUsers = await UserModel.find({ agencyId, role: "admin" }).select("-password").lean() as Array<Pick<User, "id" | "email">>;
+    const reviewers = await getLeaveReviewers(agencyId, currentUser.id);
+    if (reviewers.length > 0) {
+        const owner = leaveRequest.userId === currentUser.id
+            ? { name: currentUser.name }
+            : await UserModel.findOne({ id: leaveRequest.userId, agencyId }).select("name").lean() as Pick<User, "name"> | null;
+        const employeeName = owner?.name || currentUser.name;
+        const cancelMessage = leaveRequest.userId === currentUser.id
+            ? `${currentUser.name} cancelled their ${leaveRequest.type} leave request`
+            : `${currentUser.name} cancelled ${employeeName}'s ${leaveRequest.type} leave request`;
+
         if (await isNotifEnabled("leave")) {
-            await createNotifications(adminUsers.map((admin) => ({
+            await createNotifications(reviewers.map((reviewer) => ({
                 agencyId,
-                userId: admin.id,
-                message: `${currentUser.name} cancelled their ${leaveRequest.type} leave request`,
+                userId: reviewer.id,
+                message: cancelMessage,
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: "/dashboard/team",
+                eventKey: `leave-cancelled:${leaveRequestId}:${reviewer.id}`,
             })));
         }
 
         try {
-            const adminEmails = adminUsers.map((admin) => admin.email).filter(Boolean) as string[];
+            const adminEmails = reviewers.map((reviewer) => reviewer.email).filter(Boolean) as string[];
             if (adminEmails.length > 0 && deletedLeaveData) {
                 await sendLeaveCancelledEmail({
                     adminEmails,
-                    employeeName: currentUser.name,
+                    employeeName,
                     leaveType: deletedLeaveData.type,
                     teamLink: `${getAppUrl()}/dashboard/team`,
                 });
@@ -404,6 +426,7 @@ export async function updateLeaveStatusImpl(
             read: false,
             timestamp: new Date().toISOString(),
             link: `/dashboard/team/${userDoc?.username || request.userId}?tab=leaves`,
+            eventKey: `leave-status:${requestId}:${status}:${request.userId}`,
         });
     }
 

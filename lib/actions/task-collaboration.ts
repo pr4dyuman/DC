@@ -14,7 +14,6 @@ import { isNotifEnabled } from "./shared";
 import { createNotifications } from "./notification-service";
 import {
     type CommentAgencyContext,
-    getAgencyUser,
     type TaskMutationActor,
 } from "./task-shared";
 
@@ -100,8 +99,7 @@ export async function addCommentImpl(
 
     if (shouldSendTaskEmail) {
         try {
-            const commenterUser = await getAgencyUser(agency.id, userId);
-            if (commenterUser) {
+            if (commenter) {
                 const participantIds = new Set<string>();
                 getTaskAssigneeIds(task).forEach((assigneeId) => participantIds.add(assigneeId));
                 if (task.createdBy) participantIds.add(task.createdBy);
@@ -110,15 +108,15 @@ export async function addCommentImpl(
 
                 const participantEmails: string[] = [];
                 for (const participantId of participantIds) {
-                    const user = await getAgencyUser(agency.id, participantId);
-                    if (user?.email) participantEmails.push(user.email);
+                    const participant = await resolveUserOrClient(participantId, agency.id);
+                    if (participant?.email) participantEmails.push(participant.email);
                 }
 
                 if (participantEmails.length > 0) {
                     await sendTaskCommentEmail({
-                        recipientEmails: participantEmails,
+                        recipientEmails: [...new Set(participantEmails)],
                         taskTitle: task.title,
-                        commenterName: commenterUser.name,
+                        commenterName: commenter.name,
                         commentText: text,
                         taskLink: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/projects/${task.projectId}?task=${taskId}`,
                     });
@@ -149,6 +147,7 @@ export async function addCommentImpl(
                 read: false;
                 timestamp: string;
                 link: string;
+                eventKey: string;
             }>();
 
             const commentPreview = getNotificationPreview(text);
@@ -160,6 +159,7 @@ export async function addCommentImpl(
                     read: false,
                     timestamp,
                     link,
+                    eventKey: `task-comment:${newComment.id}:${participantId}`,
                 });
             }
 
@@ -193,6 +193,7 @@ export async function addCommentImpl(
                         read: false,
                         timestamp,
                         link,
+                        eventKey: `task-comment-mention:${newComment.id}:${mentionedId}`,
                     });
                 }
             }

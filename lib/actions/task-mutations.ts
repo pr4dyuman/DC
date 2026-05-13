@@ -35,6 +35,7 @@ import {
 } from "./projects-shared";
 import {
     type CommentAgencyContext,
+    getProjectClientIds,
     getProjectSummary,
     type TaskEffectRecord,
     type TaskMutationActor,
@@ -210,11 +211,13 @@ export async function createTaskImpl(
                 }
             }
 
-            if (createdEventConfig.notifyClient && project?.clientId) {
-                const clientDoc = await ClientModel.findOne({ id: project.clientId, agencyId: agency.id })
+            const linkedClientIds = getProjectClientIds(project);
+            if (createdEventConfig.notifyClient && project && linkedClientIds.length > 0) {
+                const clientDocs = await ClientModel.find({ id: { $in: linkedClientIds }, agencyId: agency.id })
                     .select("email name")
-                    .lean() as { email?: string; name?: string } | null;
-                if (clientDoc?.email && clientDoc.name) {
+                    .lean() as Array<{ email?: string; name?: string }>;
+                for (const clientDoc of clientDocs) {
+                    if (!clientDoc?.email || !clientDoc.name) continue;
                     await sendTaskAssignedEmail({
                         assigneeEmail: clientDoc.email,
                         assigneeName: clientDoc.name,
@@ -240,6 +243,7 @@ export async function createTaskImpl(
             read: false,
             timestamp: new Date().toISOString(),
             link: `/dashboard/projects/${task.projectId}?task=${newTask.id}`,
+            eventKey: `task-created-assignee:${newTask.id}:${assigneeId}`,
         })), { dedupeWindowMs: 10 * 60 * 1000 });
     }
 
@@ -255,6 +259,7 @@ export async function createTaskImpl(
             read: false,
             timestamp: new Date().toISOString(),
             link: `/dashboard/projects/${task.projectId}?task=${newTask.id}`,
+            eventKey: `task-created-admin:${newTask.id}:${admin.id}`,
         }));
     if (adminNewTaskNotifs.length > 0 && await isNotifEnabled("task")) {
         await createNotifications(adminNewTaskNotifs, { dedupeWindowMs: 10 * 60 * 1000 });

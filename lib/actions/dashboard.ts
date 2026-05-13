@@ -16,6 +16,7 @@ import {
     UserModel,
     connectDB,
 } from "../mongodb";
+import { stripNotificationMentionMarkup } from "../notification-text";
 import { dateKeyTz, isDateOnlyString, toLocalCalendarDay } from "@/lib/date-utils";
 import { getTaskAssigneeIds } from "../task-assignees";
 import { sanitizeName, sanitizeUrl } from "../validation";
@@ -42,6 +43,14 @@ async function cleanupExpiredNotifications(agencyId: string, userId: string) {
         userId,
         timestamp: { $lt: cutoff },
     });
+}
+
+function sanitizeNotification(notification: unknown): Notification {
+    const sanitized = sanitizeDoc(notification) as Notification;
+    return {
+        ...sanitized,
+        message: stripNotificationMentionMarkup(sanitized.message || ""),
+    };
 }
 
 type DashboardSettingsSnapshot = {
@@ -317,7 +326,7 @@ export async function getClientDashboardDataImpl(actor: DashboardActor, clientId
         transactions: [...transactions].sort(sortByDateDesc).map((transaction) => sanitizeDoc(transaction)),
         tasks: tasks.map((task) => withAgencyIdFallback(sanitizeDoc(task) as Task & { agencyId?: string }, agencyId)),
         assets: assets.map((asset) => sanitizeDoc(asset)),
-        notifications: notifications.map((notification) => sanitizeDoc(notification)),
+        notifications: notifications.map(sanitizeNotification),
         metrics: {
             activeProjects: financeSummary.activeProjectCount,
             completedProjects: financeSummary.completedProjectCount,
@@ -382,7 +391,7 @@ export async function getNotificationsImpl(
         .limit(limit)
         .lean();
 
-    return notifications.map((notification) => sanitizeDoc(notification) as Notification);
+    return notifications.map(sanitizeNotification);
 }
 
 export async function getUnreadNotificationCountImpl(actor: DashboardActor, agencyId: string, userId: string): Promise<number> {

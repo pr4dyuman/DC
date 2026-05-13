@@ -39,27 +39,12 @@ export async function createNotification(
     const agencyId = input.agencyId?.trim();
     const userId = input.userId?.trim();
     const message = normalizeMessage(input.message);
+    const eventKey = input.eventKey?.trim();
     if (!agencyId || !userId || !message) return null;
 
     await connectDB();
 
     const dedupeWindowMs = options.dedupeWindowMs ?? DEFAULT_DEDUPE_WINDOW_MS;
-    const query: Record<string, unknown> = {
-        agencyId,
-        userId,
-        message,
-        ...buildLinkFilter(input.link),
-    };
-
-    if (input.eventKey) {
-        query.eventKey = input.eventKey;
-    } else if (dedupeWindowMs > 0) {
-        query.timestamp = { $gte: new Date(Date.now() - dedupeWindowMs).toISOString() };
-    }
-
-    const existing = await NotificationModel.exists(query);
-    if (existing) return null;
-
     const notification: Notification = {
         id: generateId(),
         agencyId,
@@ -68,8 +53,30 @@ export async function createNotification(
         read: input.read ?? false,
         timestamp: input.timestamp || new Date().toISOString(),
         ...(input.link ? { link: input.link } : {}),
-        ...(input.eventKey ? { eventKey: input.eventKey } : {}),
+        ...(eventKey ? { eventKey } : {}),
     };
+
+    if (eventKey) {
+        const query = { agencyId, userId, eventKey };
+        const result = await NotificationModel.updateOne(
+            query,
+            { $setOnInsert: notification },
+            { upsert: true }
+        );
+        return result.upsertedCount > 0 ? notification : null;
+    }
+
+    if (dedupeWindowMs > 0) {
+        const query: Record<string, unknown> = {
+            agencyId,
+            userId,
+            message,
+            ...buildLinkFilter(input.link),
+            timestamp: { $gte: new Date(Date.now() - dedupeWindowMs).toISOString() },
+        };
+        const existing = await NotificationModel.exists(query);
+        if (existing) return null;
+    }
 
     return NotificationModel.create(notification);
 }
@@ -83,7 +90,10 @@ export async function createNotifications(
         const agencyId = input.agencyId?.trim() || "";
         const userId = input.userId?.trim() || "";
         const message = normalizeMessage(input.message);
-        const key = `${agencyId}\0${userId}\0${message}\0${input.link || ""}\0${input.eventKey || ""}`;
+        const eventKey = input.eventKey?.trim() || "";
+        const key = eventKey
+            ? `${agencyId}\0${userId}\0${eventKey}`
+            : `${agencyId}\0${userId}\0${message}\0${input.link || ""}`;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;

@@ -170,6 +170,7 @@ export async function createUserImpl(user: Omit<User, "id" | "agencyId">, agency
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: "/dashboard",
+                eventKey: `welcome:${newUser.id}`,
             });
         }
     } catch (notifError) {

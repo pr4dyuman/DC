@@ -296,6 +296,7 @@ export async function createProjectImpl(
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: "/dashboard/finance",
+                eventKey: `project-invoices-created:${newProject.id}:${cid}`,
             }))
         );
     }

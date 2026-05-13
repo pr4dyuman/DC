@@ -130,6 +130,7 @@ export async function createClientImpl(client: Omit<Client, "id" | "agencyId">, 
                 read: false,
                 timestamp: new Date().toISOString(),
                 link: "/dashboard",
+                eventKey: `welcome:${newClient.id}`,
             });
         }
     } catch (notifError) {

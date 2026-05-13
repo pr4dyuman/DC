@@ -147,7 +147,7 @@ export async function clientMarkInvoiceAsPaidImpl(
 
     await InvoiceModel.updateOne({ id: invoiceId, agencyId }, { $set: updateFields });
 
-    const admins = await UserModel.find({ agencyId, role: "admin" }).select("-password").lean() as Array<Pick<User, "id" | "email">>;
+    const admins = await UserModel.find({ agencyId, role: { $in: ["admin", "manager"] } }).select("-password").lean() as Array<Pick<User, "id" | "email">>;
     const currency = await getDefaultCurrency();
     if (await isNotifEnabled("invoice")) {
         await createNotifications(admins.map((admin) => ({
@@ -198,6 +198,7 @@ export async function adminApproveInvoicePaymentImpl(invoiceId: string, agencyId
             read: false,
             timestamp: new Date().toISOString(),
             link: "/dashboard/finance",
+            eventKey: `invoice-payment-approved:${invoice.id}:${clientId}`,
         })));
     }
 
@@ -353,6 +354,7 @@ export async function createInvoiceImpl(
             read: false,
             timestamp: new Date().toISOString(),
             link: "/dashboard/finance",
+            eventKey: `invoice-created:${newInvoice.id}:${clientId}`,
         })));
     }
 

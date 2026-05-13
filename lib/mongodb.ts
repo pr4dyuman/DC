@@ -277,6 +277,7 @@ NotificationSchema.index({ agencyId: 1, userId: 1, read: 1 }); // Compound: agen
 NotificationSchema.index({ agencyId: 1, userId: 1, timestamp: -1 });
 NotificationSchema.index({ agencyId: 1, userId: 1, read: 1, timestamp: -1 });
 NotificationSchema.index({ agencyId: 1, userId: 1, eventKey: 1 });
+NotificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 30 });
 
 // Activity Schema
 const ActivitySchema = new Schema<Activity>({

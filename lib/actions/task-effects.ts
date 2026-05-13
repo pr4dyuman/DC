@@ -16,6 +16,7 @@ import { generateId } from "../utils-server";
 import { getTaskAssigneeIds } from "../task-assignees";
 import { isNotifEnabled } from "./shared";
 import {
+    getProjectClientIds,
     getProjectSummary,
     type TaskEffectArgs,
 } from "./task-shared";
@@ -108,10 +109,7 @@ export async function handleTaskStatusChangeEffectsImpl({
             await createNotifications(adminNotifs, { dedupeWindowMs: 10 * 60 * 1000 });
         }
 
-        const linkedClientIds = new Set([
-            ...(projectForNotif?.clientIds || []),
-            ...(projectForNotif?.clientId ? [projectForNotif.clientId] : []),
-        ]);
+        const linkedClientIds = new Set(getProjectClientIds(projectForNotif));
         const clientNotifs = [...linkedClientIds]
             .filter((clientId) => !notifiedUserIds.has(clientId))
             .map((clientId) => ({
@@ -158,11 +156,13 @@ export async function handleTaskStatusChangeEffectsImpl({
                 }
             }
 
-            if (eventConfig?.notifyClient && projectForNotif?.clientId) {
-                const clientDoc = await ClientModel.findOne({ id: projectForNotif.clientId, agencyId: agency.id })
+            const linkedClientIds = getProjectClientIds(projectForNotif);
+            if (eventConfig?.notifyClient && linkedClientIds.length > 0) {
+                const clientDocs = await ClientModel.find({ id: { $in: linkedClientIds }, agencyId: agency.id })
                     .select("email name")
-                    .lean() as { email?: string; name?: string } | null;
-                if (clientDoc?.email && clientDoc.name) {
+                    .lean() as Array<{ email?: string; name?: string }>;
+                for (const clientDoc of clientDocs) {
+                    if (!clientDoc?.email || !clientDoc.name) continue;
                     await sendTaskStatusChangedEmail({
                         recipientEmail: clientDoc.email,
                         recipientName: clientDoc.name,
@@ -259,11 +259,13 @@ export async function handleTaskAssignmentChangeEffectsImpl({
             }
         }
 
-        if (createdEventConfig.notifyClient && project?.clientId) {
-            const clientDoc = await ClientModel.findOne({ id: project.clientId, agencyId: agency.id })
+        const linkedClientIds = getProjectClientIds(project);
+        if (createdEventConfig.notifyClient && project && linkedClientIds.length > 0) {
+            const clientDocs = await ClientModel.find({ id: { $in: linkedClientIds }, agencyId: agency.id })
                 .select("email name")
-                .lean() as { email?: string; name?: string } | null;
-            if (clientDoc?.email && clientDoc.name) {
+                .lean() as Array<{ email?: string; name?: string }>;
+            for (const clientDoc of clientDocs) {
+                if (!clientDoc?.email || !clientDoc.name) continue;
                 await sendTaskAssignedEmail({
                     assigneeEmail: clientDoc.email,
                     assigneeName: clientDoc.name,

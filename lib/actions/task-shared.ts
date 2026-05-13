@@ -32,3 +32,10 @@ export async function getProjectSummary(agencyId: string, projectId: string) {
         .select("id name clientId clientIds slug status")
         .lean() as Promise<{ id: string; name: string; clientId?: string; clientIds?: string[]; slug?: string; status?: string } | null>;
 }
+
+export function getProjectClientIds(project: { clientId?: string; clientIds?: string[] } | null | undefined): string[] {
+    return [
+        ...(project?.clientIds || []),
+        ...(project?.clientId && !(project.clientIds || []).includes(project.clientId) ? [project.clientId] : []),
+    ].filter(Boolean);
+}
