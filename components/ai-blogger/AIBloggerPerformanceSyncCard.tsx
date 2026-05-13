@@ -41,6 +41,26 @@ function formatSyncDate(value: string | null, includeTime = true) {
     return includeTime ? date.toLocaleString() : date.toLocaleDateString();
 }
 
+function getTimeValue(value: string | null) {
+    if (!value) {
+        return Number.NaN;
+    }
+
+    const time = new Date(value).getTime();
+    return Number.isFinite(time) ? time : Number.NaN;
+}
+
+function hasLaterSuccessfulSync(syncStatus: BlogStudioPerformanceSyncStatus) {
+    const lastFailureMs = getTimeValue(syncStatus.lastFailureAt);
+    if (!Number.isFinite(lastFailureMs)) {
+        return false;
+    }
+
+    return [syncStatus.lastSuccessAt, syncStatus.latestSnapshotAt]
+        .map(getTimeValue)
+        .some((time) => Number.isFinite(time) && time > lastFailureMs);
+}
+
 function getStatusTone(syncStatus: BlogStudioPerformanceSyncStatus) {
     if (!syncStatus.enabled || !syncStatus.hasValidConfig) {
         return "amber";
@@ -157,6 +177,10 @@ export function AIBloggerPerformanceSyncCard({
     const canRunSync = syncStatus.hasValidConfig && syncStatus.publishedPosts > 0;
     const capabilityBadges = getCapabilityBadges(syncStatus);
     const syncBusy = isSyncing || isPending;
+    const previousFailureResolved =
+        Boolean(syncStatus.lastFailureSummary) &&
+        syncStatus.lastRun?.status !== "failed" &&
+        hasLaterSuccessfulSync(syncStatus);
 
     const handleSync = () => {
         if (syncBusy) {
@@ -231,7 +255,9 @@ export function AIBloggerPerformanceSyncCard({
                     <p className="mt-2 text-sm font-medium">{formatSyncDate(syncStatus.lastSuccessAt)}</p>
                 </div>
                 <div className="rounded-2xl border border-border/60 bg-background/55 px-4 py-3">
-                    <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Last failure</p>
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                        {previousFailureResolved ? "Previous failure" : "Last failure"}
+                    </p>
                     <p className="mt-2 text-sm font-medium">{formatSyncDate(syncStatus.lastFailureAt)}</p>
                 </div>
                 <div className="rounded-2xl border border-border/60 bg-background/55 px-4 py-3">
@@ -254,7 +280,11 @@ export function AIBloggerPerformanceSyncCard({
                     </p>
                     <p>Manual sync only runs for this workspace and stores the latest Search Console page, query, country, and device snapshots.</p>
                     {syncStatus.lastFailureSummary ? (
-                        <p>{syncStatus.lastFailureSummary}</p>
+                        <p className={previousFailureResolved ? "text-muted-foreground/70" : "text-destructive"}>
+                            {previousFailureResolved
+                                ? `Previous failure resolved by a later successful sync: ${syncStatus.lastFailureSummary}`
+                                : syncStatus.lastFailureSummary}
+                        </p>
                     ) : null}
                 </div>
 
