@@ -5324,6 +5324,7 @@ type TopicDiscoveryResult = {
     selectedTopic: string;
     relatedQueries: string[];
     sourceSummary: string;
+    backupDiagnostics?: string[];
     trendResearchStats?: {
         queryCount: number;
         queriesAnalyzed: number;
@@ -5417,6 +5418,7 @@ type BackupTrendDiscoveryResult = {
     stage: AIBloggerStageRunResult;
     summary: string;
     source: BlogStudioFetchTrendsSource;
+    diagnostics?: string[];
 };
 
 type FreeInternetTrendEvidence = {
@@ -6089,6 +6091,69 @@ const OFF_TOPIC_COMMERCIAL_TREND_CATEGORIES = new Set([
     "travel",
     "weather",
 ]);
+const GENERIC_TREND_BRIDGE_TOKENS = new Set([
+    "ad",
+    "ads",
+    "advertising",
+    "brand",
+    "content",
+    "creative",
+    "digital",
+    "media",
+    "online",
+    "social",
+    "story",
+    "storytelling",
+    "viral",
+    "video",
+]);
+
+function hasExplicitWebsiteOfferTrendIntent(
+    trendContext: string,
+    websiteIntelligence: AIBloggerWebsiteIntelligence | null,
+    brief: BlogStudioBrief,
+) {
+    const context = sanitizeText(trendContext, 1000).toLowerCase();
+    if (!context) {
+        return false;
+    }
+
+    const dynamicOfferPhrases = sanitizeStringArray(
+        [
+            ...buildWebsiteStrictAuthorityHints(websiteIntelligence),
+            ...buildWebsiteCommercialTopicHints(websiteIntelligence),
+            ...(websiteIntelligence?.authorityProfile?.coreOffers || []),
+            ...(websiteIntelligence?.authorityProfile?.moneyPages || []).flatMap((page) => [
+                page.title,
+                page.path,
+            ]),
+            brief.primaryKeyword || "",
+            brief.trendFocus || "",
+        ],
+        72,
+        140,
+    )
+        .map((phrase) => sanitizeText(phrase, 120).toLowerCase())
+        .filter((phrase) => {
+            const tokens = tokenizeWebsiteFit(phrase);
+            return tokens.length >= 2 && tokens.some((token) => !GENERIC_TREND_BRIDGE_TOKENS.has(token));
+        });
+
+    return dynamicOfferPhrases.some((phrase) => {
+        if (context.includes(phrase)) {
+            return true;
+        }
+
+        const phraseTokens = tokenizeWebsiteFit(phrase).filter((token) => !GENERIC_TREND_BRIDGE_TOKENS.has(token));
+        if (phraseTokens.length === 0) {
+            return false;
+        }
+
+        const contextTokens = new Set(tokenizeWebsiteFit(context));
+        const matchedTokens = phraseTokens.filter((token) => contextTokens.has(token)).length;
+        return matchedTokens >= Math.min(2, phraseTokens.length);
+    });
+}
 
 type WebsiteTrendFitAssessment = {
     score: number;
@@ -6248,6 +6313,100 @@ function normalizeTrendCategories(categories: string[] | undefined) {
     );
 }
 
+function getWebsiteCategoryAlignmentText(
+    websiteIntelligence: AIBloggerWebsiteIntelligence | null,
+    brief: BlogStudioBrief,
+) {
+    return sanitizeText(
+        [
+            ...(websiteIntelligence?.authorityProfile?.coreOffers || []),
+            ...(websiteIntelligence?.authorityProfile?.authorityLanes || []),
+            ...(websiteIntelligence?.authorityProfile?.contentClusters || []),
+            ...(websiteIntelligence?.serviceSignals || []),
+            ...(websiteIntelligence?.priorityPages || []).flatMap((page) => [
+                page.path,
+                page.title,
+                page.description,
+                page.excerpt,
+                page.pageCategory,
+                ...page.serviceSignals,
+            ]),
+            brief.primaryKeyword || "",
+            brief.trendFocus || "",
+            brief.sourceValue || "",
+        ].join(" "),
+        12000,
+    ).toLowerCase();
+}
+
+function hasCommercialProductCatalog(websiteIntelligence: AIBloggerWebsiteIntelligence | null) {
+    return Boolean(
+        websiteIntelligence?.priorityPages?.some((page) =>
+            ["product", "collection", "category", "brand"].includes(page.pageCategory)
+        ) ||
+        websiteIntelligence?.priorityPaths?.some((path) =>
+            /\/(?:shop|store|products?|collections?|categories?|catalog|catalogue|brands?)\b/i.test(path)
+        ),
+    );
+}
+
+function isTrendCategoryAlignedWithWebsite(
+    category: string,
+    websiteIntelligence: AIBloggerWebsiteIntelligence | null,
+    brief: BlogStudioBrief,
+) {
+    const normalizedCategory = sanitizeText(category, 80).toLowerCase();
+    const websiteText = getWebsiteCategoryAlignmentText(websiteIntelligence, brief);
+    const categoryTokens = tokenizeWebsiteFit(normalizedCategory);
+
+    if (categoryTokens.some((token) => websiteText.includes(token))) {
+        return true;
+    }
+
+    if (normalizedCategory === "shopping") {
+        return hasCommercialProductCatalog(websiteIntelligence) ||
+            /\b(?:ecommerce|e-commerce|retail|shop|shopping|store|products?|collections?|catalog|catalogue|merchandise|furniture|apparel|clothing|jewelry|jewellery)\b/i.test(websiteText);
+    }
+
+    if (normalizedCategory === "fashion") {
+        return /\b(?:fashion|apparel|clothing|wear|wears|boutique|style|styling|beauty|cosmetic|cosmetics|jewelry|jewellery)\b/i.test(websiteText);
+    }
+
+    if (normalizedCategory === "food") {
+        return /\b(?:food|restaurant|cafe|catering|recipe|recipes|kitchen|grocery|bakery|dining|meal|meals|beverage|drink|drinks)\b/i.test(websiteText);
+    }
+
+    if (normalizedCategory === "travel") {
+        return /\b(?:travel|hotel|hotels|tour|tours|tourism|resort|flight|flights|booking|destination|destinations|hospitality)\b/i.test(websiteText);
+    }
+
+    if (normalizedCategory === "sports") {
+        return /\b(?:sport|sports|fitness|athlete|athletes|team|teams|training|gym|outdoor|equipment|coaching)\b/i.test(websiteText);
+    }
+
+    if (normalizedCategory === "entertainment" || normalizedCategory === "games" || normalizedCategory === "hobbies and leisure") {
+        return /\b(?:entertainment|game|games|gaming|music|film|films|movie|movies|event|events|streaming|media|creator|creators|leisure|hobby|hobbies)\b/i.test(websiteText);
+    }
+
+    if (normalizedCategory === "finance" || normalizedCategory === "business and finance") {
+        return /\b(?:finance|financial|accounting|tax|taxes|bank|banking|insurance|investment|investing|loan|loans|mortgage|payroll|bookkeeping)\b/i.test(websiteText);
+    }
+
+    if (normalizedCategory === "law and government" || normalizedCategory === "politics") {
+        return /\b(?:law|legal|attorney|lawyer|government|public sector|policy|compliance|immigration|visa|tax)\b/i.test(websiteText);
+    }
+
+    if (normalizedCategory === "weather") {
+        return /\b(?:weather|climate|hvac|roofing|outdoor|agriculture|farming|solar|energy|travel|event|events)\b/i.test(websiteText);
+    }
+
+    if (normalizedCategory === "lifestyle") {
+        return /\b(?:lifestyle|home|decor|furniture|wellness|fitness|beauty|fashion|travel|food|parenting|real estate|interior)\b/i.test(websiteText);
+    }
+
+    return false;
+}
+
 export function assessTrendAgainstWebsite(
     trend: AIBloggerViralTrendSignal,
     websiteIntelligence: AIBloggerWebsiteIntelligence | null,
@@ -6277,10 +6436,11 @@ export function assessTrendAgainstWebsite(
     const matchedCoreTokens = matchedStrongTokens.filter((token) =>
         Array.from(fingerprint.tokenGroupMap.get(token) || []).some((group) => WEBSITE_TREND_CORE_GROUPS.has(group)),
     );
+    const meaningfulCoreTokens = matchedCoreTokens.filter((token) => !GENERIC_TREND_BRIDGE_TOKENS.has(token));
     const exactPhraseMatch =
         topicTokens.length >= 2 &&
         fingerprint.coreHints.some((hint) => sanitizeText(hint, 240).toLowerCase().includes(topicNormalized));
-    const exactEntityTokens = matchedCoreTokens.filter((token) =>
+    const exactEntityTokens = meaningfulCoreTokens.filter((token) =>
         topicNormalized.includes(token) &&
         Array.from(fingerprint.tokenGroupMap.get(token) || []).filter((group) => WEBSITE_TREND_CORE_GROUPS.has(group)).length >= 2,
     );
@@ -6298,20 +6458,33 @@ export function assessTrendAgainstWebsite(
         .map((group) => group.name);
     const coreGroupMatches = groupMatches.filter((group) => WEBSITE_TREND_CORE_GROUPS.has(group));
     const normalizedTrendCategories = normalizeTrendCategories(trend.categories);
+    const unalignedOffLaneTrendCategories = normalizedTrendCategories.filter((category) =>
+        OFF_TOPIC_COMMERCIAL_TREND_CATEGORIES.has(category) &&
+        !isTrendCategoryAlignedWithWebsite(category, websiteIntelligence, brief),
+    );
+    const allCategoriesAreUnalignedOffLane =
+        normalizedTrendCategories.length > 0 &&
+        unalignedOffLaneTrendCategories.length === normalizedTrendCategories.length;
     const offTopicCategoryMismatch =
         isCommercialWebsiteTrendContext(websiteIntelligence) &&
-        normalizedTrendCategories.length > 0 &&
-        normalizedTrendCategories.every((category) => OFF_TOPIC_COMMERCIAL_TREND_CATEGORIES.has(category)) &&
-        matchedCoreTokens.length < 2 &&
+        allCategoriesAreUnalignedOffLane &&
+        meaningfulCoreTokens.length < 2 &&
         !exactPhraseMatch;
+    const genericOffLaneBridgeRisk =
+        isCommercialWebsiteTrendContext(websiteIntelligence) &&
+        allCategoriesAreUnalignedOffLane &&
+        matchedCoreTokens.length > 0 &&
+        meaningfulCoreTokens.length === 0 &&
+        !exactPhraseMatch &&
+        !hasExplicitWebsiteOfferTrendIntent(trendContext, websiteIntelligence, brief);
     const localInstitutionIncidentRisk =
         hasLocalInstitutionIncidentRisk(trend.topic, trendContext) &&
-        matchedCoreTokens.length < 2 &&
+        meaningfulCoreTokens.length < 2 &&
         !exactPhraseMatch;
     const requiresCommercialEvidence = isCommercialWebsiteTrendContext(websiteIntelligence);
     const hasCommercialTrendEvidence =
-        commercialOverlap >= 18 ||
-        (coreGroupMatches.includes("services") && matchedCoreTokens.length >= 2) ||
+        (commercialOverlap >= 18 && !genericOffLaneBridgeRisk) ||
+        (coreGroupMatches.includes("services") && meaningfulCoreTokens.length >= 1) ||
         (exactEntityMatch && coreGroupMatches.includes("services")) ||
         exactPhraseMatch;
 
@@ -6321,10 +6494,11 @@ export function assessTrendAgainstWebsite(
         (commercialOverlap * 0.30) +
         Math.min(18, coreGroupMatches.length * 7) +
         Math.min(6, Math.max(0, groupMatches.length - coreGroupMatches.length) * 3) +
-        (matchedCoreTokens.length >= 2 ? 14 : matchedCoreTokens.length === 1 ? 5 : 0) +
+        (meaningfulCoreTokens.length >= 2 ? 14 : meaningfulCoreTokens.length === 1 ? 5 : 0) +
         (exactPhraseMatch ? 12 : 0) +
         (exactEntityMatch ? 10 : 0) +
         (offTopicCategoryMismatch ? -28 : 0) +
+        (genericOffLaneBridgeRisk ? -32 : 0) +
         (localInstitutionIncidentRisk ? -35 : 0) +
         (requiresCommercialEvidence && !hasCommercialTrendEvidence ? -22 : 0),
     );
@@ -6354,6 +6528,9 @@ export function assessTrendAgainstWebsite(
     if (normalizedTrendCategories.length > 0) {
         reasons.push(`trend categories: ${normalizedTrendCategories.join(", ")}`);
     }
+    if (unalignedOffLaneTrendCategories.length > 0) {
+        reasons.push(`unaligned trend categories: ${unalignedOffLaneTrendCategories.join(", ")}`);
+    }
 
     if (matchedCoreTokens.length === 0 && !exactPhraseMatch) {
         score = clampBlogStudioScore(score - 30);
@@ -6372,6 +6549,10 @@ export function assessTrendAgainstWebsite(
         reasons.push("trend categories are off-lane for the website");
     }
 
+    if (genericOffLaneBridgeRisk) {
+        reasons.push("off-lane trend only matched generic bridge terms");
+    }
+
     if (localInstitutionIncidentRisk) {
         reasons.push("local institution incident trend needs explicit site fit");
     }
@@ -6383,7 +6564,7 @@ export function assessTrendAgainstWebsite(
     const hasServiceAndTopicEvidence =
         coreGroupMatches.includes("services") &&
         groupMatches.includes("topics") &&
-        matchedCoreTokens.length >= 2 &&
+        meaningfulCoreTokens.length >= 2 &&
         contextOverlap >= 35;
     const accepted =
         score >= minimumFitScore &&
@@ -6396,13 +6577,14 @@ export function assessTrendAgainstWebsite(
             (exactEntityMatch && coreGroupMatches.length >= 1)
         ) &&
         (
-            matchedCoreTokens.length >= 2 ||
-            (matchedCoreTokens.length >= 1 && coreGroupMatches.length >= 2) ||
+            meaningfulCoreTokens.length >= 2 ||
+            (meaningfulCoreTokens.length >= 1 && coreGroupMatches.length >= 2) ||
             exactPhraseMatch ||
             (exactEntityMatch && coreGroupMatches.length >= 1)
         ) &&
         (!requiresCommercialEvidence || hasCommercialTrendEvidence) &&
         !offTopicCategoryMismatch &&
+        !genericOffLaneBridgeRisk &&
         !localInstitutionIncidentRisk;
 
     if (!accepted) {
@@ -6983,6 +7165,44 @@ function buildTrendCandidateDiscovery(
     };
 }
 
+function addBackupTrendDiagnostic(diagnostics: string[] | undefined, message: string) {
+    const normalized = sanitizeText(message, 180);
+    if (normalized) {
+        diagnostics?.push(normalized);
+    }
+}
+
+function withBackupTrendDiagnostics(
+    result: BackupTrendDiscoveryResult,
+    diagnostics: string[] | undefined,
+): BackupTrendDiscoveryResult {
+    const cleanDiagnostics = sanitizeStringArray(diagnostics || [], 5, 180);
+    if (!cleanDiagnostics.length) {
+        return result;
+    }
+
+    let stage = result.stage;
+    try {
+        const parsed = JSON.parse(result.stage.text) as TopicDiscoveryResult;
+        const diagnosticPrefix = cleanDiagnostics.join(" ");
+        parsed.backupDiagnostics = cleanDiagnostics;
+        parsed.sourceSummary = sanitizeText(`${diagnosticPrefix} ${parsed.sourceSummary || ""}`, 240);
+        stage = {
+            ...result.stage,
+            text: JSON.stringify(parsed, null, 2),
+        };
+    } catch {
+        // Keep the original stage payload if an upstream provider returned non-JSON text.
+    }
+
+    return {
+        ...result,
+        stage,
+        diagnostics: cleanDiagnostics,
+        summary: sanitizeText(`${cleanDiagnostics.join(" ")} ${result.summary}`, 240),
+    };
+}
+
 async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
     agencyId: string;
     title: string;
@@ -6992,6 +7212,7 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
     minimumFitScore: number;
     recentTopicTexts?: string[];
     runtimeConfig: AIBloggerStageConfig;
+    diagnostics?: string[];
 }): Promise<BackupTrendDiscoveryResult | null> {
     if (input.brief.sourceMode !== "website") {
         return null;
@@ -6999,7 +7220,29 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
 
     const oauth = input.settings.searchConsoleOAuth;
     const selectedDomain = oauth?.selectedDomain?.trim() || "";
-    if (!oauth || !canAttemptSearchConsoleOAuth(oauth) || !selectedDomain) {
+    if (!oauth) {
+        addBackupTrendDiagnostic(input.diagnostics, "Search Console skipped: OAuth is not connected.");
+        return null;
+    }
+
+    if (!oauth.enabled) {
+        addBackupTrendDiagnostic(input.diagnostics, "Search Console skipped: OAuth is disabled in settings.");
+        return null;
+    }
+
+    if (!selectedDomain) {
+        addBackupTrendDiagnostic(input.diagnostics, "Search Console skipped: no Search Console property is selected.");
+        return null;
+    }
+
+    if (!canAttemptSearchConsoleOAuth(oauth)) {
+        const status = normalizeSearchConsoleOAuthStatus(oauth.authStatus);
+        addBackupTrendDiagnostic(
+            input.diagnostics,
+            status === "token-expired" && !oauth.refreshToken
+                ? "Search Console skipped: OAuth token expired and no refresh token is stored."
+                : `Search Console skipped: OAuth status is ${status}.`,
+        );
         return null;
     }
 
@@ -7011,6 +7254,7 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
     });
 
     if (!accessToken) {
+        addBackupTrendDiagnostic(input.diagnostics, "Search Console skipped: OAuth token refresh failed; reconnect Search Console.");
         return null;
     }
 
@@ -7033,6 +7277,15 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
             SEARCH_CONSOLE_TREND_ROW_LIMIT,
         ),
     ]);
+
+    if (!currentRows.length) {
+        addBackupTrendDiagnostic(
+            input.diagnostics,
+            `Search Console skipped: no query rows found for ${windows.currentStart} to ${windows.currentEnd}.`,
+        );
+        return null;
+    }
+
     const previousByQuery = mapSearchConsoleRowsByQuery(previousRows);
     const websiteCommercialHints = buildWebsiteCommercialTopicHints(input.websiteIntelligence);
     const initialCandidates: InternetTrendCandidate[] = [];
@@ -7143,6 +7396,10 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
     }
 
     if (!initialCandidates.length) {
+        addBackupTrendDiagnostic(
+            input.diagnostics,
+            `Search Console checked ${currentRows.length} quer${currentRows.length === 1 ? "y" : "ies"} but no rising query passed website-fit, quality, and duplicate filters.`,
+        );
         return null;
     }
 
@@ -7193,7 +7450,19 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
         },
     );
 
-    return result ? { ...result, source: "search-console-rising" } : null;
+    if (!result) {
+        addBackupTrendDiagnostic(
+            input.diagnostics,
+            `Search Console checked ${initialCandidates.length} candidate${initialCandidates.length === 1 ? "" : "s"} but none met the topic opportunity threshold.`,
+        );
+        return null;
+    }
+
+    return {
+        ...result,
+        source: "search-console-rising",
+        diagnostics: sanitizeStringArray(input.diagnostics || [], 5, 180),
+    };
 }
 
 async function buildFreeInternetTrendDiscoveryStage(input: {
@@ -7873,6 +8142,241 @@ function scoreGroundedSourceRelevance(input: {
             140,
         ),
     };
+}
+
+type GroundedResearchSourceRescueCandidate = {
+    topic: string;
+    query: string;
+    reason: string;
+    preservesSelectedTopic: boolean;
+};
+
+type GroundedResearchSourceRescueResult = {
+    topic: string;
+    query: string;
+    reason: string;
+    preservesSelectedTopic: boolean;
+    serpAnalysis: AIBloggerSerpAnalysis;
+    serpRelevanceCheck: ReturnType<typeof scoreWebsiteSerpRelevance>;
+    groundedResearch: AIBloggerGroundedResearch;
+    fetchDiagnostics: GroundedSourceFetchDiagnostic[];
+    sourceRelevanceCheck: ReturnType<typeof scoreGroundedSourceRelevance>;
+    sourceLabel: string;
+    attemptSummaries: string[];
+};
+
+function buildGroundedResearchSourceRescueCandidates(input: {
+    topic: string;
+    brief: BlogStudioBrief;
+    websiteIntelligence: AIBloggerWebsiteIntelligence | null;
+    discovery: TopicDiscoveryResult;
+    topicSelection: TopicSelectionDecision;
+    recentTopicTexts?: string[];
+    minimumFitScore: number;
+}) {
+    const selectedTopic = sanitizeText(input.topic, 180);
+    const normalizedSelectedTopic = selectedTopic.toLowerCase();
+    const authorityHints = sanitizeStringArray(
+        [
+            ...buildWebsiteStrictAuthorityHints(input.websiteIntelligence),
+            ...buildWebsiteCommercialTopicHints(input.websiteIntelligence),
+        ]
+            .map((hint) => sanitizeText(hint, 100))
+            .filter((hint) => isUsableAuthoritySearchSeed(hint, input.websiteIntelligence)),
+        16,
+        100,
+    )
+        .sort((left, right) =>
+            scoreTopicOverlap(right, [selectedTopic]) - scoreTopicOverlap(left, [selectedTopic]) ||
+            left.length - right.length,
+        );
+    const serviceQueryHints = authorityHints.slice(0, 3);
+    const sourceSafeQuery = sanitizeText(
+        [selectedTopic, ...serviceQueryHints.slice(0, 2)].filter(Boolean).join(" "),
+        180,
+    );
+    const candidates: GroundedResearchSourceRescueCandidate[] = [];
+
+    if (sourceSafeQuery && sourceSafeQuery.toLowerCase() !== normalizedSelectedTopic) {
+        candidates.push({
+            topic: selectedTopic,
+            query: sourceSafeQuery,
+            reason: "source-safe service-lane query",
+            preservesSelectedTopic: true,
+        });
+    }
+
+    const rankedTopicScores = new Map<string, number>();
+    for (const item of input.topicSelection.serpRankedTopics || []) {
+        rankedTopicScores.set(sanitizeText(item.topic, 180).toLowerCase(), item.score);
+    }
+    for (const item of input.topicSelection.rankedTopics || []) {
+        const normalized = sanitizeText(item.topic, 180).toLowerCase();
+        rankedTopicScores.set(normalized, Math.max(rankedTopicScores.get(normalized) || 0, item.score));
+    }
+
+    const alternateTopics = sanitizeStringArray(
+        [
+            ...(input.topicSelection.serpRankedTopics || []).map((item) => item.topic),
+            ...(input.topicSelection.rankedTopics || []).map((item) => item.topic),
+            ...input.discovery.candidateTopics,
+        ]
+            .map((topic) => normalizeTopicSelectionCandidate(topic, input.websiteIntelligence))
+            .filter((topic) => topic.toLowerCase() !== normalizedSelectedTopic)
+            .filter((topic) => isUsableTopicSelectionCandidate(
+                topic,
+                input.websiteIntelligence,
+                input.brief.sourceMode,
+            ))
+            .filter((topic) => !getTopicDuplicateRisk(topic, input.recentTopicTexts || []).isDuplicateRisk)
+            .filter((topic) => {
+                const integrity = assessWebsiteTopicIntegrity({
+                    topic,
+                    brief: input.brief,
+                    websiteIntelligence: input.websiteIntelligence,
+                    minimumFitScore: input.minimumFitScore,
+                    extraContext: [
+                        ...input.discovery.relatedQueries,
+                        ...serviceQueryHints,
+                    ],
+                });
+
+                return !integrity || integrity.accepted;
+            })
+            .sort((left, right) =>
+                (rankedTopicScores.get(right.toLowerCase()) || 0) -
+                (rankedTopicScores.get(left.toLowerCase()) || 0) ||
+                left.localeCompare(right),
+            ),
+        4,
+        140,
+    );
+
+    for (const topic of alternateTopics) {
+        candidates.push({
+            topic,
+            query: topic,
+            reason: "alternate website-fit candidate",
+            preservesSelectedTopic: false,
+        });
+    }
+
+    const seen = new Set<string>();
+    return candidates.filter((candidate) => {
+        const key = `${candidate.topic.toLowerCase()}::${candidate.query.toLowerCase()}`;
+        if (seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    }).slice(0, 4);
+}
+
+async function recoverGroundedResearchAfterSourceMismatch(input: {
+    agencyId: string;
+    topic: string;
+    primaryKeyword?: string;
+    brief: BlogStudioBrief;
+    websiteIntelligence: AIBloggerWebsiteIntelligence | null;
+    discovery: TopicDiscoveryResult;
+    topicSelection: TopicSelectionDecision;
+    recentTopicTexts?: string[];
+    minimumFitScore: number;
+    serpConfig: AIBloggerConfig["serp"] | undefined;
+    trendsConfig: AIBloggerConfig["trends"] | undefined;
+    groundedResearchConfig: AIBloggerConfig["groundedResearch"] | undefined;
+    location: string;
+    referenceStartedAt: string;
+}): Promise<GroundedResearchSourceRescueResult | null> {
+    if (input.brief.sourceMode !== "website" || input.groundedResearchConfig?.enabled === false || !input.serpConfig?.enabled) {
+        return null;
+    }
+
+    const candidates = buildGroundedResearchSourceRescueCandidates(input);
+    const attemptSummaries: string[] = [];
+
+    for (const candidate of candidates) {
+        try {
+            const rescueSerpAnalysis = await getAIBloggerSerpAnalysis(candidate.query, {
+                agencyId: input.agencyId,
+                enabled: input.serpConfig.enabled,
+                apiKey: input.serpConfig.apiKey,
+                fallbackApiKey: input.serpConfig.fallbackApiKey,
+                fallbackEnabled: input.serpConfig.fallbackEnabled ?? true,
+                location: input.location,
+                device: input.serpConfig.device,
+                maxCompetitors: resolveSerpMaxCompetitorsForGroundedResearch(
+                    input.serpConfig,
+                    input.groundedResearchConfig,
+                ),
+                refreshWindowHours: input.serpConfig.refreshWindowHours,
+                trendsApiKey: input.trendsConfig?.apiKey,
+                trendsFallbackApiKey: input.trendsConfig?.fallbackApiKey,
+                trendsFallbackEnabled: input.trendsConfig?.fallbackEnabled,
+            });
+
+            if (!rescueSerpAnalysis?.topResultUrls?.length) {
+                attemptSummaries.push(`${candidate.query}: no source URLs`);
+                continue;
+            }
+
+            const serpRelevanceCheck = scoreWebsiteSerpRelevance({
+                topic: candidate.topic,
+                websiteIntelligence: input.websiteIntelligence,
+                serpAnalysis: rescueSerpAnalysis,
+            });
+
+            if (serpRelevanceCheck.shouldBlock) {
+                attemptSummaries.push(`${candidate.query}: SERP drift (${serpRelevanceCheck.reasons.slice(0, 2).join("; ")})`);
+                continue;
+            }
+
+            const groundedResearchResult = await getAIBloggerGroundedResearch(candidate.query, {
+                agencyId: input.agencyId,
+                location: input.location,
+                refreshWindowHours: input.groundedResearchConfig?.refreshWindowHours || 24,
+                bypassCache: true,
+                sourceUrls: rescueSerpAnalysis.topResultUrls,
+                groundedResearchConfig: input.groundedResearchConfig,
+            });
+
+            const rescueGroundedResearch = groundedResearchResult.result;
+            if (!rescueGroundedResearch) {
+                attemptSummaries.push(`${candidate.query}: no grounded sources`);
+                continue;
+            }
+
+            const sourceRelevanceCheck = scoreGroundedSourceRelevance({
+                topic: candidate.topic,
+                primaryKeyword: input.primaryKeyword,
+                websiteIntelligence: input.websiteIntelligence,
+                groundedResearch: rescueGroundedResearch,
+            });
+
+            if (sourceRelevanceCheck.shouldBlock) {
+                attemptSummaries.push(`${candidate.query}: source mismatch (${sourceRelevanceCheck.reasons.slice(0, 2).join("; ")})`);
+                continue;
+            }
+
+            return {
+                topic: candidate.topic,
+                query: candidate.query,
+                reason: candidate.reason,
+                preservesSelectedTopic: candidate.preservesSelectedTopic,
+                serpAnalysis: rescueSerpAnalysis,
+                serpRelevanceCheck,
+                groundedResearch: rescueGroundedResearch,
+                fetchDiagnostics: groundedResearchResult.fetchDiagnostics,
+                sourceRelevanceCheck,
+                sourceLabel: `${describeGroundedResearchSource(rescueGroundedResearch, input.referenceStartedAt)} via ${candidate.reason}`,
+                attemptSummaries,
+            };
+        } catch (error) {
+            attemptSummaries.push(`${candidate.query}: ${sanitizeText(getErrorMessage(error), 140)}`);
+        }
+    }
+
+    return null;
 }
 
 function scoreInternalLinkSupport(topic: string, websiteIntelligence: AIBloggerWebsiteIntelligence | null | undefined) {
@@ -8898,6 +9402,7 @@ async function buildBackupTrendDiscoveryStage(input: {
     recentTopicTexts?: string[];
     runtimeConfig: AIBloggerStageConfig;
 }): Promise<BackupTrendDiscoveryResult | null> {
+    const diagnostics: string[] = [];
     const searchConsoleDiscovery = await buildSearchConsoleRisingTrendDiscoveryStage({
         agencyId: input.agencyId,
         title: input.title,
@@ -8907,13 +9412,15 @@ async function buildBackupTrendDiscoveryStage(input: {
         minimumFitScore: input.minimumFitScore,
         recentTopicTexts: input.recentTopicTexts,
         runtimeConfig: input.runtimeConfig,
+        diagnostics,
     }).catch((error) => {
+        addBackupTrendDiagnostic(diagnostics, `Search Console skipped: ${getErrorMessage(error)}`);
         blogLogError("DISCOVERY (search-console-rising)", "Search Console rising query fallback failed", error);
         return null;
     });
 
     if (searchConsoleDiscovery) {
-        return searchConsoleDiscovery;
+        return withBackupTrendDiagnostics(searchConsoleDiscovery, diagnostics);
     }
 
     const freeInternetDiscovery = await buildFreeInternetTrendDiscoveryStage({
@@ -8930,7 +9437,7 @@ async function buildBackupTrendDiscoveryStage(input: {
     });
 
     if (freeInternetDiscovery) {
-        return freeInternetDiscovery;
+        return withBackupTrendDiagnostics(freeInternetDiscovery, diagnostics);
     }
 
     const serpDiscovery = await buildInternetTrendFallbackDiscoveryStage({
@@ -8947,10 +9454,13 @@ async function buildBackupTrendDiscoveryStage(input: {
     });
 
     return serpDiscovery
-        ? {
-            ...serpDiscovery,
-            source: "internet-trend-research",
-        }
+        ? withBackupTrendDiagnostics(
+            {
+                ...serpDiscovery,
+                source: "internet-trend-research",
+            },
+            diagnostics,
+        )
         : null;
 }
 
@@ -10956,7 +11466,10 @@ Rules:
 - selectedTopic must be one of the candidate topics.
 - candidateTopics should stay close to the live trend data above and prioritize the highest combined score, not raw virality alone.
 - If source mode is website, candidateTopics must be strategic article angles that connect the trend to the site's real audience, services, products, category lane, or commercial problem. Do not return a raw trend label unless that label is already a complete fit.
+- If source mode is website, do not "make" an unrelated trend fit by turning it into a generic lesson about branding, video, social media, content, storytelling, virality, or marketing. The trend itself must share non-generic service/product/category evidence with the website.
+- Generic bridge words alone are not enough website fit: video, viral, content, social, digital, media, story, storytelling, brand, creative, marketing, or online.
 - If source mode is website, prefer topics that a direct visitor to the site would still find useful without knowing the trend. Reject trend-chasing, gossip, incident, entertainment, school, sports, finance, or YMYL angles unless the site clearly has authority and a useful service-led reason to cover them.
+- For incident/news/sports/entertainment trends, select a topic only when the website explicitly serves that lane or the trend context itself contains a real service/product/category phrase from the crawled website intelligence.
 - If a row is marked "trend-first match", use it as evidence, but selectedTopic should still be the best SEO article angle, not automatically the raw trend text.
 - Do not select a very viral topic when its site-fit score is weak; prefer the strongest viral trend that genuinely matches the website, source value, trend focus, or primary keyword.
 - For each topic, optimize for useful reader outcome, SERP gap, original value potential, and conversion path. Do not pick topics just because they can be loosely connected with brand language.
@@ -10977,6 +11490,7 @@ function parseTopicDiscoveryResponse(
         selectedTopic?: string;
         relatedQueries?: string[];
         sourceSummary?: string;
+        backupDiagnostics?: string[];
         trendResearchStats?: TopicDiscoveryResult["trendResearchStats"];
         trendCandidateScores?: TopicDiscoveryResult["trendCandidateScores"];
     }>(rawText);
@@ -10998,6 +11512,7 @@ function parseTopicDiscoveryResponse(
         selectedTopic,
         relatedQueries,
         sourceSummary: sanitizeText(parsed?.sourceSummary, 240),
+        backupDiagnostics: sanitizeStringArray(parsed?.backupDiagnostics, 5, 180),
         trendResearchStats: parsed?.trendResearchStats,
         trendCandidateScores: Array.isArray(parsed?.trendCandidateScores)
             ? parsed.trendCandidateScores.slice(0, 10)
@@ -19266,7 +19781,7 @@ export async function generateBlogStudioDraftImpl(
                         groundedResearch,
                         groundedResearchStepStartedAt,
                     );
-                    const highTrustCount = groundedResearch.sources.filter(
+                    let highTrustCount = groundedResearch.sources.filter(
                         (source) => source.trustLevel === "high",
                     ).length;
                     groundedSourceRelevanceCheck = scoreGroundedSourceRelevance({
@@ -19276,11 +19791,74 @@ export async function generateBlogStudioDraftImpl(
                         groundedResearch,
                     });
                     if (brief.sourceMode === "website" && groundedSourceRelevanceCheck.shouldBlock) {
-                        groundedSourceRelevanceBlocker = sanitizeText(
-                            `Source relevance blocked this topic: grounded sources do not align with the website service lane (${groundedSourceRelevanceCheck.reasons.join("; ")}).`,
-                            360,
-                        );
-                        throw new Error(groundedSourceRelevanceBlocker);
+                        const rescueResult = await recoverGroundedResearchAfterSourceMismatch({
+                            agencyId: agency.id,
+                            topic: selectedTopicForRun,
+                            primaryKeyword: brief.primaryKeyword,
+                            brief,
+                            websiteIntelligence,
+                            discovery,
+                            topicSelection,
+                            recentTopicTexts: recentPostTitles,
+                            minimumFitScore: minimumWebsiteTrendFitScore,
+                            serpConfig: aiBloggerConfig?.serp,
+                            trendsConfig: liveTrendsConfig,
+                            groundedResearchConfig: aiBloggerConfig?.groundedResearch,
+                            location: resolveExternalSearchLocation(
+                                aiBloggerConfig?.serp?.defaultLocation,
+                                brief.location,
+                                settings.seo.defaultLocation,
+                            ),
+                            referenceStartedAt: groundedResearchStepStartedAt,
+                        });
+
+                        if (rescueResult) {
+                            const previousTopic = selectedTopicForRun;
+                            if (!rescueResult.preservesSelectedTopic) {
+                                selectedTopicForRun = rescueResult.topic;
+                                serpAnalysis = rescueResult.serpAnalysis;
+                                serpSourceLabel = describeSerpAnalysisSource(
+                                    serpAnalysis,
+                                    groundedResearchStepStartedAt,
+                                    false,
+                                );
+                                serpRelevanceCheck = rescueResult.serpRelevanceCheck;
+                                serpAnalysisStepStatus = "completed";
+                                serpAnalysisError = undefined;
+                            }
+                            groundedResearch = rescueResult.groundedResearch;
+                            groundedResearchDiagnostics = rescueResult.fetchDiagnostics;
+                            groundedResearchSourceLabel = rescueResult.sourceLabel;
+                            groundedSourceRelevanceCheck = rescueResult.sourceRelevanceCheck;
+                            highTrustCount = groundedResearch.sources.filter(
+                                (source) => source.trustLevel === "high",
+                            ).length;
+                            groundedResearchError = undefined;
+                            groundedSourceRelevanceBlocker = "";
+
+                            const rescueMessage = rescueResult.preservesSelectedTopic
+                                ? `Initial grounded sources were weak, so Source Verification recovered with a source-safe query: ${rescueResult.query}.`
+                                : `Initial grounded sources were weak for "${previousTopic}", so Source Verification switched to a source-backed website-fit topic: ${selectedTopicForRun}.`;
+                            blogLogStep("GROUNDED-RESEARCH", rescueMessage, {
+                                query: rescueResult.query,
+                                reason: rescueResult.reason,
+                                attempts: rescueResult.attemptSummaries,
+                            });
+                            if (jobId) {
+                                void emitPipelineEvent(jobId, {
+                                    type: "log",
+                                    step: "grounded-research",
+                                    label: "Source Verification",
+                                    message: rescueMessage,
+                                });
+                            }
+                        } else {
+                            groundedSourceRelevanceBlocker = sanitizeText(
+                                `Source relevance blocked this topic: grounded sources do not align with the website service lane (${groundedSourceRelevanceCheck.reasons.join("; ")}). Source-safe rescue did not find a qualifying source pack.`,
+                                420,
+                            );
+                            throw new Error(groundedSourceRelevanceBlocker);
+                        }
                     }
 
                     addRunStep(
@@ -23009,7 +23587,7 @@ export async function runBlogStudioDraftResearchPhase(
                         groundedResearch,
                         groundedResearchStartedAt,
                     );
-                    const highTrustCount = groundedResearch.sources.filter(
+                    let highTrustCount = groundedResearch.sources.filter(
                         (source) => source.trustLevel === "high",
                     ).length;
                     groundedSourceRelevanceCheck = scoreGroundedSourceRelevance({
@@ -23019,11 +23597,74 @@ export async function runBlogStudioDraftResearchPhase(
                         groundedResearch,
                     });
                     if (brief.sourceMode === "website" && groundedSourceRelevanceCheck.shouldBlock) {
-                        groundedSourceRelevanceBlocker = sanitizeText(
-                            `Source relevance blocked this topic: grounded sources do not align with the website service lane (${groundedSourceRelevanceCheck.reasons.join("; ")}).`,
-                            360,
-                        );
-                        throw new Error(groundedSourceRelevanceBlocker);
+                        const rescueResult = await recoverGroundedResearchAfterSourceMismatch({
+                            agencyId: agency.id,
+                            topic: selectedTopicForRun,
+                            primaryKeyword: brief.primaryKeyword,
+                            brief,
+                            websiteIntelligence,
+                            discovery,
+                            topicSelection,
+                            recentTopicTexts: recentPostTitles,
+                            minimumFitScore: minimumWebsiteTrendFitScore,
+                            serpConfig: aiBloggerConfig?.serp,
+                            trendsConfig: liveTrendsConfig,
+                            groundedResearchConfig: aiBloggerConfig?.groundedResearch,
+                            location: resolveExternalSearchLocation(
+                                aiBloggerConfig?.serp?.defaultLocation,
+                                brief.location,
+                                settings.seo.defaultLocation,
+                            ),
+                            referenceStartedAt: groundedResearchStartedAt,
+                        });
+
+                        if (rescueResult) {
+                            const previousTopic = selectedTopicForRun;
+                            if (!rescueResult.preservesSelectedTopic) {
+                                selectedTopicForRun = rescueResult.topic;
+                                serpAnalysis = rescueResult.serpAnalysis;
+                                serpSourceLabel = describeSerpAnalysisSource(
+                                    serpAnalysis,
+                                    groundedResearchStartedAt,
+                                    false,
+                                );
+                                serpRelevanceCheck = rescueResult.serpRelevanceCheck;
+                                serpAnalysisStepStatus = "completed";
+                                serpAnalysisError = undefined;
+                            }
+                            groundedResearch = rescueResult.groundedResearch;
+                            groundedResearchDiagnostics = rescueResult.fetchDiagnostics;
+                            groundedResearchSourceLabel = rescueResult.sourceLabel;
+                            groundedSourceRelevanceCheck = rescueResult.sourceRelevanceCheck;
+                            highTrustCount = groundedResearch.sources.filter(
+                                (source) => source.trustLevel === "high",
+                            ).length;
+                            groundedResearchError = undefined;
+                            groundedSourceRelevanceBlocker = "";
+
+                            const rescueMessage = rescueResult.preservesSelectedTopic
+                                ? `Initial grounded sources were weak, so Source Verification recovered with a source-safe query: ${rescueResult.query}.`
+                                : `Initial grounded sources were weak for "${previousTopic}", so Source Verification switched to a source-backed website-fit topic: ${selectedTopicForRun}.`;
+                            blogLogStep("GROUNDED-RESEARCH", rescueMessage, {
+                                query: rescueResult.query,
+                                reason: rescueResult.reason,
+                                attempts: rescueResult.attemptSummaries,
+                            });
+                            if (jobId) {
+                                void emitPipelineEvent(jobId, {
+                                    type: "log",
+                                    step: "grounded-research",
+                                    label: "Source Verification",
+                                    message: rescueMessage,
+                                });
+                            }
+                        } else {
+                            groundedSourceRelevanceBlocker = sanitizeText(
+                                `Source relevance blocked this topic: grounded sources do not align with the website service lane (${groundedSourceRelevanceCheck.reasons.join("; ")}). Source-safe rescue did not find a qualifying source pack.`,
+                                420,
+                            );
+                            throw new Error(groundedSourceRelevanceBlocker);
+                        }
                     }
                     addRunStep(
                         "grounded-research",
@@ -26830,6 +27471,7 @@ export async function publishBlogStudioPostImpl(
 
             try {
                 await notifyWebhookDeliveryFailed(
+                    agencyId,
                     agencyName,
                     currentPost.title,
                     webhookUrl,
@@ -27664,7 +28306,7 @@ async function executeBlogStudioScheduleRun(
     let agencyName = "";
     try {
         settings = await getBlogStudioSettingsImpl(schedule.agencyId);
-        const agency = await AgencyModel.findOne({ _id: schedule.agencyId }).lean();
+        const agency = await AgencyModel.findOne({ id: schedule.agencyId }).lean();
         agencyName = agency?.name || "Agency";
     } catch {
         // Settings load failure isn't critical, continue

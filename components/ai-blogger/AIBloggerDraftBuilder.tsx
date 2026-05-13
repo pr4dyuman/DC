@@ -279,6 +279,11 @@ type PipelineLogEntry = {
     timestamp: string;
 };
 
+type PipelineTopicSourceSummary = {
+    label: string;
+    note: string;
+};
+
 type PipelineStageCopy = {
     title: string;
     pending: string;
@@ -543,6 +548,33 @@ function getPipelineSecondaryLabel(step: string, label?: string) {
     }
 
     return displayLabel;
+}
+
+function buildTopicSourceSummaryFromMessage(message: string): PipelineTopicSourceSummary | null {
+    const display = formatPipelineNoteForDisplay("fetch-trends", message);
+    if (!display) {
+        return null;
+    }
+
+    const match = display.match(/^Topic source:\s*([^.]+)\.\s*(.*)$/i);
+    if (match) {
+        return {
+            label: match[1]?.trim() || "Topic source",
+            note: match[2]?.trim() || display,
+        };
+    }
+
+    return {
+        label: "Topic source",
+        note: display,
+    };
+}
+
+function buildTopicSourceSummaryFromResult(result: BlogStudioPipelineCompletionResult): PipelineTopicSourceSummary {
+    return {
+        label: result.diagnostics.fetchTrendsLabel || "Topic source",
+        note: formatPipelineNoteForDisplay("fetch-trends", result.diagnostics.fetchTrendsNotes),
+    };
 }
 
 type AIBloggerTrendPlan = {
@@ -883,6 +915,7 @@ export function AIBloggerDraftBuilder({
     const [pipelineLogs, setPipelineLogs] = useState<PipelineLogEntry[]>([]);
     const [pipelineStepNotes, setPipelineStepNotes] = useState<PipelineStepNotesMap>({});
     const [pipelineStepLabels, setPipelineStepLabels] = useState<PipelineStepLabelsMap>({});
+    const [pipelineTopicSource, setPipelineTopicSource] = useState<PipelineTopicSourceSummary | null>(null);
     const [pipelineCompletionMessage, setPipelineCompletionMessage] = useState("");
     const [postSlugToNavigate, setPostSlugToNavigate] = useState<string | null>(null);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1007,6 +1040,14 @@ export function AIBloggerDraftBuilder({
                             return next;
                         });
                     }
+                    if (data.step === "fetch-trends" && data.notes) {
+                        setPipelineTopicSource((current) =>
+                            current || {
+                                label: getPipelineSecondaryLabel(data.step!, data.label) || "Topic selected",
+                                note: formatPipelineNoteForDisplay(data.step, data.notes),
+                            },
+                        );
+                    }
                     pushPipelineLog(
                         copy.title,
                         getPipelineLogMessage(data, "completed"),
@@ -1059,6 +1100,9 @@ export function AIBloggerDraftBuilder({
 
                 if (data.type === "log" && data.message) {
                     const logTitle = data.label || (data.step ? getPipelineStageCopy(data.step).title : "Workflow");
+                    if (data.step === "fetch-trends" && data.label === "Topic Source") {
+                        setPipelineTopicSource(buildTopicSourceSummaryFromMessage(data.message));
+                    }
                     pushPipelineLog(logTitle, formatPipelineNoteForDisplay(data.step, data.message), "info");
                     return;
                 }
@@ -1085,6 +1129,7 @@ export function AIBloggerDraftBuilder({
                             "fetch-trends": result.diagnostics.fetchTrendsLabel,
                         }));
                         setPipelineStepNotes(buildPipelineStepNotes(result.diagnostics.steps));
+                        setPipelineTopicSource(buildTopicSourceSummaryFromResult(result));
                         setPipelineCompletionMessage("Draft generated. Opening the draft...");
                         pushPipelineLog(
                             getPipelineStageCopy("fetch-trends").title,
@@ -1336,6 +1381,7 @@ export function AIBloggerDraftBuilder({
         setPipelineLogs([]);
         setPipelineStepNotes({});
         setPipelineStepLabels({});
+        setPipelineTopicSource(null);
         setPipelineCompletionMessage("");
         setPipelineStartTime(null);
         setPipelineElapsedTime(0);
@@ -1634,6 +1680,7 @@ export function AIBloggerDraftBuilder({
             setPipelineLogs([{ id: "start", level: "info", label: "Workflow", message: "Generation workflow started.", timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) }]);
             setPipelineStepNotes({});
             setPipelineStepLabels({});
+            setPipelineTopicSource(null);
             setPipelineCompletionMessage("");
             const startTs = Date.now();
             setPipelineStartTime(startTs);
@@ -2481,6 +2528,29 @@ export function AIBloggerDraftBuilder({
                                 </div>
                             </div>
                         )}
+
+                        {pipelineTopicSource ? (
+                            <div className="rounded-2xl border border-primary/25 bg-primary/8 px-4 py-3">
+                                <div className="flex items-start gap-3">
+                                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-primary/30 bg-primary/15 text-primary">
+                                        <Globe className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                                            Topic source
+                                        </p>
+                                        <p className="mt-1 text-sm font-semibold text-foreground">
+                                            {pipelineTopicSource.label}
+                                        </p>
+                                        {pipelineTopicSource.note ? (
+                                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                                {pipelineTopicSource.note}
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : null}
 
                         <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                             {AI_PIPELINE_STEPS.map((step) => {
