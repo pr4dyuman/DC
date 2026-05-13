@@ -601,6 +601,62 @@ function renderInlineContent(value: string) {
     return rendered;
 }
 
+function isMarkdownTableRow(line: string) {
+    return /^\|.+\|\s*$/.test(line.trim());
+}
+
+function splitMarkdownTableCells(line: string) {
+    return line
+        .trim()
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|")
+        .map((cell) => cell.trim());
+}
+
+function isMarkdownTableSeparator(line: string) {
+    const cells = splitMarkdownTableCells(line);
+    return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s+/g, "")));
+}
+
+function renderMarkdownTable(lines: string[]) {
+    const tableLines = lines.map((line) => line.trim()).filter(isMarkdownTableRow);
+    if (tableLines.length < 2 || !isMarkdownTableSeparator(tableLines[1])) {
+        return "";
+    }
+
+    const headers = splitMarkdownTableCells(tableLines[0]);
+    const columnCount = headers.length;
+    if (columnCount === 0) {
+        return "";
+    }
+
+    const rows = tableLines.slice(2)
+        .map(splitMarkdownTableCells)
+        .filter((cells) => cells.some((cell) => cell.trim()));
+
+    const renderCell = (cell: string | undefined, tag: "th" | "td") => (
+        `<${tag}>${renderInlineContent(cell || "")}</${tag}>`
+    );
+
+    const headerHtml = headers.map((cell) => renderCell(cell, "th")).join("");
+    const bodyHtml = rows
+        .map((row) => {
+            const normalizedRow = Array.from({ length: columnCount }, (_, index) => row[index] || "");
+            return `<tr>${normalizedRow.map((cell) => renderCell(cell, "td")).join("")}</tr>`;
+        })
+        .join("");
+
+    return [
+        '<div class="marketing-table-wrapper">',
+        "<table>",
+        `<thead><tr>${headerHtml}</tr></thead>`,
+        bodyHtml ? `<tbody>${bodyHtml}</tbody>` : "",
+        "</table>",
+        "</div>",
+    ].join("");
+}
+
 function flushListBlock(blocks: string[], listType: "ul" | "ol" | null, items: string[]) {
     if (!listType || items.length === 0) {
         return;
@@ -629,6 +685,7 @@ function flushParagraphBlock(blocks: string[], lines: string[]) {
 function convertMarkdownLikeContentToHtml(content: string) {
     const blocks: string[] = [];
     const paragraphLines: string[] = [];
+    let tableLines: string[] = [];
     let listType: "ul" | "ol" | null = null;
     let listItems: string[] = [];
 
@@ -638,15 +695,38 @@ function convertMarkdownLikeContentToHtml(content: string) {
         listType = null;
         listItems = [];
     };
+    const flushTable = () => {
+        if (tableLines.length === 0) {
+            return;
+        }
+
+        const renderedTable = renderMarkdownTable(tableLines);
+        if (renderedTable) {
+            blocks.push(renderedTable);
+        } else {
+            paragraphLines.push(...tableLines);
+        }
+        tableLines = [];
+    };
 
     for (const rawLine of normalizeNewlines(content).split("\n")) {
         const line = rawLine.trim();
 
         if (!line) {
+            flushTable();
             flushParagraph();
             flushList();
             continue;
         }
+
+        if (isMarkdownTableRow(line)) {
+            flushParagraph();
+            flushList();
+            tableLines.push(line);
+            continue;
+        }
+
+        flushTable();
 
         // Handle deeper headings (H4–H6) before H3/H2 since the patterns overlap
         const h456Match = line.match(/^(#{4,6})\s+(.+)$/);
@@ -707,6 +787,7 @@ function convertMarkdownLikeContentToHtml(content: string) {
         paragraphLines.push(line);
     }
 
+    flushTable();
     flushParagraph();
     flushList();
 

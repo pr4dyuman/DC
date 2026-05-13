@@ -3,6 +3,22 @@ import assert from "node:assert/strict";
 
 import { buildMarketingBlogHtml } from "../lib/marketing-blog-content";
 
+test("buildMarketingBlogHtml converts markdown tables into html tables", () => {
+    const html = buildMarketingBlogHtml([
+        "## Decision Matrix",
+        "| Asset Type | Production Weight | Primary Goal |",
+        "|:---|:---|:---|",
+        "| **Strategic Hero** | High | Brand Authority |",
+        "| Technical Deep-Dive | Medium | Trust & Validation |",
+    ].join("\n"));
+
+    assert.match(html, /<h2>Decision Matrix<\/h2>/i);
+    assert.match(html, /<table>/i);
+    assert.match(html, /<th>Asset Type<\/th>/i);
+    assert.match(html, /<td><strong>Strategic Hero<\/strong><\/td>/i);
+    assert.doesNotMatch(html, /\| Asset Type \| Production Weight \| Primary Goal \|/i);
+});
+
 test("buildMarketingBlogHtml converts same-line references into clickable markdown links", () => {
     const html = buildMarketingBlogHtml([
         "## References",
