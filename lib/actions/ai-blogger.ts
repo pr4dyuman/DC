@@ -5859,6 +5859,29 @@ function looksLikeWebsiteCopyFragment(value: string, websiteIntelligence: AIBlog
     return siteCopy.includes(normalized) || siteCopy.includes(normalized.slice(0, 80));
 }
 
+function looksLikeServicePageSnippet(value: string, websiteIntelligence: AIBloggerWebsiteIntelligence | null | undefined) {
+    const normalized = sanitizeText(value, 220);
+    const lower = normalized.toLowerCase();
+    const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+
+    if (!normalized || wordCount < 8) {
+        return false;
+    }
+
+    const brandTerms = getWebsiteBrandTerms(websiteIntelligence);
+    const containsBrand = brandTerms.some((term) => lower.includes(term));
+    const startsLikePageCopy = /^(?:book|build|contact|create|discover|explore|get|learn|manage|plan|scale|start|streamline|transform|unlock)\b/i.test(normalized);
+    const includesServiceList =
+        /\bincluding\b/i.test(normalized) &&
+        /\b(?:campaign|coordination|creator|delivery|discovery|management|performance|reporting|roi|service|services|strategy|tracking)\b/i.test(normalized);
+
+    if (containsBrand && (startsLikePageCopy || includesServiceList)) {
+        return true;
+    }
+
+    return wordCount >= 10 && includesServiceList;
+}
+
 function looksLikeAdCopySentence(value: string) {
     const normalized = sanitizeText(value, 220);
     const wordCount = normalized.split(/\s+/).filter(Boolean).length;
@@ -5888,7 +5911,11 @@ function isUsableAuthoritySeed(value: string, websiteIntelligence: AIBloggerWebs
         return false;
     }
 
-    if (looksLikeAdCopySentence(normalized) || looksLikeWebsiteCopyFragment(normalized, websiteIntelligence)) {
+    if (
+        looksLikeAdCopySentence(normalized) ||
+        looksLikeWebsiteCopyFragment(normalized, websiteIntelligence) ||
+        looksLikeServicePageSnippet(normalized, websiteIntelligence)
+    ) {
         return false;
     }
 
@@ -7658,6 +7685,16 @@ function normalizeWebsiteTopicCandidate(
             .trim(),
         140,
     );
+    const platformBestPracticeMatch = normalized.match(/^(.+?)\s+services?\s+best practices?\s+(youtube|tiktok|instagram|facebook|linkedin|twitter|x|pinterest|snapchat)$/i);
+    if (platformBestPracticeMatch) {
+        const topicCore = sanitizeText(platformBestPracticeMatch[1].replace(/\bservices?\b/gi, " "), 90);
+        const platform = platformBestPracticeMatch[2].toLowerCase() === "x"
+            ? "X"
+            : platformBestPracticeMatch[2].replace(/^\w/, (letter) => letter.toUpperCase());
+        if (topicCore) {
+            normalized = sanitizeText(`${platform} ${topicCore} best practices`, 140);
+        }
+    }
 
     if (!websiteIntelligence || !/\b(?:latest|best practices?|trends?|updates?|industry report|pdf|guide|free|download)\b/i.test(normalized)) {
         return hasCurrentYearAnnualCue(normalized) ? normalized : stripDecorativeCurrentYear(normalized);
@@ -7742,7 +7779,11 @@ function topicLooksLikeMalformedTrendCandidate(topic: string, websiteIntelligenc
         return true;
     }
 
-    if (looksLikeAdCopySentence(normalized) || looksLikeWebsiteCopyFragment(normalized, websiteIntelligence)) {
+    if (
+        looksLikeAdCopySentence(normalized) ||
+        looksLikeWebsiteCopyFragment(normalized, websiteIntelligence) ||
+        looksLikeServicePageSnippet(normalized, websiteIntelligence)
+    ) {
         return true;
     }
 
