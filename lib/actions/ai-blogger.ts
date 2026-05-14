@@ -5412,6 +5412,7 @@ const SEARCH_CONSOLE_TREND_CANDIDATE_LIMIT = 12;
 const FREE_INTERNET_TREND_QUERY_LIMIT = 6;
 const FREE_INTERNET_TREND_CANDIDATE_LIMIT = 12;
 const GDELT_TREND_TIMEOUT_MS = 4_500;
+const FREE_TREND_RADAR_TIMEOUT_MS = 4_500;
 const LIGHTWEIGHT_SERP_TOPIC_COMPARE_LIMIT = 6;
 
 type BackupTrendDiscoveryResult = {
@@ -5421,13 +5422,23 @@ type BackupTrendDiscoveryResult = {
     diagnostics?: string[];
 };
 
+type FreeInternetTrendEvidenceProvider =
+    | "gdelt-news"
+    | "google-news-rss"
+    | "reddit-search"
+    | "hacker-news";
+
 type FreeInternetTrendEvidence = {
+    provider: FreeInternetTrendEvidenceProvider;
+    providerLabel: string;
     query: string;
     score: number;
     articleCount: number;
     domains: string[];
     titles: string[];
     relatedQueries: string[];
+    engagementScore?: number;
+    freshnessScore?: number;
 };
 
 type ResearchInsightsResult = {
@@ -6944,6 +6955,123 @@ function buildInternetTrendSearchQueries(input: {
     return sanitizeStringArray(queries, INTERNET_TREND_FALLBACK_QUERY_LIMIT, 140);
 }
 
+function buildFreeTrendRadarSearchQueries(input: {
+    websiteIntelligence: AIBloggerWebsiteIntelligence | null;
+    brief: BlogStudioBrief;
+    title: string;
+}) {
+    const seeds = getWebsiteAuthoritySearchSeeds(input)
+        .filter((seed) => !topicLooksTooBroadForWebsite(seed))
+        .filter((seed) => isUsableAuthoritySearchSeed(seed, input.websiteIntelligence))
+        .slice(0, 5);
+    const queries: string[] = [];
+
+    for (const seed of seeds) {
+        queries.push(`${seed} trend`);
+        queries.push(`${seed} news`);
+        queries.push(`${seed} discussion`);
+        queries.push(`${seed} best practices`);
+    }
+
+    return sanitizeStringArray(queries, FREE_INTERNET_TREND_QUERY_LIMIT, 140);
+}
+
+function shouldUseHackerNewsTrendRadarProvider(websiteIntelligence: AIBloggerWebsiteIntelligence | null | undefined) {
+    const hints = sanitizeStringArray(
+        [
+            ...(websiteIntelligence?.topicHints || []),
+            ...(websiteIntelligence?.serviceSignals || []),
+            ...(websiteIntelligence?.authorityProfile?.authorityLanes || []),
+            ...(websiteIntelligence?.authorityProfile?.coreOffers || []),
+            ...(websiteIntelligence?.priorityPages || []).map((page) => `${page.title || ""} ${page.description || ""} ${page.excerpt || ""}`),
+        ],
+        80,
+        180,
+    ).join(" ");
+
+    return /\b(?:ai|api|automation|cloud|cybersecurity|data|developer|devops|fintech|machine learning|platform|saas|software|startup|tech|technology)\b/i.test(hints);
+}
+
+function getFreeTrendRadarProviderLabel(provider: FreeInternetTrendEvidenceProvider) {
+    switch (provider) {
+        case "gdelt-news":
+            return "GDELT global news";
+        case "google-news-rss":
+            return "Google News RSS";
+        case "reddit-search":
+            return "Reddit public search";
+        case "hacker-news":
+            return "Hacker News";
+        default:
+            return "free trend radar";
+    }
+}
+
+function decodeTrendRadarText(value: unknown, maxLength = 220) {
+    return sanitizeText(String(value || "")
+        .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&quot;/gi, "\"")
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/\s+/g, " ")
+        .trim(), maxLength);
+}
+
+function extractXmlTagText(block: string, tagName: string, maxLength = 220) {
+    const match = block.match(new RegExp(`<${tagName}[^>]*>([\\s\\S]*?)<\\/${tagName}>`, "i"));
+    return match ? decodeTrendRadarText(match[1], maxLength) : "";
+}
+
+function getTrendRadarCountry(location: string) {
+    const sanitized = sanitizeLocation(location, "");
+    return /^[a-z]{2}$/i.test(sanitized) ? sanitized.toUpperCase() : "US";
+}
+
+function buildFreeTrendRadarEvidence(input: {
+    provider: FreeInternetTrendEvidenceProvider;
+    query: string;
+    titles: string[];
+    domains?: string[];
+    engagementScore?: number;
+    freshnessScore?: number;
+}) {
+    const titles = sanitizeStringArray(input.titles, 10, 180);
+    if (!titles.length) {
+        return null;
+    }
+
+    const domains = Array.from(new Set(sanitizeStringArray(input.domains || [], 10, 120)));
+    const articleCount = titles.length;
+    const engagementScore = clampBlogStudioScore(input.engagementScore ?? 0);
+    const freshnessScore = clampBlogStudioScore(input.freshnessScore ?? 0);
+    const sourceDiversityScore = Math.min(24, domains.length * 6);
+    const volumeScore = Math.min(46, articleCount * 8);
+    const score = clampBlogStudioScore(
+        volumeScore +
+        sourceDiversityScore +
+        Math.min(22, Math.round(engagementScore * 0.28)) +
+        Math.min(18, Math.round(freshnessScore * 0.22)) +
+        (articleCount >= 3 ? 8 : 0),
+    );
+
+    return {
+        provider: input.provider,
+        providerLabel: getFreeTrendRadarProviderLabel(input.provider),
+        query: sanitizeText(input.query, 180),
+        score,
+        articleCount,
+        domains,
+        titles,
+        relatedQueries: sanitizeStringArray([input.query, ...titles], 10, 140),
+        engagementScore,
+        freshnessScore,
+    } satisfies FreeInternetTrendEvidence;
+}
+
 function getUtcDateString(value: Date) {
     return value.toISOString().slice(0, 10);
 }
@@ -7238,26 +7366,251 @@ async function fetchGdeltTrendEvidence(query: string): Promise<FreeInternetTrend
             120,
         );
         const uniqueDomains = Array.from(new Set(domains));
-        const articleCount = titles.length;
-        const score = clampBlogStudioScore(
-            Math.min(54, articleCount * 10) +
-            Math.min(28, uniqueDomains.length * 7) +
-            (articleCount >= 3 ? 12 : 0),
-        );
-
-        return {
+        return buildFreeTrendRadarEvidence({
+            provider: "gdelt-news",
             query: normalizedQuery,
-            score,
-            articleCount,
-            domains: uniqueDomains,
             titles,
-            relatedQueries: sanitizeStringArray([normalizedQuery, ...titles], 10, 140),
-        };
+            domains: uniqueDomains,
+            freshnessScore: 78,
+        });
     } catch {
         return null;
     } finally {
         clearTimeout(timeout);
     }
+}
+
+async function fetchGoogleNewsTrendEvidence(query: string, location: string): Promise<FreeInternetTrendEvidence | null> {
+    const normalizedQuery = sanitizeText(query, 180);
+    if (!normalizedQuery) {
+        return null;
+    }
+
+    const country = getTrendRadarCountry(location);
+    const url = new URL("https://news.google.com/rss/search");
+    url.searchParams.set("q", `${normalizedQuery} when:7d`);
+    url.searchParams.set("hl", `en-${country}`);
+    url.searchParams.set("gl", country);
+    url.searchParams.set("ceid", `${country}:en`);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FREE_TREND_RADAR_TIMEOUT_MS);
+
+    try {
+        const response = await fetch(url.toString(), {
+            signal: controller.signal,
+            headers: {
+                accept: "application/rss+xml,text/xml;q=0.9,*/*;q=0.8",
+            },
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const xml = await response.text();
+        const itemBlocks = xml.match(/<item[\s\S]*?<\/item>/gi) || [];
+        const titles = itemBlocks
+            .map((block) => extractXmlTagText(block, "title", 180))
+            .filter(Boolean)
+            .filter((title) => !/^Google News$/i.test(title));
+        const domains = itemBlocks
+            .map((block) => extractXmlTagText(block, "source", 120))
+            .filter(Boolean);
+
+        return buildFreeTrendRadarEvidence({
+            provider: "google-news-rss",
+            query: normalizedQuery,
+            titles,
+            domains,
+            freshnessScore: 86,
+        });
+    } catch {
+        return null;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function fetchRedditTrendEvidence(query: string): Promise<FreeInternetTrendEvidence | null> {
+    const normalizedQuery = sanitizeText(query, 180);
+    if (!normalizedQuery) {
+        return null;
+    }
+
+    const url = new URL("https://www.reddit.com/search.json");
+    url.searchParams.set("q", normalizedQuery);
+    url.searchParams.set("sort", "hot");
+    url.searchParams.set("t", "week");
+    url.searchParams.set("limit", "12");
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FREE_TREND_RADAR_TIMEOUT_MS);
+
+    try {
+        const response = await fetch(url.toString(), {
+            signal: controller.signal,
+            headers: {
+                accept: "application/json",
+                "user-agent": "AgencyOS-AIBlogger/1.0 (topic trend research)",
+            },
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const payload = await response.json() as {
+            data?: {
+                children?: Array<{
+                    data?: {
+                        title?: string;
+                        subreddit_name_prefixed?: string;
+                        score?: number;
+                        num_comments?: number;
+                        created_utc?: number;
+                    };
+                }>;
+            };
+        };
+        const posts = Array.isArray(payload.data?.children) ? payload.data.children : [];
+        const titles = sanitizeStringArray(posts.map((post) => post.data?.title), 10, 180);
+        const domains = sanitizeStringArray(posts.map((post) => post.data?.subreddit_name_prefixed), 10, 120);
+        const nowSeconds = Date.now() / 1000;
+        const engagementRaw = posts.reduce((sum, post) => {
+            const score = Number(post.data?.score || 0);
+            const comments = Number(post.data?.num_comments || 0);
+            return sum + Math.max(0, score) + Math.max(0, comments * 2);
+        }, 0);
+        const newestAgeHours = posts.reduce((youngest, post) => {
+            const createdAt = Number(post.data?.created_utc || 0);
+            if (!createdAt) {
+                return youngest;
+            }
+            return Math.min(youngest, Math.max(0, (nowSeconds - createdAt) / 3600));
+        }, Number.POSITIVE_INFINITY);
+        const freshnessScore = Number.isFinite(newestAgeHours)
+            ? clampBlogStudioScore(94 - Math.round(Math.min(120, newestAgeHours) * 0.45))
+            : 42;
+        const engagementScore = clampBlogStudioScore(Math.round(Math.log10(engagementRaw + 1) * 34));
+
+        return buildFreeTrendRadarEvidence({
+            provider: "reddit-search",
+            query: normalizedQuery,
+            titles,
+            domains,
+            engagementScore,
+            freshnessScore,
+        });
+    } catch {
+        return null;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function fetchHackerNewsTrendEvidence(query: string): Promise<FreeInternetTrendEvidence | null> {
+    const normalizedQuery = sanitizeText(query, 180);
+    if (!normalizedQuery) {
+        return null;
+    }
+
+    const oneWeekAgoSeconds = Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60);
+    const url = new URL("https://hn.algolia.com/api/v1/search");
+    url.searchParams.set("query", normalizedQuery);
+    url.searchParams.set("tags", "story");
+    url.searchParams.set("numericFilters", `created_at_i>${oneWeekAgoSeconds}`);
+    url.searchParams.set("hitsPerPage", "10");
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FREE_TREND_RADAR_TIMEOUT_MS);
+
+    try {
+        const response = await fetch(url.toString(), {
+            signal: controller.signal,
+            headers: {
+                accept: "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const payload = await response.json() as {
+            hits?: Array<{
+                title?: string;
+                url?: string;
+                points?: number;
+                num_comments?: number;
+                created_at_i?: number;
+            }>;
+        };
+        const hits = Array.isArray(payload.hits) ? payload.hits : [];
+        const titles = sanitizeStringArray(hits.map((hit) => hit.title), 10, 180);
+        const domains = sanitizeStringArray(
+            hits.map((hit) => {
+                try {
+                    return new URL(hit.url || "").hostname.replace(/^www\./i, "");
+                } catch {
+                    return "news.ycombinator.com";
+                }
+            }),
+            10,
+            120,
+        );
+        const engagementRaw = hits.reduce((sum, hit) => {
+            const points = Number(hit.points || 0);
+            const comments = Number(hit.num_comments || 0);
+            return sum + Math.max(0, points) + Math.max(0, comments * 2);
+        }, 0);
+        const newestAgeHours = hits.reduce((youngest, hit) => {
+            const createdAt = Number(hit.created_at_i || 0);
+            if (!createdAt) {
+                return youngest;
+            }
+            return Math.min(youngest, Math.max(0, ((Date.now() / 1000) - createdAt) / 3600));
+        }, Number.POSITIVE_INFINITY);
+        const freshnessScore = Number.isFinite(newestAgeHours)
+            ? clampBlogStudioScore(96 - Math.round(Math.min(120, newestAgeHours) * 0.45))
+            : 40;
+        const engagementScore = clampBlogStudioScore(Math.round(Math.log10(engagementRaw + 1) * 36));
+
+        return buildFreeTrendRadarEvidence({
+            provider: "hacker-news",
+            query: normalizedQuery,
+            titles,
+            domains,
+            engagementScore,
+            freshnessScore,
+        });
+    } catch {
+        return null;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function fetchFreeTrendRadarEvidence(input: {
+    query: string;
+    location: string;
+    includeHackerNews: boolean;
+}) {
+    const providers: Array<Promise<FreeInternetTrendEvidence | null>> = [
+        fetchGdeltTrendEvidence(input.query),
+        fetchGoogleNewsTrendEvidence(input.query, input.location),
+        fetchRedditTrendEvidence(input.query),
+    ];
+
+    if (input.includeHackerNews) {
+        providers.push(fetchHackerNewsTrendEvidence(input.query));
+    }
+
+    const results = await Promise.allSettled(providers);
+    return results
+        .filter((result): result is PromiseFulfilledResult<FreeInternetTrendEvidence | null> => result.status === "fulfilled")
+        .map((result) => result.value)
+        .filter((evidence): evidence is FreeInternetTrendEvidence => Boolean(evidence));
 }
 
 function buildTrendCandidateDiscovery(
@@ -7657,7 +8010,7 @@ async function buildFreeInternetTrendDiscoveryStage(input: {
         return null;
     }
 
-    const queries = buildInternetTrendSearchQueries({
+    const queries = buildFreeTrendRadarSearchQueries({
         websiteIntelligence: input.websiteIntelligence,
         brief: input.brief,
         title: input.title,
@@ -7667,11 +8020,22 @@ async function buildFreeInternetTrendDiscoveryStage(input: {
         return null;
     }
 
-    const evidenceResults = await Promise.allSettled(queries.map(fetchGdeltTrendEvidence));
+    const includeHackerNews = shouldUseHackerNewsTrendRadarProvider(input.websiteIntelligence);
+    const evidenceResults = await Promise.allSettled(
+        queries.map((query) => fetchFreeTrendRadarEvidence({
+            query,
+            location: input.location,
+            includeHackerNews,
+        })),
+    );
     const evidenceItems = evidenceResults
-        .filter((result): result is PromiseFulfilledResult<FreeInternetTrendEvidence> => result.status === "fulfilled" && Boolean(result.value))
-        .map((result) => result.value)
-        .filter((evidence) => evidence.score >= 32 || evidence.articleCount >= 2);
+        .filter((result): result is PromiseFulfilledResult<FreeInternetTrendEvidence[]> => result.status === "fulfilled")
+        .flatMap((result) => result.value)
+        .filter((evidence) =>
+            evidence.score >= 34 ||
+            evidence.articleCount >= 2 ||
+            (evidence.engagementScore || 0) >= 28,
+        );
 
     if (!evidenceItems.length) {
         return null;
@@ -7719,8 +8083,19 @@ async function buildFreeInternetTrendDiscoveryStage(input: {
 
             const internalLinkSupportScore = scoreInternalLinkSupport(topic, input.websiteIntelligence);
             const commercialFitScore = scoreTopicOverlap(topic, websiteCommercialHints);
-            const trendMomentumScore = clampBlogStudioScore(38 + Math.round(evidence.score * 0.46));
-            const searchDemandScore = clampBlogStudioScore(36 + Math.round(evidence.score * 0.42));
+            const providerDiversityBoost = evidence.domains.length >= 3 ? 6 : evidence.domains.length >= 2 ? 3 : 0;
+            const trendMomentumScore = clampBlogStudioScore(
+                34 +
+                Math.round(evidence.score * 0.42) +
+                Math.round((evidence.engagementScore || 0) * 0.12) +
+                providerDiversityBoost,
+            );
+            const searchDemandScore = clampBlogStudioScore(
+                34 +
+                Math.round(evidence.score * 0.38) +
+                Math.round((evidence.articleCount || 0) * 2) +
+                providerDiversityBoost,
+            );
             const winnabilityScore = 48;
             const opportunityScore = scoreTopicOpportunity({
                 topic,
@@ -7765,7 +8140,9 @@ async function buildFreeInternetTrendDiscoveryStage(input: {
                 sourceQuery: evidence.query,
                 reasons: sanitizeStringArray(
                     [
-                        `free-news-evidence ${evidence.articleCount} articles`,
+                        `radar-source ${evidence.providerLabel}`,
+                        `free-trend-evidence ${evidence.articleCount} item${evidence.articleCount === 1 ? "" : "s"}`,
+                        evidence.engagementScore ? `engagement ${evidence.engagementScore}` : "",
                         evidence.domains.length ? `sources ${evidence.domains.slice(0, 3).join(", ")}` : "",
                         ...opportunityScore.reasons,
                     ],
@@ -7775,17 +8152,29 @@ async function buildFreeInternetTrendDiscoveryStage(input: {
                 relatedQueries: evidence.relatedQueries,
             };
 
-            if (!existing || candidate.score > existing.score) {
+            if (existing) {
+                candidateMap.set(key, {
+                    ...candidate,
+                    score: clampBlogStudioScore(Math.max(candidate.score, existing.score) + 3),
+                    freshnessScore: Math.max(candidate.freshnessScore, existing.freshnessScore),
+                    searchDemandScore: Math.max(candidate.searchDemandScore, existing.searchDemandScore),
+                    internetEvidenceScore: Math.max(candidate.internetEvidenceScore, existing.internetEvidenceScore),
+                    trendMomentumScore: Math.max(candidate.trendMomentumScore || 0, existing.trendMomentumScore || 0),
+                    reasons: sanitizeStringArray([...existing.reasons, ...candidate.reasons], 10, 120),
+                    relatedQueries: sanitizeStringArray([...existing.relatedQueries, ...candidate.relatedQueries], 10, 120),
+                });
+            } else {
                 candidateMap.set(key, candidate);
             }
         }
     }
 
     const candidates = Array.from(candidateMap.values());
+    const providerLabels = sanitizeStringArray(evidenceItems.map((evidence) => evidence.providerLabel), 4, 60);
     const result = buildTrendCandidateDiscovery(
         candidates,
-        `Google Trends had no strict website-fit match, so free recent web/news signals were searched inside the site's authority lanes.`,
-        `Free internet trend research checked ${queries.length} authority-lane quer${queries.length === 1 ? "y" : "ies"} and selected a website-fit recent topic.`,
+        `Google Trends had no strict website-fit match, so the Website-Fit Trend Radar searched free recent signals inside the site's authority lanes.`,
+        `Website-Fit Trend Radar checked ${queries.length} authority-lane quer${queries.length === 1 ? "y" : "ies"} across ${providerLabels.join(", ") || "free web sources"} and selected a website-fit recent topic.`,
         input.runtimeConfig,
         {
             queryCount: queries.length,
@@ -9625,7 +10014,7 @@ async function buildBackupTrendDiscoveryStage(input: {
         recentTopicTexts: input.recentTopicTexts,
         runtimeConfig: input.runtimeConfig,
     }).catch((error) => {
-        blogLogError("DISCOVERY (free-internet-trend-research)", "Free internet trend fallback failed", error);
+        blogLogError("DISCOVERY (website-fit-trend-radar)", "Website-Fit Trend Radar failed", error);
         return null;
     });
 
@@ -11369,7 +11758,7 @@ function formatFetchTrendsDiagnosticsLabel(
     }
 
     if (fetchTrendsSource === "free-internet-trend-research") {
-        return "Free internet trend research";
+        return "Website-Fit Trend Radar";
     }
 
     if (fetchTrendsSource === "internet-trend-research") {
@@ -11415,7 +11804,7 @@ function formatTopicSourcePipelineNote(input: {
 
     if (input.fetchTrendsSource === "free-internet-trend-research") {
         return sanitizeText(
-            `Topic source: free internet trend research. Selected website-fit trending topic: ${selectedTopic}.`,
+            `Topic source: Website-Fit Trend Radar. Selected free-source website-fit trending topic: ${selectedTopic}.`,
             240,
         );
     }

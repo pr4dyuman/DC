@@ -1,6 +1,6 @@
 # AI Blogger Workflow Reference
 
-Last updated: 2026-05-12
+Last updated: 2026-05-14
 
 This document explains the AI Blogger generation workflow, where AI/API calls happen, what each stage does, how blocker fixing works, and how rerunning grounded research works.
 
@@ -9,7 +9,7 @@ This document explains the AI Blogger generation workflow, where AI/API calls ha
 | Step | AI API Call? | What It Does |
 | --- | --- | --- |
 | 1. Website Intelligence | No | Crawls the website and extracts services, money pages, headings, FAQs, CTAs, proof points, previous blog topics, and internal-link targets. This is the foundation for topic fit, links, business fit, and later prompts. |
-| 2. Topic Opportunity Gate | Sometimes | Checks Google Trends first. If no strict website-fit trend is found, it tries Search Console rising queries, then free internet/SERP trend research, then AI fallback only when needed. It rejects unrelated viral topics instead of forcing them into the blog. |
+| 2. Topic Opportunity Gate | Sometimes | Checks Google Trends first. If no strict website-fit trend is found, it tries Search Console rising queries, then the Website-Fit Trend Radar, then SERP trend research, then AI fallback only when needed. It rejects unrelated viral topics instead of forcing them into the blog. |
 | 3. SERP Analysis | No LLM | Gets search results, competitors, People Also Ask, headings, related searches, dominant intent, and ranking difficulty. This uses search/trend APIs, not the blog-writing AI model. |
 | 4. Grounded Research | No LLM | Fetches trusted source URLs, filters weak or unrelated sources, checks source-topic and source-service relevance, and saves sources for citations. |
 | 5. Performance Feedback | No | Looks at stored Search Console/page performance snapshots to find refresh opportunities, CTR gaps, visibility decay, or useful query context. |
@@ -35,9 +35,10 @@ Topic selection is designed to be dynamic for any website type.
 2. If a live Google trend strictly fits the website authority lane, it can be selected.
 3. If Google Trends has viral topics but none fit the website, they are rejected.
 4. Search Console rising queries are tried next when Search Console OAuth is connected or refreshable.
-5. If Search Console is unavailable or produces no usable topic, free internet/SERP trend research is used inside the website authority lanes.
-6. SERP comparison can rerank the best candidates for winnability, search intent, internal-link support, and duplicate risk.
-7. If no website-fit topic can be found, the workflow should stop or save for review instead of writing an unrelated blog.
+5. If Search Console is unavailable or produces no usable topic, the Website-Fit Trend Radar checks free public sources inside the website authority lanes: GDELT/global news, Google News RSS, Reddit public search, and Hacker News for tech/SaaS/dev websites.
+6. If the free radar does not produce a usable topic, SERP trend research is used inside the same website authority lanes.
+7. SERP comparison can rerank the best candidates for winnability, search intent, internal-link support, and duplicate risk.
+8. If no website-fit topic can be found, the workflow should stop or save for review instead of writing an unrelated blog.
 
 ## Where AI API Calls Happen
 
@@ -206,8 +207,8 @@ This prevents a long generation run from being lost at the last step.
 - Google Trends and SERP are not the same signal.
 - Google Trends finds live viral topics.
 - Search Console rising queries find website-specific demand growth.
+- Website-Fit Trend Radar finds free public recent-demand signals from news/community/tech sources.
 - SERP/internet trend research finds website-fit SEO opportunities and recent public interest.
 - The best traffic topic is usually a balance of trend momentum, website authority fit, search demand, low difficulty, and internal-link support.
 - A viral topic with no website fit is rejected to protect authority.
 - A website-fit topic with weak trend momentum can still be good for SEO, but it should not be described as a Google Trends topic.
-
