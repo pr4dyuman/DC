@@ -130,16 +130,19 @@ export async function getValidSearchConsoleAccessToken(
     encryptedOAuthConfig: OAuthConfig
 ): Promise<string | null> {
     try {
-        // Decrypt tokens
         const refreshToken = decryptApiKey(encryptedOAuthConfig.refreshToken);
-        const accessToken = decryptApiKey(encryptedOAuthConfig.accessToken);
-        if (!refreshToken || !accessToken) {
+        if (!refreshToken) {
             return null;
         }
 
-        // Check if token needs refresh
-        if (Date.now() > encryptedOAuthConfig.expiresAt - 300000) {
-            // Refresh if within 5 minutes of expiry
+        const accessToken = encryptedOAuthConfig.accessToken
+            ? decryptApiKey(encryptedOAuthConfig.accessToken)
+            : "";
+        const expiresAt = Number.isFinite(encryptedOAuthConfig.expiresAt)
+            ? encryptedOAuthConfig.expiresAt
+            : 0;
+
+        if (!accessToken || Date.now() > expiresAt - 300000) {
             const refreshed = await refreshGoogleOAuthToken(
                 agencyId,
                 encryptedOAuthConfig.refreshToken

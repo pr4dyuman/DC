@@ -7080,6 +7080,108 @@ function mapSearchConsoleRowsByQuery(rows: SearchConsoleAnalyticsRow[]) {
     return map;
 }
 
+function aggregateSearchConsoleQueryRowsFromSnapshots(snapshots: BlogStudioPerformanceSnapshot[]) {
+    const aggregates = new Map<string, {
+        query: string;
+        clicks: number;
+        impressions: number;
+        positionWeightedSum: number;
+        positionWeight: number;
+    }>();
+
+    for (const snapshot of snapshots) {
+        for (const querySnapshot of snapshot.topQueries || []) {
+            const query = sanitizeText(querySnapshot.query, 180);
+            if (!query) {
+                continue;
+            }
+
+            const clicks = toFiniteMetric(querySnapshot.clicks);
+            const impressions = toFiniteMetric(querySnapshot.impressions);
+            const position = toFiniteMetric(querySnapshot.position);
+            const weight = impressions > 0 ? impressions : 1;
+            const key = query.toLowerCase();
+            const current = aggregates.get(key) || {
+                query,
+                clicks: 0,
+                impressions: 0,
+                positionWeightedSum: 0,
+                positionWeight: 0,
+            };
+
+            current.clicks += clicks;
+            current.impressions += impressions;
+            current.positionWeightedSum += position * weight;
+            current.positionWeight += weight;
+            aggregates.set(key, current);
+        }
+    }
+
+    return Array.from(aggregates.values())
+        .map((aggregate) => ({
+            keys: [aggregate.query],
+            clicks: aggregate.clicks,
+            impressions: aggregate.impressions,
+            ctr: aggregate.impressions > 0 ? aggregate.clicks / aggregate.impressions : 0,
+            position: aggregate.positionWeight > 0
+                ? aggregate.positionWeightedSum / aggregate.positionWeight
+                : 0,
+        }))
+        .sort((left, right) =>
+            toFiniteMetric(right.impressions) - toFiniteMetric(left.impressions) ||
+            toFiniteMetric(right.clicks) - toFiniteMetric(left.clicks),
+        );
+}
+
+async function getCachedSearchConsoleRisingQueryRows(agencyId: string) {
+    const snapshotGroups = await BlogStudioPerformanceSnapshotModel.aggregate<{ _id: string; snapshots: unknown[] }>([
+        { $match: { agencyId } },
+        { $sort: { postId: 1, refreshedAt: -1 } },
+        {
+            $group: {
+                _id: "$postId",
+                snapshots: { $push: "$$ROOT" },
+            },
+        },
+        {
+            $project: {
+                snapshots: { $slice: ["$snapshots", 2] },
+            },
+        },
+    ]);
+
+    const latestSnapshots: BlogStudioPerformanceSnapshot[] = [];
+    const previousSnapshots: BlogStudioPerformanceSnapshot[] = [];
+
+    for (const group of snapshotGroups) {
+        const snapshots = group.snapshots.map((snapshot) => toBlogStudioPerformanceSnapshot(snapshot));
+        if (snapshots[0]) {
+            latestSnapshots.push(snapshots[0]);
+        }
+        if (snapshots[1]) {
+            previousSnapshots.push(snapshots[1]);
+        }
+    }
+
+    const currentRows = aggregateSearchConsoleQueryRowsFromSnapshots(latestSnapshots);
+    if (!currentRows.length) {
+        return null;
+    }
+
+    const latestSnapshotAt = latestSnapshots
+        .map((snapshot) => snapshot.refreshedAt)
+        .filter(Boolean)
+        .sort()
+        .at(-1) || null;
+
+    return {
+        currentRows,
+        previousRows: aggregateSearchConsoleQueryRowsFromSnapshots(previousSnapshots),
+        latestSnapshotAt,
+        snapshotCount: latestSnapshots.length,
+    };
+}
+
 async function fetchGdeltTrendEvidence(query: string): Promise<FreeInternetTrendEvidence | null> {
     const normalizedQuery = sanitizeText(query, 180);
     if (!normalizedQuery) {
@@ -7270,70 +7372,92 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
 
     const oauth = input.settings.searchConsoleOAuth;
     const selectedDomain = oauth?.selectedDomain?.trim() || "";
+    let currentRows: SearchConsoleAnalyticsRow[] = [];
+    let previousRows: SearchConsoleAnalyticsRow[] = [];
+    let queryDataSource: string = "live-oauth";
+
+    const loadCachedSearchConsoleRows = async (reason: string) => {
+        addBackupTrendDiagnostic(input.diagnostics, reason);
+        const cachedRows = await getCachedSearchConsoleRisingQueryRows(input.agencyId);
+        if (!cachedRows) {
+            return false;
+        }
+
+        currentRows = cachedRows.currentRows;
+        previousRows = cachedRows.previousRows;
+        queryDataSource = "cached-snapshots";
+        addBackupTrendDiagnostic(
+            input.diagnostics,
+            `Search Console using cached query snapshots (${cachedRows.snapshotCount} post${cachedRows.snapshotCount === 1 ? "" : "s"}${cachedRows.latestSnapshotAt ? `, latest ${cachedRows.latestSnapshotAt}` : ""}).`,
+        );
+        return true;
+    };
+
     if (!oauth) {
-        addBackupTrendDiagnostic(input.diagnostics, "Search Console skipped: OAuth is not connected.");
-        return null;
-    }
-
-    if (!oauth.enabled) {
-        addBackupTrendDiagnostic(input.diagnostics, "Search Console skipped: OAuth is disabled in settings.");
-        return null;
-    }
-
-    if (!selectedDomain) {
-        addBackupTrendDiagnostic(input.diagnostics, "Search Console skipped: no Search Console property is selected.");
-        return null;
-    }
-
-    if (!canAttemptSearchConsoleOAuth(oauth)) {
+        if (!await loadCachedSearchConsoleRows("Search Console live OAuth unavailable: OAuth is not connected.")) {
+            return null;
+        }
+    } else if (!oauth.enabled) {
+        if (!await loadCachedSearchConsoleRows("Search Console live OAuth unavailable: OAuth is disabled in settings.")) {
+            return null;
+        }
+    } else if (!selectedDomain) {
+        if (!await loadCachedSearchConsoleRows("Search Console live OAuth unavailable: no Search Console property is selected.")) {
+            return null;
+        }
+    } else if (!canAttemptSearchConsoleOAuth(oauth)) {
         const status = normalizeSearchConsoleOAuthStatus(oauth.authStatus);
-        addBackupTrendDiagnostic(
-            input.diagnostics,
-            status === "token-expired" && !oauth.refreshToken
-                ? "Search Console skipped: OAuth token expired and no refresh token is stored."
-                : `Search Console skipped: OAuth status is ${status}.`,
-        );
-        return null;
-    }
-
-    const accessToken = await getValidSearchConsoleAccessToken(input.agencyId, {
-        refreshToken: oauth.refreshToken || "",
-        accessToken: oauth.accessToken || "",
-        expiresAt: oauth.accessTokenExpiresAt || 0,
-        selectedDomain,
-    });
-
-    if (!accessToken) {
-        addBackupTrendDiagnostic(input.diagnostics, "Search Console skipped: OAuth token refresh failed; reconnect Search Console.");
-        return null;
-    }
-
-    const windows = getSearchConsoleTrendWindows();
-    const [currentRows, previousRows] = await Promise.all([
-        querySearchConsoleAnalytics(
+        const reason = status === "token-expired" && !oauth.refreshToken
+            ? "Search Console live OAuth unavailable: token expired and no refresh token is stored."
+            : `Search Console live OAuth unavailable: OAuth status is ${status}.`;
+        if (!await loadCachedSearchConsoleRows(reason)) {
+            return null;
+        }
+    } else {
+        const accessToken = await getValidSearchConsoleAccessToken(input.agencyId, {
+            refreshToken: oauth.refreshToken || "",
+            accessToken: oauth.accessToken || "",
+            expiresAt: oauth.accessTokenExpiresAt || 0,
             selectedDomain,
-            accessToken,
-            windows.currentStart,
-            windows.currentEnd,
-            ["query"],
-            SEARCH_CONSOLE_TREND_ROW_LIMIT,
-        ),
-        querySearchConsoleAnalytics(
-            selectedDomain,
-            accessToken,
-            windows.previousStart,
-            windows.previousEnd,
-            ["query"],
-            SEARCH_CONSOLE_TREND_ROW_LIMIT,
-        ),
-    ]);
+        });
 
-    if (!currentRows.length) {
-        addBackupTrendDiagnostic(
-            input.diagnostics,
-            `Search Console skipped: no query rows found for ${windows.currentStart} to ${windows.currentEnd}.`,
-        );
-        return null;
+        if (!accessToken) {
+            if (!await loadCachedSearchConsoleRows("Search Console live OAuth unavailable: token refresh failed; reconnect Search Console.")) {
+                return null;
+            }
+        } else {
+            const windows = getSearchConsoleTrendWindows();
+            try {
+                [currentRows, previousRows] = await Promise.all([
+                    querySearchConsoleAnalytics(
+                        selectedDomain,
+                        accessToken,
+                        windows.currentStart,
+                        windows.currentEnd,
+                        ["query"],
+                        SEARCH_CONSOLE_TREND_ROW_LIMIT,
+                    ),
+                    querySearchConsoleAnalytics(
+                        selectedDomain,
+                        accessToken,
+                        windows.previousStart,
+                        windows.previousEnd,
+                        ["query"],
+                        SEARCH_CONSOLE_TREND_ROW_LIMIT,
+                    ),
+                ]);
+            } catch (error) {
+                if (!await loadCachedSearchConsoleRows(`Search Console live OAuth unavailable: ${getErrorMessage(error)}`)) {
+                    return null;
+                }
+            }
+
+            if (!currentRows.length && queryDataSource === "live-oauth") {
+                if (!await loadCachedSearchConsoleRows(`Search Console live API returned no query rows for ${windows.currentStart} to ${windows.currentEnd}.`)) {
+                    return null;
+                }
+            }
+        }
     }
 
     const previousByQuery = mapSearchConsoleRowsByQuery(previousRows);
@@ -7432,6 +7556,7 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
             sourceQuery: rawQuery,
             reasons: sanitizeStringArray(
                 [
+                    queryDataSource === "cached-snapshots" ? "cached-search-console-snapshot" : "live-search-console-api",
                     `search-console-current-impressions ${Math.round(currentImpressions)}`,
                     `growth ${growthPct >= 999 ? "new" : `${growthPct}%`}`,
                     position ? `avg-position ${Math.round(position * 10) / 10}` : "",
@@ -7487,8 +7612,12 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
 
     const result = buildTrendCandidateDiscovery(
         candidates,
-        `Google Trends had no strict website-fit match, so Search Console rising queries were used as the free website-fit trend source.`,
-        `Search Console analyzed ${currentRows.length} current quer${currentRows.length === 1 ? "y" : "ies"} and selected a rising website-fit opportunity.`,
+        queryDataSource === "cached-snapshots"
+            ? `Google Trends had no strict website-fit match, so cached Search Console query snapshots were used as the free website-fit trend source.`
+            : `Google Trends had no strict website-fit match, so live Search Console rising queries were used as the free website-fit trend source.`,
+        queryDataSource === "cached-snapshots"
+            ? `Search Console cached snapshots analyzed ${currentRows.length} quer${currentRows.length === 1 ? "y" : "ies"} and selected a website-fit opportunity.`
+            : `Search Console analyzed ${currentRows.length} current quer${currentRows.length === 1 ? "y" : "ies"} and selected a rising website-fit opportunity.`,
         input.runtimeConfig,
         {
             queryCount: currentRows.length,
