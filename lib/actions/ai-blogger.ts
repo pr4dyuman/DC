@@ -5409,7 +5409,7 @@ const SEARCH_CONSOLE_TREND_CURRENT_DAYS = 7;
 const SEARCH_CONSOLE_TREND_PREVIOUS_DAYS = 28;
 const SEARCH_CONSOLE_TREND_ROW_LIMIT = 1000;
 const SEARCH_CONSOLE_TREND_CANDIDATE_LIMIT = 12;
-const FREE_INTERNET_TREND_QUERY_LIMIT = 6;
+const FREE_INTERNET_TREND_QUERY_LIMIT = 8;
 const FREE_INTERNET_TREND_CANDIDATE_LIMIT = 12;
 const GDELT_TREND_TIMEOUT_MS = 4_500;
 const FREE_TREND_RADAR_TIMEOUT_MS = 4_500;
@@ -6966,12 +6966,10 @@ function buildFreeTrendRadarSearchQueries(input: {
         .slice(0, 5);
     const queries: string[] = [];
 
-    for (const seed of seeds) {
-        queries.push(`${seed} trend`);
-        queries.push(`${seed} news`);
-        queries.push(`${seed} discussion`);
-        queries.push(`${seed} best practices`);
-    }
+    queries.push(...seeds.map((seed) => `${seed} trend`));
+    queries.push(...seeds.map((seed) => `${seed} news`));
+    queries.push(...seeds.map((seed) => `${seed} discussion`));
+    queries.push(...seeds.map((seed) => `${seed} best practices`));
 
     return sanitizeStringArray(queries, FREE_INTERNET_TREND_QUERY_LIMIT, 140);
 }
@@ -7028,7 +7026,15 @@ function extractXmlTagText(block: string, tagName: string, maxLength = 220) {
 
 function getTrendRadarCountry(location: string) {
     const sanitized = sanitizeLocation(location, "");
-    return /^[a-z]{2}$/i.test(sanitized) ? sanitized.toUpperCase() : "US";
+    if (!sanitized) {
+        return "";
+    }
+
+    if (sanitized === "uk") {
+        return "GB";
+    }
+
+    return /^[a-z]{2}$/i.test(sanitized) ? sanitized.toUpperCase() : "";
 }
 
 function buildFreeTrendRadarEvidence(input: {
@@ -7389,9 +7395,13 @@ async function fetchGoogleNewsTrendEvidence(query: string, location: string): Pr
     const country = getTrendRadarCountry(location);
     const url = new URL("https://news.google.com/rss/search");
     url.searchParams.set("q", `${normalizedQuery} when:7d`);
-    url.searchParams.set("hl", `en-${country}`);
-    url.searchParams.set("gl", country);
-    url.searchParams.set("ceid", `${country}:en`);
+    if (country) {
+        url.searchParams.set("hl", `en-${country}`);
+        url.searchParams.set("gl", country);
+        url.searchParams.set("ceid", `${country}:en`);
+    } else {
+        url.searchParams.set("hl", "en");
+    }
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FREE_TREND_RADAR_TIMEOUT_MS);
