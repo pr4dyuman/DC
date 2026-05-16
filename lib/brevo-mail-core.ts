@@ -30,18 +30,25 @@ export async function sendEmail({ to, templateId, params, subject, agencyId }: E
 
     const agency = agencyId ? null : await getCurrentAgency();
     const emailSettings = await getEffectiveEmailSettings({ agency, agencyId });
-    if (!emailSettings.platformEnabled) {
+    const category = TEMPLATE_TO_CATEGORY[templateId];
+    const isAccountAuthTemplate = category === "accountCreation";
+
+    if (isAccountAuthTemplate && !emailSettings.accountAuthEnabled) {
+      console.warn("[Brevo] Account creation and password reset emails are disabled by platform settings.");
+      return true;
+    }
+
+    if (!isAccountAuthTemplate && !emailSettings.platformEnabled) {
       console.warn("[Brevo] Email sending is disabled by platform email settings.");
       return true;
     }
 
-    if (!emailSettings.agencyEnabled) {
+    if (!isAccountAuthTemplate && !emailSettings.agencyEnabled) {
       console.warn("[Brevo] Email sending is disabled for this agency.");
       return true;
     }
 
-    const category = TEMPLATE_TO_CATEGORY[templateId];
-    if (category) {
+    if (category && !isAccountAuthTemplate) {
       const isEnabled = emailSettings.categories[category as EmailCategoryKey] ?? DEFAULT_EMAIL_CATEGORIES[category as EmailCategoryKey];
       if (!isEnabled) {
         console.log(`[Brevo] Email category "${category}" is disabled. Skipping template ${templateId}.`);

@@ -159,13 +159,9 @@ export function KanbanBoard({ initialTasks, users, currentUserId, currentUserRol
 
         if (!newStatus || newStatus === draggedTask.status) return;
 
-        // Permission check
-        if (newStatus === 'Done' && !effectivePermissions.canMarkDone) {
-            toast.error("You don't have permission to mark tasks as Done.");
-            return;
-        }
-        if (newStatus !== 'Done' && !effectivePermissions.canManageTasks) {
-            toast.error("You don't have permission to manage task status.");
+        const canMoveTaskStatus = effectivePermissions.canManageTasks || effectivePermissions.canMarkDone;
+        if (!canMoveTaskStatus) {
+            toast.error("You don't have permission to change task status.");
             return;
         }
 
@@ -190,13 +186,9 @@ export function KanbanBoard({ initialTasks, users, currentUserId, currentUserRol
         const task = tasks.find(t => t.id === taskId);
         if (!task || task.status === newStatus) return;
 
-        // Permission check
-        if (newStatus === 'Done' && !effectivePermissions.canMarkDone) {
-            toast.error("You don't have permission to mark tasks as Done.");
-            return;
-        }
-        if (newStatus !== 'Done' && !effectivePermissions.canManageTasks) {
-            toast.error("You don't have permission to manage task status.");
+        const canMoveTaskStatus = effectivePermissions.canManageTasks || effectivePermissions.canMarkDone;
+        if (!canMoveTaskStatus) {
+            toast.error("You don't have permission to change task status.");
             return;
         }
 

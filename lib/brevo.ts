@@ -3,7 +3,7 @@
  * Uses the Brevo REST API v3 to send emails.
  */
 
-import { isPlatformEmailGloballyEnabled } from "./email-policy";
+import { isAccountAuthEmailEnabled, isPlatformEmailGloballyEnabled } from "./email-policy";
 
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
@@ -77,6 +77,11 @@ export async function sendEmail({
  * Send OTP verification email for signup.
  */
 export async function sendOtpEmail(email: string, otp: string): Promise<{ success: boolean; error?: string }> {
+    if (!(await isAccountAuthEmailEnabled())) {
+        console.warn("Brevo: Account creation and password reset emails are disabled. Skipping signup OTP email.");
+        return { success: false, error: "Account creation and password reset emails are disabled." };
+    }
+
     return sendEmail({
         to: email,
         subject: `Your Verification Code: ${otp}`,
@@ -128,6 +133,11 @@ export async function sendOtpEmail(email: string, otp: string): Promise<{ succes
  * Send OTP email for password reset.
  */
 export async function sendPasswordResetOtpEmail(email: string, otp: string): Promise<{ success: boolean; error?: string }> {
+    if (!(await isAccountAuthEmailEnabled())) {
+        console.warn("Brevo: Account creation and password reset emails are disabled. Skipping password reset OTP email.");
+        return { success: false, error: "Account creation and password reset emails are disabled." };
+    }
+
     return sendEmail({
         to: email,
         subject: `Password Reset Code: ${otp}`,

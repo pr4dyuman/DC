@@ -125,9 +125,10 @@ export async function POST(request: Request) {
         // ── Send OTP via Brevo ──
         const result = await sendPasswordResetOtpEmail(validatedEmail, otp);
         if (!result.success) {
+            const status = result.error?.includes('disabled') ? 503 : 500;
             return NextResponse.json(
-                { error: 'Failed to send verification email. Please try again.' },
-                { status: 500 }
+                { error: result.error || 'Failed to send verification email. Please try again.' },
+                { status }
             );
         }
 

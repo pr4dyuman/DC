@@ -101,6 +101,7 @@ export function TaskCard({
         effectivePermissions.deleteAccess === "any" ||
         (effectivePermissions.deleteAccess === "own" && task.createdBy === currentUserId)
     );
+    const canMoveTaskStatus = !readOnly && (effectivePermissions.canManageTasks || effectivePermissions.canMarkDone);
     const canReassignTask = !readOnly && (currentUserRole === "admin" || currentUserRole === "manager");
 
     useEffect(() => {
@@ -187,7 +188,7 @@ export function TaskCard({
 
     const handleStatusChange = (newStatus: Task["status"]) => {
         setShowStatusMenu(false);
-        if (!canEdit || newStatus === task.status) return;
+        if (!canMoveTaskStatus || newStatus === task.status) return;
         onQuickEdit?.(task.id, { status: newStatus });
         onStatusChange?.(task.id, newStatus);
     };
@@ -331,7 +332,7 @@ export function TaskCard({
                             )}
 
                             <div className="flex items-center shrink-0 ml-auto gap-1.5">
-                                {disableDrag && canEdit && (
+                                {disableDrag && canMoveTaskStatus && (
                                     <button
                                         onClick={(event) => {
                                             event.stopPropagation();

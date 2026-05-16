@@ -98,6 +98,26 @@ export const TEMPLATE_TO_CATEGORY: Record<number, EmailCategory> = {
 };
 
 /** Default category states — critical ON, optional OFF */
+export type PlatformEmailPermissionKey = 'accountAuth' | 'contactUs';
+
+export const PLATFORM_EMAIL_PERMISSION_INFO: Record<PlatformEmailPermissionKey, { label: string; description: string; priority: 'critical' }> = {
+  accountAuth: {
+    label: 'Account Creation and Password Reset',
+    description: 'New account credentials, signup OTP, and forgot-password OTP emails',
+    priority: 'critical',
+  },
+  contactUs: {
+    label: 'Contact Us Emails',
+    description: 'Contact form thank-you email and admin notification email',
+    priority: 'critical',
+  },
+};
+
+export const DEFAULT_PLATFORM_EMAIL_PERMISSIONS: Record<PlatformEmailPermissionKey, boolean> = {
+  accountAuth: true,
+  contactUs: true,
+};
+
 export const DEFAULT_EMAIL_CATEGORIES: Record<EmailCategory, boolean> = {
   accountCreation: true,
   invoicePayment: true,

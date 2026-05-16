@@ -134,7 +134,8 @@ export function EmailSettings({ initialEnabled = true, initialCategories, loadin
         return <div className="p-4 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
     }
 
-    const categoryEntries = Object.entries(EMAIL_CATEGORY_INFO) as [EmailCategory, typeof EMAIL_CATEGORY_INFO[EmailCategory]][];
+    const categoryEntries = (Object.entries(EMAIL_CATEGORY_INFO) as [EmailCategory, typeof EMAIL_CATEGORY_INFO[EmailCategory]][])
+        .filter(([key]) => key !== "accountCreation");
 
     return (
         <div className="space-y-4">
@@ -146,8 +147,8 @@ export function EmailSettings({ initialEnabled = true, initialCategories, loadin
                             <Mail className={`h-5 w-5 ${enabled ? 'text-green-500' : 'text-red-500'}`} />
                         </div>
                         <div className="flex-1">
-                            <CardTitle className="text-base">Email Service</CardTitle>
-                            <CardDescription>Master switch for all outgoing emails</CardDescription>
+                            <CardTitle className="text-base">Agency Notification Email Service</CardTitle>
+                            <CardDescription>Master switch for agency-managed notification emails</CardDescription>
                         </div>
                         <div className="flex items-center gap-2">
                             {updating && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
@@ -162,7 +163,7 @@ export function EmailSettings({ initialEnabled = true, initialCategories, loadin
                     {!enabled && (
                         <div className="flex items-center gap-2 mt-2 text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded w-fit">
                             <AlertTriangle className="h-3 w-3" />
-                            <span>All emails are currently disabled. No emails will be sent.</span>
+                            <span>Agency notification emails are currently disabled.</span>
                         </div>
                     )}
                 </CardHeader>
@@ -173,7 +174,7 @@ export function EmailSettings({ initialEnabled = true, initialCategories, loadin
                 <Card>
                     <CardHeader className="pb-3">
                         <CardTitle className="text-base">Email Categories</CardTitle>
-                        <CardDescription>Choose which email types to send. Critical emails are recommended to stay ON.</CardDescription>
+                        <CardDescription>Choose which agency notification email types to send.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-1">
                         {categoryEntries.map(([key, info]) => {

@@ -70,6 +70,8 @@ const SystemSettingsSchema = new Schema({
     },
     emailDefaults: {
         globalEnabled: { type: Boolean, default: true },
+        accountAuth: { type: Boolean, default: true },
+        contactUs: { type: Boolean, default: true },
         accountCreation: { type: Boolean, default: true },
         invoicePayment: { type: Boolean, default: true },
         salaryPayroll: { type: Boolean, default: true },

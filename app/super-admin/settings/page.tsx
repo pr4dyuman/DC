@@ -7,14 +7,15 @@ import { useDateFormat } from "@/context/TimezoneContext";
 import { getSystemSettings, updateSystemSettings, getAllAgenciesWithStats, getDefaultAiConfig, saveDefaultAiConfig, getPromptConfig, savePromptConfig } from "@/lib/actions/super-admin";
 import { AI_MODELS } from "@/lib/ai-models";
 import { AIConfig, Agency, AIProvider } from "@/lib/types";
-import { DEFAULT_EMAIL_CATEGORIES, DEFAULT_TASK_EMAIL_EVENTS } from "@/lib/email-constants";
-import type { EmailCategory, TaskEmailEventKey, TaskEmailEventConfig } from "@/lib/email-constants";
+import { DEFAULT_EMAIL_CATEGORIES, DEFAULT_PLATFORM_EMAIL_PERMISSIONS, DEFAULT_TASK_EMAIL_EVENTS } from "@/lib/email-constants";
+import type { EmailCategory, PlatformEmailPermissionKey, TaskEmailEventKey, TaskEmailEventConfig } from "@/lib/email-constants";
 import { toast } from "sonner";
 import { SystemSettingsAiAgencyList } from "./_components/SystemSettingsAiAgencyList";
 import { SystemSettingsDefaultAiSection, FeatureConfigs } from "./_components/SystemSettingsDefaultAiSection";
 import { SystemSettingsEmailAdminSection } from "./_components/SystemSettingsEmailAdminSection";
 import { SystemSettingsEmailCategorySection } from "./_components/SystemSettingsEmailCategorySection";
 import { SystemSettingsEmailGlobalControls } from "./_components/SystemSettingsEmailGlobalControls";
+import { SystemSettingsEmailPermissionSection } from "./_components/SystemSettingsEmailPermissionSection";
 import { SystemSettingsInfoSection } from "./_components/SystemSettingsInfoSection";
 import { SystemSettingsNotificationsSection } from "./_components/SystemSettingsNotificationsSection";
 import { SystemSettingsPlatformSection } from "./_components/SystemSettingsPlatformSection";
@@ -242,6 +243,7 @@ export default function SystemSettingsPage() {
 
     // Email defaults state
     const [emailGlobalEnabled, setEmailGlobalEnabled] = useState(true);
+    const [emailPermissions, setEmailPermissions] = useState<Record<PlatformEmailPermissionKey, boolean>>({ ...DEFAULT_PLATFORM_EMAIL_PERMISSIONS });
     const [emailCategories, setEmailCategories] = useState<Record<string, boolean>>({ ...DEFAULT_EMAIL_CATEGORIES });
     const [taskEmailEvents, setTaskEmailEvents] = useState<Record<TaskEmailEventKey, TaskEmailEventConfig>>({ ...DEFAULT_TASK_EMAIL_EVENTS });
     const [updatingEmail, setUpdatingEmail] = useState<string | null>(null);
@@ -286,6 +288,14 @@ export default function SystemSettingsPage() {
                 if (settings?.emailDefaults) {
                     const emailDefaults = settings.emailDefaults;
                     if (typeof emailDefaults.globalEnabled === 'boolean') setEmailGlobalEnabled(emailDefaults.globalEnabled);
+                    setEmailPermissions({
+                        accountAuth: typeof emailDefaults.accountAuth === 'boolean'
+                            ? emailDefaults.accountAuth
+                            : DEFAULT_PLATFORM_EMAIL_PERMISSIONS.accountAuth,
+                        contactUs: typeof emailDefaults.contactUs === 'boolean'
+                            ? emailDefaults.contactUs
+                            : DEFAULT_PLATFORM_EMAIL_PERMISSIONS.contactUs,
+                    });
                     const cats: Record<string, boolean> = { ...DEFAULT_EMAIL_CATEGORIES };
                     for (const key of Object.keys(DEFAULT_EMAIL_CATEGORIES) as EmailCategory[]) {
                         const categoryValue = emailDefaults[key];
@@ -385,6 +395,22 @@ export default function SystemSettingsPage() {
             console.error('Failed to toggle category:', e);
             setEmailCategories(prev => ({ ...prev, [category]: !checked }));
             toast.error("Failed to update email category");
+        } finally {
+            setUpdatingEmail(null);
+        }
+    }, []);
+
+    const handleEmailPermissionToggle = useCallback(async (permission: PlatformEmailPermissionKey, checked: boolean) => {
+        setEmailPermissions(prev => ({ ...prev, [permission]: checked }));
+        setUpdatingEmail(`permission-${permission}`);
+        try {
+            await updateSystemSettings('emailDefaults', { [permission]: checked });
+            setSaved('email');
+            setTimeout(() => setSaved(''), 2500);
+        } catch (e) {
+            console.error('Failed to toggle platform email permission:', e);
+            setEmailPermissions(prev => ({ ...prev, [permission]: !checked }));
+            toast.error("Failed to update email permission");
         } finally {
             setUpdatingEmail(null);
         }
@@ -529,7 +555,10 @@ export default function SystemSettingsPage() {
     }, []);
 
     const configuredAgencyAiCount = agencies.filter((agency) => Boolean(agency.aiConfig)).length;
-    const enabledEmailCategoryCount = Object.values(emailCategories).filter(Boolean).length;
+    const enabledPlatformEmailPermissionCount = Object.values(emailPermissions).filter(Boolean).length;
+    const enabledEmailCategoryCount = Object.entries(emailCategories)
+        .filter(([key, enabled]) => key !== "accountCreation" && enabled)
+        .length;
     const enabledNotificationCount = Object.values(notificationDefaults).filter(Boolean).length;
     const promptOverrideCount = Object.values(promptConfig).filter(
         (config) => (config?.standard?.trim().length ?? 0) > 0 || (config?.live?.trim().length ?? 0) > 0,
@@ -541,7 +570,7 @@ export default function SystemSettingsPage() {
                 case "platform":
                     return platform.supportEmail ? "Ready" : "Needs email";
                 case "email":
-                    return emailGlobalEnabled ? `${enabledEmailCategoryCount} categories on` : "Emails off";
+                    return `${enabledPlatformEmailPermissionCount}/2 permissions, ${enabledEmailCategoryCount} defaults`;
                 case "security":
                     return security.enforceStrongPasswords ? "Strong passwords" : "Review policy";
                 case "ai":
@@ -560,7 +589,7 @@ export default function SystemSettingsPage() {
             agencies.length,
             configuredAgencyAiCount,
             defaultAiConfigured,
-            emailGlobalEnabled,
+            enabledPlatformEmailPermissionCount,
             enabledEmailCategoryCount,
             enabledNotificationCount,
             platform.supportEmail,
@@ -642,7 +671,7 @@ export default function SystemSettingsPage() {
                 <SettingsSummaryCard
                     label="Communication"
                     value={emailGlobalEnabled ? "Email on" : "Email off"}
-                    detail={`${enabledEmailCategoryCount} email categories, ${enabledNotificationCount} notification types`}
+                    detail={`${enabledPlatformEmailPermissionCount}/2 platform permissions, ${enabledEmailCategoryCount} agency defaults`}
                     icon={<Mail className="h-5 w-5" />}
                 />
                 <SettingsSummaryCard
@@ -692,6 +721,11 @@ export default function SystemSettingsPage() {
                     emailGlobalEnabled={emailGlobalEnabled}
                     updatingEmail={updatingEmail}
                     onToggle={handleEmailGlobalToggle}
+                />
+                <SystemSettingsEmailPermissionSection
+                    permissions={emailPermissions}
+                    updatingEmail={updatingEmail}
+                    onToggle={handleEmailPermissionToggle}
                 />
                 <SystemSettingsEmailCategorySection
                     emailGlobalEnabled={emailGlobalEnabled}

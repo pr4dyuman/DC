@@ -208,11 +208,11 @@ export default function PermissionSettings() {
                                         />
                                     </div>
 
-                                    {/* Permission: Mark Done */}
+                                    {/* Permission: Status Updates */}
                                     <div className="flex items-center justify-between gap-3 min-w-[160px]">
                                         <div className="flex flex-col">
-                                            <span className="text-sm text-foreground font-medium">Completion Rights</span>
-                                            <span className="text-[10px] text-muted-foreground">Move tasks to &quot;Done&quot;</span>
+                                            <span className="text-sm text-foreground font-medium">Status Updates</span>
+                                            <span className="text-[10px] text-muted-foreground">Move tasks across board columns</span>
                                         </div>
                                         <Switch
                                             checked={perms.canMarkDone ?? DEFAULT_USER_PERMISSIONS.canMarkDone}

@@ -121,6 +121,11 @@ function looksLikeBotSubmission({ fullName, companyName, message }) {
   return randomTokenCount >= 2;
 }
 
+function getEmailDeliveryStatus(result) {
+  if (result.status !== 'fulfilled') return 'failed';
+  return result.value?.skipped ? 'skipped' : 'sent';
+}
+
 export async function POST(request) {
   let json = (body, init) => NextResponse.json(body, init);
 
@@ -256,12 +261,11 @@ export async function POST(request) {
         console.error('Failed to send admin email:', adminEmailResult.reason);
       }
 
-      // Check if at least one email was sent successfully
-      const atLeastOneEmailSent = 
-        userEmailResult.status === 'fulfilled' || 
-        adminEmailResult.status === 'fulfilled';
+      const userEmailStatus = getEmailDeliveryStatus(userEmailResult);
+      const adminEmailStatus = getEmailDeliveryStatus(adminEmailResult);
+      const everyEmailFailed = userEmailStatus === 'failed' && adminEmailStatus === 'failed';
 
-      if (!atLeastOneEmailSent) {
+      if (everyEmailFailed) {
         // Both emails failed, but contact was saved
         console.error('Both emails failed to send');
         return json(
@@ -282,8 +286,8 @@ export async function POST(request) {
           message: CONTACT_SUCCESS_MESSAGE,
           contactId: contact._id,
           emailStatus: {
-            userEmail: userEmailResult.status === 'fulfilled' ? 'sent' : 'failed',
-            adminEmail: adminEmailResult.status === 'fulfilled' ? 'sent' : 'failed'
+            userEmail: userEmailStatus,
+            adminEmail: adminEmailStatus
           }
         },
         { status: 201 }

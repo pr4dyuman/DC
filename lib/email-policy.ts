@@ -3,8 +3,10 @@ import "server-only";
 import type { Agency } from "./types";
 import {
     DEFAULT_EMAIL_CATEGORIES,
+    DEFAULT_PLATFORM_EMAIL_PERMISSIONS,
     DEFAULT_TASK_EMAIL_EVENTS,
     type EmailCategory,
+    type PlatformEmailPermissionKey,
     type TaskEmailEventConfig,
     type TaskEmailEventKey,
 } from "./email-constants";
@@ -18,7 +20,7 @@ type StoredEmailCategories = Partial<Record<EmailCategory, boolean>> & {
 
 type StoredEmailDefaults = StoredEmailCategories & {
     globalEnabled?: boolean;
-};
+} & Partial<Record<PlatformEmailPermissionKey, boolean>>;
 
 type SystemEmailSettingsDoc = {
     emailDefaults?: StoredEmailDefaults;
@@ -30,6 +32,8 @@ const TASK_EMAIL_EVENT_FIELDS: EmailEventField[] = ["enabled", "notifyAssignee",
 
 export type EffectiveEmailSettings = {
     platformEnabled: boolean;
+    accountAuthEnabled: boolean;
+    contactUsEnabled: boolean;
     agencyEnabled: boolean;
     enabled: boolean;
     categories: Record<EmailCategory, boolean>;
@@ -129,11 +133,15 @@ export async function getEffectiveEmailSettings(input?: {
     }
 
     const platformEnabled = systemDefaults.globalEnabled ?? true;
+    const accountAuthEnabled = systemDefaults.accountAuth ?? DEFAULT_PLATFORM_EMAIL_PERMISSIONS.accountAuth;
+    const contactUsEnabled = systemDefaults.contactUs ?? DEFAULT_PLATFORM_EMAIL_PERMISSIONS.contactUs;
     const agencyEnabled = agency?.settings?.emailNotificationsEnabled ?? true;
     const merged = mergeEmailCategories(systemDefaults, agency?.settings?.emailCategories || {});
 
     return {
         platformEnabled,
+        accountAuthEnabled,
+        contactUsEnabled,
         agencyEnabled,
         enabled: platformEnabled && agencyEnabled,
         ...merged,
@@ -143,4 +151,14 @@ export async function getEffectiveEmailSettings(input?: {
 export async function isPlatformEmailGloballyEnabled(): Promise<boolean> {
     const systemDefaults = await getSystemEmailDefaults();
     return systemDefaults.globalEnabled ?? true;
+}
+
+export async function isAccountAuthEmailEnabled(): Promise<boolean> {
+    const systemDefaults = await getSystemEmailDefaults();
+    return systemDefaults.accountAuth ?? DEFAULT_PLATFORM_EMAIL_PERMISSIONS.accountAuth;
+}
+
+export async function isContactUsEmailEnabled(): Promise<boolean> {
+    const systemDefaults = await getSystemEmailDefaults();
+    return systemDefaults.contactUs ?? DEFAULT_PLATFORM_EMAIL_PERMISSIONS.contactUs;
 }

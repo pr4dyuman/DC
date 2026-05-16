@@ -27,47 +27,56 @@ export function SystemSettingsEmailCategorySection({
     }
 
     return (
-        <div className="space-y-1">
-            {(Object.entries(EMAIL_CATEGORY_INFO) as [EmailCategory, typeof EMAIL_CATEGORY_INFO[EmailCategory]][]).map(([key, info]) => {
-                const isOn = emailCategories[key] ?? DEFAULT_EMAIL_CATEGORIES[key];
-                const isUpdating = updatingEmail === key;
+        <div className="border-t border-border pt-4">
+            <div className="mb-2">
+                <p className="text-xs font-medium text-foreground">Agency Notification Defaults</p>
+                <p className="text-xs text-muted-foreground">
+                    Defaults for agency-managed notification emails. Agencies can still override these in their own settings.
+                </p>
+            </div>
+            <div className="space-y-1">
+                {(Object.entries(EMAIL_CATEGORY_INFO) as [EmailCategory, typeof EMAIL_CATEGORY_INFO[EmailCategory]][])
+                    .filter(([key]) => key !== "accountCreation")
+                    .map(([key, info]) => {
+                    const isOn = emailCategories[key] ?? DEFAULT_EMAIL_CATEGORIES[key];
+                    const isUpdating = updatingEmail === key;
 
-                return (
-                    <div key={key}>
-                        <div className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-muted/30 transition-colors">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <div className={`p-1.5 rounded-md ${info.priority === "critical" ? "bg-amber-500/10" : "bg-blue-500/10"}`}>
-                                    {info.priority === "critical"
-                                        ? <Shield className="h-4 w-4 text-amber-500" />
-                                        : <Zap className="h-4 w-4 text-blue-500" />}
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-medium text-foreground">{info.label}</span>
-                                        <span
-                                            className={`text-[10px] px-1.5 py-0 rounded-full border ${info.priority === "critical"
-                                                ? "border-amber-500/30 text-amber-500 bg-amber-500/10"
-                                                : "border-blue-500/30 text-blue-500 bg-blue-500/10"
-                                                }`}
-                                        >
-                                            {info.priority}
-                                        </span>
+                    return (
+                        <div key={key}>
+                            <div className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-muted/30 transition-colors">
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    <div className={`p-1.5 rounded-md ${info.priority === "critical" ? "bg-amber-500/10" : "bg-blue-500/10"}`}>
+                                        {info.priority === "critical"
+                                            ? <Shield className="h-4 w-4 text-amber-500" />
+                                            : <Zap className="h-4 w-4 text-blue-500" />}
                                     </div>
-                                    <p className="text-xs text-muted-foreground truncate">{info.description}</p>
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-medium text-foreground">{info.label}</span>
+                                            <span
+                                                className={`text-[10px] px-1.5 py-0 rounded-full border ${info.priority === "critical"
+                                                    ? "border-amber-500/30 text-amber-500 bg-amber-500/10"
+                                                    : "border-blue-500/30 text-blue-500 bg-blue-500/10"
+                                                    }`}
+                                            >
+                                                {info.priority}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground truncate">{info.description}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 ml-2">
+                                    {isUpdating && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                                    <Switch
+                                        checked={isOn}
+                                        onCheckedChange={(checked) => onCategoryToggle(key, checked)}
+                                        disabled={!!updatingEmail}
+                                    />
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 ml-2">
-                                {isUpdating && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-                                <Switch
-                                    checked={isOn}
-                                    onCheckedChange={(checked) => onCategoryToggle(key, checked)}
-                                    disabled={!!updatingEmail}
-                                />
-                            </div>
-                        </div>
 
-                        {key === "taskUpdates" && isOn && (
-                            <div className="ml-12 pl-3 border-l-2 border-blue-500/20 space-y-2 py-1 mb-1">
+                            {key === "taskUpdates" && isOn && (
+                                <div className="ml-12 pl-3 border-l-2 border-blue-500/20 space-y-2 py-1 mb-1">
                                 <p className="text-xs text-muted-foreground mb-1">Configure task email events and recipients:</p>
                                 {(Object.entries(TASK_EMAIL_EVENTS) as [TaskEmailEventKey, typeof TASK_EMAIL_EVENTS[TaskEmailEventKey]][]).map(([eventKey, eventInfo]) => {
                                     const eventConfig = taskEmailEvents[eventKey] || DEFAULT_TASK_EMAIL_EVENTS[eventKey];
@@ -125,6 +134,7 @@ export function SystemSettingsEmailCategorySection({
                     </div>
                 );
             })}
+            </div>
         </div>
     );
 }

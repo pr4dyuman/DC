@@ -285,12 +285,9 @@ export async function updateTaskStatusImpl(
 
     await connectDB();
 
-    if (status === "Done") {
-        if (!permissions.canMarkDone) {
-            throw new Error("Unauthorized: You do not have permission to mark tasks as Done.");
-        }
-    } else if (!permissions.canManageTasks) {
-        throw new Error("Unauthorized: You do not have permission to manage tasks.");
+    const canChangeTaskStatus = permissions.canManageTasks || permissions.canMarkDone;
+    if (!canChangeTaskStatus) {
+        throw new Error("Unauthorized: You do not have permission to change task status.");
     }
 
     const updateFields: { status: Task["status"]; updatedAt?: string } = { status };
@@ -349,11 +346,12 @@ export async function updateTaskImpl(
         updates.assigneeId = assigneeUpdate.assigneeId;
     }
 
-    if (updates.status === "Done" && !permissions.canMarkDone) {
-        throw new Error("Unauthorized: You do not have permission to mark tasks as Done.");
-    }
+    const canChangeTaskStatus = permissions.canManageTasks || permissions.canMarkDone;
     const isStatusOnly = Object.keys(updates).length === 1 && typeof updates.status === "string";
-    if ((!isStatusOnly || (updates.status && updates.status !== "Done")) && !permissions.canManageTasks) {
+    if (isStatusOnly && !canChangeTaskStatus) {
+        throw new Error("Unauthorized: You do not have permission to change task status.");
+    }
+    if (!isStatusOnly && !permissions.canManageTasks) {
         throw new Error("Unauthorized: You do not have permission to edit tasks.");
     }
 

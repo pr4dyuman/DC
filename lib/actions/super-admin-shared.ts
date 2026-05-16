@@ -63,6 +63,8 @@ type EmailEventSettingsRecord = {
 
 type EmailDefaultsRecord = {
     globalEnabled?: boolean;
+    accountAuth?: boolean;
+    contactUs?: boolean;
     accountCreation?: boolean;
     invoicePayment?: boolean;
     salaryPayroll?: boolean;
