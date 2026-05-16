@@ -2808,6 +2808,7 @@ function canAttemptSearchConsoleOAuth(value: {
     selectedDomain?: string;
     authStatus?: unknown;
     refreshToken?: string;
+    accessToken?: string;
 } | null | undefined) {
     if (!value?.enabled || !value.selectedDomain?.trim()) {
         return false;
@@ -2816,7 +2817,7 @@ function canAttemptSearchConsoleOAuth(value: {
     const status = normalizeSearchConsoleOAuthStatus(value.authStatus);
 
     if (status === "configured") {
-        return true;
+        return Boolean(value.refreshToken || value.accessToken);
     }
 
     return status === "token-expired" && Boolean(value.refreshToken);
@@ -3419,6 +3420,7 @@ Content writing rules — READ CAREFULLY:
 - Make the who/how/why clear in the body: who the advice is for, how the recommendation was derived from the provided sources/context, and why the article exists for this audience.
 - Do not write a trend-chasing article just because a topic is popular. Tie the topic to the site's real audience, service/category lane, and conversion path.
 - Use bullets, numbered steps, or compact markdown tables only when they create real reader value: checklists, frameworks, scorecards, comparison tables, templates, audit steps, or decision guides. Avoid decorative lists.
+- If you use a markdown table, it must be valid Markdown: one header row, one separator row, then body rows, each on its own line. Do not add empty pipe-only columns. If the table would be wide or fragile, use bullets instead.
 - NEVER open a sentence or a section with "In conclusion", "In summary", "To summarise", "In a nutshell", "At the end of the day". Write a real closing paragraph instead.
 - NEVER use hollow filler phrases like "In today's digital landscape", "In this day and age", "It's no secret that", "Now more than ever", "Look no further". Start with a specific, gripping hook instead.
 - NEVER use corporate buzzwords: "leverage", "synergy", "game-changer", "disruptive", "cutting-edge", "robust", "seamless", "comprehensive". Use plain, direct language.
@@ -4198,9 +4200,11 @@ QUALITY REPAIR RULES:
 - Fix the listed final quality blockers directly. Do not merely describe what should be fixed.
 - If intent satisfaction is weak, rewrite the opening so it answers the query immediately, then make the first two H2 sections more practical.
 - If original value execution is weak, add or expand one clearly labeled usable asset: checklist, framework, scorecard, comparison table, audit process, template, or decision guide.
+- If you add a table, use valid Markdown table syntax with the header, separator, and every body row on separate lines. Do not add empty pipe-only columns. Prefer bullets if the table would be too wide.
 - If proof strength is weak, use only the grounded source context above. Add [1], [2] citations only for claims supported by those sources. If sources are not strong enough, soften claims instead of inventing proof.
 - If source alignment is weak, do not pivot into an unrelated topic. Keep the site-fit topic and remove claims that depend on drifting sources.
 - If numeric claims are unsupported, remove or soften the numbers.
+- If a Markdown table is malformed, repair it into valid Markdown table syntax or replace it with clean bullets.
 - If cluster or conversion fit is weak, add a natural service/category internal link and a closing next step tied to the audience.
 - Preserve the same topic, audience, search intent, CTA path, and business fit unless a tiny adjustment is required to fix the blocker.
 - Preserve relevant internal links. Do not reduce below the existing number of useful internal links.
@@ -5409,6 +5413,7 @@ const SEARCH_CONSOLE_TREND_CURRENT_DAYS = 7;
 const SEARCH_CONSOLE_TREND_PREVIOUS_DAYS = 28;
 const SEARCH_CONSOLE_TREND_ROW_LIMIT = 1000;
 const SEARCH_CONSOLE_TREND_CANDIDATE_LIMIT = 12;
+const SEARCH_CONSOLE_CACHED_TREND_MAX_AGE_DAYS = 10;
 const FREE_INTERNET_TREND_QUERY_LIMIT = 8;
 const FREE_INTERNET_TREND_CANDIDATE_LIMIT = 12;
 const GDELT_TREND_TIMEOUT_MS = 4_500;
@@ -6990,6 +6995,129 @@ function shouldUseHackerNewsTrendRadarProvider(websiteIntelligence: AIBloggerWeb
     return /\b(?:ai|api|automation|cloud|cybersecurity|data|developer|devops|fintech|machine learning|platform|saas|software|startup|tech|technology)\b/i.test(hints);
 }
 
+function shouldUseRedditTrendRadarProvider(websiteIntelligence: AIBloggerWebsiteIntelligence | null | undefined) {
+    const laneText = getWebsiteTrendRadarLaneText(websiteIntelligence);
+    if (!laneText) {
+        return false;
+    }
+
+    if (/\b(?:agency|b2b|clinic|doctor|enterprise|financial|insurance|law|legal|medical|professional services|regulated|surgeon)\b/i.test(laneText)) {
+        return false;
+    }
+
+    return /\b(?:beauty|community|consumer|decor|diy|ecommerce|e-commerce|education|fashion|fitness|food|furniture|gaming|hobby|home|local|parenting|pet|product|restaurant|retail|shopping|travel|wellness)\b/i.test(laneText);
+}
+
+function getWebsiteTrendRadarLaneText(websiteIntelligence: AIBloggerWebsiteIntelligence | null | undefined) {
+    return sanitizeStringArray(
+        [
+            ...(websiteIntelligence?.topicHints || []),
+            ...(websiteIntelligence?.serviceSignals || []),
+            ...(websiteIntelligence?.pageTitles || []),
+            ...(websiteIntelligence?.priorityPaths || []),
+            ...(websiteIntelligence?.priorityPages || []).flatMap((page) => [
+                page.title,
+                page.description,
+                page.excerpt,
+                page.url,
+            ]),
+            websiteIntelligence?.summary || "",
+            websiteIntelligence?.authorityProfile?.siteType || "",
+            websiteIntelligence?.authorityProfile?.businessModel || "",
+            ...(websiteIntelligence?.authorityProfile?.coreOffers || []),
+            ...(websiteIntelligence?.authorityProfile?.authorityLanes || []),
+            ...(websiteIntelligence?.authorityProfile?.adjacentLanes || []),
+            ...(websiteIntelligence?.authorityProfile?.contentClusters || []),
+            ...(websiteIntelligence?.authorityProfile?.audienceSegments || []),
+            ...(websiteIntelligence?.authorityProfile?.moneyPages || []).map((page) => `${page.title} ${page.path}`),
+        ],
+        140,
+        180,
+    ).join(" ").toLowerCase();
+}
+
+function websiteTrendRadarLaneMatches(
+    websiteIntelligence: AIBloggerWebsiteIntelligence | null | undefined,
+    pattern: RegExp,
+) {
+    const laneText = getWebsiteTrendRadarLaneText(websiteIntelligence);
+    return laneText ? pattern.test(laneText) : false;
+}
+
+function getWebsiteTrendRadarBusinessModelText(websiteIntelligence: AIBloggerWebsiteIntelligence | null | undefined) {
+    return sanitizeStringArray(
+        [
+            websiteIntelligence?.authorityProfile?.siteType || "",
+            websiteIntelligence?.authorityProfile?.businessModel || "",
+            ...(websiteIntelligence?.authorityProfile?.coreOffers || []),
+            ...(websiteIntelligence?.authorityProfile?.authorityLanes || []),
+            ...(websiteIntelligence?.authorityProfile?.moneyPages || []).map((page) => `${page.title} ${page.path}`),
+            ...(websiteIntelligence?.priorityPages || [])
+                .filter((page) => ["product", "collection", "category"].includes(page.pageCategory))
+                .flatMap((page) => [page.title, page.description, page.url]),
+        ],
+        80,
+        180,
+    ).join(" ").toLowerCase();
+}
+
+function topicLooksLikeLowQualityRadarCandidate(
+    topic: string,
+    websiteIntelligence: AIBloggerWebsiteIntelligence | null | undefined,
+) {
+    const normalized = sanitizeText(topic, 180).toLowerCase();
+    if (!normalized) {
+        return true;
+    }
+
+    const supportsRecruitingLane = websiteTrendRadarLaneMatches(
+        websiteIntelligence,
+        /\b(?:career|careers|employment|employer|freelance|hiring|hr|job|jobs|payroll|recruit|recruiting|staffing|talent|workforce)\b/i,
+    );
+    const supportsPoliticalLane = websiteTrendRadarLaneMatches(
+        websiteIntelligence,
+        /\b(?:advocacy|campaign|civic|election|government|law|legal|policy|politic|public affairs|public sector|regulation)\b/i,
+    );
+    const supportsGamingLane = websiteTrendRadarLaneMatches(
+        websiteIntelligence,
+        /\b(?:esports|game development|game studio|gaming|interactive entertainment|streaming|twitch|video game)\b/i,
+    );
+    const businessModelText = getWebsiteTrendRadarBusinessModelText(websiteIntelligence);
+    const supportsThirdPartyNewsLane =
+        /\b(?:affiliate|ecommerce|e-commerce|editorial|magazine|marketplace|media|news|publication|retail|reviews?|shop|store)\b/i.test(businessModelText) &&
+        !/\b(?:agency|b2b services?|consultancy|consulting|professional services)\b/i.test(businessModelText);
+
+    const bracketedMarketplacePost = /^\s*\[[^\]]+\]/.test(normalized);
+    const recruitingNoise =
+        bracketedMarketplacePost ||
+        /\b(?:for hire|hiring|hire me|jobseekers?|looking for work|remote job|salary|work from home|wfh|freelance(?:r|rs)?|part-time|full-time|internship|\/month|per month|₹|\$|usd|inr)\b/i.test(normalized);
+    if (recruitingNoise && !supportsRecruitingLane) {
+        return true;
+    }
+
+    const politicalNoise = /\b(?:campaign strategy drops|congress|democrat|election|gop|parliament|presidential|republican|senate)\b/i.test(normalized);
+    if (politicalNoise && !supportsPoliticalLane) {
+        return true;
+    }
+
+    const gamingNoise = /\b(?:gameplay|gaming leak|multiplayer|singleplayer|unplayable|video game)\b/i.test(normalized);
+    if (gamingNoise && !supportsGamingLane) {
+        return true;
+    }
+
+    const thirdPartyNewsHeadline = /\b(?:achieves|acquires|announces|appoints|backs|buys|expands|launches|partners with|raises|selects|secures|taps|teams with|unveils)\b/i.test(normalized);
+    const evergreenNewsAngle = /\b(?:analysis|best practices?|checklist|framework|guide|how|lessons?|playbook|strategy|strategies|tips|trends?|why)\b/i.test(normalized);
+    if (thirdPartyNewsHeadline && !evergreenNewsAngle && !supportsThirdPartyNewsLane) {
+        return true;
+    }
+
+    if (/\b(?:asking for a friend|help\?|requesting new workshop members|tough times)\b/i.test(normalized)) {
+        return true;
+    }
+
+    return false;
+}
+
 function getFreeTrendRadarProviderLabel(provider: FreeInternetTrendEvidenceProvider) {
     switch (provider) {
         case "gdelt-news":
@@ -7308,6 +7436,16 @@ async function getCachedSearchConsoleRisingQueryRows(agencyId: string) {
         .sort()
         .at(-1) || null;
 
+    if (!latestSnapshotAt) {
+        return null;
+    }
+
+    const latestSnapshotMs = new Date(latestSnapshotAt).getTime();
+    const maxAgeMs = SEARCH_CONSOLE_CACHED_TREND_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+    if (!Number.isFinite(latestSnapshotMs) || Date.now() - latestSnapshotMs > maxAgeMs) {
+        return null;
+    }
+
     return {
         currentRows,
         previousRows: aggregateSearchConsoleQueryRowsFromSnapshots(previousSnapshots),
@@ -7605,12 +7743,16 @@ async function fetchFreeTrendRadarEvidence(input: {
     query: string;
     location: string;
     includeHackerNews: boolean;
+    includeReddit: boolean;
 }) {
     const providers: Array<Promise<FreeInternetTrendEvidence | null>> = [
         fetchGdeltTrendEvidence(input.query),
         fetchGoogleNewsTrendEvidence(input.query, input.location),
-        fetchRedditTrendEvidence(input.query),
     ];
+
+    if (input.includeReddit) {
+        providers.push(fetchRedditTrendEvidence(input.query));
+    }
 
     if (input.includeHackerNews) {
         providers.push(fetchHackerNewsTrendEvidence(input.query));
@@ -7699,9 +7841,8 @@ function withBackupTrendDiagnostics(
     let stage = result.stage;
     try {
         const parsed = JSON.parse(result.stage.text) as TopicDiscoveryResult;
-        const diagnosticPrefix = cleanDiagnostics.join(" ");
         parsed.backupDiagnostics = cleanDiagnostics;
-        parsed.sourceSummary = sanitizeText(`${diagnosticPrefix} ${parsed.sourceSummary || ""}`, 240);
+        parsed.sourceSummary = sanitizeText(parsed.sourceSummary || result.summary, 260);
         stage = {
             ...result.stage,
             text: JSON.stringify(parsed, null, 2),
@@ -7714,7 +7855,7 @@ function withBackupTrendDiagnostics(
         ...result,
         stage,
         diagnostics: cleanDiagnostics,
-        summary: sanitizeText(`${cleanDiagnostics.join(" ")} ${result.summary}`, 240),
+        summary: sanitizeText(result.summary, 260),
     };
 }
 
@@ -7728,6 +7869,7 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
     recentTopicTexts?: string[];
     runtimeConfig: AIBloggerStageConfig;
     diagnostics?: string[];
+    afterGoogleTrendMiss?: boolean;
 }): Promise<BackupTrendDiscoveryResult | null> {
     if (input.brief.sourceMode !== "website") {
         return null;
@@ -7785,7 +7927,7 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
         });
 
         if (!accessToken) {
-            if (!await loadCachedSearchConsoleRows("Search Console live OAuth unavailable: token refresh failed; reconnect Search Console.")) {
+            if (!await loadCachedSearchConsoleRows("Search Console live OAuth unavailable: token refresh failed; reconnect Search Console and verify the Google OAuth client environment variables.")) {
                 return null;
             }
         } else {
@@ -7824,6 +7966,7 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
     }
 
     const previousByQuery = mapSearchConsoleRowsByQuery(previousRows);
+    const hasPreviousComparisonRows = previousRows.length > 0;
     const websiteCommercialHints = buildWebsiteCommercialTopicHints(input.websiteIntelligence);
     const initialCandidates: InternetTrendCandidate[] = [];
 
@@ -7850,9 +7993,13 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
             ? row.ctr
             : currentImpressions > 0 ? clicks / currentImpressions : 0;
         const position = toFiniteMetric(row.position);
-        const previousWeeklyImpressions = toFiniteMetric(previousRow?.impressions) / Math.max(1, SEARCH_CONSOLE_TREND_PREVIOUS_DAYS / SEARCH_CONSOLE_TREND_CURRENT_DAYS);
-        const trendMomentumScore = scoreSearchConsoleGrowth(currentImpressions, previousWeeklyImpressions);
         const searchDemandScore = scoreSearchConsoleDemand(currentImpressions, clicks, ctr);
+        const previousWeeklyImpressions = hasPreviousComparisonRows
+            ? toFiniteMetric(previousRow?.impressions) / Math.max(1, SEARCH_CONSOLE_TREND_PREVIOUS_DAYS / SEARCH_CONSOLE_TREND_CURRENT_DAYS)
+            : 0;
+        const trendMomentumScore = hasPreviousComparisonRows
+            ? scoreSearchConsoleGrowth(currentImpressions, previousWeeklyImpressions)
+            : clampBlogStudioScore(42 + Math.round(searchDemandScore * 0.2));
         const winnabilityScore = scoreSearchConsoleWinnability(position);
         const topicIntegrity = assessWebsiteTopicIntegrity({
             topic,
@@ -7898,9 +8045,9 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
             duplicateRiskScore: opportunityScore.duplicateRiskScore,
             authorityMismatchPenalty: opportunityScore.authorityMismatchPenalty,
         });
-        const growthPct = previousWeeklyImpressions > 0
+        const growthPct = hasPreviousComparisonRows && previousWeeklyImpressions > 0
             ? Math.round(((currentImpressions - previousWeeklyImpressions) / previousWeeklyImpressions) * 100)
-            : currentImpressions > 0 ? 999 : 0;
+            : hasPreviousComparisonRows && currentImpressions > 0 ? 999 : 0;
 
         initialCandidates.push({
             topic,
@@ -7921,7 +8068,7 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
                 [
                     queryDataSource === "cached-snapshots" ? "cached-search-console-snapshot" : "live-search-console-api",
                     `search-console-current-impressions ${Math.round(currentImpressions)}`,
-                    `growth ${growthPct >= 999 ? "new" : `${growthPct}%`}`,
+                    hasPreviousComparisonRows ? `growth ${growthPct >= 999 ? "new" : `${growthPct}%`}` : "no-previous-comparison",
                     position ? `avg-position ${Math.round(position * 10) / 10}` : "",
                     ctr ? `ctr ${Math.round(ctr * 1000) / 10}%` : "",
                     ...opportunityScore.reasons,
@@ -7973,14 +8120,21 @@ async function buildSearchConsoleRisingTrendDiscoveryStage(input: {
         };
     });
 
+    const sourceSummary = input.afterGoogleTrendMiss
+        ? queryDataSource === "cached-snapshots"
+            ? `Google Trends had no strict website-fit match, so cached Search Console query snapshots were used as the free website-fit trend source.`
+            : `Google Trends had no strict website-fit match, so live Search Console rising queries were used as the free website-fit trend source.`
+        : queryDataSource === "cached-snapshots"
+            ? `Search Console cached query snapshots were checked before Google Trends as the first website-fit topic source.`
+            : `Search Console rising queries were checked before Google Trends as the first website-fit topic source.`;
+    const summary = queryDataSource === "cached-snapshots"
+        ? `Search Console cached snapshots analyzed ${currentRows.length} quer${currentRows.length === 1 ? "y" : "ies"} and selected a website-fit opportunity.`
+        : `Search Console analyzed ${currentRows.length} current quer${currentRows.length === 1 ? "y" : "ies"} and selected a rising website-fit opportunity.`;
+
     const result = buildTrendCandidateDiscovery(
         candidates,
-        queryDataSource === "cached-snapshots"
-            ? `Google Trends had no strict website-fit match, so cached Search Console query snapshots were used as the free website-fit trend source.`
-            : `Google Trends had no strict website-fit match, so live Search Console rising queries were used as the free website-fit trend source.`,
-        queryDataSource === "cached-snapshots"
-            ? `Search Console cached snapshots analyzed ${currentRows.length} quer${currentRows.length === 1 ? "y" : "ies"} and selected a website-fit opportunity.`
-            : `Search Console analyzed ${currentRows.length} current quer${currentRows.length === 1 ? "y" : "ies"} and selected a rising website-fit opportunity.`,
+        sourceSummary,
+        summary,
         input.runtimeConfig,
         {
             queryCount: currentRows.length,
@@ -8031,11 +8185,13 @@ async function buildFreeInternetTrendDiscoveryStage(input: {
     }
 
     const includeHackerNews = shouldUseHackerNewsTrendRadarProvider(input.websiteIntelligence);
+    const includeReddit = shouldUseRedditTrendRadarProvider(input.websiteIntelligence);
     const evidenceResults = await Promise.allSettled(
         queries.map((query) => fetchFreeTrendRadarEvidence({
             query,
             location: input.location,
             includeHackerNews,
+            includeReddit,
         })),
     );
     const evidenceItems = evidenceResults
@@ -8055,9 +8211,19 @@ async function buildFreeInternetTrendDiscoveryStage(input: {
     const candidateMap = new Map<string, InternetTrendCandidate>();
 
     for (const evidence of evidenceItems) {
+        const queryCore = sanitizeText(
+            evidence.query.replace(/\b(?:trends?|news|discussion|best practices?)$/i, "").trim(),
+            120,
+        );
+        const allowQueryTopic =
+            evidence.provider !== "reddit-search" &&
+            queryCore &&
+            tokenizeTopicSelection(queryCore).length >= 3 &&
+            scoreTopicOverlap(queryCore, evidence.titles) >= 24 &&
+            scoreTopicOverlap(queryCore, buildWebsiteSelectionAuthorityHints(input.websiteIntelligence)) >= 32;
         const rawTopics = sanitizeStringArray(
             [
-                evidence.query,
+                ...(allowQueryTopic ? [queryCore] : []),
                 ...evidence.titles,
             ],
             FREE_INTERNET_TREND_CANDIDATE_LIMIT,
@@ -8065,11 +8231,16 @@ async function buildFreeInternetTrendDiscoveryStage(input: {
         );
 
         for (const rawTopic of rawTopics) {
+            if (topicLooksLikeLowQualityRadarCandidate(rawTopic, input.websiteIntelligence)) {
+                continue;
+            }
+
             const topic = normalizeWebsiteTopicCandidate(rawTopic, input.websiteIntelligence);
             if (
                 !topic ||
                 topicLooksTooBroadForWebsite(topic) ||
-                topicLooksLikeMalformedTrendCandidate(topic, input.websiteIntelligence)
+                topicLooksLikeMalformedTrendCandidate(topic, input.websiteIntelligence) ||
+                topicLooksLikeLowQualityRadarCandidate(topic, input.websiteIntelligence)
             ) {
                 continue;
             }
@@ -8275,8 +8446,22 @@ function topicLooksLikeMalformedTrendCandidate(topic: string, websiteIntelligenc
     const lower = normalized.toLowerCase();
     const wordCount = normalized.split(/\s+/).filter(Boolean).length;
 
-    if (!normalized || normalized.length < 12) {
+    if (!normalized) {
         return true;
+    }
+
+    if (normalized.length < 12) {
+        const websiteHints = [
+            ...buildWebsiteCommercialTopicHints(websiteIntelligence),
+            ...(websiteIntelligence?.authorityProfile?.coreOffers || []),
+            ...(websiteIntelligence?.authorityProfile?.authorityLanes || []),
+            ...(websiteIntelligence?.serviceSignals || []),
+        ];
+        const hasWebsiteOverlap = scoreTopicOverlap(normalized, websiteHints) >= 35;
+
+        if (wordCount <= 1 && !hasWebsiteOverlap) {
+            return true;
+        }
     }
 
     if (/[\uFFFD]|\u00c3|\u00e2|&#/.test(normalized)) {
@@ -10005,6 +10190,7 @@ async function buildBackupTrendDiscoveryStage(input: {
         recentTopicTexts: input.recentTopicTexts,
         runtimeConfig: input.runtimeConfig,
         diagnostics,
+        afterGoogleTrendMiss: true,
     }).catch((error) => {
         addBackupTrendDiagnostic(diagnostics, `Search Console skipped: ${getErrorMessage(error)}`);
         blogLogError("DISCOVERY (search-console-rising)", "Search Console rising query fallback failed", error);
@@ -10053,6 +10239,39 @@ async function buildBackupTrendDiscoveryStage(input: {
             },
             diagnostics,
         )
+        : null;
+}
+
+async function buildSearchConsolePriorityTrendDiscoveryStage(input: {
+    agencyId: string;
+    title: string;
+    brief: BlogStudioBrief;
+    settings: BlogStudioSettings;
+    websiteIntelligence: AIBloggerWebsiteIntelligence | null;
+    minimumFitScore: number;
+    recentTopicTexts?: string[];
+    runtimeConfig: AIBloggerStageConfig;
+}): Promise<BackupTrendDiscoveryResult | null> {
+    const diagnostics: string[] = [];
+    const searchConsoleDiscovery = await buildSearchConsoleRisingTrendDiscoveryStage({
+        agencyId: input.agencyId,
+        title: input.title,
+        brief: input.brief,
+        settings: input.settings,
+        websiteIntelligence: input.websiteIntelligence,
+        minimumFitScore: input.minimumFitScore,
+        recentTopicTexts: input.recentTopicTexts,
+        runtimeConfig: input.runtimeConfig,
+        diagnostics,
+        afterGoogleTrendMiss: false,
+    }).catch((error) => {
+        addBackupTrendDiagnostic(diagnostics, `Search Console skipped: ${getErrorMessage(error)}`);
+        blogLogError("DISCOVERY (search-console-priority)", "Search Console priority discovery failed", error);
+        return null;
+    });
+
+    return searchConsoleDiscovery
+        ? withBackupTrendDiagnostics(searchConsoleDiscovery, diagnostics)
         : null;
 }
 
@@ -10850,7 +11069,89 @@ function hasOriginalValueAssetCue(content: string) {
 }
 
 function hasMarkdownTable(content: string) {
-    return /\n\|.+\|\s*\n\|[\s:|.-]+\|/m.test(content);
+    const lines = sanitizeText(content, 50000).split(/\r?\n/).map((line) => line.trim());
+    for (let index = 0; index < lines.length - 2; index += 1) {
+        if (isValidMarkdownTableBlock(lines.slice(index, index + 3))) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function getMarkdownTableColumnCount(line: string) {
+    const normalized = line.trim();
+    if (!normalized.includes("|")) {
+        return 0;
+    }
+
+    const cells = normalized
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|")
+        .map((cell) => cell.trim());
+
+    if (cells.length < 2 || cells.some((cell) => !cell)) {
+        return 0;
+    }
+
+    return cells.length;
+}
+
+function isMarkdownTableSeparator(line: string, expectedColumns: number) {
+    const normalized = line.trim();
+    const cells = normalized
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|")
+        .map((cell) => cell.trim());
+
+    return (
+        expectedColumns >= 2 &&
+        cells.length === expectedColumns &&
+        cells.every((cell) => /^:?-{3,}:?$/.test(cell))
+    );
+}
+
+function isValidMarkdownTableBlock(lines: string[]) {
+    const [header = "", separator = "", firstBodyRow = ""] = lines;
+    const columnCount = getMarkdownTableColumnCount(header);
+    if (columnCount < 2 || !isMarkdownTableSeparator(separator, columnCount)) {
+        return false;
+    }
+
+    return getMarkdownTableColumnCount(firstBodyRow) === columnCount;
+}
+
+function hasMalformedMarkdownTable(content: string) {
+    const lines = sanitizeText(content, 50000).split(/\r?\n/).map((line) => line.trim());
+    for (let index = 0; index < lines.length - 1; index += 1) {
+        const current = lines[index] || "";
+        const next = lines[index + 1] || "";
+        const columnCount = getMarkdownTableColumnCount(current);
+        if (columnCount < 2) {
+            continue;
+        }
+
+        const looksLikeExplicitTable =
+            current.startsWith("|") ||
+            current.endsWith("|") ||
+            /^\|?\s*:?-{3,}:?\s*\|/.test(next);
+        if (!looksLikeExplicitTable) {
+            continue;
+        }
+
+        if (!isMarkdownTableSeparator(next, columnCount)) {
+            return true;
+        }
+
+        const body = lines[index + 2] || "";
+        if (body && body.includes("|") && getMarkdownTableColumnCount(body) !== columnCount) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function hasActionableList(content: string) {
@@ -10975,7 +11276,8 @@ type UnsupportedNumericClaim = {
     context: string;
 };
 
-const UNSUPPORTED_NUMERIC_CLAIM_PATTERN = /\b\d+(?:\.\d+)?\s*(?:%|percent|percentage points?|x|times|k|m|million|billion|hours?|days?|weeks?|months?|years?|users?|customers?|posts?|followers?|subscribers?|impressions?|clicks?|leads?|sales|revenue|engagement|conversion|conversions|ctr|traffic|growth)\b/gi;
+const UNSUPPORTED_NUMERIC_CLAIM_PATTERN =
+    /\b\d+(?:\.\d+)?(?:\s*(?:[-\u2013\u2014]|to)\s*\d+(?:\.\d+)?)?(?:\s+(?:new|fresh|additional|monthly|weekly|daily|annual|video|creative|content|ad|social|campaign|qualified|organic|net|total|average|avg)){0,4}\s*(?:%|percent(?:age)?(?:\s+points?)?|x|times|k|m|million|billion|s|sec(?:ond)?s?|min(?:ute)?s?|hours?|days?|weeks?|months?|years?|users?|customers?|posts?|followers?|subscribers?|impressions?|clicks?|leads?|sales|revenue|engagement|conversions?|ctr|traffic|growth|assets?|videos?|reels?|campaigns?|creatives?)(?=$|[^\w])/gi;
 
 function escapeRegExp(value: string) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -11003,6 +11305,61 @@ function isFrameworkNumberContext(claim: string, context: string) {
     }
 
     return new RegExp(`\\b${escapeRegExp(number)}\\s*m\\s*(?:['\\u2019]s|s)\\b`, "i").test(context);
+}
+
+function getNumericClaimSupportUnitPattern(claim: string) {
+    const normalized = claim.toLowerCase();
+
+    if (/%|percent|percentage/.test(normalized)) {
+        return "(?:%|percent|percentage\\s+points?)";
+    }
+
+    if (/\b(?:s|sec(?:ond)?s?|min(?:ute)?s?|hours?|days?|weeks?|months?|years?)\b/i.test(normalized)) {
+        return "(?:s|sec(?:ond)?s?|min(?:ute)?s?|hours?|days?|weeks?|months?|years?)";
+    }
+
+    if (/\b(?:x|times)\b/i.test(normalized)) {
+        return "(?:x|times)";
+    }
+
+    if (/\b(?:k|m|million|billion)\b/i.test(normalized)) {
+        return "(?:k|m|million|billion)";
+    }
+
+    if (/\b(?:assets?|videos?|reels?|campaigns?|creatives?)\b/i.test(normalized)) {
+        return "(?:assets?|videos?|reels?|campaigns?|creatives?)";
+    }
+
+    if (/\b(?:users?|customers?|posts?|followers?|subscribers?|impressions?|clicks?|leads?|sales|revenue|engagement|conversions?|ctr|traffic|growth)\b/i.test(normalized)) {
+        return "(?:users?|customers?|posts?|followers?|subscribers?|impressions?|clicks?|leads?|sales|revenue|engagement|conversions?|ctr|traffic|growth)";
+    }
+
+    return "";
+}
+
+function sourceSupportsNumericClaim(
+    claim: string,
+    sourceSupportText: string,
+    compactSourceSupportText: string,
+) {
+    const claimKey = claim.toLowerCase().replace(/\s+/g, "");
+    if (compactSourceSupportText.includes(claimKey)) {
+        return true;
+    }
+
+    const numbers = claim.match(/\d+(?:\.\d+)?/g) || [];
+    const unitPattern = getNumericClaimSupportUnitPattern(claim);
+    if (!numbers.length || !unitPattern) {
+        return false;
+    }
+
+    return numbers.every((number) => {
+        const escapedNumber = escapeRegExp(number);
+        return (
+            new RegExp(`(^|\\D)${escapedNumber}\\s*(?:${unitPattern})(?=$|[^\\w])`, "i").test(sourceSupportText) ||
+            new RegExp(`(^|\\D)${escapedNumber}\\D{0,36}(?:${unitPattern})(?=$|[^\\w])`, "i").test(sourceSupportText)
+        );
+    });
 }
 
 function collectUnsupportedNumericClaims(
@@ -11038,7 +11395,7 @@ function collectUnsupportedNumericClaims(
             continue;
         }
 
-        if (sourceSupportText.includes(number) || compactSourceSupportText.includes(claimKey)) {
+        if (sourceSupportsNumericClaim(claim, sourceSupportText, compactSourceSupportText)) {
             continue;
         }
 
@@ -11096,8 +11453,8 @@ function sanitizeUnsupportedNumericClaimText(
     for (const claim of unsupportedClaims) {
         const flexibleClaimPattern = escapeRegExp(claim).replace(/\s+/g, "\\s*");
         nextValue = nextValue.replace(
-            new RegExp(`\\b${flexibleClaimPattern}\\b`, "gi"),
-            getUnsupportedNumericClaimReplacement(claim),
+            new RegExp(`(^|[^\\w])${flexibleClaimPattern}(?=$|[^\\w])`, "gi"),
+            (_match, prefix: string) => `${prefix}${getUnsupportedNumericClaimReplacement(claim)}`,
         );
     }
 
@@ -11246,7 +11603,9 @@ export function buildFinalSeoQualityAssessment(input: {
         input.draft.outline.some((section) => /\b(?:how|what|why|steps?|guide|checklist|framework|compare|scorecard|template)\b/i.test(section));
     const hasPlannedAsset = hasSubstantialStrategyText(input.draft.draftBrief?.originalValueAsset, 10);
     const hasAssetCue = hasOriginalValueAssetCue(content);
-    const hasUsableAsset = hasAssetCue && (hasMarkdownTable(content) || hasActionableList(content) || countMarkdownHeadings(content, 3) >= 2);
+    const hasValidTable = hasMarkdownTable(content);
+    const hasMalformedTable = hasMalformedMarkdownTable(content);
+    const hasUsableAsset = hasAssetCue && (hasValidTable || hasActionableList(content) || countMarkdownHeadings(content, 3) >= 2);
     const conversionCue = /\b(?:audit|book|call|consult|contact|demo|estimate|proposal|review|schedule|service|strategy session|work with|next step)\b/i;
     const hasConversionPath = hasSubstantialStrategyText(
         input.draft.draftBrief?.conversionPath || input.draft.draftBrief?.ctaGoal || input.draft.brief.cta,
@@ -11282,7 +11641,7 @@ export function buildFinalSeoQualityAssessment(input: {
         (hasPlannedAsset ? 18 : 0) +
         (hasAssetCue ? 20 : 0) +
         (hasUsableAsset ? 20 : 0) +
-        (hasMarkdownTable(content) ? 8 : 0) +
+        (hasValidTable ? 8 : 0) +
         (hasActionableList(content) ? 8 : 0),
     );
     const proofStrength = clampBlogStudioScore(
@@ -11356,6 +11715,9 @@ export function buildFinalSeoQualityAssessment(input: {
     if (styleFlags.length > 0) {
         warnings.push(`AI-style phrases remain: ${styleFlags.slice(0, 3).join(", ")}.`);
     }
+    if (hasMalformedTable) {
+        warnings.push("A Markdown table appears malformed; repair the table syntax or convert it to bullets.");
+    }
     if (score < MINIMUM_FINAL_SEO_QUALITY_SCORE) {
         warnings.push(`Final SEO quality is below the target (${score}/${MINIMUM_FINAL_SEO_QUALITY_SCORE}).`);
     }
@@ -11378,6 +11740,9 @@ export function buildFinalSeoQualityAssessment(input: {
     if (unsupportedNumericClaims.length > 0) {
         blockers.push(`Precise numeric claims are not present in grounded sources: ${unsupportedNumericClaims.slice(0, 3).join(", ")}.`);
     }
+    if (hasMalformedTable && originalValueExecution < 70) {
+        blockers.push("Original value asset uses malformed Markdown table syntax.");
+    }
 
     return {
         score,
@@ -11393,6 +11758,18 @@ export function buildFinalSeoQualityAssessment(input: {
         },
     };
 }
+
+type LightweightSerpRankedTopic = {
+    topic: string;
+    score: number;
+    winnabilityScore: number;
+    searchDemandScore: number;
+    internalLinkSupportScore: number;
+    reasons: string[];
+    cacheStatus: AIBloggerSerpAnalysis["cacheStatus"] | undefined;
+    intent: AIBloggerSerpAnalysis["intent"] | undefined;
+    rankingDifficulty: string | undefined;
+};
 
 async function compareTopicCandidatesWithLightweightSerp(input: {
     agencyId: string;
@@ -11496,6 +11873,13 @@ async function compareTopicCandidatesWithLightweightSerp(input: {
                     ],
                 })
                 : null;
+            if (
+                input.brief.sourceMode === "website" &&
+                (serpRelevance.shouldBlock || (topicIntegrity && !topicIntegrity.accepted))
+            ) {
+                return null;
+            }
+
             const opportunity = scoreTopicOpportunity({
                 topic,
                 brief: input.brief,
@@ -11539,6 +11923,7 @@ async function compareTopicCandidatesWithLightweightSerp(input: {
                 rankingDifficulty: analysis?.rankingDifficulty,
             };
         })
+        .filter((entry): entry is LightweightSerpRankedTopic => Boolean(entry))
         .sort((left, right) => right.score - left.score || left.topic.localeCompare(right.topic));
 
     if (serpRankedTopics.length === 0) {
@@ -11580,17 +11965,36 @@ function buildFinalDiscoverySourceSummary(
     const selectedTopic = sanitizeText(topicSelection.selectedTopic, 180);
     const originalTopic = sanitizeText(parsedDiscovery.selectedTopic, 180);
     if (selectedTopic && selectedTopic !== originalTopic) {
-        const baseSummary = sanitizeText(
+        const baseSummary = summarizeCompleteSentences(
             (parsedDiscovery.sourceSummary || "").replace(/\s*Selected:\s*[^.]+\.?\s*$/i, ""),
-            180,
+            220,
         );
         return sanitizeText(
             `${baseSummary || "Google Trends had no strict website-fit match; website-led discovery was used."} Final selected after SERP comparison: ${selectedTopic}.`,
-            240,
+            320,
         );
     }
 
-    return sanitizeText(parsedDiscovery.sourceSummary || topicSelection.selectionSummary, 240);
+    return sanitizeText(parsedDiscovery.sourceSummary || topicSelection.selectionSummary, 320);
+}
+
+function summarizeCompleteSentences(value: unknown, maxLength: number) {
+    const normalized = sanitizeText(value, 600);
+    if (!normalized || normalized.length <= maxLength) {
+        return normalized;
+    }
+
+    const matches = normalized.match(/[^.!?]+[.!?]+(?:\s+|$)/g) || [];
+    let summary = "";
+    for (const sentence of matches) {
+        const nextSummary = `${summary} ${sentence.trim()}`.trim();
+        if (nextSummary.length > maxLength) {
+            break;
+        }
+        summary = nextSummary;
+    }
+
+    return summary || sanitizeText(normalized, maxLength);
 }
 
 function buildGenerationScorecard(input: {
@@ -13637,7 +14041,7 @@ function shouldRunAIBloggerQualityRepair(
         assessment.components.originalValueExecution < 70 ||
         assessment.components.intentSatisfaction < 70 ||
         assessment.components.conversionFit < 70 ||
-        /\b(?:ai-style|proof|source|citation|numeric|unsupported|evidence|weak)\b/.test(warningText)
+        /\b(?:ai-style|proof|source|citation|numeric|unsupported|evidence|weak|malformed|markdown|table)\b/.test(warningText)
     );
 }
 
@@ -13732,14 +14136,14 @@ function normalizeMarketingBrandSpelling(value: string | undefined) {
     return (value || "").replace(/\bDigitalcorvids\b(?!\.)/gi, "Digital Corvids");
 }
 
-function normalizeSchemaOrganizationName(value: string | undefined, fallback = "Digital Corvids") {
+function normalizeSchemaOrganizationName(value: string | undefined, fallback = "Organization") {
     const name = sanitizeText(value, 160, fallback);
 
     if (/^digitalcorvids$/i.test(name)) {
         return "Digital Corvids";
     }
 
-    return name || "Digital Corvids";
+    return name || fallback || "Organization";
 }
 
 function normalizeMarketingQuestion(value: string | undefined) {
@@ -15436,7 +15840,8 @@ export async function getBlogStudioPerformanceSyncStatusImpl(
     const syncWindowMs = 24 * 60 * 60 * 1000; // 24 hours for OAuth
     const latestSnapshotMs = latestSnapshotAt ? new Date(latestSnapshotAt).getTime() : Number.NaN;
     const stale = !Number.isFinite(latestSnapshotMs) || Date.now() - latestSnapshotMs > syncWindowMs;
-    const needsAttention = !hasValidConfig || publishedPosts === 0 || stale || lastRun?.status === "failed";
+    const authNeedsReconnect = oauthConfig.authStatus === "token-expired";
+    const needsAttention = !hasValidConfig || authNeedsReconnect || publishedPosts === 0 || stale || lastRun?.status === "failed";
 
     return {
         enabled: oauthConfig?.enabled || false,
@@ -16115,7 +16520,7 @@ export async function createBlogStudioDraftImpl(
     blogLog("CREATE-DRAFT", "Starting", { agency: blogShortId(agency.id), actor: blogShortId(actor.id), title: input.title });
     await connectDB();
 
-    const settings = await getBlogStudioSettingsImpl(agency.id, agency.name);
+    const settings = await getBlogStudioRuntimeSettingsImpl(agency.id, agency.name);
     const now = new Date().toISOString();
     const title = sanitizeText(input.title, 180);
 
@@ -19211,7 +19616,7 @@ export async function generateBlogStudioDraftImpl(
         });
     }
 
-    const settings = await getBlogStudioSettingsImpl(agency.id, agency.name);
+    const settings = await getBlogStudioRuntimeSettingsImpl(agency.id, agency.name);
     const title = sanitizeText(input.title, 180);
 
     const brief = sanitizeBrief(input.brief, {
@@ -19637,7 +20042,7 @@ export async function generateBlogStudioDraftImpl(
         const liveTrendsConfig = aiBloggerConfig?.trends;
         const minimumWebsiteTrendFitScore = resolveMinimumWebsiteTrendFitScore(liveTrendsConfig);
         const allowAiDiscoveryFallback = liveTrendsConfig?.fallbackToAi ?? true;
-        let discoveryStage: AIBloggerStageRunResult;
+        let discoveryStage: AIBloggerStageRunResult | null = null;
         let discoverySummary = "AI-only topic discovery used.";
         let liveTrendsUsedFallbackKey = false;
         let capturedTrendSignals: AIBloggerTrendSignals | null = null;
@@ -19645,7 +20050,32 @@ export async function generateBlogStudioDraftImpl(
 
         emitStepStart("fetch-trends", "Fetch Trends");
 
-        if (liveTrendsConfig?.enabled) {
+        if (brief.sourceMode === "website") {
+            const searchConsolePriorityDiscovery = await buildSearchConsolePriorityTrendDiscoveryStage({
+                agencyId: agency.id,
+                title,
+                brief,
+                settings,
+                websiteIntelligence,
+                minimumFitScore: minimumWebsiteTrendFitScore,
+                recentTopicTexts: recentPostTitles,
+                runtimeConfig: mergedAIBloggerConfig.extractKeywords,
+            }).catch((searchConsoleError) => {
+                blogLogError("DISCOVERY (search-console-priority)", "Search Console priority discovery failed", searchConsoleError);
+                return null;
+            });
+
+            if (searchConsolePriorityDiscovery) {
+                discoverySummary = searchConsolePriorityDiscovery.summary;
+                fetchTrendsSource = searchConsolePriorityDiscovery.source;
+                discoveryStage = searchConsolePriorityDiscovery.stage;
+                blogLogOutput("DISCOVERY (search-console-priority)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
+            } else {
+                blogLogStep("TREND-MINER", "Search Console rising queries did not produce a qualified website-fit topic; checking Google Trends next.");
+            }
+        }
+
+        if (!discoveryStage && liveTrendsConfig?.enabled) {
             try {
                 const liveTrends = await fetchAIBloggerTrendSignals({
                     config: liveTrendsConfig,
@@ -19915,7 +20345,7 @@ export async function generateBlogStudioDraftImpl(
                     blogLogOutput("DISCOVERY (given-topic-live-trends-unavailable)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
                 }
             }
-        } else if (allowAiDiscoveryFallback) {
+        } else if (!discoveryStage && allowAiDiscoveryFallback) {
             const internetFallbackDiscovery = await buildBackupTrendDiscoveryStage({
                 agencyId: agency.id,
                 title,
@@ -19962,8 +20392,12 @@ export async function generateBlogStudioDraftImpl(
                 );
                 blogLogOutput("DISCOVERY (ai-only)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
             }
-        } else {
+        } else if (!discoveryStage) {
             throw new Error("AI Blogger topic discovery has no live trends provider or AI fallback enabled.");
+        }
+
+        if (!discoveryStage) {
+            throw new Error("AI Blogger topic discovery did not produce a valid discovery stage.");
         }
 
         stageRuntimeConfigs.extractKeywords = discoveryStage.runtimeConfig;
@@ -20110,6 +20544,7 @@ export async function generateBlogStudioDraftImpl(
             finalDiscoverySummary,
             `Selected: ${selectedTopicForRun}`,
             topicSelection.selectionSummary,
+            discovery.backupDiagnostics?.length ? `Backup diagnostics: ${discovery.backupDiagnostics.slice(0, 2).join("; ")}` : "",
             discovery.relatedQueries.length > 0 ? `Related: ${discovery.relatedQueries.slice(0, 3).join(", ")}` : "",
             capturedTrendSignals?.scanStats
                 ? `Trend scan: ${capturedTrendSignals.scanStats.requestCount}/${capturedTrendSignals.scanStats.maxRequests} requests, ${capturedTrendSignals.scanStats.acceptedCount} matches`
@@ -23009,7 +23444,7 @@ async function initializeBlogStudioDraftPhaseRuntime(
     blogLog("GENERATE-DRAFT", "Starting", { agency: blogShortId(agency.id), title: input.title });
     await connectDB();
 
-    const settings = await getBlogStudioSettingsImpl(agency.id, agency.name);
+    const settings = await getBlogStudioRuntimeSettingsImpl(agency.id, agency.name);
     const title = sanitizeText(input.title, 180);
     const brief = state?.brief ?? sanitizeBrief(input.brief, {
         sourceMode: "website",
@@ -23448,7 +23883,7 @@ export async function runBlogStudioDraftResearchPhase(
         const liveTrendsConfig = aiBloggerConfig?.trends;
         const minimumWebsiteTrendFitScore = resolveMinimumWebsiteTrendFitScore(liveTrendsConfig);
         const allowAiDiscoveryFallback = liveTrendsConfig?.fallbackToAi ?? true;
-        let discoveryStage: AIBloggerStageRunResult;
+        let discoveryStage: AIBloggerStageRunResult | null = null;
         let discoverySummary = "AI-only topic discovery used.";
         let liveTrendsUsedFallbackKey = false;
         let capturedTrendSignals: AIBloggerTrendSignals | null = null;
@@ -23456,7 +23891,32 @@ export async function runBlogStudioDraftResearchPhase(
 
         emitStepStart("fetch-trends", "Fetch Trends");
 
-        if (liveTrendsConfig?.enabled) {
+        if (brief.sourceMode === "website") {
+            const searchConsolePriorityDiscovery = await buildSearchConsolePriorityTrendDiscoveryStage({
+                agencyId: agency.id,
+                title,
+                brief,
+                settings,
+                websiteIntelligence,
+                minimumFitScore: minimumWebsiteTrendFitScore,
+                recentTopicTexts: recentPostTitles,
+                runtimeConfig: mergedAIBloggerConfig.extractKeywords,
+            }).catch((searchConsoleError) => {
+                blogLogError("DISCOVERY (search-console-priority)", "Search Console priority discovery failed", searchConsoleError);
+                return null;
+            });
+
+            if (searchConsolePriorityDiscovery) {
+                discoverySummary = searchConsolePriorityDiscovery.summary;
+                fetchTrendsSource = searchConsolePriorityDiscovery.source;
+                discoveryStage = searchConsolePriorityDiscovery.stage;
+                blogLogOutput("DISCOVERY (search-console-priority)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
+            } else {
+                blogLogStep("TREND-MINER", "Search Console rising queries did not produce a qualified website-fit topic; checking Google Trends next.");
+            }
+        }
+
+        if (!discoveryStage && liveTrendsConfig?.enabled) {
             try {
                 const liveTrends = await fetchAIBloggerTrendSignals({
                     config: liveTrendsConfig,
@@ -23725,7 +24185,7 @@ export async function runBlogStudioDraftResearchPhase(
                     blogLogOutput("DISCOVERY (given-topic-live-trends-unavailable)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
                 }
             }
-        } else if (allowAiDiscoveryFallback) {
+        } else if (!discoveryStage && allowAiDiscoveryFallback) {
             const internetFallbackDiscovery = await buildBackupTrendDiscoveryStage({
                 agencyId: agency.id,
                 title,
@@ -23772,8 +24232,12 @@ export async function runBlogStudioDraftResearchPhase(
                 );
                 blogLogOutput("DISCOVERY (ai-only)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
             }
-        } else {
+        } else if (!discoveryStage) {
             throw new Error("AI Blogger topic discovery has no live trends provider or AI fallback enabled.");
+        }
+
+        if (!discoveryStage) {
+            throw new Error("AI Blogger topic discovery did not produce a valid discovery stage.");
         }
 
         stageRuntimeConfigs.extractKeywords = discoveryStage.runtimeConfig;
@@ -23920,6 +24384,7 @@ export async function runBlogStudioDraftResearchPhase(
             finalDiscoverySummary,
             `Selected: ${selectedTopicForRun}`,
             topicSelection.selectionSummary,
+            discovery.backupDiagnostics?.length ? `Backup diagnostics: ${discovery.backupDiagnostics.slice(0, 2).join("; ")}` : "",
             discovery.relatedQueries.length > 0 ? `Related: ${discovery.relatedQueries.slice(0, 3).join(", ")}` : "",
             capturedTrendSignals?.scanStats
                 ? `Trend scan: ${capturedTrendSignals.scanStats.requestCount}/${capturedTrendSignals.scanStats.maxRequests} requests, ${capturedTrendSignals.scanStats.acceptedCount} matches`
@@ -28482,7 +28947,7 @@ export async function createBlogStudioScheduleImpl(
     blogLog("CREATE-SCHEDULE", "Starting", { agency: blogShortId(agency.id), name: input.name });
     await connectDB();
 
-    const settings = await getBlogStudioSettingsImpl(agency.id, agency.name);
+    const settings = await getBlogStudioRuntimeSettingsImpl(agency.id, agency.name);
     const now = new Date().toISOString();
     const name = sanitizeText(input.name, 120);
 

@@ -12,9 +12,16 @@ interface SendEmailOptions {
     toName?: string;
     subject: string;
     htmlContent: string;
+    respectPlatformEmailSettings?: boolean;
 }
 
-export async function sendEmail({ to, toName, subject, htmlContent }: SendEmailOptions): Promise<{ success: boolean; error?: string }> {
+export async function sendEmail({
+    to,
+    toName,
+    subject,
+    htmlContent,
+    respectPlatformEmailSettings = true,
+}: SendEmailOptions): Promise<{ success: boolean; error?: string }> {
     const apiKey = process.env.BREVO_API_KEY;
     const senderEmail = process.env.BREVO_SENDER_EMAIL;
     const senderName = process.env.BREVO_SENDER_NAME || "Digital Corvids";
@@ -27,7 +34,7 @@ export async function sendEmail({ to, toName, subject, htmlContent }: SendEmailO
     }
 
     try {
-        if (!(await isPlatformEmailGloballyEnabled())) {
+        if (respectPlatformEmailSettings && !(await isPlatformEmailGloballyEnabled())) {
             console.warn("Brevo: Platform email service is disabled. Skipping raw transactional email.");
             return { success: true };
         }
@@ -73,6 +80,7 @@ export async function sendOtpEmail(email: string, otp: string): Promise<{ succes
     return sendEmail({
         to: email,
         subject: `Your Verification Code: ${otp}`,
+        respectPlatformEmailSettings: false,
         htmlContent: `
 <!DOCTYPE html>
 <html>
@@ -123,6 +131,7 @@ export async function sendPasswordResetOtpEmail(email: string, otp: string): Pro
     return sendEmail({
         to: email,
         subject: `Password Reset Code: ${otp}`,
+        respectPlatformEmailSettings: false,
         htmlContent: `
 <!DOCTYPE html>
 <html>

@@ -12,6 +12,7 @@ type ForgotPasswordFlowProps = {
     forgotNewPassword: string;
     forgotConfirmPassword: string;
     forgotLoading: boolean;
+    resendOtpLoading: boolean;
     forgotError: string;
     showNewPassword: boolean;
     showConfirmPassword: boolean;
@@ -43,6 +44,7 @@ export default function ForgotPasswordFlow({
     forgotNewPassword,
     forgotConfirmPassword,
     forgotLoading,
+    resendOtpLoading,
     forgotError,
     showNewPassword,
     showConfirmPassword,
@@ -211,7 +213,7 @@ export default function ForgotPasswordFlow({
                     <button
                         className="w-full py-3 bg-[#F5EE30] text-black font-glacial-bold uppercase tracking-widest text-sm hover:bg-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         type="submit"
-                        disabled={forgotLoading || forgotOtp.join("").length !== 6}
+                        disabled={forgotLoading || resendOtpLoading || forgotOtp.join("").length !== 6}
                     >
                         {forgotLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                         Verify Code
@@ -222,14 +224,15 @@ export default function ForgotPasswordFlow({
                         <button
                             type="button"
                             onClick={onResendOtp}
-                            disabled={cooldown > 0 || forgotLoading}
-                            className={`text-sm uppercase tracking-wider transition-colors ${
+                            disabled={cooldown > 0 || resendOtpLoading}
+                            className={`inline-flex items-center justify-center gap-2 text-sm uppercase tracking-wider transition-colors ${
                                 cooldown > 0
                                     ? "text-gray-600 cursor-not-allowed"
                                     : "text-[#F5EE30] hover:text-white"
                             }`}
                         >
-                            {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend Code"}
+                            {resendOtpLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+                            {resendOtpLoading ? "Sending..." : cooldown > 0 ? `Resend in ${cooldown}s` : "Resend Code"}
                         </button>
                     </div>
 

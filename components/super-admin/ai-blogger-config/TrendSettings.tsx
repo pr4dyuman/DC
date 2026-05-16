@@ -29,7 +29,7 @@ export default function TrendSettings({ config, setConfig, visibleKeys, toggleKe
                         <div>
                             <h2 className="text-lg font-semibold text-foreground">Live Trends Provider</h2>
                             <p className="text-sm text-muted-foreground">
-                                Powers the real Google Trends fetch for Trend Assisted mode and the first trend-scoring step.
+                                Powers Google Trends after Search Console rising queries and for Trend Assisted mode.
                             </p>
                         </div>
                     </div>
@@ -243,7 +243,7 @@ export default function TrendSettings({ config, setConfig, visibleKeys, toggleKe
                     <div>
                         <p className="text-sm font-medium text-foreground">Trend-first topic lock</p>
                         <p className="text-xs leading-5 text-muted-foreground">
-                            Scan Google Trends first, lock the best website-matched trend, and use AI only after no acceptable trend is found.
+                            Lock the best website-matched live trend after Search Console rising queries are checked for owned demand.
                         </p>
                     </div>
                     <Switch

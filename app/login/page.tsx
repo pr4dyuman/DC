@@ -27,6 +27,7 @@ export default function LoginPage() {
     const [forgotNewPassword, setForgotNewPassword] = useState("");
     const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
     const [forgotLoading, setForgotLoading] = useState(false);
+    const [resendOtpLoading, setResendOtpLoading] = useState(false);
     const [forgotError, setForgotError] = useState("");
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -104,6 +105,7 @@ export default function LoginPage() {
         setForgotOtp(["", "", "", "", "", ""]);
         setForgotNewPassword("");
         setForgotConfirmPassword("");
+        setResendOtpLoading(false);
         setForgotError("");
         setCooldown(0);
     };
@@ -142,7 +144,7 @@ export default function LoginPage() {
 
     const handleResendOtp = async () => {
         if (cooldown > 0) return;
-        setForgotLoading(true);
+        setResendOtpLoading(true);
         setForgotError("");
 
         try {
@@ -163,7 +165,7 @@ export default function LoginPage() {
         } catch {
             setForgotError("Something went wrong. Please try again.");
         } finally {
-            setForgotLoading(false);
+            setResendOtpLoading(false);
         }
     };
 
@@ -282,6 +284,7 @@ export default function LoginPage() {
                             forgotNewPassword={forgotNewPassword}
                             forgotConfirmPassword={forgotConfirmPassword}
                             forgotLoading={forgotLoading}
+                            resendOtpLoading={resendOtpLoading}
                             forgotError={forgotError}
                             showNewPassword={showNewPassword}
                             showConfirmPassword={showConfirmPassword}

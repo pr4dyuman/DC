@@ -307,7 +307,7 @@ const PIPELINE_STAGE_COPY: Record<string, PipelineStageCopy> = {
     "fetch-trends": {
         title: "Topic Opportunity Gate",
         pending: "Waiting to compare trend demand against the website service lane.",
-        active: "Checking Google Trends first, then Search Console rising queries and internet signals if no live trend fits the site.",
+        active: "Checking Search Console rising queries first, then Google Trends and internet signals if no site-owned trend fits.",
         completed: "A website-fit topic opportunity passed trend, freshness, and business relevance checks.",
         skipped: "Topic opportunity checks were skipped for this run.",
         failed: "Topic opportunity checks blocked the run before drafting.",

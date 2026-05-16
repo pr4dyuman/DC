@@ -38,6 +38,23 @@ function normalizeSearchConsolePropertyUrl(value: string) {
     return `sc-domain:${trimmed}`;
 }
 
+async function markSearchConsoleOAuthTokenExpired(agencyId: string) {
+    try {
+        await connectDB();
+        await BlogStudioSettingsModel.findOneAndUpdate(
+            { agencyId },
+            {
+                $set: {
+                    "searchConsoleOAuth.authStatus": "token-expired",
+                    updatedAt: new Date().toISOString(),
+                },
+            }
+        );
+    } catch (error) {
+        console.error("[OAuth Refresh] Failed to mark Search Console token expired:", error);
+    }
+}
+
 /**
  * Refresh OAuth access token using refresh token
  * Updates database with new access token and expiry
@@ -74,17 +91,7 @@ export async function refreshGoogleOAuthToken(
             const error = await response.json();
             console.error("[OAuth Refresh] Token refresh failed:", error);
 
-            // Mark token as expired in database
-            await connectDB();
-            await BlogStudioSettingsModel.findOneAndUpdate(
-                { agencyId },
-                {
-                    $set: {
-                        "searchConsoleOAuth.authStatus": "token-expired",
-                        updatedAt: new Date().toISOString(),
-                    },
-                }
-            );
+            await markSearchConsoleOAuthTokenExpired(agencyId);
 
             return null;
         }
@@ -92,6 +99,7 @@ export async function refreshGoogleOAuthToken(
         const data = await response.json();
         if (!data.access_token) {
             console.error("[OAuth Refresh] No access token in response");
+            await markSearchConsoleOAuthTokenExpired(agencyId);
             return null;
         }
 
@@ -118,6 +126,7 @@ export async function refreshGoogleOAuthToken(
         };
     } catch (error) {
         console.error("[OAuth Refresh] Error:", error);
+        await markSearchConsoleOAuthTokenExpired(agencyId);
         return null;
     }
 }
@@ -130,17 +139,28 @@ export async function getValidSearchConsoleAccessToken(
     encryptedOAuthConfig: OAuthConfig
 ): Promise<string | null> {
     try {
-        const refreshToken = decryptApiKey(encryptedOAuthConfig.refreshToken);
-        if (!refreshToken) {
-            return null;
+        let accessToken = "";
+        if (encryptedOAuthConfig.accessToken) {
+            try {
+                accessToken = decryptApiKey(encryptedOAuthConfig.accessToken);
+            } catch (error) {
+                console.warn("[OAuth Token] Stored access token could not be decrypted; trying refresh token:", error);
+            }
         }
-
-        const accessToken = encryptedOAuthConfig.accessToken
-            ? decryptApiKey(encryptedOAuthConfig.accessToken)
-            : "";
         const expiresAt = Number.isFinite(encryptedOAuthConfig.expiresAt)
             ? encryptedOAuthConfig.expiresAt
             : 0;
+
+        if (accessToken && Date.now() < expiresAt - 30000) {
+            return accessToken;
+        }
+
+        const refreshToken = encryptedOAuthConfig.refreshToken
+            ? decryptApiKey(encryptedOAuthConfig.refreshToken)
+            : "";
+        if (!refreshToken) {
+            return null;
+        }
 
         if (!accessToken || Date.now() > expiresAt - 300000) {
             const refreshed = await refreshGoogleOAuthToken(
@@ -149,6 +169,10 @@ export async function getValidSearchConsoleAccessToken(
             );
 
             if (!refreshed) {
+                if (accessToken && Date.now() < expiresAt - 30000) {
+                    return accessToken;
+                }
+
                 return null;
             }
 
@@ -159,6 +183,7 @@ export async function getValidSearchConsoleAccessToken(
         return accessToken;
     } catch (error) {
         console.error("[OAuth Token] Error getting valid token:", error);
+        await markSearchConsoleOAuthTokenExpired(agencyId);
         return null;
     }
 }
