@@ -1,114 +1,121 @@
-"use client";
-import { useEffect, useRef } from "react";
 import Image from "next/image";
-
-
-import { gsap } from "gsap";
 import Link from "next/link";
+import {
+  getMarketingBreadcrumbJsonLd,
+  getMarketingServiceJsonLd,
+  serializeMarketingJsonLd,
+} from "@/lib/marketing-seo";
+
+const socialMediaFaqs = [
+  {
+    question: "What is included in Digital Corvids social media marketing services?",
+    answer:
+      "Our social media marketing work can include strategy, content calendars, creative production, caption writing, community management, paid social campaigns, reporting, and performance optimization.",
+  },
+  {
+    question: "Which social media platforms do you manage?",
+    answer:
+      "We can support Instagram, Facebook, LinkedIn, X, Pinterest, YouTube, and other platforms when they match your audience, content format, and campaign goals.",
+  },
+  {
+    question: "Do you handle both organic social and paid social campaigns?",
+    answer:
+      "Yes. We can combine organic content, community engagement, paid social advertising, retargeting, and campaign reporting so social activity connects to measurable growth.",
+  },
+  {
+    question: "How do you measure social media marketing success?",
+    answer:
+      "We track metrics such as reach, engagement quality, follower growth, website clicks, leads, conversions, cost per result, creative performance, and audience insights.",
+  },
+];
+
+const socialMediaProcessSteps = [
+  {
+    title: "Audit",
+    description:
+      "Review current profiles, content performance, audience behavior, competitors, creative gaps, and conversion paths.",
+  },
+  {
+    title: "Plan",
+    description:
+      "Build platform strategy, content pillars, posting rhythm, campaign ideas, paid targeting, and reporting goals.",
+  },
+  {
+    title: "Create",
+    description:
+      "Produce posts, reels, carousels, captions, ad creatives, stories, and brand-safe trend concepts for each platform.",
+  },
+  {
+    title: "Optimize",
+    description:
+      "Use performance data to refine hooks, formats, posting times, audiences, budgets, and creative direction.",
+  },
+];
+
+const socialMediaProofPoints = [
+  "Content calendars are tied to business goals, not random posting.",
+  "Creative performance is reviewed by format, hook, platform, and audience response.",
+  "Paid social campaigns are tracked against leads, cost per result, and conversion quality.",
+  "Reporting connects social engagement with website traffic, inquiries, and campaign learnings.",
+];
+
+const relatedSocialMediaLinks = [
+  {
+    title: "PPC Advertising",
+    href: "/services/ppc",
+    description: "Scale demand with paid search and performance campaigns.",
+  },
+  {
+    title: "Influencer Marketing",
+    href: "/services/influencer-marketing",
+    description: "Add creator trust and social proof to campaign reach.",
+  },
+  {
+    title: "Video Production Ads",
+    href: "/services/video-production-ad",
+    description: "Create video assets built for social platforms and ads.",
+  },
+  {
+    title: "Web Development",
+    href: "/services/web-development",
+    description: "Send social traffic to fast, conversion-ready landing pages.",
+  },
+];
+
+const structuredData = [
+  getMarketingServiceJsonLd({
+    name: "Social Media Marketing Services",
+    description:
+      "Grow your brand with Digital Corvids social media marketing: content strategy, creative production, paid social campaigns, analytics, and platform management.",
+    path: "/services/social-media-marketing",
+    serviceType: "Social Media Marketing",
+  }),
+  getMarketingBreadcrumbJsonLd([
+    { name: "Home", path: "/" },
+    { name: "Services", path: "/services" },
+    { name: "Social Media Marketing", path: "/services/social-media-marketing" },
+  ]),
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: socialMediaFaqs.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer,
+      },
+    })),
+  },
+];
 
 export default function SocialMediaMarketing() {
-
-  const btnRef = useRef(null);
-
- 
-
-useEffect(() => {
-  const btn = btnRef.current;
-  if (!btn) return;
-
-  let xForce = 0, yForce = 0;
-  let isHovered = false;
-  let animationFrame;
-
-  const handleMouseMove = (e) => {
-    if (!isHovered) return;
-    
-    const rect = btn.getBoundingClientRect();
-    const x = e.clientX - (rect.left + rect.width / 2);
-    const y = e.clientY - (rect.top + rect.height / 2);
-
-    // More aggressive movement
-    xForce = x * 2.5;
-    yForce = y * 2.5;
-
-    // Update white fill position
-    const fill = btn.querySelector('.fill-effect');
-    if (fill) {
-      const relX = e.clientX - rect.left;
-      const relY = e.clientY - rect.top;
-      fill.style.left = `${relX}px`;
-      fill.style.top = `${relY}px`;
-    }
-  };
-
-  const handleMouseEnter = () => {
-    isHovered = true;
-    const fill = btn.querySelector('.fill-effect');
-    if (fill) {
-      fill.style.opacity = '1';
-      fill.style.transform = 'scale(30)';
-    }
-  };
-
-  const handleMouseLeave = () => {
-    isHovered = false;
-    
-    // Fast reset with bounce
-    gsap.to(btn, {
-      x: 0,
-      y: 0,
-      scale: 1,
-      rotateZ: 0,
-      duration: 0.3,
-      ease: 'power2.out'
-    });
-
-    // Hide fill effect
-    const fill = btn.querySelector('.fill-effect');
-    if (fill) {
-      fill.style.opacity = '0';
-      fill.style.transform = 'scale(0.1)';
-    }
-  };
-
-  const update = () => {
-    if (isHovered) {
-      const shake = 20; // Increased shake intensity
-      const shakeX = (Math.random() - 0.5) * shake;
-      const shakeY = (Math.random() - 0.5) * shake;
-
-      gsap.set(btn, {
-        x: xForce + shakeX,
-        y: yForce + shakeY,
-        scale: 1.2, // Bigger scale on hover
-        transformPerspective: 1000,
-        rotateZ: (Math.random() - 0.5) * 5, // Slightly more rotation
-      });
-    }
-    
-    animationFrame = requestAnimationFrame(update);
-  };
-
-  // Add event listeners to the button only
-  btn.addEventListener('mousemove', handleMouseMove);
-  btn.addEventListener('mouseenter', handleMouseEnter);
-  btn.addEventListener('mouseleave', handleMouseLeave);
-  
-  // Start the animation loop
-  update();
-
-  return () => {
-    cancelAnimationFrame(animationFrame);
-    btn.removeEventListener('mousemove', handleMouseMove);
-    btn.removeEventListener('mouseenter', handleMouseEnter);
-    btn.removeEventListener('mouseleave', handleMouseLeave);
-  };
-}, []);
-
-
-
   return (
     <div className="min-h-screen flex flex-col bg-black text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
+      />
       
       <main className="flex-grow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8  w-full">
@@ -125,7 +132,7 @@ useEffect(() => {
               SERVICES
             </Link>
             <span className="text-gray-500 mx-2">|</span>
-            <span className="text-[#3E3E3E] font-glacial-bold">SocialMediaMarketing</span>
+            <span className="text-[#3E3E3E] font-glacial-bold">SOCIAL MEDIA MARKETING</span>
             </p>
             </div>
         {/* First Section - Social Media Marketing */}
@@ -147,9 +154,9 @@ useEffect(() => {
           <div className="w-full lg:w-1/2">
             <h3 className="text-sm sm:text-base lg:text-lg font-semibold mb-3 sm:mb-4 uppercase tracking-wide flex items-start">
               <span className="w-2 h-2 sm:w-3 sm:h-3 bg-[#F5EE30] rounded-full mr-2 sm:mr-3 mt-1 sm:mt-1.5 flex-shrink-0"></span>
-              <span className="leading-relaxed whitespace-normal font-glacial-bold xl:whitespace-nowrap">Build Loyal Communities, Spark Conversations, and Drive Action</span>
+              <span className="leading-relaxed whitespace-normal font-glacial-bold">Build Loyal Communities, Spark Conversations, and Drive Action</span>
             </h3>
-            <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-5xl xl:text-6xl font-['Etna'] font-bold mb-4 sm:mb-6 text-[#F5EE30] whitespace-nowrap">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-5xl xl:text-6xl font-['Etna'] font-bold mb-4 sm:mb-6 text-[#F5EE30] whitespace-normal break-words leading-tight">
               SOCIAL MEDIA MARKETING
             </h1>
             <p className="text-lg sm:text-xl font-glacial-bold mb-3 sm:mb-4 text-white">OUR MISSION</p>
@@ -368,6 +375,99 @@ useEffect(() => {
             </ul>
           </div>
         </div>
+
+        {/* Social Media Process Section */}
+        <section className="mb-16 sm:mb-20 lg:mb-32">
+          <div className="mb-10 max-w-3xl">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="h-2 w-2 rounded-full bg-[#F5EE30]"></span>
+              <span className="font-glacial-bold text-sm uppercase tracking-widest text-white">
+                How We Build Social Momentum
+              </span>
+            </div>
+            <h2 className="mb-5 text-3xl font-extrabold uppercase leading-tight md:text-5xl">
+              <span className="text-white">Social Media Process</span>
+              <br />
+              <span className="text-[#3E3E3E]">From Content To Community</span>
+            </h2>
+            <p className="text-base leading-relaxed text-gray-300 md:text-lg">
+              We plan social media around audience behavior, content quality, platform fit, and measurable action. That
+              keeps your brand visible while giving every post and campaign a clear purpose.
+            </p>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+            {socialMediaProcessSteps.map((step, index) => (
+              <div key={step.title} className="border border-white/10 bg-white/[0.03] p-6">
+                <p className="mb-5 font-glacial-bold text-sm text-[#F5EE30]">
+                  {String(index + 1).padStart(2, "0")}
+                </p>
+                <h3 className="mb-3 text-xl font-bold uppercase text-white">{step.title}</h3>
+                <p className="text-sm leading-relaxed text-gray-300">{step.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Social Media Proof And Internal Links Section */}
+        <section className="mb-16 grid gap-10 sm:mb-20 lg:mb-32 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+          <div>
+            <div className="mb-4 flex items-center gap-3">
+              <span className="h-2 w-2 rounded-full bg-[#F5EE30]"></span>
+              <span className="font-glacial-bold text-sm uppercase tracking-widest text-white">
+                Creative, Community, And Conversion Signals
+              </span>
+            </div>
+            <h2 className="mb-6 text-3xl font-extrabold uppercase leading-tight md:text-5xl">
+              <span className="text-white">What You Can</span>
+              <br />
+              <span className="text-[#3E3E3E]">Expect From Social</span>
+            </h2>
+            <div className="space-y-4">
+              {socialMediaProofPoints.map((point) => (
+                <div key={point} className="flex gap-3 border-b border-white/10 pb-4">
+                  <span className="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-[#F5EE30]"></span>
+                  <p className="text-base leading-relaxed text-gray-300 md:text-lg">{point}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="border border-white/10 bg-white/[0.03] p-6">
+            <h3 className="mb-5 text-xl font-bold uppercase text-[#F5EE30]">Related Growth Paths</h3>
+            <div className="space-y-5">
+              {relatedSocialMediaLinks.map((item) => (
+                <Link key={item.href} href={item.href} className="block group">
+                  <span className="block text-base font-bold uppercase text-white transition-colors group-hover:text-[#F5EE30]">
+                    {item.title}
+                  </span>
+                  <span className="mt-1 block text-sm leading-relaxed text-gray-400">{item.description}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Social Media FAQ Section */}
+        <section className="mb-20 lg:mb-28">
+          <div className="mb-10 text-center">
+            <p className="mb-4 font-glacial-bold text-sm uppercase tracking-widest text-[#F5EE30]">
+              Common Social Media Questions
+            </p>
+            <h2 className="text-3xl font-extrabold uppercase leading-tight md:text-5xl">
+              <span className="text-white">Social Media FAQs</span>
+            </h2>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            {socialMediaFaqs.map((item) => (
+              <div key={item.question} className="border border-white/10 bg-white/[0.03] p-6">
+                <h3 className="mb-3 text-lg font-bold uppercase text-white">{item.question}</h3>
+                <p className="text-sm leading-relaxed text-gray-300 md:text-base">{item.answer}</p>
+              </div>
+            ))}
+          </div>
+        </section>
         </div>
         <div className="bg-black text-white w-full">
   
@@ -440,11 +540,11 @@ useEffect(() => {
             
             <div className="text-center md:text-left max-w-xl">
               <h3 className="text-2xl md:text-3xl font-extrabold leading-snug">
-                READY TO DOMINATE <br />
-                <span className="text-gray-400">GOOGLE SEARCH RESULTS?</span>
+                READY TO BUILD <br />
+                <span className="text-gray-400">SOCIAL MOMENTUM?</span>
               </h3>
               <p className="text-sm md:text-base mt-3 text-gray-400 leading-relaxed">
-                Let&apos;s discuss how our proven SEO strategies can help you outrank competitors and drive qualified organic traffic.
+                Let&apos;s discuss how social strategy, creative content, and paid campaigns can turn your audience into measurable demand.
               </p>
             </div>
 

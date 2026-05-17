@@ -27,7 +27,7 @@ export default function GetStartedSignupForm({
 }) {
     return (
         <section id="signup" className="py-20 sm:py-24 lg:py-32 relative">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-[#F5EE30]/5 rounded-full blur-[180px] pointer-events-none" />
+            <div className="absolute top-0 left-1/2 h-[100vw] max-h-[600px] w-[100vw] max-w-[600px] -translate-x-1/2 rounded-full bg-[#F5EE30]/5 blur-[180px] pointer-events-none" />
 
             <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
                 <div className="text-center mb-12 sm:mb-16">

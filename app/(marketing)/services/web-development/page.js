@@ -1,11 +1,121 @@
 import Image from "next/image";
-
-
 import Link from "next/link";
+import {
+  getMarketingBreadcrumbJsonLd,
+  getMarketingServiceJsonLd,
+  serializeMarketingJsonLd,
+} from "@/lib/marketing-seo";
+
+const webDevelopmentFaqs = [
+  {
+    question: "What is included in Digital Corvids web development services?",
+    answer:
+      "Our web development work can include UX planning, responsive frontend development, CMS or ecommerce integration, technical SEO foundations, performance optimization, QA, and launch support.",
+  },
+  {
+    question: "Do you build custom websites or use templates?",
+    answer:
+      "We build around the business need. For most growth-focused projects, we create custom layouts and components, then connect them to the right CMS, ecommerce platform, or backend workflow.",
+  },
+  {
+    question: "Will the website be mobile-friendly and SEO-ready?",
+    answer:
+      "Yes. We plan responsive layouts, crawlable pages, clean headings, optimized images, schema-ready structure, and Core Web Vitals improvements from the start.",
+  },
+  {
+    question: "Can you improve an existing website instead of rebuilding it?",
+    answer:
+      "Yes. We can audit an existing site for speed, UX, technical SEO, content structure, conversion paths, and code quality before deciding whether optimization or rebuilding is the better route.",
+  },
+];
+
+const webDevelopmentProcessSteps = [
+  {
+    title: "Discovery",
+    description:
+      "Clarify business goals, user journeys, page priorities, technical constraints, integrations, and launch requirements.",
+  },
+  {
+    title: "Structure",
+    description:
+      "Plan information architecture, responsive layouts, content hierarchy, conversion paths, and SEO-friendly page structure.",
+  },
+  {
+    title: "Build",
+    description:
+      "Develop clean, scalable frontend and backend pieces with CMS, ecommerce, analytics, and performance requirements in mind.",
+  },
+  {
+    title: "Launch",
+    description:
+      "Test across devices, check speed and crawlability, connect forms and tracking, then monitor improvements after release.",
+  },
+];
+
+const webDevelopmentProofPoints = [
+  "Responsive layouts are checked across mobile, tablet, and desktop breakpoints.",
+  "Performance work covers image sizing, lazy loading, caching, and Core Web Vitals basics.",
+  "Technical SEO foundations are planned before launch, not added as an afterthought.",
+  "CMS, ecommerce, and integrations are selected around the team's real workflow.",
+];
+
+const relatedWebDevelopmentLinks = [
+  {
+    title: "SEO Services",
+    href: "/services/seo",
+    description: "Make the new website easier to crawl, index, and rank.",
+  },
+  {
+    title: "PPC Advertising",
+    href: "/services/ppc",
+    description: "Send qualified traffic to high-converting landing pages.",
+  },
+  {
+    title: "Social Media Marketing",
+    href: "/services/social-media-marketing",
+    description: "Support launch campaigns with consistent social visibility.",
+  },
+  {
+    title: "Get Started",
+    href: "/get-started",
+    description: "Share your website goals and plan the next build step.",
+  },
+];
+
+const structuredData = [
+  getMarketingServiceJsonLd({
+    name: "Web Development Services",
+    description:
+      "Build fast, secure, conversion-focused websites with Digital Corvids web development, UX design, responsive development, technical SEO, and performance optimization.",
+    path: "/services/web-development",
+    serviceType: "Web Development",
+  }),
+  getMarketingBreadcrumbJsonLd([
+    { name: "Home", path: "/" },
+    { name: "Services", path: "/services" },
+    { name: "Web Development", path: "/services/web-development" },
+  ]),
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: webDevelopmentFaqs.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer,
+      },
+    })),
+  },
+];
 
 export default function WebDevelopment() {
   return (
     <div className="min-h-screen bg-black text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
+      />
       
       <div className="max-w-7xl mx-auto px-6 pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12">
         <div className="text-center mb-16">
@@ -221,6 +331,99 @@ export default function WebDevelopment() {
             </ul>
           </div>
         </div>
+
+        {/* Web Development Process Section */}
+        <section className="mt-24 lg:mt-32">
+          <div className="mb-10 max-w-3xl">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="h-2 w-2 rounded-full bg-[#F5EE30]"></span>
+              <span className="font-glacial-bold text-sm uppercase tracking-widest text-white">
+                How We Build Reliable Websites
+              </span>
+            </div>
+            <h2 className="mb-5 text-3xl font-extrabold uppercase leading-tight md:text-5xl">
+              <span className="text-white">Development Process</span>
+              <br />
+              <span className="text-[#3E3E3E]">From Plan To Launch</span>
+            </h2>
+            <p className="text-base leading-relaxed text-gray-300 md:text-lg">
+              We connect design, development, content, performance, and technical SEO early so your website is not just
+              visually polished. It is built to load quickly, guide visitors clearly, and support long-term growth.
+            </p>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+            {webDevelopmentProcessSteps.map((step, index) => (
+              <div key={step.title} className="border border-white/10 bg-white/[0.03] p-6">
+                <p className="mb-5 font-glacial-bold text-sm text-[#F5EE30]">
+                  {String(index + 1).padStart(2, "0")}
+                </p>
+                <h3 className="mb-3 text-xl font-bold uppercase text-white">{step.title}</h3>
+                <p className="text-sm leading-relaxed text-gray-300">{step.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Web Development Proof And Internal Links Section */}
+        <section className="mt-20 grid gap-10 lg:mt-32 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+          <div>
+            <div className="mb-4 flex items-center gap-3">
+              <span className="h-2 w-2 rounded-full bg-[#F5EE30]"></span>
+              <span className="font-glacial-bold text-sm uppercase tracking-widest text-white">
+                Performance, Usability, And Maintainability
+              </span>
+            </div>
+            <h2 className="mb-6 text-3xl font-extrabold uppercase leading-tight md:text-5xl">
+              <span className="text-white">What You Can</span>
+              <br />
+              <span className="text-[#3E3E3E]">Expect From The Build</span>
+            </h2>
+            <div className="space-y-4">
+              {webDevelopmentProofPoints.map((point) => (
+                <div key={point} className="flex gap-3 border-b border-white/10 pb-4">
+                  <span className="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-[#F5EE30]"></span>
+                  <p className="text-base leading-relaxed text-gray-300 md:text-lg">{point}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="border border-white/10 bg-white/[0.03] p-6">
+            <h3 className="mb-5 text-xl font-bold uppercase text-[#F5EE30]">Related Growth Paths</h3>
+            <div className="space-y-5">
+              {relatedWebDevelopmentLinks.map((item) => (
+                <Link key={item.href} href={item.href} className="block group">
+                  <span className="block text-base font-bold uppercase text-white transition-colors group-hover:text-[#F5EE30]">
+                    {item.title}
+                  </span>
+                  <span className="mt-1 block text-sm leading-relaxed text-gray-400">{item.description}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Web Development FAQ Section */}
+        <section className="mt-20 mb-20 lg:mt-28 lg:mb-28">
+          <div className="mb-10 text-center">
+            <p className="mb-4 font-glacial-bold text-sm uppercase tracking-widest text-[#F5EE30]">
+              Common Web Development Questions
+            </p>
+            <h2 className="text-3xl font-extrabold uppercase leading-tight md:text-5xl">
+              <span className="text-white">Web Development FAQs</span>
+            </h2>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            {webDevelopmentFaqs.map((item) => (
+              <div key={item.question} className="border border-white/10 bg-white/[0.03] p-6">
+                <h3 className="mb-3 text-lg font-bold uppercase text-white">{item.question}</h3>
+                <p className="text-sm leading-relaxed text-gray-300 md:text-base">{item.answer}</p>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
         <div className="bg-black text-white py-16">
       {/* Title */}

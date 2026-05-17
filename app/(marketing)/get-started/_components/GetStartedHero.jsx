@@ -6,7 +6,7 @@ import { heroStats } from "./get-started-content";
 export default function GetStartedHero() {
     return (
         <section className="relative overflow-hidden">
-            <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[#F5EE30]/[0.04] rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute top-20 left-1/2 h-[400px] w-[100vw] max-w-[800px] -translate-x-1/2 rounded-full bg-[#F5EE30]/[0.04] blur-[120px] pointer-events-none" />
             <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#F5EE30]/20 to-transparent" />
 
             <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-28 lg:pt-36 pb-10 text-center">

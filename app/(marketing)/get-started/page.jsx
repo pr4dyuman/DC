@@ -234,7 +234,7 @@ function GetStartedPageContent() {
     if (directAuthMode) {
         return (
             <section className="relative overflow-hidden py-12 text-white font-glacial sm:py-16 lg:py-20">
-                <div className="pointer-events-none absolute left-1/2 top-20 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-[#F5EE30]/10 blur-[140px]" />
+                <div className="pointer-events-none absolute left-1/2 top-20 h-[90vw] max-h-[420px] w-[90vw] max-w-[420px] -translate-x-1/2 rounded-full bg-[#F5EE30]/10 blur-[140px]" />
 
                 <div className="relative z-10 mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
                     <div className="mb-10 text-center">

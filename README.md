@@ -92,9 +92,6 @@ npm install
 # Set up environment variables (see Environment Variables section)
 cp .env.example .env
 
-# Seed demo accounts (optional)
-node scripts/seed-accounts.js
-
 # Run the dev server
 npm run dev
 ```
@@ -105,7 +102,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Account Types & Credentials
 
-Run `node scripts/seed-accounts.js` to create all demo accounts inside the `Digitalcorvids` agency.
+Demo seed scripts are not bundled in this cleaned repository. Create accounts through the signup/admin flow, or add a new explicit seed script if demo credentials are needed again.
 
 | # | Role | Email | Password | Login Redirect |
 |---|------|-------|----------|----------------|
@@ -855,12 +852,7 @@ Built with full multi-tenancy from the ground up:
 
 | Script | Description |
 |--------|-------------|
-| `scripts/seed-accounts.js` | Create demo accounts for all 6 roles in `Digitalcorvids` agency |
-| `scripts/check-db.js` | Verify MongoDB connection, inspect collections and counts |
-| `scripts/export-db.js` | Export full database to JSON backup files |
-| `scripts/import-db.js` | Import database from JSON backup |
-| `scripts/fix-db.js` | Database migration and fix utilities |
-| `scripts/create-email-templates.js` | Initialize Brevo email templates |
+| `npm run audit:email-templates` | Run the active Brevo email-template audit utility |
 | `check-env.js` | Validate all environment variables are set |
 
 ---
@@ -964,7 +956,7 @@ agency-os/
 │
 ├── context/                          # React context providers
 ├── hooks/                            # Custom React hooks
-├── scripts/                          # CLI utility scripts
+├── scripts/                          # Referenced utility scripts
 └── public/                           # Static assets
 ```
 

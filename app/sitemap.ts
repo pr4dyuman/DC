@@ -13,6 +13,7 @@ const SITE_URL = (
     process.env.NEXT_PUBLIC_APP_URL ||
     "https://digitalcorvids.com"
 ).replace(/\/+$/, "");
+const STATIC_LAST_MODIFIED = new Date("2026-05-17");
 
 type MarketingSitemapBlog = {
     slug?: string;
@@ -36,6 +37,28 @@ function withSiteUrl(path: string) {
     return `${SITE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+function normalizeHost(hostname: string) {
+    return hostname.trim().toLowerCase().replace(/^www\./, "");
+}
+
+function isSameSiteUrl(value: string) {
+    try {
+        const candidate = new URL(value);
+        const site = new URL(SITE_URL);
+        return normalizeHost(candidate.hostname) === normalizeHost(site.hostname);
+    } catch {
+        return false;
+    }
+}
+
+function toSitemapPageUrl(value: string, fallbackPath: string) {
+    if (isSameSiteUrl(value)) {
+        return value;
+    }
+
+    return withSiteUrl(fallbackPath);
+}
+
 function toSitemapImageUrl(value?: string) {
     const imageUrl = toAbsoluteMarketingImageUrl(value, "");
     if (!imageUrl) {
@@ -52,7 +75,7 @@ function staticEntry(
 ): MetadataRoute.Sitemap[number] {
     return {
         url: withSiteUrl(path),
-        lastModified: new Date("2026-05-04"),
+        lastModified: STATIC_LAST_MODIFIED,
         changeFrequency,
         priority,
     };
@@ -95,10 +118,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             const canonicalUrl =
                 normalizeMarketingCanonicalUrl(blog.canonicalUrl, slug) ||
                 withSiteUrl(`/blog/${slug}`);
+            const sitemapUrl = toSitemapPageUrl(canonicalUrl, `/blog/${slug}`);
             const imageUrl = toSitemapImageUrl(blog.image);
 
             blogEntries.push({
-                url: canonicalUrl,
+                url: sitemapUrl,
                 lastModified:
                     toDate(blog.updatedAt) ||
                     toDate(blog.publishedAt) ||

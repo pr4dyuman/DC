@@ -1,5 +1,3 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, BarChart3, Bot, Wallet, Users } from "lucide-react";
@@ -31,7 +29,7 @@ const features = [
     },
 ];
 
-export default function ManageCompanySection({ headingLevel = "h2" }) {
+export default function ManageCompanySection({ headingLevel = "h2", imagePriority = false }) {
     const HeadingTag = headingLevel === "h1" ? "h1" : "h2";
 
     return (
@@ -88,12 +86,12 @@ export default function ManageCompanySection({ headingLevel = "h2" }) {
                         <div className="absolute -inset-4 bg-gradient-to-br from-[#F5EE30]/10 via-transparent to-[#F5EE30]/5 rounded-2xl blur-xl"></div>
                         <div className="relative rounded-xl overflow-hidden border border-white/10 shadow-2xl shadow-[#F5EE30]/5">
                             <Image
-                                src="/dashboard-mockup.png"
+                                src="/dashboard-mockup-640-q84.jpg"
                                 alt="Agency OS Dashboard — AI-powered company management platform"
                                 width={800}
                                 height={500}
                                 className="w-full h-auto"
-                                priority
+                                priority={imagePriority}
                             />
                             {/* Glass overlay at bottom */}
                             <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/60 to-transparent"></div>

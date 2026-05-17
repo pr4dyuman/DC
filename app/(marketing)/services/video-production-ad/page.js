@@ -1,10 +1,121 @@
 import Image from "next/image";
-
-
 import Link from "next/link";
+import {
+  getMarketingBreadcrumbJsonLd,
+  getMarketingServiceJsonLd,
+  serializeMarketingJsonLd,
+} from "@/lib/marketing-seo";
+
+const videoProductionFaqs = [
+  {
+    question: "What is included in Digital Corvids video production services?",
+    answer:
+      "Our video production work can include concept development, scripting, storyboarding, production planning, shooting, editing, motion graphics, sound design, distribution planning, and performance reporting.",
+  },
+  {
+    question: "Do you create videos for ads and social media platforms?",
+    answer:
+      "Yes. We can create ad films, reels, product demos, explainer videos, testimonials, YouTube videos, and platform-specific cuts for Instagram, LinkedIn, Facebook, and paid campaigns.",
+  },
+  {
+    question: "Can you handle the full video process from idea to final delivery?",
+    answer:
+      "Yes. We can manage the complete workflow from creative brief and pre-production to filming, post-production, revisions, export formats, and launch recommendations.",
+  },
+  {
+    question: "How do you measure video production success?",
+    answer:
+      "We connect creative decisions to goals such as watch time, engagement, click-through rate, conversions, social shares, audience retention, and campaign performance.",
+  },
+];
+
+const videoProductionProcessSteps = [
+  {
+    title: "Concept",
+    description:
+      "Define the message, audience, format, channel, creative angle, and campaign goal before production begins.",
+  },
+  {
+    title: "Plan",
+    description:
+      "Prepare scripts, storyboards, shot lists, schedules, locations, talent needs, production assets, and approvals.",
+  },
+  {
+    title: "Produce",
+    description:
+      "Capture footage, audio, product shots, interviews, b-roll, and platform-specific creative with a clear shot plan.",
+  },
+  {
+    title: "Polish",
+    description:
+      "Edit, color grade, mix sound, add motion graphics, export versions, and prepare launch-ready video assets.",
+  },
+];
+
+const videoProductionProofPoints = [
+  "Creative briefs connect every video to a campaign goal and audience insight.",
+  "Production plans define formats, deliverables, timelines, and approval checkpoints early.",
+  "Post-production includes edits built for platform behavior, not one generic video file.",
+  "Distribution recommendations help each asset work across organic, paid, and landing page channels.",
+];
+
+const relatedVideoProductionLinks = [
+  {
+    title: "Social Media Marketing",
+    href: "/services/social-media-marketing",
+    description: "Use video assets across organic social and community campaigns.",
+  },
+  {
+    title: "PPC Advertising",
+    href: "/services/ppc",
+    description: "Turn video creative into paid campaigns with measurable results.",
+  },
+  {
+    title: "Influencer Marketing",
+    href: "/services/influencer-marketing",
+    description: "Combine creator content with brand-led production for trust and reach.",
+  },
+  {
+    title: "Web Development",
+    href: "/services/web-development",
+    description: "Place videos on fast landing pages that support conversion.",
+  },
+];
+
+const structuredData = [
+  getMarketingServiceJsonLd({
+    name: "Video Production and Ad Films",
+    description:
+      "Create high-impact videos and ad films with Digital Corvids, from pre-production and scripting to production, post-production, distribution, and performance creative.",
+    path: "/services/video-production-ad",
+    serviceType: "Video Production",
+  }),
+  getMarketingBreadcrumbJsonLd([
+    { name: "Home", path: "/" },
+    { name: "Services", path: "/services" },
+    { name: "Video Production and Ad Films", path: "/services/video-production-ad" },
+  ]),
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: videoProductionFaqs.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer,
+      },
+    })),
+  },
+];
+
 export default function VideoProduction() {
   return (
     <div className="min-h-screen bg-black text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
+      />
       
       <div className="max-w-7xl mx-auto px-6 pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12">
         {/* Header Section */}
@@ -20,7 +131,7 @@ export default function VideoProduction() {
               SERVICES
             </Link>
             <span className="text-gray-500 mx-2">|</span>
-            <span className="text-[#3E3E3E] font-glacial-bold">VideoProduction</span>
+            <span className="text-[#3E3E3E] font-glacial-bold">VIDEO PRODUCTION</span>
             </p>
           </div>
 
@@ -267,6 +378,99 @@ export default function VideoProduction() {
             </ul>
           </div>
         </div>
+
+        {/* Video Production Process Section */}
+        <section className="mb-20 lg:mb-32">
+          <div className="mb-10 max-w-3xl">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="h-2 w-2 rounded-full bg-[#F5EE30]"></span>
+              <span className="font-glacial-bold text-sm uppercase tracking-widest text-white">
+                How We Turn Ideas Into Video Assets
+              </span>
+            </div>
+            <h2 className="mb-5 text-3xl font-extrabold uppercase leading-tight md:text-5xl">
+              <span className="text-white">Video Production Process</span>
+              <br />
+              <span className="text-[#3E3E3E]">From Concept To Campaign</span>
+            </h2>
+            <p className="text-base leading-relaxed text-gray-300 md:text-lg">
+              We plan video around the audience, platform, message, and business goal before the shoot starts. That
+              keeps production focused and makes every final cut easier to use across ads, social, and landing pages.
+            </p>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+            {videoProductionProcessSteps.map((step, index) => (
+              <div key={step.title} className="border border-white/10 bg-white/[0.03] p-6">
+                <p className="mb-5 font-glacial-bold text-sm text-[#F5EE30]">
+                  {String(index + 1).padStart(2, "0")}
+                </p>
+                <h3 className="mb-3 text-xl font-bold uppercase text-white">{step.title}</h3>
+                <p className="text-sm leading-relaxed text-gray-300">{step.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Video Production Proof And Internal Links Section */}
+        <section className="mb-20 grid gap-10 lg:mb-32 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+          <div>
+            <div className="mb-4 flex items-center gap-3">
+              <span className="h-2 w-2 rounded-full bg-[#F5EE30]"></span>
+              <span className="font-glacial-bold text-sm uppercase tracking-widest text-white">
+                Creative, Production, And Performance Alignment
+              </span>
+            </div>
+            <h2 className="mb-6 text-3xl font-extrabold uppercase leading-tight md:text-5xl">
+              <span className="text-white">What You Can</span>
+              <br />
+              <span className="text-[#3E3E3E]">Expect From Video</span>
+            </h2>
+            <div className="space-y-4">
+              {videoProductionProofPoints.map((point) => (
+                <div key={point} className="flex gap-3 border-b border-white/10 pb-4">
+                  <span className="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-[#F5EE30]"></span>
+                  <p className="text-base leading-relaxed text-gray-300 md:text-lg">{point}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="border border-white/10 bg-white/[0.03] p-6">
+            <h3 className="mb-5 text-xl font-bold uppercase text-[#F5EE30]">Related Growth Paths</h3>
+            <div className="space-y-5">
+              {relatedVideoProductionLinks.map((item) => (
+                <Link key={item.href} href={item.href} className="block group">
+                  <span className="block text-base font-bold uppercase text-white transition-colors group-hover:text-[#F5EE30]">
+                    {item.title}
+                  </span>
+                  <span className="mt-1 block text-sm leading-relaxed text-gray-400">{item.description}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Video Production FAQ Section */}
+        <section className="mb-20 lg:mb-28">
+          <div className="mb-10 text-center">
+            <p className="mb-4 font-glacial-bold text-sm uppercase tracking-widest text-[#F5EE30]">
+              Common Video Production Questions
+            </p>
+            <h2 className="text-3xl font-extrabold uppercase leading-tight md:text-5xl">
+              <span className="text-white">Video Production FAQs</span>
+            </h2>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            {videoProductionFaqs.map((item) => (
+              <div key={item.question} className="border border-white/10 bg-white/[0.03] p-6">
+                <h3 className="mb-3 text-lg font-bold uppercase text-white">{item.question}</h3>
+                <p className="text-sm leading-relaxed text-gray-300 md:text-base">{item.answer}</p>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
 
       {/* Why Choose Us Section */}
@@ -341,11 +545,11 @@ export default function VideoProduction() {
     
     <div className="text-center md:text-left max-w-xl">
       <h3 className="text-2xl md:text-3xl font-extrabold leading-snug">
-        READY TO DOMINATE <br />
-        <span className="text-gray-400">GOOGLE SEARCH RESULTS?</span>
+        READY TO CREATE <br />
+        <span className="text-gray-400">VIDEO THAT PERFORMS?</span>
       </h3>
       <p className="text-sm md:text-base mt-3 text-gray-400 leading-relaxed">
-        Let&apos;s discuss how our proven SEO strategies can help you outrank competitors and drive qualified organic traffic.
+        Let&apos;s discuss how video strategy, production, editing, and distribution can turn your story into campaign-ready assets.
       </p>
     </div>
 

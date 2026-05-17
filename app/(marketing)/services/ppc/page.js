@@ -1,103 +1,121 @@
-"use client";
-import { useEffect, useRef } from "react";
 import Image from "next/image";
-
 import Link from "next/link";
+import {
+  getMarketingBreadcrumbJsonLd,
+  getMarketingServiceJsonLd,
+  serializeMarketingJsonLd,
+} from "@/lib/marketing-seo";
+
+const ppcFaqs = [
+  {
+    question: "What is included in Digital Corvids PPC advertising services?",
+    answer:
+      "Our PPC services can include campaign strategy, keyword and audience research, ad copywriting, creative testing, conversion tracking, bid management, landing page recommendations, and performance reporting.",
+  },
+  {
+    question: "Which advertising platforms do you manage?",
+    answer:
+      "We can manage campaigns across Google Ads, Microsoft Advertising, Meta ads, LinkedIn ads, YouTube, Shopping, Display, and other paid channels when they fit the business goal.",
+  },
+  {
+    question: "How quickly can PPC campaigns start generating traffic?",
+    answer:
+      "PPC can start sending traffic as soon as campaigns are approved and live. Strong results still depend on targeting, budget, landing page quality, conversion tracking, and ongoing optimization.",
+  },
+  {
+    question: "How do you measure PPC success?",
+    answer:
+      "We track metrics that connect ad spend to business outcomes, including conversions, cost per lead, conversion rate, ROAS, wasted spend, lead quality, and campaign-level trends.",
+  },
+];
+
+const ppcProcessSteps = [
+  {
+    title: "Research",
+    description:
+      "Analyze goals, competitors, search demand, audience segments, channel fit, budgets, and conversion paths.",
+  },
+  {
+    title: "Setup",
+    description:
+      "Build campaign structure, ad groups, keywords, audiences, negative keywords, tracking, and landing page recommendations.",
+  },
+  {
+    title: "Launch",
+    description:
+      "Publish campaigns with clear testing priorities across copy, creative, bids, placements, devices, and locations.",
+  },
+  {
+    title: "Optimize",
+    description:
+      "Review performance data, reduce wasted spend, improve quality scores, refine targeting, and scale what converts.",
+  },
+];
+
+const ppcProofPoints = [
+  "Conversion tracking is checked before budget is scaled.",
+  "Reports focus on leads, revenue, ROAS, CPL, and wasted spend, not vanity clicks.",
+  "Search terms, audiences, placements, and creatives are reviewed for ongoing optimization.",
+  "Paid traffic recommendations are connected to landing page UX and conversion quality.",
+];
+
+const relatedPpcLinks = [
+  {
+    title: "Web Development",
+    href: "/services/web-development",
+    description: "Build landing pages that turn paid clicks into real inquiries.",
+  },
+  {
+    title: "SEO Services",
+    href: "/services/seo",
+    description: "Balance paid acquisition with compounding organic visibility.",
+  },
+  {
+    title: "Social Media Marketing",
+    href: "/services/social-media-marketing",
+    description: "Connect paid campaigns with consistent social demand creation.",
+  },
+  {
+    title: "Get Started",
+    href: "/get-started",
+    description: "Plan the next paid campaign with clear goals and tracking.",
+  },
+];
+
+const structuredData = [
+  getMarketingServiceJsonLd({
+    name: "PPC Advertising Services",
+    description:
+      "Launch performance-focused PPC campaigns with Digital Corvids across Google, Bing, and social platforms, with testing, tracking, bid management, and ROI reporting.",
+    path: "/services/ppc",
+    serviceType: "Pay-Per-Click Advertising",
+  }),
+  getMarketingBreadcrumbJsonLd([
+    { name: "Home", path: "/" },
+    { name: "Services", path: "/services" },
+    { name: "PPC Advertising", path: "/services/ppc" },
+  ]),
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: ppcFaqs.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer,
+      },
+    })),
+  },
+];
 
 export default function PPCAdvertising() {
-  const btnRef = useRef(null);
-
-  useEffect(() => {
-    const btn = btnRef.current;
-    if (!btn) return;
-
-    let xForce = 0, yForce = 0;
-    let isHovered = false;
-    let animationFrame;
-
-    const handleMouseMove = (e) => {
-      if (!isHovered) return;
-
-      const rect = btn.getBoundingClientRect();
-      const x = e.clientX - (rect.left + rect.width / 2);
-      const y = e.clientY - (rect.top + rect.height / 2);
-
-      xForce = x * 2.5;
-      yForce = y * 2.5;
-
-      const fill = btn.querySelector('.fill-effect');
-      if (fill) {
-        const relX = e.clientX - rect.left;
-        const relY = e.clientY - rect.top;
-        fill.style.left = `${relX}px`;
-        fill.style.top = `${relY}px`;
-      }
-    };
-
-    const handleMouseEnter = () => {
-      isHovered = true;
-      const fill = btn.querySelector('.fill-effect');
-      if (fill) {
-        fill.style.opacity = '1';
-        fill.style.transform = 'scale(30)';
-      }
-    };
-
-    const handleMouseLeave = () => {
-      isHovered = false;
-
-      const gsapTo = (element, props) => {
-        Object.keys(props).forEach(key => {
-          if (key === 'duration' || key === 'ease') return;
-          element.style.transform = `translate(${props.x || 0}px, ${props.y || 0}px) scale(${props.scale || 1}) rotateZ(${props.rotateZ || 0}deg)`;
-        });
-      };
-
-      gsapTo(btn, {
-        x: 0,
-        y: 0,
-        scale: 1,
-        rotateZ: 0,
-        duration: 0.3,
-        ease: 'power2.out'
-      });
-
-      const fill = btn.querySelector('.fill-effect');
-      if (fill) {
-        fill.style.opacity = '0';
-        fill.style.transform = 'scale(0.1)';
-      }
-    };
-
-    const update = () => {
-      if (isHovered) {
-        const shake = 20;
-        const shakeX = (Math.random() - 0.5) * shake;
-        const shakeY = (Math.random() - 0.5) * shake;
-
-        btn.style.transform = `translate(${xForce + shakeX}px, ${yForce + shakeY}px) scale(1.2) rotateZ(${(Math.random() - 0.5) * 5}deg)`;
-        btn.style.transformPerspective = '1000px';
-      }
-
-      animationFrame = requestAnimationFrame(update);
-    };
-
-    btn.addEventListener('mousemove', handleMouseMove);
-    btn.addEventListener('mouseenter', handleMouseEnter);
-    btn.addEventListener('mouseleave', handleMouseLeave);
-
-    update();
-
-    return () => {
-      cancelAnimationFrame(animationFrame);
-      btn.removeEventListener('mousemove', handleMouseMove);
-      btn.removeEventListener('mouseenter', handleMouseEnter);
-      btn.removeEventListener('mouseleave', handleMouseLeave);
-    };
-  }, []);
-
   return (
     <div className="min-h-screen flex flex-col bg-black text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
+      />
       <main className="flex-grow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           {/* Header Section */}
@@ -137,7 +155,7 @@ export default function PPCAdvertising() {
                 <span className="w-2 h-2 sm:w-3 sm:h-3 bg-[#F5EE30] rounded-full mr-2 sm:mr-3 mt-1 sm:mt-1.5 flex-shrink-0"></span>
                 <span className="leading-relaxed whitespace-normal xl:whitespace-nowrap">Get Instant Visibility, Drive Qualified Traffic, and Maximize ROI</span>
               </h3>
-              <h1 className="text-2xl sm:text-4xl md:text-2xl lg:text-3xl xl:text-4xl font-['Etna'] font-bold mb-4 sm:mb-6 text-[#F5EE30] whitespace-nowrap">
+              <h1 className="text-2xl sm:text-4xl md:text-2xl lg:text-3xl xl:text-4xl font-['Etna'] font-bold mb-4 sm:mb-6 text-[#F5EE30] whitespace-normal break-words xl:whitespace-nowrap leading-tight">
                 PAY-PER-CLICK (PPC) ADVERTISING
               </h1>
               <p className="text-lg sm:text-xl font-glacial-bold mb-3 sm:mb-4 text-white">OUR MISSION</p>
@@ -408,6 +426,99 @@ export default function PPCAdvertising() {
               </ul>
             </div>
           </div>
+
+          {/* PPC Process Section */}
+          <section className="mb-16 sm:mb-20 lg:mb-32">
+            <div className="mb-10 max-w-3xl">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="h-2 w-2 rounded-full bg-[#F5EE30]"></span>
+                <span className="font-glacial-bold text-sm uppercase tracking-widest text-white">
+                  How We Improve Paid Performance
+                </span>
+              </div>
+              <h2 className="mb-5 text-3xl font-extrabold uppercase leading-tight md:text-5xl">
+                <span className="text-white">PPC Process</span>
+                <br />
+                <span className="text-[#3E3E3E]">From Spend To Scale</span>
+              </h2>
+              <p className="text-base leading-relaxed text-gray-300 md:text-lg">
+                We treat PPC as a measurable acquisition system. Campaigns are planned around intent, tracking, landing
+                page quality, and continuous testing so ad spend has a clear path to leads and revenue.
+              </p>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+              {ppcProcessSteps.map((step, index) => (
+                <div key={step.title} className="border border-white/10 bg-white/[0.03] p-6">
+                  <p className="mb-5 font-glacial-bold text-sm text-[#F5EE30]">
+                    {String(index + 1).padStart(2, "0")}
+                  </p>
+                  <h3 className="mb-3 text-xl font-bold uppercase text-white">{step.title}</h3>
+                  <p className="text-sm leading-relaxed text-gray-300">{step.description}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* PPC Proof And Internal Links Section */}
+          <section className="mb-16 grid gap-10 sm:mb-20 lg:mb-32 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+            <div>
+              <div className="mb-4 flex items-center gap-3">
+                <span className="h-2 w-2 rounded-full bg-[#F5EE30]"></span>
+                <span className="font-glacial-bold text-sm uppercase tracking-widest text-white">
+                  Tracking, Testing, And Budget Control
+                </span>
+              </div>
+              <h2 className="mb-6 text-3xl font-extrabold uppercase leading-tight md:text-5xl">
+                <span className="text-white">What You Can</span>
+                <br />
+                <span className="text-[#3E3E3E]">Expect From PPC</span>
+              </h2>
+              <div className="space-y-4">
+                {ppcProofPoints.map((point) => (
+                  <div key={point} className="flex gap-3 border-b border-white/10 pb-4">
+                    <span className="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-[#F5EE30]"></span>
+                    <p className="text-base leading-relaxed text-gray-300 md:text-lg">{point}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="border border-white/10 bg-white/[0.03] p-6">
+              <h3 className="mb-5 text-xl font-bold uppercase text-[#F5EE30]">Related Growth Paths</h3>
+              <div className="space-y-5">
+                {relatedPpcLinks.map((item) => (
+                  <Link key={item.href} href={item.href} className="block group">
+                    <span className="block text-base font-bold uppercase text-white transition-colors group-hover:text-[#F5EE30]">
+                      {item.title}
+                    </span>
+                    <span className="mt-1 block text-sm leading-relaxed text-gray-400">{item.description}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* PPC FAQ Section */}
+          <section className="mb-20 lg:mb-28">
+            <div className="mb-10 text-center">
+              <p className="mb-4 font-glacial-bold text-sm uppercase tracking-widest text-[#F5EE30]">
+                Common PPC Questions
+              </p>
+              <h2 className="text-3xl font-extrabold uppercase leading-tight md:text-5xl">
+                <span className="text-white">PPC FAQs</span>
+              </h2>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2">
+              {ppcFaqs.map((item) => (
+                <div key={item.question} className="border border-white/10 bg-white/[0.03] p-6">
+                  <h3 className="mb-3 text-lg font-bold uppercase text-white">{item.question}</h3>
+                  <p className="text-sm leading-relaxed text-gray-300 md:text-base">{item.answer}</p>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
         {/* Why Choose Us Section */}
         <div className="bg-black text-white w-full">
@@ -482,11 +593,11 @@ export default function PPCAdvertising() {
 
             <div className="text-center md:text-left max-w-xl">
               <h3 className="text-2xl md:text-3xl font-extrabold leading-snug">
-                READY TO DOMINATE <br />
-                <span className="text-gray-400">GOOGLE SEARCH RESULTS?</span>
+                READY TO SCALE <br />
+                <span className="text-gray-400">PAID ACQUISITION?</span>
               </h3>
               <p className="text-sm md:text-base mt-3 text-gray-400 leading-relaxed">
-                Let&apos;s discuss how our proven SEO strategies can help you outrank competitors and drive qualified organic traffic.
+                Let&apos;s discuss how our PPC strategy can help you reach qualified buyers, reduce wasted spend, and turn more clicks into conversions.
               </p>
             </div>
 

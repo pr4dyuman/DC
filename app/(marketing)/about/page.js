@@ -71,6 +71,7 @@ export default function AboutPage() {
                 src="/about.png"
                 alt="Digital Corvids illustration showing a person climbing a ladder next to a large yellow megaphone with floating icons"
                 fill
+                sizes="(min-width: 1280px) 512px, (min-width: 1024px) 448px, (min-width: 640px) 448px, calc(100vw - 48px)"
                 className="object-contain rounded-lg"
               />
             </div>
@@ -145,6 +146,7 @@ export default function AboutPage() {
                   src="/about2.png"
                   alt="Digital Corvids why us illustration showing a person climbing stairs with trophy and money floating around"
                   fill
+                  sizes="(min-width: 1280px) 512px, (min-width: 1024px) 448px, (min-width: 640px) 448px, calc(100vw - 48px)"
                   className="object-contain rounded-lg"
                 />
               </div>
@@ -261,6 +263,7 @@ export default function AboutPage() {
             src="/about3.png"
             alt="Objective Illustration"
             fill
+            sizes="(min-width: 1024px) 460px, (min-width: 768px) 380px, 280px"
             className="object-contain"
           />
         </div>

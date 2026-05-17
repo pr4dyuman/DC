@@ -6,7 +6,7 @@ import { platformFeatures } from "./get-started-content";
 export default function GetStartedFeaturesSection() {
     return (
         <section id="features" className="py-20 sm:py-24 lg:py-32 relative">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-[#F5EE30]/3 rounded-full blur-[200px] pointer-events-none" />
+            <div className="absolute top-1/2 left-1/2 h-[100vw] max-h-[700px] w-[100vw] max-w-[700px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#F5EE30]/3 blur-[200px] pointer-events-none" />
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
                 <div className="text-center mb-16 sm:mb-20">

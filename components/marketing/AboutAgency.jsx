@@ -105,12 +105,11 @@ export default function AboutAgency() {
           {/* Right Side - Illustration */}
           <div className="relative flex justify-center items-center min-h-[300px] sm:min-h-[400px] md:min-h-[500px] lg:min-h-[500px]">
             <Image
-              src="/agency.png"
+              src="/agency-900.png"
               alt="Creative team illustration with gears"
               width={600}
               height={600}
               className="w-full max-w-sm sm:max-w-md lg:max-w-lg h-auto object-contain"
-              priority
             />
           </div>
         </div>

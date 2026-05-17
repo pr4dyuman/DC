@@ -1,0 +1,463 @@
+Digital Corvids SEO Optimization Checklist
+Last updated: 2026-05-18
+
+Repo-specific notes
+- The project is a Next.js App Router site.
+- Existing SEO basics already present: app/sitemap.ts, public/robots.txt, marketing metadata helper, blog metadata, blog structured data, private dashboard/admin noindex metadata, and old .html redirects.
+- Key gaps to improve: page performance, home page client rendering, heavy public assets, missing web manifest/icons, inconsistent encoding artifacts, richer service-page schema, richer internal linking, and stronger local/entity SEO.
+
+P0 priorities
+- Make important marketing content render from the server, especially the home page.
+- Improve Core Web Vitals: LCP <= 2.5s, INP <= 200ms, CLS <= 0.1 at the 75th percentile.
+- Compress and resize large images before shipping them.
+- Add /llms.txt and optional /llms-full.txt.
+  - Done 2026-05-17: added dynamic /llms.txt and /llms-full.txt route handlers backed by published blog data.
+- Keep sitemap and robots.txt accurate.
+- Fix visible encoding issues such as broken bullet, dash, and quote characters.
+  - Audited 2026-05-17: source files contain valid UTF-8 characters and local rendered pages showed zero mojibake; the earlier broken-looking output was PowerShell display encoding.
+- Strengthen service pages with deeper content, FAQs, proof, process, and internal links.
+- Validate structured data and canonical URLs.
+
+P1 plan
+- Baseline measurement:
+  - Run PageSpeed Insights and Lighthouse on production for /, /services, top service pages, /blog, and /get-started.
+  - Record LCP, INP, CLS, total JS, main-thread work, image transfer size, and top render-blocking resources.
+  - Add Vercel Speed Insights or web-vitals tracking so Core Web Vitals are measured with real users.
+- JavaScript and rendering optimization:
+  - Audit client bundles for Swiper, GSAP, Framer Motion, Three.js, and other heavy libraries.
+  - Lazy-load below-fold sliders, testimonials, team sections, and animation-heavy components.
+  - Keep page-level marketing content server-rendered and push client interactivity into small islands.
+  - Remove unused client imports from pages that do not need them.
+- Image and media improvements:
+  - Convert remaining large JPG/PNG assets to WebP or AVIF where quality allows.
+  - Add exact sizes attributes for important next/image usage.
+  - Keep priority only on the true LCP image per template.
+  - Add image sitemap data for important home, service, and blog images if useful.
+- Local and entity SEO:
+  - Strengthen Organization, LocalBusiness, and sameAs schema.
+  - Add consistent NAP, Jaipur/India service-area context, and trust signals where natural.
+  - Connect Google Business Profile, Bing Places, and citation profiles to the same canonical site data.
+- Content depth and internal linking:
+  - Build service topic clusters with supporting blog posts for SEO, PPC, web development, social media, video, and influencer marketing.
+  - Add real case studies, examples, testimonials, tools used, timelines, deliverables, and engagement models where available.
+  - Add contextual internal links from blogs to service pages and from service pages to related services.
+  - Keep /services/manage-company and /services/ai-blogger deferred until their redesigns are ready.
+- Structured data QA:
+  - Validate Organization, Service, BreadcrumbList, FAQPage, BlogPosting, and Article schema with Rich Results Test or schema validator.
+  - Keep schema aligned with visible page content.
+  - Add Review, AggregateRating, or CaseStudy-style schema only when real evidence exists.
+- Analytics and conversion tracking:
+  - Verify Google Search Console and Bing Webmaster Tools.
+  - Add GA4 or equivalent conversion tracking for contact form, get-started form, WhatsApp, email, phone, and newsletter events.
+  - Avoid duplicate analytics scripts and respect privacy requirements.
+- Accessibility and UX SEO:
+  - Audit heading order, labels, alt text, focus states, form errors, and keyboard navigation.
+  - Keep mobile layouts free of horizontal overflow after new content changes.
+  - Improve CTA clarity and form friction on conversion pages.
+- Off-page and sharing:
+  - Validate OG/Twitter previews for home, service, and blog pages.
+  - Build high-quality citations, partner links, social profile consistency, and relevant backlinks.
+- Monitoring cadence:
+  - Review Search Console indexing, queries, pages, Core Web Vitals, crawl stats, and structured data warnings monthly.
+  - Re-run build, sitemap, robots, schema, and mobile overflow checks before major releases.
+
+1. Crawlability and indexability
+- Public pages must return HTTP 200.
+- Removed pages must return 404 or 410, not soft-404 content.
+- Redirect old URLs with 301 redirects to the best current URL.
+- Keep one preferred host only: https://digitalcorvids.com.
+- Redirect www to non-www, already present in next.config.ts.
+- Do not allow staging or preview domains to be indexed.
+- Do not block CSS, JS, images, or fonts that Google needs to render public pages.
+- Private pages must use noindex metadata and authentication.
+- Dashboard, super-admin, login, admin, API, trial-expired, and plan-expired pages should not be indexed.
+- Use X-Robots-Tag for non-HTML files only when needed.
+- Do not rely on robots.txt to hide sensitive pages. Use noindex, authentication, password protection, or remove the page.
+
+2. Robots.txt
+- Keep public/robots.txt available at /robots.txt.
+- Keep Sitemap: https://digitalcorvids.com/sitemap.xml.
+- Disallow crawl-heavy private areas:
+  - /api/
+  - /dashboard
+  - /super-admin
+  - /admin
+- Allow public marketing pages, blogs, images, CSS, and JS.
+- Add AI crawler policy only after deciding the business intent:
+  - Allow if the goal is broader AI discovery.
+  - Disallow if the goal is restricting training/crawling.
+- Candidate AI crawler user agents to review:
+  - GPTBot
+  - ChatGPT-User
+  - ClaudeBot
+  - PerplexityBot
+  - Google-Extended
+  - CCBot
+  - Bytespider
+- Remember: robots.txt controls crawling access, not guaranteed indexing removal.
+
+3. Sitemap
+- Keep app/sitemap.ts dynamic for published blogs.
+- Include only canonical, indexable, public URLs.
+- Exclude private routes, auth routes, API routes, draft posts, admin URLs, duplicate URLs, and noindex pages.
+- Keep static marketing pages in sitemap:
+  - /
+  - /about
+  - /services
+  - /services/seo
+  - /services/web-development
+  - /services/ppc
+  - /services/social-media-marketing
+  - /services/video-production-ad
+  - /services/influencer-marketing
+  - /services/manage-company
+  - /services/ai-blogger
+  - /contact
+  - /get-started
+  - /blog
+- Include all published blog detail pages.
+- Use real lastModified values for blogs and, where possible, static pages.
+- Keep absolute URLs using the production origin.
+- Done 2026-05-17: updated static sitemap lastModified to 2026-05-17 and hardened blog sitemap URLs so off-domain canonicals cannot enter sitemap.xml.
+- Add image sitemap data for important service/home/blog images where useful.
+- If the site grows above 50,000 URLs or 50MB sitemap size, split into sitemap indexes.
+- Submit sitemap in Google Search Console and Bing Webmaster Tools.
+
+4. Canonical URLs and duplicates
+- Every public page should have one canonical URL.
+- Canonicals must be absolute, for example https://digitalcorvids.com/services/seo.
+- Canonical, sitemap URL, Open Graph URL, and internal links should all match.
+- Normalize trailing slashes consistently.
+- Avoid duplicate content across service pages.
+- Redirect legacy .html pages to current routes, already partly handled in next.config.ts.
+- Make sure blog canonical URLs do not accidentally point to another domain unless intentionally syndicated.
+- Avoid query parameter duplicates for indexable pages.
+- Add canonical handling for paginated blog/category pages if pagination is added.
+
+5. Rendering and JavaScript SEO
+- Keep important text in server-rendered HTML.
+- Do not hide primary content behind client-only state, canvas, animations, or API calls.
+- The home page currently uses client-side rendering; convert it to a Server Component and isolate Swiper/animations into small client components.
+- Navigation links must be real links using next/link or a href.
+- Each meaningful page or screen should have a unique URL.
+- Avoid injecting title, description, canonical, and robots metadata only after hydration.
+- Use server-rendered metadata through Next.js Metadata API.
+- Lazy-load below-fold interactive sections.
+- Avoid dynamic rendering as a long-term SEO workaround.
+
+6. Core Web Vitals and performance
+- Target LCP <= 2.5s, INP <= 200ms, CLS <= 0.1.
+- Measure real-user data, not only Lighthouse lab scores.
+- Optimize the LCP element on each template.
+- Add priority only to the real above-fold LCP image.
+- Remove priority from below-fold images.
+- Add correct sizes attributes to next/image components.
+- Remove or compress large public assets after proving they are used.
+  - Done 2026-05-17: removed unused public/service1.jpg, public/service2.jpg, public/service3.png, public/sliderbg.jpg, and public/sliderbg1.jpg after code, build-output, and marketing-blog DB checks returned no references.
+- Convert large PNG/JPG assets to WebP or AVIF where quality allows.
+- Done 2026-05-17: replaced used heavy public images with smaller versioned assets:
+  - public/ssbg.jpeg -> public/ssbg-1600-q74.jpg
+  - public/dashboard-mockup.png -> public/dashboard-mockup-640-q84.jpg
+  - public/s1.png -> public/s1-360-q88.jpg
+  - public/lf.png -> public/lf-320-q88.jpg
+  - public/agency.png -> public/agency-900.png
+  - Removed unused public/hero-bg.png after code and marketing-blog DB checks returned no references.
+- Serve responsive image dimensions, not oversized images.
+- Lazy-load sliders, testimonials, team carousel, and below-fold media.
+- Reduce JavaScript bundle size from Swiper, GSAP, Framer Motion, Three.js, and other animation libraries on pages where they are not needed.
+- Prefer CSS animations for simple effects.
+- Pause or disable animations for prefers-reduced-motion.
+- Keep layout dimensions stable to avoid CLS.
+- Define width/height or aspect-ratio for images, cards, sliders, and hero media.
+- Use font-display: swap, already present for local Geist fonts.
+- Preload only critical fonts used above the fold.
+- Remove unused fonts if not needed.
+- Minimize third-party scripts.
+- Use compression, CDN caching, immutable caching for hashed static assets, and short cache for dynamic HTML.
+- Avoid heavy client auth/session checks in marketing navigation when possible.
+
+7. Metadata
+- Every public page needs unique title and description.
+- Title should be specific, useful, and not keyword-stuffed.
+- Meta description should describe the page and user benefit.
+- Root app metadata should not leak generic "Agency OS" onto public marketing pages.
+- Keep title/description visible content aligned with metadata.
+- Add Open Graph metadata for every public page.
+- Add Twitter card metadata.
+- Add a strong default social image, ideally 1200x630.
+- Add page-specific OG images for major services and important blog posts.
+- Add applicationName/siteName consistently as "Digital Corvids".
+- Meta keywords are not useful for Google; keep focus on visible content and structured data.
+
+8. Structured data
+- Existing Organization/WebSite schema is a good start.
+- Add or improve these schema types:
+  - Organization
+  - LocalBusiness or ProfessionalService
+  - WebSite
+  - WebPage
+  - Service for each service page
+  - BreadcrumbList for service and blog pages
+  - BlogPosting for blogs
+  - FAQPage only where FAQ content is visible
+  - ImageObject where helpful
+  - VideoObject if real video content is added
+- Structured data must match visible page content.
+- Add sameAs links for official social profiles.
+- Add contactPoint, areaServed, address, email, and phone where accurate.
+- Done 2026-05-17: added Service and BreadcrumbList JSON-LD to all service detail pages.
+- Validate with Google Rich Results Test and Schema Markup Validator.
+- Do not add review/rating schema unless real visible reviews exist.
+
+9. URL structure
+- Keep URLs short, readable, lowercase, and keyword-relevant.
+- Use hyphens, not underscores.
+- Avoid random IDs in public blog URLs.
+- Keep service routes stable.
+- Use topic directories when content grows, for example /blog/seo/topic-name if categories become important.
+- Avoid changing URLs unless there is a redirect plan.
+- Keep breadcrumbs aligned with URL structure.
+
+10. Content quality
+- Build helpful, reliable, people-first content.
+- Add clear service-specific sections:
+  - What the service includes
+  - Problems solved
+  - Process
+  - Deliverables
+  - Tools and platforms
+  - Results or proof
+  - FAQs
+  - Pricing or engagement model if possible
+  - CTA
+- Improve thin or repeated service-page copy.
+- Done 2026-05-17: strengthened /services/seo with process, proof/reporting, related internal links, visible FAQs, and matching FAQPage schema.
+- Done 2026-05-17: strengthened /services/web-development with process, build expectations/proof, related internal links, visible FAQs, and matching FAQPage schema.
+- Done 2026-05-17: strengthened /services/ppc with PPC process, tracking/proof expectations, related internal links, visible FAQs, matching FAQPage schema, and corrected PPC CTA copy.
+- Done 2026-05-17: strengthened /services/social-media-marketing with social process, creative/community/conversion proof, related internal links, visible FAQs, matching FAQPage schema, and corrected social CTA copy.
+- Done 2026-05-18: strengthened /services/video-production-ad with video production process, creative/production/performance proof, related internal links, visible FAQs, matching FAQPage schema, and corrected video CTA copy.
+- Done 2026-05-18: strengthened /services/influencer-marketing with creator campaign process, creator-fit/brand-safety/ROI proof, related internal links, visible FAQs, matching FAQPage schema, and corrected influencer hero/CTA copy.
+- Deferred 2026-05-18: /services/manage-company is intentionally due later because this page is expected to change heavily. When redesigned, add deeper service content, internal links, visible FAQs, and matching structured data.
+- Deferred 2026-05-18: /services/ai-blogger is intentionally due later because this page is expected to change heavily. When redesigned, add deeper service content, internal links, visible FAQs, and matching structured data.
+- Done 2026-05-18: final P0 validation passed for build, public marketing routes, robots.txt, sitemap.xml, llms.txt, llms-full.txt, service schema output, server-rendered priority content, encoding scan, and desktop/mobile overflow checks. /services/manage-company and /services/ai-blogger remain intentionally deferred for future redesign.
+- Add Jaipur and India context naturally where relevant.
+- Add case studies and examples from real client work.
+- Add testimonials with real names/company context where permitted.
+- Add author/editor review to blogs.
+- Avoid publishing AI-generated pages at scale without human review and unique value.
+- Keep AI-generated blog metadata, alt text, and structured data accurate.
+- Add "last updated" dates to evergreen guides when they are maintained.
+- Remove outdated claims or update the year-based stats.
+- Fix encoding artifacts before search engines index them.
+  - Audited 2026-05-17: no browser-visible encoding artifacts found on checked marketing and service pages.
+
+11. Blog SEO
+- Keep blog list and blog detail pages server-rendered.
+- Ensure only published posts are publicly indexable.
+- Drafts should require auth or noindex.
+- Blog titles should be unique and search-intent aligned.
+- Blog meta descriptions should be unique and concise.
+- Add table of contents for long posts, already partly present.
+- Add internal links from blog posts to service pages.
+- Add related posts and topic clusters.
+- Add author, published date, modified date, and category.
+- Add canonical URL to every blog post.
+- Keep FAQ schema only for visible FAQ blocks.
+- Add source/reference links for research-heavy posts.
+- Avoid duplicate canonical URLs across posts.
+
+12. Internal linking
+- Home page should link clearly to every core service.
+- Services page should link to individual service pages.
+- Every service page should link to related services and relevant blog posts.
+- Blog posts should link back to relevant services.
+- Footer should include important public pages.
+- Add breadcrumb navigation on service and blog pages.
+- Avoid orphan pages.
+- Use descriptive anchor text, not only "click here" or "learn more".
+- Keep nav and footer crawlable without JavaScript-only interactions.
+
+13. Image SEO
+- Use descriptive alt text for meaningful images.
+- Use empty alt text for decorative images.
+- Replace generic alts like "Logo 1", "Background", "Track Icon", and "Learn More" with useful text or empty alt if decorative.
+- Use modern formats: WebP or AVIF.
+- Keep image filenames descriptive where possible.
+- Add image dimensions or aspect-ratio to prevent layout shift.
+- Avoid text embedded inside images when HTML text can be used.
+- Add Open Graph images for sharing.
+- Add ImageObject schema only when it helps.
+
+14. Video SEO
+- If real videos are added, use VideoObject schema.
+- Provide title, description, upload date, thumbnail, duration, and embed/content URL.
+- Add captions or transcripts for important videos.
+- Do not add video schema for decorative animations.
+- Host thumbnails in crawlable public paths.
+
+15. Local SEO
+- Optimize Google Business Profile.
+- Keep NAP consistent:
+  - Name: Digital Corvids
+  - Address: use the real public business address if available
+  - Phone: keep same phone everywhere
+  - Email: flytheraven@digitalcorvids.com
+- Add LocalBusiness or ProfessionalService schema with Jaipur/Rajasthan/India service area.
+- Add contact page details in plain HTML text.
+- Add Google Maps embed only if there is a real public office location.
+- Build local citations on trusted directories.
+- Add reviews/testimonials and link to Google Business Profile where appropriate.
+- Add Jaipur-focused service sections without keyword stuffing.
+
+16. Entity SEO and E-E-A-T
+- Keep brand name consistent as "Digital Corvids".
+- Use same logo, social URLs, phone, email, and service descriptions across site, schema, llms.txt, Google Business Profile, and social profiles.
+- Add About page proof:
+  - Team
+  - Experience
+  - Services
+  - Process
+  - Values
+  - Real contact details
+- Add author bios for blog authors.
+- Add editorial policy or content review note if AI Blogger publishes posts.
+- Add privacy policy, terms, and refund/cancellation policy where relevant.
+- Add case studies, client logos, and real outcomes where permitted.
+
+17. Accessibility and UX
+- Each page should have one clear primary H1.
+- Heading hierarchy should be logical: H1, H2, H3.
+- Add aria-label to icon-only social links.
+- Ensure keyboard navigation works.
+- Ensure focus states are visible.
+- Maintain color contrast.
+- Respect prefers-reduced-motion.
+- Keep button/link text readable on mobile.
+- Do not let text overflow or overlap on mobile.
+- Forms should have labels and clear validation messages.
+- Accessible pages often perform better for users and crawlers.
+
+18. Mobile SEO
+- Test every public page on mobile.
+- Use responsive layouts without horizontal scrolling.
+- Avoid intrusive popups or overlays.
+- Keep tap targets large enough.
+- Keep first viewport useful and fast.
+- Check mobile navigation links and dropdown service links.
+- Ensure forms are usable on mobile.
+
+19. Security and trust
+- HTTPS must be enforced.
+- HSTS is already present in next.config.ts.
+- Keep security headers.
+- Avoid exposing private API data to crawlers.
+- Keep admin/dashboard routes authenticated.
+- Do not put sensitive exports or logs in public.
+- Add privacy policy and terms pages if collecting contact/signup data.
+- Keep contact forms protected from spam and abuse.
+
+20. AI search, AEO, and llms.txt
+- Add public/llms.txt or app route equivalent at /llms.txt.
+- Optional: add /llms-full.txt with more detailed page summaries.
+- Done 2026-05-17: implemented app route handlers for /llms.txt and /llms-full.txt; both include core pages, services, sitemap/robots/contact info, and published blog links.
+- llms.txt should be concise Markdown.
+- Suggested llms.txt sections:
+  - H1: Digital Corvids
+  - Blockquote summary
+  - About
+  - Services
+  - Key pages
+  - Blog and resources
+  - Contact
+  - Optional secondary links
+- Include brief descriptions beside links.
+- Keep llms.txt aligned with site copy and structured data.
+- Do not treat llms.txt as a guaranteed ranking factor.
+- For Google AI features, normal SEO fundamentals still matter most:
+  - Indexed pages
+  - Allowed crawling
+  - Helpful text content
+  - Page experience
+  - Internal links
+  - High-quality images/videos
+  - Structured data matching visible content
+
+21. Social and sharing
+- Add OG title, description, URL, site name, and image.
+- Add Twitter summary_large_image cards.
+- Test sharing previews for home, service pages, and blogs.
+- Keep social profile links accurate.
+- Add aria labels to Instagram, LinkedIn, WhatsApp links.
+- Use UTM tags carefully; avoid making public canonical URLs include UTM parameters.
+
+22. Analytics and conversion tracking
+- Verify Google Search Console.
+- Verify Bing Webmaster Tools.
+- Set up GA4 or equivalent analytics.
+- Keep Vercel Analytics if useful.
+- Add Vercel Speed Insights or web-vitals tracking for real-user CWV.
+- Track conversions:
+  - Contact form submits
+  - Get Started submits
+  - WhatsApp clicks
+  - Email clicks
+  - Phone clicks
+  - Newsletter signups
+- Track blog-assisted conversions.
+- Avoid duplicate analytics scripts.
+- Respect privacy and cookie requirements.
+
+23. Search Console monitoring
+- Submit sitemap.
+- Inspect important URLs.
+- Monitor Page Indexing.
+- Monitor Crawl Stats.
+- Monitor Core Web Vitals.
+- Monitor Enhancements and structured data warnings.
+- Check manual actions and security issues.
+- Review query/page performance monthly.
+- Use URL Inspection after major releases.
+- Request recrawl for critical changed pages.
+
+24. Technical QA before launch
+- Run next build.
+- Run lint.
+- Check for broken links.
+- Check redirects.
+- Check canonical tags.
+- Check robots.txt.
+- Check sitemap.xml.
+- Check noindex on private pages.
+- Check Rich Results Test.
+- Check Lighthouse/PageSpeed on:
+  - Home
+  - Services
+  - SEO service
+  - Blog listing
+  - Blog detail
+  - Contact
+  - Get Started
+- Check mobile screenshots.
+- Check social preview cards.
+- Check form submissions.
+
+25. Cleanup and repository hygiene
+- Keep generated logs out of git.
+- Keep generated audit files out of git.
+- Keep only useful docs in doc/.
+- Keep scripts only if referenced by package.json, CI, or active maintenance workflows.
+- Add .gitignore entries for logs, generated reports, local exports, and temporary files.
+- Avoid committing build output such as .next, .swc, logs, and report JSON.
+- Keep README.md updated if scripts or setup flow changes.
+
+26. Suggested implementation order
+1. Fix rendering: convert marketing home from client-heavy to server-first.
+2. Optimize images and remove unnecessary above-fold JS.
+3. Fix encoding artifacts and obvious content polish issues.
+4. Add /llms.txt and optional /llms-full.txt.
+5. Improve sitemap image data and verify robots.txt.
+6. Add service page schema and breadcrumbs.
+7. Improve service-page content and internal linking.
+8. Add local SEO/entity improvements.
+9. Add monitoring: Search Console, Bing, analytics, speed insights.
+10. Run full technical QA and schedule monthly SEO maintenance.

@@ -1,60 +1,7 @@
-"use client";
-
-import { useState } from "react";
 import { Instagram, Linkedin } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { subscribeNewsletter } from "@/lib/actions/super-admin";
-
-function NewsletterForm() {
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState(""); // "" | "loading" | "success" | "error"
-  const [message, setMessage] = useState("");
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!email) return;
-    setStatus("loading");
-    const result = await subscribeNewsletter(email);
-    if (result.success) {
-      setStatus("success");
-      setMessage("Subscribed!");
-      setEmail("");
-      setTimeout(() => { setStatus(""); setMessage(""); }, 3000);
-    } else {
-      setStatus("error");
-      setMessage(result.error || "Failed");
-      setTimeout(() => { setStatus(""); setMessage(""); }, 3000);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="relative w-full mb-8">
-      <input
-        type="email"
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        required
-        className="w-full bg-transparent border-b border-gray-500 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-white font-glacial"
-        suppressHydrationWarning
-      />
-      <button
-        type="submit"
-        disabled={status === "loading"}
-        suppressHydrationWarning
-        className="absolute right-0 bottom-2 text-[#D4E647] font-bold flex items-center gap-1 hover:text-[#e5f758] transition-colors uppercase text-sm tracking-wider disabled:opacity-50"
-      >
-        {status === "loading" ? "..." : "SEND"} <span className="text-xs">➤</span>
-      </button>
-      {message && (
-        <p className={`text-xs mt-1 ${status === "success" ? "text-green-400" : "text-red-400"}`}>
-          {message}
-        </p>
-      )}
-    </form>
-  );
-}
+import NewsletterForm from "./NewsletterForm";
 
 export default function Footer() {
   return (
@@ -65,8 +12,9 @@ export default function Footer() {
         lg:-top-32 lg:bottom-auto lg:right-0 lg:w-[45%] lg:h-[140%] lg:opacity-20">
         <Image
           src="/footer.svg"
-          alt="decorative wing"
+          alt=""
           fill
+          sizes="(min-width: 1024px) 45vw, 100vw"
           className="object-contain object-bottom lg:object-right-top"
           priority={false}
         />
@@ -75,14 +23,13 @@ export default function Footer() {
       {/* Footer Content */}
       <div className="container mx-auto px-6 py-16 relative z-10">
         <div className="flex flex-col lg:flex-row justify-between items-start gap-12">
-          
           {/* Left: Branding & Socials */}
           <div className="flex flex-col max-w-md">
             <h2 className="text-5xl md:text-6xl font-suifak mb-4 text-white">Digital Corvids</h2>
             <p className="text-gray-400 text-sm leading-relaxed mb-6 font-glacial">
               A digital marketing agency specializing in SEO, social media, content, and ads—helping brands grow through smart, creative strategy.
             </p>
-            
+
             {/* Divider Line */}
             <div className="w-full h-px bg-gray-700 mb-6"></div>
 
@@ -118,7 +65,6 @@ export default function Footer() {
               <p>Email - flytheraven@digitalcorvids.com</p>
             </div>
           </div>
-
         </div>
       </div>
     </footer>

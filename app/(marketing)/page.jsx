@@ -1,5 +1,3 @@
-"use client";
-import React from "react";
 import Image from "next/image";
 import AboutAgency from "@/components/marketing/AboutAgency";
 import ServicesSection from "@/components/marketing/ServiceSlider";
@@ -7,48 +5,17 @@ import TestimonialSection from "@/components/marketing/testomonial";
 import TeamSlider from "@/components/marketing/TeamSlider";
 import ManageCompanySection from "@/components/marketing/ManageCompany";
 import HeroBackground from "@/components/marketing/HeroBackground";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Autoplay } from "swiper/modules";
-import { useEffect, useState } from "react";
+import HomeRotatingWord from "@/components/marketing/HomeRotatingWord";
+import {
+  CompanionsSlider,
+  DigitalPartnersSlider,
+  ServicesTicker,
+} from "@/components/marketing/HomeSliders";
 import "swiper/css";
 
 const HeroSection = () => {
-  const commands = [
-    { type: "logo", src: "/s1.png", alt: "Logo 1" },
-    { type: "logo", src: "/s2.png", alt: "Logo 2" },
-    { type: "logo", src: "/s3.png", alt: "Logo 3" },
-    { type: "text", label: "STORIES ON SCREEN" },
-    { type: "text", label: "MOHIT CHEMICALS" },
-    { type: "logo", src: "/lf.png", alt: "Logo 6" },
-  ];
-
-  const words = [
-    "DIGITAL INNOVATION!",
-    "Storytelling",
-    "SEO Excellence",
-    "Creative Strategy",
-    "Analytics Intelligence",
-    "Brand Storytelling",
-  ];
-
-  const [index, setIndex] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setIsAnimating(true);
-      setTimeout(() => {
-        setIndex((i) => (i + 1) % words.length);
-        setIsAnimating(false);
-      }, 800);
-    }, 3500);
-
-    return () => clearInterval(timer);
-  }, [words.length]);
-
   return (
     <div className="font-glacial text-white bg-black">
-
       <section className="relative overflow-hidden mx-4 sm:mx-6 md:mx-8 lg:mx-10 xl:mx-12 pt-12 sm:pt-16 md:pt-20 text-center flex items-center justify-start min-h-[300px] sm:min-h-[350px] md:min-h-[400px] lg:min-h-[450px]">
         {/* Animated canvas background */}
         <HeroBackground />
@@ -61,15 +28,7 @@ const HeroSection = () => {
 
             {/* SINGLE LIFT-UP TEXT ANIMATION */}
             <span className="block relative h-[1.2em] overflow-hidden text-[clamp(1.5rem,6vw,5rem)] leading-[1] mt-1 sm:mt-2 font-bold text-[#F5EE30]">
-              <span
-                className="absolute inset-0 flex items-center transition-all duration-[800ms] ease-in-out"
-                style={{
-                  transform: isAnimating ? 'translateY(-100%)' : 'translateY(0)',
-                  opacity: isAnimating ? 0 : 1,
-                }}
-              >
-                {words[index]}
-              </span>
+              <HomeRotatingWord />
             </span>
           </h1>
         </div>
@@ -105,8 +64,6 @@ const HeroSection = () => {
             </p>
           </div>
         </div>
-
-
       </section>
 
       {/* Manage Company Section — Agency OS Showcase */}
@@ -119,43 +76,8 @@ const HeroSection = () => {
             Our Digital Partners
           </p>
         </div>
-        <Swiper
-          modules={[Autoplay]}
-          loop={true}
-          speed={3000}
-          allowTouchMove={false}
-          autoplay={{
-            delay: 0,
-            disableOnInteraction: false,
-            pauseOnMouseEnter: false,
-          }}
-          slidesPerView={3.5}
-          spaceBetween={10}
-          breakpoints={{
-            480: { slidesPerView: 4.5, spaceBetween: 15 },
-            768: { slidesPerView: 5.5, spaceBetween: 20 },
-            1024: { slidesPerView: 6.5, spaceBetween: 25 },
-            1280: { slidesPerView: 7.5, spaceBetween: 30 },
-          }}
-          className="dc-camp-slider"
-        >
-          {Array.from({ length: 15 }, (_, i) => i + 1).map((num) => (
-            <SwiperSlide key={num} className="flex items-center justify-center">
-              <div className="relative w-full h-[40px] sm:h-[60px] md:h-[80px] overflow-hidden rounded-xl">
-                <Image
-                  src={`/dc-camp/${num}.png`}
-                  alt={`DC Camp ${num}`}
-                  fill
-                  className="object-contain hover:scale-105 transition-transform duration-500"
-                />
-              </div>
-            </SwiperSlide>
-          ))}
-        </Swiper>
+        <DigitalPartnersSlider />
       </section>
-
-
-
 
       <ServicesSection />
       <AboutAgency />
@@ -163,65 +85,7 @@ const HeroSection = () => {
       {/* New Auto-Width Services Slider */}
       <section className="w-full bg-[#F5EE30] py-4 overflow-hidden">
         <div className="w-full">
-          <Swiper
-            modules={[Autoplay]}
-            loop={true}
-            autoplay={{
-              delay: 0,
-              disableOnInteraction: false,
-              pauseOnMouseEnter: false,
-            }}
-            speed={5000}
-            allowTouchMove={false}
-            slidesPerView="auto"
-            spaceBetween={40}
-            className="select-none auto-width-services-slider"
-          >
-
-            {[
-              'SEO',
-              'PPC Advertising',
-              'Content Marketing',
-              'Email Marketing',
-              'Influencer Marketing',
-              'Social Media Marketing',
-              'Web Design',
-              'Branding',
-            ]
-              .concat([
-                'SEO',
-                'PPC Advertising',
-                'Content Marketing',
-                'Email Marketing',
-                'Influencer Marketing',
-                'Social Media Marketing',
-                'Web Design',
-                'Branding',
-              ])
-              .concat([
-                'SEO',
-                'PPC Advertising',
-                'Content Marketing',
-                'Email Marketing',
-                'Influencer Marketing',
-                'Social Media Marketing',
-                'Web Design',
-                'Branding',
-                'Agency Management',
-              ])
-              .map((label, idx) => (
-                <SwiperSlide key={`auto-svc-${idx}`} className="flex items-center">
-                  <span className="font-etna text-black uppercase flex items-center gap-3 md:gap-4">
-                    <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-none text-black">
-                      •
-                    </span>
-                    <span className="text-base sm:text-lg md:text-xl lg:text-2xl leading-tight whitespace-nowrap">
-                      {label}
-                    </span>
-                  </span>
-                </SwiperSlide>
-              ))}
-          </Swiper>
+          <ServicesTicker />
         </div>
       </section>
 
@@ -235,50 +99,7 @@ const HeroSection = () => {
           </p>
         </div>
         <div className="w-full">
-          <Swiper
-            modules={[Autoplay]}
-            loop={true}
-            speed={6000}
-            allowTouchMove={false}
-            autoplay={{
-              delay: 0,
-              disableOnInteraction: false,
-              pauseOnMouseEnter: false,
-            }}
-            slidesPerView={2.5}
-            spaceBetween={0}
-            breakpoints={{
-              640: { slidesPerView: 3.5, spaceBetween: 0 },
-              1024: { slidesPerView: 5, spaceBetween: 0 },
-              1400: { slidesPerView: 6, spaceBetween: 0 },
-            }}
-            className="companions-slider"
-          >
-            {commands.concat(commands).concat(commands).map((item, idx) => (
-              <SwiperSlide key={idx} className="flex items-center justify-center">
-                <div className="flex items-center justify-center h-20 sm:h-24 w-full">
-                  {item.type === "logo" ? (
-                    <Image
-                      src={item.src}
-                      alt={item.alt}
-                      width={80}
-                      height={80}
-                      className="filter grayscale hover:grayscale-0 opacity-70 hover:opacity-100 transition-all duration-300"
-                    />
-                  ) : (
-                    <span
-                      className={`
-                        text-gray-500 text-lg sm:text-lg uppercase tracking-wide px-2 text-center
-                        ${idx % 2 === 0 ? "font-advent" : "font-architects"}
-                      `}
-                    >
-                      {item.label}
-                    </span>
-                  )}
-                </div>
-              </SwiperSlide>
-            ))}
-          </Swiper>
+          <CompanionsSlider />
         </div>
       </section>
       <TeamSlider />

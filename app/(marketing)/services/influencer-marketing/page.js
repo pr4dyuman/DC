@@ -1,114 +1,121 @@
-"use client";
-import { useEffect, useRef } from "react";
 import Image from "next/image";
-
-
-import { gsap } from "gsap";
 import Link from "next/link";
+import {
+  getMarketingBreadcrumbJsonLd,
+  getMarketingServiceJsonLd,
+  serializeMarketingJsonLd,
+} from "@/lib/marketing-seo";
 
-export default function SocialMediaMarketing() {
+const influencerMarketingFaqs = [
+  {
+    question: "What is included in Digital Corvids influencer marketing services?",
+    answer:
+      "Our influencer marketing services can include creator discovery, audience and engagement checks, campaign strategy, creative briefs, content coordination, approvals, paid amplification, tracking, and ROI reporting.",
+  },
+  {
+    question: "How do you choose the right influencers for a brand?",
+    answer:
+      "We evaluate audience fit, content quality, engagement authenticity, niche relevance, brand safety, past collaborations, platform strength, and the campaign goal before recommending creators.",
+  },
+  {
+    question: "Can influencer content be used in paid ads?",
+    answer:
+      "Yes. When usage rights are planned correctly, creator content can be repurposed for paid social, landing pages, testimonials, product launches, and broader campaign assets.",
+  },
+  {
+    question: "How do you measure influencer campaign success?",
+    answer:
+      "We track metrics such as reach, engagement quality, traffic, conversions, creator-level performance, cost per result, content reuse value, and campaign ROI.",
+  },
+];
 
-  const btnRef = useRef(null);
+const influencerProcessSteps = [
+  {
+    title: "Match",
+    description:
+      "Identify creators whose audience, content style, credibility, and platform strength fit the campaign goal.",
+  },
+  {
+    title: "Brief",
+    description:
+      "Build clear creative guidelines, deliverables, deadlines, messaging guardrails, usage rights, and approval workflows.",
+  },
+  {
+    title: "Launch",
+    description:
+      "Coordinate creator content, posting timelines, campaign tracking, UTM links, codes, and paid amplification when needed.",
+  },
+  {
+    title: "Measure",
+    description:
+      "Review creator performance, engagement quality, traffic, conversions, reuse opportunities, and next campaign learnings.",
+  },
+];
 
- 
+const influencerProofPoints = [
+  "Creators are vetted for audience fit, authenticity, engagement quality, and brand safety.",
+  "Campaign briefs balance creative freedom with clear messaging and compliance guardrails.",
+  "Tracking connects creator posts to website visits, inquiries, sales, and campaign learnings.",
+  "Usage rights and repurposing plans are clarified before content is used beyond the original post.",
+];
 
-useEffect(() => {
-  const btn = btnRef.current;
-  if (!btn) return;
+const relatedInfluencerLinks = [
+  {
+    title: "Social Media Marketing",
+    href: "/services/social-media-marketing",
+    description: "Turn creator activity into sustained social momentum.",
+  },
+  {
+    title: "Video Production Ads",
+    href: "/services/video-production-ad",
+    description: "Create high-quality campaign assets around creator stories.",
+  },
+  {
+    title: "PPC Advertising",
+    href: "/services/ppc",
+    description: "Amplify influencer content with measurable paid campaigns.",
+  },
+  {
+    title: "Web Development",
+    href: "/services/web-development",
+    description: "Send campaign traffic to fast, conversion-ready landing pages.",
+  },
+];
 
-  let xForce = 0, yForce = 0;
-  let isHovered = false;
-  let animationFrame;
+const structuredData = [
+  getMarketingServiceJsonLd({
+    name: "Influencer Marketing Services",
+    description:
+      "Plan and manage influencer campaigns with Digital Corvids, including creator discovery, campaign strategy, content coordination, performance tracking, and ROI reporting.",
+    path: "/services/influencer-marketing",
+    serviceType: "Influencer Marketing",
+  }),
+  getMarketingBreadcrumbJsonLd([
+    { name: "Home", path: "/" },
+    { name: "Services", path: "/services" },
+    { name: "Influencer Marketing", path: "/services/influencer-marketing" },
+  ]),
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: influencerMarketingFaqs.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer,
+      },
+    })),
+  },
+];
 
-  const handleMouseMove = (e) => {
-    if (!isHovered) return;
-    
-    const rect = btn.getBoundingClientRect();
-    const x = e.clientX - (rect.left + rect.width / 2);
-    const y = e.clientY - (rect.top + rect.height / 2);
-
-    // More aggressive movement
-    xForce = x * 2.5;
-    yForce = y * 2.5;
-
-    // Update white fill position
-    const fill = btn.querySelector('.fill-effect');
-    if (fill) {
-      const relX = e.clientX - rect.left;
-      const relY = e.clientY - rect.top;
-      fill.style.left = `${relX}px`;
-      fill.style.top = `${relY}px`;
-    }
-  };
-
-  const handleMouseEnter = () => {
-    isHovered = true;
-    const fill = btn.querySelector('.fill-effect');
-    if (fill) {
-      fill.style.opacity = '1';
-      fill.style.transform = 'scale(30)';
-    }
-  };
-
-  const handleMouseLeave = () => {
-    isHovered = false;
-    
-    // Fast reset with bounce
-    gsap.to(btn, {
-      x: 0,
-      y: 0,
-      scale: 1,
-      rotateZ: 0,
-      duration: 0.3,
-      ease: 'power2.out'
-    });
-
-    // Hide fill effect
-    const fill = btn.querySelector('.fill-effect');
-    if (fill) {
-      fill.style.opacity = '0';
-      fill.style.transform = 'scale(0.1)';
-    }
-  };
-
-  const update = () => {
-    if (isHovered) {
-      const shake = 20; // Increased shake intensity
-      const shakeX = (Math.random() - 0.5) * shake;
-      const shakeY = (Math.random() - 0.5) * shake;
-
-      gsap.set(btn, {
-        x: xForce + shakeX,
-        y: yForce + shakeY,
-        scale: 1.2, // Bigger scale on hover
-        transformPerspective: 1000,
-        rotateZ: (Math.random() - 0.5) * 5, // Slightly more rotation
-      });
-    }
-    
-    animationFrame = requestAnimationFrame(update);
-  };
-
-  // Add event listeners to the button only
-  btn.addEventListener('mousemove', handleMouseMove);
-  btn.addEventListener('mouseenter', handleMouseEnter);
-  btn.addEventListener('mouseleave', handleMouseLeave);
-  
-  // Start the animation loop
-  update();
-
-  return () => {
-    cancelAnimationFrame(animationFrame);
-    btn.removeEventListener('mousemove', handleMouseMove);
-    btn.removeEventListener('mouseenter', handleMouseEnter);
-    btn.removeEventListener('mouseleave', handleMouseLeave);
-  };
-}, []);
-
-
-
+export default function InfluencerMarketing() {
   return (
     <div className="min-h-screen flex flex-col bg-black text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
+      />
       
       <main className="flex-grow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8  w-full">
@@ -125,17 +132,17 @@ useEffect(() => {
               SERVICES
             </Link>
             <span className="text-gray-500 mx-2">|</span>
-            <span className="text-[#3E3E3E] font-glacial-bold">Influencer-Marketing</span>
+            <span className="text-[#3E3E3E] font-glacial-bold">INFLUENCER MARKETING</span>
             </p>
             </div>
-        {/* First Section - Social Media Marketing */}
+        {/* First Section - Influencer Marketing */}
         <div className="flex flex-col lg:flex-row items-center justify-between mb-16 sm:mb-20 lg:mb-32 gap-8 lg:gap-12">
           {/* Left - Image */}
           <div className="w-full lg:w-1/2 flex justify-center">
             <div className="relative w-full max-w-[280px] sm:max-w-[350px] md:max-w-[400px] lg:max-w-[450px]">
               <Image
                 src="/inf1.svg"
-                alt="Social Media Marketing"
+                alt="Influencer marketing campaign illustration"
                 width={400}
                 height={400}
                 className="w-full h-auto"
@@ -147,18 +154,18 @@ useEffect(() => {
           <div className="w-full lg:w-1/2">
             <h3 className="text-sm sm:text-base lg:text-lg font-semibold mb-3 sm:mb-4 uppercase tracking-wide flex items-start">
               <span className="w-2 h-2 sm:w-3 sm:h-3 bg-[#F5EE30] rounded-full mr-2 sm:mr-3 mt-1 sm:mt-1.5 flex-shrink-0"></span>
-              <span className="leading-relaxed whitespace-normal font-glacial-bold xl:whitespace-nowrap">Amplify Your Brand with Authentic Voices that Drive Action</span>
+              <span className="leading-relaxed whitespace-normal font-glacial-bold">Amplify Your Brand with Authentic Voices that Drive Action</span>
             </h3>
-            <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-5xl xl:text-6xl font-['Etna'] font-bold mb-4 sm:mb-6 text-[#F5EE30] uppercase whitespace-nowrap">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-5xl xl:text-6xl font-['Etna'] font-bold mb-4 sm:mb-6 text-[#F5EE30] uppercase whitespace-normal break-words leading-tight">
               Influencer Marketing
             </h1>
             <p className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-white">OUR MISSION</p>
             <p className="text-white mb-4 sm:mb-6 leading-relaxed text-base sm:text-lg font-['Glacial_Indifference']">
-              To empower businesses by transforming social media into a powerhouse of engagement, loyalty, and revenue. We craft data-backed strategies that turn followers into brand advocates and scrolls into sales.
+              To connect brands with credible creators who can build trust, spark conversation, and turn audience attention into measurable business outcomes.
             </p>
             <p className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-white font-glacial-bold">OUR VISION</p>
             <p className="text-white leading-relaxed text-base sm:text-lg font-['Glacial_Indifference']">
-              To redefine social media as a dynamic ecosystem for authentic human connection, where brands thrive through creativity, agility, and measurable impact.
+              To make influencer campaigns more strategic, transparent, and performance-focused, so creator partnerships feel authentic and still tie back to growth.
             </p>
           </div>
         </div>
@@ -370,6 +377,99 @@ useEffect(() => {
             </ul>
           </div>
         </div>
+
+        {/* Influencer Marketing Process Section */}
+        <section className="mb-16 sm:mb-20 lg:mb-32">
+          <div className="mb-10 max-w-3xl">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="h-2 w-2 rounded-full bg-[#F5EE30]"></span>
+              <span className="font-glacial-bold text-sm uppercase tracking-widest text-white">
+                How We Build Creator-Led Growth
+              </span>
+            </div>
+            <h2 className="mb-5 text-3xl font-extrabold uppercase leading-tight md:text-5xl">
+              <span className="text-white">Influencer Process</span>
+              <br />
+              <span className="text-[#3E3E3E]">From Match To Measurement</span>
+            </h2>
+            <p className="text-base leading-relaxed text-gray-300 md:text-lg">
+              We plan creator partnerships around audience trust, content quality, platform behavior, and measurable
+              action. That keeps influencer campaigns authentic while still connecting them to business results.
+            </p>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+            {influencerProcessSteps.map((step, index) => (
+              <div key={step.title} className="border border-white/10 bg-white/[0.03] p-6">
+                <p className="mb-5 font-glacial-bold text-sm text-[#F5EE30]">
+                  {String(index + 1).padStart(2, "0")}
+                </p>
+                <h3 className="mb-3 text-xl font-bold uppercase text-white">{step.title}</h3>
+                <p className="text-sm leading-relaxed text-gray-300">{step.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Influencer Proof And Internal Links Section */}
+        <section className="mb-16 grid gap-10 sm:mb-20 lg:mb-32 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+          <div>
+            <div className="mb-4 flex items-center gap-3">
+              <span className="h-2 w-2 rounded-full bg-[#F5EE30]"></span>
+              <span className="font-glacial-bold text-sm uppercase tracking-widest text-white">
+                Creator Fit, Brand Safety, And ROI Tracking
+              </span>
+            </div>
+            <h2 className="mb-6 text-3xl font-extrabold uppercase leading-tight md:text-5xl">
+              <span className="text-white">What You Can</span>
+              <br />
+              <span className="text-[#3E3E3E]">Expect From Influencers</span>
+            </h2>
+            <div className="space-y-4">
+              {influencerProofPoints.map((point) => (
+                <div key={point} className="flex gap-3 border-b border-white/10 pb-4">
+                  <span className="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-[#F5EE30]"></span>
+                  <p className="text-base leading-relaxed text-gray-300 md:text-lg">{point}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="border border-white/10 bg-white/[0.03] p-6">
+            <h3 className="mb-5 text-xl font-bold uppercase text-[#F5EE30]">Related Growth Paths</h3>
+            <div className="space-y-5">
+              {relatedInfluencerLinks.map((item) => (
+                <Link key={item.href} href={item.href} className="block group">
+                  <span className="block text-base font-bold uppercase text-white transition-colors group-hover:text-[#F5EE30]">
+                    {item.title}
+                  </span>
+                  <span className="mt-1 block text-sm leading-relaxed text-gray-400">{item.description}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Influencer FAQ Section */}
+        <section className="mb-20 lg:mb-28">
+          <div className="mb-10 text-center">
+            <p className="mb-4 font-glacial-bold text-sm uppercase tracking-widest text-[#F5EE30]">
+              Common Influencer Marketing Questions
+            </p>
+            <h2 className="text-3xl font-extrabold uppercase leading-tight md:text-5xl">
+              <span className="text-white">Influencer Marketing FAQs</span>
+            </h2>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            {influencerMarketingFaqs.map((item) => (
+              <div key={item.question} className="border border-white/10 bg-white/[0.03] p-6">
+                <h3 className="mb-3 text-lg font-bold uppercase text-white">{item.question}</h3>
+                <p className="text-sm leading-relaxed text-gray-300 md:text-base">{item.answer}</p>
+              </div>
+            ))}
+          </div>
+        </section>
         </div>
         <div className="bg-black text-white w-full">
   
@@ -442,11 +542,11 @@ useEffect(() => {
             
             <div className="text-center md:text-left max-w-xl">
               <h3 className="text-2xl md:text-3xl font-extrabold leading-snug">
-                READY TO DOMINATE <br />
-                <span className="text-gray-400">GOOGLE SEARCH RESULTS?</span>
+                READY TO BUILD <br />
+                <span className="text-gray-400">CREATOR-LED DEMAND?</span>
               </h3>
               <p className='text-sm md:text-base mt-3 text-gray-400 leading-relaxed'>
-  Let&apos;s discuss how our proven SEO strategies can help you outrank competitors and drive qualified organic traffic.
+  Let&apos;s discuss how the right creators, content, and tracking can turn audience trust into measurable campaign results.
 </p>
 
             </div>

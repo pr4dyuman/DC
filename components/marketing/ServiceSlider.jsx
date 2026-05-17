@@ -71,7 +71,7 @@ const ServicesSection = () => {
       id: "07",
       title: "Manage",
       titleHighlight: "Company",
-      image: "/dashboard-mockup.png",
+      image: "/dashboard-mockup-640-q84.jpg",
       description:
         "AI-powered agency management platform for projects, finances, invoicing, and operational visibility.",
       link: "/services/manage-company",
@@ -119,10 +119,11 @@ const ServicesSection = () => {
       <div className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-black via-transparent to-black opacity-50"></div>
         <Image
-          src="/ssbg.jpeg"
+          src="/ssbg-1600-q74.jpg"
           alt="Background"
           width={1920}
           height={900}
+          sizes="100vw"
           className="w-full h-[500px] sm:h-[600px] md:h-[700px] lg:h-[800px] xl:h-[900px] object-cover filter grayscale opacity-50"
         />
 

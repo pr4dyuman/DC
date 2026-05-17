@@ -605,6 +605,7 @@ export default async function BlogPost({ params }) {
                 src={heroImageSrc}
                 alt={seo.imageAlt}
                 fill
+                sizes="100vw"
                 className="object-cover"
                 priority
                 unoptimized={isSvgHeroImage}

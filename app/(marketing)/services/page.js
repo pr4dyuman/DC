@@ -66,7 +66,7 @@ export default function Services() {
       id: "07",
       title: "Manage",
       titleHighlight: "Company",
-      image: "/dashboard-mockup.png",
+      image: "/dashboard-mockup-640-q84.jpg",
       description: "AI-powered agency management platform. Track projects, manage finances, automate invoicing, and let AI handle the heavy lifting.",
       link: "/services/manage-company",
       tagline: "AI-POWERED MANAGEMENT",

@@ -15,14 +15,16 @@ export default function HeroBackground() {
         if (!canvas) return;
 
         const ctx = canvas.getContext("2d");
+        const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
         let animationId;
         let time = 0;
         let dpr = 1;
+        let shouldAnimate = !motionQuery.matches;
 
         const resize = () => {
             const parent = canvas.parentElement;
             if (!parent) return;
-            dpr = window.devicePixelRatio || 1;
+            dpr = Math.min(window.devicePixelRatio || 1, 2);
             const w = parent.offsetWidth;
             const h = parent.offsetHeight;
             canvas.width = w * dpr;
@@ -204,14 +206,33 @@ export default function HeroBackground() {
             ctx.fillStyle = vig;
             ctx.fillRect(0, 0, w, h);
 
-            animationId = requestAnimationFrame(draw);
+            if (shouldAnimate) {
+                animationId = requestAnimationFrame(draw);
+            }
         };
 
         draw();
 
+        const handleMotionChange = (event) => {
+            shouldAnimate = !event.matches;
+            if (!shouldAnimate) {
+                cancelAnimationFrame(animationId);
+                animationId = undefined;
+                draw();
+                return;
+            }
+
+            if (!animationId) {
+                animationId = requestAnimationFrame(draw);
+            }
+        };
+
+        motionQuery.addEventListener("change", handleMotionChange);
+
         return () => {
             cancelAnimationFrame(animationId);
             window.removeEventListener("resize", resize);
+            motionQuery.removeEventListener("change", handleMotionChange);
         };
     }, []);
 

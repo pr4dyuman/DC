@@ -127,3 +127,63 @@ export function getMarketingWebsiteJsonLd() {
         inLanguage: "en-IN",
     };
 }
+
+export function serializeMarketingJsonLd(data: unknown) {
+    return JSON.stringify(data).replace(/</g, "\\u003c");
+}
+
+export function getMarketingBreadcrumbJsonLd(
+    items: Array<{
+        name: string;
+        path: string;
+    }>,
+) {
+    return {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: items.map((item, index) => ({
+            "@type": "ListItem",
+            position: index + 1,
+            name: item.name,
+            item: marketingAbsoluteUrl(item.path),
+        })),
+    };
+}
+
+export function getMarketingServiceJsonLd(input: {
+    name: string;
+    description: string;
+    path: string;
+    serviceType?: string;
+}) {
+    return {
+        "@context": "https://schema.org",
+        "@type": "Service",
+        name: input.name,
+        serviceType: input.serviceType || input.name,
+        description: input.description,
+        url: marketingAbsoluteUrl(input.path),
+        provider: {
+            "@type": "ProfessionalService",
+            name: MARKETING_SITE_NAME,
+            url: MARKETING_SITE_URL,
+            email: "flytheraven@digitalcorvids.com",
+            address: {
+                "@type": "PostalAddress",
+                addressLocality: "Jaipur",
+                addressRegion: "Rajasthan",
+                addressCountry: "IN",
+            },
+        },
+        areaServed: [
+            {
+                "@type": "City",
+                name: "Jaipur",
+            },
+            {
+                "@type": "Country",
+                name: "India",
+            },
+        ],
+    };
+}
