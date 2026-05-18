@@ -33,6 +33,27 @@ export default function MarketingLayout({
 
     return (
         <div className="min-h-screen bg-black text-white">
+            <link
+                rel="preload"
+                href="/fonts/etna.otf"
+                as="font"
+                type="font/otf"
+                crossOrigin="anonymous"
+            />
+            <link
+                rel="preload"
+                href="/fonts/Glacial.otf"
+                as="font"
+                type="font/otf"
+                crossOrigin="anonymous"
+            />
+            <link
+                rel="preload"
+                href="/fonts/Glacial-bold.otf"
+                as="font"
+                type="font/otf"
+                crossOrigin="anonymous"
+            />
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}

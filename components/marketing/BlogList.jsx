@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useMemo, useState } from "react";
+import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
@@ -25,6 +23,9 @@ function FeaturedPost({ post }) {
             <img
               src={normalizedImageSrc}
               alt={post.imageAlt || post.title}
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
               className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
             />
           ) : (
@@ -32,6 +33,8 @@ function FeaturedPost({ post }) {
               src={normalizedImageSrc}
               alt={post.imageAlt || post.title}
               fill
+              priority
+              fetchPriority="high"
               sizes="(min-width: 1024px) 58vw, 100vw"
               className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
               unoptimized={isSvgImage}
@@ -69,28 +72,23 @@ function FeaturedPost({ post }) {
   );
 }
 
-const BlogList = ({ posts, categories }) => {
-  const [activeCategory, setActiveCategory] = useState("ALL");
+function getCategoryHref(category) {
+  return category === "ALL" ? "/blog" : `/blog?category=${encodeURIComponent(category)}`;
+}
 
-  const filteredPosts = useMemo(
-    () => (
-      activeCategory === "ALL"
-        ? posts
-        : posts.filter((post) => post.category === activeCategory)
-    ),
-    [activeCategory, posts]
-  );
+const BlogList = ({ posts, categories, activeCategory = "ALL" }) => {
+  const filteredPosts =
+    activeCategory === "ALL"
+      ? posts
+      : posts.filter((post) => post.category === activeCategory);
 
-  const categoryCounts = useMemo(() => {
-    const counts = posts.reduce((acc, post) => {
-      const key = post.category || "Uncategorized";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
+  const categoryCounts = posts.reduce((acc, post) => {
+    const key = post.category || "Uncategorized";
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
 
-    counts.ALL = posts.length;
-    return counts;
-  }, [posts]);
+  categoryCounts.ALL = posts.length;
 
   const featuredPost = filteredPosts[0] || null;
   const remainingPosts = featuredPost ? filteredPosts.slice(1) : [];
@@ -105,8 +103,8 @@ const BlogList = ({ posts, categories }) => {
           <p className="mb-5 text-[11px] font-bold uppercase tracking-[0.28em] text-[#F5EE30]">
             Digital Corvids Journal
           </p>
-          <h1 className="mb-6 text-[clamp(3.5rem,9vw,8rem)] font-etna leading-[0.85] tracking-tight text-white">
-            LATEST <span className="bg-gradient-to-r from-[#F5EE30] to-white bg-clip-text text-transparent">INSIGHTS</span>
+          <h1 className="mb-6 text-[clamp(3.25rem,9vw,8rem)] font-etna leading-[0.85] tracking-tight text-white">
+            LATEST <span className="block bg-gradient-to-r from-[#F5EE30] to-white bg-clip-text text-transparent sm:inline">INSIGHTS</span>
           </h1>
           <p className="mb-10 max-w-3xl text-lg leading-relaxed text-gray-400 md:text-xl">
             SEO-ready articles, brand strategy thinking, and practical digital growth ideas from the Digital Corvids team.
@@ -123,10 +121,12 @@ const BlogList = ({ posts, categories }) => {
 
           <div className="flex flex-wrap gap-4">
             {categories.map((cat) => (
-              <button
+              <Link
                 key={cat}
-                onClick={() => setActiveCategory(cat)}
-                aria-pressed={activeCategory === cat}
+                href={getCategoryHref(cat)}
+                prefetch={false}
+                scroll={false}
+                aria-current={activeCategory === cat ? "page" : undefined}
                 className={`inline-flex items-center gap-3 rounded-full border px-6 py-3 text-sm font-bold tracking-[0.16em] transition-all duration-300 ${
                   activeCategory === cat
                     ? "border-[#F5EE30] bg-[#F5EE30] text-black"
@@ -137,7 +137,7 @@ const BlogList = ({ posts, categories }) => {
                 <span className={`rounded-full px-2 py-0.5 text-[10px] ${activeCategory === cat ? "bg-black/10" : "bg-white/5"}`}>
                   {categoryCounts[cat] || 0}
                 </span>
-              </button>
+              </Link>
             ))}
           </div>
         </div>

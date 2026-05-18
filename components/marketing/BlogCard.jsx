@@ -23,6 +23,8 @@ const BlogCard = ({ title, category, excerpt, image, imageAlt, slug, date }) => 
             <img
               src={normalizedImageSrc}
               alt={imageAlt || title}
+              loading="lazy"
+              decoding="async"
               className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
             />
           ) : (
@@ -30,6 +32,7 @@ const BlogCard = ({ title, category, excerpt, image, imageAlt, slug, date }) => 
               src={normalizedImageSrc}
               alt={imageAlt || title}
               fill
+              loading="lazy"
               sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
               className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
               unoptimized={isSvgImage}

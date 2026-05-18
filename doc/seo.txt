@@ -62,6 +62,7 @@ P1 plan
   - Done 2026-05-19: audited remaining public marketing timers/animations. CountUp already starts once on intersection, /get-started OTP countdown only runs after user OTP request, and contact/newsletter timers are short form-feedback cleanup timers. No further P1 code change needed for these.
   - Done 2026-05-19: final local smoke checks passed on /, /services, /about, /blog, /get-started, and /contact across mobile and desktop. Checks confirmed no horizontal overflow, no true rendered mojibake/replacement characters, expected titles/H1s, and no app console errors beyond local-only Vercel Analytics/Speed Insights script 404s.
   - Done 2026-05-19: full lint passed with warnings only. Remaining warnings are existing/non-blocking: native img usage for remote blog images and unused AI Blogger helper variables.
+  - Done 2026-05-19: after Vercel Speed Insights showed /blog at RES 92 with FCP/LCP ~2.65s on early desktop samples, optimized the blog listing route. The /blog archive now renders category filters from the server with shareable /blog?category= URLs, avoids page-level client state for the archive, prioritizes the featured image, preloads the marketing fonts used above the fold, stops preloading root Geist fonts globally, and fixes the mobile /blog H1 overflow.
   - Remaining P1: compare UI on localhost versus hosted before pushing.
 - Image and media improvements:
   - Convert remaining large JPG/PNG assets to WebP or AVIF where quality allows.

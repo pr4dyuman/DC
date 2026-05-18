@@ -41,6 +41,23 @@ export const metadata = {
   },
 };
 
+function getRequestedCategory(searchParams) {
+  const rawCategory = Array.isArray(searchParams?.category)
+    ? searchParams.category[0]
+    : searchParams?.category;
+
+  return typeof rawCategory === 'string' ? rawCategory.trim() : '';
+}
+
+function resolveActiveCategory(requestedCategory, categories) {
+  if (!requestedCategory) {
+    return 'ALL';
+  }
+
+  const requested = requestedCategory.toLowerCase();
+  return categories.find((category) => category.toLowerCase() === requested) || 'ALL';
+}
+
 // Helper to truncate text
 function truncate(str, length) {
   if (!str) return '';
@@ -131,9 +148,14 @@ const getPublishedBlogList = unstable_cache(
   }
 );
 
-export default async function BlogPage() {
+export default async function BlogPage({ searchParams }) {
+  const resolvedSearchParams = await searchParams;
   const { posts, categories } = await getPublishedBlogList();
+  const activeCategory = resolveActiveCategory(
+    getRequestedCategory(resolvedSearchParams),
+    categories,
+  );
 
-  return <BlogList posts={posts} categories={categories} />;
+  return <BlogList posts={posts} categories={categories} activeCategory={activeCategory} />;
 }
 
