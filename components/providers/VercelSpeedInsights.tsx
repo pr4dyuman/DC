@@ -1,6 +1,7 @@
 "use client";
 
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import { SpeedInsights } from "@vercel/speed-insights/react";
+import { usePathname } from "next/navigation";
 
 const INTERNAL_SPEED_INSIGHTS_PATH_PREFIXES = ["/dashboard", "/super-admin", "/admin"];
 
@@ -22,8 +23,12 @@ function shouldSkipSpeedInsightsEvent(event: SpeedInsightsEvent) {
 }
 
 export function VercelSpeedInsights() {
+  const pathname = usePathname();
+
   return (
     <SpeedInsights
+      framework="next"
+      route={pathname || undefined}
       beforeSend={(event) => (shouldSkipSpeedInsightsEvent(event) ? null : event)}
     />
   );
