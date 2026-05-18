@@ -290,16 +290,113 @@ body {
 }
 
 /* ── Swiper linear-timing sliders (marketing page) ── */
-.dc-camp-slider .swiper-wrapper,
-.auto-width-services-slider .swiper-wrapper,
+.dc-marquee {
+  overflow: hidden;
+  width: 100%;
+}
+
+.dc-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: dc-marquee-x 30s linear infinite;
+  will-change: transform;
+}
+
+.dc-partners-marquee-track {
+  animation-duration: 28s;
+}
+
+.dc-services-marquee-track {
+  animation-duration: 36s;
+}
+
+.dc-partner-item {
+  flex: 0 0 29vw;
+  min-width: 29vw;
+  padding: 0 5px;
+}
+
+.dc-service-ticker-item {
+  flex: 0 0 auto;
+  padding-right: 40px;
+}
+
+@media (min-width: 480px) {
+  .dc-partner-item {
+    flex-basis: 22vw;
+    min-width: 22vw;
+    padding: 0 7.5px;
+  }
+}
+
+@media (min-width: 768px) {
+  .dc-partner-item {
+    flex-basis: 18vw;
+    min-width: 18vw;
+    padding: 0 10px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .dc-partner-item {
+    flex-basis: 15vw;
+    min-width: 15vw;
+    padding: 0 12.5px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .dc-partner-item {
+    flex-basis: 13vw;
+    min-width: 13vw;
+    padding: 0 15px;
+  }
+}
+
+@keyframes dc-marquee-x {
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-marquee-track {
+    animation: none;
+  }
+}
+
 .companions-slider .swiper-wrapper {
   transition-timing-function: linear !important;
 }
-.auto-width-services-slider .swiper-slide {
-  width: auto !important;
-}
 
 /* ── Swiper pagination — testimonials ── */
+.dc-testimonial-swiper {
+  padding-bottom: 8px !important;
+}
+
+.dc-testimonial-swiper .swiper-pagination {
+  position: static !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 14px;
+  margin-top: 28px !important;
+}
+
+.dc-testimonial-swiper .swiper-pagination-bullet {
+  width: 10px !important;
+  height: 10px !important;
+  margin: 0 6px !important;
+  background: #cacaca !important;
+  opacity: 1 !important;
+  border-radius: 9999px !important;
+}
+
+.dc-testimonial-swiper .swiper-pagination-bullet-active {
+  width: 10px !important;
+  background: #F5EE30 !important;
+}
+
 .swiper-pagination-bullet {
   background: #4a5568;
   opacity: 1;

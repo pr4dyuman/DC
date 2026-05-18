@@ -66,6 +66,7 @@ export default function ManageCompanySection({ headingLevel = "h2", imagePriorit
                         <div className="flex flex-wrap gap-4 pt-2">
                             <Link
                                 href="/get-started"
+                                prefetch={false}
                                 className="group inline-flex items-center gap-2 bg-[#F5EE30] text-black font-bold uppercase text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 rounded-full hover:bg-yellow-300 transition-all duration-300 hover:shadow-[0_0_30px_rgba(245,238,48,0.3)]"
                             >
                                 Get Started
@@ -73,6 +74,7 @@ export default function ManageCompanySection({ headingLevel = "h2", imagePriorit
                             </Link>
                             <Link
                                 href="/services/manage-company"
+                                prefetch={false}
                                 className="inline-flex items-center gap-2 border border-white/30 text-white font-bold uppercase text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 rounded-full hover:border-[#F5EE30] hover:text-[#F5EE30] transition-all duration-300"
                             >
                                 Learn More
@@ -90,6 +92,7 @@ export default function ManageCompanySection({ headingLevel = "h2", imagePriorit
                                 alt="Agency OS Dashboard — AI-powered company management platform"
                                 width={800}
                                 height={500}
+                                sizes="(min-width: 1280px) 576px, (min-width: 1024px) 45vw, (min-width: 640px) 90vw, 100vw"
                                 className="w-full h-auto"
                                 priority={imagePriority}
                             />

@@ -1,96 +1,162 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import { Swiper, SwiperSlide } from "swiper/react"
 import { Autoplay } from "swiper/modules"
 import "swiper/css"
 import Link from "next/link"
 import Image from "next/image"
 
+const servicesData = [
+  {
+    id: "01",
+    title: "Web",
+    titleHighlight: "development",
+    image: "/web3.svg",
+    description:
+      "Your website is your digital storefront. We build fast, secure, and user-friendly sites optimized for maximum conversions.",
+    link: "/services/web-development",
+    gradientColor: "#F5EE30",
+  },
+  {
+    id: "02",
+    title: "Search engine",
+    titleHighlight: "optimization",
+    image: "/web4.svg",
+    description:
+      "Drive organic growth. We optimize your site to rank higher, attract traffic, and convert visitors.",
+    link: "/services/seo",
+    gradientColor: "#F5EE30",
+  },
+  {
+    id: "03",
+    title: "Social Media",
+    titleHighlight: "marketing",
+    image: "/smm1.svg",
+    description:
+      "Build a loyal audience and amplify your brand's voice across platforms like Facebook, Instagram, LinkedIn, and Pinterest.",
+    link: "/services/social-media-marketing",
+    gradientColor: "#F5EE30",
+  },
+  {
+    id: "04",
+    title: "Video & Ad",
+    titleHighlight: "Production",
+    image: "/vpd1.svg",
+    description:
+      "We craft high-quality, compelling videos that tell your brand's story, drive engagement, and convert viewers into customers.",
+    link: "/services/video-production-ad",
+    gradientColor: "#F5EE30",
+  },
+  {
+    id: "05",
+    title: "PPC",
+    titleHighlight: "Advertising",
+    image: "/ppc1.svg",
+    description:
+      "Gain instant visibility. We create targeted ad campaigns that maximize ROI and minimize wasted spend.",
+    link: "/services/ppc",
+    gradientColor: "#F5EE30",
+  },
+  {
+    id: "06",
+    title: "Influencer",
+    titleHighlight: "Marketing",
+    image: "/inf1.svg",
+    description: "Partner with influencers who align with your brand to reach highly engaged audiences and build authentic trust.",
+    link: "/services/influencer-marketing",
+    gradientColor: "#F5EE30",
+  },
+  {
+    id: "07",
+    title: "Manage",
+    titleHighlight: "Company",
+    image: "/dashboard-mockup-service-564-q84.jpg",
+    description:
+      "AI-powered agency management platform for projects, finances, invoicing, and operational visibility.",
+    link: "/services/manage-company",
+    gradientColor: "#F5EE30",
+  },
+  {
+    id: "08",
+    title: "AI",
+    titleHighlight: "Blogger",
+    image: "/ai-blogger.svg",
+    description:
+      "Plan, generate, optimize, and schedule SEO-focused blogs in one workflow built for agencies and growth teams.",
+    link: "/services/ai-blogger",
+    gradientColor: "#F5EE30",
+  },
+]
+
 const ServicesSection = () => {
-  const servicesData = [
-    {
-      id: "01",
-      title: "Web",
-      titleHighlight: "development",
-      image: "/web3.svg",
-      description:
-        "Your website is your digital storefront. We build fast, secure, and user-friendly sites optimized for maximum conversions.",
-      link: "/services/web-development",
-      gradientColor: "#F5EE30",
-    },
-    {
-      id: "02",
-      title: "Search engine",
-      titleHighlight: "optimization",
-      image: "/web4.svg",
-      description:
-        "Drive organic growth. We optimize your site to rank higher, attract traffic, and convert visitors.",
-      link: "/services/seo",
-      gradientColor: "#F5EE30",
-    },
-    {
-      id: "03",
-      title: "Social Media",
-      titleHighlight: "marketing",
-      image: "/smm1.svg",
-      description:
-        "Build a loyal audience and amplify your brand's voice across platforms like Facebook, Instagram, LinkedIn, and Pinterest.",
-      link: "/services/social-media-marketing",
-      gradientColor: "#F5EE30",
-    },
-    {
-      id: "04",
-      title: "Video & Ad",
-      titleHighlight: "Production",
-      image: "/vpd1.svg",
-      description:
-        "We craft high-quality, compelling videos that tell your brand's story, drive engagement, and convert viewers into customers.",
-      link: "/services/video-production-ad",
-      gradientColor: "#F5EE30",
-    },
-    {
-      id: "05",
-      title: "PPC",
-      titleHighlight: "Advertising",
-      image: "/ppc1.svg",
-      description:
-        "Gain instant visibility. We create targeted ad campaigns that maximize ROI and minimize wasted spend.",
-      link: "/services/ppc",
-      gradientColor: "#F5EE30",
-    },
-    {
-      id: "06",
-      title: "Influencer",
-      titleHighlight: "Marketing",
-      image: "/inf1.svg",
-      description: "Partner with influencers who align with your brand to reach highly engaged audiences and build authentic trust.",
-      link: "/services/influencer-marketing",
-      gradientColor: "#F5EE30",
-    },
-    {
-      id: "07",
-      title: "Manage",
-      titleHighlight: "Company",
-      image: "/dashboard-mockup-640-q84.jpg",
-      description:
-        "AI-powered agency management platform for projects, finances, invoicing, and operational visibility.",
-      link: "/services/manage-company",
-      gradientColor: "#F5EE30",
-    },
-    {
-      id: "08",
-      title: "AI",
-      titleHighlight: "Blogger",
-      image: "/ai-blogger.svg",
-      description:
-        "Plan, generate, optimize, and schedule SEO-focused blogs in one workflow built for agencies and growth teams.",
-      link: "/services/ai-blogger",
-      gradientColor: "#F5EE30",
-    },
-  ]
+  const sectionRef = useRef(null)
+  const swiperRef = useRef(null)
+  const syncAutoplayRef = useRef(() => {})
+
+  useEffect(() => {
+    const section = sectionRef.current
+    if (!section) return
+
+    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)")
+    let isNearViewport = false
+
+    const shouldPlay = () =>
+      isNearViewport && document.visibilityState === "visible" && !motionQuery.matches
+
+    const stopAutoplay = () => {
+      swiperRef.current?.autoplay?.stop()
+    }
+
+    const syncAutoplay = () => {
+      const swiper = swiperRef.current
+      if (!swiper?.autoplay) return
+
+      if (shouldPlay()) {
+        swiper.autoplay.start()
+      } else {
+        swiper.autoplay.stop()
+      }
+    }
+
+    syncAutoplayRef.current = syncAutoplay
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isNearViewport = entry.isIntersecting
+        syncAutoplay()
+      },
+      { rootMargin: "200px 0px", threshold: 0.05 },
+    )
+
+    observer.observe(section)
+    document.addEventListener("visibilitychange", syncAutoplay)
+
+    if (motionQuery.addEventListener) {
+      motionQuery.addEventListener("change", syncAutoplay)
+    } else {
+      motionQuery.addListener(syncAutoplay)
+    }
+
+    syncAutoplay()
+
+    return () => {
+      observer.disconnect()
+      document.removeEventListener("visibilitychange", syncAutoplay)
+
+      if (motionQuery.removeEventListener) {
+        motionQuery.removeEventListener("change", syncAutoplay)
+      } else {
+        motionQuery.removeListener(syncAutoplay)
+      }
+
+      syncAutoplayRef.current = () => {}
+      stopAutoplay()
+    }
+  }, [])
 
   return (
-    <div className="bg-black min-h-auto">
+    <div ref={sectionRef} className="bg-black min-h-auto">
       {/* Section Header */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8 sm:mb-12 lg:mb-16">
         <div className="flex items-center gap-3 mb-6 sm:mb-8">
@@ -134,6 +200,10 @@ const ServicesSection = () => {
               modules={[Autoplay]}
               loop={true}
               centeredSlides={true}
+              onSwiper={(swiper) => {
+                swiperRef.current = swiper
+                syncAutoplayRef.current()
+              }}
               autoplay={{
                 delay: 5000,
                 disableOnInteraction: false,
@@ -164,7 +234,7 @@ const ServicesSection = () => {
                   spaceBetween: 30,
                 },
               }}
-              className="w-full overflow-visible relative"
+              className="dc-home-services-swiper w-full overflow-visible relative"
               style={{ padding: "0 10px" }}
             >
               {servicesData.map((service) => (
@@ -172,7 +242,7 @@ const ServicesSection = () => {
                   key={service.id}
                   className="transition-all duration-300 ease-in-out border-l border-r border-white/30 overflow-visible group h-full"
                 >
-                  <Link href={service.link} className="block text-white no-underline h-full">
+                  <Link href={service.link} prefetch={false} className="block text-white no-underline h-full">
                     <div className="relative p-4 md:p-5 lg:p-6 xl:p-8 z-10 h-full flex flex-col justify-between">
                       {/* Overlay - Black by default; #F5EE30 on hover */}
                       <div className="pointer-events-none absolute inset-0 z-0 transition-all duration-300 group-hover:opacity-90 group-hover:bg-gradient-to-t group-hover:from-[#F5EE30] group-hover:via-[#F5EE30]/30 group-hover:to-transparent bg-gradient-to-t from-black via-black/60 to-transparent opacity-80"></div>
@@ -195,6 +265,7 @@ const ServicesSection = () => {
                             alt={`${service.title} ${service.titleHighlight}`}
                             width={350}
                             height={350}
+                            sizes="(min-width: 1280px) 320px, (min-width: 1024px) 28vw, (min-width: 768px) 42vw, (min-width: 640px) 58vw, 80vw"
                             className="w-full h-[140px] sm:h-[180px] md:h-[220px] lg:h-[280px] xl:h-[350px] object-contain"
                           />
                         </div>

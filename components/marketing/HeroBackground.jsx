@@ -19,7 +19,24 @@ export default function HeroBackground() {
         let animationId;
         let time = 0;
         let dpr = 1;
-        let shouldAnimate = !motionQuery.matches;
+        let prefersReducedMotion = motionQuery.matches;
+        let isInViewport = true;
+        let isDocumentVisible = !document.hidden;
+
+        const shouldAnimate = () => !prefersReducedMotion && isInViewport && isDocumentVisible;
+
+        const stopAnimation = () => {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = undefined;
+            }
+        };
+
+        const startAnimation = () => {
+            if (!animationId && shouldAnimate()) {
+                animationId = requestAnimationFrame(draw);
+            }
+        };
 
         const resize = () => {
             const parent = canvas.parentElement;
@@ -206,33 +223,59 @@ export default function HeroBackground() {
             ctx.fillStyle = vig;
             ctx.fillRect(0, 0, w, h);
 
-            if (shouldAnimate) {
+            if (shouldAnimate()) {
                 animationId = requestAnimationFrame(draw);
+            } else {
+                animationId = undefined;
             }
         };
 
         draw();
 
         const handleMotionChange = (event) => {
-            shouldAnimate = !event.matches;
-            if (!shouldAnimate) {
-                cancelAnimationFrame(animationId);
-                animationId = undefined;
+            prefersReducedMotion = event.matches;
+            if (prefersReducedMotion) {
+                stopAnimation();
                 draw();
                 return;
             }
 
-            if (!animationId) {
-                animationId = requestAnimationFrame(draw);
+            startAnimation();
+        };
+
+        const handleVisibilityChange = () => {
+            isDocumentVisible = !document.hidden;
+
+            if (isDocumentVisible) {
+                startAnimation();
+            } else {
+                stopAnimation();
             }
         };
 
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                isInViewport = entry.isIntersecting;
+
+                if (isInViewport) {
+                    startAnimation();
+                } else {
+                    stopAnimation();
+                }
+            },
+            { rootMargin: "100px 0px" },
+        );
+
+        observer.observe(canvas);
         motionQuery.addEventListener("change", handleMotionChange);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
 
         return () => {
-            cancelAnimationFrame(animationId);
+            stopAnimation();
+            observer.disconnect();
             window.removeEventListener("resize", resize);
             motionQuery.removeEventListener("change", handleMotionChange);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
         };
     }, []);
 

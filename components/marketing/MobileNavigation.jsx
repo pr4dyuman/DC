@@ -2,49 +2,30 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { getCurrentUser } from "@/lib/actions";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Menu, X } from "lucide-react";
+
+function hasLoggedInCookie() {
+  if (typeof document === "undefined") return false;
+
+  return document.cookie
+    .split(";")
+    .some((cookie) => cookie.trim().startsWith("logged_in=1"));
+}
+
+function subscribeToCookieChanges() {
+  return () => {};
+}
 
 export default function MobileNavigation({ servicesList }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const pathname = usePathname();
-
-  const clearLoggedInCookie = () => {
-    document.cookie = "logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const syncSessionState = async () => {
-      try {
-        const currentUser = await getCurrentUser();
-        if (cancelled) return;
-
-        if (currentUser) {
-          setIsLoggedIn(true);
-          return;
-        }
-
-        clearLoggedInCookie();
-        setIsLoggedIn(false);
-      } catch {
-        if (!cancelled) {
-          clearLoggedInCookie();
-          setIsLoggedIn(false);
-        }
-      }
-    };
-
-    void syncSessionState();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [pathname]);
+  const isLoggedIn = useSyncExternalStore(
+    subscribeToCookieChanges,
+    hasLoggedInCookie,
+    () => false,
+  );
 
   useEffect(() => {
     if (mobileOpen) document.body.style.overflow = "hidden";
@@ -99,6 +80,7 @@ export default function MobileNavigation({ servicesList }) {
           <nav className="space-y-5 text-2xl font-semibold uppercase">
             <Link
               href="/"
+              prefetch={false}
               className={`block py-2 border-b border-white/10 ${
                 isActive("/") ? "text-[#F5EE30]" : "hover:text-[#F5EE30]"
               }`}
@@ -141,6 +123,7 @@ export default function MobileNavigation({ servicesList }) {
                     <Link
                       key={service.href}
                       href={service.href}
+                      prefetch={false}
                       className={`block py-2 text-lg ${
                         isActive(service.href)
                           ? "text-[#F5EE30]"
@@ -157,6 +140,7 @@ export default function MobileNavigation({ servicesList }) {
 
             <Link
               href="/about"
+              prefetch={false}
               className={`block py-2 border-b border-white/10 ${
                 isActive("/about") ? "text-[#F5EE30]" : "hover:text-[#F5EE30]"
               }`}
@@ -166,6 +150,7 @@ export default function MobileNavigation({ servicesList }) {
             </Link>
             <Link
               href={isLoggedIn ? "/dashboard" : "/login"}
+              prefetch={false}
               className="block py-2 text-[#F5EE30] border-b border-white/10"
               onClick={() => setMobileOpen(false)}
             >
@@ -173,6 +158,7 @@ export default function MobileNavigation({ servicesList }) {
             </Link>
             <Link
               href="/contact"
+              prefetch={false}
               className="block py-2 hover:text-[#F5EE30] transition-colors font-etna border-b border-white/10"
               onClick={() => setMobileOpen(false)}
             >

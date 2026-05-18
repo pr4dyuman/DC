@@ -1,17 +1,16 @@
 import Image from "next/image";
 import AboutAgency from "@/components/marketing/AboutAgency";
 import ServicesSection from "@/components/marketing/ServiceSlider";
-import TestimonialSection from "@/components/marketing/testomonial";
-import TeamSlider from "@/components/marketing/TeamSlider";
 import ManageCompanySection from "@/components/marketing/ManageCompany";
 import HeroBackground from "@/components/marketing/HeroBackground";
 import HomeRotatingWord from "@/components/marketing/HomeRotatingWord";
+import LazyCompanionsSlider from "@/components/marketing/LazyCompanionsSlider";
+import LazyTeamSlider from "@/components/marketing/LazyTeamSlider";
+import LazyTestimonialSection from "@/components/marketing/LazyTestimonialSection";
 import {
-  CompanionsSlider,
   DigitalPartnersSlider,
   ServicesTicker,
 } from "@/components/marketing/HomeSliders";
-import "swiper/css";
 
 const HeroSection = () => {
   return (
@@ -89,7 +88,7 @@ const HeroSection = () => {
         </div>
       </section>
 
-      <TestimonialSection />
+      <LazyTestimonialSection />
 
       {/* Commands Slider Moved Here */}
       <section className="bg-black py-12 w-full overflow-hidden">
@@ -99,10 +98,10 @@ const HeroSection = () => {
           </p>
         </div>
         <div className="w-full">
-          <CompanionsSlider />
+          <LazyCompanionsSlider />
         </div>
       </section>
-      <TeamSlider />
+      <LazyTeamSlider />
     </div>
   );
 };

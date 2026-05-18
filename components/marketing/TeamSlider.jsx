@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useRef } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Navigation, Pagination } from "swiper/modules";
 import "swiper/css";
@@ -19,8 +20,78 @@ const teamMembers = [
 ];
 
 export default function TeamSlider() {
+  const sectionRef = useRef(null);
+  const swiperRef = useRef(null);
+  const syncAutoplayRef = useRef(() => {});
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const isSectionNearViewport = () => {
+      const rect = section.getBoundingClientRect();
+      return rect.bottom > -200 && rect.top < window.innerHeight + 200;
+    };
+
+    let isNearViewport = isSectionNearViewport();
+
+    const shouldPlay = () =>
+      isNearViewport && document.visibilityState === "visible" && !motionQuery.matches;
+
+    const stopAutoplay = () => {
+      swiperRef.current?.autoplay?.stop();
+    };
+
+    const syncAutoplay = () => {
+      const swiper = swiperRef.current;
+      if (!swiper?.autoplay) return;
+
+      if (shouldPlay()) {
+        swiper.autoplay.start();
+      } else {
+        swiper.autoplay.stop();
+      }
+    };
+
+    syncAutoplayRef.current = syncAutoplay;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isNearViewport = entry.isIntersecting || isSectionNearViewport();
+        syncAutoplay();
+      },
+      { rootMargin: "200px 0px", threshold: 0.05 },
+    );
+
+    observer.observe(section);
+    document.addEventListener("visibilitychange", syncAutoplay);
+
+    if (motionQuery.addEventListener) {
+      motionQuery.addEventListener("change", syncAutoplay);
+    } else {
+      motionQuery.addListener(syncAutoplay);
+    }
+
+    syncAutoplay();
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", syncAutoplay);
+
+      if (motionQuery.removeEventListener) {
+        motionQuery.removeEventListener("change", syncAutoplay);
+      } else {
+        motionQuery.removeListener(syncAutoplay);
+      }
+
+      syncAutoplayRef.current = () => {};
+      stopAutoplay();
+    };
+  }, []);
+
   return (
-    <section className="bg-black py-12 sm:py-16 lg:py-20">
+    <section ref={sectionRef} className="bg-black py-12 sm:py-16 lg:py-20">
       {/* Header */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12 sm:mb-16">
         <div className="flex items-center gap-3 mb-6">
@@ -53,6 +124,10 @@ export default function TeamSlider() {
             delay: 3500,
             disableOnInteraction: false,
             pauseOnMouseEnter: true,
+          }}
+          onSwiper={(swiper) => {
+            swiperRef.current = swiper;
+            syncAutoplayRef.current();
           }}
           spaceBetween={16}
           slidesPerView={1.3}

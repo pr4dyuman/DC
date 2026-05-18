@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Pagination, Autoplay } from 'swiper/modules';
@@ -8,6 +8,9 @@ import 'swiper/css';
 import 'swiper/css/pagination';
 
 export default function TestimonialSection() {
+  const sectionRef = useRef(null);
+  const swiperRef = useRef(null);
+  const syncAutoplayRef = useRef(() => {});
   const [testimonials, setTestimonials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -34,6 +37,67 @@ export default function TestimonialSection() {
     }
   };
 
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let isNearViewport = false;
+
+    const shouldPlay = () =>
+      isNearViewport && document.visibilityState === "visible" && !motionQuery.matches;
+
+    const stopAutoplay = () => {
+      swiperRef.current?.autoplay?.stop();
+    };
+
+    const syncAutoplay = () => {
+      const swiper = swiperRef.current;
+      if (!swiper?.autoplay) return;
+
+      if (shouldPlay()) {
+        swiper.autoplay.start();
+      } else {
+        swiper.autoplay.stop();
+      }
+    };
+
+    syncAutoplayRef.current = syncAutoplay;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isNearViewport = entry.isIntersecting;
+        syncAutoplay();
+      },
+      { rootMargin: "200px 0px", threshold: 0.05 },
+    );
+
+    observer.observe(section);
+    document.addEventListener("visibilitychange", syncAutoplay);
+
+    if (motionQuery.addEventListener) {
+      motionQuery.addEventListener("change", syncAutoplay);
+    } else {
+      motionQuery.addListener(syncAutoplay);
+    }
+
+    syncAutoplay();
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", syncAutoplay);
+
+      if (motionQuery.removeEventListener) {
+        motionQuery.removeEventListener("change", syncAutoplay);
+      } else {
+        motionQuery.removeListener(syncAutoplay);
+      }
+
+      syncAutoplayRef.current = () => {};
+      stopAutoplay();
+    };
+  }, [testimonials.length]);
+
   if (loading) {
     return (
       <section className="bg-black text-white py-20 px-6">
@@ -49,7 +113,7 @@ export default function TestimonialSection() {
   }
 
   return (
-    <section className="bg-black text-white py-20 px-6">
+    <section ref={sectionRef} className="bg-black text-white py-20 px-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-16 gap-8">
@@ -76,6 +140,10 @@ export default function TestimonialSection() {
           slidesPerView={1}
           spaceBetween={30}
           loop={true}
+          onSwiper={(swiper) => {
+            swiperRef.current = swiper;
+            syncAutoplayRef.current();
+          }}
           autoplay={{
             delay: 3000,
             disableOnInteraction: false,
@@ -91,7 +159,7 @@ export default function TestimonialSection() {
               slidesPerView: 3,
             },
           }}
-          className="pb-16"
+          className="dc-testimonial-swiper"
         >
           {testimonials.map((testimonial, index) => (
             <SwiperSlide key={index}>

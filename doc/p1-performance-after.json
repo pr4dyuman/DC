@@ -1,0 +1,895 @@
+[
+  {
+    "measuredAt": "2026-05-18T19:51:05.998Z",
+    "source": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "route": "/",
+    "strategy": "mobile",
+    "url": "http://localhost:3007/",
+    "title": "Digital Corvids | Digital Marketing Agency in Jaipur",
+    "bodyTextLength": 4219,
+    "domContentLoadedMs": 1029.7000000476837,
+    "loadEventMs": 1030.8000001907349,
+    "transferSize": 22727,
+    "fcpMs": 968,
+    "lcpMs": 968,
+    "lcpSize": 24290,
+    "lcpUrl": "",
+    "cls": 0,
+    "longTaskCount": 4,
+    "tbtApproxMs": 108,
+    "hasOverlay": false,
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "visibleImages": [
+      {
+        "src": "http://localhost:3007/home1.svg",
+        "alt": "Track Icon",
+        "top": 420,
+        "width": 64,
+        "height": 64,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/_next/image?url=%2Fdashboard-mockup-640-q84.jpg&w=1200&q=75",
+        "alt": "Agency OS Dashboard — AI-powered company management platform",
+        "top": 1005,
+        "width": 356,
+        "height": 356,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 50,
+    "horizontalOverflow": false,
+    "requestCount": 33,
+    "transferBytes": 507247,
+    "jsBytes": 221921,
+    "cssBytes": 44623,
+    "imageBytes": 26232,
+    "fontBytes": 183187,
+    "documentBytes": 23195,
+    "topHosts": [
+      {
+        "host": "localhost:3007",
+        "bytes": 507247
+      }
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ]
+  },
+  {
+    "measuredAt": "2026-05-18T19:51:09.106Z",
+    "source": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "route": "/",
+    "strategy": "desktop",
+    "url": "http://localhost:3007/",
+    "title": "Digital Corvids | Digital Marketing Agency in Jaipur",
+    "bodyTextLength": 4263,
+    "domContentLoadedMs": 535.9000000953674,
+    "loadEventMs": 780.6000001430511,
+    "transferSize": 22727,
+    "fcpMs": 644,
+    "lcpMs": 644,
+    "lcpSize": 104486,
+    "lcpUrl": "",
+    "cls": 0.005507049014741602,
+    "longTaskCount": 5,
+    "tbtApproxMs": 446,
+    "hasOverlay": false,
+    "clientWidth": 1424,
+    "scrollWidth": 1424,
+    "visibleImages": [
+      {
+        "src": "http://localhost:3007/home1.svg",
+        "alt": "Track Icon",
+        "top": 616,
+        "width": 112,
+        "height": 112,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/_next/image?url=%2Fdashboard-mockup-640-q84.jpg&w=640&q=75",
+        "alt": "Agency OS Dashboard — AI-powered company management platform",
+        "top": 1003,
+        "width": 574,
+        "height": 574,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 50,
+    "horizontalOverflow": false,
+    "requestCount": 58,
+    "transferBytes": 636809,
+    "jsBytes": 221921,
+    "cssBytes": 44623,
+    "imageBytes": 155794,
+    "fontBytes": 183187,
+    "documentBytes": 23195,
+    "topHosts": [
+      {
+        "host": "localhost:3007",
+        "bytes": 636809
+      }
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ]
+  },
+  {
+    "measuredAt": "2026-05-18T19:51:11.404Z",
+    "source": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "route": "/services",
+    "strategy": "mobile",
+    "url": "http://localhost:3007/services",
+    "title": "Digital Marketing Services | Digital Corvids",
+    "bodyTextLength": 1750,
+    "domContentLoadedMs": 203,
+    "loadEventMs": 288.39999985694885,
+    "transferSize": 11622,
+    "fcpMs": 208,
+    "lcpMs": 208,
+    "lcpSize": 28044,
+    "lcpUrl": "",
+    "cls": 0,
+    "longTaskCount": 1,
+    "tbtApproxMs": 29,
+    "hasOverlay": false,
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "visibleImages": [
+      {
+        "src": "http://localhost:3007/web3.svg",
+        "alt": "Web development",
+        "top": 262,
+        "width": 160,
+        "height": 153,
+        "complete": true,
+        "loading": "auto",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/web4.svg",
+        "alt": "Search engine optimization",
+        "top": 795,
+        "width": 160,
+        "height": 160,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/smm1.svg",
+        "alt": "Social Media marketing",
+        "top": 1401,
+        "width": 160,
+        "height": 171,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 39,
+    "horizontalOverflow": false,
+    "requestCount": 35,
+    "transferBytes": 678856,
+    "jsBytes": 187489,
+    "cssBytes": 42845,
+    "imageBytes": 276070,
+    "fontBytes": 152280,
+    "documentBytes": 12083,
+    "topHosts": [
+      {
+        "host": "localhost:3007",
+        "bytes": 678856
+      }
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ]
+  },
+  {
+    "measuredAt": "2026-05-18T19:51:13.693Z",
+    "source": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "route": "/services",
+    "strategy": "desktop",
+    "url": "http://localhost:3007/services",
+    "title": "Digital Marketing Services | Digital Corvids",
+    "bodyTextLength": 1792,
+    "domContentLoadedMs": 160.59999990463257,
+    "loadEventMs": 257,
+    "transferSize": 11622,
+    "fcpMs": 188,
+    "lcpMs": 188,
+    "lcpSize": 296856,
+    "lcpUrl": "http://localhost:3007/web3.svg",
+    "cls": 0.08883552446710365,
+    "longTaskCount": 2,
+    "tbtApproxMs": 23,
+    "hasOverlay": false,
+    "clientWidth": 1424,
+    "scrollWidth": 1424,
+    "visibleImages": [
+      {
+        "src": "http://localhost:3007/web3.svg",
+        "alt": "Web development",
+        "top": 320,
+        "width": 558,
+        "height": 532,
+        "complete": true,
+        "loading": "auto",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/web4.svg",
+        "alt": "Search engine optimization",
+        "top": 964,
+        "width": 557,
+        "height": 557,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 39,
+    "horizontalOverflow": false,
+    "requestCount": 39,
+    "transferBytes": 788396,
+    "jsBytes": 187489,
+    "cssBytes": 42845,
+    "imageBytes": 354703,
+    "fontBytes": 183187,
+    "documentBytes": 12083,
+    "topHosts": [
+      {
+        "host": "localhost:3007",
+        "bytes": 788396
+      }
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ]
+  },
+  {
+    "measuredAt": "2026-05-18T19:51:16.072Z",
+    "source": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "route": "/services/seo",
+    "strategy": "mobile",
+    "url": "http://localhost:3007/services/seo",
+    "title": "SEO Services in Jaipur | Digital Corvids",
+    "bodyTextLength": 5183,
+    "domContentLoadedMs": 237.59999990463257,
+    "loadEventMs": 310.39999985694885,
+    "transferSize": 17503,
+    "fcpMs": 240,
+    "lcpMs": 328,
+    "lcpSize": 116964,
+    "lcpUrl": "http://localhost:3007/web4.svg",
+    "cls": 0,
+    "longTaskCount": 1,
+    "tbtApproxMs": 35,
+    "hasOverlay": false,
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "visibleImages": [
+      {
+        "src": "http://localhost:3007/web4.svg",
+        "alt": "SEO Illustration",
+        "top": 254,
+        "width": 342,
+        "height": 342,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/seo2.svg",
+        "alt": "Technical SEO Illustration",
+        "top": 1265,
+        "width": 342,
+        "height": 319,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 46,
+    "horizontalOverflow": false,
+    "requestCount": 37,
+    "transferBytes": 536429,
+    "jsBytes": 187489,
+    "cssBytes": 42845,
+    "imageBytes": 115290,
+    "fontBytes": 152280,
+    "documentBytes": 17970,
+    "topHosts": [
+      {
+        "host": "localhost:3007",
+        "bytes": 536429
+      }
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ]
+  },
+  {
+    "measuredAt": "2026-05-18T19:51:18.441Z",
+    "source": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "route": "/services/seo",
+    "strategy": "desktop",
+    "url": "http://localhost:3007/services/seo",
+    "title": "SEO Services in Jaipur | Digital Corvids",
+    "bodyTextLength": 5227,
+    "domContentLoadedMs": 248,
+    "loadEventMs": 353.59999990463257,
+    "transferSize": 17503,
+    "fcpMs": 244,
+    "lcpMs": 348,
+    "lcpSize": 160000,
+    "lcpUrl": "http://localhost:3007/web4.svg",
+    "cls": 0.01430473159079208,
+    "longTaskCount": 2,
+    "tbtApproxMs": 75,
+    "hasOverlay": false,
+    "clientWidth": 1424,
+    "scrollWidth": 1424,
+    "visibleImages": [
+      {
+        "src": "http://localhost:3007/web4.svg",
+        "alt": "SEO Illustration",
+        "top": 312,
+        "width": 400,
+        "height": 400,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/seo2.svg",
+        "alt": "Technical SEO Illustration",
+        "top": 857,
+        "width": 500,
+        "height": 466,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/seo3.svg",
+        "alt": "Keyword research illustration",
+        "top": 1510,
+        "width": 400,
+        "height": 343,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 46,
+    "horizontalOverflow": false,
+    "requestCount": 42,
+    "transferBytes": 664334,
+    "jsBytes": 187489,
+    "cssBytes": 42845,
+    "imageBytes": 212288,
+    "fontBytes": 183187,
+    "documentBytes": 17970,
+    "topHosts": [
+      {
+        "host": "localhost:3007",
+        "bytes": 664334
+      }
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ]
+  },
+  {
+    "measuredAt": "2026-05-18T19:51:20.825Z",
+    "source": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "route": "/services/web-development",
+    "strategy": "mobile",
+    "url": "http://localhost:3007/services/web-development",
+    "title": "Web Development Services | Digital Corvids",
+    "bodyTextLength": 5053,
+    "domContentLoadedMs": 221.09999990463257,
+    "loadEventMs": 379.39999985694885,
+    "transferSize": 16614,
+    "fcpMs": 228,
+    "lcpMs": 324,
+    "lcpSize": 111492,
+    "lcpUrl": "http://localhost:3007/web3.svg",
+    "cls": 0,
+    "longTaskCount": 2,
+    "tbtApproxMs": 40,
+    "hasOverlay": false,
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "visibleImages": [
+      {
+        "src": "http://localhost:3007/web3.svg",
+        "alt": "Web Development Illustration",
+        "top": 255,
+        "width": 342,
+        "height": 326,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/web6.svg",
+        "alt": "UX Research Illustration",
+        "top": 1200,
+        "width": 342,
+        "height": 289,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 44,
+    "horizontalOverflow": false,
+    "requestCount": 37,
+    "transferBytes": 545946,
+    "jsBytes": 187489,
+    "cssBytes": 42845,
+    "imageBytes": 125702,
+    "fontBytes": 152280,
+    "documentBytes": 17075,
+    "topHosts": [
+      {
+        "host": "localhost:3007",
+        "bytes": 545946
+      }
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ]
+  },
+  {
+    "measuredAt": "2026-05-18T19:51:23.074Z",
+    "source": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "route": "/services/web-development",
+    "strategy": "desktop",
+    "url": "http://localhost:3007/services/web-development",
+    "title": "Web Development Services | Digital Corvids",
+    "bodyTextLength": 5095,
+    "domContentLoadedMs": 92.40000009536743,
+    "loadEventMs": 266.30000019073486,
+    "transferSize": 16614,
+    "fcpMs": 208,
+    "lcpMs": 280,
+    "lcpSize": 152400,
+    "lcpUrl": "http://localhost:3007/web3.svg",
+    "cls": 0.004901001557042461,
+    "longTaskCount": 1,
+    "tbtApproxMs": 33,
+    "hasOverlay": false,
+    "clientWidth": 1424,
+    "scrollWidth": 1424,
+    "visibleImages": [
+      {
+        "src": "http://localhost:3007/web3.svg",
+        "alt": "Web Development Illustration",
+        "top": 319,
+        "width": 400,
+        "height": 381,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/web6.svg",
+        "alt": "UX Research Illustration",
+        "top": 836,
+        "width": 500,
+        "height": 423,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/web1.svg",
+        "alt": "Responsive development illustration",
+        "top": 1384,
+        "width": 400,
+        "height": 309,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 44,
+    "horizontalOverflow": false,
+    "requestCount": 42,
+    "transferBytes": 695677,
+    "jsBytes": 187489,
+    "cssBytes": 42845,
+    "imageBytes": 244526,
+    "fontBytes": 183187,
+    "documentBytes": 17075,
+    "topHosts": [
+      {
+        "host": "localhost:3007",
+        "bytes": 695677
+      }
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ]
+  },
+  {
+    "measuredAt": "2026-05-18T19:51:25.476Z",
+    "source": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "route": "/services/ppc",
+    "strategy": "mobile",
+    "url": "http://localhost:3007/services/ppc",
+    "title": "PPC Advertising Services | Digital Corvids",
+    "bodyTextLength": 6054,
+    "domContentLoadedMs": 336.7999999523163,
+    "loadEventMs": 339.7000000476837,
+    "transferSize": 18550,
+    "fcpMs": 256,
+    "lcpMs": 344,
+    "lcpSize": 89320,
+    "lcpUrl": "http://localhost:3007/ppc1.svg",
+    "cls": 0,
+    "longTaskCount": 1,
+    "tbtApproxMs": 76,
+    "hasOverlay": false,
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "visibleImages": [
+      {
+        "src": "http://localhost:3007/ppc1.svg",
+        "alt": "PPC Advertising",
+        "top": 282,
+        "width": 280,
+        "height": 319,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/ppc2.svg",
+        "alt": "Strategic Campaign Planning",
+        "top": 1160,
+        "width": 300,
+        "height": 226,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 46,
+    "horizontalOverflow": false,
+    "requestCount": 40,
+    "transferBytes": 631849,
+    "jsBytes": 187489,
+    "cssBytes": 42845,
+    "imageBytes": 178756,
+    "fontBytes": 183187,
+    "documentBytes": 19017,
+    "topHosts": [
+      {
+        "host": "localhost:3007",
+        "bytes": 631849
+      }
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ]
+  },
+  {
+    "measuredAt": "2026-05-18T19:51:27.889Z",
+    "source": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "route": "/services/ppc",
+    "strategy": "desktop",
+    "url": "http://localhost:3007/services/ppc",
+    "title": "PPC Advertising Services | Digital Corvids",
+    "bodyTextLength": 6096,
+    "domContentLoadedMs": 215.29999995231628,
+    "loadEventMs": 406.09999990463257,
+    "transferSize": 18550,
+    "fcpMs": 224,
+    "lcpMs": 404,
+    "lcpSize": 230400,
+    "lcpUrl": "http://localhost:3007/ppc1.svg",
+    "cls": 0.01792473405387643,
+    "longTaskCount": 2,
+    "tbtApproxMs": 105,
+    "hasOverlay": false,
+    "clientWidth": 1424,
+    "scrollWidth": 1424,
+    "visibleImages": [
+      {
+        "src": "http://localhost:3007/ppc1.svg",
+        "alt": "PPC Advertising",
+        "top": 376,
+        "width": 450,
+        "height": 512,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/ppc2.svg",
+        "alt": "Strategic Campaign Planning",
+        "top": 1016,
+        "width": 550,
+        "height": 415,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/ppc3.svg",
+        "alt": "Ad Creation & Copywriting",
+        "top": 1559,
+        "width": 450,
+        "height": 414,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 46,
+    "horizontalOverflow": false,
+    "requestCount": 42,
+    "transferBytes": 693503,
+    "jsBytes": 187489,
+    "cssBytes": 42845,
+    "imageBytes": 240410,
+    "fontBytes": 183187,
+    "documentBytes": 19017,
+    "topHosts": [
+      {
+        "host": "localhost:3007",
+        "bytes": 693503
+      }
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ]
+  },
+  {
+    "measuredAt": "2026-05-18T20:05:41.487Z",
+    "source": "Local production build Chrome CDP after P1 blog cache follow-up, cold browser cache, warm server data cache, no artificial throttling",
+    "route": "/blog",
+    "strategy": "mobile",
+    "url": "http://localhost:3007/blog",
+    "title": "Digital Marketing Blog | Digital Corvids",
+    "bodyTextLength": 7587,
+    "domContentLoadedMs": 270.5,
+    "loadEventMs": 358.10000014305115,
+    "transferSize": 23051,
+    "fcpMs": 300,
+    "lcpMs": 300,
+    "lcpSize": 27940,
+    "lcpUrl": "",
+    "cls": 0,
+    "longTaskCount": 1,
+    "tbtApproxMs": 40,
+    "hasOverlay": false,
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "visibleImages": [],
+    "scripts": 30,
+    "horizontalOverflow": false,
+    "requestCount": 31,
+    "transferBytes": 452416,
+    "jsBytes": 191372,
+    "cssBytes": 42845,
+    "imageBytes": 2908,
+    "fontBytes": 183187,
+    "documentBytes": 24015,
+    "topHosts": [
+      {
+        "host": "localhost:3007",
+        "bytes": 452416
+      }
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ]
+  },
+  {
+    "measuredAt": "2026-05-18T20:05:43.809Z",
+    "source": "Local production build Chrome CDP after P1 blog cache follow-up, cold browser cache, warm server data cache, no artificial throttling",
+    "route": "/blog",
+    "strategy": "desktop",
+    "url": "http://localhost:3007/blog",
+    "title": "Digital Marketing Blog | Digital Corvids",
+    "bodyTextLength": 7629,
+    "domContentLoadedMs": 367.5,
+    "loadEventMs": 369.30000019073486,
+    "transferSize": 23051,
+    "fcpMs": 316,
+    "lcpMs": 316,
+    "lcpSize": 152152,
+    "lcpUrl": "",
+    "cls": 0.013672399820665596,
+    "longTaskCount": 1,
+    "tbtApproxMs": 31,
+    "hasOverlay": false,
+    "clientWidth": 1424,
+    "scrollWidth": 1424,
+    "visibleImages": [
+      {
+        "src": "http://localhost:3007/ai-blogger.svg",
+        "alt": "A high-tech digital marketing dashboard showing e-commerce growth metrics, short-form video thumbnails, and a mobile shopping interface representing discovery-led commerce.",
+        "top": 984,
+        "width": 734,
+        "height": 520,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/ai-blogger.svg",
+        "alt": "A digital analytics dashboard showing conversion rates and performance metrics for influencer campaigns within specific industrial and technical verticals.",
+        "top": 1582,
+        "width": 403,
+        "height": 301,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/ai-blogger.svg",
+        "alt": "A professional digital workspace showing multiple monitors with video editing software and LinkedIn analytics dashboards, representing a modern B2B video scaling engine.",
+        "top": 1582,
+        "width": 403,
+        "height": 301,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "http://localhost:3007/ai-blogger.svg",
+        "alt": "A professional video production set showing a creator filming a high-quality YouTube video with professional cameras, lighting, and a detailed storyboard in the background.",
+        "top": 1582,
+        "width": 403,
+        "height": 302,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 30,
+    "horizontalOverflow": false,
+    "requestCount": 33,
+    "transferBytes": 453680,
+    "jsBytes": 191372,
+    "cssBytes": 42845,
+    "imageBytes": 2908,
+    "fontBytes": 183187,
+    "documentBytes": 24015,
+    "topHosts": [
+      {
+        "host": "localhost:3007",
+        "bytes": 453680
+      }
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ]
+  },
+  {
+    "measuredAt": "2026-05-18T19:51:40.911Z",
+    "source": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "route": "/get-started",
+    "strategy": "mobile",
+    "url": "http://localhost:3007/get-started",
+    "title": "Get Started With Digital Corvids | Growth Strategy Call",
+    "bodyTextLength": 4104,
+    "domContentLoadedMs": 132.09999990463257,
+    "loadEventMs": 404.40000009536743,
+    "transferSize": 8691,
+    "fcpMs": 272,
+    "lcpMs": 2088,
+    "lcpSize": 23288,
+    "lcpUrl": "",
+    "cls": 0,
+    "longTaskCount": 4,
+    "tbtApproxMs": 151,
+    "hasOverlay": false,
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "visibleImages": [],
+    "scripts": 32,
+    "horizontalOverflow": false,
+    "requestCount": 32,
+    "transferBytes": 452548,
+    "jsBytes": 197966,
+    "cssBytes": 42845,
+    "imageBytes": 10644,
+    "fontBytes": 183187,
+    "documentBytes": 9150,
+    "topHosts": [
+      {
+        "host": "localhost:3007",
+        "bytes": 452548
+      }
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ]
+  },
+  {
+    "measuredAt": "2026-05-18T19:51:43.248Z",
+    "source": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "route": "/get-started",
+    "strategy": "desktop",
+    "url": "http://localhost:3007/get-started",
+    "title": "Get Started With Digital Corvids | Growth Strategy Call",
+    "bodyTextLength": 4146,
+    "domContentLoadedMs": 303.19999980926514,
+    "loadEventMs": 308,
+    "transferSize": 8691,
+    "fcpMs": 236,
+    "lcpMs": 720,
+    "lcpSize": 151956,
+    "lcpUrl": "",
+    "cls": 0.0007323742122869806,
+    "longTaskCount": 2,
+    "tbtApproxMs": 8,
+    "hasOverlay": false,
+    "clientWidth": 1424,
+    "scrollWidth": 1424,
+    "visibleImages": [],
+    "scripts": 32,
+    "horizontalOverflow": false,
+    "requestCount": 32,
+    "transferBytes": 452548,
+    "jsBytes": 197966,
+    "cssBytes": 42845,
+    "imageBytes": 10644,
+    "fontBytes": 183187,
+    "documentBytes": 9150,
+    "topHosts": [
+      {
+        "host": "localhost:3007",
+        "bytes": 452548
+      }
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ]
+  }
+]

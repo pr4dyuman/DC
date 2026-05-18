@@ -19,7 +19,7 @@ export default function Navigation() {
       <NavigationEnhancer />
       <div className="max-w-7xl mx-auto flex items-center justify-between px-6">
         {/* Logo Section */}
-        <Link href="/" className="flex items-center space-x-3 group">
+        <Link href="/" prefetch={false} className="flex items-center space-x-3 group">
           <span className="text-[#F5EE30] text-5xl sm:text-6xl md:text-7xl font-suifak tracking-tight group-hover:drop-shadow-[0_0_10px_rgba(245,238,48,0.5)] transition-all">
             DC
           </span>
@@ -33,6 +33,7 @@ export default function Navigation() {
           <li>
             <Link
               href="/"
+              prefetch={false}
               data-nav-path="/"
               className="transition-all duration-200 hover:text-[#F5EE30]"
             >
@@ -42,6 +43,7 @@ export default function Navigation() {
           <li className="relative group">
             <Link
               href="/services"
+              prefetch={false}
               data-nav-path="/services"
               className="transition-all duration-200 hover:text-[#F5EE30]"
             >
@@ -54,6 +56,7 @@ export default function Navigation() {
                   <Link
                     key={service.href}
                     href={service.href}
+                    prefetch={false}
                     data-nav-path={service.href}
                     className="px-4 py-3 hover:bg-white/10 hover:text-[#F5EE30] transition-colors border-b border-white/5 last:border-0 text-white"
                   >
@@ -66,6 +69,7 @@ export default function Navigation() {
           <li>
             <Link
               href="/about"
+              prefetch={false}
               data-nav-path="/about"
               className="transition-all duration-200 hover:text-[#F5EE30]"
             >
@@ -75,6 +79,7 @@ export default function Navigation() {
           <li>
             <Link
               href="/login"
+              prefetch={false}
               data-auth-nav-link
               data-nav-path="/login"
               data-nav-group="auth"
@@ -89,6 +94,7 @@ export default function Navigation() {
         <div className="hidden md:block">
           <Link
             href="/contact"
+            prefetch={false}
             className="text-4xl font-bold hover:text-[#F5EE30] transition-all duration-200 font-etna"
           >
             GET IN TOUCH

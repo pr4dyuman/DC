@@ -78,7 +78,7 @@ export default function AboutAgency() {
               {/* White Line */}
               <div className="absolute left-0 top-1/2 -translate-y-1/2 h-[2px] bg-white w-[calc(100%-6rem)] sm:w-[calc(100%-7rem)] md:w-[calc(100%-8rem)]"></div>
 
-              <Link href="/contact" className="z-10">
+              <Link href="/contact" prefetch={false} className="z-10">
                 <div className="group relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full bg-white text-black font-bold text-xs sm:text-sm flex items-center justify-center overflow-hidden transition-all duration-500 hover:scale-110 hover:shadow-2xl cursor-pointer">
                   <span className="relative z-10 transition-colors duration-500 group-hover:text-black text-center font-glacial-bold leading-tight">
                     EXPLORE

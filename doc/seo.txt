@@ -1,5 +1,5 @@
 Digital Corvids SEO Optimization Checklist
-Last updated: 2026-05-18
+Last updated: 2026-05-19
 
 Repo-specific notes
 - The project is a Next.js App Router site.
@@ -23,16 +23,55 @@ P1 plan
   - Run PageSpeed Insights and Lighthouse on production for /, /services, top service pages, /blog, and /get-started.
   - Record LCP, INP, CLS, total JS, main-thread work, image transfer size, and top render-blocking resources.
   - Add Vercel Speed Insights or web-vitals tracking so Core Web Vitals are measured with real users.
+  - Started 2026-05-18: PageSpeed API was rate-limited with 429, so a Chrome CDP lab baseline was saved at doc/p1-performance-baseline.json.
+  - Started 2026-05-18: lab baseline highlights:
+    - /services desktop was the weakest page: LCP ~7.4s, CLS ~0.101, ~1.1MB transfer, ~426KB JS, 85 requests.
+    - / desktop showed LCP ~4.4s in this cold-cache lab run, with font transfer a major part of payload.
+    - / mobile showed TBT ~626ms, so homepage client-side work remains a P1 target.
+    - Service detail pages, /blog, and /get-started were comparatively healthier in the lab run.
+  - Done 2026-05-18: added Vercel Speed Insights so deployed pages collect real-user Core Web Vitals by route.
+  - Done 2026-05-19: ran a fresh local production-build Chrome CDP after-pass and saved results at doc/p1-performance-after.json, with a route-by-route comparison at doc/p1-performance-comparison.json.
+  - Note 2026-05-19: the baseline was measured on hosted production and the after-pass was measured on localhost:3007, so the comparison is directional until these changes are deployed and measured again on production.
+  - After-pass highlights:
+    - / mobile improved directionally: LCP ~1.8s -> ~1.0s, TBT ~626ms -> ~108ms, requests 52 -> 33, transfer ~925KB -> ~495KB.
+    - /services desktop improved directionally: LCP ~7.4s -> ~0.2s locally, CLS ~0.101 -> ~0.089, JS ~426KB -> ~183KB, requests 85 -> 39.
+    - Service detail pages remain healthy and now show lower local JS transfer, around ~183KB on checked service pages.
+    - Local after-pass showed no horizontal overflow on checked mobile/desktop pages.
+    - Local console errors were limited to Vercel Analytics and Speed Insights script 404/MIME warnings on localhost; verify those again after Vercel deployment.
+  - Done 2026-05-19: investigated the /blog mobile outlier. The blog listing was forced dynamic and fetched MongoDB on each request, while its revalidate setting was not enough to cache the DB query. Added a 60-second data cache for the published blog listing and stopped selecting full blog content for list cards because shortDescription is required by the model.
+  - Done 2026-05-19: focused /blog recheck after the data-cache change was merged into doc/p1-performance-after.json and doc/p1-performance-comparison.json. Warm-cache local browser results: /blog mobile LCP ~300ms, TBT ~40ms; /blog desktop LCP ~316ms, TBT ~31ms.
+  - Remaining P1 production check: first local cold /blog server hit still spent ~4.3s before the MongoDB connection/data cache warmed, then repeated hits dropped to ~0.05-0.15s TTFB. After deploy, verify Vercel real-user and production lab data before deciding whether /blog needs ISR/static prerendering or pagination.
 - JavaScript and rendering optimization:
   - Audit client bundles for Swiper, GSAP, Framer Motion, Three.js, and other heavy libraries.
   - Lazy-load below-fold sliders, testimonials, team sections, and animation-heavy components.
   - Keep page-level marketing content server-rendered and push client interactivity into small islands.
   - Remove unused client imports from pages that do not need them.
+  - Done 2026-05-18: reduced public marketing navigation work by removing client-side getCurrentUser server action checks from NavigationEnhancer and MobileNavigation. The nav now uses the existing logged_in indicator cookie for Login/Dashboard display; protected dashboard routes still enforce auth server-side.
+  - Done 2026-05-18: disabled automatic Next.js prefetch on shared marketing navigation/footer links and /services listing CTAs. Local /services desktop production check after the change showed 0 background _rsc/action prefetches, 37 total requests, and ~181.5KB JS transfer.
+  - Done 2026-05-18: disabled automatic prefetch on home page in-content CTAs and service carousel cards. Local home mobile first-viewport check showed 0 _rsc prefetches after the change.
+  - Done 2026-05-18: lazy-rendered the below-fold Digital Companions slider so its Advent Pro and Architects Daughter fonts do not load in the first viewport. Local home mobile first-viewport check after this change: 37 requests, ~773.5KB transfer, ~219KB JS transfer, ~178.9KB font transfer, no horizontal overflow. Scroll check confirmed the companions slider renders before viewing the section.
+  - Done 2026-05-18: lazy-loaded the below-fold testimonial carousel module and testimonial API request. Local production check confirmed /api/testimonial is not requested on first viewport and loads only when scrolling near the testimonial placeholder.
+  - Done 2026-05-18: lazy-loaded the bottom home page team carousel on the home page only. Local production check confirmed team images are not requested on first viewport, then the team chunk/images and text load when scrolling near the section without horizontal overflow. About page still imports the team slider directly because team content is core there.
+  - Done 2026-05-18: paused the home hero canvas animation when the hero is offscreen, when the tab is hidden, or when prefers-reduced-motion is enabled. Local production canvas-pixel checks confirmed the animation changes while visible, stops offscreen, resumes when returning to the hero, and has no mobile/desktop overflow.
+  - Done 2026-05-18: replaced the home page Digital Partners slider and yellow services ticker Swiper instances with server-rendered CSS marquees. Local production browser checks confirmed both marquees animate on mobile/desktop, no longer render Swiper DOM, the companion Swiper still lazy-loads after scroll, and horizontal overflow remains 0.
+  - Done 2026-05-18: paused the main home services carousel autoplay while the section is offscreen, while the tab is hidden, or when prefers-reduced-motion is enabled. Local production browser checks confirmed autoplay is stopped offscreen, starts when the carousel is visible, advances normally, stops again after returning above the section, and keeps mobile/desktop overflow at 0.
+  - Done 2026-05-18: paused the home hero rotating-word timer while the hero text is offscreen, while the tab is hidden, or when prefers-reduced-motion is enabled. Local production browser checks confirmed the word rotates while visible, stays still offscreen, and keeps mobile/desktop overflow at 0.
+  - Done 2026-05-18: paused the testimonial carousel autoplay while the section is offscreen, while the tab is hidden, or when prefers-reduced-motion is enabled. Local production check confirmed /api/testimonial still waits until the lazy testimonial section is near view; local data is currently empty, so a browser-only mocked testimonial response was used to verify the Swiper path starts near view, advances normally, stops offscreen, and keeps mobile/desktop overflow at 0.
+  - Done 2026-05-19: paused the shared team carousel autoplay while the section is offscreen, while the tab is hidden, or when prefers-reduced-motion is enabled. Local production browser checks confirmed the home page still lazy-loads the team carousel, /about still loads it directly, autoplay starts only when visible, stops offscreen, and mobile/desktop overflow remains 0.
+  - Done 2026-05-19: paused the home Digital Companions carousel autoplay while the section is offscreen, while the tab is hidden, or when prefers-reduced-motion is enabled. Local production browser checks confirmed the carousel is absent from first viewport, loads near the section, starts only when visible, stops offscreen, and mobile overflow remains 0.
+  - Done 2026-05-19: audited remaining public marketing timers/animations. CountUp already starts once on intersection, /get-started OTP countdown only runs after user OTP request, and contact/newsletter timers are short form-feedback cleanup timers. No further P1 code change needed for these.
+  - Done 2026-05-19: final local smoke checks passed on /, /services, /about, /blog, /get-started, and /contact across mobile and desktop. Checks confirmed no horizontal overflow, no true rendered mojibake/replacement characters, expected titles/H1s, and no app console errors beyond local-only Vercel Analytics/Speed Insights script 404s.
+  - Done 2026-05-19: full lint passed with warnings only. Remaining warnings are existing/non-blocking: native img usage for remote blog images and unused AI Blogger helper variables.
+  - Remaining P1: compare UI on localhost versus hosted before pushing.
 - Image and media improvements:
   - Convert remaining large JPG/PNG assets to WebP or AVIF where quality allows.
   - Add exact sizes attributes for important next/image usage.
   - Keep priority only on the true LCP image per template.
   - Add image sitemap data for important home, service, and blog images if useful.
+  - Done 2026-05-18: added priority and responsive sizes to the first /services image so the above-fold service visual is preloaded without forcing all below-fold service images to load eagerly.
+  - Done 2026-05-18: replaced the oversized app/favicon.ico source, which was a 874x1024 PNG stored as .ico (~264KB), with a 128x128 optimized transparent icon (~7.5KB). Local production browser check confirmed the served favicon transfer is ~7.9KB instead of ~258.7KB.
+  - Done 2026-05-18: added a cropped services-list image for Manage Company so the dashboard mockup is not visually tiny inside the /services row while keeping the shared full-square mockup unchanged elsewhere.
+  - Done 2026-05-18: added explicit sizes hints for the home page Manage Company dashboard image and home services carousel card images. The home services carousel now uses the cropped dashboard card image. Local mobile production check reduced first-load image transfer from ~59.1KB to ~38KB and removed the duplicate dashboard mockup request.
 - Local and entity SEO:
   - Strengthen Organization, LocalBusiness, and sameAs schema.
   - Add consistent NAP, Jaipur/India service-area context, and trust signals where natural.

@@ -1,0 +1,716 @@
+[
+  {
+    "route": "/",
+    "strategy": "mobile",
+    "baselineSource": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "afterSource": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "comparableNote": "Baseline was production; after run is local production build, so compare directionally until deployed.",
+    "metrics": {
+      "lcpMs": {
+        "before": 1816,
+        "after": 968,
+        "delta": -848,
+        "deltaPercent": -46.69603524229075
+      },
+      "tbtApproxMs": {
+        "before": 626,
+        "after": 108,
+        "delta": -518,
+        "deltaPercent": -82.74760383386581
+      },
+      "cls": {
+        "before": 0,
+        "after": 0,
+        "delta": 0,
+        "deltaPercent": null
+      },
+      "transferBytes": {
+        "before": 947589,
+        "after": 507247,
+        "delta": -440342,
+        "deltaPercent": -46.46972474353333
+      },
+      "jsBytes": {
+        "before": 225022,
+        "after": 221921,
+        "delta": -3101,
+        "deltaPercent": -1.3780874758912462
+      },
+      "requestCount": {
+        "before": 52,
+        "after": 33,
+        "delta": -19,
+        "deltaPercent": -36.53846153846153
+      }
+    },
+    "afterConsoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ],
+    "afterHorizontalOverflow": false
+  },
+  {
+    "route": "/",
+    "strategy": "desktop",
+    "baselineSource": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "afterSource": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "comparableNote": "Baseline was production; after run is local production build, so compare directionally until deployed.",
+    "metrics": {
+      "lcpMs": {
+        "before": 4384,
+        "after": 644,
+        "delta": -3740,
+        "deltaPercent": -85.3102189781022
+      },
+      "tbtApproxMs": {
+        "before": 349,
+        "after": 446,
+        "delta": 97,
+        "deltaPercent": 27.793696275071632
+      },
+      "cls": {
+        "before": 0.0005460621238173888,
+        "after": 0.005507049014741602,
+        "delta": 0.0049609868909242134,
+        "deltaPercent": 908.5022883922344
+      },
+      "transferBytes": {
+        "before": 495182,
+        "after": 636809,
+        "delta": 141627,
+        "deltaPercent": 28.600999228566465
+      },
+      "jsBytes": {
+        "before": 223715,
+        "after": 221921,
+        "delta": -1794,
+        "deltaPercent": -0.801913148425452
+      },
+      "requestCount": {
+        "before": 30,
+        "after": 58,
+        "delta": 28,
+        "deltaPercent": 93.33333333333333
+      }
+    },
+    "afterConsoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ],
+    "afterHorizontalOverflow": false
+  },
+  {
+    "route": "/services",
+    "strategy": "mobile",
+    "baselineSource": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "afterSource": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "comparableNote": "Baseline was production; after run is local production build, so compare directionally until deployed.",
+    "metrics": {
+      "lcpMs": {
+        "before": 2188,
+        "after": 208,
+        "delta": -1980,
+        "deltaPercent": -90.49360146252286
+      },
+      "tbtApproxMs": {
+        "before": 54,
+        "after": 29,
+        "delta": -25,
+        "deltaPercent": -46.2962962962963
+      },
+      "cls": {
+        "before": 0,
+        "after": 0,
+        "delta": 0,
+        "deltaPercent": null
+      },
+      "transferBytes": {
+        "before": 389082,
+        "after": 678856,
+        "delta": 289774,
+        "deltaPercent": 74.47633146740276
+      },
+      "jsBytes": {
+        "before": 38463,
+        "after": 187489,
+        "delta": 149026,
+        "deltaPercent": 387.45287679068196
+      },
+      "requestCount": {
+        "before": 44,
+        "after": 35,
+        "delta": -9,
+        "deltaPercent": -20.454545454545457
+      }
+    },
+    "afterConsoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ],
+    "afterHorizontalOverflow": false
+  },
+  {
+    "route": "/services",
+    "strategy": "desktop",
+    "baselineSource": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "afterSource": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "comparableNote": "Baseline was production; after run is local production build, so compare directionally until deployed.",
+    "metrics": {
+      "lcpMs": {
+        "before": 7396,
+        "after": 188,
+        "delta": -7208,
+        "deltaPercent": -97.45808545159545
+      },
+      "tbtApproxMs": {
+        "before": 5,
+        "after": 23,
+        "delta": 18,
+        "deltaPercent": 360
+      },
+      "cls": {
+        "before": 0.10078607897633732,
+        "after": 0.08883552446710365,
+        "delta": -0.011950554509233671,
+        "deltaPercent": -11.857346402015935
+      },
+      "transferBytes": {
+        "before": 1135113,
+        "after": 788396,
+        "delta": -346717,
+        "deltaPercent": -30.54471228855629
+      },
+      "jsBytes": {
+        "before": 435810,
+        "after": 187489,
+        "delta": -248321,
+        "deltaPercent": -56.979188178334596
+      },
+      "requestCount": {
+        "before": 85,
+        "after": 39,
+        "delta": -46,
+        "deltaPercent": -54.11764705882353
+      }
+    },
+    "afterConsoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ],
+    "afterHorizontalOverflow": false
+  },
+  {
+    "route": "/services/seo",
+    "strategy": "mobile",
+    "baselineSource": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "afterSource": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "comparableNote": "Baseline was production; after run is local production build, so compare directionally until deployed.",
+    "metrics": {
+      "lcpMs": {
+        "before": 1236,
+        "after": 328,
+        "delta": -908,
+        "deltaPercent": -73.46278317152104
+      },
+      "tbtApproxMs": {
+        "before": 52,
+        "after": 35,
+        "delta": -17,
+        "deltaPercent": -32.69230769230769
+      },
+      "cls": {
+        "before": 0,
+        "after": 0,
+        "delta": 0,
+        "deltaPercent": null
+      },
+      "transferBytes": {
+        "before": 510484,
+        "after": 536429,
+        "delta": 25945,
+        "deltaPercent": 5.082431574740834
+      },
+      "jsBytes": {
+        "before": 225325,
+        "after": 187489,
+        "delta": -37836,
+        "deltaPercent": -16.791745256851215
+      },
+      "requestCount": {
+        "before": 43,
+        "after": 37,
+        "delta": -6,
+        "deltaPercent": -13.953488372093023
+      }
+    },
+    "afterConsoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ],
+    "afterHorizontalOverflow": false
+  },
+  {
+    "route": "/services/seo",
+    "strategy": "desktop",
+    "baselineSource": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "afterSource": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "comparableNote": "Baseline was production; after run is local production build, so compare directionally until deployed.",
+    "metrics": {
+      "lcpMs": {
+        "before": 992,
+        "after": 348,
+        "delta": -644,
+        "deltaPercent": -64.91935483870968
+      },
+      "tbtApproxMs": {
+        "before": 47,
+        "after": 75,
+        "delta": 28,
+        "deltaPercent": 59.57446808510638
+      },
+      "cls": {
+        "before": 0.014258097197154712,
+        "after": 0.01430473159079208,
+        "delta": 0.00004663439363736775,
+        "deltaPercent": 0.32707305184224666
+      },
+      "transferBytes": {
+        "before": 700284,
+        "after": 664334,
+        "delta": -35950,
+        "deltaPercent": -5.133631498077923
+      },
+      "jsBytes": {
+        "before": 288024,
+        "after": 187489,
+        "delta": -100535,
+        "deltaPercent": -34.90507735466489
+      },
+      "requestCount": {
+        "before": 63,
+        "after": 42,
+        "delta": -21,
+        "deltaPercent": -33.33333333333333
+      }
+    },
+    "afterConsoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ],
+    "afterHorizontalOverflow": false
+  },
+  {
+    "route": "/services/web-development",
+    "strategy": "mobile",
+    "baselineSource": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "afterSource": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "comparableNote": "Baseline was production; after run is local production build, so compare directionally until deployed.",
+    "metrics": {
+      "lcpMs": {
+        "before": 1264,
+        "after": 324,
+        "delta": -940,
+        "deltaPercent": -74.36708860759494
+      },
+      "tbtApproxMs": {
+        "before": 31,
+        "after": 40,
+        "delta": 9,
+        "deltaPercent": 29.03225806451613
+      },
+      "cls": {
+        "before": 0,
+        "after": 0,
+        "delta": 0,
+        "deltaPercent": null
+      },
+      "transferBytes": {
+        "before": 578019,
+        "after": 545946,
+        "delta": -32073,
+        "deltaPercent": -5.548779538388877
+      },
+      "jsBytes": {
+        "before": 225330,
+        "after": 187489,
+        "delta": -37841,
+        "deltaPercent": -16.79359162117783
+      },
+      "requestCount": {
+        "before": 45,
+        "after": 37,
+        "delta": -8,
+        "deltaPercent": -17.77777777777778
+      }
+    },
+    "afterConsoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ],
+    "afterHorizontalOverflow": false
+  },
+  {
+    "route": "/services/web-development",
+    "strategy": "desktop",
+    "baselineSource": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "afterSource": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "comparableNote": "Baseline was production; after run is local production build, so compare directionally until deployed.",
+    "metrics": {
+      "lcpMs": {
+        "before": 916,
+        "after": 280,
+        "delta": -636,
+        "deltaPercent": -69.43231441048034
+      },
+      "tbtApproxMs": {
+        "before": 26,
+        "after": 33,
+        "delta": 7,
+        "deltaPercent": 26.923076923076923
+      },
+      "cls": {
+        "before": 0.0026176952307067148,
+        "after": 0.004901001557042461,
+        "delta": 0.0022833063263357463,
+        "deltaPercent": 87.22582749708829
+      },
+      "transferBytes": {
+        "before": 748445,
+        "after": 695677,
+        "delta": -52768,
+        "deltaPercent": -7.050351061200222
+      },
+      "jsBytes": {
+        "before": 288066,
+        "after": 187489,
+        "delta": -100577,
+        "deltaPercent": -34.914568189234416
+      },
+      "requestCount": {
+        "before": 66,
+        "after": 42,
+        "delta": -24,
+        "deltaPercent": -36.36363636363637
+      }
+    },
+    "afterConsoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ],
+    "afterHorizontalOverflow": false
+  },
+  {
+    "route": "/services/ppc",
+    "strategy": "mobile",
+    "baselineSource": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "afterSource": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "comparableNote": "Baseline was production; after run is local production build, so compare directionally until deployed.",
+    "metrics": {
+      "lcpMs": {
+        "before": 1140,
+        "after": 344,
+        "delta": -796,
+        "deltaPercent": -69.82456140350877
+      },
+      "tbtApproxMs": {
+        "before": 103,
+        "after": 76,
+        "delta": -27,
+        "deltaPercent": -26.21359223300971
+      },
+      "cls": {
+        "before": 0,
+        "after": 0,
+        "delta": 0,
+        "deltaPercent": null
+      },
+      "transferBytes": {
+        "before": 601714,
+        "after": 631849,
+        "delta": 30135,
+        "deltaPercent": 5.008193261250361
+      },
+      "jsBytes": {
+        "before": 225178,
+        "after": 187489,
+        "delta": -37689,
+        "deltaPercent": -16.737425503379548
+      },
+      "requestCount": {
+        "before": 46,
+        "after": 40,
+        "delta": -6,
+        "deltaPercent": -13.043478260869565
+      }
+    },
+    "afterConsoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ],
+    "afterHorizontalOverflow": false
+  },
+  {
+    "route": "/services/ppc",
+    "strategy": "desktop",
+    "baselineSource": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "afterSource": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "comparableNote": "Baseline was production; after run is local production build, so compare directionally until deployed.",
+    "metrics": {
+      "lcpMs": {
+        "before": 824,
+        "after": 404,
+        "delta": -420,
+        "deltaPercent": -50.970873786407765
+      },
+      "tbtApproxMs": {
+        "before": 89,
+        "after": 105,
+        "delta": 16,
+        "deltaPercent": 17.97752808988764
+      },
+      "cls": {
+        "before": 0.01639954876927928,
+        "after": 0.01792473405387643,
+        "delta": 0.0015251852845971497,
+        "deltaPercent": 9.300166157341035
+      },
+      "transferBytes": {
+        "before": 687545,
+        "after": 693503,
+        "delta": 5958,
+        "deltaPercent": 0.8665614614316154
+      },
+      "jsBytes": {
+        "before": 287851,
+        "after": 187489,
+        "delta": -100362,
+        "deltaPercent": -34.865954955862584
+      },
+      "requestCount": {
+        "before": 65,
+        "after": 42,
+        "delta": -23,
+        "deltaPercent": -35.38461538461539
+      }
+    },
+    "afterConsoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ],
+    "afterHorizontalOverflow": false
+  },
+  {
+    "route": "/blog",
+    "strategy": "mobile",
+    "baselineSource": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "afterSource": "Local production build Chrome CDP after P1 blog cache follow-up, cold browser cache, warm server data cache, no artificial throttling",
+    "comparableNote": "Baseline was production; after run is local production build, so compare directionally until deployed.",
+    "metrics": {
+      "lcpMs": {
+        "before": 1564,
+        "after": 300,
+        "delta": -1264,
+        "deltaPercent": -80.81841432225065
+      },
+      "tbtApproxMs": {
+        "before": 14,
+        "after": 40,
+        "delta": 26,
+        "deltaPercent": 185.71428571428572
+      },
+      "cls": {
+        "before": 0,
+        "after": 0,
+        "delta": 0,
+        "deltaPercent": null
+      },
+      "transferBytes": {
+        "before": 486651,
+        "after": 452416,
+        "delta": -34235,
+        "deltaPercent": -7.034815504334728
+      },
+      "jsBytes": {
+        "before": 228739,
+        "after": 191372,
+        "delta": -37367,
+        "deltaPercent": -16.336086106872898
+      },
+      "requestCount": {
+        "before": 40,
+        "after": 31,
+        "delta": -9,
+        "deltaPercent": -22.5
+      }
+    },
+    "afterConsoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ],
+    "afterHorizontalOverflow": false
+  },
+  {
+    "route": "/blog",
+    "strategy": "desktop",
+    "baselineSource": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "afterSource": "Local production build Chrome CDP after P1 blog cache follow-up, cold browser cache, warm server data cache, no artificial throttling",
+    "comparableNote": "Baseline was production; after run is local production build, so compare directionally until deployed.",
+    "metrics": {
+      "lcpMs": {
+        "before": 1152,
+        "after": 316,
+        "delta": -836,
+        "deltaPercent": -72.56944444444444
+      },
+      "tbtApproxMs": {
+        "before": 2,
+        "after": 31,
+        "delta": 29,
+        "deltaPercent": 1450
+      },
+      "cls": {
+        "before": 0.007978052489920584,
+        "after": 0.013672399820665596,
+        "delta": 0.005694347330745012,
+        "deltaPercent": 71.3751550010383
+      },
+      "transferBytes": {
+        "before": 575053,
+        "after": 453680,
+        "delta": -121373,
+        "deltaPercent": -21.106402366390576
+      },
+      "jsBytes": {
+        "before": 291656,
+        "after": 191372,
+        "delta": -100284,
+        "deltaPercent": -34.38434319883699
+      },
+      "requestCount": {
+        "before": 67,
+        "after": 33,
+        "delta": -34,
+        "deltaPercent": -50.74626865671642
+      }
+    },
+    "afterConsoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ],
+    "afterHorizontalOverflow": false
+  },
+  {
+    "route": "/get-started",
+    "strategy": "mobile",
+    "baselineSource": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "afterSource": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "comparableNote": "Baseline was production; after run is local production build, so compare directionally until deployed.",
+    "metrics": {
+      "lcpMs": {
+        "before": 2080,
+        "after": 2088,
+        "delta": 8,
+        "deltaPercent": 0.38461538461538464
+      },
+      "tbtApproxMs": {
+        "before": 0,
+        "after": 151,
+        "delta": 151,
+        "deltaPercent": null
+      },
+      "cls": {
+        "before": 0,
+        "after": 0,
+        "delta": 0,
+        "deltaPercent": null
+      },
+      "transferBytes": {
+        "before": 489053,
+        "after": 452548,
+        "delta": -36505,
+        "deltaPercent": -7.464426146041431
+      },
+      "jsBytes": {
+        "before": 235977,
+        "after": 197966,
+        "delta": -38011,
+        "deltaPercent": -16.107925772426974
+      },
+      "requestCount": {
+        "before": 41,
+        "after": 32,
+        "delta": -9,
+        "deltaPercent": -21.951219512195124
+      }
+    },
+    "afterConsoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ],
+    "afterHorizontalOverflow": false
+  },
+  {
+    "route": "/get-started",
+    "strategy": "desktop",
+    "baselineSource": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "afterSource": "Local production build Chrome CDP after P1 edits, cold cache, no artificial throttling",
+    "comparableNote": "Baseline was production; after run is local production build, so compare directionally until deployed.",
+    "metrics": {
+      "lcpMs": {
+        "before": 1596,
+        "after": 720,
+        "delta": -876,
+        "deltaPercent": -54.88721804511278
+      },
+      "tbtApproxMs": {
+        "before": 0,
+        "after": 8,
+        "delta": 8,
+        "deltaPercent": null
+      },
+      "cls": {
+        "before": 0.0005623468841901072,
+        "after": 0.0007323742122869806,
+        "delta": 0.00017002732809687335,
+        "deltaPercent": 30.235310780061837
+      },
+      "transferBytes": {
+        "before": 576810,
+        "after": 452548,
+        "delta": -124262,
+        "deltaPercent": -21.542969088608032
+      },
+      "jsBytes": {
+        "before": 299054,
+        "after": 197966,
+        "delta": -101088,
+        "deltaPercent": -33.80259083643757
+      },
+      "requestCount": {
+        "before": 65,
+        "after": 32,
+        "delta": -33,
+        "deltaPercent": -50.76923076923077
+      }
+    },
+    "afterConsoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "Refused to execute script from 'http://localhost:3007/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled.",
+      "Refused to execute script from 'http://localhost:3007/_vercel/speed-insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled."
+    ],
+    "afterHorizontalOverflow": false
+  }
+]

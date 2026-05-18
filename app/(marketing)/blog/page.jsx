@@ -1,4 +1,5 @@
 import React from "react";
+import { unstable_cache } from 'next/cache';
 import dbConnect from '@/lib/marketing-db';
 import Blog from '@/models/marketing/Blog';
 import BlogList from '@/components/marketing/BlogList';
@@ -84,39 +85,55 @@ function getBlogDate(blog) {
   }).toUpperCase();
 }
 
+const getPublishedBlogList = unstable_cache(
+  async () => {
+    await dbConnect();
+
+    // Fetch only card/listing fields; full content belongs on detail pages.
+    const blogs = await Blog.find({ status: 'published' })
+      .select('title category shortDescription metaDescription image imageAlt slug publishedAt createdAt')
+      .sort({ publishedAt: -1, createdAt: -1 })
+      .lean();
+
+    const categoryNames = [
+      'ALL',
+      ...Array.from(
+        new Set(
+          blogs
+            .map((blog) => blog.category?.trim())
+            .filter(Boolean)
+        )
+      ).sort((left, right) => left.localeCompare(right))
+    ];
+
+    // Map DB objects to the format expected by BlogCard/BlogList.
+    const formattedBlogs = blogs.map(blog => ({
+      id: blog._id.toString(),
+      _id: blog._id.toString(),
+      title: blog.title,
+      category: blog.category || "Uncategorized",
+      excerpt: getBlogExcerpt(blog),
+      image: blog.image,
+      imageAlt: blog.imageAlt || blog.title,
+      slug: blog.slug,
+      date: getBlogDate(blog),
+    }));
+
+    return {
+      posts: formattedBlogs,
+      categories: categoryNames,
+    };
+  },
+  ['marketing-published-blog-list'],
+  {
+    revalidate: 60,
+    tags: ['marketing-published-blog-list'],
+  }
+);
+
 export default async function BlogPage() {
-  await dbConnect();
+  const { posts, categories } = await getPublishedBlogList();
 
-  // Fetch only published blogs with lean queries and field selection
-  const blogs = await Blog.find({ status: 'published' })
-    .select('title category content shortDescription metaDescription image imageAlt slug publishedAt createdAt')
-    .sort({ publishedAt: -1, createdAt: -1 })
-    .lean();
-
-  const categoryNames = [
-    'ALL',
-    ...Array.from(
-      new Set(
-        blogs
-          .map((blog) => blog.category?.trim())
-          .filter(Boolean)
-      )
-    ).sort((left, right) => left.localeCompare(right))
-  ];
-
-  // Map DB objects to the format expected by BlogCard/BlogList
-  const formattedBlogs = blogs.map(blog => ({
-    id: blog._id.toString(),
-    _id: blog._id.toString(),
-    title: blog.title,
-    category: blog.category || "Uncategorized",
-    excerpt: getBlogExcerpt(blog),
-    image: blog.image,
-    imageAlt: blog.imageAlt || blog.title,
-    slug: blog.slug,
-    date: getBlogDate(blog),
-  }));
-
-  return <BlogList posts={formattedBlogs} categories={categoryNames} />;
+  return <BlogList posts={posts} categories={categories} />;
 }
 

@@ -1,0 +1,1432 @@
+[
+  {
+    "measuredAt": "2026-05-17T20:25:20.203Z",
+    "source": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "route": "/",
+    "strategy": "mobile",
+    "url": "https://digitalcorvids.com/",
+    "title": "Digital Corvids | Digital Marketing Agency in Jaipur",
+    "bodyTextLength": 48839,
+    "domContentLoadedMs": 1934.6999998092651,
+    "loadEventMs": 2736.699999809265,
+    "transferSize": 18314,
+    "fcpMs": 1816,
+    "lcpMs": 1816,
+    "lcpSize": 24290,
+    "lcpUrl": "",
+    "cls": 0,
+    "longTaskCount": 4,
+    "tbtApproxMs": 626,
+    "hasOverlay": false,
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "visibleImages": [
+      {
+        "src": "https://digitalcorvids.com/home1.svg",
+        "alt": "Track Icon",
+        "top": 420,
+        "width": 64,
+        "height": 64,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/_next/image?url=%2Fdashboard-mockup-640-q84.jpg&w=828&q=75",
+        "alt": "Agency OS Dashboard — AI-powered company management platform",
+        "top": 1005,
+        "width": 356,
+        "height": 356,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/_next/image?url=%2Fdc-camp%2F1.png&w=3840&q=75",
+        "alt": "DC Camp 1",
+        "top": 2474,
+        "width": 104,
+        "height": 40,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/_next/image?url=%2Fdc-camp%2F2.png&w=3840&q=75",
+        "alt": "DC Camp 2",
+        "top": 2474,
+        "width": 104,
+        "height": 40,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/_next/image?url=%2Fdc-camp%2F3.png&w=3840&q=75",
+        "alt": "DC Camp 3",
+        "top": 2474,
+        "width": 104,
+        "height": 40,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/_next/image?url=%2Fdc-camp%2F4.png&w=3840&q=75",
+        "alt": "DC Camp 4",
+        "top": 2474,
+        "width": 104,
+        "height": 40,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/_next/image?url=%2Fdc-camp%2F5.png&w=3840&q=75",
+        "alt": "DC Camp 5",
+        "top": 2474,
+        "width": 104,
+        "height": 40,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/_next/image?url=%2Fdc-camp%2F6.png&w=3840&q=75",
+        "alt": "DC Camp 6",
+        "top": 2474,
+        "width": 104,
+        "height": 40,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 39,
+    "horizontalOverflow": false,
+    "requestCount": 52,
+    "transferBytes": 947589,
+    "jsBytes": 225022,
+    "cssBytes": 42497,
+    "imageBytes": 288796,
+    "fontBytes": 354018,
+    "documentBytes": 18585,
+    "topHosts": [
+      {
+        "host": "digitalcorvids.com",
+        "bytes": 947589
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "measuredAt": "2026-05-17T20:25:26.757Z",
+    "source": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "route": "/",
+    "strategy": "desktop",
+    "url": "https://digitalcorvids.com/",
+    "title": "Digital Corvids | Digital Marketing Agency in Jaipur",
+    "bodyTextLength": 48869,
+    "domContentLoadedMs": 4310.700000047684,
+    "loadEventMs": 0,
+    "transferSize": 18314,
+    "fcpMs": 4384,
+    "lcpMs": 4384,
+    "lcpSize": 104486,
+    "lcpUrl": "",
+    "cls": 0.0005460621238173888,
+    "longTaskCount": 7,
+    "tbtApproxMs": 349,
+    "hasOverlay": false,
+    "clientWidth": 1432,
+    "scrollWidth": 1432,
+    "visibleImages": [
+      {
+        "src": "https://digitalcorvids.com/home1.svg",
+        "alt": "Track Icon",
+        "top": 616,
+        "width": 112,
+        "height": 112,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/_next/image?url=%2Fdashboard-mockup-640-q84.jpg&w=1920&q=75",
+        "alt": "Agency OS Dashboard — AI-powered company management platform",
+        "top": 1036,
+        "width": 574,
+        "height": 359,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/_next/image?url=%2Fdc-camp%2F1.png&w=3840&q=75",
+        "alt": "DC Camp 1",
+        "top": 1975,
+        "width": 165,
+        "height": 80,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/_next/image?url=%2Fdc-camp%2F2.png&w=3840&q=75",
+        "alt": "DC Camp 2",
+        "top": 1975,
+        "width": 165,
+        "height": 80,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/_next/image?url=%2Fdc-camp%2F3.png&w=3840&q=75",
+        "alt": "DC Camp 3",
+        "top": 1975,
+        "width": 165,
+        "height": 80,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/_next/image?url=%2Fdc-camp%2F4.png&w=3840&q=75",
+        "alt": "DC Camp 4",
+        "top": 1975,
+        "width": 165,
+        "height": 80,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/_next/image?url=%2Fdc-camp%2F5.png&w=3840&q=75",
+        "alt": "DC Camp 5",
+        "top": 1975,
+        "width": 165,
+        "height": 80,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/_next/image?url=%2Fdc-camp%2F6.png&w=3840&q=75",
+        "alt": "DC Camp 6",
+        "top": 1975,
+        "width": 165,
+        "height": 80,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 38,
+    "horizontalOverflow": false,
+    "requestCount": 30,
+    "transferBytes": 495182,
+    "jsBytes": 223715,
+    "cssBytes": 42326,
+    "imageBytes": 0,
+    "fontBytes": 206097,
+    "documentBytes": 18204,
+    "topHosts": [
+      {
+        "host": "digitalcorvids.com",
+        "bytes": 495182
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "measuredAt": "2026-05-17T20:25:33.296Z",
+    "source": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "route": "/services",
+    "strategy": "mobile",
+    "url": "https://digitalcorvids.com/services",
+    "title": "Digital Marketing Services | Digital Corvids",
+    "bodyTextLength": 40253,
+    "domContentLoadedMs": 2172.600000143051,
+    "loadEventMs": 0,
+    "transferSize": 11296,
+    "fcpMs": 2188,
+    "lcpMs": 2188,
+    "lcpSize": 27060,
+    "lcpUrl": "",
+    "cls": 0,
+    "longTaskCount": 1,
+    "tbtApproxMs": 54,
+    "hasOverlay": false,
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "visibleImages": [
+      {
+        "src": "https://digitalcorvids.com/web3.svg",
+        "alt": "Web development",
+        "top": 262,
+        "width": 160,
+        "height": 160,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/web4.svg",
+        "alt": "Search engine optimization",
+        "top": 803,
+        "width": 160,
+        "height": 160,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/smm1.svg",
+        "alt": "Social Media marketing",
+        "top": 1409,
+        "width": 160,
+        "height": 160,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/vpd1.svg",
+        "alt": "Video & Ad Production",
+        "top": 2015,
+        "width": 160,
+        "height": 160,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ppc1.svg",
+        "alt": "PPC Advertising",
+        "top": 2621,
+        "width": 160,
+        "height": 160,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/inf1.svg",
+        "alt": "Influencer Marketing",
+        "top": 3191,
+        "width": 160,
+        "height": 160,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/_next/image?url=%2Fdashboard-mockup-640-q84.jpg&w=1080&q=75",
+        "alt": "Manage Company",
+        "top": 3768,
+        "width": 160,
+        "height": 160,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "AI Blogger",
+        "top": 4338,
+        "width": 160,
+        "height": 160,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 37,
+    "horizontalOverflow": false,
+    "requestCount": 44,
+    "transferBytes": 389082,
+    "jsBytes": 38463,
+    "cssBytes": 39894,
+    "imageBytes": 86199,
+    "fontBytes": 208135,
+    "documentBytes": 11477,
+    "topHosts": [
+      {
+        "host": "digitalcorvids.com",
+        "bytes": 389082
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "measuredAt": "2026-05-17T20:25:45.600Z",
+    "source": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "route": "/services",
+    "strategy": "desktop",
+    "url": "https://digitalcorvids.com/services",
+    "title": "Digital Marketing Services | Digital Corvids",
+    "bodyTextLength": 40253,
+    "domContentLoadedMs": 7212,
+    "loadEventMs": 7558.599999904633,
+    "transferSize": 11296,
+    "fcpMs": 7228,
+    "lcpMs": 7396,
+    "lcpSize": 296856,
+    "lcpUrl": "https://digitalcorvids.com/web3.svg",
+    "cls": 0.10078607897633732,
+    "longTaskCount": 1,
+    "tbtApproxMs": 5,
+    "hasOverlay": false,
+    "clientWidth": 1432,
+    "scrollWidth": 1432,
+    "visibleImages": [
+      {
+        "src": "https://digitalcorvids.com/web3.svg",
+        "alt": "Web development",
+        "top": 320,
+        "width": 558,
+        "height": 532,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/web4.svg",
+        "alt": "Search engine optimization",
+        "top": 964,
+        "width": 557,
+        "height": 557,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/smm1.svg",
+        "alt": "Social Media marketing",
+        "top": 1633,
+        "width": 520,
+        "height": 556,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/vpd1.svg",
+        "alt": "Video & Ad Production",
+        "top": 2301,
+        "width": 467,
+        "height": 520,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ppc1.svg",
+        "alt": "PPC Advertising",
+        "top": 2933,
+        "width": 464,
+        "height": 528,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/inf1.svg",
+        "alt": "Influencer Marketing",
+        "top": 3573,
+        "width": 504,
+        "height": 556,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/footer.svg",
+        "alt": "",
+        "top": 4827,
+        "width": 644,
+        "height": 452,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 44,
+    "horizontalOverflow": false,
+    "requestCount": 85,
+    "transferBytes": 1135113,
+    "jsBytes": 435810,
+    "cssBytes": 42410,
+    "imageBytes": 327103,
+    "fontBytes": 275148,
+    "documentBytes": 11309,
+    "topHosts": [
+      {
+        "host": "digitalcorvids.com",
+        "bytes": 1135113
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "measuredAt": "2026-05-17T20:25:52.221Z",
+    "source": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "route": "/services/seo",
+    "strategy": "mobile",
+    "url": "https://digitalcorvids.com/services/seo",
+    "title": "SEO Services in Jaipur | Digital Corvids",
+    "bodyTextLength": 63042,
+    "domContentLoadedMs": 810.6999998092651,
+    "loadEventMs": 1255.3999998569489,
+    "transferSize": 16089,
+    "fcpMs": 944,
+    "lcpMs": 1236,
+    "lcpSize": 116964,
+    "lcpUrl": "https://digitalcorvids.com/web4.svg",
+    "cls": 0,
+    "longTaskCount": 2,
+    "tbtApproxMs": 52,
+    "hasOverlay": false,
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "visibleImages": [
+      {
+        "src": "https://digitalcorvids.com/web4.svg",
+        "alt": "SEO Illustration",
+        "top": 254,
+        "width": 342,
+        "height": 342,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/seo2.svg",
+        "alt": "Technical SEO Illustration",
+        "top": 1265,
+        "width": 342,
+        "height": 319,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/seo3.svg",
+        "alt": "Keyword research illustration",
+        "top": 2215,
+        "width": 342,
+        "height": 342,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/seo4.svg",
+        "alt": "Local SEO illustration",
+        "top": 3138,
+        "width": 342,
+        "height": 342,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/seo5.svg",
+        "alt": "Link building illustration",
+        "top": 4140,
+        "width": 342,
+        "height": 342,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/footer.svg",
+        "alt": "",
+        "top": 9728,
+        "width": 390,
+        "height": 776,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 47,
+    "horizontalOverflow": false,
+    "requestCount": 43,
+    "transferBytes": 510484,
+    "jsBytes": 225325,
+    "cssBytes": 42358,
+    "imageBytes": 56998,
+    "fontBytes": 151611,
+    "documentBytes": 16001,
+    "topHosts": [
+      {
+        "host": "digitalcorvids.com",
+        "bytes": 510484
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "measuredAt": "2026-05-17T20:25:58.460Z",
+    "source": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "route": "/services/seo",
+    "strategy": "desktop",
+    "url": "https://digitalcorvids.com/services/seo",
+    "title": "SEO Services in Jaipur | Digital Corvids",
+    "bodyTextLength": 63042,
+    "domContentLoadedMs": 777.1999998092651,
+    "loadEventMs": 1056.3999998569489,
+    "transferSize": 16089,
+    "fcpMs": 784,
+    "lcpMs": 992,
+    "lcpSize": 160000,
+    "lcpUrl": "https://digitalcorvids.com/web4.svg",
+    "cls": 0.014258097197154712,
+    "longTaskCount": 1,
+    "tbtApproxMs": 47,
+    "hasOverlay": false,
+    "clientWidth": 1432,
+    "scrollWidth": 1432,
+    "visibleImages": [
+      {
+        "src": "https://digitalcorvids.com/web4.svg",
+        "alt": "SEO Illustration",
+        "top": 312,
+        "width": 400,
+        "height": 400,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/seo2.svg",
+        "alt": "Technical SEO Illustration",
+        "top": 857,
+        "width": 500,
+        "height": 466,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/seo3.svg",
+        "alt": "Keyword research illustration",
+        "top": 1510,
+        "width": 400,
+        "height": 343,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/seo4.svg",
+        "alt": "Local SEO illustration",
+        "top": 2053,
+        "width": 400,
+        "height": 321,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/seo5.svg",
+        "alt": "Link building illustration",
+        "top": 2532,
+        "width": 400,
+        "height": 400,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/footer.svg",
+        "alt": "",
+        "top": 5607,
+        "width": 644,
+        "height": 452,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 51,
+    "horizontalOverflow": false,
+    "requestCount": 63,
+    "transferBytes": 700284,
+    "jsBytes": 288024,
+    "cssBytes": 42378,
+    "imageBytes": 104440,
+    "fontBytes": 216127,
+    "documentBytes": 15969,
+    "topHosts": [
+      {
+        "host": "digitalcorvids.com",
+        "bytes": 700284
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "measuredAt": "2026-05-17T20:26:05.015Z",
+    "source": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "route": "/services/web-development",
+    "strategy": "mobile",
+    "url": "https://digitalcorvids.com/services/web-development",
+    "title": "Web Development Services | Digital Corvids",
+    "bodyTextLength": 60759,
+    "domContentLoadedMs": 1058.7000000476837,
+    "loadEventMs": 1085.5999999046326,
+    "transferSize": 15425,
+    "fcpMs": 1024,
+    "lcpMs": 1264,
+    "lcpSize": 111492,
+    "lcpUrl": "https://digitalcorvids.com/web3.svg",
+    "cls": 0,
+    "longTaskCount": 1,
+    "tbtApproxMs": 31,
+    "hasOverlay": false,
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "visibleImages": [
+      {
+        "src": "https://digitalcorvids.com/web3.svg",
+        "alt": "Web Development Illustration",
+        "top": 255,
+        "width": 342,
+        "height": 326,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/web6.svg",
+        "alt": "UX Research Illustration",
+        "top": 1200,
+        "width": 342,
+        "height": 289,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/web1.svg",
+        "alt": "Responsive development illustration",
+        "top": 2114,
+        "width": 342,
+        "height": 342,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/web4.svg",
+        "alt": "Technical SEO illustration",
+        "top": 2999,
+        "width": 342,
+        "height": 342,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/web5.svg",
+        "alt": "Performance optimization illustration",
+        "top": 3868,
+        "width": 342,
+        "height": 342,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/footer.svg",
+        "alt": "",
+        "top": 9349,
+        "width": 390,
+        "height": 776,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 45,
+    "horizontalOverflow": false,
+    "requestCount": 45,
+    "transferBytes": 578019,
+    "jsBytes": 225330,
+    "cssBytes": 42382,
+    "imageBytes": 124269,
+    "fontBytes": 151970,
+    "documentBytes": 15485,
+    "topHosts": [
+      {
+        "host": "digitalcorvids.com",
+        "bytes": 578019
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "measuredAt": "2026-05-17T20:26:11.235Z",
+    "source": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "route": "/services/web-development",
+    "strategy": "desktop",
+    "url": "https://digitalcorvids.com/services/web-development",
+    "title": "Web Development Services | Digital Corvids",
+    "bodyTextLength": 60759,
+    "domContentLoadedMs": 727.5,
+    "loadEventMs": 972.2999999523163,
+    "transferSize": 15425,
+    "fcpMs": 744,
+    "lcpMs": 916,
+    "lcpSize": 152400,
+    "lcpUrl": "https://digitalcorvids.com/web3.svg",
+    "cls": 0.0026176952307067148,
+    "longTaskCount": 1,
+    "tbtApproxMs": 26,
+    "hasOverlay": false,
+    "clientWidth": 1432,
+    "scrollWidth": 1432,
+    "visibleImages": [
+      {
+        "src": "https://digitalcorvids.com/web3.svg",
+        "alt": "Web Development Illustration",
+        "top": 319,
+        "width": 400,
+        "height": 381,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/web6.svg",
+        "alt": "UX Research Illustration",
+        "top": 836,
+        "width": 500,
+        "height": 423,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/web1.svg",
+        "alt": "Responsive development illustration",
+        "top": 1384,
+        "width": 400,
+        "height": 309,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/web4.svg",
+        "alt": "Technical SEO illustration",
+        "top": 1822,
+        "width": 400,
+        "height": 400,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/web5.svg",
+        "alt": "Performance optimization illustration",
+        "top": 2322,
+        "width": 400,
+        "height": 389,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/footer.svg",
+        "alt": "",
+        "top": 5330,
+        "width": 644,
+        "height": 452,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 49,
+    "horizontalOverflow": false,
+    "requestCount": 66,
+    "transferBytes": 748445,
+    "jsBytes": 288066,
+    "cssBytes": 42391,
+    "imageBytes": 151972,
+    "fontBytes": 215960,
+    "documentBytes": 15404,
+    "topHosts": [
+      {
+        "host": "digitalcorvids.com",
+        "bytes": 748445
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "measuredAt": "2026-05-17T20:26:17.761Z",
+    "source": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "route": "/services/ppc",
+    "strategy": "mobile",
+    "url": "https://digitalcorvids.com/services/ppc",
+    "title": "PPC Advertising Services | Digital Corvids",
+    "bodyTextLength": 68854,
+    "domContentLoadedMs": 678.6000001430511,
+    "loadEventMs": 1061,
+    "transferSize": 16725,
+    "fcpMs": 876,
+    "lcpMs": 1140,
+    "lcpSize": 89320,
+    "lcpUrl": "https://digitalcorvids.com/ppc1.svg",
+    "cls": 0,
+    "longTaskCount": 1,
+    "tbtApproxMs": 103,
+    "hasOverlay": false,
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "visibleImages": [
+      {
+        "src": "https://digitalcorvids.com/ppc1.svg",
+        "alt": "PPC Advertising",
+        "top": 282,
+        "width": 280,
+        "height": 319,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ppc2.svg",
+        "alt": "Strategic Campaign Planning",
+        "top": 1160,
+        "width": 300,
+        "height": 226,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ppc3.svg",
+        "alt": "Ad Creation & Copywriting",
+        "top": 1810,
+        "width": 280,
+        "height": 257,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ppc4.svg",
+        "alt": "Platform Mastery",
+        "top": 2538,
+        "width": 280,
+        "height": 280,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ppc5.svg",
+        "alt": "Bid Management & Optimization",
+        "top": 3217,
+        "width": 280,
+        "height": 280,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ppc6.svg",
+        "alt": "Transparent Analytics & Reporting",
+        "top": 3920,
+        "width": 280,
+        "height": 280,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/footer.svg",
+        "alt": "",
+        "top": 9008,
+        "width": 390,
+        "height": 776,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 47,
+    "horizontalOverflow": false,
+    "requestCount": 46,
+    "transferBytes": 601714,
+    "jsBytes": 225178,
+    "cssBytes": 42343,
+    "imageBytes": 114614,
+    "fontBytes": 184059,
+    "documentBytes": 16782,
+    "topHosts": [
+      {
+        "host": "digitalcorvids.com",
+        "bytes": 601714
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "measuredAt": "2026-05-17T20:26:24.005Z",
+    "source": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "route": "/services/ppc",
+    "strategy": "desktop",
+    "url": "https://digitalcorvids.com/services/ppc",
+    "title": "PPC Advertising Services | Digital Corvids",
+    "bodyTextLength": 68854,
+    "domContentLoadedMs": 447.5,
+    "loadEventMs": 928.8999998569489,
+    "transferSize": 16725,
+    "fcpMs": 640,
+    "lcpMs": 824,
+    "lcpSize": 202500,
+    "lcpUrl": "https://digitalcorvids.com/ppc1.svg",
+    "cls": 0.01639954876927928,
+    "longTaskCount": 1,
+    "tbtApproxMs": 89,
+    "hasOverlay": false,
+    "clientWidth": 1432,
+    "scrollWidth": 1432,
+    "visibleImages": [
+      {
+        "src": "https://digitalcorvids.com/ppc1.svg",
+        "alt": "PPC Advertising",
+        "top": 376,
+        "width": 450,
+        "height": 512,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ppc2.svg",
+        "alt": "Strategic Campaign Planning",
+        "top": 1016,
+        "width": 550,
+        "height": 415,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ppc3.svg",
+        "alt": "Ad Creation & Copywriting",
+        "top": 1559,
+        "width": 450,
+        "height": 414,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ppc4.svg",
+        "alt": "Platform Mastery",
+        "top": 2101,
+        "width": 450,
+        "height": 440,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ppc5.svg",
+        "alt": "Bid Management & Optimization",
+        "top": 2669,
+        "width": 450,
+        "height": 450,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ppc6.svg",
+        "alt": "Transparent Analytics & Reporting",
+        "top": 3247,
+        "width": 450,
+        "height": 450,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/footer.svg",
+        "alt": "",
+        "top": 6143,
+        "width": 644,
+        "height": 452,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 51,
+    "horizontalOverflow": false,
+    "requestCount": 65,
+    "transferBytes": 687545,
+    "jsBytes": 287851,
+    "cssBytes": 42539,
+    "imageBytes": 119655,
+    "fontBytes": 183891,
+    "documentBytes": 16625,
+    "topHosts": [
+      {
+        "host": "digitalcorvids.com",
+        "bytes": 687545
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "measuredAt": "2026-05-17T20:26:30.904Z",
+    "source": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "route": "/blog",
+    "strategy": "mobile",
+    "url": "https://digitalcorvids.com/blog",
+    "title": "Digital Marketing Blog | Digital Corvids",
+    "bodyTextLength": 46944,
+    "domContentLoadedMs": 1314.6000001430511,
+    "loadEventMs": 1568.3000001907349,
+    "transferSize": 16616,
+    "fcpMs": 1436,
+    "lcpMs": 1564,
+    "lcpSize": 27222,
+    "lcpUrl": "",
+    "cls": 0,
+    "longTaskCount": 1,
+    "tbtApproxMs": 14,
+    "hasOverlay": false,
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "visibleImages": [
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "A high-tech digital marketing dashboard showing e-commerce growth metrics, short-form video thumbnails, and a mobile shopping interface representing discovery-led commerce.",
+        "top": 2037,
+        "width": 356,
+        "height": 319,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "A digital analytics dashboard showing conversion rates and performance metrics for influencer campaigns within specific industrial and technical verticals.",
+        "top": 2939,
+        "width": 356,
+        "height": 266,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "A professional digital workspace showing multiple monitors with video editing software and LinkedIn analytics dashboards, representing a modern B2B video scaling engine.",
+        "top": 3590,
+        "width": 356,
+        "height": 266,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "A professional video production set showing a creator filming a high-quality YouTube video with professional cameras, lighting, and a detailed storyboard in the background.",
+        "top": 4242,
+        "width": 356,
+        "height": 266,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "A modern marketing professional reviewing high-impact video assets and industry-specific data on a digital dashboard for a 2026 campaign.",
+        "top": 4893,
+        "width": 356,
+        "height": 266,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "A modern marketing director reviewing a digital dashboard that integrates AI content performance metrics with human engagement scores for 2026 media planning.",
+        "top": 5545,
+        "width": 356,
+        "height": 266,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "A professional digital marketing dashboard showing analytics for Instagram, LinkedIn, and X with a central framework diagram highlighting the 3-3-3 rule and 2026 production mandate.",
+        "top": 6196,
+        "width": 356,
+        "height": 266,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "A professional digital workspace showing a complex 2026 social media content calendar with icons for reels, carousels, and AI-driven workflow steps on a high-end monitor.",
+        "top": 6848,
+        "width": 356,
+        "height": 266,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 31,
+    "horizontalOverflow": false,
+    "requestCount": 40,
+    "transferBytes": 486651,
+    "jsBytes": 228739,
+    "cssBytes": 42386,
+    "imageBytes": 1028,
+    "fontBytes": 183780,
+    "documentBytes": 17288,
+    "topHosts": [
+      {
+        "host": "digitalcorvids.com",
+        "bytes": 486651
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "measuredAt": "2026-05-17T20:26:37.095Z",
+    "source": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "route": "/blog",
+    "strategy": "desktop",
+    "url": "https://digitalcorvids.com/blog",
+    "title": "Digital Marketing Blog | Digital Corvids",
+    "bodyTextLength": 46944,
+    "domContentLoadedMs": 1015.2000000476837,
+    "loadEventMs": 1226.2999999523163,
+    "transferSize": 16616,
+    "fcpMs": 1052,
+    "lcpMs": 1152,
+    "lcpSize": 152152,
+    "lcpUrl": "",
+    "cls": 0.007978052489920584,
+    "longTaskCount": 1,
+    "tbtApproxMs": 2,
+    "hasOverlay": false,
+    "clientWidth": 1432,
+    "scrollWidth": 1432,
+    "visibleImages": [
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "A high-tech digital marketing dashboard showing e-commerce growth metrics, short-form video thumbnails, and a mobile shopping interface representing discovery-led commerce.",
+        "top": 984,
+        "width": 734,
+        "height": 520,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "A digital analytics dashboard showing conversion rates and performance metrics for influencer campaigns within specific industrial and technical verticals.",
+        "top": 1582,
+        "width": 403,
+        "height": 301,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "A professional digital workspace showing multiple monitors with video editing software and LinkedIn analytics dashboards, representing a modern B2B video scaling engine.",
+        "top": 1582,
+        "width": 403,
+        "height": 301,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "A professional video production set showing a creator filming a high-quality YouTube video with professional cameras, lighting, and a detailed storyboard in the background.",
+        "top": 1582,
+        "width": 403,
+        "height": 302,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "A modern marketing professional reviewing high-impact video assets and industry-specific data on a digital dashboard for a 2026 campaign.",
+        "top": 2347,
+        "width": 403,
+        "height": 301,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "A modern marketing director reviewing a digital dashboard that integrates AI content performance metrics with human engagement scores for 2026 media planning.",
+        "top": 2347,
+        "width": 403,
+        "height": 301,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "A professional digital marketing dashboard showing analytics for Instagram, LinkedIn, and X with a central framework diagram highlighting the 3-3-3 rule and 2026 production mandate.",
+        "top": 2347,
+        "width": 403,
+        "height": 302,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      },
+      {
+        "src": "https://digitalcorvids.com/ai-blogger.svg",
+        "alt": "A professional digital workspace showing a complex 2026 social media content calendar with icons for reels, carousels, and AI-driven workflow steps on a high-end monitor.",
+        "top": 3112,
+        "width": 403,
+        "height": 301,
+        "complete": false,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 35,
+    "horizontalOverflow": false,
+    "requestCount": 67,
+    "transferBytes": 575053,
+    "jsBytes": 291656,
+    "cssBytes": 42374,
+    "imageBytes": 3064,
+    "fontBytes": 183725,
+    "documentBytes": 17084,
+    "topHosts": [
+      {
+        "host": "digitalcorvids.com",
+        "bytes": 575053
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "measuredAt": "2026-05-17T20:26:43.627Z",
+    "source": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "route": "/get-started",
+    "strategy": "mobile",
+    "url": "https://digitalcorvids.com/get-started",
+    "title": "Get Started With Digital Corvids | Growth Strategy Call",
+    "bodyTextLength": 29009,
+    "domContentLoadedMs": 910.5999999046326,
+    "loadEventMs": 1447.5999999046326,
+    "transferSize": 8996,
+    "fcpMs": 1024,
+    "lcpMs": 2080,
+    "lcpSize": 23288,
+    "lcpUrl": "",
+    "cls": 0,
+    "longTaskCount": 0,
+    "tbtApproxMs": 0,
+    "hasOverlay": false,
+    "clientWidth": 390,
+    "scrollWidth": 390,
+    "visibleImages": [
+      {
+        "src": "https://digitalcorvids.com/footer.svg",
+        "alt": "",
+        "top": 7295,
+        "width": 390,
+        "height": 776,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 33,
+    "horizontalOverflow": false,
+    "requestCount": 41,
+    "transferBytes": 489053,
+    "jsBytes": 235977,
+    "cssBytes": 42444,
+    "imageBytes": 4760,
+    "fontBytes": 183741,
+    "documentBytes": 8946,
+    "topHosts": [
+      {
+        "host": "digitalcorvids.com",
+        "bytes": 489053
+      }
+    ],
+    "consoleErrors": []
+  },
+  {
+    "measuredAt": "2026-05-17T20:26:49.771Z",
+    "source": "Chrome CDP lab baseline, cold cache, no artificial throttling",
+    "route": "/get-started",
+    "strategy": "desktop",
+    "url": "https://digitalcorvids.com/get-started",
+    "title": "Get Started With Digital Corvids | Growth Strategy Call",
+    "bodyTextLength": 29009,
+    "domContentLoadedMs": 805.9000000953674,
+    "loadEventMs": 1101.7999999523163,
+    "transferSize": 8996,
+    "fcpMs": 880,
+    "lcpMs": 1596,
+    "lcpSize": 151956,
+    "lcpUrl": "",
+    "cls": 0.0005623468841901072,
+    "longTaskCount": 0,
+    "tbtApproxMs": 0,
+    "hasOverlay": false,
+    "clientWidth": 1432,
+    "scrollWidth": 1432,
+    "visibleImages": [
+      {
+        "src": "https://digitalcorvids.com/footer.svg",
+        "alt": "",
+        "top": 5049,
+        "width": 644,
+        "height": 452,
+        "complete": true,
+        "loading": "lazy",
+        "fetchPriority": "auto"
+      }
+    ],
+    "scripts": 37,
+    "horizontalOverflow": false,
+    "requestCount": 65,
+    "transferBytes": 576810,
+    "jsBytes": 299054,
+    "cssBytes": 42366,
+    "imageBytes": 4760,
+    "fontBytes": 183717,
+    "documentBytes": 8886,
+    "topHosts": [
+      {
+        "host": "digitalcorvids.com",
+        "bytes": 576810
+      }
+    ],
+    "consoleErrors": []
+  }
+]

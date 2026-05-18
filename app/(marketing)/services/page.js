@@ -66,7 +66,11 @@ export default function Services() {
       id: "07",
       title: "Manage",
       titleHighlight: "Company",
-      image: "/dashboard-mockup-640-q84.jpg",
+      image: "/dashboard-mockup-service-564-q84.jpg",
+      imageWidth: 564,
+      imageHeight: 404,
+      imageClassName: "h-auto w-72 sm:w-[26rem] md:w-[34rem] lg:w-[34rem] max-w-full",
+      imageSizes: "(min-width: 1024px) 544px, (min-width: 768px) 544px, (min-width: 640px) 416px, 288px",
       description: "AI-powered agency management platform. Track projects, manage finances, automate invoicing, and let AI handle the heavy lifting.",
       link: "/services/manage-company",
       tagline: "AI-POWERED MANAGEMENT",
@@ -95,6 +99,10 @@ export default function Services() {
         {/* Services Grid - Zigzag Layout */}
         {servicesData.map((service, index) => {
           const isEven = index % 2 === 0;
+          const imageWidth = service.imageWidth ?? 420;
+          const imageHeight = service.imageHeight ?? 420;
+          const imageClassName = service.imageClassName ?? "h-auto w-40 sm:w-56 md:w-80 lg:w-auto";
+          const imageSizes = service.imageSizes ?? "(min-width: 1024px) 420px, (min-width: 768px) 320px, (min-width: 640px) 224px, 160px";
 
           return (
             <div key={service.id}>
@@ -106,9 +114,11 @@ export default function Services() {
                     <Image
                       src={service.image}
                       alt={`${service.title} ${service.titleHighlight}`}
-                      width={420}
-                      height={420}
-                      className="h-auto w-40 sm:w-56 md:w-80 lg:w-auto"
+                      width={imageWidth}
+                      height={imageHeight}
+                      priority={index === 0}
+                      sizes={imageSizes}
+                      className={imageClassName}
                     />
                   </div>
                 </div>
@@ -131,6 +141,7 @@ export default function Services() {
                   <div className={`text-center ${isEven ? 'lg:text-left' : 'lg:text-right'}`}>
                     <Link
                       href={service.link}
+                      prefetch={false}
                       className="inline-block bg-white text-black font-bold uppercase px-6 py-3 rounded-full hover:bg-[#F5EE30] transition-all w-full sm:w-auto text-center"
                     >
                       Explore Service
