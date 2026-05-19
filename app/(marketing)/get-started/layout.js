@@ -9,10 +9,5 @@ export const metadata = buildMarketingMetadata({
 });
 
 export default function GetStartedLayout({ children }) {
-  return (
-    <>
-      <h1 className="sr-only">Get Started With Digital Corvids</h1>
-      {children}
-    </>
-  );
+  return children;
 }

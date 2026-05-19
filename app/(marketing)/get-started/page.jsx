@@ -274,7 +274,8 @@ function GetStartedPageContent() {
                             <button
                                 type="button"
                                 onClick={() => handleAuthViewChange("signup")}
-                                className={`group inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold uppercase transition-all duration-300 sm:px-8 sm:py-4 sm:text-base ${authView === "signup"
+                                aria-pressed={authView === "signup"}
+                                className={`group inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold uppercase transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] sm:px-8 sm:py-4 sm:text-base ${authView === "signup"
                                         ? "bg-[#F5EE30] text-black hover:bg-yellow-300 hover:shadow-[0_0_30px_rgba(245,238,48,0.3)]"
                                         : "border border-white/30 text-white hover:border-[#F5EE30] hover:text-[#F5EE30]"
                                     }`}
@@ -285,7 +286,8 @@ function GetStartedPageContent() {
                             <button
                                 type="button"
                                 onClick={() => handleAuthViewChange("login")}
-                                className={`inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold uppercase transition-all duration-300 sm:px-8 sm:py-4 sm:text-base ${authView === "login"
+                                aria-pressed={authView === "login"}
+                                className={`inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold uppercase transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] sm:px-8 sm:py-4 sm:text-base ${authView === "login"
                                         ? "bg-[#F5EE30] text-black hover:bg-yellow-300 hover:shadow-[0_0_30px_rgba(245,238,48,0.3)]"
                                         : "border border-white/30 text-white hover:border-[#F5EE30] hover:text-[#F5EE30]"
                                     }`}
@@ -317,7 +319,7 @@ function GetStartedPageContent() {
                     ) : (
                         <div className="mx-auto max-w-2xl rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 sm:p-10">
                             {loginError && (
-                                <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                                <div id="get-started-login-error" role="alert" className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
                                     {loginError}
                                 </div>
                             )}
@@ -334,24 +336,26 @@ function GetStartedPageContent() {
                                 </p>
                             </div>
 
-                            <form onSubmit={handleLogin} className="space-y-5">
+                            <form onSubmit={handleLogin} className="space-y-5" aria-describedby={loginError ? "get-started-login-error" : undefined}>
                                 <div>
-                                    <label className="mb-2 block text-sm font-glacial-bold uppercase tracking-wide text-gray-400">
+                                    <label htmlFor="get-started-login-email" className="mb-2 block text-sm font-glacial-bold uppercase tracking-wide text-gray-400">
                                         Email Address
                                     </label>
                                     <input
+                                        id="get-started-login-email"
                                         type="email"
                                         value={loginEmail}
                                         onChange={(event) => setLoginEmail(event.target.value)}
-                                        className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3.5 text-white placeholder-gray-600 transition-colors focus:border-[#F5EE30]/50 focus:outline-none"
+                                        className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3.5 text-white placeholder-gray-600 transition-colors focus:border-[#F5EE30]/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5EE30]/40"
                                         placeholder="you@company.com"
+                                        autoComplete="email"
                                         required
                                     />
                                 </div>
 
                                 <div>
                                     <div className="mb-2 flex items-center justify-between">
-                                        <label className="block text-sm font-glacial-bold uppercase tracking-wide text-gray-400">
+                                        <label htmlFor="get-started-login-password" className="block text-sm font-glacial-bold uppercase tracking-wide text-gray-400">
                                             Password
                                         </label>
                                         <Link
@@ -363,19 +367,23 @@ function GetStartedPageContent() {
                                     </div>
                                     <div className="relative">
                                         <input
+                                            id="get-started-login-password"
                                             type={showLoginPassword ? "text" : "password"}
                                             value={loginPassword}
                                             onChange={(event) => setLoginPassword(event.target.value)}
-                                            className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3.5 pr-12 text-white placeholder-gray-600 transition-colors focus:border-[#F5EE30]/50 focus:outline-none"
+                                            className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3.5 pr-12 text-white placeholder-gray-600 transition-colors focus:border-[#F5EE30]/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#F5EE30]/40"
                                             placeholder="Enter your password"
+                                            autoComplete="current-password"
                                             required
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setShowLoginPassword((value) => !value)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 transition-colors hover:text-gray-300"
+                                            aria-label={showLoginPassword ? "Hide password" : "Show password"}
+                                            aria-pressed={showLoginPassword}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 transition-colors hover:text-gray-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
                                         >
-                                            {showLoginPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                            {showLoginPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
                                         </button>
                                     </div>
                                 </div>
@@ -383,7 +391,7 @@ function GetStartedPageContent() {
                                 <button
                                     type="submit"
                                     disabled={loginLoading}
-                                    className="w-full rounded-full bg-[#F5EE30] px-10 py-4 text-base font-bold uppercase text-black transition-all duration-300 hover:bg-yellow-300 hover:shadow-[0_0_40px_rgba(245,238,48,0.3)] disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="w-full rounded-full bg-[#F5EE30] px-10 py-4 text-base font-bold uppercase text-black transition-all duration-300 hover:bg-yellow-300 hover:shadow-[0_0_40px_rgba(245,238,48,0.3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     {loginLoading ? "Signing In..." : "Sign In"}
                                 </button>
@@ -394,7 +402,7 @@ function GetStartedPageContent() {
                                 <button
                                     type="button"
                                     onClick={() => handleAuthViewChange("signup")}
-                                    className="text-[#F5EE30] hover:underline"
+                                    className="text-[#F5EE30] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
                                 >
                                     Create one here
                                 </button>

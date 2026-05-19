@@ -101,6 +101,7 @@ P1 plan
   - Audit heading order, labels, alt text, focus states, form errors, and keyboard navigation.
   - Keep mobile layouts free of horizontal overflow after new content changes.
   - Improve CTA clarity and form friction on conversion pages.
+  - Done 2026-05-20: improved public marketing accessibility by connecting contact, newsletter, get-started, and login form labels; adding live regions for form feedback; adding focus-visible states to navigation, footer, contact, and form controls; making the mobile nav keyboard/ARIA-aware; removing the duplicate get-started hidden H1; and verifying key pages for missing control names, missing image alt text, duplicate IDs, H1 count, and mobile overflow.
 - Off-page and sharing:
   - Validate OG/Twitter previews for home, service, and blog pages.
   - Build high-quality citations, partner links, social profile consistency, and relevant backlinks.

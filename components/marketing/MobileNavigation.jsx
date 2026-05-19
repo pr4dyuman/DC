@@ -21,6 +21,8 @@ export default function MobileNavigation({ servicesList }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
   const pathname = usePathname();
+  const mobileMenuId = "mobile-navigation-panel";
+  const mobileServicesId = "mobile-navigation-services";
   const isLoggedIn = useSyncExternalStore(
     subscribeToCookieChanges,
     hasLoggedInCookie,
@@ -35,22 +37,41 @@ export default function MobileNavigation({ servicesList }) {
     };
   }, [mobileOpen]);
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setMobileOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [mobileOpen]);
+
   const isActive = (path) => pathname === path;
 
   return (
     <>
       {/* Mobile Hamburger */}
       <button
-        aria-label="Toggle menu"
-        className="md:hidden text-white focus:outline-none"
+        aria-label="Open mobile menu"
+        aria-controls={mobileMenuId}
+        aria-expanded={mobileOpen}
+        className="md:hidden text-white focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
         onClick={() => setMobileOpen(true)}
       >
-        <Menu className="w-7 h-7" />
+        <Menu className="w-7 h-7" aria-hidden="true" />
       </button>
 
       {/* Mobile Menu Overlay */}
       <div
+        id={mobileMenuId}
         aria-hidden={!mobileOpen}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Mobile navigation"
         className={`fixed left-0 top-0 z-50 h-[100dvh] w-screen max-w-[100vw] overflow-hidden transition-opacity duration-300 ease-in-out md:hidden ${
           mobileOpen ? "block pointer-events-auto opacity-100" : "hidden pointer-events-none opacity-0"
         }`}
@@ -70,10 +91,10 @@ export default function MobileNavigation({ servicesList }) {
           {/* Close Icon */}
           <button
             aria-label="Close menu"
-            className="self-end text-white hover:text-[#F5EE30] mb-10 transition-colors"
+            className="self-end text-white hover:text-[#F5EE30] mb-10 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
             onClick={() => setMobileOpen(false)}
           >
-            <X className="w-8 h-8" />
+            <X className="w-8 h-8" aria-hidden="true" />
           </button>
 
           {/* Links */}
@@ -81,7 +102,7 @@ export default function MobileNavigation({ servicesList }) {
             <Link
               href="/"
               prefetch={false}
-              className={`block py-2 border-b border-white/10 ${
+              className={`block py-2 border-b border-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] ${
                 isActive("/") ? "text-[#F5EE30]" : "hover:text-[#F5EE30]"
               }`}
               onClick={() => setMobileOpen(false)}
@@ -92,7 +113,9 @@ export default function MobileNavigation({ servicesList }) {
             {/* Mobile Services with Dropdown */}
             <div>
               <button
-                className={`w-full text-left py-2 border-b border-white/10 flex items-center justify-between ${
+                aria-controls={mobileServicesId}
+                aria-expanded={mobileServicesOpen}
+                className={`w-full text-left py-2 border-b border-white/10 flex items-center justify-between focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] ${
                   pathname.startsWith("/services")
                     ? "text-[#F5EE30]"
                     : "hover:text-[#F5EE30]"
@@ -107,6 +130,7 @@ export default function MobileNavigation({ servicesList }) {
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
+                  aria-hidden="true"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
@@ -114,6 +138,8 @@ export default function MobileNavigation({ servicesList }) {
 
               {/* Dropdown Menu */}
               <div
+                id={mobileServicesId}
+                aria-hidden={!mobileServicesOpen}
                 className={`overflow-hidden transition-all duration-300 ${
                   mobileServicesOpen ? "max-h-96" : "max-h-0"
                 }`}
@@ -124,7 +150,8 @@ export default function MobileNavigation({ servicesList }) {
                       key={service.href}
                       href={service.href}
                       prefetch={false}
-                      className={`block py-2 text-lg ${
+                      tabIndex={mobileServicesOpen ? undefined : -1}
+                      className={`block py-2 text-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] ${
                         isActive(service.href)
                           ? "text-[#F5EE30]"
                           : "hover:text-[#F5EE30]"
@@ -141,7 +168,7 @@ export default function MobileNavigation({ servicesList }) {
             <Link
               href="/about"
               prefetch={false}
-              className={`block py-2 border-b border-white/10 ${
+              className={`block py-2 border-b border-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] ${
                 isActive("/about") ? "text-[#F5EE30]" : "hover:text-[#F5EE30]"
               }`}
               onClick={() => setMobileOpen(false)}
@@ -151,7 +178,7 @@ export default function MobileNavigation({ servicesList }) {
             <Link
               href={isLoggedIn ? "/dashboard" : "/login"}
               prefetch={false}
-              className="block py-2 text-[#F5EE30] border-b border-white/10"
+              className="block py-2 text-[#F5EE30] border-b border-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
               onClick={() => setMobileOpen(false)}
             >
               {isLoggedIn ? "DASHBOARD" : "LOGIN"}
@@ -159,7 +186,7 @@ export default function MobileNavigation({ servicesList }) {
             <Link
               href="/contact"
               prefetch={false}
-              className="block py-2 hover:text-[#F5EE30] transition-colors font-etna border-b border-white/10"
+              className="block py-2 hover:text-[#F5EE30] transition-colors font-etna border-b border-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
               onClick={() => setMobileOpen(false)}
             >
               GET IN TOUCH

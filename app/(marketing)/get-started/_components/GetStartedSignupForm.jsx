@@ -5,7 +5,19 @@ import Image from "next/image";
 import { ArrowRight, Shield } from "lucide-react";
 
 const inputClass =
-    "w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-[#F5EE30]/50 transition-colors";
+    "w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-[#F5EE30]/50 focus-visible:ring-2 focus-visible:ring-[#F5EE30]/40 transition-colors";
+
+const fieldIds = {
+    agencyName: "signup-agency-name",
+    ownerName: "signup-owner-name",
+    email: "signup-email",
+    password: "signup-password",
+    confirmPassword: "signup-confirm-password",
+    phone: "signup-phone",
+    gender: "signup-gender",
+    logo: "signup-logo",
+    otp: "signup-otp",
+};
 
 export default function GetStartedSignupForm({
     formData,
@@ -50,21 +62,24 @@ export default function GetStartedSignupForm({
                 <form
                     onSubmit={onSendOtp}
                     className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 sm:p-10"
+                    aria-describedby={error ? "signup-form-error" : undefined}
                 >
                     {error && (
-                        <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm">
+                        <div id="signup-form-error" role="alert" className="mb-6 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm">
                             {error}
                         </div>
                     )}
 
                     <div className="space-y-5">
                         <div>
-                            <label className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
+                            <label htmlFor={fieldIds.agencyName} className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
                                 Agency / Company Name *
                             </label>
                             <input
+                                id={fieldIds.agencyName}
                                 type="text"
                                 required
+                                autoComplete="organization"
                                 value={formData.agencyName}
                                 onChange={(event) => onFormFieldChange("agencyName", event.target.value)}
                                 className={inputClass}
@@ -73,12 +88,14 @@ export default function GetStartedSignupForm({
                         </div>
 
                         <div>
-                            <label className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
+                            <label htmlFor={fieldIds.ownerName} className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
                                 Your Full Name *
                             </label>
                             <input
+                                id={fieldIds.ownerName}
                                 type="text"
                                 required
+                                autoComplete="name"
                                 value={formData.ownerName}
                                 onChange={(event) => onFormFieldChange("ownerName", event.target.value)}
                                 className={inputClass}
@@ -87,30 +104,35 @@ export default function GetStartedSignupForm({
                         </div>
 
                         <div>
-                            <label className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
+                            <label htmlFor={fieldIds.email} className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
                                 Email Address *
                             </label>
                             <input
+                                id={fieldIds.email}
                                 type="email"
                                 required
+                                autoComplete="email"
                                 value={formData.email}
                                 onChange={(event) => onFormFieldChange("email", event.target.value)}
                                 className={inputClass}
                                 placeholder="you@company.com"
+                                aria-describedby="signup-email-hint"
                             />
-                            <p className="text-xs text-gray-600 mt-1.5">This will be your login email</p>
+                            <p id="signup-email-hint" className="text-xs text-gray-600 mt-1.5">This will be your login email</p>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                             <div>
-                                <label className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
+                                <label htmlFor={fieldIds.password} className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
                                     Password *
                                 </label>
                                 <div className="relative">
                                     <input
+                                        id={fieldIds.password}
                                         type={showPassword ? "text" : "password"}
                                         required
                                         minLength={6}
+                                        autoComplete="new-password"
                                         value={formData.password}
                                         onChange={(event) => onFormFieldChange("password", event.target.value)}
                                         className={`${inputClass} pr-12`}
@@ -119,20 +141,24 @@ export default function GetStartedSignupForm({
                                     <button
                                         type="button"
                                         onClick={onTogglePassword}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-xs uppercase tracking-wide"
+                                        aria-label={showPassword ? "Hide password" : "Show password"}
+                                        aria-pressed={showPassword}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-xs uppercase tracking-wide focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
                                     >
                                         {showPassword ? "Hide" : "Show"}
                                     </button>
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
+                                <label htmlFor={fieldIds.confirmPassword} className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
                                     Confirm Password *
                                 </label>
                                 <input
+                                    id={fieldIds.confirmPassword}
                                     type={showPassword ? "text" : "password"}
                                     required
                                     minLength={6}
+                                    autoComplete="new-password"
                                     value={formData.confirmPassword}
                                     onChange={(event) => onFormFieldChange("confirmPassword", event.target.value)}
                                     className={inputClass}
@@ -142,11 +168,13 @@ export default function GetStartedSignupForm({
                         </div>
 
                         <div>
-                            <label className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
+                            <label htmlFor={fieldIds.phone} className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
                                 Phone Number
                             </label>
                             <input
+                                id={fieldIds.phone}
                                 type="tel"
+                                autoComplete="tel"
                                 value={formData.phone}
                                 onChange={(event) => onFormFieldChange("phone", event.target.value)}
                                 className={inputClass}
@@ -155,10 +183,11 @@ export default function GetStartedSignupForm({
                         </div>
 
                         <div>
-                            <label className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
+                            <label htmlFor={fieldIds.gender} className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
                                 Gender *
                             </label>
                             <select
+                                id={fieldIds.gender}
                                 required
                                 value={formData.gender}
                                 onChange={(event) => onFormFieldChange("gender", event.target.value)}
@@ -171,7 +200,7 @@ export default function GetStartedSignupForm({
                         </div>
 
                         <div>
-                            <label className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
+                            <label htmlFor={fieldIds.logo} className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide">
                                 Agency Logo (Optional)
                             </label>
                             <div className="flex items-center gap-4">
@@ -192,12 +221,13 @@ export default function GetStartedSignupForm({
                                     </div>
                                 )}
                                 <div className="flex-1">
-                                    <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-gray-400 hover:border-[#F5EE30]/30 hover:text-white transition-all">
+                                    <label htmlFor={fieldIds.logo} className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-gray-400 hover:border-[#F5EE30]/30 hover:text-white focus-within:border-[#F5EE30]/50 focus-within:ring-2 focus-within:ring-[#F5EE30]/30 transition-all">
                                         <input
+                                            id={fieldIds.logo}
                                             type="file"
                                             accept="image/png,image/jpeg,image/gif,image/webp"
                                             onChange={onLogoChange}
-                                            className="hidden"
+                                            className="sr-only"
                                         />
                                         {logoPreview ? "Change Logo" : "Upload Logo"}
                                     </label>
@@ -216,25 +246,28 @@ export default function GetStartedSignupForm({
 
                     {otpSent ? (
                         <div className="space-y-4">
-                            <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-green-400 text-sm text-center">
+                            <div role="status" aria-live="polite" className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 text-green-400 text-sm text-center">
                                 Verification code sent to <strong>{formData.email}</strong>
                             </div>
                             <div>
-                                <label className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide text-center">
+                                <label htmlFor={fieldIds.otp} className="block text-sm text-gray-400 mb-2 font-glacial-bold uppercase tracking-wide text-center">
                                     Enter 6-Digit Verification Code
                                 </label>
                                 <input
+                                    id={fieldIds.otp}
                                     type="text"
                                     inputMode="numeric"
                                     maxLength={6}
                                     value={otp}
                                     onChange={(event) => onOtpChange(event.target.value)}
-                                    className="w-full bg-black/50 border-2 border-[#F5EE30]/30 rounded-xl px-4 py-4 text-white text-center text-2xl tracking-[0.5em] font-bold placeholder-gray-600 focus:outline-none focus:border-[#F5EE30] transition-colors"
+                                    className="w-full bg-black/50 border-2 border-[#F5EE30]/30 rounded-xl px-4 py-4 text-white text-center text-2xl tracking-[0.5em] font-bold placeholder-gray-600 focus:outline-none focus:border-[#F5EE30] focus-visible:ring-2 focus-visible:ring-[#F5EE30]/40 transition-colors"
                                     placeholder="000000"
+                                    aria-describedby="signup-otp-timer"
+                                    autoComplete="one-time-code"
                                     autoFocus
                                 />
                                 <div className="flex items-center justify-between mt-2">
-                                    <p className="text-xs text-gray-500">
+                                    <p id="signup-otp-timer" className="text-xs text-gray-500">
                                         {otpTimer > 0
                                             ? `Expires in ${Math.floor(otpTimer / 60)}:${String(otpTimer % 60).padStart(2, "0")}`
                                             : "Code expired"}
@@ -243,7 +276,7 @@ export default function GetStartedSignupForm({
                                         type="button"
                                         onClick={onSendOtp}
                                         disabled={sendingOtp || otpTimer > 240}
-                                        className="text-xs text-[#F5EE30] hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                                        className="text-xs text-[#F5EE30] hover:underline disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
                                     >
                                         {sendingOtp ? "Sending..." : "Resend Code"}
                                     </button>
@@ -253,7 +286,7 @@ export default function GetStartedSignupForm({
                                 type="button"
                                 onClick={onSubmit}
                                 disabled={submitting || otp.length !== 6}
-                                className="w-full group inline-flex items-center justify-center gap-3 bg-[#F5EE30] text-black font-bold uppercase text-base px-10 py-4 rounded-full hover:bg-yellow-300 transition-all duration-300 hover:shadow-[0_0_40px_rgba(245,238,48,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full group inline-flex items-center justify-center gap-3 bg-[#F5EE30] text-black font-bold uppercase text-base px-10 py-4 rounded-full hover:bg-yellow-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] transition-all duration-300 hover:shadow-[0_0_40px_rgba(245,238,48,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {submitting ? (
                                     "Creating Your Account..."
@@ -269,7 +302,7 @@ export default function GetStartedSignupForm({
                         <button
                             type="submit"
                             disabled={sendingOtp}
-                            className="w-full group inline-flex items-center justify-center gap-3 bg-[#F5EE30] text-black font-bold uppercase text-base px-10 py-4 rounded-full hover:bg-yellow-300 transition-all duration-300 hover:shadow-[0_0_40px_rgba(245,238,48,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full group inline-flex items-center justify-center gap-3 bg-[#F5EE30] text-black font-bold uppercase text-base px-10 py-4 rounded-full hover:bg-yellow-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] transition-all duration-300 hover:shadow-[0_0_40px_rgba(245,238,48,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {sendingOtp ? (
                                 "Sending Verification Code..."
@@ -285,11 +318,11 @@ export default function GetStartedSignupForm({
                     <p className="text-center text-sm text-gray-600 mt-4">
                         Already have an account?{" "}
                         {onOpenSignIn ? (
-                            <button type="button" onClick={onOpenSignIn} className="text-[#F5EE30] hover:underline">
+                            <button type="button" onClick={onOpenSignIn} className="text-[#F5EE30] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]">
                                 Sign in
                             </button>
                         ) : (
-                            <Link href="/login" className="text-[#F5EE30] hover:underline">
+                            <Link href="/login" className="text-[#F5EE30] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]">
                                 Sign in
                             </Link>
                         )}

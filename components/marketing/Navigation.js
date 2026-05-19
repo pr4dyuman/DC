@@ -15,11 +15,16 @@ const servicesList = [
 
 export default function Navigation() {
   return (
-    <nav className="bg-black text-white shadow-md py-6 md:py-7 font-glacial relative z-50">
+    <nav aria-label="Primary navigation" className="bg-black text-white shadow-md py-6 md:py-7 font-glacial relative z-50">
       <NavigationEnhancer />
       <div className="max-w-7xl mx-auto flex items-center justify-between px-6">
         {/* Logo Section */}
-        <Link href="/" prefetch={false} className="flex items-center space-x-3 group">
+        <Link
+          href="/"
+          prefetch={false}
+          aria-label="Digital Corvids home"
+          className="flex items-center space-x-3 group focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
+        >
           <span className="text-[#F5EE30] text-5xl sm:text-6xl md:text-7xl font-suifak tracking-tight group-hover:drop-shadow-[0_0_10px_rgba(245,238,48,0.5)] transition-all">
             DC
           </span>
@@ -35,7 +40,7 @@ export default function Navigation() {
               href="/"
               prefetch={false}
               data-nav-path="/"
-              className="transition-all duration-200 hover:text-[#F5EE30]"
+              className="transition-all duration-200 hover:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
             >
               HOME
             </Link>
@@ -45,12 +50,12 @@ export default function Navigation() {
               href="/services"
               prefetch={false}
               data-nav-path="/services"
-              className="transition-all duration-200 hover:text-[#F5EE30]"
+              className="transition-all duration-200 hover:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
             >
               SERVICES
             </Link>
             {/* Dropdown Menu */}
-            <div className="absolute left-1/2 -translate-x-1/2 top-full pt-4 hidden group-hover:block w-56">
+            <div className="absolute left-1/2 -translate-x-1/2 top-full pt-4 hidden group-hover:block group-focus-within:block w-56">
               <div className="bg-black/50 border border-white/10 shadow-xl rounded-sm overflow-hidden flex flex-col">
                 {servicesList.map((service) => (
                   <Link
@@ -58,7 +63,7 @@ export default function Navigation() {
                     href={service.href}
                     prefetch={false}
                     data-nav-path={service.href}
-                    className="px-4 py-3 hover:bg-white/10 hover:text-[#F5EE30] transition-colors border-b border-white/5 last:border-0 text-white"
+                    className="px-4 py-3 hover:bg-white/10 hover:text-[#F5EE30] focus-visible:bg-white/10 focus-visible:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#F5EE30] transition-colors border-b border-white/5 last:border-0 text-white"
                   >
                     {service.name}
                   </Link>
@@ -71,7 +76,7 @@ export default function Navigation() {
               href="/about"
               prefetch={false}
               data-nav-path="/about"
-              className="transition-all duration-200 hover:text-[#F5EE30]"
+              className="transition-all duration-200 hover:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
             >
               ABOUT US
             </Link>
@@ -83,7 +88,7 @@ export default function Navigation() {
               data-auth-nav-link
               data-nav-path="/login"
               data-nav-group="auth"
-              className="transition-all duration-200 hover:text-[#F5EE30]"
+              className="transition-all duration-200 hover:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
             >
               LOGIN
             </Link>
@@ -95,7 +100,7 @@ export default function Navigation() {
           <Link
             href="/contact"
             prefetch={false}
-            className="text-4xl font-bold hover:text-[#F5EE30] transition-all duration-200 font-etna"
+            className="text-4xl font-bold hover:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] transition-all duration-200 font-etna"
           >
             GET IN TOUCH
           </Link>

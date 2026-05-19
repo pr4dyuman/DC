@@ -24,7 +24,7 @@ const ContactPage = () => {
               CONTACT US
             </h1>
             <div className="flex items-center justify-center gap-2 text-[14px] md:text-[16px]">
-              <Link href="/" className="text-white hover:text-[#F5EE30] transition-colors font-medium">
+              <Link href="/" className="text-white hover:text-[#F5EE30] transition-colors font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]">
                 HOME
               </Link>
               <span className="text-white">|</span>
@@ -121,10 +121,10 @@ const ContactPage = () => {
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <h3 className="text-[16px] md:text-[18px] font-bold uppercase tracking-wide">CONTACT</h3>
                 <div className="text-[13px] md:text-[14px] text-gray-300 md:text-right space-y-1">
-                  <a href="mailto:flytheraven@digitalcorvids.com" className="block hover:text-white transition-colors">
+                  <a href="mailto:flytheraven@digitalcorvids.com" className="block hover:text-white transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]">
                     flytheraven@digitalcorvids.com
                   </a>
-                  <a href="tel:+918003177679" className="block hover:text-white transition-colors">
+                  <a href="tel:+918003177679" className="block hover:text-white transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]">
                     +91-8003177679
                   </a>
                 </div>
@@ -135,16 +135,16 @@ const ContactPage = () => {
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <h3 className="text-[16px] md:text-[18px] font-bold uppercase tracking-wide">SOCIAL</h3>
                 <div className="flex gap-6 text-[13px] md:text-[14px] font-medium">
-                  <Link href="https://www.facebook.com/profile.php?id=61571171168177" target="_blank" rel="noopener noreferrer" className="hover:text-[#F5EE30] transition-colors uppercase">
+                  <Link href="https://www.facebook.com/profile.php?id=61571171168177" target="_blank" rel="noopener noreferrer" className="hover:text-[#F5EE30] transition-colors uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]">
                     Facebook
                   </Link>
-                  <Link href="https://www.instagram.com/digitalcorvids/" target="_blank" rel="noopener noreferrer" className="hover:text-[#F5EE30] transition-colors uppercase">
+                  <Link href="https://www.instagram.com/digitalcorvids/" target="_blank" rel="noopener noreferrer" className="hover:text-[#F5EE30] transition-colors uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]">
                     Instagram
                   </Link>
-                  <Link href="https://www.linkedin.com/company/digital-corvids/" target="_blank" rel="noopener noreferrer" className="hover:text-[#F5EE30] transition-colors uppercase">
+                  <Link href="https://www.linkedin.com/company/digital-corvids/" target="_blank" rel="noopener noreferrer" className="hover:text-[#F5EE30] transition-colors uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]">
                     LinkedIn
                   </Link>
-                  <Link href="https://wa.me/918003177679" target="_blank" rel="noopener noreferrer" className="hover:text-[#F5EE30] transition-colors uppercase">
+                  <Link href="https://wa.me/918003177679" target="_blank" rel="noopener noreferrer" className="hover:text-[#F5EE30] transition-colors uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]">
                     WhatsApp
                   </Link>
                 </div>
