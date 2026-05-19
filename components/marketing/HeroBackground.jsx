@@ -22,6 +22,13 @@ export default function HeroBackground() {
         let prefersReducedMotion = motionQuery.matches;
         let isInViewport = true;
         let isDocumentVisible = !document.hidden;
+        let activeParticleCount = 36;
+        let activeOrbCount = 3;
+        let beamCount = 2;
+        let connectionDistance = 145;
+        let frameInterval = 1000 / 24;
+        let lastFrameTime = 0;
+        let useParticleGlow = true;
         const shouldAnimate = () =>
             !prefersReducedMotion && isInViewport && isDocumentVisible;
 
@@ -38,10 +45,21 @@ export default function HeroBackground() {
             }
         };
 
+        const configureQuality = () => {
+            const compact = window.innerWidth < 768;
+            activeParticleCount = compact ? 22 : 36;
+            activeOrbCount = compact ? 1 : 3;
+            beamCount = compact ? 1 : 2;
+            connectionDistance = compact ? 105 : 145;
+            frameInterval = 1000 / (compact ? 15 : 24);
+            useParticleGlow = !compact;
+            dpr = Math.min(window.devicePixelRatio || 1, compact ? 1.15 : 1.6);
+        };
+
         const resize = () => {
             const parent = canvas.parentElement;
             if (!parent) return;
-            dpr = Math.min(window.devicePixelRatio || 1, 2);
+            configureQuality();
             const w = parent.offsetWidth;
             const h = parent.offsetHeight;
             canvas.width = w * dpr;
@@ -54,7 +72,7 @@ export default function HeroBackground() {
         window.addEventListener("resize", resize);
 
         // ── Particles ──
-        const COUNT = 45;
+        const COUNT = 36;
         const particles = Array.from({ length: COUNT }, () => ({
             x: Math.random(),
             y: Math.random(),
@@ -71,10 +89,16 @@ export default function HeroBackground() {
             { x: 0.5, y: 0.2, r: 160, speed: 0.00015, phase: 4 },
         ];
 
-        const draw = () => {
+        const draw = (timestamp = 0) => {
+            if (shouldAnimate() && timestamp && timestamp - lastFrameTime < frameInterval) {
+                animationId = requestAnimationFrame(draw);
+                return;
+            }
+
+            lastFrameTime = timestamp || performance.now();
             const w = canvas.width / dpr;
             const h = canvas.height / dpr;
-            time += 0.012;
+            time += 0.016;
 
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             ctx.clearRect(0, 0, w, h);
@@ -108,7 +132,8 @@ export default function HeroBackground() {
             }
 
             // ── Pulsing orbs ──
-            orbs.forEach((orb) => {
+            for (let index = 0; index < activeOrbCount; index++) {
+                const orb = orbs[index];
                 orb.x += Math.sin(time * 0.5 + orb.phase) * orb.speed;
                 orb.y += Math.cos(time * 0.4 + orb.phase) * orb.speed;
 
@@ -126,10 +151,10 @@ export default function HeroBackground() {
                 ctx.beginPath();
                 ctx.arc(ox, oy, radius, 0, Math.PI * 2);
                 ctx.fill();
-            });
+            }
 
             // ── Bold sweeping light beams ──
-            for (let i = 0; i < 2; i++) {
+            for (let i = 0; i < beamCount; i++) {
                 const phase = time * 0.25 + i * Math.PI;
                 const beamX = w * (0.5 + 0.7 * Math.sin(phase));
                 const beamW = w * 0.2;
@@ -161,7 +186,8 @@ export default function HeroBackground() {
             ctx.restore();
 
             // ── Update + draw particles ──
-            particles.forEach((p) => {
+            for (let index = 0; index < activeParticleCount; index++) {
+                const p = particles[index];
                 p.x += p.vx;
                 p.y += p.vy;
                 p.phase += 0.03;
@@ -177,13 +203,14 @@ export default function HeroBackground() {
                 const pulse = 0.6 + 0.4 * Math.sin(p.phase);
                 const cr = p.r * pulse;
 
-                // Glow halo
-                const glow = ctx.createRadialGradient(px, py, 0, px, py, cr * 6);
-                glow.addColorStop(0, `rgba(245, 238, 48, ${0.25 * pulse})`);
-                glow.addColorStop(0.5, `rgba(245, 238, 48, ${0.08 * pulse})`);
-                glow.addColorStop(1, "rgba(245, 238, 48, 0)");
-                ctx.fillStyle = glow;
-                ctx.fillRect(px - cr * 6, py - cr * 6, cr * 12, cr * 12);
+                if (useParticleGlow) {
+                    const glow = ctx.createRadialGradient(px, py, 0, px, py, cr * 6);
+                    glow.addColorStop(0, `rgba(245, 238, 48, ${0.25 * pulse})`);
+                    glow.addColorStop(0.5, `rgba(245, 238, 48, ${0.08 * pulse})`);
+                    glow.addColorStop(1, "rgba(245, 238, 48, 0)");
+                    ctx.fillStyle = glow;
+                    ctx.fillRect(px - cr * 6, py - cr * 6, cr * 12, cr * 12);
+                }
 
                 // Core dot
                 ctx.beginPath();
@@ -196,17 +223,17 @@ export default function HeroBackground() {
                 ctx.arc(px, py, cr * 0.4, 0, Math.PI * 2);
                 ctx.fillStyle = `rgba(245, 238, 48, ${0.4 * pulse})`;
                 ctx.fill();
-            });
+            }
 
             // ── Connection lines ──
             ctx.lineWidth = 1;
-            for (let i = 0; i < particles.length; i++) {
-                for (let j = i + 1; j < particles.length; j++) {
+            for (let i = 0; i < activeParticleCount; i++) {
+                for (let j = i + 1; j < activeParticleCount; j++) {
                     const dx = (particles[i].x - particles[j].x) * w;
                     const dy = (particles[i].y - particles[j].y) * h;
                     const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < 150) {
-                        const alpha = (1 - dist / 150) * 0.15;
+                    if (dist < connectionDistance) {
+                        const alpha = (1 - dist / connectionDistance) * 0.15;
                         ctx.strokeStyle = `rgba(245, 238, 48, ${alpha})`;
                         ctx.beginPath();
                         ctx.moveTo(particles[i].x * w, particles[i].y * h);

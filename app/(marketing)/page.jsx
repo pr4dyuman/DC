@@ -1,6 +1,6 @@
 import Image from "next/image";
 import AboutAgency from "@/components/marketing/AboutAgency";
-import ServicesSection from "@/components/marketing/ServiceSlider";
+import LazyServicesSection from "@/components/marketing/LazyServicesSection";
 import ManageCompanySection from "@/components/marketing/ManageCompany";
 import HeroBackground from "@/components/marketing/HeroBackground";
 import HomeRotatingWord from "@/components/marketing/HomeRotatingWord";
@@ -78,7 +78,7 @@ const HeroSection = () => {
         <DigitalPartnersSlider />
       </section>
 
-      <ServicesSection />
+      <LazyServicesSection />
       <AboutAgency />
 
       {/* New Auto-Width Services Slider */}
