@@ -110,6 +110,10 @@ P1 plan
 - Monitoring cadence:
   - Review Search Console indexing, queries, pages, Core Web Vitals, crawl stats, and structured data warnings monthly.
   - Re-run build, sitemap, robots, schema, and mobile overflow checks before major releases.
+  - Done 2026-05-20: added `npm run audit:seo` for repeatable SEO QA against production or localhost. It checks robots.txt, sitemap.xml, public page metadata, canonical URLs, social preview tags, server-rendered H1s, JSON-LD parsing, private-route noindex signals, webmaster verification meta, and /og-image.
+  - Usage: `npm run audit:seo -- https://digitalcorvids.com` or `npm run audit:seo -- http://localhost:3000 --max-pages=20`.
+  - Production run 2026-05-20: 210 pass, 0 fail, 2 warnings. Warnings: webmaster verification tokens are not configured locally yet, and /get-started currently has no server-rendered H1 in production.
+  - Remaining manual step: add Search Console and Bing Webmaster verification tokens in Vercel, redeploy, run the audit, then submit `https://digitalcorvids.com/sitemap.xml` in both dashboards.
 
 1. Crawlability and indexability
 - Public pages must return HTTP 200.
