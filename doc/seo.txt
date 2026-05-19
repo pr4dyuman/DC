@@ -81,6 +81,7 @@ P1 plan
   - Strengthen Organization, LocalBusiness, and sameAs schema.
   - Add consistent NAP, Jaipur/India service-area context, and trust signals where natural.
   - Connect Google Business Profile, Bing Places, and citation profiles to the same canonical site data.
+  - Done 2026-05-19: strengthened global ProfessionalService schema with sameAs social profiles, phone, email, Jaipur/Rajasthan address, contactPoint, service knowledge areas, and an offer catalog. Added ContactPage JSON-LD for /contact.
 - Content depth and internal linking:
   - Build service topic clusters with supporting blog posts for SEO, PPC, web development, social media, video, and influencer marketing.
   - Add real case studies, examples, testimonials, tools used, timelines, deliverables, and engagement models where available.

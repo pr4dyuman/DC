@@ -5,6 +5,23 @@ export const MARKETING_SITE_NAME = "Digital Corvids";
 export const MARKETING_DEFAULT_DESCRIPTION =
     "Digital Corvids is a Jaipur-based digital marketing agency for SEO, PPC, social media marketing, web development, video production, influencer marketing, and AI blogging.";
 
+export const MARKETING_EMAIL = "flytheraven@digitalcorvids.com";
+export const MARKETING_PHONE = "+91-8003177679";
+export const MARKETING_PHONE_E164 = "+918003177679";
+export const MARKETING_ADDRESS = {
+    streetAddress: "Malviya Nagar",
+    addressLocality: "Jaipur",
+    addressRegion: "Rajasthan",
+    addressCountry: "IN",
+};
+export const MARKETING_SOCIAL_PROFILES = [
+    "https://www.facebook.com/profile.php?id=61571171168177",
+    "https://www.instagram.com/digitalcorvids/",
+    "https://www.linkedin.com/company/digital-corvids/",
+    "https://www.linkedin.com/in/digital-corvids-681389306",
+    "https://wa.me/918003177679",
+];
+
 export const MARKETING_SITE_URL = (
     process.env.NEXT_PUBLIC_SITE_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
@@ -12,6 +29,44 @@ export const MARKETING_SITE_URL = (
 ).replace(/\/+$/, "");
 
 const DEFAULT_IMAGE_PATH = "/hero.webp";
+
+const marketingOfferCatalog = [
+    {
+        name: "SEO Services",
+        url: "/services/seo",
+        serviceType: "Search Engine Optimization",
+    },
+    {
+        name: "PPC Advertising",
+        url: "/services/ppc",
+        serviceType: "Paid Search and Paid Media Advertising",
+    },
+    {
+        name: "Social Media Marketing",
+        url: "/services/social-media-marketing",
+        serviceType: "Social Media Marketing",
+    },
+    {
+        name: "Web Development",
+        url: "/services/web-development",
+        serviceType: "Website Design and Development",
+    },
+    {
+        name: "Video Production and Ad Films",
+        url: "/services/video-production-ad",
+        serviceType: "Video Production",
+    },
+    {
+        name: "Influencer Marketing",
+        url: "/services/influencer-marketing",
+        serviceType: "Influencer Marketing",
+    },
+    {
+        name: "AI Blogger",
+        url: "/services/ai-blogger",
+        serviceType: "AI-assisted Blog Planning and Publishing",
+    },
+];
 
 export function marketingAbsoluteUrl(path = "/") {
     if (/^https?:\/\//i.test(path)) {
@@ -92,19 +147,55 @@ export function getMarketingOrganizationJsonLd() {
     return {
         "@context": "https://schema.org",
         "@type": "ProfessionalService",
+        "@id": `${MARKETING_SITE_URL}/#organization`,
         name: MARKETING_SITE_NAME,
+        alternateName: "DC Digital Corvids",
         url: MARKETING_SITE_URL,
         logo: marketingAbsoluteUrl("/favicon.ico"),
         image: marketingAbsoluteUrl(DEFAULT_IMAGE_PATH),
         description: MARKETING_DEFAULT_DESCRIPTION,
-        email: "flytheraven@digitalcorvids.com",
+        email: MARKETING_EMAIL,
+        telephone: MARKETING_PHONE,
+        priceRange: "$$",
         address: {
             "@type": "PostalAddress",
-            addressLocality: "Jaipur",
-            addressRegion: "Rajasthan",
-            addressCountry: "IN",
+            ...MARKETING_ADDRESS,
         },
-        areaServed: ["Jaipur", "India"],
+        areaServed: [
+            {
+                "@type": "City",
+                name: "Jaipur",
+            },
+            {
+                "@type": "State",
+                name: "Rajasthan",
+            },
+            {
+                "@type": "Country",
+                name: "India",
+            },
+        ],
+        contactPoint: [
+            {
+                "@type": "ContactPoint",
+                contactType: "customer support",
+                email: MARKETING_EMAIL,
+                telephone: MARKETING_PHONE_E164,
+                areaServed: "IN",
+                availableLanguage: ["en", "hi"],
+            },
+        ],
+        sameAs: MARKETING_SOCIAL_PROFILES,
+        knowsAbout: [
+            "Digital marketing strategy",
+            "Search engine optimization",
+            "Paid media advertising",
+            "Social media marketing",
+            "Website development",
+            "Video advertising",
+            "Influencer marketing",
+            "AI-assisted content workflows",
+        ],
         serviceType: [
             "Search Engine Optimization",
             "PPC Advertising",
@@ -114,6 +205,19 @@ export function getMarketingOrganizationJsonLd() {
             "Influencer Marketing",
             "AI Blogging",
         ],
+        hasOfferCatalog: {
+            "@type": "OfferCatalog",
+            name: "Digital Corvids digital marketing services",
+            itemListElement: marketingOfferCatalog.map((service) => ({
+                "@type": "Offer",
+                itemOffered: {
+                    "@type": "Service",
+                    name: service.name,
+                    serviceType: service.serviceType,
+                    url: marketingAbsoluteUrl(service.url),
+                },
+            })),
+        },
     };
 }
 
@@ -121,10 +225,36 @@ export function getMarketingWebsiteJsonLd() {
     return {
         "@context": "https://schema.org",
         "@type": "WebSite",
+        "@id": `${MARKETING_SITE_URL}/#website`,
         name: MARKETING_SITE_NAME,
         url: MARKETING_SITE_URL,
         description: MARKETING_DEFAULT_DESCRIPTION,
         inLanguage: "en-IN",
+        publisher: {
+            "@id": `${MARKETING_SITE_URL}/#organization`,
+        },
+    };
+}
+
+export function getMarketingContactPageJsonLd() {
+    return {
+        "@context": "https://schema.org",
+        "@type": "ContactPage",
+        "@id": `${marketingAbsoluteUrl("/contact")}#webpage`,
+        name: "Contact Digital Corvids",
+        url: marketingAbsoluteUrl("/contact"),
+        description:
+            "Contact Digital Corvids in Jaipur for SEO, PPC, social media marketing, web development, video production, influencer marketing, and AI blogging support.",
+        inLanguage: "en-IN",
+        isPartOf: {
+            "@id": `${MARKETING_SITE_URL}/#website`,
+        },
+        about: {
+            "@id": `${MARKETING_SITE_URL}/#organization`,
+        },
+        mainEntity: {
+            "@id": `${MARKETING_SITE_URL}/#organization`,
+        },
     };
 }
 
@@ -165,14 +295,14 @@ export function getMarketingServiceJsonLd(input: {
         url: marketingAbsoluteUrl(input.path),
         provider: {
             "@type": "ProfessionalService",
+            "@id": `${MARKETING_SITE_URL}/#organization`,
             name: MARKETING_SITE_NAME,
             url: MARKETING_SITE_URL,
-            email: "flytheraven@digitalcorvids.com",
+            email: MARKETING_EMAIL,
+            telephone: MARKETING_PHONE,
             address: {
                 "@type": "PostalAddress",
-                addressLocality: "Jaipur",
-                addressRegion: "Rajasthan",
-                addressCountry: "IN",
+                ...MARKETING_ADDRESS,
             },
         },
         areaServed: [

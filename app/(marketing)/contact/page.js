@@ -1,10 +1,20 @@
 import Image from "next/image";
 import Link from "next/link";
 import ContactForm from "./ContactForm";
+import {
+  getMarketingContactPageJsonLd,
+  serializeMarketingJsonLd,
+} from "@/lib/marketing-seo";
 
 const ContactPage = () => {
+  const structuredData = getMarketingContactPageJsonLd();
+
   return (
     <div className="min-h-screen bg-black text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
+      />
       {/* Hero Section */}
       <div className="relative px-6 md:px-12 lg:px-16 pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12">
         <div className="max-w-7xl mx-auto">

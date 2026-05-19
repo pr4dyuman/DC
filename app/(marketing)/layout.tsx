@@ -4,6 +4,7 @@ import {
     buildMarketingMetadata,
     getMarketingOrganizationJsonLd,
     getMarketingWebsiteJsonLd,
+    serializeMarketingJsonLd,
 } from "@/lib/marketing-seo";
 
 export const metadata = buildMarketingMetadata({
@@ -56,7 +57,7 @@ export default function MarketingLayout({
             />
             <script
                 type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+                dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
             />
             <Navigation />
             {children}
