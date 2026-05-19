@@ -109,6 +109,9 @@ export default function AboutAgency() {
               alt="Creative team illustration with gears"
               width={600}
               height={600}
+              loading="lazy"
+              fetchPriority="low"
+              sizes="(min-width: 1024px) 512px, (min-width: 640px) 448px, 100vw"
               className="w-full max-w-sm sm:max-w-md lg:max-w-lg h-auto object-contain"
             />
           </div>

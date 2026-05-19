@@ -168,7 +168,7 @@ const ServicesSection = () => {
           <div className="lg:w-2/3">
             <h3 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-white uppercase leading-tight">
               <span className="text-white block">Your Growth Fuelled By</span>
-              <span className="text-[#3d3d3d] block">Our Expertise</span>
+              <span className="text-[#666666] block">Our Expertise</span>
             </h3>
           </div>
 
@@ -189,6 +189,8 @@ const ServicesSection = () => {
           alt="Background"
           width={1920}
           height={900}
+          loading="lazy"
+          fetchPriority="low"
           sizes="100vw"
           className="w-full h-[500px] sm:h-[600px] md:h-[700px] lg:h-[800px] xl:h-[900px] object-cover filter grayscale opacity-50"
         />
@@ -265,6 +267,8 @@ const ServicesSection = () => {
                             alt={`${service.title} ${service.titleHighlight}`}
                             width={350}
                             height={350}
+                            loading="lazy"
+                            fetchPriority="low"
                             sizes="(min-width: 1280px) 320px, (min-width: 1024px) 28vw, (min-width: 768px) 42vw, (min-width: 640px) 58vw, 80vw"
                             className="w-full h-[140px] sm:h-[180px] md:h-[220px] lg:h-[280px] xl:h-[350px] object-contain"
                           />

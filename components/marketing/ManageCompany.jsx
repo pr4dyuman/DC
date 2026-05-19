@@ -77,7 +77,7 @@ export default function ManageCompanySection({ headingLevel = "h2", imagePriorit
                                 prefetch={false}
                                 className="inline-flex items-center gap-2 border border-white/30 text-white font-bold uppercase text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 rounded-full hover:border-[#F5EE30] hover:text-[#F5EE30] transition-all duration-300"
                             >
-                                Learn More
+                                Learn More<span className="sr-only"> about Manage Company</span>
                             </Link>
                         </div>
                     </div>

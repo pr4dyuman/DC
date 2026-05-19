@@ -22,8 +22,11 @@ export default function HeroBackground() {
         let prefersReducedMotion = motionQuery.matches;
         let isInViewport = true;
         let isDocumentVisible = !document.hidden;
+        let initialAnimationReady = false;
+        let initialStartTimer;
 
-        const shouldAnimate = () => !prefersReducedMotion && isInViewport && isDocumentVisible;
+        const shouldAnimate = () =>
+            initialAnimationReady && !prefersReducedMotion && isInViewport && isDocumentVisible;
 
         const stopAnimation = () => {
             if (animationId) {
@@ -230,13 +233,24 @@ export default function HeroBackground() {
             }
         };
 
-        draw();
+        initialStartTimer = window.setTimeout(() => {
+            initialAnimationReady = true;
+
+            if (prefersReducedMotion) {
+                draw();
+                return;
+            }
+
+            startAnimation();
+        }, 3200);
 
         const handleMotionChange = (event) => {
             prefersReducedMotion = event.matches;
             if (prefersReducedMotion) {
                 stopAnimation();
-                draw();
+                if (initialAnimationReady) {
+                    draw();
+                }
                 return;
             }
 
@@ -271,6 +285,7 @@ export default function HeroBackground() {
         document.addEventListener("visibilitychange", handleVisibilityChange);
 
         return () => {
+            window.clearTimeout(initialStartTimer);
             stopAnimation();
             observer.disconnect();
             window.removeEventListener("resize", resize);
@@ -280,10 +295,22 @@ export default function HeroBackground() {
     }, []);
 
     return (
-        <canvas
-            ref={canvasRef}
-            className="absolute inset-0 w-full h-full"
-            style={{ pointerEvents: "none" }}
-        />
+        <>
+            <div
+                aria-hidden="true"
+                className="absolute inset-0 bg-[#050508]"
+                style={{
+                    backgroundImage:
+                        "linear-gradient(rgba(245,238,48,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(245,238,48,0.05) 1px, transparent 1px), linear-gradient(135deg, rgba(245,238,48,0.10), rgba(0,0,0,0) 55%)",
+                    backgroundSize: "56px 56px, 56px 56px, 100% 100%",
+                }}
+            />
+            <canvas
+                ref={canvasRef}
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full"
+                style={{ pointerEvents: "none" }}
+            />
+        </>
     );
 }

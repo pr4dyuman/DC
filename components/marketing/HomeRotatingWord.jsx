@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 
 const words = [
+  "Creative Strategy",
   "DIGITAL INNOVATION!",
   "Storytelling",
   "SEO Excellence",
-  "Creative Strategy",
   "Analytics Intelligence",
   "Brand Storytelling",
 ];
@@ -55,7 +55,7 @@ export default function HomeRotatingWord() {
       setIsAnimating(false);
 
       if (shouldRotate()) {
-        rotationTimer = window.setInterval(rotateWord, 3500);
+        rotationTimer = window.setInterval(rotateWord, 5500);
       }
     };
 
