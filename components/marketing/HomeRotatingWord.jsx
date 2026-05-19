@@ -55,7 +55,7 @@ export default function HomeRotatingWord() {
       setIsAnimating(false);
 
       if (shouldRotate()) {
-        rotationTimer = window.setInterval(rotateWord, 5500);
+        rotationTimer = window.setInterval(rotateWord, 3600);
       }
     };
 

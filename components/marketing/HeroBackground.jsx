@@ -22,11 +22,8 @@ export default function HeroBackground() {
         let prefersReducedMotion = motionQuery.matches;
         let isInViewport = true;
         let isDocumentVisible = !document.hidden;
-        let initialAnimationReady = false;
-        let initialStartTimer;
-
         const shouldAnimate = () =>
-            initialAnimationReady && !prefersReducedMotion && isInViewport && isDocumentVisible;
+            !prefersReducedMotion && isInViewport && isDocumentVisible;
 
         const stopAnimation = () => {
             if (animationId) {
@@ -233,24 +230,13 @@ export default function HeroBackground() {
             }
         };
 
-        initialStartTimer = window.setTimeout(() => {
-            initialAnimationReady = true;
-
-            if (prefersReducedMotion) {
-                draw();
-                return;
-            }
-
-            startAnimation();
-        }, 3200);
+        draw();
 
         const handleMotionChange = (event) => {
             prefersReducedMotion = event.matches;
             if (prefersReducedMotion) {
                 stopAnimation();
-                if (initialAnimationReady) {
-                    draw();
-                }
+                draw();
                 return;
             }
 
@@ -285,7 +271,6 @@ export default function HeroBackground() {
         document.addEventListener("visibilitychange", handleVisibilityChange);
 
         return () => {
-            window.clearTimeout(initialStartTimer);
             stopAnimation();
             observer.disconnect();
             window.removeEventListener("resize", resize);
