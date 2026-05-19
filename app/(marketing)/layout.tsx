@@ -1,6 +1,7 @@
 import Navigation from "@/components/marketing/Navigation";
 import Footer from "@/components/marketing/Footer";
 import MarketingConversionTracker from "@/components/marketing/MarketingConversionTracker";
+import { GoogleAnalytics } from "@/components/providers/GoogleAnalytics";
 import {
     buildMarketingMetadata,
     getMarketingOrganizationJsonLd,
@@ -61,6 +62,7 @@ export default function MarketingLayout({
                 dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
             />
             <MarketingConversionTracker />
+            <GoogleAnalytics />
             <Navigation />
             {children}
             <Footer />
