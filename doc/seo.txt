@@ -67,6 +67,7 @@ P1 plan
   - Done 2026-05-19: restored the home hero canvas to start immediately and shortened the rotating headline interval after production review showed the artificial delay made the first viewport feel slow.
   - Done 2026-05-19: CLI Lighthouse on production reproduced the homepage lab issue on the mobile profile; optimized the hero canvas to use lower frame rate, lower DPR, fewer particles/connections, and simpler mobile drawing while keeping the immediate animated look.
   - Done 2026-05-19: lazy-loaded the below-fold home services Swiper carousel and kept a static SEO-visible services placeholder with service links until the interactive carousel is near the viewport.
+  - Done 2026-05-20: fixed the /get-started server-rendered H1 warning by moving query-param handling into the Server Component page and keeping the auth/signup logic in a smaller client child.
   - Remaining P1: compare UI on localhost versus hosted before pushing.
 - Image and media improvements:
   - Convert remaining large JPG/PNG assets to WebP or AVIF where quality allows.
@@ -113,6 +114,7 @@ P1 plan
   - Done 2026-05-20: added `npm run audit:seo` for repeatable SEO QA against production or localhost. It checks robots.txt, sitemap.xml, public page metadata, canonical URLs, social preview tags, server-rendered H1s, JSON-LD parsing, private-route noindex signals, webmaster verification meta, and /og-image.
   - Usage: `npm run audit:seo -- https://digitalcorvids.com` or `npm run audit:seo -- http://localhost:3000 --max-pages=20`.
   - Production run 2026-05-20: 210 pass, 0 fail, 2 warnings. Warnings: webmaster verification tokens are not configured locally yet, and /get-started currently has no server-rendered H1 in production.
+  - Follow-up 2026-05-20: /get-started server-rendered H1 has been fixed in code; re-run production audit after deployment to confirm the warning disappears.
   - Remaining manual step: add Search Console and Bing Webmaster verification tokens in Vercel, redeploy, run the audit, then submit `https://digitalcorvids.com/sitemap.xml` in both dashboards.
 
 1. Crawlability and indexability
