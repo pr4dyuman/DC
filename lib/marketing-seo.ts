@@ -28,7 +28,8 @@ export const MARKETING_SITE_URL = (
     "https://digitalcorvids.com"
 ).replace(/\/+$/, "");
 
-const DEFAULT_IMAGE_PATH = "/hero.webp";
+const DEFAULT_SOCIAL_IMAGE_PATH = "/og-image";
+const DEFAULT_TWITTER_IMAGE_PATH = "/og-image";
 
 const marketingOfferCatalog = [
     {
@@ -76,6 +77,56 @@ export function marketingAbsoluteUrl(path = "/") {
     return `${MARKETING_SITE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+function getOptionalEnvValue(...names: string[]) {
+    for (const name of names) {
+        const value = process.env[name]?.trim();
+        if (value) {
+            return value;
+        }
+    }
+
+    return undefined;
+}
+
+export function getMarketingVerificationMetadata(): Metadata["verification"] | undefined {
+    const google = getOptionalEnvValue(
+        "GOOGLE_SITE_VERIFICATION",
+        "NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION",
+    );
+    const yandex = getOptionalEnvValue(
+        "YANDEX_SITE_VERIFICATION",
+        "NEXT_PUBLIC_YANDEX_SITE_VERIFICATION",
+    );
+    const bing = getOptionalEnvValue(
+        "BING_SITE_VERIFICATION",
+        "NEXT_PUBLIC_BING_SITE_VERIFICATION",
+        "MSVALIDATE_SITE_VERIFICATION",
+        "NEXT_PUBLIC_MSVALIDATE_SITE_VERIFICATION",
+    );
+    const pinterest = getOptionalEnvValue(
+        "PINTEREST_SITE_VERIFICATION",
+        "NEXT_PUBLIC_PINTEREST_SITE_VERIFICATION",
+    );
+
+    const other: Record<string, string> = {};
+    if (bing) {
+        other["msvalidate.01"] = bing;
+    }
+    if (pinterest) {
+        other["p:domain_verify"] = pinterest;
+    }
+
+    if (!google && !yandex && Object.keys(other).length === 0) {
+        return undefined;
+    }
+
+    return {
+        google,
+        yandex,
+        other: Object.keys(other).length > 0 ? other : undefined,
+    };
+}
+
 export function buildMarketingMetadata(input: {
     title: string;
     description?: string;
@@ -87,7 +138,10 @@ export function buildMarketingMetadata(input: {
     const path = input.path || "/";
     const description = input.description || MARKETING_DEFAULT_DESCRIPTION;
     const canonicalUrl = marketingAbsoluteUrl(path);
-    const imageUrl = marketingAbsoluteUrl(input.image || DEFAULT_IMAGE_PATH);
+    const imageUrl = marketingAbsoluteUrl(input.image || DEFAULT_SOCIAL_IMAGE_PATH);
+    const twitterImageUrl = input.image
+        ? imageUrl
+        : marketingAbsoluteUrl(DEFAULT_TWITTER_IMAGE_PATH);
 
     return {
         metadataBase: new URL(MARKETING_SITE_URL),
@@ -95,6 +149,7 @@ export function buildMarketingMetadata(input: {
         title: input.title,
         description,
         keywords: input.keywords,
+        verification: getMarketingVerificationMetadata(),
         alternates: {
             canonical: canonicalUrl,
         },
@@ -138,7 +193,7 @@ export function buildMarketingMetadata(input: {
             card: "summary_large_image",
             title: input.title,
             description,
-            images: [imageUrl],
+            images: [twitterImageUrl],
         },
     };
 }
@@ -152,7 +207,7 @@ export function getMarketingOrganizationJsonLd() {
         alternateName: "DC Digital Corvids",
         url: MARKETING_SITE_URL,
         logo: marketingAbsoluteUrl("/favicon.ico"),
-        image: marketingAbsoluteUrl(DEFAULT_IMAGE_PATH),
+        image: marketingAbsoluteUrl(DEFAULT_SOCIAL_IMAGE_PATH),
         description: MARKETING_DEFAULT_DESCRIPTION,
         email: MARKETING_EMAIL,
         telephone: MARKETING_PHONE,

@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache';
 import dbConnect from '@/lib/marketing-db';
 import Blog from '@/models/marketing/Blog';
 import BlogList from '@/components/marketing/BlogList';
+import { buildMarketingMetadata } from '@/lib/marketing-seo';
 
 // This page depends on MongoDB, so render it at request time instead of
 // requiring a live database during Vercel's static prerender step.
@@ -11,35 +12,16 @@ export const dynamic = 'force-dynamic';
 // Cache for 60 seconds
 export const revalidate = 60;
 
-const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  process.env.NEXT_PUBLIC_APP_URL ||
-  'https://digitalcorvids.com'
-).replace(/\/+$/, '');
-
 const BLOG_TITLE = 'Digital Marketing Blog | Digital Corvids';
 const BLOG_DESCRIPTION =
   'Read practical SEO, web design, paid media, social media, and digital growth insights from the Digital Corvids team.';
 
-export const metadata = {
+export const metadata = buildMarketingMetadata({
   title: BLOG_TITLE,
   description: BLOG_DESCRIPTION,
-  alternates: {
-    canonical: `${SITE_URL}/blog`,
-  },
-  openGraph: {
-    type: 'website',
-    url: `${SITE_URL}/blog`,
-    title: BLOG_TITLE,
-    description: BLOG_DESCRIPTION,
-    siteName: 'Digital Corvids',
-  },
-  twitter: {
-    card: 'summary',
-    title: BLOG_TITLE,
-    description: BLOG_DESCRIPTION,
-  },
-};
+  path: '/blog',
+  keywords: ['digital marketing blog', 'SEO insights', 'paid media tips', 'web design ideas'],
+});
 
 function getRequestedCategory(searchParams) {
   const rawCategory = Array.isArray(searchParams?.category)

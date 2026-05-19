@@ -13,6 +13,10 @@ import {
   normalizeMarketingImageSrc,
   toAbsoluteMarketingImageUrl,
 } from "@/lib/marketing-blog-utils";
+import {
+  getMarketingVerificationMetadata,
+  marketingAbsoluteUrl,
+} from "@/lib/marketing-seo";
 import { notFound } from "next/navigation";
 
 // Blog detail pages depend on MongoDB and draft auth checks, so render them at
@@ -49,6 +53,15 @@ const SITE_NAME = "Digital Corvids";
 
 function getBlogUrl(slug) {
   return `${SITE_URL.replace(/\/+$/, "")}/blog/${slug}`;
+}
+
+function getBlogSocialImageUrl(value) {
+  const imageUrl = toAbsoluteMarketingImageUrl(value, "/og-image");
+  if (!imageUrl) {
+    return marketingAbsoluteUrl("/og-image");
+  }
+
+  return /^https?:\/\//i.test(imageUrl) ? imageUrl : marketingAbsoluteUrl(imageUrl);
 }
 
 function stripHtml(value = "") {
@@ -240,7 +253,7 @@ function preferBlogPostingSchemaType(value) {
 function buildFallbackSchemaMarkup(blog) {
   const canonicalUrl =
     normalizeMarketingCanonicalUrl(blog.canonicalUrl, blog.slug) || getBlogUrl(blog.slug);
-  const imageUrl = toAbsoluteMarketingImageUrl(blog.image);
+  const imageUrl = getBlogSocialImageUrl(blog.image);
   const description = getBlogDescription(blog);
   const publishedAt = blog.publishedAt || blog.createdAt;
   const updatedAt = blog.updatedAt || publishedAt;
@@ -341,7 +354,7 @@ function getResolvedBlogSeo(blog) {
   const title = blog.metaTitle?.trim() || `${blog.title} | ${SITE_NAME}`;
   const description = getBlogDescription(blog);
   const displayDescription = getBlogDisplayDescription(blog);
-  const imageUrl = toAbsoluteMarketingImageUrl(blog.image);
+  const imageUrl = getBlogSocialImageUrl(blog.image);
   const imageAlt = blog.imageAlt?.trim() || blog.title;
   const keywords = getBlogKeywords(blog);
   const publishedAt = blog.publishedAt || blog.createdAt;
@@ -468,6 +481,7 @@ export async function generateMetadata({ params }) {
       title: seo.title,
       description: seo.description,
       keywords: seo.keywords.length > 0 ? seo.keywords : undefined,
+      verification: getMarketingVerificationMetadata(),
       alternates: {
         canonical: seo.canonicalUrl,
       },
@@ -486,13 +500,20 @@ export async function generateMetadata({ params }) {
         section: blog.category || "Insights",
         siteName: SITE_NAME,
         tags: seo.keywords.length > 0 ? seo.keywords : undefined,
-        images: seo.imageUrl ? [{ url: seo.imageUrl, alt: seo.imageAlt }] : undefined,
+        images: [
+          {
+            url: seo.imageUrl,
+            width: 1200,
+            height: 630,
+            alt: seo.imageAlt,
+          },
+        ],
       },
       twitter: {
         card: "summary_large_image",
         title: seo.title,
         description: seo.description,
-        images: seo.imageUrl ? [seo.imageUrl] : undefined,
+        images: [seo.imageUrl],
       },
     };
   } catch (error) {

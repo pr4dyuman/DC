@@ -105,6 +105,8 @@ P1 plan
 - Off-page and sharing:
   - Validate OG/Twitter previews for home, service, and blog pages.
   - Build high-quality citations, partner links, social profile consistency, and relevant backlinks.
+  - Done 2026-05-20: added a generated 1200x630 /og-image route for OG/Twitter cards, switched marketing defaults and the blog listing to large-image social cards, added blog-post social image fallback, and added env-driven webmaster verification meta support for Google, Bing, Yandex, and Pinterest.
+  - Webmaster verification env names supported: GOOGLE_SITE_VERIFICATION, BING_SITE_VERIFICATION, YANDEX_SITE_VERIFICATION, and PINTEREST_SITE_VERIFICATION. Add them in Vercel and redeploy before verifying ownership.
 - Monitoring cadence:
   - Review Search Console indexing, queries, pages, Core Web Vitals, crawl stats, and structured data warnings monthly.
   - Re-run build, sitemap, robots, schema, and mobile overflow checks before major releases.
