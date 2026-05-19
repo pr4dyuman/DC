@@ -1,5 +1,6 @@
 import Navigation from "@/components/marketing/Navigation";
 import Footer from "@/components/marketing/Footer";
+import MarketingConversionTracker from "@/components/marketing/MarketingConversionTracker";
 import {
     buildMarketingMetadata,
     getMarketingOrganizationJsonLd,
@@ -59,6 +60,7 @@ export default function MarketingLayout({
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
             />
+            <MarketingConversionTracker />
             <Navigation />
             {children}
             <Footer />

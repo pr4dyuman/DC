@@ -1,5 +1,5 @@
 Digital Corvids SEO Optimization Checklist
-Last updated: 2026-05-19
+Last updated: 2026-05-20
 
 Repo-specific notes
 - The project is a Next.js App Router site.
@@ -95,6 +95,7 @@ P1 plan
   - Verify Google Search Console and Bing Webmaster Tools.
   - Add GA4 or equivalent conversion tracking for contact form, get-started form, WhatsApp, email, phone, and newsletter events.
   - Avoid duplicate analytics scripts and respect privacy requirements.
+  - Done 2026-05-20: kept the existing single Vercel Analytics install and added privacy-safe marketing conversion events for contact form success, newsletter signup success, get-started CTA clicks, get-started OTP/signup/login success, WhatsApp/social clicks, email clicks, and phone clicks. Event properties intentionally avoid names, emails, phone numbers, messages, and other personal data.
 - Accessibility and UX SEO:
   - Audit heading order, labels, alt text, focus states, form errors, and keyboard navigation.
   - Keep mobile layouts free of horizontal overflow after new content changes.

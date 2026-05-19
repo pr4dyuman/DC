@@ -121,8 +121,12 @@ const ContactPage = () => {
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <h3 className="text-[16px] md:text-[18px] font-bold uppercase tracking-wide">CONTACT</h3>
                 <div className="text-[13px] md:text-[14px] text-gray-300 md:text-right space-y-1">
-                  <p>flytheraven@digitalcorvids.com</p>
-                  <p>+91-8003177679</p>
+                  <a href="mailto:flytheraven@digitalcorvids.com" className="block hover:text-white transition-colors">
+                    flytheraven@digitalcorvids.com
+                  </a>
+                  <a href="tel:+918003177679" className="block hover:text-white transition-colors">
+                    +91-8003177679
+                  </a>
                 </div>
               </div>
             </div>

@@ -59,10 +59,12 @@ export default function Footer() {
 
             {/* Contact Info */}
             <div className="text-gray-400 text-sm font-glacial space-y-1">
-              <a href="https://wa.me/918003177679" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors block">
+              <a href="tel:+918003177679" className="hover:text-white transition-colors block">
                 Mob No. - +91-8003177679
               </a>
-              <p>Email - flytheraven@digitalcorvids.com</p>
+              <a href="mailto:flytheraven@digitalcorvids.com" className="hover:text-white transition-colors block">
+                Email - flytheraven@digitalcorvids.com
+              </a>
             </div>
           </div>
         </div>

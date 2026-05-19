@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { subscribeNewsletter } from "@/lib/actions/super-admin";
+import { MARKETING_EVENTS, trackMarketingEvent } from "@/lib/marketing-analytics";
 
 export default function NewsletterForm() {
   const [email, setEmail] = useState("");
@@ -14,6 +15,9 @@ export default function NewsletterForm() {
     setStatus("loading");
     const result = await subscribeNewsletter(email);
     if (result.success) {
+      trackMarketingEvent(MARKETING_EVENTS.newsletterSignup, {
+        source: "footer",
+      });
       setStatus("success");
       setMessage("Subscribed!");
       setEmail("");

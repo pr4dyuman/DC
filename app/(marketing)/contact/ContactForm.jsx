@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { MARKETING_EVENTS, trackMarketingEvent } from "@/lib/marketing-analytics";
 
 export default function ContactForm() {
   const [toast, setToast] = useState({ show: false, message: "", isSuccess: true });
@@ -59,6 +60,11 @@ export default function ContactForm() {
       }
 
       showToast(result.message || "Your message has been sent successfully!", true);
+      trackMarketingEvent(MARKETING_EVENTS.contactFormSubmitted, {
+        source: "contact_page",
+        hasCompanyName: Boolean(data.companyName),
+        hasPhone: Boolean(data.phone),
+      });
       reset();
     } catch (error) {
       console.error("Submission error:", error);

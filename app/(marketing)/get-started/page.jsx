@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, Sparkles } from "lucide-react";
 import { getCurrentUser } from "@/lib/actions";
 import { authenticateUser } from "@/lib/auth";
+import { MARKETING_EVENTS, getGetStartedFlow, trackMarketingEvent } from "@/lib/marketing-analytics";
 import GetStartedLoadingScreen from "./_components/GetStartedLoadingScreen";
 import GetStartedHero from "./_components/GetStartedHero";
 import GetStartedFeaturesSection from "./_components/GetStartedFeaturesSection";
@@ -42,6 +43,7 @@ function GetStartedPageContent() {
     const [showLoginPassword, setShowLoginPassword] = useState(false);
     const directAuthMode = searchParams.get("mode") === "auth" || searchParams.get("source") === "ai-blogger";
     const isAIBloggerFlow = searchParams.get("source") === "ai-blogger";
+    const getStartedFlow = getGetStartedFlow({ isAIBloggerFlow, directAuthMode });
 
     const clearLoggedInCookie = () => {
         document.cookie = "logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
@@ -157,6 +159,11 @@ function GetStartedPageContent() {
             });
             const data = await response.json();
             if (data.success) {
+                trackMarketingEvent(MARKETING_EVENTS.getStartedOtpRequested, {
+                    flow: getStartedFlow,
+                    hasLogo: Boolean(logo),
+                    hasPhone: Boolean(formData.phone),
+                });
                 setOtpSent(true);
                 setOtpTimer(300);
                 setOtp("");
@@ -197,6 +204,11 @@ function GetStartedPageContent() {
             });
             const data = await response.json();
             if (data.success) {
+                trackMarketingEvent(MARKETING_EVENTS.getStartedSignupCompleted, {
+                    flow: getStartedFlow,
+                    hasLogo: Boolean(logo),
+                    hasPhone: Boolean(formData.phone),
+                });
                 window.location.href = data.redirectTo || "/dashboard";
             } else {
                 setError(data.error || "Something went wrong");
@@ -216,6 +228,9 @@ function GetStartedPageContent() {
         try {
             const result = await authenticateUser(loginEmail, loginPassword);
             if (result.success) {
+                trackMarketingEvent(MARKETING_EVENTS.getStartedLoginCompleted, {
+                    flow: getStartedFlow,
+                });
                 window.location.href = result.redirectTo || "/dashboard";
             } else {
                 setLoginError(result.error || "Login failed");
