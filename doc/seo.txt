@@ -118,6 +118,27 @@ P1 plan
   - Production re-run 2026-05-20: 211 pass, 0 fail, 1 warning. /get-started server-rendered H1 now passes on production; only the webmaster verification token warning remains.
   - Remaining manual step: add Search Console and Bing Webmaster verification tokens in Vercel, redeploy, run the audit, then submit `https://digitalcorvids.com/sitemap.xml` in both dashboards.
 
+P2 plan
+- Content and internal linking:
+  - Done 2026-05-20: added `npm run audit:links` for contextual internal-link QA across sitemap pages.
+  - Production run 2026-05-20: 40 pass, 48 warnings, 0 fail across 36 crawled pages.
+  - Strong points found:
+    - Home and /services link to every core service page.
+    - Core service pages except /services/manage-company and /services/ai-blogger already link contextually to related services.
+    - No crawled sitemap page looks orphaned.
+  - Gaps found:
+    - All service pages currently have no contextual links to related blog posts.
+    - /services/manage-company and /services/ai-blogger still need contextual related-service links when redesigned.
+    - Only 10 of 22 blog detail pages have contextual links to service pages.
+    - /services/web-development, /services/ppc, and /services/social-media-marketing receive no contextual blog links in the crawl.
+    - /services uses repeated generic "Explore Service" CTA text for service links.
+  - P2 implementation order:
+    - Add related article sections to service pages, starting with SEO, web development, PPC, social, video, and influencer.
+    - Add contextual related-service blocks to /services/manage-company and /services/ai-blogger during their planned redesigns.
+    - Update existing blog posts or CMS internalLinks so priority posts link to the most relevant service pages in body content, not only nav/footer.
+    - Replace generic /services CTA anchors with service-specific labels.
+    - Add real proof/case-study sections when real client details are approved.
+
 1. Crawlability and indexability
 - Public pages must return HTTP 200.
 - Removed pages must return 404 or 410, not soft-404 content.

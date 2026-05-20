@@ -10,6 +10,7 @@
     "build": "next build",
     "start": "next start",
     "audit:email-templates": "node scripts/audit-email-templates.mjs",
+    "audit:links": "node scripts/internal-link-audit.mjs",
     "audit:seo": "node scripts/seo-qa.mjs",
     "lint": "eslint"
   },
