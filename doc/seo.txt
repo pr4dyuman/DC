@@ -147,6 +147,43 @@ P2 plan
     - Done 2026-05-20: replaced unsupported hard-metric proof claims on service pages with evidence-safe reporting, tracking, and workflow proof language. Real case-study numbers should only be added when client details and source data are approved.
     - Remaining P2 proof work: add real case studies, client logos, before/after metrics, testimonial source links, and Review/AggregateRating schema only after real evidence is approved.
 
+Pending SEO roadmap
+- P1 remaining technical/manual items:
+  - Add webmaster verification tokens in Vercel and redeploy:
+    - GOOGLE_SITE_VERIFICATION
+    - BING_SITE_VERIFICATION
+    - YANDEX_SITE_VERIFICATION
+    - PINTEREST_SITE_VERIFICATION
+  - Re-run `npm run audit:seo -- https://digitalcorvids.com` after redeploy and confirm the webmaster warning is gone.
+  - Submit `https://digitalcorvids.com/sitemap.xml` in Google Search Console and Bing Webmaster Tools.
+  - Review Vercel Speed Insights after more real-user traffic, especially /, /blog, /services, and /get-started.
+- P2 remaining trust/proof items:
+  - Add real case studies only when client names, screenshots, metrics, and approval are available.
+  - Add real client logos only with permission and correct alt text.
+  - Connect testimonials to real approved sources or database-managed reviews.
+  - Add Review, AggregateRating, or case-study structured data only after real evidence exists.
+  - Deepen /services/manage-company and /services/ai-blogger later if their product positioning changes.
+- P3 local and entity SEO:
+  - Verify and optimize Google Business Profile.
+  - Verify and optimize Bing Places.
+  - Keep NAP consistent across website, Google, Bing, social profiles, and citations.
+  - Build high-quality Jaipur/India service-area context where it is natural and useful, not thin doorway pages.
+  - Add citation profiles on relevant business directories and keep the same canonical website URL.
+  - Track local queries, map visibility, calls, direction requests, and contact actions.
+- P4 content authority and off-page growth:
+  - Build a topic-cluster calendar from Search Console/Bing query data after webmaster setup.
+  - Expand high-intent service support content: pricing guidance, comparison pages, checklists, FAQs, and use-case articles.
+  - Refresh underperforming blog posts with stronger introductions, internal links, screenshots, examples, and updated FAQs.
+  - Earn relevant backlinks through partner pages, guest features, citations, digital PR, and useful original resources.
+  - Keep social profile consistency and link important profiles back to the canonical website.
+- P5 monitoring, governance, and CRO:
+  - Monthly: review Search Console, Bing Webmaster Tools, indexing, query/page performance, Core Web Vitals, and structured data warnings.
+  - Monthly: run `npm run audit:seo -- https://digitalcorvids.com` and `npm run audit:links -- https://digitalcorvids.com --max-pages=40`.
+  - Quarterly: prune, merge, or improve weak content so the blog does not accumulate thin pages.
+  - Quarterly: review conversion events, contact form completion, get-started flow, WhatsApp clicks, and assisted conversions.
+  - Before major releases: run build, lint, sitemap, robots, schema, noindex, social preview, forms, and mobile overflow checks.
+  - Keep `doc/seo.txt` updated after every major SEO change so production history stays clear.
+
 1. Crawlability and indexability
 - Public pages must return HTTP 200.
 - Removed pages must return 404 or 410, not soft-404 content.
