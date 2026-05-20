@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import RelatedArticlesSection from "@/components/marketing/RelatedArticlesSection";
 import {
   getMarketingBreadcrumbJsonLd,
   getMarketingServiceJsonLd,
@@ -79,6 +80,27 @@ const relatedVideoProductionLinks = [
     title: "Web Development",
     href: "/services/web-development",
     description: "Place videos on fast landing pages that support conversion.",
+  },
+];
+
+const relatedVideoProductionArticles = [
+  {
+    title: "Scaling B2B Video Production On LinkedIn",
+    href: "/blog/scaling-b2b-video-production-on-linkedin-beyond-the-feed",
+    category: "B2B Video",
+    description: "Plan LinkedIn video systems that support thought leadership, demand generation, and sales conversations.",
+  },
+  {
+    title: "Pre-Production Strategy For Content Engines",
+    href: "/blog/pre-production-strategy-for-digital-content-engines-scale-in-2026",
+    category: "Pre-Production",
+    description: "Use stronger planning to make shoots, edits, approvals, and distribution easier to scale.",
+  },
+  {
+    title: "The 2026 Production Mandate",
+    href: "/blog/the-2026-production-mandate-balancing-speed-and-quality",
+    category: "Production Quality",
+    description: "Balance speed, brand quality, and repeatable creative workflows before production becomes chaotic.",
   },
 ];
 
@@ -450,6 +472,13 @@ export default function VideoProduction() {
             </div>
           </div>
         </section>
+
+        <RelatedArticlesSection
+          eyebrow="Video Reading List"
+          title="Guides For Better Production Systems"
+          description="Use these articles to connect video strategy, pre-production, platform planning, and campaign-ready creative assets."
+          articles={relatedVideoProductionArticles}
+        />
 
         {/* Video Production FAQ Section */}
         <section className="mb-20 lg:mb-28">

@@ -1,5 +1,6 @@
 import Image from "next/image"
 import Link from "next/link"
+import RelatedArticlesSection from "@/components/marketing/RelatedArticlesSection"
 import {
   getMarketingBreadcrumbJsonLd,
   getMarketingServiceJsonLd,
@@ -79,6 +80,27 @@ const relatedSeoLinks = [
     title: "Digital Marketing Blog",
     href: "/blog",
     description: "Read current strategy guides and search marketing insights.",
+  },
+]
+
+const relatedSeoArticles = [
+  {
+    title: "The 2026 SEO Management Workflow",
+    href: "/blog/the-2026-seo-management-workflow-scaling-content-with-ai",
+    category: "SEO Workflow",
+    description: "See how SEO operations, content production, and AI review can work together without losing quality.",
+  },
+  {
+    title: "Brand Voice Guardrails For AI Assets",
+    href: "/blog/brand-voice-insurance-editorial-guardrails-for-ai-generated-assets",
+    category: "Content Quality",
+    description: "Build editorial checks that keep AI-assisted content useful, consistent, and search-ready.",
+  },
+  {
+    title: "High-ROI Content Distribution",
+    href: "/blog/how-to-build-a-high-roi-content-distribution-engine-for-2026",
+    category: "Organic Growth",
+    description: "Turn SEO content into a wider distribution system across owned, social, and campaign channels.",
   },
 ]
 
@@ -441,6 +463,13 @@ export default function SEOServices() {
             </div>
           </div>
         </section>
+
+        <RelatedArticlesSection
+          eyebrow="SEO Reading List"
+          title="Search Strategy Guides"
+          description="Use these Digital Corvids articles to connect technical SEO, content quality, and distribution into one organic growth plan."
+          articles={relatedSeoArticles}
+        />
 
         {/* SEO FAQ Section */}
         <section className="mb-20 lg:mb-28">

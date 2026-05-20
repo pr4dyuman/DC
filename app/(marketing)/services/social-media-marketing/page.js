@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import RelatedArticlesSection from "@/components/marketing/RelatedArticlesSection";
 import {
   getMarketingBreadcrumbJsonLd,
   getMarketingServiceJsonLd,
@@ -79,6 +80,27 @@ const relatedSocialMediaLinks = [
     title: "Web Development",
     href: "/services/web-development",
     description: "Send social traffic to fast, conversion-ready landing pages.",
+  },
+];
+
+const relatedSocialMediaArticles = [
+  {
+    title: "2026 Social Media Marketing Trends",
+    href: "/blog/2026-social-media-marketing-trends-operationalizing-ai-and-creative",
+    category: "Social Trends",
+    description: "See how AI, creative systems, and sharper planning are changing social media execution.",
+  },
+  {
+    title: "Platform-Specific Social Strategy",
+    href: "/blog/2026-platform-specific-social-media-strategy-framework-ai-scaling",
+    category: "Platform Planning",
+    description: "Map ideas to the right platform behavior instead of forcing every post into the same format.",
+  },
+  {
+    title: "Viral-Worthy Content Calendar Strategy",
+    href: "/blog/2026-viral-worthy-content-calendar-strategy-for-reels-and-carousels",
+    category: "Content Calendar",
+    description: "Plan reels, carousels, and recurring content themes with a stronger operating rhythm.",
   },
 ];
 
@@ -447,6 +469,13 @@ export default function SocialMediaMarketing() {
             </div>
           </div>
         </section>
+
+        <RelatedArticlesSection
+          eyebrow="Social Reading List"
+          title="Guides For Stronger Social Content"
+          description="Use these articles to sharpen platform strategy, creative planning, and content calendars for social growth."
+          articles={relatedSocialMediaArticles}
+        />
 
         {/* Social Media FAQ Section */}
         <section className="mb-20 lg:mb-28">

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import RelatedArticlesSection from "@/components/marketing/RelatedArticlesSection";
 import {
   getMarketingBreadcrumbJsonLd,
   getMarketingServiceJsonLd,
@@ -79,6 +80,27 @@ const relatedPpcLinks = [
     title: "Get Started",
     href: "/get-started",
     description: "Plan the next paid campaign with clear goals and tracking.",
+  },
+];
+
+const relatedPpcArticles = [
+  {
+    title: "High-ROI Content Distribution Engine",
+    href: "/blog/how-to-build-a-high-roi-content-distribution-engine-for-2026",
+    category: "Campaign ROI",
+    description: "Learn how to move content and campaign assets across channels so paid traffic supports bigger growth.",
+  },
+  {
+    title: "AJIO 22feet Ecommerce Expansion Strategy",
+    href: "/blog/ajio-22feet-a-winning-fashion-e-commerce-digital-expansion-strategy",
+    category: "Ecommerce Growth",
+    description: "Review a fashion ecommerce strategy lens for acquisition, positioning, and scalable digital demand.",
+  },
+  {
+    title: "Media Strategy Guide 2026",
+    href: "/blog/media-strategy-guide-2026-scaling-impact-with-hybrid-models",
+    category: "Paid Media",
+    description: "Build a more resilient media mix across paid, owned, creator, and campaign channels.",
   },
 ];
 
@@ -498,6 +520,13 @@ export default function PPCAdvertising() {
               </div>
             </div>
           </section>
+
+          <RelatedArticlesSection
+            eyebrow="PPC Reading List"
+            title="Guides For Smarter Paid Growth"
+            description="Use these articles to connect paid media planning with content distribution, ecommerce demand, and campaign measurement."
+            articles={relatedPpcArticles}
+          />
 
           {/* PPC FAQ Section */}
           <section className="mb-20 lg:mb-28">

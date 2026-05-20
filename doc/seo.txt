@@ -126,14 +126,16 @@ P2 plan
     - Home and /services link to every core service page.
     - Core service pages except /services/manage-company and /services/ai-blogger already link contextually to related services.
     - No crawled sitemap page looks orphaned.
-  - Gaps found:
-    - All service pages currently have no contextual links to related blog posts.
+  - Baseline gaps found:
+    - Core service pages had no contextual links to related blog posts before the 2026-05-20 related-article update.
     - /services/manage-company and /services/ai-blogger still need contextual related-service links when redesigned.
     - Only 10 of 22 blog detail pages have contextual links to service pages.
     - /services/web-development, /services/ppc, and /services/social-media-marketing receive no contextual blog links in the crawl.
     - /services uses repeated generic "Explore Service" CTA text for service links.
   - P2 implementation order:
-    - Add related article sections to service pages, starting with SEO, web development, PPC, social, video, and influencer.
+    - Done 2026-05-20: added reusable related-article sections to /services/seo, /services/web-development, /services/ppc, /services/social-media-marketing, /services/video-production-ad, and /services/influencer-marketing. Each page now links contextually to three relevant Digital Corvids blog detail pages.
+    - Local verification 2026-05-20: production build passed; targeted ESLint passed; local rendered HTML on all six service pages showed 3 blog detail links per page.
+    - Next production verification: after deployment, re-run `npm run audit:links -- https://digitalcorvids.com --max-pages=40` so the production sitemap and production origin match.
     - Add contextual related-service blocks to /services/manage-company and /services/ai-blogger during their planned redesigns.
     - Update existing blog posts or CMS internalLinks so priority posts link to the most relevant service pages in body content, not only nav/footer.
     - Replace generic /services CTA anchors with service-specific labels.

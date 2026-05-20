@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import RelatedArticlesSection from "@/components/marketing/RelatedArticlesSection";
 import {
   getMarketingBreadcrumbJsonLd,
   getMarketingServiceJsonLd,
@@ -79,6 +80,27 @@ const relatedWebDevelopmentLinks = [
     title: "Get Started",
     href: "/get-started",
     description: "Share your website goals and plan the next build step.",
+  },
+];
+
+const relatedWebDevelopmentArticles = [
+  {
+    title: "Digital Production Vs Marketing Strategy",
+    href: "/blog/digital-production-vs-digital-marketing-strategy-the-2026-gap",
+    category: "Website Strategy",
+    description: "Understand why stronger production systems and clearer strategy need to meet before a site launch.",
+  },
+  {
+    title: "The 2026 Production Mandate",
+    href: "/blog/the-2026-production-mandate-balancing-speed-and-quality",
+    category: "Quality Systems",
+    description: "Plan web and content workflows that move quickly without sacrificing structure, QA, or brand quality.",
+  },
+  {
+    title: "Pre-Production For Content Engines",
+    href: "/blog/pre-production-strategy-for-digital-content-engines-scale-in-2026",
+    category: "Launch Planning",
+    description: "Use pre-production thinking to prepare website content, page hierarchy, and campaign assets before build.",
   },
 ];
 
@@ -403,6 +425,13 @@ export default function WebDevelopment() {
             </div>
           </div>
         </section>
+
+        <RelatedArticlesSection
+          eyebrow="Website Reading List"
+          title="Planning Guides For Better Builds"
+          description="Use these articles to connect website structure, launch planning, content operations, and performance-minded production."
+          articles={relatedWebDevelopmentArticles}
+        />
 
         {/* Web Development FAQ Section */}
         <section className="mt-20 mb-20 lg:mt-28 lg:mb-28">

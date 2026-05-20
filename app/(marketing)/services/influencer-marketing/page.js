@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import RelatedArticlesSection from "@/components/marketing/RelatedArticlesSection";
 import {
   getMarketingBreadcrumbJsonLd,
   getMarketingServiceJsonLd,
@@ -79,6 +80,27 @@ const relatedInfluencerLinks = [
     title: "Web Development",
     href: "/services/web-development",
     description: "Send campaign traffic to fast, conversion-ready landing pages.",
+  },
+];
+
+const relatedInfluencerArticles = [
+  {
+    title: "Vertical-Specific Influencer Campaign Management",
+    href: "/blog/vertical-specific-influencer-campaign-management-the-framework",
+    category: "Creator Strategy",
+    description: "Build influencer campaigns around niche, audience fit, platform behavior, and measurable goals.",
+  },
+  {
+    title: "YouTube Influencer Marketing ROI Guide",
+    href: "/blog/youtube-influencer-marketing-campaign-best-practices-the-roi-guide",
+    category: "YouTube Campaigns",
+    description: "Plan YouTube creator campaigns with stronger briefs, tracking, content usage, and ROI expectations.",
+  },
+  {
+    title: "AI For Influencer Marketing ROI",
+    href: "/blog/using-ai-to-optimize-influencer-marketing-roi-a-2026-strategy",
+    category: "Campaign Analytics",
+    description: "Use AI-assisted analysis to improve creator selection, campaign tracking, and performance decisions.",
   },
 ];
 
@@ -449,6 +471,13 @@ export default function InfluencerMarketing() {
             </div>
           </div>
         </section>
+
+        <RelatedArticlesSection
+          eyebrow="Influencer Reading List"
+          title="Guides For Creator-Led Growth"
+          description="Use these articles to plan creator selection, campaign tracking, content usage, and influencer ROI with more confidence."
+          articles={relatedInfluencerArticles}
+        />
 
         {/* Influencer FAQ Section */}
         <section className="mb-20 lg:mb-28">
