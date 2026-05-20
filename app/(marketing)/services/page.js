@@ -12,6 +12,7 @@ export default function Services() {
         "Your website is your digital storefront. We build fast, secure, and user-friendly sites optimized for conversions.",
       link: "/services/web-development",
       tagline: "BUILDING DIGITAL EXPERIENCES",
+      ctaLabel: "Explore Web Development",
     },
     {
       id: "02",
@@ -22,6 +23,7 @@ export default function Services() {
         "SEO is the backbone of organic growth. We optimize your website to rank higher on Google, drive targeted traffic, and turn visitors into loyal customers.",
       link: "/services/seo",
       tagline: "RANK HIGHER, GROW FASTER",
+      ctaLabel: "Explore SEO",
     },
     {
       id: "03",
@@ -32,6 +34,7 @@ export default function Services() {
         "Build a loyal audience and amplify your brand's voice across platforms like Facebook, Instagram, LinkedIn, and Pinterest.",
       link: "/services/social-media-marketing",
       tagline: "BUILD COMMUNITY",
+      ctaLabel: "Explore Social Media Marketing",
     },
     {
       id: "04",
@@ -42,6 +45,7 @@ export default function Services() {
         "We craft high-quality, compelling videos that tell your brand's story, drive engagement, and convert viewers into customers.",
       link: "/services/video-production-ad",
       tagline: "STORY-LED CONTENT",
+      ctaLabel: "Explore Video Production",
     },
     {
       id: "05",
@@ -52,6 +56,7 @@ export default function Services() {
         "Get immediate visibility with targeted ads on Google, Bing, and social media. We craft campaigns that maximize ROI and minimize wasted spend.",
       link: "/services/ppc",
       tagline: "IMMEDIATE RESULTS",
+      ctaLabel: "Explore PPC Advertising",
     },
     {
       id: "06",
@@ -61,6 +66,7 @@ export default function Services() {
       description: "Partner with influencers who align with your brand to reach highly engaged audiences.",
       link: "/services/influencer-marketing",
       tagline: "CREATORS THAT CONVERT",
+      ctaLabel: "Explore Influencer Marketing",
     },
     {
       id: "07",
@@ -74,6 +80,7 @@ export default function Services() {
       description: "AI-powered agency management platform. Track projects, manage finances, automate invoicing, and let AI handle the heavy lifting.",
       link: "/services/manage-company",
       tagline: "AI-POWERED MANAGEMENT",
+      ctaLabel: "Explore Manage Company",
     },
     {
       id: "08",
@@ -84,6 +91,7 @@ export default function Services() {
         "Plan, generate, optimize, and schedule SEO-focused blogs from one clean workflow built for agencies and growth teams.",
       link: "/services/ai-blogger",
       tagline: "CONTENT ENGINE FOR GROWTH",
+      ctaLabel: "Explore AI Blogger",
     },
   ];
 
@@ -144,7 +152,7 @@ export default function Services() {
                       prefetch={false}
                       className="inline-block bg-white text-black font-bold uppercase px-6 py-3 rounded-full hover:bg-[#F5EE30] transition-all w-full sm:w-auto text-center"
                     >
-                      Explore Service
+                      {service.ctaLabel}
                     </Link>
                   </div>
                 </div>
