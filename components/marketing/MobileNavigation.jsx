@@ -175,14 +175,13 @@ export default function MobileNavigation({ servicesList }) {
             >
               ABOUT US
             </Link>
-            <Link
+            <a
               href={isLoggedIn ? "/dashboard" : "/login"}
-              prefetch={false}
               className="block py-2 text-[#F5EE30] border-b border-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
               onClick={() => setMobileOpen(false)}
             >
               {isLoggedIn ? "DASHBOARD" : "LOGIN"}
-            </Link>
+            </a>
             <Link
               href="/contact"
               prefetch={false}

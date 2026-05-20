@@ -82,16 +82,15 @@ export default function Navigation() {
             </Link>
           </li>
           <li>
-            <Link
+            <a
               href="/login"
-              prefetch={false}
               data-auth-nav-link
               data-nav-path="/login"
               data-nav-group="auth"
               className="transition-all duration-200 hover:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
             >
               LOGIN
-            </Link>
+            </a>
           </li>
         </ul>
 

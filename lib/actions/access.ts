@@ -35,10 +35,10 @@ type AIPermissionSettingsSnapshot = {
 };
 
 export async function getCurrentUserImpl(): Promise<CurrentUserResult | null> {
-    await connectDB();
-
     const session = await getSessionUser();
     if (session) {
+        await connectDB();
+
         const now = new Date().toISOString();
         if (session.role === 'superadmin') {
             const admin = await SuperAdminModel.findOne({ id: session.userId }).select('-password').lean() as CurrentUserResult | null;
@@ -74,6 +74,8 @@ export async function getCurrentUserImpl(): Promise<CurrentUserResult | null> {
 
     const userId = await getSessionId();
     if (!userId) return null;
+
+    await connectDB();
 
     const superAdmin = await SuperAdminModel.findOne({ id: userId }).select('-password').lean() as CurrentUserResult | null;
     if (superAdmin) return sanitizeDoc(superAdmin) as CurrentUserResult;

@@ -12,6 +12,16 @@ import LoginPanel from "./_components/LoginPanel";
 import ForgotPasswordFlow from "./_components/ForgotPasswordFlow";
 import type { ForgotStep } from "./_components/login-shared";
 
+function hasLoggedInCookie() {
+    return document.cookie
+        .split(";")
+        .some((cookie) => cookie.trim().startsWith("logged_in=1"));
+}
+
+function clearLoggedInCookie() {
+    document.cookie = "logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+}
+
 export default function LoginPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
@@ -35,14 +45,16 @@ export default function LoginPage() {
 
     const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-    const clearLoggedInCookie = () => {
-        document.cookie = "logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    };
-
     useEffect(() => {
         let cancelled = false;
 
         const checkSession = async () => {
+            if (!hasLoggedInCookie()) {
+                clearLoggedInCookie();
+                setAuthChecked(true);
+                return;
+            }
+
             try {
                 const currentUser = await getCurrentUser();
                 if (cancelled) return;
