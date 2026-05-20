@@ -92,6 +92,8 @@ P1 plan
   - Validate Organization, Service, BreadcrumbList, FAQPage, BlogPosting, and Article schema with Rich Results Test or schema validator.
   - Keep schema aligned with visible page content.
   - Add Review, AggregateRating, or CaseStudy-style schema only when real evidence exists.
+  - Done 2026-05-20: strengthened `npm run audit:seo` so it now verifies expected JSON-LD schema types per route, including ProfessionalService, WebSite, ContactPage, Service, BreadcrumbList, FAQPage on FAQ-backed service pages, and BlogPosting on blog detail pages.
+  - Production run 2026-05-20: stricter structured-data audit passed with 432 pass, 0 fail, 1 expected warning for missing webmaster verification tokens.
 - Analytics and conversion tracking:
   - Verify Google Search Console and Bing Webmaster Tools.
   - Add GA4 or equivalent conversion tracking for contact form, get-started form, WhatsApp, email, phone, and newsletter events.

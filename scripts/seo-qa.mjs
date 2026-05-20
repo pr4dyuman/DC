@@ -41,6 +41,26 @@ const EXPECTED_NOINDEX_PATHS = [
   "/plan-expired",
 ];
 
+const SERVICE_DETAIL_PATHS = [
+  "/services/seo",
+  "/services/web-development",
+  "/services/ppc",
+  "/services/social-media-marketing",
+  "/services/video-production-ad",
+  "/services/influencer-marketing",
+  "/services/manage-company",
+  "/services/ai-blogger",
+];
+
+const SERVICE_FAQ_PATHS = [
+  "/services/seo",
+  "/services/web-development",
+  "/services/ppc",
+  "/services/social-media-marketing",
+  "/services/video-production-ad",
+  "/services/influencer-marketing",
+];
+
 const VERIFICATION_ENV = [
   {
     env: "GOOGLE_SITE_VERIFICATION",
@@ -200,6 +220,89 @@ function getJsonLdBlocks(html) {
     .filter(Boolean);
 }
 
+function flattenJsonLd(value, output = []) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      flattenJsonLd(item, output);
+    }
+    return output;
+  }
+
+  if (!value || typeof value !== "object") {
+    return output;
+  }
+
+  output.push(value);
+
+  for (const key of ["@graph", "itemListElement", "mainEntity", "acceptedAnswer", "author", "publisher", "image"]) {
+    if (value[key]) {
+      flattenJsonLd(value[key], output);
+    }
+  }
+
+  return output;
+}
+
+function parseJsonLdBlocks(blocks) {
+  const parsed = [];
+  const invalid = [];
+
+  for (const block of blocks) {
+    try {
+      parsed.push(JSON.parse(decodeHtml(block)));
+    } catch (error) {
+      invalid.push(error);
+    }
+  }
+
+  return {
+    parsed,
+    invalid,
+    nodes: parsed.flatMap((item) => flattenJsonLd(item)),
+  };
+}
+
+function getSchemaTypes(nodes) {
+  const types = new Set();
+
+  for (const node of nodes) {
+    const type = node?.["@type"];
+    if (Array.isArray(type)) {
+      for (const item of type) {
+        if (typeof item === "string" && item.trim()) {
+          types.add(item.trim());
+        }
+      }
+    } else if (typeof type === "string" && type.trim()) {
+      types.add(type.trim());
+    }
+  }
+
+  return types;
+}
+
+function getExpectedSchemaTypes(path) {
+  const expected = ["ProfessionalService", "WebSite"];
+
+  if (path === "/contact") {
+    expected.push("ContactPage");
+  }
+
+  if (SERVICE_DETAIL_PATHS.includes(path)) {
+    expected.push("Service", "BreadcrumbList");
+  }
+
+  if (SERVICE_FAQ_PATHS.includes(path)) {
+    expected.push("FAQPage");
+  }
+
+  if (/^\/blog\/[^/]+$/.test(path)) {
+    expected.push("BlogPosting", "BreadcrumbList");
+  }
+
+  return expected;
+}
+
 function extractSitemapUrls(xml) {
   return [...xml.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)]
     .map((match) => decodeHtml(match[1].trim()))
@@ -351,18 +454,25 @@ async function checkPublicPage(path) {
     if (jsonLdBlocks.length === 0) {
       warn(`${path} has JSON-LD structured data`);
     } else {
-      const invalid = jsonLdBlocks.filter((block) => {
-        try {
-          JSON.parse(decodeHtml(block));
-          return false;
-        } catch {
-          return true;
-        }
-      });
-      if (invalid.length === 0) {
+      const jsonLd = parseJsonLdBlocks(jsonLdBlocks);
+      if (jsonLd.invalid.length === 0) {
         pass(`${path} JSON-LD parses`, `${jsonLdBlocks.length} block(s)`);
       } else {
-        fail(`${path} JSON-LD parses`, `${invalid.length} invalid block(s)`);
+        fail(`${path} JSON-LD parses`, `${jsonLd.invalid.length} invalid block(s)`);
+      }
+
+      if (jsonLd.invalid.length === 0) {
+        const schemaTypes = getSchemaTypes(jsonLd.nodes);
+        for (const expectedType of getExpectedSchemaTypes(path)) {
+          if (schemaTypes.has(expectedType)) {
+            pass(`${path} has ${expectedType} schema`);
+          } else {
+            fail(
+              `${path} has ${expectedType} schema`,
+              `found: ${[...schemaTypes].sort().join(", ") || "none"}`,
+            );
+          }
+        }
       }
     }
   } catch (error) {
