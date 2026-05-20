@@ -138,7 +138,8 @@ P2 plan
     - Production verification 2026-05-20: `npm run audit:links -- https://digitalcorvids.com --max-pages=40` passed with 46 pass, 42 warnings, 0 fail. The six core service pages now pass related-blog checks; remaining warnings are blog-to-service links, /services/manage-company and /services/ai-blogger redesign items, and generic /services CTA anchor text.
     - Add contextual related-service blocks to /services/manage-company and /services/ai-blogger during their planned redesigns.
     - Update existing blog posts or CMS internalLinks so priority posts link to the most relevant service pages in body content, not only nav/footer.
-    - Replace generic /services CTA anchors with service-specific labels.
+    - Done 2026-05-20: replaced generic /services "Explore Service" CTA anchors with service-specific labels such as "Explore Web Development", "Explore SEO", and "Explore PPC Advertising".
+    - Production verification 2026-05-20: `npm run audit:links -- https://digitalcorvids.com --max-pages=40` passed with 47 pass, 41 warnings, 0 fail. The descriptive-anchor check now passes.
     - Add real proof/case-study sections when real client details are approved.
 
 1. Crawlability and indexability
