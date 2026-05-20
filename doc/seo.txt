@@ -113,8 +113,7 @@ P1 plan
   - Re-run build, sitemap, robots, schema, and mobile overflow checks before major releases.
   - Done 2026-05-20: added `npm run audit:seo` for repeatable SEO QA against production or localhost. It checks robots.txt, sitemap.xml, public page metadata, canonical URLs, social preview tags, server-rendered H1s, JSON-LD parsing, private-route noindex signals, webmaster verification meta, and /og-image.
   - Usage: `npm run audit:seo -- https://digitalcorvids.com` or `npm run audit:seo -- http://localhost:3000 --max-pages=20`.
-  - Production run 2026-05-20: 210 pass, 0 fail, 2 warnings. Warnings: webmaster verification tokens are not configured locally yet, and /get-started currently has no server-rendered H1 in production.
-  - Follow-up 2026-05-20: /get-started server-rendered H1 has been fixed in code; re-run production audit after deployment to confirm the warning disappears.
+  - Production re-run 2026-05-20: 211 pass, 0 fail, 1 warning. /get-started server-rendered H1 now passes on production; only the webmaster verification token warning remains.
   - Remaining manual step: add Search Console and Bing Webmaster verification tokens in Vercel, redeploy, run the audit, then submit `https://digitalcorvids.com/sitemap.xml` in both dashboards.
 
 1. Crawlability and indexability
