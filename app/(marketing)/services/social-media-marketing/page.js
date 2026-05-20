@@ -554,10 +554,10 @@ export default function SocialMediaMarketing() {
           {/* Card 5 */}
           <div className="flex flex-col items-center px-2">
             <h3 className="text-xs sm:text-sm md:text-base font-bold uppercase tracking-wide">
-              PROVEN VIRALITY
+              CREATIVE LEARNING
             </h3>
             <p className="text-[10px] sm:text-xs md:text-sm text-gray-300 mt-2 leading-relaxed max-w-[200px]">
-              10M+ organic views generated for clients through strategic content.
+              Campaign learnings are reviewed by hook, format, audience, and platform so future content gets sharper.
             </p>
           </div>
 
@@ -588,7 +588,7 @@ export default function SocialMediaMarketing() {
     className="text-3xl md:text-4xl font-bold text-center text-black py-4"
     style={{ backgroundColor: "#F5EE30" }}
   >
-    STATS THAT MATTER
+    PROOF WE TRACK
   </h2>
 
   <div className="relative w-full flex flex-col items-center justify-center px-6 py-12">
@@ -597,7 +597,7 @@ export default function SocialMediaMarketing() {
       {/* Stat */}
       <div className="flex flex-col items-center flex-1">
         <p className="text-sm md:text-base font-light text-gray-300 leading-relaxed">
-          Average 400% increase in engagement within 6 months.
+          Engagement quality is reviewed by format, platform, audience response, and conversion path.
         </p>
         <div className="w-full md:hidden h-[2px] bg-[#F5EE30] mt-4"></div>
       </div>
@@ -608,7 +608,7 @@ export default function SocialMediaMarketing() {
       {/* Stat */}
       <div className="flex flex-col items-center flex-1">
         <p className="text-sm md:text-base font-light text-gray-300 leading-relaxed">
-         50% lower cost-per-click (CPC) than industry benchmarks.
+          Paid social performance is checked against cost per result, creative quality, and landing page behavior.
         </p>
         <div className="w-full md:hidden h-[2px] bg-[#F5EE30] mt-4"></div>
       </div>
@@ -619,7 +619,7 @@ export default function SocialMediaMarketing() {
       {/* Stat */}
       <div className="flex flex-col items-center flex-1">
         <p className="text-sm md:text-base font-light text-gray-300 leading-relaxed">
-          85% of clients hit their lead gen goals in Q1.
+          Lead generation goals are tied to tracking setup, inquiry quality, and campaign learnings.
         </p>
       </div>
 

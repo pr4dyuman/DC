@@ -562,7 +562,7 @@ export default function SEOServices() {
           className="text-3xl md:text-4xl font-bold text-center text-black py-4"
           style={{ backgroundColor: "#F5EE30" }}
         >
-          STATS THAT MATTER
+          PROOF WE TRACK
         </h2>
 
         <div className="relative w-full flex flex-col items-center justify-center px-6 py-12">
@@ -571,7 +571,7 @@ export default function SEOServices() {
             {/* Stat */}
             <div className="flex flex-col items-center flex-1">
               <p className="text-sm md:text-base font-light text-gray-300 leading-relaxed">
-                Average 300% increase in organic traffic within 12 months.
+                Organic visibility reports compare traffic quality, ranking movement, and inquiry paths over time.
               </p>
               <div className="w-full md:hidden h-[2px] bg-[#F5EE30] mt-4"></div>
             </div>
@@ -582,7 +582,7 @@ export default function SEOServices() {
             {/* Stat */}
             <div className="flex flex-col items-center flex-1">
               <p className="text-sm md:text-base font-light text-gray-300 leading-relaxed">
-                92% client retention rate—we&apos;re in it for the long haul.
+                Before-and-after technical fixes are documented so every SEO improvement has a clear audit trail.
 
               </p>
               <div className="w-full md:hidden h-[2px] bg-[#F5EE30] mt-4"></div>
@@ -594,7 +594,7 @@ export default function SEOServices() {
             {/* Stat */}
             <div className="flex flex-col items-center flex-1">
               <p className="text-sm md:text-base font-light text-gray-300 leading-relaxed">
-                First-page rankings for 450+ competitive keywords in 2023.
+                Keyword progress is reviewed against search intent, content updates, and conversion opportunities.
               </p>
             </div>
 

@@ -566,10 +566,10 @@ export default function PPCAdvertising() {
             {/* Card 1 */}
             <div className="flex flex-col items-center px-2">
               <h3 className="text-xs sm:text-sm md:text-base font-bold uppercase tracking-wide">
-                ROI Obsession
+                ROI Discipline
               </h3>
               <p className="text-[10px] sm:text-xs md:text-sm text-gray-300 mt-2 leading-relaxed max-w-[200px]">
-                We&apos;ve driven over $15 million in client revenue from paid ads, with every campaign oriented toward measurable returns and tangible business growth.
+                Every campaign is oriented around measurable returns, conversion quality, wasted spend reduction, and useful reporting.
               </p>
             </div>
 
@@ -579,17 +579,17 @@ export default function PPCAdvertising() {
                 No Lock-Ins
               </h3>
               <p className="text-[10px] sm:text-xs md:text-sm text-gray-300 mt-2 leading-relaxed max-w-[200px]">
-                We offer flexible contracts because we&apos;re confident in our results—our client relationships are built on performance, not paperwork.
+                We offer flexible planning because client relationships should be built on clarity, performance review, and useful next steps.
               </p>
             </div>
 
             {/* Card 3 */}
             <div className="flex flex-col items-center px-2">
               <h3 className="text-xs sm:text-sm md:text-base font-bold uppercase tracking-wide">
-                Speed Demon Launches
+                Structured Launches
               </h3>
               <p className="text-[10px] sm:text-xs md:text-sm text-gray-300 mt-2 leading-relaxed max-w-[200px]">
-                Our streamlined process gets your campaigns live in 72 hours or less, letting you capitalize on market opportunities faster than competitors.
+                Launch plans cover targeting, tracking, budgets, creative checks, and landing page readiness before spend scales.
               </p>
             </div>
 
@@ -606,10 +606,10 @@ export default function PPCAdvertising() {
             {/* Card 5 */}
             <div className="flex flex-col items-center px-2">
               <h3 className="text-xs sm:text-sm md:text-base font-bold uppercase tracking-wide">
-                Unlimited A/B Testing
+                Ongoing A/B Testing
               </h3>
               <p className="text-[10px] sm:text-xs md:text-sm text-gray-300 mt-2 leading-relaxed max-w-[200px]">
-                We continuously test ad variations, landing pages, and audience segments to maximize performance—we never settle for &quot;good enough.&quot;
+                We continuously test ad variations, landing pages, and audience segments so performance can improve with evidence.
               </p>
 
             </div>

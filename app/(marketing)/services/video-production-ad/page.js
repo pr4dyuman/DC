@@ -519,20 +519,20 @@ export default function VideoProduction() {
   {/* Card 1 */}
   <div className="flex flex-col items-center px-2">
     <h3 className="text-xs sm:text-sm md:text-base font-bold uppercase tracking-wide">
-     Award-Winning Team
+     Production Team
     </h3>
     <p className="text-[10px] sm:text-xs md:text-sm text-gray-300 mt-2 leading-relaxed max-w-[200px]">
-     Our team of directors, editors, and animators boasts more than 50 industry accolades, bringing world-class expertise to every project regardless of size or budget.
+     Direction, editing, motion, sound, and delivery are planned together so each video has a clear creative and campaign purpose.
     </p>
   </div>
 
   {/* Card 2 */}
   <div className="flex flex-col items-center px-2">
     <h3 className="text-xs sm:text-sm md:text-base font-bold uppercase tracking-wide">
-     Speed & Precision
+     Planned Timelines
     </h3>
     <p className="text-[10px] sm:text-xs md:text-sm text-gray-300 mt-2 leading-relaxed max-w-[200px]">
-      We deliver high-quality video content in 15 days or less without cutting creative corners, meeting tight deadlines without sacrificing production value.
+      Timelines, shot lists, review rounds, and export needs are agreed before production so delivery stays organized.
     </p>
   </div>
 
@@ -562,7 +562,7 @@ export default function VideoProduction() {
       Proven Impact
     </h3>
     <p className="text-[10px] sm:text-xs md:text-sm text-gray-300 mt-2 leading-relaxed max-w-[200px]">
-     Our video campaigns achieve an average 70% increase in social shares compared to industry standards, helping your content break through digital noise.
+     Video performance is reviewed through watch behavior, engagement signals, campaign usage, and distribution learnings.
     </p>
   </div>
 

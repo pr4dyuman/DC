@@ -144,7 +144,8 @@ P2 plan
     - Done 2026-05-20: added lightweight related-service and related-article blocks to /services/manage-company and /services/ai-blogger to close the remaining internal-link warnings while keeping deeper page redesigns deferred.
     - Local verification 2026-05-20: targeted ESLint passed; production build passed; local rendered HTML confirmed /services/manage-company has 3 related service links and 3 related blog links, /services/ai-blogger has 4 related service links and 3 related blog links, and mobile headless checks showed 0px horizontal overflow with one H1 per page.
     - Production verification 2026-05-20: `npm run audit:links -- https://digitalcorvids.com --max-pages=40` passed with 88 pass, 0 warnings, 0 fail across 36 crawled pages.
-    - Add real proof/case-study sections when real client details are approved.
+    - Done 2026-05-20: replaced unsupported hard-metric proof claims on service pages with evidence-safe reporting, tracking, and workflow proof language. Real case-study numbers should only be added when client details and source data are approved.
+    - Remaining P2 proof work: add real case studies, client logos, before/after metrics, testimonial source links, and Review/AggregateRating schema only after real evidence is approved.
 
 1. Crawlability and indexability
 - Public pages must return HTTP 200.

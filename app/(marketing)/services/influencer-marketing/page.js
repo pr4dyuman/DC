@@ -519,7 +519,7 @@ export default function InfluencerMarketing() {
               Creator Network
             </h3>
             <p className="text-[10px] sm:text-xs md:text-sm text-gray-300 mt-2 leading-relaxed max-w-[200px]">
-              Access to 10,000+ pre-vetted influencers across all niches and industries, ensuring we can match your brand with the perfect voice regardless of your target audience.
+              Creator shortlists are built around audience fit, niche relevance, content quality, engagement authenticity, and brand safety.
             </p>
           </div>
 
@@ -556,10 +556,10 @@ export default function InfluencerMarketing() {
           {/* Card 5 */}
           <div className="flex flex-col items-center px-2">
             <h3 className="text-xs sm:text-sm md:text-base font-bold uppercase tracking-wide">
-              Proven ROI
+              ROI Tracking
             </h3>
             <p className="text-[10px] sm:text-xs md:text-sm text-gray-300 mt-2 leading-relaxed max-w-[200px]">
-              85% of our influencer campaigns exceed client KPIs, with transparent reporting that connects creator activity directly to your bottom line.
+              Creator activity is connected to traffic, conversions, content reuse, and campaign learnings wherever tracking is available.
             </p>
           </div>
 
@@ -592,7 +592,7 @@ export default function InfluencerMarketing() {
     className="text-3xl md:text-4xl font-bold text-center text-black py-4"
     style={{ backgroundColor: "#F5EE30" }}
   >
-    STATS THAT MATTER
+    PROOF WE TRACK
   </h2>
 
   <div className="relative w-full flex flex-col items-center justify-center px-6 py-12">
@@ -601,7 +601,7 @@ export default function InfluencerMarketing() {
       {/* Stat */}
       <div className="flex flex-col items-center flex-1">
         <p className="text-sm md:text-base font-light text-gray-300 leading-relaxed">
-          Average 8:1 ROI on influencer campaigns in 2023.
+          Creator fit is reviewed against audience quality, engagement behavior, content style, and campaign objective.
         </p>
         <div className="w-full md:hidden h-[2px] bg-[#F5EE30] mt-4"></div>
       </div>
@@ -612,7 +612,7 @@ export default function InfluencerMarketing() {
       {/* Stat */}
       <div className="flex flex-col items-center flex-1">
         <p className="text-sm md:text-base font-light text-gray-300 leading-relaxed">
-          70% of clients see a 3x boost in social engagement.
+          Performance is measured with UTM links, creator-level reporting, conversion paths, and reuse opportunities.
         </p>
         <div className="w-full md:hidden h-[2px] bg-[#F5EE30] mt-4"></div>
       </div>
@@ -623,7 +623,7 @@ export default function InfluencerMarketing() {
       {/* Stat */}
       <div className="flex flex-col items-center flex-1">
         <p className="text-sm md:text-base font-light text-gray-300 leading-relaxed">
-          50+ viral campaigns (1M+ views) launched last year.
+          Final reporting separates reach, engagement quality, traffic, conversions, and next campaign learnings.
         </p>
       </div>
 
