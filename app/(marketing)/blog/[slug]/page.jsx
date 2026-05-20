@@ -162,6 +162,211 @@ function getBlogKeywords(blog) {
     : [];
 }
 
+const MARKETING_SERVICE_LINKS = [
+  {
+    key: "seo",
+    title: "SEO Services",
+    href: "/services/seo",
+    description: "Improve technical SEO, content structure, rankings, and organic visibility.",
+    keywords: ["seo", "search engine", "organic", "keyword", "ranking", "content distribution"],
+  },
+  {
+    key: "web-development",
+    title: "Web Development",
+    href: "/services/web-development",
+    description: "Build fast, conversion-focused websites and landing pages for campaign traffic.",
+    keywords: ["web development", "website", "web design", "landing page", "ecommerce", "e-commerce"],
+  },
+  {
+    key: "ppc",
+    title: "PPC Advertising",
+    href: "/services/ppc",
+    description: "Turn paid media, search ads, and campaign budgets into measurable demand.",
+    keywords: ["ppc", "paid media", "paid search", "ads", "advertising", "roi", "roas", "media strategy"],
+  },
+  {
+    key: "social-media-marketing",
+    title: "Social Media Marketing",
+    href: "/services/social-media-marketing",
+    description: "Plan platform-specific social content, campaigns, calendars, and community growth.",
+    keywords: ["social media", "instagram", "linkedin", "reels", "carousel", "viral", "content calendar"],
+  },
+  {
+    key: "video-production-ad",
+    title: "Video Production Ads",
+    href: "/services/video-production-ad",
+    description: "Create video, ad films, pre-production systems, and platform-ready creative assets.",
+    keywords: ["video", "production", "pre-production", "storytelling", "creative", "youtube"],
+  },
+  {
+    key: "influencer-marketing",
+    title: "Influencer Marketing",
+    href: "/services/influencer-marketing",
+    description: "Build creator partnerships, influencer campaigns, audience trust, and ROI tracking.",
+    keywords: ["influencer", "creator", "youtube", "campaign", "brand voice"],
+  },
+  {
+    key: "manage-company",
+    title: "Manage Company",
+    href: "/services/manage-company",
+    description: "Connect agency operations, projects, finances, workflows, and AI-powered management.",
+    keywords: ["agency operations", "financial intelligence", "manage your company", "company", "workflows"],
+  },
+  {
+    key: "ai-blogger",
+    title: "AI Blogger",
+    href: "/services/ai-blogger",
+    description: "Plan, generate, optimize, and schedule SEO-focused blog content from one workflow.",
+    keywords: ["ai blogger", "ai", "blog", "content workflow", "content", "generated assets"],
+  },
+];
+
+const BLOG_SERVICE_LINK_OVERRIDES = {
+  "2026-platform-specific-social-media-strategy-framework-ai-scaling": [
+    "social-media-marketing",
+    "ai-blogger",
+    "video-production-ad",
+    "influencer-marketing",
+  ],
+  "2026-social-media-marketing-trends-operationalizing-ai-and-creative": [
+    "social-media-marketing",
+    "ai-blogger",
+    "video-production-ad",
+  ],
+  "2026-viral-worthy-content-calendar-strategy-for-reels-and-carousels": [
+    "social-media-marketing",
+    "ai-blogger",
+    "video-production-ad",
+    "influencer-marketing",
+  ],
+  "ajio-22feet-a-winning-fashion-e-commerce-digital-expansion-strategy": [
+    "ppc",
+    "web-development",
+    "ai-blogger",
+  ],
+  "amplify-your-brand-voice-with-authentic-content-and-influencer-marketing": [
+    "influencer-marketing",
+    "social-media-marketing",
+    "ai-blogger",
+  ],
+  "brand-voice-insurance-editorial-guardrails-for-ai-generated-assets": [
+    "ai-blogger",
+    "seo",
+    "influencer-marketing",
+  ],
+  "digital-production-vs-digital-marketing-strategy-the-2026-gap": [
+    "video-production-ad",
+    "web-development",
+    "ai-blogger",
+  ],
+  "enterprise-ai-distribution-strategy-2026-scaling-agentic-workflows": [
+    "ai-blogger",
+    "manage-company",
+    "seo",
+  ],
+  "how-ai-powered-financial-intelligence-improves-agency-operations-2026": [
+    "manage-company",
+    "ai-blogger",
+  ],
+  "how-to-build-a-high-roi-content-distribution-engine-for-2026": [
+    "ai-blogger",
+    "ppc",
+    "seo",
+  ],
+  "how-to-build-a-storytelling-campaign-strategy-the-2026-model": [
+    "video-production-ad",
+    "influencer-marketing",
+    "social-media-marketing",
+    "ai-blogger",
+  ],
+  "how-to-manage-your-company-using-ai-powered-tools-2026-strategy": [
+    "manage-company",
+    "ai-blogger",
+  ],
+  "how-to-manage-your-company-with-ai-driven-workflows-in-2026": [
+    "manage-company",
+    "ai-blogger",
+  ],
+  "media-strategy-guide-2026-scaling-impact-with-hybrid-models": [
+    "ppc",
+    "video-production-ad",
+    "influencer-marketing",
+    "ai-blogger",
+  ],
+  "pre-production-strategy-for-digital-content-engines-scale-in-2026": [
+    "video-production-ad",
+    "web-development",
+    "ai-blogger",
+  ],
+  "scaling-b2b-video-production-on-linkedin-beyond-the-feed": [
+    "video-production-ad",
+    "social-media-marketing",
+    "influencer-marketing",
+    "ai-blogger",
+  ],
+  "the-2026-production-mandate-balancing-speed-and-quality": [
+    "video-production-ad",
+    "ai-blogger",
+    "manage-company",
+    "seo",
+  ],
+  "the-2026-seo-management-workflow-scaling-content-with-ai": [
+    "seo",
+    "ai-blogger",
+  ],
+  "using-ai-to-optimize-influencer-marketing-roi-a-2026-strategy": [
+    "influencer-marketing",
+    "ai-blogger",
+    "ppc",
+  ],
+  "vertical-specific-influencer-campaign-management-the-framework": [
+    "influencer-marketing",
+    "ai-blogger",
+    "video-production-ad",
+  ],
+  "vertical-specific-marketing-strategies-a-production-first-framework": [
+    "influencer-marketing",
+    "video-production-ad",
+    "social-media-marketing",
+    "ai-blogger",
+  ],
+  "youtube-influencer-marketing-campaign-best-practices-the-roi-guide": [
+    "influencer-marketing",
+    "video-production-ad",
+    "ai-blogger",
+  ],
+};
+
+function uniqueServiceKeys(keys = []) {
+  return [...new Set(keys.filter(Boolean))];
+}
+
+function getRelatedServiceLinks(blog) {
+  const serviceByKey = new Map(MARKETING_SERVICE_LINKS.map((service) => [service.key, service]));
+  const explicitKeys = BLOG_SERVICE_LINK_OVERRIDES[blog.slug] || [];
+  const searchText = [
+    blog.slug,
+    blog.title,
+    blog.category,
+    blog.shortDescription,
+    blog.metaDescription,
+    blog.metaKeywords,
+    stripHtml(blog.content || "").slice(0, 3000),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const matchedKeys = MARKETING_SERVICE_LINKS.filter((service) =>
+    service.key !== "ai-blogger" && service.keywords.some((keyword) => searchText.includes(keyword))
+  ).map((service) => service.key);
+
+  return uniqueServiceKeys([...explicitKeys, ...matchedKeys, "ai-blogger"])
+    .map((key) => serviceByKey.get(key))
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
 function getReadTimeLabel(content = "") {
   const plainText = stripHtml(content);
   return `${Math.max(
@@ -568,6 +773,7 @@ export default async function BlogPost({ params }) {
     : contentWithoutInlineFaq;
   const sanitizedContent = serverSanitizeHtml(contentWithHeadingIds);
   const readTime = getReadTimeLabel(contentWithoutInlineFaq || post.content);
+  const relatedServiceLinks = getRelatedServiceLinks(post);
 
   const heroImageSrc = normalizeMarketingImageSrc(post.image);
   const isDefaultImage = heroImageSrc?.includes("ai-blogger.svg");
@@ -781,6 +987,34 @@ export default async function BlogPost({ params }) {
                     dangerouslySetInnerHTML={{ __html: sanitizedContent }}
                   />
                 </div>
+
+                {relatedServiceLinks.length > 0 && (
+                  <section className="mb-8 bg-[#0d0d0d] border border-white/[0.07] rounded-xl p-6 md:p-8">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F5EE30] mb-3">
+                      Related Services
+                    </p>
+                    <h2 className="font-etna text-2xl text-white mb-3">Turn This Strategy Into Execution</h2>
+                    <p className="text-sm leading-relaxed text-gray-400 mb-6">
+                      Explore the Digital Corvids services that connect most directly with this article.
+                    </p>
+                    <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
+                      {relatedServiceLinks.map((service) => (
+                        <Link
+                          key={service.href}
+                          href={service.href}
+                          className="group block py-4 transition-colors hover:bg-white/[0.02]"
+                        >
+                          <span className="block text-base font-bold uppercase text-white transition-colors group-hover:text-[#F5EE30]">
+                            {service.title}
+                          </span>
+                          <span className="mt-1 block text-sm leading-relaxed text-gray-400">
+                            {service.description}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
+                )}
 
                 {visibleSources.length > 0 && (
                   <div className="mb-8 bg-[#0d0d0d] border border-white/[0.07] rounded-xl p-6 md:p-8">

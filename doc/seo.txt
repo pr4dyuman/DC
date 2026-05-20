@@ -137,7 +137,8 @@ P2 plan
     - Local verification 2026-05-20: production build passed; targeted ESLint passed; local rendered HTML on all six service pages showed 3 blog detail links per page.
     - Production verification 2026-05-20: `npm run audit:links -- https://digitalcorvids.com --max-pages=40` passed with 46 pass, 42 warnings, 0 fail. The six core service pages now pass related-blog checks; remaining warnings are blog-to-service links, /services/manage-company and /services/ai-blogger redesign items, and generic /services CTA anchor text.
     - Add contextual related-service blocks to /services/manage-company and /services/ai-blogger during their planned redesigns.
-    - Update existing blog posts or CMS internalLinks so priority posts link to the most relevant service pages in body content, not only nav/footer.
+    - Done 2026-05-20: added a server-rendered Related Services block to blog detail pages. Current published slugs use explicit service mappings and future posts use keyword fallback, so blog articles can link contextually to the most relevant service pages without manually editing DB content.
+    - Local verification 2026-05-20: production build passed; targeted blog page lint passed with one existing native remote-image warning; local rendered HTML checks confirmed all 22 published blog detail pages have service links and all include the expected /services/ai-blogger contextual link.
     - Done 2026-05-20: replaced generic /services "Explore Service" CTA anchors with service-specific labels such as "Explore Web Development", "Explore SEO", and "Explore PPC Advertising".
     - Production verification 2026-05-20: `npm run audit:links -- https://digitalcorvids.com --max-pages=40` passed with 47 pass, 41 warnings, 0 fail. The descriptive-anchor check now passes.
     - Add real proof/case-study sections when real client details are approved.
