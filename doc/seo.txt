@@ -135,7 +135,7 @@ P2 plan
   - P2 implementation order:
     - Done 2026-05-20: added reusable related-article sections to /services/seo, /services/web-development, /services/ppc, /services/social-media-marketing, /services/video-production-ad, and /services/influencer-marketing. Each page now links contextually to three relevant Digital Corvids blog detail pages.
     - Local verification 2026-05-20: production build passed; targeted ESLint passed; local rendered HTML on all six service pages showed 3 blog detail links per page.
-    - Next production verification: after deployment, re-run `npm run audit:links -- https://digitalcorvids.com --max-pages=40` so the production sitemap and production origin match.
+    - Production verification 2026-05-20: `npm run audit:links -- https://digitalcorvids.com --max-pages=40` passed with 46 pass, 42 warnings, 0 fail. The six core service pages now pass related-blog checks; remaining warnings are blog-to-service links, /services/manage-company and /services/ai-blogger redesign items, and generic /services CTA anchor text.
     - Add contextual related-service blocks to /services/manage-company and /services/ai-blogger during their planned redesigns.
     - Update existing blog posts or CMS internalLinks so priority posts link to the most relevant service pages in body content, not only nav/footer.
     - Replace generic /services CTA anchors with service-specific labels.
