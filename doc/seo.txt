@@ -128,7 +128,7 @@ P2 plan
     - No crawled sitemap page looks orphaned.
   - Baseline gaps found:
     - Core service pages had no contextual links to related blog posts before the 2026-05-20 related-article update.
-    - /services/manage-company and /services/ai-blogger still need contextual related-service links when redesigned.
+    - /services/manage-company and /services/ai-blogger had no contextual related links before the lightweight page-level update.
     - Only 10 of 22 blog detail pages have contextual links to service pages.
     - /services/web-development, /services/ppc, and /services/social-media-marketing receive no contextual blog links in the crawl.
     - /services uses repeated generic "Explore Service" CTA text for service links.
@@ -136,10 +136,11 @@ P2 plan
     - Done 2026-05-20: added reusable related-article sections to /services/seo, /services/web-development, /services/ppc, /services/social-media-marketing, /services/video-production-ad, and /services/influencer-marketing. Each page now links contextually to three relevant Digital Corvids blog detail pages.
     - Local verification 2026-05-20: production build passed; targeted ESLint passed; local rendered HTML on all six service pages showed 3 blog detail links per page.
     - Production verification 2026-05-20: `npm run audit:links -- https://digitalcorvids.com --max-pages=40` passed with 46 pass, 42 warnings, 0 fail. The six core service pages now pass related-blog checks; remaining warnings are blog-to-service links, /services/manage-company and /services/ai-blogger redesign items, and generic /services CTA anchor text.
-    - Add contextual related-service blocks to /services/manage-company and /services/ai-blogger during their planned redesigns.
+    - Done 2026-05-20: added lightweight related-service and related-article blocks to /services/manage-company and /services/ai-blogger to close the remaining internal-link warnings while keeping deeper page redesigns deferred.
+    - Local verification 2026-05-20: targeted ESLint passed; production build passed; local rendered HTML confirmed /services/manage-company has 3 related service links and 3 related blog links, /services/ai-blogger has 4 related service links and 3 related blog links, and mobile headless checks showed 0px horizontal overflow with one H1 per page.
     - Done 2026-05-20: added a server-rendered Related Services block to blog detail pages. Current published slugs use explicit service mappings and future posts use keyword fallback, so blog articles can link contextually to the most relevant service pages without manually editing DB content.
     - Local verification 2026-05-20: production build passed; targeted blog page lint passed with one existing native remote-image warning; local rendered HTML checks confirmed all 22 published blog detail pages have service links and all include the expected /services/ai-blogger contextual link.
-    - Production verification 2026-05-20: `npm run audit:links -- https://digitalcorvids.com --max-pages=40` passed with 84 pass, 4 warnings, 0 fail. Blog pages with service links improved to 22/22, topic-matched blog service links now pass, and every service receives contextual blog links. Remaining warnings are only /services/manage-company and /services/ai-blogger page-level related links, which are deferred to their redesigns.
+    - Production verification 2026-05-20 before the lightweight deferred-page update: `npm run audit:links -- https://digitalcorvids.com --max-pages=40` passed with 84 pass, 4 warnings, 0 fail. Blog pages with service links improved to 22/22, topic-matched blog service links now pass, and every service receives contextual blog links. Remaining warnings at that point were only /services/manage-company and /services/ai-blogger page-level related links.
     - Done 2026-05-20: replaced generic /services "Explore Service" CTA anchors with service-specific labels such as "Explore Web Development", "Explore SEO", and "Explore PPC Advertising".
     - Production verification 2026-05-20: `npm run audit:links -- https://digitalcorvids.com --max-pages=40` passed with 47 pass, 41 warnings, 0 fail. The descriptive-anchor check now passes.
     - Add real proof/case-study sections when real client details are approved.

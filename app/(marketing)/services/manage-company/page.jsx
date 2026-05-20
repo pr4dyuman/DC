@@ -1,4 +1,5 @@
 import ManageCompanySection from "@/components/marketing/ManageCompany";
+import RelatedArticlesSection from "@/components/marketing/RelatedArticlesSection";
 import {
   buildMarketingMetadata,
   getMarketingBreadcrumbJsonLd,
@@ -30,6 +31,48 @@ const structuredData = [
   ]),
 ];
 
+const relatedManageCompanyServices = [
+  {
+    title: "AI Blogger",
+    href: "/services/ai-blogger",
+    category: "Content Operations",
+    description: "Add a structured AI content workflow to your agency operating system.",
+  },
+  {
+    title: "Web Development",
+    href: "/services/web-development",
+    category: "Client Portals",
+    description: "Build fast, reliable web experiences that support client and team workflows.",
+  },
+  {
+    title: "PPC Advertising",
+    href: "/services/ppc",
+    category: "Growth Tracking",
+    description: "Connect campaign spend, lead quality, and reporting with clearer business outcomes.",
+  },
+];
+
+const relatedManageCompanyArticles = [
+  {
+    title: "AI-Powered Financial Intelligence For Agency Operations",
+    href: "/blog/how-ai-powered-financial-intelligence-improves-agency-operations-2026",
+    category: "Agency Finance",
+    description: "See how AI can improve agency finance visibility, operations decisions, and workflow control.",
+  },
+  {
+    title: "Manage Your Company With AI-Driven Workflows",
+    href: "/blog/how-to-manage-your-company-with-ai-driven-workflows-in-2026",
+    category: "Operations",
+    description: "Explore practical ways AI workflows can organize projects, teams, and recurring agency tasks.",
+  },
+  {
+    title: "Manage Your Company Using AI-Powered Tools",
+    href: "/blog/how-to-manage-your-company-using-ai-powered-tools-2026-strategy",
+    category: "AI Tools",
+    description: "Review a strategy for using AI-powered tools across planning, tracking, and management.",
+  },
+];
+
 export default function ManageCompanyPage() {
   return (
     <>
@@ -38,6 +81,23 @@ export default function ManageCompanyPage() {
         dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
       />
       <ManageCompanySection headingLevel="h1" imagePriority />
+      <div className="bg-black text-white">
+        <div className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 sm:pb-20 lg:px-8 lg:pb-24">
+          <RelatedArticlesSection
+            eyebrow="Connected Services"
+            title="Build The Operating System Around Growth"
+            description="Manage Company works best when operations, content, web infrastructure, and campaign reporting stay connected."
+            articles={relatedManageCompanyServices}
+            actionLabel="Explore Service"
+          />
+          <RelatedArticlesSection
+            eyebrow="Agency Operations Reading List"
+            title="Guides For AI-Powered Management"
+            description="Use these Digital Corvids articles to plan more organized agency workflows, finance visibility, and management systems."
+            articles={relatedManageCompanyArticles}
+          />
+        </div>
+      </div>
     </>
   );
 }

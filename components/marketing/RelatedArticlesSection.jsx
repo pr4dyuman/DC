@@ -5,6 +5,7 @@ export default function RelatedArticlesSection({
   title = "Keep Building Context",
   description,
   articles = [],
+  actionLabel = "Read This Guide",
   className = "",
 }) {
   if (!articles.length) {
@@ -45,7 +46,7 @@ export default function RelatedArticlesSection({
               <span className="mt-4 block text-sm leading-relaxed text-gray-400">{article.description}</span>
             </span>
             <span className="mt-8 block font-glacial-bold text-sm uppercase tracking-widest text-white transition-colors group-hover:text-[#F5EE30]">
-              Read This Guide
+              {actionLabel}
             </span>
           </Link>
         ))}
