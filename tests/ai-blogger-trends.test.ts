@@ -268,6 +268,87 @@ test("website keyword trend analysis uses recent time-series momentum", async ()
     }
 });
 
+test("website keyword trend analysis plans broad candidate set but batches paid requests", async () => {
+    const originalFetch = globalThis.fetch;
+    const timeseriesBatches: string[][] = [];
+    const relatedQueryRequests: string[] = [];
+    const fallbackCandidates = [
+        "https://www.digitalcorvids.com/",
+        ...Array.from({ length: 35 }, (_, index) => `AI content workflow candidate ${index + 1}`),
+    ];
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+        const url = new URL(String(input));
+        const dataType = url.searchParams.get("data_type");
+        const q = url.searchParams.get("q") || "";
+
+        if (dataType === "TIMESERIES") {
+            const queries = q.split(",").map((item) => item.trim()).filter(Boolean);
+            timeseriesBatches.push(queries);
+
+            return new Response(
+                JSON.stringify({
+                    interest_over_time: {
+                        timeline_data: [
+                            { values: queries.map((_query, index) => ({ extracted_value: 10 + index })) },
+                            { values: queries.map((_query, index) => ({ extracted_value: 35 + index })) },
+                            { values: queries.map((_query, index) => ({ extracted_value: 80 + index })) },
+                        ],
+                    },
+                }),
+                {
+                    status: 200,
+                    headers: { "content-type": "application/json" },
+                },
+            );
+        }
+
+        relatedQueryRequests.push(q);
+        return new Response(
+            JSON.stringify({
+                related_queries: {
+                    rising: [{ query: `${q} automation` }],
+                    top: [{ query: `${q} strategy` }],
+                },
+            }),
+            {
+                status: 200,
+                headers: { "content-type": "application/json" },
+            },
+        );
+    }) as typeof fetch;
+
+    try {
+        const signals = await fetchAIBloggerTrendSignals({
+            config: {
+                ...trendsConfig,
+                trendFirstMode: false,
+            },
+            sourceMode: "website",
+            sourceValue: "https://www.digitalcorvids.com/",
+            trendFocus: "AI content operations",
+            primaryKeyword: "AI content workflow",
+            location: "us",
+            fallbackCandidates,
+        });
+
+        assert.equal(signals.mode, "keyword-analysis");
+        assert.equal(signals.queryPlan?.candidateCount, 30);
+        assert.equal(signals.queryPlan?.selectedTimeseriesQueries.length, 15);
+        assert.equal(signals.queryPlan?.relatedQueryRequestCount, 8);
+        assert.ok(timeseriesBatches.length <= 3);
+        assert.ok(timeseriesBatches.every((batch) => batch.length <= 5));
+        assert.ok(relatedQueryRequests.length <= 8);
+        assert.ok(relatedQueryRequests.every((query) => !query.includes(",")));
+        assert.equal(
+            signals.queryPlan?.candidates.some((candidate) => /digitalcorvids\.com/i.test(candidate.query)),
+            false,
+        );
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
 test("strict trend-first mode does not fall back to keyword analysis when SerpAPI credits are exhausted", async () => {
     const originalFetch = globalThis.fetch;
 

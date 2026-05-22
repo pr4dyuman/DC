@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildFinalSeoQualityAssessment, buildSeoStrategyReadinessAssessment, parseAdvancedBriefResponse } from "../lib/actions/ai-blogger";
+import {
+    buildFinalSeoQualityAssessment,
+    buildSeoStrategyReadinessAssessment,
+    cleanAIBloggerStylePhrasesForText,
+    parseAdvancedBriefResponse,
+} from "../lib/actions/ai-blogger";
+import type { AIBloggerGroundedResearch } from "../lib/ai-blogger-grounded-research";
 import type { BlogStudioPost, BlogStudioSeoAudit } from "../lib/types-ai-blogger";
 
 const passingAudit: BlogStudioSeoAudit = {
@@ -26,6 +32,96 @@ const passingAudit: BlogStudioSeoAudit = {
         recommendedTotal: 4,
     },
 };
+
+type FinalQualityDraft = Pick<
+    BlogStudioPost,
+    "title" | "metaTitle" | "metaDescription" | "excerpt" | "content" | "wordCount" | "outline" | "brief" | "draftBrief" | "faqItems" | "searchIntent" | "contentType" | "internalLinks"
+>;
+
+function buildNumericClaimQualityDraft(content: string): FinalQualityDraft {
+    return {
+        title: "Custom Marketing Campaign Architecture Blueprint",
+        metaTitle: "Custom Marketing Campaign Architecture Blueprint",
+        metaDescription: "Use a campaign architecture blueprint to align buyer journey proof, content assets, and conversion planning.",
+        excerpt: "A practical blueprint for building custom marketing campaign architecture.",
+        content,
+        wordCount: 980,
+        outline: [
+            "Campaign Architecture Blueprint",
+            "Buyer Journey Proof Map",
+            "Custom Marketing Checklist",
+            "Next Step",
+        ],
+        brief: {
+            sourceMode: "website",
+            sourceValue: "https://www.digitalcorvids.com/",
+            audience: "Marketing directors",
+            tone: "Strategic",
+            cta: "Book a campaign architecture audit",
+            primaryKeyword: "custom marketing campaign architecture",
+            language: "en",
+            location: "us",
+        },
+        draftBrief: {
+            businessFitSummary: "Fits marketing strategy and SEO services.",
+            businessFitScore: 92,
+            targetAudience: "Marketing directors",
+            ctaGoal: "Book a campaign architecture audit",
+            toneDirection: "Strategic",
+            titleDirection: "Blueprint guide",
+            metadataDirection: "Blueprint metadata",
+            entities: ["campaign architecture", "buyer journey"],
+            topicalCluster: "custom marketing campaign architecture",
+            readerPromise: "Build a custom campaign architecture blueprint",
+            serpGap: "Competitors miss operational proof mapping",
+            uniqueAngle: "Production-first campaign architecture",
+            originalValueAsset: "Campaign architecture blueprint checklist",
+            proofPlan: ["Use source-backed buyer journey evidence"],
+            internalLinkPlan: ["Campaign strategy service page"],
+            conversionPath: "Book a campaign architecture audit",
+        },
+        faqItems: [],
+        searchIntent: "informational",
+        contentType: "how-to",
+        internalLinks: [
+            {
+                href: "/services/seo",
+                title: "SEO Services",
+                source: "service",
+                anchorText: "SEO services",
+                relationType: "service-authority",
+                score: 90,
+                matchReason: "Supports the conversion path.",
+                clusterAligned: true,
+            },
+        ],
+    };
+}
+
+function buildNumericClaimGroundedResearch(keyClaims: string[]): AIBloggerGroundedResearch {
+    return {
+        query: "custom marketing campaign architecture",
+        normalizedQuery: "custom marketing campaign architecture",
+        location: "us",
+        summary: "Source-backed campaign architecture research.",
+        cacheStatus: "live",
+        refreshedAt: "2026-05-23T00:00:00.000Z",
+        sources: [
+            {
+                id: "source-1",
+                title: "Custom marketing campaign architecture research",
+                url: "https://example.com/custom-marketing-campaign-architecture",
+                domain: "example.com",
+                summary: "A source about custom marketing campaign architecture, buyer journey proof, and conversion planning.",
+                type: "industry",
+                trustLevel: "high",
+                freshness: "recent",
+                keyClaims,
+                citationBlock: "Custom marketing campaign architecture research.",
+            },
+        ],
+    };
+}
 
 test("seo strategy readiness rewards strong topic fit, original value, proof, and conversion path", () => {
     const assessment = buildSeoStrategyReadinessAssessment({
@@ -314,4 +410,162 @@ They can help many companies create more content. This article explains the topi
 
     assert.ok(assessment.score < 65);
     assert.ok(assessment.blockers.some((blocker) => /Final SEO quality|original value|search intent/i.test(blocker)));
+});
+
+test("final seo quality does not flag valid markdown table body rows as malformed", () => {
+    const draft = buildNumericClaimQualityDraft(`Conversion funnel mapping and optimization helps teams find weak handoffs between campaign traffic, landing pages, forms, and sales follow-up.
+
+## Campaign Architecture Blueprint
+
+Use this conversion funnel mapping template to inspect the path from first touch to booked call.
+
+| Funnel Stage | User Goal | Key Content Assets | Optimization Actions |
+| :--- | :--- | :--- | :--- |
+| **Awareness** | Find useful guidance | SEO guides and social posts | Clarify the promise and page speed |
+| **Interest** | Compare options | Case studies and demos | Match proof to the reader's use case |
+| **Decision** | Validate trust | Pricing pages and consultations | Reduce form friction and add proof |
+
+## Buyer Journey Proof Map
+
+Review the table, inspect analytics events, and document where users stop moving forward.
+
+## Custom Marketing Checklist
+
+- Check whether every funnel stage has a page, proof point, and next step.
+- Connect analytics events to your highest-value conversion path.
+- Review internal links from SEO, PPC, and video service pages.
+
+## Next Step
+
+Book a campaign architecture audit to review your funnel, proof plan, and SEO services alignment.`);
+
+    const assessment = buildFinalSeoQualityAssessment({
+        draft,
+        audit: passingAudit,
+        primaryKeyword: "conversion funnel mapping and optimization",
+        secondaryKeywords: ["campaign architecture audit", "buyer journey proof"],
+        groundedResearch: buildNumericClaimGroundedResearch([
+            "Conversion funnel mapping helps teams inspect traffic, landing pages, forms, and sales follow-up.",
+        ]),
+    });
+
+    assert.equal(
+        assessment.warnings.some((warning) => /Markdown table appears malformed/i.test(warning)),
+        false,
+    );
+    assert.equal(
+        assessment.blockers.some((blocker) => /Markdown table/i.test(blocker)),
+        false,
+    );
+});
+
+test("style phrase cleanup removes common AI phrasing before final quality scoring", () => {
+    const cleanup = cleanAIBloggerStylePhrasesForText(
+        `In today's digital landscape, teams need reliable funnel operations. This is where a checklist can help you optimize your handoffs and streamline your review process.`,
+        500,
+    );
+
+    assert.ok(cleanup.removedPhrases.includes("in today's digital landscape"));
+    assert.ok(cleanup.removedPhrases.includes("this is where"));
+    assert.ok(cleanup.removedPhrases.includes("optimize your"));
+    assert.ok(cleanup.removedPhrases.includes("streamline your"));
+    assert.equal(/in today's digital landscape|this is where|optimize your|streamline your/i.test(cleanup.text), false);
+    assert.match(cleanup.text, /Today|today|Here|here|improve your|simplify your/);
+});
+
+test("final seo quality blocks numeric campaign rules absent from grounded sources", () => {
+    const draft = buildNumericClaimQualityDraft(`Custom marketing campaign architecture helps marketing directors align buyer journey proof with conversion planning.
+
+## Campaign Architecture Blueprint
+
+Use the 7-11-4 rule to plan 7 hours of education across 11 touchpoints and 4 channels before a high-value buying decision.
+
+## Buyer Journey Proof Map
+
+The 3-3-3 framework gives teams 3 seconds to earn attention, 30 seconds to clarify the value proposition, and 3 minutes to establish credibility.
+
+## Custom Marketing Checklist
+
+| Check | What good looks like |
+| --- | --- |
+| Intent | The first section answers the campaign architecture question |
+| Proof | Claims cite source-backed evidence [1] |
+| Cluster | The article links to a relevant service page |
+| Conversion | The closing paragraph gives one relevant next step |
+
+## Next Step
+
+Book a campaign architecture audit to review your buyer journey, proof plan, and SEO services alignment.
+
+## Sources
+
+1. [Campaign architecture research](https://example.com/custom-marketing-campaign-architecture)`);
+
+    const assessment = buildFinalSeoQualityAssessment({
+        draft,
+        audit: passingAudit,
+        primaryKeyword: "custom marketing campaign architecture",
+        secondaryKeywords: ["buyer journey proof", "campaign architecture audit"],
+        groundedResearch: buildNumericClaimGroundedResearch([
+            "Custom marketing campaign architecture works best when teams align proof, buyer journey content, and conversion planning.",
+        ]),
+    });
+
+    assert.ok(
+        assessment.blockers.some((blocker) =>
+            /Precise numeric claims are not present in grounded sources/i.test(blocker),
+        ),
+    );
+    assert.ok(
+        assessment.warnings.some((warning) =>
+            /Precise numeric claims need source verification/i.test(warning),
+        ),
+    );
+});
+
+test("final seo quality accepts numeric campaign claims present in grounded sources", () => {
+    const draft = buildNumericClaimQualityDraft(`Custom marketing campaign architecture helps marketing directors align buyer journey proof with conversion planning.
+
+## Campaign Architecture Blueprint
+
+Use the 7-11-4 rule to plan 7 hours of education across 11 touchpoints and 4 channels before a high-value buying decision.
+
+## Buyer Journey Proof Map
+
+The 3-3-3 framework gives teams 3 seconds to earn attention, 30 seconds to clarify the value proposition, and 3 minutes to establish credibility.
+
+## Custom Marketing Checklist
+
+| Check | What good looks like |
+| --- | --- |
+| Intent | The first section answers the campaign architecture question |
+| Proof | Claims cite source-backed evidence [1] |
+| Cluster | The article links to a relevant service page |
+| Conversion | The closing paragraph gives one relevant next step |
+
+## Next Step
+
+Book a campaign architecture audit to review your buyer journey, proof plan, and SEO services alignment.
+
+## Sources
+
+1. [Campaign architecture research](https://example.com/custom-marketing-campaign-architecture)`);
+
+    const assessment = buildFinalSeoQualityAssessment({
+        draft,
+        audit: passingAudit,
+        primaryKeyword: "custom marketing campaign architecture",
+        secondaryKeywords: ["buyer journey proof", "campaign architecture audit"],
+        groundedResearch: buildNumericClaimGroundedResearch([
+            "The 7-11-4 rule describes 7 hours of education across 11 touchpoints and 4 channels.",
+            "The 3-3-3 framework covers 3 seconds, 30 seconds, and 3 minutes of engagement depth.",
+        ]),
+    });
+
+    assert.equal(
+        assessment.blockers.some((blocker) =>
+            /Precise numeric claims are not present in grounded sources/i.test(blocker),
+        ),
+        false,
+    );
 });

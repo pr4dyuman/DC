@@ -55,6 +55,23 @@ export type AIBloggerTrendScanStats = {
     fallbackUsed: boolean;
 };
 
+export type AIBloggerTrendQueryCandidate = {
+    query: string;
+    score: number;
+    reasons: string[];
+    selectedForTimeseries: boolean;
+    selectedForRelatedQueries: boolean;
+};
+
+export type AIBloggerTrendQueryPlan = {
+    candidateCount: number;
+    selectedTimeseriesQueries: string[];
+    selectedRelatedQueryQueries: string[];
+    timeseriesBatchCount: number;
+    relatedQueryRequestCount: number;
+    candidates: AIBloggerTrendQueryCandidate[];
+};
+
 export type AIBloggerTrendSignals = {
     mode: "live-topics" | "keyword-analysis";
     provider: "serpapi";
@@ -66,6 +83,7 @@ export type AIBloggerTrendSignals = {
     viralTrends: AIBloggerViralTrendSignal[];
     selectedViralTrend?: AIBloggerViralTrendSignal;
     scanStats?: AIBloggerTrendScanStats;
+    queryPlan?: AIBloggerTrendQueryPlan;
     summary: string;
 };
 
@@ -122,9 +140,174 @@ function getMeaningfulTokenList(value: string) {
     return getTokenList(value).filter((token) => !LOW_VALUE_MATCH_TOKENS.has(token));
 }
 
+const TREND_QUERY_PLANNER_CANDIDATE_LIMIT = 30;
+const GOOGLE_TRENDS_TIMESERIES_BATCH_SIZE = 5;
+const GOOGLE_TRENDS_KEYWORD_TIMESERIES_LIMIT = 15;
+const GOOGLE_TRENDS_RELATED_QUERY_LIMIT = 8;
+const GENERIC_SINGLE_WORD_TREND_QUERIES = new Set([
+    "ads",
+    "audit",
+    "blog",
+    "brand",
+    "content",
+    "creative",
+    "growth",
+    "marketing",
+    "ppc",
+    "seo",
+    "services",
+    "social",
+    "strategy",
+]);
+
 function looksLikeUrl(value: string) {
     const trimmed = value.trim();
     return /^https?:\/\//i.test(trimmed) || /^[a-z0-9.-]+\.[a-z]{2,}(?:[/?#]|$)/i.test(trimmed);
+}
+
+function normalizeTrendQuery(value: string) {
+    return sanitizeText(
+        value
+            .replace(/^https?:\/\/\S+/i, "")
+            .replace(/\b(?:www\.)?[a-z0-9.-]+\.[a-z]{2,}(?:\/\S*)?/gi, "")
+            .replace(/[|•·]+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim(),
+        120,
+    );
+}
+
+function isLowValueTrendQuery(value: string) {
+    const query = normalizeTrendQuery(value);
+    if (!query || looksLikeUrl(value)) {
+        return true;
+    }
+
+    const tokens = getMeaningfulTokenList(query);
+    const rawTokens = getTokenList(query);
+    if (tokens.length === 0) {
+        return true;
+    }
+
+    if (tokens.length === 1 && (tokens[0].length < 6 || GENERIC_SINGLE_WORD_TREND_QUERIES.has(tokens[0]))) {
+        return true;
+    }
+
+    if (rawTokens.length > 10) {
+        return true;
+    }
+
+    if (
+        /\b(?:home|login|dashboard|copy body|copy meta|draft status|publishing status)\b/i.test(query) ||
+        /[.!?]$/.test(query) ||
+        /\b(?:before drafting begins|in one place|workflow for planning|status in one place)\b/i.test(query)
+    ) {
+        return true;
+    }
+
+    if (tokens.length >= 8 && /\b(?:is|are|was|were|can|could|should|must|before|after)\b/i.test(query)) {
+        return true;
+    }
+
+    return /^(?:home|about|contact|pricing|blog|services?|products?|solutions?)$/i.test(query);
+}
+
+function getTrendQueryIntentScore(query: string) {
+    const tokenCount = getMeaningfulTokenList(query).length;
+    const longTailScore =
+        tokenCount >= 3 && tokenCount <= 7 ? 18
+            : tokenCount === 2 ? 10
+                : tokenCount > 7 ? 8
+                    : 0;
+    const intentScore = /\b(?:ai|automation|best|checklist|compare|cost|guide|how|ideas?|near me|pricing|services?|software|strategy|template|tools?|trends?|vs|what|why)\b/i.test(query)
+        ? 8
+        : 0;
+
+    return longTailScore + intentScore;
+}
+
+function addTrendQueryCandidate(
+    candidates: Map<string, AIBloggerTrendQueryCandidate>,
+    value: string,
+    baseScore: number,
+    reason: string,
+) {
+    const query = normalizeTrendQuery(value);
+    if (isLowValueTrendQuery(query)) {
+        return;
+    }
+
+    const key = query.toLowerCase();
+    const score = clampScore(baseScore + getTrendQueryIntentScore(query));
+    const existing = candidates.get(key);
+    if (!existing || score > existing.score) {
+        candidates.set(key, {
+            query,
+            score,
+            reasons: sanitizeStringArray(
+                [
+                    reason,
+                    `tokens ${getMeaningfulTokenList(query).length}`,
+                    getTrendQueryIntentScore(query) > 0 ? "query-shape" : "",
+                ],
+                5,
+                80,
+            ),
+            selectedForTimeseries: false,
+            selectedForRelatedQueries: false,
+        });
+        return;
+    }
+
+    candidates.set(key, {
+        ...existing,
+        reasons: sanitizeStringArray([...existing.reasons, reason], 5, 80),
+    });
+}
+
+function buildTrendQueryPlan(input: FetchTrendSignalsInput, sourceValueHint: string): AIBloggerTrendQueryPlan {
+    const candidates = new Map<string, AIBloggerTrendQueryCandidate>();
+
+    addTrendQueryCandidate(candidates, input.primaryKeyword || "", 86, "primary-keyword");
+    addTrendQueryCandidate(candidates, input.trendFocus || "", 78, "trend-focus");
+
+    if (sourceValueHint) {
+        addTrendQueryCandidate(candidates, sourceValueHint, input.sourceMode === "website" ? 24 : 64, "source-value");
+    }
+
+    for (const [index, candidate] of (input.fallbackCandidates || []).entries()) {
+        addTrendQueryCandidate(
+            candidates,
+            candidate,
+            Math.max(34, 70 - index * 2),
+            "website-candidate",
+        );
+    }
+
+    const rankedCandidates = Array.from(candidates.values())
+        .sort((left, right) => right.score - left.score || left.query.localeCompare(right.query))
+        .slice(0, TREND_QUERY_PLANNER_CANDIDATE_LIMIT);
+    const selectedTimeseriesQueries = rankedCandidates
+        .slice(0, GOOGLE_TRENDS_KEYWORD_TIMESERIES_LIMIT)
+        .map((candidate) => candidate.query);
+    const selectedRelatedQueryQueries = rankedCandidates
+        .slice(0, GOOGLE_TRENDS_RELATED_QUERY_LIMIT)
+        .map((candidate) => candidate.query);
+    const selectedTimeseriesSet = new Set(selectedTimeseriesQueries.map((query) => query.toLowerCase()));
+    const selectedRelatedSet = new Set(selectedRelatedQueryQueries.map((query) => query.toLowerCase()));
+
+    return {
+        candidateCount: rankedCandidates.length,
+        selectedTimeseriesQueries,
+        selectedRelatedQueryQueries,
+        timeseriesBatchCount: Math.ceil(selectedTimeseriesQueries.length / GOOGLE_TRENDS_TIMESERIES_BATCH_SIZE),
+        relatedQueryRequestCount: selectedRelatedQueryQueries.length,
+        candidates: rankedCandidates.map((candidate) => ({
+            ...candidate,
+            selectedForTimeseries: selectedTimeseriesSet.has(candidate.query.toLowerCase()),
+            selectedForRelatedQueries: selectedRelatedSet.has(candidate.query.toLowerCase()),
+        })),
+    };
 }
 
 function clampScore(value: number) {
@@ -813,35 +996,50 @@ async function fetchDeepTrendFirstSignals(input: {
     };
 }
 
-function getTimelineValues(timelineData: Array<{ values?: Array<{ value?: number | string; extracted_value?: number }> }> | undefined) {
+type TrendTimelineValue = { value?: number | string; extracted_value?: number };
+type TrendTimelineEntry = { values?: TrendTimelineValue[] };
+
+function chunkArray<T>(items: T[], size: number) {
+    const chunks: T[][] = [];
+    for (let index = 0; index < items.length; index += size) {
+        chunks.push(items.slice(index, index + size));
+    }
+    return chunks;
+}
+
+function extractTrendTimelineValue(value: TrendTimelineValue | undefined) {
+    if (!value) {
+        return 0;
+    }
+
+    if (typeof value.extracted_value === "number") {
+        return value.extracted_value;
+    }
+
+    if (typeof value.value === "number") {
+        return value.value;
+    }
+
+    if (typeof value.value === "string") {
+        const numeric = Number(value.value.replace(/[^0-9.]/g, ""));
+        return Number.isFinite(numeric) ? numeric : 0;
+    }
+
+    return 0;
+}
+
+function getTimelineValues(timelineData: TrendTimelineEntry[] | undefined) {
     if (!timelineData?.length) {
         return [];
     }
 
     return timelineData
         .flatMap((entry) => entry.values || [])
-        .map((value) => {
-            if (typeof value.extracted_value === "number") {
-                return value.extracted_value;
-            }
-
-            if (typeof value.value === "number") {
-                return value.value;
-            }
-
-            if (typeof value.value === "string") {
-                const numeric = Number(value.value.replace(/[^0-9.]/g, ""));
-                return Number.isFinite(numeric) ? numeric : 0;
-            }
-
-            return 0;
-        })
+        .map((value) => extractTrendTimelineValue(value))
         .filter((value) => Number.isFinite(value));
 }
 
-function getTrendMomentumScore(timelineData: Array<{ values?: Array<{ value?: number | string; extracted_value?: number }> }> | undefined) {
-    const values = getTimelineValues(timelineData);
-
+function getTrendMomentumScoreFromValues(values: number[]) {
     if (!values.length) {
         return 30;
     }
@@ -854,6 +1052,37 @@ function getTrendMomentumScore(timelineData: Array<{ values?: Array<{ value?: nu
     const upwardMomentum = Math.max(0, recentAverage - earlierAverage);
 
     return clampScore((recentAverage * 0.55) + (peak * 0.25) + (upwardMomentum * 0.20));
+}
+
+function getTrendMomentumScore(timelineData: TrendTimelineEntry[] | undefined) {
+    return getTrendMomentumScoreFromValues(getTimelineValues(timelineData));
+}
+
+function getTrendMomentumScoresByKeyword(
+    timelineData: TrendTimelineEntry[] | undefined,
+    keywords: string[],
+) {
+    const valuesByKeyword = new Map<string, number[]>(
+        keywords.map((keyword) => [keyword, []]),
+    );
+
+    for (const entry of timelineData || []) {
+        (entry.values || []).forEach((value, index) => {
+            const keyword = keywords[index];
+            if (!keyword) {
+                return;
+            }
+
+            valuesByKeyword.get(keyword)?.push(extractTrendTimelineValue(value));
+        });
+    }
+
+    return new Map(
+        keywords.map((keyword) => [
+            keyword,
+            getTrendMomentumScoreFromValues(valuesByKeyword.get(keyword) || []),
+        ]),
+    );
 }
 
 async function fetchKeywordTrendResult(
@@ -963,6 +1192,193 @@ async function fetchKeywordTrendResult(
     }
 }
 
+async function fetchKeywordRelatedQueries(
+    keyword: string,
+    location: string,
+    config: AIBloggerTrendsConfig,
+    options?: { timeoutMs?: number },
+) {
+    const { data, usedFallbackKey } = await fetchSerpApiJson<{
+        related_queries?: {
+            rising?: Array<{ query?: string }>;
+            top?: Array<{ query?: string }>;
+        };
+    }>(
+        {
+            engine: "google_trends",
+            q: keyword,
+            geo: location.toUpperCase(),
+            data_type: "RELATED_QUERIES",
+            date: "now 7-d",
+        },
+        config,
+        options,
+    );
+
+    return {
+        relatedQueries: sanitizeStringArray(
+            [
+                ...(data.related_queries?.rising?.map((item) => item.query) || []),
+                ...(data.related_queries?.top?.map((item) => item.query) || []),
+            ],
+            6,
+            120,
+        ),
+        usedFallbackKey,
+    };
+}
+
+async function fetchKeywordTimeseriesBatch(
+    keywords: string[],
+    location: string,
+    config: AIBloggerTrendsConfig,
+    options?: { timeoutMs?: number },
+) {
+    const cleanKeywords = sanitizeStringArray(keywords, GOOGLE_TRENDS_TIMESERIES_BATCH_SIZE, 120);
+    if (!cleanKeywords.length) {
+        return {
+            scores: new Map<string, number>(),
+            usedFallbackKey: false,
+        };
+    }
+
+    const { data, usedFallbackKey } = await fetchSerpApiJson<{
+        interest_over_time?: {
+            timeline_data?: TrendTimelineEntry[];
+        };
+    }>(
+        {
+            engine: "google_trends",
+            q: cleanKeywords.join(","),
+            geo: location.toUpperCase(),
+            data_type: "TIMESERIES",
+            date: "now 7-d",
+        },
+        config,
+        options,
+    );
+
+    return {
+        scores: getTrendMomentumScoresByKeyword(
+            data.interest_over_time?.timeline_data,
+            cleanKeywords,
+        ),
+        usedFallbackKey,
+    };
+}
+
+async function fetchPlannedKeywordTrendResults(input: {
+    queryPlan: AIBloggerTrendQueryPlan;
+    location: string;
+    config: AIBloggerTrendsConfig;
+}): Promise<{ keywordResults: AIBloggerKeywordTrendResult[]; usedFallbackKey: boolean; queryPlan: AIBloggerTrendQueryPlan }> {
+    const timeseriesQueries = input.queryPlan.selectedTimeseriesQueries;
+    const timeseriesScores = new Map<string, number>();
+    let usedFallbackKey = false;
+
+    const timeseriesResults = await Promise.allSettled(
+        chunkArray(timeseriesQueries, GOOGLE_TRENDS_TIMESERIES_BATCH_SIZE).map((batch) =>
+            fetchKeywordTimeseriesBatch(batch, input.location, input.config, { timeoutMs: 9_000 }),
+        ),
+    );
+
+    for (const result of timeseriesResults) {
+        if (result.status !== "fulfilled") {
+            if (isQuotaOrRateLimitFailure(getTrendErrorMessage(result.reason))) {
+                throw result.reason;
+            }
+            continue;
+        }
+
+        usedFallbackKey = usedFallbackKey || result.value.usedFallbackKey;
+        for (const [keyword, score] of result.value.scores) {
+            timeseriesScores.set(keyword, score);
+        }
+    }
+
+    const planScoreByQuery = new Map(
+        input.queryPlan.candidates.map((candidate) => [candidate.query, candidate.score]),
+    );
+    const relatedQueryTargets = timeseriesQueries
+        .map((query) => ({
+            query,
+            trendScore: timeseriesScores.get(query) ?? 30,
+            planScore: planScoreByQuery.get(query) ?? 0,
+        }))
+        .sort((left, right) =>
+            right.trendScore - left.trendScore ||
+            right.planScore - left.planScore ||
+            left.query.localeCompare(right.query),
+        )
+        .slice(0, GOOGLE_TRENDS_RELATED_QUERY_LIMIT)
+        .map((item) => item.query);
+    const relatedQueryTargetSet = new Set(relatedQueryTargets.map((query) => query.toLowerCase()));
+    const relatedQueryResults = await Promise.allSettled(
+        relatedQueryTargets.map(async (keyword) => {
+            const related = await fetchKeywordRelatedQueries(
+                keyword,
+                input.location,
+                input.config,
+                { timeoutMs: 8_000 },
+            );
+
+            return {
+                keyword,
+                ...related,
+            };
+        }),
+    );
+    const relatedQueriesByKeyword = new Map<string, string[]>();
+
+    for (const result of relatedQueryResults) {
+        if (result.status !== "fulfilled") {
+            if (isQuotaOrRateLimitFailure(getTrendErrorMessage(result.reason))) {
+                throw result.reason;
+            }
+            continue;
+        }
+
+        usedFallbackKey = usedFallbackKey || result.value.usedFallbackKey;
+        relatedQueriesByKeyword.set(result.value.keyword, result.value.relatedQueries);
+    }
+
+    const keywordResults = timeseriesQueries
+        .map((keyword) => {
+            const relatedQueries = relatedQueriesByKeyword.get(keyword) || [];
+            const trendScore = timeseriesScores.get(keyword) ?? (relatedQueries.length > 0 ? 38 : 30);
+            return {
+                keyword,
+                trendingTopic: sanitizeText(
+                    relatedQueries[0] ? `${keyword} ${relatedQueries[0]}` : keyword,
+                    180,
+                    keyword,
+                ),
+                score: trendScore,
+                relatedQueries,
+            } satisfies AIBloggerKeywordTrendResult;
+        })
+        .sort((left, right) =>
+            right.score - left.score ||
+            (planScoreByQuery.get(right.keyword) || 0) - (planScoreByQuery.get(left.keyword) || 0) ||
+            left.keyword.localeCompare(right.keyword),
+        );
+
+    return {
+        keywordResults,
+        usedFallbackKey,
+        queryPlan: {
+            ...input.queryPlan,
+            selectedRelatedQueryQueries: relatedQueryTargets,
+            relatedQueryRequestCount: relatedQueryTargets.length,
+            candidates: input.queryPlan.candidates.map((candidate) => ({
+                ...candidate,
+                selectedForTimeseries: timeseriesQueries.some((query) => query.toLowerCase() === candidate.query.toLowerCase()),
+                selectedForRelatedQueries: relatedQueryTargetSet.has(candidate.query.toLowerCase()),
+            })),
+        },
+    };
+}
+
 export async function fetchAIBloggerKeywordTrendResult(
     keyword: string,
     location: string,
@@ -1002,13 +1418,9 @@ export async function fetchAIBloggerTrendSignals(input: FetchTrendSignalsInput):
     const sourceValueHint = input.sourceMode === "website" && looksLikeUrl(input.sourceValue)
         ? ""
         : input.sourceValue;
+    const queryPlan = buildTrendQueryPlan(input, sourceValueHint);
     const fitHints = sanitizeStringArray(
-        [
-            sourceValueHint,
-            input.trendFocus || "",
-            input.primaryKeyword || "",
-            ...(input.fallbackCandidates || []),
-        ],
+        queryPlan.candidates.map((candidate) => candidate.query),
         36,
         180,
     );
@@ -1066,6 +1478,7 @@ export async function fetchAIBloggerTrendSignals(input: FetchTrendSignalsInput):
                 viralTrends: orderedTrends,
                 selectedViralTrend,
                 scanStats: deepScan.scanStats,
+                queryPlan,
                 summary: buildLiveTrendSummary(location, orderedTrends, deepScan.scanStats),
             };
         }
@@ -1076,34 +1489,19 @@ export async function fetchAIBloggerTrendSignals(input: FetchTrendSignalsInput):
         );
     }
 
-    const keywordsToAnalyze = sanitizeStringArray(
-        [
-            input.primaryKeyword || "",
-            input.trendFocus || "",
-            sourceValueHint,
-            ...(input.fallbackCandidates || []),
-        ],
-        input.sourceMode === "website" ? 6 : 4,
-        120,
-    );
+    const keywordsToAnalyze = queryPlan.selectedTimeseriesQueries;
 
     if (!keywordsToAnalyze.length) {
         throw new Error("No keyword candidates were available for Google Trends analysis.");
     }
 
-    const keywordResults: AIBloggerKeywordTrendResult[] = [];
-    let usedFallbackKey = trendFirstUsedFallbackKey;
-
-    for (const keyword of keywordsToAnalyze) {
-        const response = await fetchKeywordTrendResult(keyword, location, input.config);
-        if (response.usedFallbackKey) {
-            usedFallbackKey = true;
-        }
-        keywordResults.push(response.result);
-        await new Promise((resolve) => setTimeout(resolve, 120));
-    }
-
-    keywordResults.sort((left, right) => right.score - left.score);
+    const plannedKeywordResults = await fetchPlannedKeywordTrendResults({
+        queryPlan,
+        location,
+        config: input.config,
+    });
+    const keywordResults = plannedKeywordResults.keywordResults;
+    const usedFallbackKey = trendFirstUsedFallbackKey || plannedKeywordResults.usedFallbackKey;
 
     const candidateTopics = sanitizeStringArray(
         keywordResults.flatMap((item) => [item.trendingTopic, item.keyword]),
@@ -1130,8 +1528,9 @@ export async function fetchAIBloggerTrendSignals(input: FetchTrendSignalsInput):
         keywordResults,
         viralTrends: [],
         scanStats: trendFirstFallbackStats,
+        queryPlan: plannedKeywordResults.queryPlan,
         summary: trendFirstFallbackStats
-            ? `Trend-first scan found no usable live topics after ${trendFirstFallbackStats.requestCount}/${trendFirstFallbackStats.maxRequests} request(s), then analyzed ${keywordResults.length} keyword candidates with Google Trends momentum and related queries for ${formatLocationLabel(location)} via SerpAPI.`
-            : `Analyzed ${keywordResults.length} keyword candidates with Google Trends momentum and related queries for ${formatLocationLabel(location)} via SerpAPI.`,
+            ? `Trend-first scan found no usable live topics after ${trendFirstFallbackStats.requestCount}/${trendFirstFallbackStats.maxRequests} request(s), then planned ${plannedKeywordResults.queryPlan.candidateCount} website-derived trend quer${plannedKeywordResults.queryPlan.candidateCount === 1 ? "y" : "ies"}, batched ${plannedKeywordResults.queryPlan.selectedTimeseriesQueries.length} time-series quer${plannedKeywordResults.queryPlan.selectedTimeseriesQueries.length === 1 ? "y" : "ies"}, and fetched related queries for ${plannedKeywordResults.queryPlan.relatedQueryRequestCount}.`
+            : `Planned ${plannedKeywordResults.queryPlan.candidateCount} website-derived trend quer${plannedKeywordResults.queryPlan.candidateCount === 1 ? "y" : "ies"}, batched ${plannedKeywordResults.queryPlan.selectedTimeseriesQueries.length} Google Trends time-series quer${plannedKeywordResults.queryPlan.selectedTimeseriesQueries.length === 1 ? "y" : "ies"}, and fetched related queries for ${plannedKeywordResults.queryPlan.relatedQueryRequestCount} for ${formatLocationLabel(location)} via SerpAPI.`,
     };
 }

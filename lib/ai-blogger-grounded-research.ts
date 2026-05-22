@@ -375,6 +375,8 @@ const CLAIM_PATTERNS = [
     /\b(?:according to|research shows|studies show|data shows|survey found|report found)\b/i,
     /\b(?:more than|less than|over|under|approximately|nearly|about)\s+\d/i,
     /\b(?:\d+x|\d+-fold|double|triple|quadruple)\b/i,
+    /\b\d+(?:\.\d+)?(?:\s*(?:[-\u2013\u2014]|to)\s*\d+(?:\.\d+)?){1,3}\s*(?:rule|framework|model|method|formula|principle|matrix)?\b/i,
+    /\b\d+(?:\.\d+)?(?:\s*(?:[-\u2013\u2014]|to)\s*\d+(?:\.\d+)?)?\s*(?:s|sec(?:ond)?s?|min(?:ute)?s?|hours?|days?|weeks?|months?|years?|touchpoints?|contacts?|channels?|locations?|steps?|parts?|stages?|phases?|points?|assets?|videos?|reels?|campaigns?|creatives?|users?|customers?|followers?|subscribers?|impressions?|clicks?|leads?|conversions?)\b/i,
 ];
 
 function extractKeyClaims(paragraphs: string[]) {

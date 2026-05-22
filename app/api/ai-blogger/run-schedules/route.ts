@@ -63,7 +63,10 @@ async function handleScheduleRun(request: Request) {
                 { status: 400 },
             );
         }
-        const limit = Math.min(limitParam, 3);
+        // A single schedule can run the full AI Blogger generation pipeline.
+        // Keep this route inside Vercel's 300s budget until scheduled runs are
+        // fully moved onto the phase-based worker dispatcher.
+        const limit = 1;
 
         const result = await runDueBlogStudioSchedulesImpl(limit);
 
