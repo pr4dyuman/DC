@@ -28,6 +28,7 @@ const BlogStudioTargetSchema = new Schema(
         },
         label: { type: String, required: true },
         externalId: { type: String },
+        websiteUrl: { type: String },
         webhookConfig: {
             url: { type: String },
             active: { type: Boolean, default: false },
@@ -504,6 +505,7 @@ const BlogStudioSeoSchema = new Schema(
 const BlogStudioPublishingSchema = new Schema(
     {
         defaultTarget: { type: BlogStudioTargetSchema, required: true },
+        targets: { type: [BlogStudioTargetSchema], default: [] },
         requireApproval: { type: Boolean, required: true, default: true },
         autoSchedule: { type: Boolean, required: true, default: false },
         publishMode: {

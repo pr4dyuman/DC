@@ -60,6 +60,9 @@ export type WebhookPayload = {
         agencyId: string;
         agencyName: string;
         publishedAt: string;
+        targetKey?: string;
+        targetLabel?: string;
+        targetWebsiteUrl?: string;
     };
 };
 
@@ -159,6 +162,7 @@ export async function sendWebhookToAgency(
                 method: "POST",
                 headers: buildWebhookRequestHeaders(payload.event, webhookSecret, {
                     "X-AI-Blogger-Agency-Id": payload.source.agencyId,
+                    ...(payload.source.targetKey ? { "X-AI-Blogger-Target-Key": payload.source.targetKey } : {}),
                 }),
                 body: JSON.stringify(payload),
                 signal: controller.signal,
@@ -389,6 +393,8 @@ export function buildWebhookPayload(
         peopleAlsoAsk?: string[];
         siteUrl?: string;
         slug?: string;
+        target?: Pick<BlogStudioPost["target"], "externalId" | "label" | "websiteUrl" | "webhookConfig">;
+        targetKey?: string;
     },
 ): WebhookPayload {
     const resolvedSlug = options?.slug?.trim() || post.publishedEntrySlug?.trim() || post.slug;
@@ -455,6 +461,9 @@ export function buildWebhookPayload(
             agencyId,
             agencyName,
             publishedAt: new Date().toISOString(),
+            targetKey: options?.targetKey,
+            targetLabel: options?.target?.label,
+            targetWebsiteUrl: options?.target?.websiteUrl,
         },
     };
 }

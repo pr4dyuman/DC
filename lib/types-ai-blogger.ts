@@ -76,6 +76,7 @@ export type BlogStudioTarget = {
     type: BlogStudioTargetType;
     label: string;
     externalId?: string;
+    websiteUrl?: string;
     webhookConfig?: BlogStudioWebhookConfig;
 };
 
@@ -547,6 +548,7 @@ export type BlogStudioInternalLinkSuggestion = {
 
 export type BlogStudioPublishingSettings = {
     defaultTarget: BlogStudioTarget;
+    targets?: BlogStudioTarget[];
     requireApproval: boolean;
     autoSchedule: boolean;
     publishMode: BlogStudioPublishMode;

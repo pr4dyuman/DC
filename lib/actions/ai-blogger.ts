@@ -798,6 +798,10 @@ export type UpdateBlogStudioPostStatusInput = {
     expectedCurrentStatus?: BlogStudioPostStatus;
 };
 
+export type PublishBlogStudioPostInput = {
+    targetKey?: string;
+};
+
 export type GenerateBlogStudioDraftInput = {
     title: string;
     brief?: Partial<BlogStudioBrief>;
@@ -855,6 +859,7 @@ export type UpdateBlogStudioSettingsInput = {
     seo?: Partial<BlogStudioSettings["seo"]>;
     publishing?: {
         defaultTarget?: Partial<BlogStudioTarget>;
+        targets?: Array<Partial<BlogStudioTarget>>;
         requireApproval?: boolean;
         autoSchedule?: boolean;
         publishMode?: BlogStudioPublishingSettings["publishMode"];
@@ -2785,6 +2790,7 @@ function getDefaultBlogStudioSettings(agencyId: string, agencyName?: string): Bl
         },
         publishing: {
             defaultTarget: getDefaultBlogStudioTarget(agencyName),
+            targets: [],
             requireApproval: true,
             autoSchedule: false,
             publishMode: "draft-only",
@@ -2867,6 +2873,142 @@ function hasConfiguredWebhookSecret(config?: BlogStudioTarget["webhookConfig"]) 
     );
 }
 
+function normalizeTargetSelectionValue(value: unknown) {
+    return sanitizeText(value, 500).trim().toLowerCase();
+}
+
+function getBlogStudioTargetSelectionKey(target?: Partial<BlogStudioTarget> | null) {
+    if (!target) {
+        return "";
+    }
+
+    return (
+        sanitizeText(target.externalId, 120) ||
+        sanitizeText(target.webhookConfig?.url, 500) ||
+        sanitizeText(target.websiteUrl, 500) ||
+        sanitizeText(target.label, 120)
+    );
+}
+
+function blogStudioTargetMatchesSelection(target: Partial<BlogStudioTarget> | undefined, selectionKey: string) {
+    const normalizedSelection = normalizeTargetSelectionValue(selectionKey);
+    if (!target || !normalizedSelection) {
+        return false;
+    }
+
+    return [
+        target.externalId,
+        target.webhookConfig?.url,
+        target.websiteUrl,
+        target.label,
+    ].some((value) => normalizeTargetSelectionValue(value) === normalizedSelection);
+}
+
+function dedupeBlogStudioTargets(targets: BlogStudioTarget[]) {
+    const seen = new Set<string>();
+    const deduped: BlogStudioTarget[] = [];
+
+    for (const target of targets) {
+        const key = normalizeTargetSelectionValue(getBlogStudioTargetSelectionKey(target));
+        if (!key || seen.has(key)) {
+            continue;
+        }
+
+        seen.add(key);
+        deduped.push(target);
+    }
+
+    return deduped;
+}
+
+function getBlogStudioPublishingTargets(publishing: BlogStudioPublishingSettings | undefined) {
+    if (!publishing) {
+        return [];
+    }
+
+    const targets = Array.isArray(publishing.targets)
+        ? publishing.targets.filter(Boolean)
+        : [];
+
+    return dedupeBlogStudioTargets([
+        publishing.defaultTarget,
+        ...targets,
+    ].filter(Boolean) as BlogStudioTarget[]);
+}
+
+function resolveBlogStudioTargetFallback(
+    target: Partial<BlogStudioTarget> | undefined,
+    fallbacks: BlogStudioTarget[],
+    defaultFallback: BlogStudioTarget,
+) {
+    const targetKey = getBlogStudioTargetSelectionKey(target);
+    const matched = targetKey
+        ? fallbacks.find((candidate) => blogStudioTargetMatchesSelection(candidate, targetKey))
+        : undefined;
+
+    return matched || defaultFallback;
+}
+
+function resolveBlogStudioPublishTarget(
+    postTarget: Partial<BlogStudioTarget> | undefined,
+    publishing: BlogStudioPublishingSettings,
+    selectedTargetKey?: string,
+) {
+    const targets = getBlogStudioPublishingTargets(publishing);
+    const selectedKey = sanitizeText(selectedTargetKey, 500);
+
+    if (selectedKey) {
+        const selected = targets.find((candidate) => blogStudioTargetMatchesSelection(candidate, selectedKey));
+        if (!selected) {
+            throw new Error("Selected publish website is not connected to this agency.");
+        }
+
+        return selected;
+    }
+
+    const postTargetKey = getBlogStudioTargetSelectionKey(postTarget);
+    const matchedPostTarget = postTargetKey
+        ? targets.find((candidate) => blogStudioTargetMatchesSelection(candidate, postTargetKey))
+        : undefined;
+
+    return matchedPostTarget || resolveBlogStudioTarget(postTarget, publishing.defaultTarget);
+}
+
+function resolveBlogStudioTargetSiteOrigin(target: BlogStudioTarget) {
+    const candidates = [
+        target.websiteUrl,
+        target.webhookConfig?.url,
+    ];
+
+    for (const candidate of candidates) {
+        const value = sanitizeText(candidate, 2000);
+        if (!value) {
+            continue;
+        }
+
+        try {
+            return new URL(value).origin;
+        } catch {
+            continue;
+        }
+    }
+
+    return "";
+}
+
+function getUrlOrigin(value: string | undefined) {
+    const normalized = sanitizeText(value, 2000);
+    if (!normalized) {
+        return "";
+    }
+
+    try {
+        return new URL(normalized).origin;
+    } catch {
+        return "";
+    }
+}
+
 function normalizePersistedBlogStudioTarget(target: Partial<BlogStudioTarget> | undefined): BlogStudioTarget {
     const normalizedType = normalizeBlogStudioTargetType(
         typeof target?.type === "string" ? target.type : undefined,
@@ -2878,6 +3020,7 @@ function normalizePersistedBlogStudioTarget(target: Partial<BlogStudioTarget> | 
         type: normalizedType,
         label: sanitizeText(target?.label, 120, fallbackLabel),
         externalId: sanitizeText(target?.externalId, 120),
+        websiteUrl: sanitizeText(target?.websiteUrl, 500),
         webhookConfig: normalizedType === "webhook" && target?.webhookConfig
             ? {
                 ...target.webhookConfig,
@@ -2930,6 +3073,7 @@ function toRuntimeBlogStudioSettings(settings: BlogStudioSettings): BlogStudioSe
         publishing: {
             ...settings.publishing,
             defaultTarget: toRuntimeBlogStudioTarget(settings.publishing.defaultTarget),
+            targets: (settings.publishing.targets || []).map(toRuntimeBlogStudioTarget),
         },
     };
 }
@@ -2951,6 +3095,7 @@ function toClientBlogStudioSettings(settings: BlogStudioSettings): BlogStudioSet
         publishing: {
             ...settings.publishing,
             defaultTarget: toClientBlogStudioTarget(settings.publishing.defaultTarget),
+            targets: (settings.publishing.targets || []).map(toClientBlogStudioTarget),
         },
     };
 }
@@ -2965,6 +3110,20 @@ function mergeBlogStudioSettings(
     if (!stored) {
         return defaults;
     }
+
+    const mergedDefaultTarget = {
+        ...defaults.publishing.defaultTarget,
+        ...stored.publishing?.defaultTarget,
+    };
+    const storedTargets = Array.isArray(stored.publishing?.targets)
+        ? stored.publishing.targets
+        : [];
+    const mergedTargets = dedupeBlogStudioTargets(
+        [
+            mergedDefaultTarget,
+            ...storedTargets,
+        ].map((target) => normalizePersistedBlogStudioTarget(target)),
+    );
 
     return {
         ...defaults,
@@ -2981,10 +3140,8 @@ function mergeBlogStudioSettings(
         publishing: {
             ...defaults.publishing,
             ...stored.publishing,
-            defaultTarget: {
-                ...defaults.publishing.defaultTarget,
-                ...stored.publishing?.defaultTarget,
-            },
+            defaultTarget: mergedDefaultTarget,
+            targets: mergedTargets,
         },
         searchConsoleOAuth: stored.searchConsoleOAuth
             ? {
@@ -3017,6 +3174,7 @@ function resolveBlogStudioTarget(
             ),
         ),
         externalId: sanitizeText(target?.externalId, 120, fallback.externalId || ""),
+        websiteUrl: sanitizeText(target?.websiteUrl, 500, fallback.websiteUrl || ""),
     };
 
     if (nextType !== "webhook") {
@@ -3091,6 +3249,37 @@ function sanitizeTarget(
         });
         throw error;
     }
+}
+
+function sanitizePublishingTargets(
+    targets: Array<Partial<BlogStudioTarget>> | undefined,
+    existingTargets: BlogStudioTarget[] | undefined,
+    defaultTarget: BlogStudioTarget,
+    options?: {
+        includeWebhookConfig?: boolean;
+        encryptWebhookSecret?: boolean;
+    },
+) {
+    const existing = dedupeBlogStudioTargets([
+        defaultTarget,
+        ...(existingTargets || []),
+    ]);
+    const sourceTargets = targets !== undefined
+        ? targets
+        : existingTargets;
+
+    const sanitizedTargets = (sourceTargets || [])
+        .map((target) => {
+            const fallback = resolveBlogStudioTargetFallback(target, existing, defaultTarget);
+            return sanitizeTarget(target, fallback, options);
+        })
+        .filter((target) => target.label);
+
+    if (!sanitizedTargets.some((target) => blogStudioTargetMatchesSelection(target, getBlogStudioTargetSelectionKey(defaultTarget)))) {
+        sanitizedTargets.unshift(defaultTarget);
+    }
+
+    return dedupeBlogStudioTargets(sanitizedTargets);
 }
 
 function sanitizeBrief(brief: Partial<BlogStudioBrief> | undefined, fallback: BlogStudioBrief): BlogStudioBrief {
@@ -16765,9 +16954,10 @@ async function syncAgencyBlogStudioPerformanceImpl(
 
     for (const row of queryRows) {
         const pageUrl = normalizePerformancePageUrl(row.keys?.[0]);
+        const pageLookupKey = normalizePerformancePageLookupKey(pageUrl);
         const query = sanitizeText(row.keys?.[1], 200);
 
-        if (!pageUrl || !query) {
+        if (!pageLookupKey || !query) {
             continue;
         }
 
@@ -16775,7 +16965,7 @@ async function syncAgencyBlogStudioPerformanceImpl(
         const impressions = toFiniteMetric(row.impressions);
         const position = toFiniteMetric(row.position);
         const weight = impressions > 0 ? impressions : 1;
-        const pageQueries = queryAggregates.get(pageUrl) || new Map<string, {
+        const pageQueries = queryAggregates.get(pageLookupKey) || new Map<string, {
             query: string;
             clicks: number;
             impressions: number;
@@ -16795,7 +16985,7 @@ async function syncAgencyBlogStudioPerformanceImpl(
         currentQuery.positionWeightedSum += position * weight;
         currentQuery.positionWeight += weight;
         pageQueries.set(query, currentQuery);
-        queryAggregates.set(pageUrl, pageQueries);
+        queryAggregates.set(pageLookupKey, pageQueries);
     }
 
     for (const row of countryRows) {
@@ -28747,6 +28937,7 @@ export async function publishBlogStudioPostImpl(
     agencyId: string,
     actor: ActionActor,
     slug: string,
+    input: PublishBlogStudioPostInput = {},
 ): Promise<BlogStudioPost> {
     const _startMs = Date.now();
     blogLog("PUBLISH", "Starting", { agency: blogShortId(agencyId), slug });
@@ -28761,7 +28952,11 @@ export async function publishBlogStudioPostImpl(
     const currentPost = toBlogStudioPost(post);
     const settings = await getBlogStudioRuntimeSettingsImpl(agencyId);
     const aiBloggerConfig = await getAgencyAIBloggerRuntimeConfig(agencyId);
-    const effectiveTarget = resolveBlogStudioTarget(currentPost.target, settings.publishing.defaultTarget);
+    const effectiveTarget = resolveBlogStudioPublishTarget(
+        currentPost.target,
+        settings.publishing,
+        input.targetKey,
+    );
     const startedAt = new Date().toISOString();
     const publishRunSteps: BlogStudioRunStep[] = [];
     const recordPublishRun = async (status: BlogStudioRunStatus, summary: string) => {
@@ -28809,6 +29004,22 @@ export async function publishBlogStudioPostImpl(
         }));
         await recordPublishRun("failed", message);
         throw new Error("Direct publishing is only available for webhook targets. Export the draft manually for other targets.");
+    }
+
+    if (input.targetKey && !effectiveTarget.webhookConfig?.active) {
+        const message = "Selected publish website is not active. Enable that website connection before publishing.";
+        publishRunSteps.push(buildDetailedRunStep({
+            key: "publish-preflight",
+            label: "Publish Preflight",
+            status: "failed",
+            notes: message,
+            startedAt,
+            input: { slug, targetLabel: effectiveTarget.label },
+            output: { summary: message },
+            errors: [message],
+        }));
+        await recordPublishRun("failed", message);
+        throw new Error(message);
     }
 
     if (isBlogStudioDraftOnlyMode(settings)) {
@@ -28955,13 +29166,16 @@ export async function publishBlogStudioPostImpl(
             return null;
         })
         : null;
+    const selectedTargetSiteUrl = normalizeMarketingSiteOrigin(resolveBlogStudioTargetSiteOrigin(effectiveTarget));
     const resolvedSiteUrl = normalizeMarketingSiteOrigin(
+        selectedTargetSiteUrl ||
         resolveBlogStudioSiteUrl({
             canonicalUrl: currentPost.canonicalUrl,
             brief: currentPost.brief,
             author: aiBloggerConfig?.author,
             entityModeling: aiBloggerConfig?.entityModeling,
-        }) || MARKETING_SITE_URL,
+        }) ||
+        MARKETING_SITE_URL,
     );
     const agencyDoc = await AgencyModel.findOne({ id: agencyId }).select("name").lean();
     const agencyName = agencyDoc?.name || "Unknown Agency";
@@ -29039,9 +29253,15 @@ export async function publishBlogStudioPostImpl(
         throw new Error(message);
     }
 
+    const currentCanonicalOrigin = getUrlOrigin(currentPost.canonicalUrl);
+    const canKeepCurrentCanonical = Boolean(
+        currentPost.canonicalUrl?.trim() &&
+        (!selectedTargetSiteUrl || currentCanonicalOrigin === selectedTargetSiteUrl),
+    );
     const resolvedCanonicalUrl = normalizeMarketingCanonicalUrl(
-        currentPost.canonicalUrl?.trim() ||
-        `${resolvedSiteUrl.replace(/\/+$/, "")}/blog/${publishedSlug}`,
+        canKeepCurrentCanonical
+            ? currentPost.canonicalUrl?.trim()
+            : `${resolvedSiteUrl.replace(/\/+$/, "")}/blog/${publishedSlug}`,
         publishedSlug,
     );
     await assertBlogStudioCanonicalUrlAvailable(agencyId, resolvedCanonicalUrl, slug);
@@ -29114,6 +29334,8 @@ export async function publishBlogStudioPostImpl(
 
     let updated: unknown = null;
     const webhookUrl = effectiveTarget.webhookConfig?.url || "";
+    const webhookTargetKey = getBlogStudioTargetSelectionKey(effectiveTarget);
+    const effectivePostTarget = sanitizeTarget(effectiveTarget, settings.publishing.defaultTarget);
     const pendingPublishCutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const isLocalWebhookTarget = isLocalMarketingWebhookTarget(webhookUrl, [
         resolvedSiteUrl,
@@ -29123,14 +29345,33 @@ export async function publishBlogStudioPostImpl(
 
     const persistWebhookStatus = async (success: boolean, errorMessage = "") => {
         try {
+            const statusFields: Record<string, string> = {};
+            const lastStatus = success ? "success" : "failed";
+            const lastSentAt = new Date().toISOString();
+            const targetIndex = (settings.publishing.targets || []).findIndex((target) =>
+                blogStudioTargetMatchesSelection(target, webhookTargetKey),
+            );
+
+            if (blogStudioTargetMatchesSelection(settings.publishing.defaultTarget, webhookTargetKey)) {
+                statusFields["publishing.defaultTarget.webhookConfig.lastStatus"] = lastStatus;
+                statusFields["publishing.defaultTarget.webhookConfig.lastSentAt"] = lastSentAt;
+                statusFields["publishing.defaultTarget.webhookConfig.lastError"] = errorMessage;
+            }
+
+            if (targetIndex >= 0) {
+                statusFields[`publishing.targets.${targetIndex}.webhookConfig.lastStatus`] = lastStatus;
+                statusFields[`publishing.targets.${targetIndex}.webhookConfig.lastSentAt`] = lastSentAt;
+                statusFields[`publishing.targets.${targetIndex}.webhookConfig.lastError`] = errorMessage;
+            }
+
+            if (Object.keys(statusFields).length === 0) {
+                return;
+            }
+
             await BlogStudioSettingsModel.findOneAndUpdate(
                 { agencyId },
                 {
-                    $set: {
-                        "publishing.defaultTarget.webhookConfig.lastStatus": success ? "success" : "failed",
-                        "publishing.defaultTarget.webhookConfig.lastSentAt": new Date().toISOString(),
-                        "publishing.defaultTarget.webhookConfig.lastError": errorMessage,
-                    },
+                    $set: statusFields,
                 },
             );
         } catch (settingsError) {
@@ -29176,7 +29417,7 @@ export async function publishBlogStudioPostImpl(
             content: renderedPublishedContent,
             excerpt: resolvedExcerpt,
             internalLinks: resolvedPublishedInternalLinks,
-            target: effectiveTarget,
+            target: effectivePostTarget,
             metaTitle: resolvedMetaTitle,
             metaDescription: resolvedMetaDescription,
             canonicalUrl: resolvedCanonicalUrl,
@@ -29202,6 +29443,8 @@ export async function publishBlogStudioPostImpl(
                 peopleAlsoAsk: resolvedPeopleAlsoAsk,
                 siteUrl: resolvedSiteUrl,
                 slug: publishedSlug,
+                target: effectiveTarget,
+                targetKey: webhookTargetKey,
             },
         );
         const webhookStepStartedAt = new Date().toISOString();
@@ -29303,7 +29546,7 @@ export async function publishBlogStudioPostImpl(
             {
                 $set: {
                     status: "Published",
-                    target: effectiveTarget,
+                    target: effectivePostTarget,
                     content: renderedPublishedContent,
                     internalLinks: resolvedPublishedInternalLinks,
                     title: resolvedTitle,
@@ -29598,6 +29841,20 @@ export async function upsertBlogStudioSettingsImpl(
     const existing = await getStoredBlogStudioSettingsImpl(agency.id, agency.name);
     const now = new Date().toISOString();
 
+    const nextDefaultTarget = sanitizeTarget(input.publishing?.defaultTarget, existing.publishing.defaultTarget, {
+        includeWebhookConfig: true,
+        encryptWebhookSecret: true,
+    });
+    const nextPublishingTargets = sanitizePublishingTargets(
+        input.publishing?.targets,
+        existing.publishing.targets,
+        nextDefaultTarget,
+        {
+            includeWebhookConfig: true,
+            encryptWebhookSecret: true,
+        },
+    );
+
     const nextSettings: BlogStudioSettings = {
         agencyId: agency.id,
         brandVoice: {
@@ -29620,10 +29877,8 @@ export async function upsertBlogStudioSettingsImpl(
             requireSeoReview: input.seo?.requireSeoReview ?? existing.seo.requireSeoReview,
         },
         publishing: {
-            defaultTarget: sanitizeTarget(input.publishing?.defaultTarget, existing.publishing.defaultTarget, {
-                includeWebhookConfig: true,
-                encryptWebhookSecret: true,
-            }),
+            defaultTarget: nextDefaultTarget,
+            targets: nextPublishingTargets,
             requireApproval: input.publishing?.requireApproval ?? existing.publishing.requireApproval,
             autoSchedule: input.publishing?.autoSchedule ?? existing.publishing.autoSchedule,
             publishMode: input.publishing?.publishMode ?? existing.publishing.publishMode,
@@ -29635,6 +29890,9 @@ export async function upsertBlogStudioSettingsImpl(
     };
 
     validateTarget(nextSettings.publishing.defaultTarget);
+    for (const target of nextSettings.publishing.targets || []) {
+        validateTarget(target);
+    }
 
     if (nextSettings.seo.maxWords <= nextSettings.seo.minWords) {
         throw new Error("Maximum word count must be greater than the minimum word count.");

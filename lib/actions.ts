@@ -76,6 +76,7 @@ import {
     type GenerateBlogStudioFeaturedImageResult,
     type GenerateBlogStudioDraftInput,
     publishBlogStudioPostImpl,
+    type PublishBlogStudioPostInput,
     testBlogStudioWebhookTargetImpl,
     type TestBlogStudioWebhookTargetInput,
     updateBlogStudioPostImpl,
@@ -871,7 +872,7 @@ export async function runBlogStudioPerformanceSync(force = true) {
     });
 }
 
-export async function publishBlogStudioPost(slug: string) {
+export async function publishBlogStudioPost(slug: string, input: PublishBlogStudioPostInput = {}) {
     const currentUser = await requireRole('admin');
     const agency = await getCurrentAgency();
     if (!agency) throw new Error("Unauthorized");
@@ -884,7 +885,8 @@ export async function publishBlogStudioPost(slug: string) {
     return publishBlogStudioPostImpl(
         agency.id,
         toActionActor(currentUser),
-        sanitizeMongoInput(slug)
+        sanitizeMongoInput(slug),
+        sanitizeMongoInput(input),
     );
 }
 

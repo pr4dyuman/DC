@@ -11,6 +11,7 @@ import {
     Globe2,
     Loader2,
     PencilLine,
+    Plus,
     Play,
     Save,
     SearchCheck,
@@ -95,6 +96,19 @@ type WebhookHealthcheckState = {
     checkedAt: string;
 };
 
+type WebhookTargetFormState = {
+    id: string;
+    label: string;
+    websiteUrl: string;
+    url: string;
+    active: boolean;
+    retryAttempts: string;
+    timeout: string;
+    secret: string;
+    secretMasked?: string;
+    hasSecret?: boolean;
+};
+
 const tabItems = [
     { value: "brand", label: "Brand Voice", icon: Bot },
     { value: "publishing", label: "Publishing", icon: Target },
@@ -152,22 +166,113 @@ function isValidHttpsUrl(value: string) {
     }
 }
 
+function isValidWebsiteUrl(value: string) {
+    if (!value.trim()) {
+        return true;
+    }
+
+    try {
+        const parsed = new URL(value);
+        return parsed.protocol === "https:" || parsed.protocol === "http:";
+    } catch {
+        return false;
+    }
+}
+
+function getTargetFormKey(value: {
+    id?: string;
+    label?: string;
+    websiteUrl?: string;
+    url?: string;
+    webhookConfig?: { url?: string };
+}) {
+    return (
+        value.id?.trim() ||
+        value.url?.trim() ||
+        value.webhookConfig?.url?.trim() ||
+        value.websiteUrl?.trim() ||
+        value.label?.trim() ||
+        ""
+    ).toLowerCase();
+}
+
+function makeWebhookTargetId() {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+        return crypto.randomUUID();
+    }
+
+    return `webhook-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function mapTargetToWebhookForm(target: BlogStudioSettings["publishing"]["defaultTarget"], fallbackId: string): WebhookTargetFormState | null {
+    if (target.type !== "webhook") {
+        return null;
+    }
+
+    return {
+        id: target.externalId || fallbackId,
+        label: target.label || "Website Webhook",
+        websiteUrl: target.websiteUrl || "",
+        url: target.webhookConfig?.url || "",
+        active: target.webhookConfig?.active || false,
+        retryAttempts: String(target.webhookConfig?.retryAttempts || 3),
+        timeout: String(target.webhookConfig?.timeout || 10),
+        secret: "",
+        secretMasked: target.webhookConfig?.secretMasked,
+        hasSecret: Boolean(target.webhookConfig?.hasSecret),
+    };
+}
+
+function buildAdditionalWebhookTargets(settings: BlogStudioSettings): WebhookTargetFormState[] {
+    const defaultKey = getTargetFormKey({
+        id: settings.publishing.defaultTarget.externalId,
+        label: settings.publishing.defaultTarget.label,
+        websiteUrl: settings.publishing.defaultTarget.websiteUrl,
+        webhookConfig: settings.publishing.defaultTarget.webhookConfig,
+    });
+    const seen = new Set(defaultKey ? [defaultKey] : []);
+
+    return (settings.publishing.targets || [])
+        .map((target, index) => mapTargetToWebhookForm(target, `webhook-${index + 1}`))
+        .filter((target): target is WebhookTargetFormState => Boolean(target))
+        .filter((target) => {
+            const key = getTargetFormKey(target);
+            if (!key || seen.has(key)) {
+                return false;
+            }
+
+            seen.add(key);
+            return true;
+        });
+}
+
 function validatePublishingForm(input: {
     defaultTargetType: BlogStudioTargetType;
     defaultTargetLabel: string;
     webhookUrl: string;
+    webhookWebsiteUrl?: string;
     webhookActive: boolean;
     webhookRetryAttempts: string;
     webhookTimeout: string;
     webhookSecret: string;
     webhookHasSecret: boolean;
+    additionalWebhookTargets?: WebhookTargetFormState[];
 }) {
     if (!input.defaultTargetLabel.trim()) {
         return "Add a target label so the publishing destination is easy to recognize.";
     }
 
     if (input.defaultTargetType !== "webhook") {
+        for (const target of input.additionalWebhookTargets || []) {
+            const message = validateWebhookTargetForm(target, "Additional website connection");
+            if (message) return message;
+        }
+
         return null;
+    }
+
+    if (input.webhookWebsiteUrl?.trim() && !isValidWebsiteUrl(input.webhookWebsiteUrl)) {
+        return "Enter a valid website URL for the default website connection.";
     }
 
     if (!isValidHttpsUrl(input.webhookUrl.trim())) {
@@ -186,6 +291,41 @@ function validatePublishingForm(input: {
 
     if (input.webhookActive && !input.webhookSecret.trim() && !input.webhookHasSecret) {
         return "Add a webhook secret before enabling webhook delivery.";
+    }
+
+    for (const target of input.additionalWebhookTargets || []) {
+        const message = validateWebhookTargetForm(target, "Additional website connection");
+        if (message) return message;
+    }
+
+    return null;
+}
+
+function validateWebhookTargetForm(target: WebhookTargetFormState, label: string) {
+    if (!target.label.trim()) {
+        return `${label}: add a label.`;
+    }
+
+    if (target.websiteUrl.trim() && !isValidWebsiteUrl(target.websiteUrl)) {
+        return `${label}: enter a valid website URL.`;
+    }
+
+    if (!isValidHttpsUrl(target.url.trim())) {
+        return `${label}: enter a valid HTTPS webhook URL.`;
+    }
+
+    const retryAttempts = Number.parseInt(target.retryAttempts, 10);
+    if (!Number.isFinite(retryAttempts) || retryAttempts < 1 || retryAttempts > 5) {
+        return `${label}: retry attempts must be between 1 and 5.`;
+    }
+
+    const timeout = Number.parseInt(target.timeout, 10);
+    if (!Number.isFinite(timeout) || timeout < 5 || timeout > 30) {
+        return `${label}: timeout must be between 5 and 30 seconds.`;
+    }
+
+    if (target.active && !target.secret.trim() && !target.hasSecret) {
+        return `${label}: add a webhook secret before enabling delivery.`;
     }
 
     return null;
@@ -370,12 +510,15 @@ export function AIBloggerSettingsWorkspace({
     const [bannedTerms, setBannedTerms] = useState(settings.brandVoice.bannedTerms.join(", "));
 
     const [defaultTargetType, setDefaultTargetType] = useState<BlogStudioTargetType>(settings.publishing.defaultTarget.type);
+    const [defaultTargetExternalId] = useState(settings.publishing.defaultTarget.externalId || "default-webhook");
     const [defaultTargetLabel, setDefaultTargetLabel] = useState(settings.publishing.defaultTarget.label);
+    const [webhookWebsiteUrl, setWebhookWebsiteUrl] = useState(settings.publishing.defaultTarget.websiteUrl || "");
     const [webhookUrl, setWebhookUrl] = useState(settings.publishing.defaultTarget.webhookConfig?.url || "");
     const [webhookActive, setWebhookActive] = useState(settings.publishing.defaultTarget.webhookConfig?.active || false);
     const [webhookRetryAttempts, setWebhookRetryAttempts] = useState(String(settings.publishing.defaultTarget.webhookConfig?.retryAttempts || 3));
     const [webhookTimeout, setWebhookTimeout] = useState(String(settings.publishing.defaultTarget.webhookConfig?.timeout || 10));
     const [webhookSecret, setWebhookSecret] = useState("");
+    const [additionalWebhookTargets, setAdditionalWebhookTargets] = useState<WebhookTargetFormState[]>(() => buildAdditionalWebhookTargets(settings));
     const [publishMode, setPublishMode] = useState<BlogStudioPublishMode>(settings.publishing.publishMode);
     const [requireApproval, setRequireApproval] = useState(settings.publishing.requireApproval);
     const [autoSchedule, setAutoSchedule] = useState(settings.publishing.autoSchedule);
@@ -409,7 +552,7 @@ export function AIBloggerSettingsWorkspace({
 
     useEffect(() => {
         setWebhookHealthcheck(null);
-    }, [defaultTargetType, defaultTargetLabel, webhookUrl, webhookActive, webhookRetryAttempts, webhookTimeout, webhookSecret]);
+    }, [defaultTargetType, defaultTargetLabel, webhookWebsiteUrl, webhookUrl, webhookActive, webhookRetryAttempts, webhookTimeout, webhookSecret, additionalWebhookTargets]);
 
     const activeSchedules = schedules.filter((schedule) => schedule.status === "active").length;
     const timezoneLabel = useMemo(
@@ -454,6 +597,40 @@ export function AIBloggerSettingsWorkspace({
         setScheduleTargetLabel(defaultTargetLabel);
         setScheduleNextRunAt(toDateTimeLocalValue());
         setScheduleCreateDraftOnly(true);
+    };
+
+    const addWebhookTarget = () => {
+        setAdditionalWebhookTargets((current) => [
+            ...current,
+            {
+                id: makeWebhookTargetId(),
+                label: `Website ${current.length + 2}`,
+                websiteUrl: "",
+                url: "",
+                active: false,
+                retryAttempts: "3",
+                timeout: "10",
+                secret: "",
+                hasSecret: false,
+            },
+        ]);
+    };
+
+    const updateWebhookTarget = (
+        id: string,
+        updates: Partial<WebhookTargetFormState>,
+    ) => {
+        setAdditionalWebhookTargets((current) =>
+            current.map((target) =>
+                target.id === id
+                    ? { ...target, ...updates }
+                    : target,
+            ),
+        );
+    };
+
+    const removeWebhookTarget = (id: string) => {
+        setAdditionalWebhookTargets((current) => current.filter((target) => target.id !== id));
     };
 
     const runAction = (key: string, action: () => Promise<unknown>, successMessage: string) => {
@@ -501,12 +678,14 @@ export function AIBloggerSettingsWorkspace({
         const validationMessage = validatePublishingForm({
             defaultTargetType,
             defaultTargetLabel,
+            webhookWebsiteUrl,
             webhookUrl,
             webhookActive,
             webhookRetryAttempts,
             webhookTimeout,
             webhookSecret,
             webhookHasSecret,
+            additionalWebhookTargets,
         });
 
         if (validationMessage) {
@@ -521,6 +700,8 @@ export function AIBloggerSettingsWorkspace({
                     defaultTarget: {
                         type: defaultTargetType,
                         label: defaultTargetLabel,
+                        externalId: defaultTargetType === "webhook" ? defaultTargetExternalId : undefined,
+                        websiteUrl: defaultTargetType === "webhook" ? webhookWebsiteUrl.trim() || undefined : undefined,
                         webhookConfig: defaultTargetType === "webhook" ? {
                             url: webhookUrl,
                             active: webhookActive,
@@ -529,6 +710,36 @@ export function AIBloggerSettingsWorkspace({
                             secret: webhookSecret.trim() || undefined,
                         } : undefined,
                     },
+                    targets: [
+                        ...(defaultTargetType === "webhook"
+                            ? [{
+                                type: "webhook" as const,
+                                label: defaultTargetLabel,
+                                externalId: defaultTargetExternalId,
+                                websiteUrl: webhookWebsiteUrl.trim() || undefined,
+                                webhookConfig: {
+                                    url: webhookUrl,
+                                    active: webhookActive,
+                                    retryAttempts: Number.parseInt(webhookRetryAttempts, 10),
+                                    timeout: Number.parseInt(webhookTimeout, 10),
+                                    secret: webhookSecret.trim() || undefined,
+                                },
+                            }]
+                            : []),
+                        ...additionalWebhookTargets.map((target) => ({
+                            type: "webhook" as const,
+                            label: target.label,
+                            externalId: target.id,
+                            websiteUrl: target.websiteUrl.trim() || undefined,
+                            webhookConfig: {
+                                url: target.url,
+                                active: target.active,
+                                retryAttempts: Number.parseInt(target.retryAttempts, 10),
+                                timeout: Number.parseInt(target.timeout, 10),
+                                secret: target.secret.trim() || undefined,
+                            },
+                        })),
+                    ],
                     requireApproval,
                     autoSchedule,
                     publishMode,
@@ -562,6 +773,7 @@ export function AIBloggerSettingsWorkspace({
         const validationMessage = validatePublishingForm({
             defaultTargetType,
             defaultTargetLabel,
+            webhookWebsiteUrl,
             webhookUrl,
             webhookActive,
             webhookRetryAttempts,
@@ -582,6 +794,8 @@ export function AIBloggerSettingsWorkspace({
                     target: {
                         type: defaultTargetType,
                         label: defaultTargetLabel,
+                        externalId: defaultTargetType === "webhook" ? defaultTargetExternalId : undefined,
+                        websiteUrl: defaultTargetType === "webhook" ? webhookWebsiteUrl.trim() || undefined : undefined,
                         webhookConfig: defaultTargetType === "webhook"
                             ? {
                                 url: webhookUrl,
@@ -931,6 +1145,18 @@ export function AIBloggerSettingsWorkspace({
                                             </button>
                                          </div>
                                          <div className="space-y-2">
+                                             <Label htmlFor="ai-blogger-webhook-website-url">Website URL</Label>
+                                             <Input
+                                                 id="ai-blogger-webhook-website-url"
+                                                 type="url"
+                                                 placeholder="https://your-site.com"
+                                                 value={webhookWebsiteUrl}
+                                                 onChange={(e) => setWebhookWebsiteUrl(e.target.value)}
+                                                 className="h-12 rounded-2xl border-border/60 bg-background/60"
+                                             />
+                                             <p className="text-xs text-muted-foreground">Used to build the canonical blog URL when publishing to this website.</p>
+                                         </div>
+                                         <div className="space-y-2">
                                              <Label htmlFor="ai-blogger-webhook-url">Webhook URL</Label>
                                             <Textarea
                                                 id="ai-blogger-webhook-url"
@@ -1062,6 +1288,128 @@ export function AIBloggerSettingsWorkspace({
                                         ) : null}
                                     </div>
                                 )}
+
+                                <div className="space-y-4 rounded-xl border border-border/60 bg-background/50 px-4 py-4">
+                                    <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                            <h4 className="font-medium text-foreground">Additional Website Connections</h4>
+                                            <p className="text-sm text-muted-foreground">
+                                                Saved webhook websites appear as choices when a scheduled post is published.
+                                            </p>
+                                        </div>
+                                        <AIBloggerGradientButton type="button" variant="outline" size="sm" onClick={addWebhookTarget}>
+                                            <Plus className="h-4 w-4" />
+                                            Add Website
+                                        </AIBloggerGradientButton>
+                                    </div>
+
+                                    {additionalWebhookTargets.length === 0 ? (
+                                        <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4 text-sm text-muted-foreground">
+                                            No extra website webhooks are connected yet.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {additionalWebhookTargets.map((target, index) => (
+                                                <div key={target.id} className="space-y-4 rounded-xl border border-border/60 bg-background/60 px-4 py-4">
+                                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                                        <p className="text-sm font-semibold text-foreground">Website {index + 2}</p>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeWebhookTarget(target.id)}
+                                                            className="inline-flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                            Remove
+                                                        </button>
+                                                    </div>
+                                                    <div className="grid gap-4 md:grid-cols-2">
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor={`ai-blogger-extra-label-${target.id}`}>Label</Label>
+                                                            <Input
+                                                                id={`ai-blogger-extra-label-${target.id}`}
+                                                                value={target.label}
+                                                                onChange={(event) => updateWebhookTarget(target.id, { label: event.target.value })}
+                                                                className="h-12 rounded-2xl border-border/60 bg-background/60"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor={`ai-blogger-extra-website-${target.id}`}>Website URL</Label>
+                                                            <Input
+                                                                id={`ai-blogger-extra-website-${target.id}`}
+                                                                type="url"
+                                                                placeholder="https://client-site.com"
+                                                                value={target.websiteUrl}
+                                                                onChange={(event) => updateWebhookTarget(target.id, { websiteUrl: event.target.value })}
+                                                                className="h-12 rounded-2xl border-border/60 bg-background/60"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2 md:col-span-2">
+                                                            <Label htmlFor={`ai-blogger-extra-url-${target.id}`}>Webhook URL</Label>
+                                                            <Textarea
+                                                                id={`ai-blogger-extra-url-${target.id}`}
+                                                                value={target.url}
+                                                                onChange={(event) => updateWebhookTarget(target.id, { url: event.target.value })}
+                                                                placeholder="https://client-site.com/api/blogs/webhook"
+                                                                className="rounded-2xl border-border/60 bg-background/60 font-mono text-sm"
+                                                                rows={2}
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor={`ai-blogger-extra-secret-${target.id}`}>Webhook Secret</Label>
+                                                            <Input
+                                                                id={`ai-blogger-extra-secret-${target.id}`}
+                                                                type="password"
+                                                                value={target.secret}
+                                                                onChange={(event) => updateWebhookTarget(target.id, { secret: event.target.value })}
+                                                                placeholder={target.hasSecret ? "Leave blank to keep stored secret" : "Enter shared secret"}
+                                                                className="h-12 rounded-2xl border-border/60 bg-background/60 font-mono text-sm"
+                                                            />
+                                                            {target.hasSecret ? (
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    Stored secret: {target.secretMasked || "configured"}.
+                                                                </p>
+                                                            ) : null}
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor={`ai-blogger-extra-active-${target.id}`}>Active</Label>
+                                                            <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/60 px-4 py-3">
+                                                                <span className="text-sm">Enable webhook delivery</span>
+                                                                <Switch
+                                                                    checked={target.active}
+                                                                    onCheckedChange={(checked) => updateWebhookTarget(target.id, { active: checked })}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor={`ai-blogger-extra-retries-${target.id}`}>Retry Attempts</Label>
+                                                            <Input
+                                                                id={`ai-blogger-extra-retries-${target.id}`}
+                                                                type="number"
+                                                                min="1"
+                                                                max="5"
+                                                                value={target.retryAttempts}
+                                                                onChange={(event) => updateWebhookTarget(target.id, { retryAttempts: event.target.value })}
+                                                                className="h-12 rounded-2xl border-border/60 bg-background/60"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor={`ai-blogger-extra-timeout-${target.id}`}>Timeout (seconds)</Label>
+                                                            <Input
+                                                                id={`ai-blogger-extra-timeout-${target.id}`}
+                                                                type="number"
+                                                                min="5"
+                                                                max="30"
+                                                                value={target.timeout}
+                                                                onChange={(event) => updateWebhookTarget(target.id, { timeout: event.target.value })}
+                                                                className="h-12 rounded-2xl border-border/60 bg-background/60"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
 
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/60 px-4 py-4">

@@ -28,6 +28,7 @@ import type {
     BlogStudioSeoSettings,
     BlogStudioResolvedBlocker,
     BlogStudioSeoAudit,
+    BlogStudioTarget,
     BlogStudioTargetType,
     BlogStudioWebhookStatus,
 } from "@/lib/types";
@@ -39,6 +40,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem } from "@/components/ui/select";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -125,6 +127,46 @@ function getBlockerPreviewSignature(preview?: BlogStudioBlockerResolutionPreview
         `human:${serialize(preview.humanRequired || [])}`,
         `system:${serialize(preview.systemRequired || [])}`,
     ].join("::");
+}
+
+function getPublishTargetKey(target: BlogStudioTarget) {
+    return (
+        target.externalId?.trim() ||
+        target.webhookConfig?.url?.trim() ||
+        target.websiteUrl?.trim() ||
+        target.label.trim()
+    );
+}
+
+function normalizePublishTargetKey(value?: string) {
+    return (value || "").trim().toLowerCase();
+}
+
+function dedupePublishTargets(targets: BlogStudioTarget[]) {
+    const seen = new Set<string>();
+
+    return targets.filter((target) => {
+        const key = normalizePublishTargetKey(getPublishTargetKey(target));
+        if (!key || seen.has(key)) {
+            return false;
+        }
+
+        seen.add(key);
+        return true;
+    });
+}
+
+function getPublishTargetUrlLabel(target: BlogStudioTarget) {
+    const value = target.websiteUrl || target.webhookConfig?.url || "";
+    if (!value) {
+        return "";
+    }
+
+    try {
+        return new URL(value).hostname.replace(/^www\./, "");
+    } catch {
+        return value;
+    }
 }
 
 function BlockerResolutionList({
@@ -245,6 +287,42 @@ export function AIBloggerPostStatusControls({
     const isRetargetingCannibalization = activeAction === "retarget-cannibalization";
     const wordRangeWarning = audit?.checks.find((check) => check.key === "word-range" && !check.passed) ?? null;
     const publishWarnings = publishesToWebhook ? (publishValidation?.warnings || []) : [];
+    const webhookPublishTargets = useMemo(() => {
+        if (!publishingSettings) {
+            return [];
+        }
+
+        return dedupePublishTargets([
+            publishingSettings.defaultTarget,
+            ...(publishingSettings.targets || []),
+        ].filter((target) =>
+            target.type === "webhook" &&
+            Boolean(target.webhookConfig?.active) &&
+            Boolean(target.webhookConfig?.url?.trim()),
+        ));
+    }, [publishingSettings]);
+    const initialPublishTargetKey = useMemo(() => {
+        const currentTarget = webhookPublishTargets.find((target) =>
+            normalizePublishTargetKey(target.label) === normalizePublishTargetKey(targetLabel),
+        );
+
+        return currentTarget
+            ? getPublishTargetKey(currentTarget)
+            : webhookPublishTargets[0]
+                ? getPublishTargetKey(webhookPublishTargets[0])
+                : "";
+    }, [targetLabel, webhookPublishTargets]);
+    const [publishTargetKey, setPublishTargetKey] = useState(initialPublishTargetKey);
+    const selectedPublishTarget = useMemo(
+        () => webhookPublishTargets.find((target) =>
+            normalizePublishTargetKey(getPublishTargetKey(target)) === normalizePublishTargetKey(publishTargetKey),
+        ) || webhookPublishTargets[0],
+        [publishTargetKey, webhookPublishTargets],
+    );
+    const showPublishTargetSelector = publishesToWebhook && webhookPublishTargets.length > 1;
+    const displayTargetLabel = publishesToWebhook
+        ? selectedPublishTarget?.label || targetLabel
+        : targetLabel;
     const publishedHref = useMemo(() => {
         const candidate = publishedUrl?.trim() || "";
         if (!candidate) {
@@ -280,6 +358,10 @@ export function AIBloggerPostStatusControls({
         }
 
         if (publishesToWebhook) {
+            if (showPublishTargetSelector) {
+                return "Choose the connected website for this publish, then AI Blogger will send the post to that website webhook.";
+            }
+
             return "This will publish to the configured webhook target and mark the AI Blogger post as published.";
         }
 
@@ -304,8 +386,24 @@ export function AIBloggerPostStatusControls({
         publishesToWebhook,
         readinessBlockers.length,
         readyForManualExport,
+        showPublishTargetSelector,
         status,
     ]);
+
+    useEffect(() => {
+        if (!showPublishTargetSelector) {
+            setPublishTargetKey(initialPublishTargetKey);
+            return;
+        }
+
+        const selectedStillExists = webhookPublishTargets.some((target) =>
+            normalizePublishTargetKey(getPublishTargetKey(target)) === normalizePublishTargetKey(publishTargetKey),
+        );
+
+        if (!selectedStillExists) {
+            setPublishTargetKey(initialPublishTargetKey);
+        }
+    }, [initialPublishTargetKey, publishTargetKey, showPublishTargetSelector, webhookPublishTargets]);
 
     useEffect(() => {
         if (typeof window === "undefined") {
@@ -414,6 +512,11 @@ export function AIBloggerPostStatusControls({
             return;
         }
 
+        if (showPublishTargetSelector && !selectedPublishTarget) {
+            setError("Choose which connected website should receive this post.");
+            return;
+        }
+
         setError("");
 
         setActiveAction("advance");
@@ -421,8 +524,10 @@ export function AIBloggerPostStatusControls({
             let waitingForRefresh = false;
             try {
                 if (publishesToWebhook) {
-                    await publishBlogStudioPost(slug);
-                    toast.success("Published to webhook target");
+                    await publishBlogStudioPost(slug, {
+                        targetKey: selectedPublishTarget ? getPublishTargetKey(selectedPublishTarget) : undefined,
+                    });
+                    toast.success(`Published to ${selectedPublishTarget?.label || "webhook target"}`);
                     if (wordRangeWarning) {
                         toast("Published with warning: word count is outside the target range.");
                     }
@@ -730,9 +835,29 @@ export function AIBloggerPostStatusControls({
                 </div>
 
                 <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4 text-sm leading-6 text-muted-foreground">
-                    Publish target: <span className="font-medium text-foreground">{targetLabel}</span> via{" "}
+                    Publish target: <span className="font-medium text-foreground">{displayTargetLabel}</span> via{" "}
                     {getBlogStudioTargetTypeLabel(targetType)}
                 </div>
+
+                {showPublishTargetSelector ? (
+                    <div className="space-y-2">
+                        <Label htmlFor="ai-blogger-publish-website">Publish Website</Label>
+                        <Select id="ai-blogger-publish-website" value={publishTargetKey} onValueChange={setPublishTargetKey}>
+                            <SelectContent>
+                                {webhookPublishTargets.map((target) => {
+                                    const key = getPublishTargetKey(target);
+                                    const urlLabel = getPublishTargetUrlLabel(target);
+
+                                    return (
+                                        <SelectItem key={key} value={key}>
+                                            {target.label}{urlLabel ? ` - ${urlLabel}` : ""}
+                                        </SelectItem>
+                                    );
+                                })}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                ) : null}
 
                 {status === "Scheduled" && scheduledFor ? (
                     <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4 text-sm text-muted-foreground">

@@ -67,6 +67,9 @@ type IncomingWebhookPayload = {
         agencyId?: string;
         agencyName?: string;
         publishedAt?: string;
+        targetKey?: string;
+        targetLabel?: string;
+        targetWebsiteUrl?: string;
     };
 };
 
@@ -182,6 +185,47 @@ function getWebhookAgencyId(request: NextRequest, payload?: unknown) {
     return "";
 }
 
+function getWebhookTargetKey(request: NextRequest, payload?: unknown) {
+    const headerTargetKey = request.headers.get("x-ai-blogger-target-key")?.trim() || "";
+    if (headerTargetKey) {
+        return headerTargetKey;
+    }
+
+    if (payload && typeof payload === "object" && "source" in payload) {
+        const source = (payload as { source?: { targetKey?: unknown } }).source;
+        if (source && hasNonEmptyString(source.targetKey)) {
+            return source.targetKey.trim();
+        }
+    }
+
+    return "";
+}
+
+function normalizeTargetSelectionValue(value: unknown) {
+    return hasNonEmptyString(value) ? value.trim().toLowerCase() : "";
+}
+
+function targetMatchesSelection(target: {
+    externalId?: unknown;
+    websiteUrl?: unknown;
+    label?: unknown;
+    webhookConfig?: {
+        url?: unknown;
+    };
+} | undefined, selectionKey: string) {
+    const normalizedSelection = normalizeTargetSelectionValue(selectionKey);
+    if (!target || !normalizedSelection) {
+        return false;
+    }
+
+    return [
+        target.externalId,
+        target.webhookConfig?.url,
+        target.websiteUrl,
+        target.label,
+    ].some((value) => normalizeTargetSelectionValue(value) === normalizedSelection);
+}
+
 function getPrimaryDatabaseName() {
     const mongoUri = process.env.MONGODB_URI?.trim();
     if (!mongoUri) {
@@ -224,10 +268,10 @@ async function getMainMongoClient() {
     return cachedMainMongoClientPromise;
 }
 
-async function getStoredWebhookSecretForAgency(agencyId: string) {
+async function getStoredWebhookSecretsForAgency(agencyId: string, targetKey = "") {
     const normalizedAgencyId = agencyId.trim();
     if (!normalizedAgencyId) {
-        return "";
+        return [];
     }
 
     try {
@@ -239,27 +283,62 @@ async function getStoredWebhookSecretForAgency(agencyId: string) {
             {
                 projection: {
                     _id: 0,
-                    "publishing.defaultTarget.webhookConfig.secret": 1,
+                    "publishing.defaultTarget": 1,
+                    "publishing.targets": 1,
                 },
             },
         );
-        const storedSecret = (settings as {
+        const publishing = (settings as {
             publishing?: {
-                defaultTarget?: {
-                    webhookConfig?: {
-                        secret?: unknown;
-                    };
-                };
+                defaultTarget?: StoredWebhookTarget;
+                targets?: StoredWebhookTarget[];
             };
-        } | null)?.publishing?.defaultTarget?.webhookConfig?.secret;
+        } | null)?.publishing;
+        const allTargets = [
+            publishing?.defaultTarget,
+            ...(Array.isArray(publishing?.targets) ? publishing.targets : []),
+        ].filter((target): target is StoredWebhookTarget => Boolean(target));
+        const matchingTargets = targetKey
+            ? allTargets.filter((target) => targetMatchesSelection(target, targetKey))
+            : allTargets;
+        const targetsToUse = targetKey ? matchingTargets : allTargets;
+        const secrets = targetsToUse
+            .map((target) => target.webhookConfig?.secret)
+            .filter((secret): secret is string => hasNonEmptyString(secret))
+            .map((secret) => {
+                try {
+                    return decryptApiKey(secret.trim());
+                } catch {
+                    return "";
+                }
+            })
+            .filter(Boolean);
 
-        return hasNonEmptyString(storedSecret) ? decryptApiKey(storedSecret.trim()) : "";
+        return Array.from(new Set(secrets));
     } catch (error) {
         console.warn("[Webhook] Failed to load stored agency secret", {
             agencyId: normalizedAgencyId,
             error: error instanceof Error ? error.message : String(error),
         });
-        return "";
+        return [];
+    }
+}
+
+type StoredWebhookTarget = {
+    externalId?: unknown;
+    websiteUrl?: unknown;
+    label?: unknown;
+    webhookConfig?: {
+        url?: unknown;
+        secret?: unknown;
+    };
+};
+
+async function addStoredWebhookSecretsForAgency(expectedSecrets: Set<string>, agencyId: string, targetKey: string) {
+    const storedSecrets = await getStoredWebhookSecretsForAgency(agencyId, targetKey);
+
+    for (const storedSecret of storedSecrets) {
+        expectedSecrets.add(storedSecret);
     }
 }
 
@@ -291,10 +370,11 @@ async function authorizeWebhookRequest(request: NextRequest, payload?: unknown) 
 
     const agencyId = getWebhookAgencyId(request, payload);
     if (agencyId) {
-        const storedSecret = await getStoredWebhookSecretForAgency(agencyId);
-        if (storedSecret) {
-            expectedSecrets.add(storedSecret);
-        }
+        await addStoredWebhookSecretsForAgency(
+            expectedSecrets,
+            agencyId,
+            getWebhookTargetKey(request, payload),
+        );
     }
 
     if (expectedSecrets.size === 0) {

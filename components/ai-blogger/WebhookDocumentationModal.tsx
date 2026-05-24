@@ -18,12 +18,21 @@ const codeExamples = {
 import Blog from "@/models/Blog";
 import dbConnect from "@/lib/db";
 
+function getPresentedSecret(request: NextRequest) {
+  const headerSecret = request.headers.get("x-ai-blogger-webhook-secret")?.trim() || "";
+  const authorization = request.headers.get("authorization") || "";
+  const bearerSecret = authorization.startsWith("Bearer ")
+    ? authorization.slice("Bearer ".length).trim()
+    : "";
+
+  return headerSecret || bearerSecret;
+}
+
 function isAuthorized(request: NextRequest) {
   const expectedSecret = process.env.AI_BLOGGER_WEBHOOK_SECRET?.trim() || "";
-  if (!expectedSecret) return true;
+  if (!expectedSecret) return false;
 
-  const receivedSecret = request.headers.get("x-ai-blogger-webhook-secret")?.trim() || "";
-  return receivedSecret === expectedSecret;
+  return getPresentedSecret(request) === expectedSecret;
 }
 
 export async function GET(request: NextRequest) {
@@ -33,7 +42,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    message: "Webhook reachable",
+    service: "AI Blogger Webhook Receiver",
     timestamp: new Date().toISOString(),
   });
 }
@@ -41,100 +50,132 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     if (!isAuthorized(request)) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const payload = await request.json();
     const { blog, source } = payload;
 
-    // Validate
-    if (!blog?.slug) {
-      return NextResponse.json(
-        { error: "Invalid blog data" },
-        { status: 400 }
-      );
+    if (!blog?.id || !blog?.slug || !blog?.title || !blog?.content) {
+      return NextResponse.json({ error: "Invalid blog data" }, { status: 400 });
     }
 
-    // Connect & save
     await dbConnect();
-    await Blog.findOneAndUpdate(
-      { slug: blog.slug },
+
+    const savedBlog = await Blog.findOneAndUpdate(
+      { sourcePostId: blog.id },
       {
+        sourcePostId: blog.id,
+        slug: blog.slug,
         title: blog.title,
         content: blog.content,
         excerpt: blog.excerpt,
         metaTitle: blog.metaTitle,
         metaDescription: blog.metaDescription,
-        metaKeywords: blog.metaKeywords,
+        metaKeywords: blog.metaKeywords || "",
         canonicalUrl: blog.canonicalUrl,
-        category: blog.category,
+        category: blog.category || "AI Blogger",
         image: blog.image,
         imageAlt: blog.imageAlt,
         schemaMarkup: blog.schemaMarkup,
-        faqItems: blog.faqItems,
-        peopleAlsoAsk: blog.peopleAlsoAsk,
-        internalLinks: blog.internalLinks,
+        faqItems: blog.faqItems || [],
+        externalSources: blog.externalSources || [],
+        peopleAlsoAsk: blog.peopleAlsoAsk || [],
+        internalLinks: blog.internalLinks || [],
         contentClusterId: blog.contentClusterId,
         parentTopicSlug: blog.parentTopicSlug,
+        targetKey: source?.targetKey,
+        targetLabel: source?.targetLabel,
+        targetWebsiteUrl: source?.targetWebsiteUrl,
         publishedAt: new Date(blog.publishedAt),
         status: "published",
       },
-      { upsert: true, returnDocument: 'after' }
+      { upsert: true, returnDocument: "after" }
     );
 
     return NextResponse.json(
-      { success: true, message: "Blog saved" },
+      { success: true, message: "Blog saved", blogId: savedBlog._id },
       { status: 200 }
     );
   } catch (error) {
     console.error("[Webhook Error]", error);
-    return NextResponse.json(
-      { error: "Failed to save blog" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to save blog" }, { status: 500 });
   }
 }`,
 
   express: `const express = require("express");
 const app = express();
 
-app.use(express.json());
+app.use(express.json({ limit: "5mb" }));
+
+function getPresentedSecret(req) {
+  const headerSecret = (req.get("x-ai-blogger-webhook-secret") || "").trim();
+  const authorization = req.get("authorization") || "";
+  const bearerSecret = authorization.startsWith("Bearer ")
+    ? authorization.slice("Bearer ".length).trim()
+    : "";
+
+  return headerSecret || bearerSecret;
+}
+
+function isAuthorized(req) {
+  const expectedSecret = (process.env.AI_BLOGGER_WEBHOOK_SECRET || "").trim();
+  return Boolean(expectedSecret) && getPresentedSecret(req) === expectedSecret;
+}
+
+app.get("/api/webhooks/blog-published", (req, res) => {
+  if (!isAuthorized(req)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  res.json({
+    success: true,
+    service: "AI Blogger Webhook Receiver",
+    timestamp: new Date().toISOString(),
+  });
+});
 
 app.post("/api/webhooks/blog-published", async (req, res) => {
   try {
+    if (!isAuthorized(req)) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     const { blog, source } = req.body;
 
-    // Validate
-    if (!blog?.slug) {
+    if (!blog?.id || !blog?.slug || !blog?.title || !blog?.content) {
       return res.status(400).json({ error: "Invalid blog data" });
     }
 
-    // Save to database
     const savedBlog = await Blog.findOneAndUpdate(
-      { slug: blog.slug },
+      { sourcePostId: blog.id },
       {
+        sourcePostId: blog.id,
+        slug: blog.slug,
         title: blog.title,
         content: blog.content,
         excerpt: blog.excerpt,
         metaTitle: blog.metaTitle,
         metaDescription: blog.metaDescription,
-        metaKeywords: blog.metaKeywords,
+        metaKeywords: blog.metaKeywords || "",
         canonicalUrl: blog.canonicalUrl,
-        category: blog.category,
+        category: blog.category || "AI Blogger",
         image: blog.image,
         imageAlt: blog.imageAlt,
         schemaMarkup: blog.schemaMarkup,
-        faqItems: blog.faqItems,
-        peopleAlsoAsk: blog.peopleAlsoAsk,
-        internalLinks: blog.internalLinks,
+        faqItems: blog.faqItems || [],
+        externalSources: blog.externalSources || [],
+        peopleAlsoAsk: blog.peopleAlsoAsk || [],
+        internalLinks: blog.internalLinks || [],
         contentClusterId: blog.contentClusterId,
+        parentTopicSlug: blog.parentTopicSlug,
+        targetKey: source?.targetKey,
+        targetLabel: source?.targetLabel,
+        targetWebsiteUrl: source?.targetWebsiteUrl,
         publishedAt: new Date(blog.publishedAt),
         status: "published",
       },
-      { upsert: true, returnDocument: 'after' }
+      { upsert: true, returnDocument: "after" }
     );
 
     res.json({ success: true, blogId: savedBlog._id });
@@ -149,96 +190,134 @@ app.listen(3000, () => {
 });`,
 
   django: `from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 import json
+import os
 from .models import Blog
 
-@require_http_methods(["POST"])
+def get_presented_secret(request):
+  header_secret = request.headers.get("x-ai-blogger-webhook-secret", "").strip()
+  authorization = request.headers.get("authorization", "")
+  bearer_secret = authorization.replace("Bearer ", "", 1).strip() if authorization.startswith("Bearer ") else ""
+  return header_secret or bearer_secret
+
+def is_authorized(request):
+  expected_secret = os.environ.get("AI_BLOGGER_WEBHOOK_SECRET", "").strip()
+  return bool(expected_secret) and get_presented_secret(request) == expected_secret
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
 def blog_webhook(request):
+  if not is_authorized(request):
+    return JsonResponse({"error": "Unauthorized"}, status=401)
+
+  if request.method == "GET":
+    return JsonResponse({
+      "success": True,
+      "service": "AI Blogger Webhook Receiver",
+    })
+
   try:
     payload = json.loads(request.body)
     blog = payload.get("blog")
-    source = payload.get("source")
+    source = payload.get("source", {})
 
-    # Validate
-    if not blog or not blog.get("slug"):
-      return JsonResponse(
-        {"error": "Invalid blog data"},
-        status=400
-      )
+    if not blog or not blog.get("id") or not blog.get("slug") or not blog.get("content"):
+      return JsonResponse({"error": "Invalid blog data"}, status=400)
 
-    # Save to database
     blog_obj, created = Blog.objects.update_or_create(
-      slug=blog["slug"],
+      source_post_id=blog["id"],
       defaults={
+        "slug": blog["slug"],
         "title": blog["title"],
         "content": blog["content"],
         "excerpt": blog.get("excerpt", ""),
-        "meta_title": blog["metaTitle"],
-        "meta_description": blog["metaDescription"],
+        "meta_title": blog.get("metaTitle", ""),
+        "meta_description": blog.get("metaDescription", ""),
         "meta_keywords": blog.get("metaKeywords", ""),
         "canonical_url": blog.get("canonicalUrl"),
-        "category": blog.get("category", ""),
+        "category": blog.get("category", "AI Blogger"),
         "image": blog.get("image", ""),
         "image_alt": blog.get("imageAlt", ""),
         "schema_markup": blog.get("schemaMarkup"),
         "faq_items": blog.get("faqItems", []),
+        "external_sources": blog.get("externalSources", []),
         "people_also_ask": blog.get("peopleAlsoAsk", []),
         "internal_links": blog.get("internalLinks", []),
         "content_cluster_id": blog.get("contentClusterId"),
         "parent_topic_slug": blog.get("parentTopicSlug"),
+        "target_key": source.get("targetKey"),
+        "target_label": source.get("targetLabel"),
+        "target_website_url": source.get("targetWebsiteUrl"),
         "status": "published",
       }
     )
 
-    return JsonResponse({
-      "success": True,
-      "blogId": str(blog_obj.id)
-    })
+    return JsonResponse({"success": True, "blogId": str(blog_obj.id)})
 
   except Exception as error:
     print(f"[Webhook Error] {error}")
-    return JsonResponse(
-      {"error": "Failed to save blog"},
-      status=500
-    )`,
+    return JsonResponse({"error": "Failed to save blog"}, status=500)`,
 
   laravel: `<?php
 
-Route::post('/api/webhooks/blog-published', function (Request $request) {
-  try {
-    $payload = $request->json();
-    $blog = $payload['blog'];
-    $source = $payload['source'];
+use Illuminate\\Http\\Request;
+use Illuminate\\Support\\Facades\\Log;
+use Illuminate\\Support\\Facades\\Route;
 
-    // Validate
-    if (!$blog || !isset($blog['slug'])) {
-      return response()->json(
-        ['error' => 'Invalid blog data'],
-        400
-      );
+Route::match(['get', 'post'], '/api/webhooks/blog-published', function (Request $request) {
+  $expectedSecret = trim(env('AI_BLOGGER_WEBHOOK_SECRET', ''));
+  $headerSecret = trim($request->header('x-ai-blogger-webhook-secret', ''));
+  $authorization = $request->header('authorization', '');
+  $bearerSecret = str_starts_with($authorization, 'Bearer ')
+    ? trim(substr($authorization, 7))
+    : '';
+
+  if (!$expectedSecret || ($headerSecret ?: $bearerSecret) !== $expectedSecret) {
+    return response()->json(['error' => 'Unauthorized'], 401);
+  }
+
+  if ($request->isMethod('get')) {
+    return response()->json([
+      'success' => true,
+      'service' => 'AI Blogger Webhook Receiver',
+    ]);
+  }
+
+  try {
+    $payload = $request->json()->all();
+    $blog = $payload['blog'] ?? null;
+    $source = $payload['source'] ?? [];
+
+    if (!$blog || empty($blog['id']) || empty($blog['slug']) || empty($blog['content'])) {
+      return response()->json(['error' => 'Invalid blog data'], 400);
     }
 
-    // Save to database
     $blogModel = Blog::updateOrCreate(
-      ['slug' => $blog['slug']],
+      ['source_post_id' => $blog['id']],
       [
+        'slug' => $blog['slug'],
         'title' => $blog['title'],
         'content' => $blog['content'],
         'excerpt' => $blog['excerpt'] ?? '',
-        'meta_title' => $blog['metaTitle'],
-        'meta_description' => $blog['metaDescription'],
+        'meta_title' => $blog['metaTitle'] ?? '',
+        'meta_description' => $blog['metaDescription'] ?? '',
         'meta_keywords' => $blog['metaKeywords'] ?? '',
         'canonical_url' => $blog['canonicalUrl'] ?? null,
-        'category' => $blog['category'] ?? '',
+        'category' => $blog['category'] ?? 'AI Blogger',
         'image' => $blog['image'] ?? '',
         'image_alt' => $blog['imageAlt'] ?? '',
         'schema_markup' => $blog['schemaMarkup'] ?? null,
         'faq_items' => $blog['faqItems'] ?? [],
+        'external_sources' => $blog['externalSources'] ?? [],
         'people_also_ask' => $blog['peopleAlsoAsk'] ?? [],
         'internal_links' => $blog['internalLinks'] ?? [],
         'content_cluster_id' => $blog['contentClusterId'] ?? null,
         'parent_topic_slug' => $blog['parentTopicSlug'] ?? null,
+        'target_key' => $source['targetKey'] ?? null,
+        'target_label' => $source['targetLabel'] ?? null,
+        'target_website_url' => $source['targetWebsiteUrl'] ?? null,
         'status' => 'published',
       ]
     );
@@ -250,10 +329,7 @@ Route::post('/api/webhooks/blog-published', function (Request $request) {
 
   } catch (Exception $error) {
     Log::error('[Webhook Error] ' . $error->getMessage());
-    return response()->json(
-      ['error' => 'Failed to save blog'],
-      500
-    );
+    return response()->json(['error' => 'Failed to save blog'], 500);
   }
 });
 ?>`,
@@ -275,6 +351,18 @@ const payloadExample = {
     imageAlt: "SEO optimization checklist",
     schemaMarkup: '{"@context": "https://schema.org", "@type": "BlogPosting"...}',
     category: "SEO",
+    externalSources: [
+      {
+        id: "source-1",
+        title: "Google Search Central",
+        url: "https://developers.google.com/search/docs",
+        domain: "developers.google.com",
+        summary: "Official guidance used while drafting.",
+        type: "official",
+        freshness: "current",
+        trustLevel: "high",
+      },
+    ],
     faqItems: [
       {
         question: "What is SEO?",
@@ -307,7 +395,30 @@ const payloadExample = {
     agencyId: "agency-123",
     agencyName: "Your Agency",
     publishedAt: "2026-03-30T14:23:45Z",
+    targetKey: "client-site-main",
+    targetLabel: "Client Site Main",
+    targetWebsiteUrl: "https://yoursite.com",
   },
+};
+
+const headersExample = {
+  "Content-Type": "application/json",
+  "X-Webhook-Event": "blog.published",
+  "X-Webhook-Timestamp": "2026-03-30T14:23:45.000Z",
+  "X-AI-Blogger-Webhook-Secret": "your-shared-secret",
+  Authorization: "Bearer your-shared-secret",
+  "X-AI-Blogger-Agency-Id": "agency-123",
+  "X-AI-Blogger-Target-Key": "client-site-main",
+};
+
+const healthCheckHeadersExample = {
+  "Content-Type": "application/json",
+  "X-Webhook-Event": "webhook.healthcheck",
+  "X-Webhook-Timestamp": "2026-03-30T14:20:00.000Z",
+  "X-AI-Blogger-Test": "healthcheck",
+  "X-AI-Blogger-Webhook-Secret": "your-shared-secret",
+  Authorization: "Bearer your-shared-secret",
+  "X-AI-Blogger-Agency-Id": "agency-123",
 };
 
 const faqItems = [
@@ -319,7 +430,7 @@ const faqItems = [
   {
     question: "What should my endpoint return?",
     answer:
-      'Your endpoint should return HTTP 200 status with JSON: {"success": true}. Any non-200 status will trigger automatic retries.',
+      'Your endpoint should return any 2xx status, usually HTTP 200, with JSON like {"success": true}. Retryable failures include timeouts, 408, 409, 425, 429, and 5xx responses.',
   },
   {
     question: "How many retries if it fails?",
@@ -329,12 +440,17 @@ const faqItems = [
   {
     question: "What if I need to add authentication?",
     answer:
-      "Set a shared webhook secret in AI Blogger and on your website. We send it in the x-ai-blogger-webhook-secret header on every request.",
+      "Set the same shared webhook secret in AI Blogger and on your website. We send it in both x-ai-blogger-webhook-secret and Authorization: Bearer headers.",
   },
   {
     question: "Can I test the webhook?",
     answer:
-      "Yes. The Test Webhook button sends an authenticated GET health check so you can verify the endpoint without creating blog content.",
+      "Yes. The Test Webhook button sends an authenticated GET health check to the same URL, with no blog payload, so your endpoint should support GET and POST.",
+  },
+  {
+    question: "What if one agency publishes to multiple websites?",
+    answer:
+      "Each website connection has its own webhook URL, secret, and website URL. On publish, the selected website is sent in source.targetKey, source.targetLabel, source.targetWebsiteUrl, and the x-ai-blogger-target-key header.",
   },
   {
     question: "How do I know if webhooks are working?",
@@ -392,6 +508,7 @@ function CodeBlock({
 export function WebhookDocumentationModal({
   isOpen,
   onClose,
+  webhookUrl,
 }: WebhookDocumentationModalProps) {
   if (!isOpen) return null;
 
@@ -406,7 +523,7 @@ export function WebhookDocumentationModal({
               <h2 className="text-2xl font-bold">Webhook Integration</h2>
             </div>
             <p className="text-sm text-muted-foreground">
-              Setup your endpoint to receive published blogs in real-time
+              Set up your endpoint to receive published blogs in real time
             </p>
           </div>
           <button
@@ -426,9 +543,10 @@ export function WebhookDocumentationModal({
               How Webhooks Work
             </h3>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-              When you publish a blog, we send it to your endpoint as an HTTP
-              POST request. Your server receives the data and saves it to your
-              database. No need to export or copy-paste!
+              When you publish a blog, we send it to the selected website
+              connection as an HTTP POST request. Your server receives the
+              rendered blog data, saves it to your database, and returns a 2xx
+              response.
             </p>
             <div className="bg-background/40 rounded-lg p-4 text-sm space-y-2">
               <div className="flex items-start gap-2">
@@ -437,7 +555,7 @@ export function WebhookDocumentationModal({
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-primary font-semibold">2.</span>
-                <span>We send HTTP POST to your webhook URL</span>
+                <span>We send HTTP POST to the selected website webhook URL</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-primary font-semibold">3.</span>
@@ -450,11 +568,37 @@ export function WebhookDocumentationModal({
             </div>
           </section>
 
+          {/* Headers Reference */}
+          <section>
+            <h3 className="text-lg font-semibold mb-4">Request Headers</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Publish requests include these headers. If a shared secret is configured,
+              verify either the secret header or the bearer token.
+            </p>
+            <CodeBlock
+              code={JSON.stringify(headersExample, null, 2)}
+              language="json"
+            />
+            <div className="mt-4 rounded-lg border border-border/40 bg-background/40 p-4 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">Health check request</p>
+              <p className="mt-1">
+                The Test Webhook button sends a GET request to the same URL with
+                no body. Your endpoint should return any 2xx response.
+              </p>
+              <div className="mt-3">
+                <CodeBlock
+                  code={JSON.stringify(healthCheckHeadersExample, null, 2)}
+                  language="json"
+                />
+              </div>
+            </div>
+          </section>
+
           {/* Payload Reference */}
           <section>
             <h3 className="text-lg font-semibold mb-4">Webhook Payload</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Here&apos;s what we send to your endpoint:
+              Here&apos;s what we send in the POST body when a blog is published:
             </p>
             <CodeBlock
               code={JSON.stringify(payloadExample, null, 2)}
@@ -468,6 +612,14 @@ export function WebhookDocumentationModal({
             <p className="text-sm text-muted-foreground mb-4">
               Choose your framework and copy the code:
             </p>
+            {webhookUrl ? (
+              <div className="mb-4 rounded-lg border border-border/40 bg-background/40 p-4 text-sm">
+                <p className="font-medium text-foreground">Current configured URL</p>
+                <code className="mt-2 block break-all rounded bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+                  {webhookUrl}
+                </code>
+              </div>
+            ) : null}
 
             <Tabs defaultValue="nodejs" className="w-full">
               <TabsList className="grid w-full grid-cols-4 bg-background/40 p-1 rounded-lg">
@@ -531,7 +683,8 @@ export function WebhookDocumentationModal({
                 <div>
                   <p className="font-medium">Deploy your endpoint</p>
                   <p className="text-sm text-muted-foreground">
-                    Make sure it&apos;s publicly accessible and returns HTTP 200
+                    Make sure it&apos;s publicly accessible and returns a 2xx
+                    response for both health checks and publish requests.
                   </p>
                 </div>
               </div>
@@ -556,7 +709,8 @@ export function WebhookDocumentationModal({
                 <div>
                   <p className="font-medium">Click &quot;Test Webhook&quot;</p>
                   <p className="text-sm text-muted-foreground">
-                    We&apos;ll send a sample blog to verify everything works
+                    We&apos;ll send an authenticated GET health check. It should
+                    verify your secret and return a 2xx response without creating content.
                   </p>
                 </div>
               </div>
@@ -567,7 +721,8 @@ export function WebhookDocumentationModal({
                 <div>
                   <p className="font-medium">Publish a blog</p>
                   <p className="text-sm text-muted-foreground">
-                    Your blog will be sent to the webhook automatically
+                    If multiple websites are connected, choose the publish website
+                    in the post workflow before publishing.
                   </p>
                 </div>
               </div>
@@ -590,6 +745,10 @@ export function WebhookDocumentationModal({
             />
             <p className="text-sm text-muted-foreground mt-4">
               <strong>Status Code:</strong> HTTP 200 (any 2xx is accepted)
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              For conflicts, return HTTP 409. For temporary failures, return 5xx
+              so AI Blogger can retry based on your retry settings.
             </p>
           </section>
 
@@ -620,9 +779,6 @@ export function WebhookDocumentationModal({
               className="flex-1"
             >
               Close
-            </Button>
-            <Button className="flex-1 bg-primary hover:bg-primary/90">
-              Test Webhook
             </Button>
           </div>
         </div>
