@@ -525,6 +525,7 @@ export function AIBloggerSettingsWorkspace({
     const webhookSecretMasked = settings.publishing.defaultTarget.webhookConfig?.secretMasked || "";
     const webhookHasSecret = Boolean(settings.publishing.defaultTarget.webhookConfig?.hasSecret);
     const [webhookHealthcheck, setWebhookHealthcheck] = useState<WebhookHealthcheckState | null>(null);
+    const [webhookTargetHealthchecks, setWebhookTargetHealthchecks] = useState<Record<string, WebhookHealthcheckState>>({});
     const savedWebhookStatus = settings.publishing.defaultTarget.webhookConfig?.lastStatus;
     const savedWebhookLastSentAt = settings.publishing.defaultTarget.webhookConfig?.lastSentAt;
     const savedWebhookLastError = settings.publishing.defaultTarget.webhookConfig?.lastError;
@@ -552,6 +553,7 @@ export function AIBloggerSettingsWorkspace({
 
     useEffect(() => {
         setWebhookHealthcheck(null);
+        setWebhookTargetHealthchecks({});
     }, [defaultTargetType, defaultTargetLabel, webhookWebsiteUrl, webhookUrl, webhookActive, webhookRetryAttempts, webhookTimeout, webhookSecret, additionalWebhookTargets]);
 
     const activeSchedules = schedules.filter((schedule) => schedule.status === "active").length;
@@ -826,6 +828,71 @@ export function AIBloggerSettingsWorkspace({
                     message,
                     checkedAt: new Date().toISOString(),
                 });
+                toast.error(message);
+            } finally {
+                setPendingAction("");
+            }
+        });
+    };
+
+    const runAdditionalWebhookHealthCheck = (target: WebhookTargetFormState) => {
+        if (hasPendingAction) {
+            return;
+        }
+
+        const validationMessage = validateWebhookTargetForm(target, target.label || "Additional website connection");
+        if (validationMessage) {
+            toast.error(validationMessage);
+            return;
+        }
+
+        const actionKey = `webhook-test-${target.id}`;
+        setPendingAction(actionKey);
+        startTransition(async () => {
+            try {
+                const result = await testBlogStudioWebhookTarget({
+                    targetKey: target.id,
+                    target: {
+                        type: "webhook",
+                        label: target.label,
+                        externalId: target.id,
+                        websiteUrl: target.websiteUrl.trim() || undefined,
+                        webhookConfig: {
+                            url: target.url,
+                            active: target.active,
+                            retryAttempts: Number.parseInt(target.retryAttempts, 10),
+                            timeout: Number.parseInt(target.timeout, 10),
+                            secret: target.secret.trim() || undefined,
+                        },
+                    },
+                });
+
+                const nextHealthcheck = {
+                    success: result.success,
+                    message: result.message,
+                    statusCode: result.statusCode,
+                    checkedAt: result.timestamp,
+                };
+                setWebhookTargetHealthchecks((current) => ({
+                    ...current,
+                    [target.id]: nextHealthcheck,
+                }));
+
+                if (result.success) {
+                    toast.success(result.message);
+                } else {
+                    toast.error(result.message);
+                }
+            } catch (error: unknown) {
+                const message = error instanceof Error ? error.message : "Webhook health check failed";
+                setWebhookTargetHealthchecks((current) => ({
+                    ...current,
+                    [target.id]: {
+                        success: false,
+                        message,
+                        checkedAt: new Date().toISOString(),
+                    },
+                }));
                 toast.error(message);
             } finally {
                 setPendingAction("");
@@ -1294,7 +1361,7 @@ export function AIBloggerSettingsWorkspace({
                                         <div>
                                             <h4 className="font-medium text-foreground">Additional Website Connections</h4>
                                             <p className="text-sm text-muted-foreground">
-                                                Saved webhook websites appear as choices when a scheduled post is published.
+                                                The website selector appears on a scheduled post when more than one active webhook website is connected.
                                             </p>
                                         </div>
                                         <AIBloggerGradientButton type="button" variant="outline" size="sm" onClick={addWebhookTarget}>
@@ -1309,7 +1376,12 @@ export function AIBloggerSettingsWorkspace({
                                         </div>
                                     ) : (
                                         <div className="space-y-4">
-                                            {additionalWebhookTargets.map((target, index) => (
+                                            {additionalWebhookTargets.map((target, index) => {
+                                                const healthcheck = webhookTargetHealthchecks[target.id];
+                                                const testActionKey = `webhook-test-${target.id}`;
+                                                const isTestingTarget = pendingAction === testActionKey;
+
+                                                return (
                                                 <div key={target.id} className="space-y-4 rounded-xl border border-border/60 bg-background/60 px-4 py-4">
                                                     <div className="flex flex-wrap items-center justify-between gap-3">
                                                         <p className="text-sm font-semibold text-foreground">Website {index + 2}</p>
@@ -1404,9 +1476,49 @@ export function AIBloggerSettingsWorkspace({
                                                                 className="h-12 rounded-2xl border-border/60 bg-background/60"
                                                             />
                                                         </div>
+                                                        <div className="space-y-3 md:col-span-2">
+                                                            <div className="flex flex-wrap items-center gap-3">
+                                                                <AIBloggerGradientButton
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => runAdditionalWebhookHealthCheck(target)}
+                                                                    disabled={hasPendingAction}
+                                                                >
+                                                                    {isTestingTarget ? (
+                                                                        <>
+                                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                                            Testing
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Play className="h-4 w-4" />
+                                                                            Test Webhook
+                                                                        </>
+                                                                    )}
+                                                                </AIBloggerGradientButton>
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    Sends a safe authenticated GET health check to this website.
+                                                                </p>
+                                                            </div>
+                                                            {healthcheck ? (
+                                                                <div className={`rounded-xl border px-4 py-3 text-sm ${
+                                                                    healthcheck.success
+                                                                        ? "border-emerald-500/25 bg-emerald-500/8 text-emerald-700 dark:text-emerald-300"
+                                                                        : "border-destructive/25 bg-destructive/5 text-destructive"
+                                                                }`}>
+                                                                    <p className="font-medium text-foreground">Latest health check</p>
+                                                                    <p className="mt-1.5">{healthcheck.message}</p>
+                                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                                        Checked {formatBlogStudioDate(healthcheck.checkedAt, true)}
+                                                                    </p>
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            ))}
+                                            );
+                                            })}
                                         </div>
                                     )}
                                 </div>
@@ -1430,7 +1542,7 @@ export function AIBloggerSettingsWorkspace({
 
                                 <div className="rounded-xl border border-border/60 bg-background/60 px-4 py-4 text-sm leading-6 text-muted-foreground">
                                     {defaultTargetType === "webhook"
-                                        ? "Published posts will be sent to your webhook URL after publication. Configure the URL, secret, retry, and timeout settings above."
+                                        ? "Published posts are sent to the selected website webhook. If multiple active websites are connected, choose the website from the scheduled post workflow before publishing."
                                         : "Manual Export keeps posts in the queue for review, copy, and markdown export."}
                                 </div>
 

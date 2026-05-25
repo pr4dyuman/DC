@@ -868,6 +868,7 @@ export type UpdateBlogStudioSettingsInput = {
 
 export type TestBlogStudioWebhookTargetInput = {
     target?: Partial<BlogStudioTarget>;
+    targetKey?: string;
 };
 
 export type GenerateBlogStudioFeaturedImageResult = {
@@ -16018,7 +16019,18 @@ export async function testBlogStudioWebhookTargetImpl(
     await connectDB();
 
     const settings = await getBlogStudioRuntimeSettingsImpl(agencyId);
-    const target = resolveBlogStudioTarget(input.target, settings.publishing.defaultTarget);
+    const targetKey =
+        sanitizeText(input.targetKey, 500) ||
+        getBlogStudioTargetSelectionKey(input.target);
+    const storedTarget = targetKey
+        ? getBlogStudioPublishingTargets(settings.publishing).find((candidate) =>
+            blogStudioTargetMatchesSelection(candidate, targetKey),
+        )
+        : undefined;
+    const target = resolveBlogStudioTarget(
+        input.target,
+        storedTarget || settings.publishing.defaultTarget,
+    );
 
     if (target.type !== "webhook") {
         throw new Error("Switch the publish target to Webhook before running a health check.");
