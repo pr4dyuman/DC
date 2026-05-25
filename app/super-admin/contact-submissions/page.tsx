@@ -177,20 +177,15 @@ export default async function ContactSubmissionsPage({ searchParams }: ContactSu
                                     <TableCell className="max-w-44 text-sm text-muted-foreground">
                                         {submission.companyName || "No company"}
                                     </TableCell>
-                                    <TableCell className="min-w-80 max-w-xl">
-                                        <details>
-                                            <summary className="cursor-pointer text-sm text-foreground line-clamp-2">
-                                                {submission.message}
-                                            </summary>
-                                            <div className="mt-3 whitespace-pre-wrap rounded-md bg-muted p-3 text-sm text-foreground">
-                                                {submission.message}
-                                                {submission.emailError && (
-                                                    <div className="mt-3 border-t border-border pt-3 text-xs text-destructive">
-                                                        Email error: {submission.emailError}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </details>
+                                    <TableCell className="min-w-[420px] max-w-2xl">
+                                        <div className="max-h-56 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-muted/60 p-3 text-sm leading-6 text-foreground">
+                                            {submission.message}
+                                            {submission.emailError && (
+                                                <div className="mt-3 border-t border-border pt-3 text-xs leading-5 text-destructive">
+                                                    Email error: {submission.emailError}
+                                                </div>
+                                            )}
+                                        </div>
                                     </TableCell>
                                     <TableCell>{getStatusBadge(submission.userEmailStatus)}</TableCell>
                                     <TableCell>{getStatusBadge(submission.adminEmailStatus)}</TableCell>
