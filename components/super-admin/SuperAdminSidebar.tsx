@@ -15,6 +15,7 @@ import {
     Brain,
     Sparkles,
     BookOpen,
+    MessageSquare,
 } from "lucide-react";
 import { logout } from "@/lib/auth";
 
@@ -25,6 +26,7 @@ const navigation = [
     { name: "Analytics", href: "/super-admin/analytics", icon: BarChart3 },
     { name: "AI Usage", href: "/super-admin/analytics/ai", icon: Brain },
     { name: "AI Blogger", href: "/super-admin/ai-blogger", icon: Sparkles },
+    { name: "Contact Submissions", href: "/super-admin/contact-submissions", icon: MessageSquare },
     { name: "Blog Management", href: "/super-admin/blogs", icon: BookOpen },
     { name: "Billing", href: "/super-admin/billing", icon: CreditCard },
     { name: "System Logs", href: "/super-admin/logs", icon: FileText },

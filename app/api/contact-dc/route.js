@@ -126,6 +126,26 @@ function getEmailDeliveryStatus(result) {
   return result.value?.skipped ? 'skipped' : 'sent';
 }
 
+function getEmailFailureMessage(...results) {
+  const messages = results
+    .filter((result) => result.status === 'rejected')
+    .map((result) => result.reason?.message || String(result.reason || 'Email delivery failed'))
+    .filter(Boolean);
+
+  return messages.join(' | ').slice(0, 1000);
+}
+
+async function updateContactEmailMetadata(contactId, metadata) {
+  try {
+    await Contact.updateOne(
+      { _id: contactId },
+      { $set: metadata }
+    );
+  } catch (metadataError) {
+    console.error('Failed to update contact email metadata:', metadataError);
+  }
+}
+
 export async function POST(request) {
   let json = (body, init) => NextResponse.json(body, init);
 
@@ -239,6 +259,7 @@ export async function POST(request) {
       phone,
       companyName: companyName || '',
       message,
+      source: 'contact_page',
     });
 
     // Send emails concurrently
@@ -264,6 +285,11 @@ export async function POST(request) {
       const userEmailStatus = getEmailDeliveryStatus(userEmailResult);
       const adminEmailStatus = getEmailDeliveryStatus(adminEmailResult);
       const everyEmailFailed = userEmailStatus === 'failed' && adminEmailStatus === 'failed';
+      await updateContactEmailMetadata(contact._id, {
+        userEmailStatus,
+        adminEmailStatus,
+        emailError: getEmailFailureMessage(userEmailResult, adminEmailResult),
+      });
 
       if (everyEmailFailed) {
         // Both emails failed, but contact was saved
@@ -296,6 +322,11 @@ export async function POST(request) {
     } catch (emailError) {
       // Email sending failed, but contact was saved
       console.error('Email error:', emailError);
+      await updateContactEmailMetadata(contact._id, {
+        userEmailStatus: 'failed',
+        adminEmailStatus: 'failed',
+        emailError: (emailError?.message || String(emailError || 'Email delivery failed')).slice(0, 1000),
+      });
       return json(
         {
           success: true,

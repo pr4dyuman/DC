@@ -31,6 +31,28 @@ const ContactSchema = new mongoose.Schema({
     required: [true, 'Please provide a message'],
     minlength: [10, 'Message must be at least 10 characters long'],
   },
+  source: {
+    type: String,
+    default: 'contact_page',
+    trim: true,
+  },
+  userEmailStatus: {
+    type: String,
+    enum: ['pending', 'sent', 'failed', 'skipped'],
+    default: 'pending',
+  },
+  adminEmailStatus: {
+    type: String,
+    enum: ['pending', 'sent', 'failed', 'skipped'],
+    default: 'pending',
+  },
+  emailError: {
+    type: String,
+    trim: true,
+  },
+  readAt: {
+    type: Date,
+  },
 }, { timestamps: true });
 
 const marketingConnection = getMarketingDbConnectionHandle();
