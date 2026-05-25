@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/lib/marketing-db";
 import Blog from "@/models/marketing/Blog";
 import { verifySuperAdmin } from "@/lib/actions/super-admin-shared";
-import { normalizeMarketingCanonicalUrl } from "@/lib/marketing-blog-utils";
+import { normalizeMarketingCanonicalUrl, normalizeMarketingImageSrc } from "@/lib/marketing-blog-utils";
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Validate required fields
-    const required = ["title", "slug", "content", "image", "imageAlt", "shortDescription", "category"];
+    const required = ["title", "slug", "content", "shortDescription", "category"];
     for (const field of required) {
       if (!body[field]) {
         return NextResponse.json(
@@ -46,13 +46,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const normalizedImage = normalizeMarketingImageSrc(body.image || "", "");
+
     // Create new blog
     const blog = new Blog({
       title: body.title,
       slug: body.slug,
       content: body.content,
-      image: body.image,
-      imageAlt: body.imageAlt,
+      image: normalizedImage,
+      imageAlt: normalizedImage ? body.imageAlt || body.title : "",
       shortDescription: body.shortDescription,
       category: body.category,
       status: body.status || "draft",

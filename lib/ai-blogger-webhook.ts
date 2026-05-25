@@ -22,8 +22,8 @@ export type WebhookPayload = {
         metaTitle: string;
         metaDescription: string;
         canonicalUrl: string;
-        image: string;
-        imageAlt: string;
+        image?: string;
+        imageAlt?: string;
         schemaMarkup?: string;
         category: string;
         faqItems?: Array<{
@@ -122,7 +122,8 @@ function isRetryableStatusCode(statusCode: number): boolean {
 }
 
 function toWebhookAttempt(result: WebhookDeliveryResult): WebhookDeliveryResult {
-    const { attempts: _attempts, ...attempt } = result;
+    const attempt = { ...result };
+    delete attempt.attempts;
     return attempt;
 }
 
@@ -404,6 +405,8 @@ export function buildWebhookPayload(
         siteUrl: options?.siteUrl,
         externalSources: post.externalSources,
     });
+    const imageUrl = post.featuredImageUrl?.trim() || "";
+    const imageAlt = imageUrl ? post.featuredImageAlt?.trim() || "" : "";
 
     return {
         event: "blog.published",
@@ -417,8 +420,12 @@ export function buildWebhookPayload(
             metaTitle: post.metaTitle || "",
             metaDescription: post.metaDescription || "",
             canonicalUrl: post.canonicalUrl || "",
-            image: post.featuredImageUrl || "",
-            imageAlt: post.featuredImageAlt || "",
+            ...(imageUrl
+                ? {
+                    image: imageUrl,
+                    imageAlt,
+                }
+                : {}),
             schemaMarkup: post.schemaMarkup,
             category: options?.category || "",
             faqItems: (post.faqItems || [])

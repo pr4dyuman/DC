@@ -22,7 +22,7 @@ const BlogSchema = new mongoose.Schema({
   },
   image: {
     type: String, // URL path to the uploaded image
-    required: [true, 'Please upload an image'],
+    default: '',
   },
   imageAlt: {
     type: String,

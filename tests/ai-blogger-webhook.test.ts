@@ -1,12 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { sendWebhookToAgency, type WebhookPayload } from "../lib/ai-blogger-webhook";
+import { buildWebhookPayload, sendWebhookToAgency, type WebhookPayload } from "../lib/ai-blogger-webhook";
 import {
     contentHasStandaloneFaqSection,
     stripStandaloneFaqSection,
 } from "../lib/marketing-blog-content";
 import type { BlogStudioWebhookConfig } from "../lib/types-ai-blogger";
+import type { BlogStudioPost } from "../lib/types-ai-blogger";
 
 const webhookConfig: BlogStudioWebhookConfig = {
     url: "https://example.com/webhook",
@@ -142,6 +143,79 @@ test("sendWebhookToAgency retries request timeouts", async () => {
             globalThis.fetch = originalFetch;
         }
     });
+});
+
+test("buildWebhookPayload omits image fields when no featured image URL exists", () => {
+    const webhookPayload = buildWebhookPayload(
+        {
+            id: "post-no-image",
+            agencyId: "agency-1",
+            slug: "post-no-image",
+            title: "Post without image",
+            excerpt: "Excerpt",
+            content: "<p>Body</p>",
+            status: "Published",
+            target: { type: "webhook", label: "Webhook" },
+            tags: [],
+            outline: [],
+            brief: {
+                mode: "keywords",
+                sourceMode: "keywords",
+                sourceValue: "test",
+                primaryKeyword: "test",
+                secondaryKeywords: [],
+                tone: "",
+                audience: "",
+                cta: "",
+            },
+            featuredImageAlt: "Generated alt text without an image",
+            createdBy: "user-1",
+            createdAt: "2026-04-12T00:00:00.000Z",
+            updatedAt: "2026-04-12T00:00:00.000Z",
+        } as BlogStudioPost,
+        "agency-1",
+        "Agency",
+    );
+
+    assert.equal(Object.hasOwn(webhookPayload.blog, "image"), false);
+    assert.equal(Object.hasOwn(webhookPayload.blog, "imageAlt"), false);
+});
+
+test("buildWebhookPayload includes image fields when a featured image URL exists", () => {
+    const webhookPayload = buildWebhookPayload(
+        {
+            id: "post-with-image",
+            agencyId: "agency-1",
+            slug: "post-with-image",
+            title: "Post with image",
+            excerpt: "Excerpt",
+            content: "<p>Body</p>",
+            status: "Published",
+            target: { type: "webhook", label: "Webhook" },
+            tags: [],
+            outline: [],
+            brief: {
+                mode: "keywords",
+                sourceMode: "keywords",
+                sourceValue: "test",
+                primaryKeyword: "test",
+                secondaryKeywords: [],
+                tone: "",
+                audience: "",
+                cta: "",
+            },
+            featuredImageUrl: "https://cdn.example.com/hero.jpg",
+            featuredImageAlt: "Hero image",
+            createdBy: "user-1",
+            createdAt: "2026-04-12T00:00:00.000Z",
+            updatedAt: "2026-04-12T00:00:00.000Z",
+        } as BlogStudioPost,
+        "agency-1",
+        "Agency",
+    );
+
+    assert.equal(webhookPayload.blog.image, "https://cdn.example.com/hero.jpg");
+    assert.equal(webhookPayload.blog.imageAlt, "Hero image");
 });
 
 test("stripStandaloneFaqSection removes markdown FAQ blocks but preserves later sections", () => {

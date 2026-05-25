@@ -75,8 +75,12 @@ export async function POST(request: NextRequest) {
         metaKeywords: blog.metaKeywords || "",
         canonicalUrl: blog.canonicalUrl,
         category: blog.category || "AI Blogger",
-        image: blog.image,
-        imageAlt: blog.imageAlt,
+        ...(blog.image
+          ? {
+              image: blog.image,
+              imageAlt: blog.imageAlt || "",
+            }
+          : {}),
         schemaMarkup: blog.schemaMarkup,
         faqItems: blog.faqItems || [],
         externalSources: blog.externalSources || [],
@@ -160,8 +164,12 @@ app.post("/api/webhooks/blog-published", async (req, res) => {
         metaKeywords: blog.metaKeywords || "",
         canonicalUrl: blog.canonicalUrl,
         category: blog.category || "AI Blogger",
-        image: blog.image,
-        imageAlt: blog.imageAlt,
+        ...(blog.image
+          ? {
+              image: blog.image,
+              imageAlt: blog.imageAlt || "",
+            }
+          : {}),
         schemaMarkup: blog.schemaMarkup,
         faqItems: blog.faqItems || [],
         externalSources: blog.externalSources || [],
@@ -239,7 +247,7 @@ def blog_webhook(request):
         "canonical_url": blog.get("canonicalUrl"),
         "category": blog.get("category", "AI Blogger"),
         "image": blog.get("image", ""),
-        "image_alt": blog.get("imageAlt", ""),
+        "image_alt": blog.get("imageAlt", "") if blog.get("image") else "",
         "schema_markup": blog.get("schemaMarkup"),
         "faq_items": blog.get("faqItems", []),
         "external_sources": blog.get("externalSources", []),
@@ -307,7 +315,7 @@ Route::match(['get', 'post'], '/api/webhooks/blog-published', function (Request 
         'canonical_url' => $blog['canonicalUrl'] ?? null,
         'category' => $blog['category'] ?? 'AI Blogger',
         'image' => $blog['image'] ?? '',
-        'image_alt' => $blog['imageAlt'] ?? '',
+        'image_alt' => !empty($blog['image']) ? ($blog['imageAlt'] ?? '') : '',
         'schema_markup' => $blog['schemaMarkup'] ?? null,
         'faq_items' => $blog['faqItems'] ?? [],
         'external_sources' => $blog['externalSources'] ?? [],
@@ -347,8 +355,6 @@ const payloadExample = {
     metaTitle: "Complete Guide to SEO 2026",
     metaDescription: "Master modern SEO with comprehensive guide...",
     canonicalUrl: "https://yoursite.com/blog/complete-guide-seo-2026",
-    image: "https://cdn.example.com/images/seo-guide.jpg",
-    imageAlt: "SEO optimization checklist",
     schemaMarkup: '{"@context": "https://schema.org", "@type": "BlogPosting"...}',
     category: "SEO",
     externalSources: [
@@ -451,6 +457,11 @@ const faqItems = [
     question: "What if one agency publishes to multiple websites?",
     answer:
       "Each website connection has its own webhook URL, secret, and website URL. On publish, the selected website is sent in source.targetKey, source.targetLabel, source.targetWebsiteUrl, and the x-ai-blogger-target-key header.",
+  },
+  {
+    question: "What if image generation is turned off?",
+    answer:
+      "If the post has no generated or uploaded featured image, the webhook payload does not include blog.image or blog.imageAlt. Your receiver should treat those fields as optional.",
   },
   {
     question: "How do I know if webhooks are working?",
@@ -598,7 +609,9 @@ export function WebhookDocumentationModal({
           <section>
             <h3 className="text-lg font-semibold mb-4">Webhook Payload</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Here&apos;s what we send in the POST body when a blog is published:
+              Here&apos;s what we send in the POST body when a blog is published.
+              Image fields are optional and are only included when the post has
+              a generated or uploaded featured image.
             </p>
             <CodeBlock
               code={JSON.stringify(payloadExample, null, 2)}

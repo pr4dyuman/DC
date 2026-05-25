@@ -74,15 +74,15 @@ export function extractInternalLinkTargets(content?: string, siteUrl?: string): 
     const hostnamePattern = escapeRegex(hostname);
     const linkPatterns: Array<{ pattern: RegExp; groupIndex: number }> = [
         {
-            pattern: new RegExp(`\\[[^\\]]+\\]\\((\\/[^)\\s]+|https?:\\/\\/(?:www\\.)?${hostnamePattern}\\/[^)\\s]+)\\)`, "gi"),
+            pattern: new RegExp(`\\[[^\\]]+\\]\\((\\/[^)\\s]*|https?:\\/\\/(?:www\\.)?${hostnamePattern}(?:\\/[^)\\s]*)?)\\)`, "gi"),
             groupIndex: 1,
         },
         {
-            pattern: new RegExp(`href=["'](\\/[^"']+|https?:\\/\\/(?:www\\.)?${hostnamePattern}\\/[^"']+)["']`, "gi"),
+            pattern: new RegExp(`href=["'](\\/[^"']*|https?:\\/\\/(?:www\\.)?${hostnamePattern}(?:\\/[^"']*)?)["']`, "gi"),
             groupIndex: 1,
         },
         {
-            pattern: new RegExp(`https?:\\/\\/(?:www\\.)?${hostnamePattern}\\/[^^\\s)"']+`.replace("[^^", "[^"), "gi"),
+            pattern: new RegExp(`https?:\\/\\/(?:www\\.)?${hostnamePattern}(?:\\/[^\\s)"']*|(?=[\\s)"']))`, "gi"),
             groupIndex: 0,
         },
     ];

@@ -8,7 +8,7 @@ import {
   buildDeletedBlogHrefCandidates,
   stripDeletedBlogLinksFromContent,
 } from "@/lib/marketing-blog-delete-cleanup";
-import { normalizeMarketingCanonicalUrl } from "@/lib/marketing-blog-utils";
+import { normalizeMarketingCanonicalUrl, normalizeMarketingImageSrc } from "@/lib/marketing-blog-utils";
 import { BlogStudioPostModel, connectDB as connectPrimaryDb } from "@/lib/mongodb";
 import { verifySuperAdmin } from "./super-admin-shared";
 
@@ -491,7 +491,7 @@ export async function updateBlog(
     slug: string;
     content: string;
     image: string;
-    imageAlt: string;
+    imageAlt?: string;
     shortDescription: string;
     category: string;
     status: "draft" | "published";
@@ -552,6 +552,13 @@ export async function updateBlog(
       }
 
       updates.canonicalUrl = normalizedCanonicalUrl || undefined;
+    }
+
+    if (updates.image !== undefined) {
+      updates.image = normalizeMarketingImageSrc(updates.image, "");
+      if (!updates.image) {
+        updates.imageAlt = "";
+      }
     }
 
     // Set publishedAt based on status

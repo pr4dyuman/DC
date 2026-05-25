@@ -199,6 +199,8 @@ function isLowValueTrendQuery(value: string) {
 
     if (
         /\b(?:home|login|dashboard|copy body|copy meta|draft status|publishing status)\b/i.test(query) ||
+        /\$\{|\bAI_BLOGGER_WEBHOOK_SECRET\b/i.test(query) ||
+        /\b(?:first published AI Blogger file|published AI Blogger dispatches|webhook receives a post|webhook delivery status|shared webhook secret|same shared secret|copy\s+\$?\{?nextStatus|PUBLISH'\s*:\s*'UNPUBLISH)\b/i.test(query) ||
         /[.!?]$/.test(query) ||
         /\b(?:before drafting begins|in one place|workflow for planning|status in one place)\b/i.test(query)
     ) {
@@ -808,11 +810,6 @@ function buildTrendScanPlan(location: string, fitHints: string[], maxRequests: n
     }
 
     plan.push({ geo: primaryGeo, hours: 48, onlyActive: false });
-
-    if (primaryGeo && primaryGeo !== "US") {
-        plan.push({ geo: "US", hours: 24, onlyActive: true });
-        plan.push({ geo: "US", hours: 48, onlyActive: true });
-    }
 
     const seen = new Set<string>();
     return plan

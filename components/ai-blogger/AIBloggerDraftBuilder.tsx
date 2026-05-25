@@ -1510,6 +1510,22 @@ export function AIBloggerDraftBuilder({
         () => getStrategyResearchStack(sourceMode, trendPlan, serpPlan, groundedResearchPlan),
         [groundedResearchPlan, serpPlan, sourceMode, trendPlan],
     );
+    const generationLocation = useMemo(
+        () =>
+            (
+                (trendPlan.liveTrendsEnabled ? trendPlan.defaultLocation?.trim() : "") ||
+                (serpPlan.enabled ? serpPlan.defaultLocation?.trim() : "") ||
+                settings.seo.defaultLocation?.trim() ||
+                "us"
+            ).toLowerCase(),
+        [
+            serpPlan.defaultLocation,
+            serpPlan.enabled,
+            settings.seo.defaultLocation,
+            trendPlan.defaultLocation,
+            trendPlan.liveTrendsEnabled,
+        ],
+    );
     const strategySeoSummary = useMemo(
         () => getStrategySeoSummary(settings, publishRulesPlan),
         [publishRulesPlan, settings],
@@ -1706,7 +1722,7 @@ export function AIBloggerDraftBuilder({
                 trendFocus,
                 primaryKeyword,
                 language: settings.seo.defaultLanguage,
-                location: settings.seo.defaultLocation,
+                location: generationLocation,
                 // Only pass targetWebsiteUrl for non-website modes
                 ...(sourceMode !== "website" && targetWebsiteUrl.trim()
                     ? { targetWebsiteUrl: targetWebsiteUrl.trim() }
@@ -1772,7 +1788,7 @@ export function AIBloggerDraftBuilder({
                     trendFocus,
                     primaryKeyword,
                     language: settings.seo.defaultLanguage,
-                    location: settings.seo.defaultLocation,
+                    location: generationLocation,
                     // Only pass targetWebsiteUrl for non-website modes
                     ...(sourceMode !== "website" && targetWebsiteUrl.trim()
                         ? { targetWebsiteUrl: targetWebsiteUrl.trim() }

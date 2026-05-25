@@ -11,46 +11,55 @@ import {
 } from "@/lib/marketing-blog-utils";
 
 function FeaturedPost({ post }) {
-  const normalizedImageSrc = normalizeMarketingImageSrc(post.image);
-  const useNativeImage = isRemoteMarketingImageSrc(normalizedImageSrc);
-  const isSvgImage = isSvgMarketingImageSrc(normalizedImageSrc);
+  const normalizedImageSrc = normalizeMarketingImageSrc(post.image, "");
+  const isDefaultImage = normalizedImageSrc?.includes("ai-blogger.svg");
+  const hasImage = Boolean(normalizedImageSrc) && !isDefaultImage;
+  const useNativeImage = hasImage && isRemoteMarketingImageSrc(normalizedImageSrc);
+  const isSvgImage = hasImage && isSvgMarketingImageSrc(normalizedImageSrc);
 
   return (
     <Link href={`/blog/${post.slug}`} className="group block">
-      <article className="grid overflow-hidden rounded-[32px] border border-white/10 bg-[#070707] lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="relative min-h-[320px] border-b border-white/10 lg:min-h-[520px] lg:border-b-0 lg:border-r">
-          {useNativeImage ? (
-            <img
-              src={normalizedImageSrc}
-              alt={post.imageAlt || post.title}
-              loading="eager"
-              fetchPriority="high"
-              decoding="async"
-              className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
-            />
-          ) : (
-            <Image
-              src={normalizedImageSrc}
-              alt={post.imageAlt || post.title}
-              fill
-              priority
-              fetchPriority="high"
-              sizes="(min-width: 1024px) 58vw, 100vw"
-              className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
-              unoptimized={isSvgImage}
-            />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/25 to-transparent" />
-          <div className="absolute left-6 top-6">
-            <span className="inline-flex items-center rounded-full bg-[#F5EE30] px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.22em] text-black">
-              Featured
-            </span>
+      <article className={`grid overflow-hidden rounded-[32px] border border-white/10 bg-[#070707] ${hasImage ? "lg:grid-cols-[1.15fr_0.85fr]" : ""}`}>
+        {hasImage ? (
+          <div className="relative min-h-[320px] border-b border-white/10 lg:min-h-[520px] lg:border-b-0 lg:border-r">
+            {useNativeImage ? (
+              <img
+                src={normalizedImageSrc}
+                alt={post.imageAlt || post.title}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+              />
+            ) : (
+              <Image
+                src={normalizedImageSrc}
+                alt={post.imageAlt || post.title}
+                fill
+                priority
+                fetchPriority="high"
+                sizes="(min-width: 1024px) 58vw, 100vw"
+                className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                unoptimized={isSvgImage}
+              />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/25 to-transparent" />
+            <div className="absolute left-6 top-6">
+              <span className="inline-flex items-center rounded-full bg-[#F5EE30] px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.22em] text-black">
+                Featured
+              </span>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="relative flex flex-col justify-between p-7 md:p-10">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,_rgba(245,238,48,0.18),_transparent_50%)]" />
           <div className="relative">
+            {!hasImage ? (
+              <span className="mb-6 inline-flex items-center rounded-full bg-[#F5EE30] px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.22em] text-black">
+                Featured
+              </span>
+            ) : null}
             <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.22em] text-gray-400">
               {post.date || "LATEST INSIGHT"} | {post.category}
             </p>

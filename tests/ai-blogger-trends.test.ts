@@ -470,6 +470,47 @@ test("website trend-first returns live topics without auto-selecting an unrelate
     }
 });
 
+test("trend-first scan respects non-US configured location without adding US fallback", async () => {
+    const originalFetch = globalThis.fetch;
+    const requestedGeos: string[] = [];
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+        const url = new URL(String(input));
+        requestedGeos.push(url.searchParams.get("geo") || "");
+
+        return new Response(
+            JSON.stringify({ trending_searches: [] }),
+            {
+                status: 200,
+                headers: { "content-type": "application/json" },
+            },
+        );
+    }) as typeof fetch;
+
+    try {
+        await assert.rejects(
+            () => fetchAIBloggerTrendSignals({
+                config: {
+                    ...trendsConfig,
+                    maxTrendRequestsPerBlog: 8,
+                },
+                sourceMode: "website",
+                sourceValue: "https://example.com",
+                trendFocus: "",
+                primaryKeyword: "",
+                location: "in",
+                fallbackCandidates: ["investigative media", "public accountability"],
+            }),
+            /will not invent topics/i,
+        );
+
+        assert.ok(requestedGeos.length > 0);
+        assert.deepEqual(Array.from(new Set(requestedGeos)), ["IN"]);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
 test("website mode switches to site-led discovery when live trends miss website fit", () => {
     const unrelatedTrends = buildTrendSignals([
         {

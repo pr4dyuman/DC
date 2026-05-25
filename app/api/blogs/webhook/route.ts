@@ -29,8 +29,8 @@ type IncomingWebhookPayload = {
         metaTitle: string;
         metaDescription: string;
         canonicalUrl: string;
-        image: string;
-        imageAlt: string;
+        image?: string;
+        imageAlt?: string;
         schemaMarkup?: string;
         category?: string;
         faqItems?: Array<{
@@ -425,7 +425,6 @@ function validateWebhookPayload(payload: unknown): payload is IncomingWebhookPay
         "metaTitle",
         "metaDescription",
         "canonicalUrl",
-        "image",
         "publishedAt",
     ];
     if (!requiredStringFields.every((field) => hasNonEmptyString(blog[field]))) {
@@ -577,7 +576,7 @@ export async function POST(request: NextRequest) {
         await dbConnect();
 
         // Prepare blog data
-        const normalizedImage = normalizeMarketingImageSrc(payload.blog.image);
+        const normalizedImage = normalizeMarketingImageSrc(payload.blog.image, "");
         const normalizedCanonicalUrl = normalizeMarketingCanonicalUrl(
             payload.blog.canonicalUrl,
             payload.blog.slug,
@@ -644,7 +643,9 @@ export async function POST(request: NextRequest) {
             slug: payload.blog.slug,
             content: normalizedContent,
             image: normalizedImage,
-            imageAlt: normalizeBrandSpelling(payload.blog.imageAlt || payload.blog.title),
+            imageAlt: normalizedImage
+                ? normalizeBrandSpelling(payload.blog.imageAlt || payload.blog.title)
+                : "",
             shortDescription: normalizeBrandSpelling(payload.blog.excerpt),
             category: normalizeBrandSpelling(payload.blog.category || "AI Blogger"),
             status: "published",

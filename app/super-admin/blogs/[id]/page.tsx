@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
-import { Loader2, Trash2, ArrowLeft, Eye } from "lucide-react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { Loader2, Trash2, ArrowLeft, Eye, Upload, XCircle } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
@@ -74,6 +74,66 @@ const CATEGORIES = [
   "Other",
 ];
 
+const IMAGE_UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
+const IMAGE_UPLOAD_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+
+function validateBlogImageFile(file: File) {
+  if (!IMAGE_UPLOAD_TYPES.has(file.type)) {
+    throw new Error("Upload a JPG, PNG, GIF, or WebP image.");
+  }
+
+  if (file.size > IMAGE_UPLOAD_MAX_BYTES) {
+    throw new Error("Image must be 50MB or smaller.");
+  }
+}
+
+async function uploadBlogImageFile(
+  file: File,
+  onProgress: (value: number) => void,
+) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return new Promise<string>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.addEventListener("progress", (event) => {
+      if (!event.lengthComputable) {
+        return;
+      }
+
+      onProgress(Math.round((event.loaded / event.total) * 100));
+    });
+
+    xhr.addEventListener("load", () => {
+      try {
+        const payload = JSON.parse(xhr.responseText) as {
+          success?: boolean;
+          url?: string;
+          error?: string;
+        };
+
+        if (xhr.status >= 200 && xhr.status < 300 && payload.success && payload.url) {
+          resolve(payload.url);
+          return;
+        }
+
+        reject(new Error(payload.error || "Image upload failed."));
+      } catch {
+        reject(new Error("Image upload failed."));
+      }
+    });
+
+    xhr.addEventListener("error", () => reject(new Error("Network error while uploading the image.")));
+    xhr.addEventListener("abort", () => reject(new Error("Image upload was cancelled.")));
+    xhr.addEventListener("timeout", () => reject(new Error("Image upload timed out.")));
+
+    xhr.open("POST", "/api/super-admin/blogs/image");
+    xhr.timeout = 120000;
+    xhr.send(formData);
+  });
+}
+
 function toBlogData(data: BlogDataInput): BlogData {
   return {
     _id: data._id,
@@ -130,6 +190,9 @@ export default function BlogEditorPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [seoErrors, setSeoErrors] = useState<string[]>([]);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageUploadProgress, setImageUploadProgress] = useState(0);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   // Load blog if editing
   useEffect(() => {
@@ -173,6 +236,44 @@ export default function BlogEditorPage() {
     },
     [isNewBlog, blog.slug]
   );
+
+  const handleImageUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      validateBlogImageFile(file);
+      setImageUploading(true);
+      setImageUploadProgress(0);
+      const uploadedUrl = await uploadBlogImageFile(file, setImageUploadProgress);
+      setBlog((prev) => ({
+        ...prev,
+        image: uploadedUrl,
+        imageAlt: prev.imageAlt || prev.title || file.name.replace(/\.[^.]+$/, ""),
+      }));
+      setImageUploadProgress(100);
+      toast.success("Featured image uploaded. Save the blog to apply it.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to upload image";
+      toast.error(message);
+    } finally {
+      setImageUploading(false);
+    }
+  }, []);
+
+  const handleRemoveImage = useCallback(() => {
+    setBlog((prev) => ({
+      ...prev,
+      image: "",
+      imageAlt: "",
+    }));
+    setImageUploadProgress(0);
+    toast.success("Featured image removed. Save the blog to apply it.");
+  }, []);
 
   const handleSave = useCallback(
     async (newStatus?: "draft" | "published") => {
@@ -443,7 +544,7 @@ export default function BlogEditorPage() {
 
               {/* Image */}
               <div>
-                <Label htmlFor="image">Featured Image URL *</Label>
+                <Label htmlFor="image">Featured Image URL</Label>
                 <Input
                   id="image"
                   value={blog.image}
@@ -451,6 +552,46 @@ export default function BlogEditorPage() {
                   placeholder="https://example.com/image.jpg"
                   className="mt-2"
                 />
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={imageUploading}
+                  >
+                    {imageUploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                    {imageUploading ? `Uploading ${imageUploadProgress}%` : "Upload image"}
+                  </Button>
+                  {blog.image ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 text-destructive hover:text-destructive"
+                      onClick={handleRemoveImage}
+                      disabled={imageUploading}
+                    >
+                      <XCircle className="h-4 w-4" />
+                      Remove image
+                    </Button>
+                  ) : null}
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Optional. Upload JPG, PNG, GIF, or WebP, or paste an existing image URL.
+                </p>
                 {blog.image && (
                   <div className="mt-2 rounded-lg overflow-hidden h-40">
                     <picture>
@@ -462,7 +603,7 @@ export default function BlogEditorPage() {
 
               {/* Image Alt */}
               <div>
-                <Label htmlFor="imageAlt">Image Alt Text *</Label>
+                <Label htmlFor="imageAlt">Image Alt Text</Label>
                 <Input
                   id="imageAlt"
                   value={blog.imageAlt}

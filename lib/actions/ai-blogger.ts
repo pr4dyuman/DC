@@ -1393,7 +1393,7 @@ function extractTrackedInternalLinksFromContent(content: string, siteUrl?: strin
     const patterns = [
         /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
         new RegExp(
-            `\\[([^\\]]+)\\]\\((\\/[^)\\s]+${hostnamePattern ? `|https?:\\/\\/(?:www\\.)?${hostnamePattern}\\/[^)\\s]+` : ""})\\)`,
+            `\\[([^\\]]+)\\]\\((\\/[^)\\s]*${hostnamePattern ? `|https?:\\/\\/(?:www\\.)?${hostnamePattern}(?:\\/[^)\\s]*)?` : ""})\\)`,
             "gi",
         ),
     ];
@@ -6236,9 +6236,25 @@ function looksLikeAdCopySentence(value: string) {
     );
 }
 
+function looksLikeInternalAIBloggerAdminCopy(value: string) {
+    const normalized = sanitizeText(value, 240);
+    if (!normalized) {
+        return false;
+    }
+
+    return (
+        /\$\{|\bAI_BLOGGER_WEBHOOK_SECRET\b/i.test(normalized) ||
+        /\b(?:first published AI Blogger file|published AI Blogger dispatches|webhook receives a post|webhook delivery status|shared webhook secret|same shared secret|copy\s+\$?\{?nextStatus|PUBLISH'\s*:\s*'UNPUBLISH)\b/i.test(normalized)
+    );
+}
+
 function isUsableAuthoritySeed(value: string, websiteIntelligence: AIBloggerWebsiteIntelligence | null | undefined) {
     const normalized = sanitizeText(value, 140);
     if (!normalized) {
+        return false;
+    }
+
+    if (looksLikeInternalAIBloggerAdminCopy(normalized)) {
         return false;
     }
 
@@ -8867,6 +8883,10 @@ function topicLooksLikeMalformedTrendCandidate(topic: string, websiteIntelligenc
     }
 
     if (/\b(?:free|release|download|login|sign in)\??$/i.test(normalized) && looksLikeBrandTagline(normalized, websiteIntelligence)) {
+        return true;
+    }
+
+    if (looksLikeInternalAIBloggerAdminCopy(normalized)) {
         return true;
     }
 
@@ -15370,23 +15390,37 @@ export function validateBlogStudioPublishPackage(
     }
 
     // ─── Internal links checks ───────────────────────────────────
-    const internalLinkMapCount = post.internalLinks?.length || 0;
     const contentSiteUrl =
         resolveBlogStudioSiteUrl({
             canonicalUrl: post.canonicalUrl,
             brief: post.brief,
         }) || undefined;
+    const storedInternalLinks = post.internalLinks || [];
+    const inferredBodyInternalLinks = buildTrackedInternalLinksFromContent(
+        content,
+        [],
+        contentSiteUrl,
+        Math.max(8, storedInternalLinks.length + 4),
+    );
+    const effectiveInternalLinks = sanitizePostInternalLinks(
+        [
+            ...storedInternalLinks,
+            ...inferredBodyInternalLinks,
+        ],
+        Math.max(8, storedInternalLinks.length + inferredBodyInternalLinks.length),
+    );
+    const internalLinkMapCount = effectiveInternalLinks.length;
     const bodyInternalLinkCount = countInternalLinks(content, contentSiteUrl);
     const bodyInternalLinkTargets = extractInternalLinkTargets(content, contentSiteUrl);
     const trackedInternalLinkTargets = new Set(
-        (post.internalLinks || [])
+        effectiveInternalLinks
             .map((link) => normalizeInternalLinkHref(link.href, contentSiteUrl) || link.href.trim())
             .filter(Boolean),
     );
     const trackedBodyInternalLinkCount = bodyInternalLinkTargets.filter((href) =>
         trackedInternalLinkTargets.has(href),
     ).length;
-    const nonBlogTrackedLinkCount = (post.internalLinks || []).filter((link) =>
+    const nonBlogTrackedLinkCount = effectiveInternalLinks.filter((link) =>
         link.source !== "blog" && !/^\/(?:blog|blogs|articles?|resources?|news|insights)(?:\/|$)/i.test(
             normalizeInternalLinkHref(link.href, contentSiteUrl) || link.href.trim(),
         ),
@@ -20815,7 +20849,12 @@ export async function generateBlogStudioDraftImpl(
                 discoveryStage = searchConsolePriorityDiscovery.stage;
                 blogLogOutput("DISCOVERY (search-console-priority)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
             } else {
-                blogLogStep("TREND-MINER", "Search Console rising queries did not produce a qualified website-fit topic; checking Google Trends next.");
+                blogLogStep(
+                    "TREND-MINER",
+                    liveTrendsConfig?.enabled
+                        ? "Search Console rising queries did not produce a qualified website-fit topic; checking Google Trends next."
+                        : "Search Console rising queries did not produce a qualified website-fit topic; Google Trends is off, so checking website-led backup discovery next.",
+                );
             }
         }
 
@@ -21119,11 +21158,26 @@ export async function generateBlogStudioDraftImpl(
                 discoveryStage = internetFallbackDiscovery.stage;
                 blogLogOutput(`DISCOVERY (${internetFallbackDiscovery.source}-no-live-trends)`, discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
             } else if (brief.sourceMode === "website") {
-                throw new WebsiteTrendDiscoveryNoFitError(
-                    buildNoWebsiteFitTrendDiscoveryMessage(
-                        "Live Google Trends was not used and backup trend discovery did not find a website-fit topic.",
-                    ),
+                topicOpportunityWarning = "Live Google Trends is off and backup trend discovery did not find a qualified website-fit topic; proceeding with website-led AI discovery.";
+                discoverySummary = `${topicOpportunityWarning} Discovery will use the fresh website crawl, authority lanes, internal-link support, and recent-topic exclusions instead of forcing a live trend.`;
+                fetchTrendsSource = "ai-only-discovery";
+                blogLogStep("TREND-MINER", discoverySummary);
+                if (jobId) {
+                    void emitPipelineEvent(jobId, {
+                        type: "log",
+                        step: "fetch-trends",
+                        label: "Topic Opportunity Gate",
+                        message: topicOpportunityWarning,
+                    });
+                }
+                blogLogInput("DISCOVERY (website-ai-no-live-trends)", aiOnlyDiscoveryPrompt);
+                discoveryStage = await runAIBloggerStage(
+                    aiConfig,
+                    aiBloggerConfig,
+                    "extractKeywords",
+                    aiOnlyDiscoveryPrompt,
                 );
+                blogLogOutput("DISCOVERY (website-ai-no-live-trends)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
             } else if (brief.sourceMode === "trending") {
                 throw new Error("Trend Assisted mode requires live Google Trends. No draft was generated because no live trending topic was available.");
             } else {
@@ -24743,7 +24797,12 @@ export async function runBlogStudioDraftResearchPhase(
                 discoveryStage = searchConsolePriorityDiscovery.stage;
                 blogLogOutput("DISCOVERY (search-console-priority)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
             } else {
-                blogLogStep("TREND-MINER", "Search Console rising queries did not produce a qualified website-fit topic; checking Google Trends next.");
+                blogLogStep(
+                    "TREND-MINER",
+                    liveTrendsConfig?.enabled
+                        ? "Search Console rising queries did not produce a qualified website-fit topic; checking Google Trends next."
+                        : "Search Console rising queries did not produce a qualified website-fit topic; Google Trends is off, so checking website-led backup discovery next.",
+                );
             }
         }
 
@@ -25046,11 +25105,26 @@ export async function runBlogStudioDraftResearchPhase(
                 discoveryStage = internetFallbackDiscovery.stage;
                 blogLogOutput(`DISCOVERY (${internetFallbackDiscovery.source}-no-live-trends)`, discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
             } else if (brief.sourceMode === "website") {
-                throw new WebsiteTrendDiscoveryNoFitError(
-                    buildNoWebsiteFitTrendDiscoveryMessage(
-                        "Live Google Trends was not used and backup trend discovery did not find a website-fit topic.",
-                    ),
+                topicOpportunityWarning = "Live Google Trends is off and backup trend discovery did not find a qualified website-fit topic; proceeding with website-led AI discovery.";
+                discoverySummary = `${topicOpportunityWarning} Discovery will use the fresh website crawl, authority lanes, internal-link support, and recent-topic exclusions instead of forcing a live trend.`;
+                fetchTrendsSource = "ai-only-discovery";
+                blogLogStep("TREND-MINER", discoverySummary);
+                if (jobId) {
+                    void emitPipelineEvent(jobId, {
+                        type: "log",
+                        step: "fetch-trends",
+                        label: "Topic Opportunity Gate",
+                        message: topicOpportunityWarning,
+                    });
+                }
+                blogLogInput("DISCOVERY (website-ai-no-live-trends)", aiOnlyDiscoveryPrompt);
+                discoveryStage = await runAIBloggerStage(
+                    aiConfig,
+                    aiBloggerConfig,
+                    "extractKeywords",
+                    aiOnlyDiscoveryPrompt,
                 );
+                blogLogOutput("DISCOVERY (website-ai-no-live-trends)", discoveryStage.text, { tokens: discoveryStage.tokens, usedFallback: discoveryStage.usedFallback });
             } else if (brief.sourceMode === "trending") {
                 throw new Error("Trend Assisted mode requires live Google Trends. No draft was generated because no live trending topic was available.");
             } else {
@@ -29145,10 +29219,9 @@ export async function publishBlogStudioPostImpl(
         buildMetaDescription("", resolvedExcerpt, content, resolvedTitle),
     );
     const resolvedImageAlt = normalizeMarketingBrandSpelling(currentPost.featuredImageAlt?.trim() || resolvedTitle);
-    const resolvedImageUrl = toAbsoluteMarketingImageUrl(
-        currentPost.featuredImageUrl?.trim() ||
-        `${MARKETING_SITE_URL.replace(/\/+$/, "")}/ai-blogger.svg`,
-    ) || `${MARKETING_SITE_URL.replace(/\/+$/, "")}/ai-blogger.svg`;
+    const resolvedImageUrl = currentPost.featuredImageUrl?.trim()
+        ? toAbsoluteMarketingImageUrl(currentPost.featuredImageUrl.trim()) || ""
+        : "";
     const resolvedFaqItems = buildMarketingBlogFaqItems(currentPost);
     const resolvedCategory = getMarketingCategory(currentPost);
     const resolvedKeywords = getMarketingMetaKeywords(currentPost);

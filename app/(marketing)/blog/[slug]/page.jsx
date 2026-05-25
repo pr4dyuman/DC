@@ -64,6 +64,15 @@ function getBlogSocialImageUrl(value) {
   return /^https?:\/\//i.test(imageUrl) ? imageUrl : marketingAbsoluteUrl(imageUrl);
 }
 
+function getBlogArticleImageUrl(value) {
+  const imageUrl = toAbsoluteMarketingImageUrl(value, "");
+  if (!imageUrl) {
+    return "";
+  }
+
+  return /^https?:\/\//i.test(imageUrl) ? imageUrl : marketingAbsoluteUrl(imageUrl);
+}
+
 function stripHtml(value = "") {
   return value
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -458,7 +467,7 @@ function preferBlogPostingSchemaType(value) {
 function buildFallbackSchemaMarkup(blog) {
   const canonicalUrl =
     normalizeMarketingCanonicalUrl(blog.canonicalUrl, blog.slug) || getBlogUrl(blog.slug);
-  const imageUrl = getBlogSocialImageUrl(blog.image);
+  const imageUrl = getBlogArticleImageUrl(blog.image);
   const description = getBlogDescription(blog);
   const publishedAt = blog.publishedAt || blog.createdAt;
   const updatedAt = blog.updatedAt || publishedAt;
@@ -653,7 +662,7 @@ async function getBlog(slug) {
     return {
       ...blog,
       _id: blog._id.toString(),
-      image: normalizeMarketingImageSrc(blog.image),
+      image: normalizeMarketingImageSrc(blog.image, ""),
       canonicalUrl: normalizeMarketingCanonicalUrl(blog.canonicalUrl, blog.slug),
       publishedAt: toIsoDate(blog.publishedAt),
       createdAt: toIsoDate(blog.createdAt) || new Date().toISOString(),
@@ -775,9 +784,9 @@ export default async function BlogPost({ params }) {
   const readTime = getReadTimeLabel(contentWithoutInlineFaq || post.content);
   const relatedServiceLinks = getRelatedServiceLinks(post);
 
-  const heroImageSrc = normalizeMarketingImageSrc(post.image);
+  const heroImageSrc = normalizeMarketingImageSrc(post.image, "");
   const isDefaultImage = heroImageSrc?.includes("ai-blogger.svg");
-  const showImage = heroImageSrc && !isDefaultImage;
+  const showImage = Boolean(heroImageSrc) && !isDefaultImage;
   const useNativeHeroImage = isRemoteMarketingImageSrc(heroImageSrc);
   const isSvgHeroImage = isSvgMarketingImageSrc(heroImageSrc);
 

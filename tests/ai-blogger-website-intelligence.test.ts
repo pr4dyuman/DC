@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { extractInternalLinkTargets } from "../lib/ai-blogger-internal-link-utils";
+import { countInternalLinks, extractInternalLinkTargets } from "../lib/ai-blogger-internal-link-utils";
 
 function htmlResponse(body: string) {
     return new Response(body, {
@@ -25,6 +25,31 @@ test("extractInternalLinkTargets keeps relative product and collection links on 
         targets.sort(),
         ["/collections/running-shoes", "/products/pegasus-41"],
     );
+});
+
+test("extractInternalLinkTargets counts homepage links as internal targets", () => {
+    const targets = extractInternalLinkTargets(
+        [
+            "Read the [homepage](https://shop.example.com/) first.",
+            "<a href=\"/\">Home</a>",
+            "Visit https://shop.example.com for more context.",
+        ].join("\n"),
+        "https://shop.example.com",
+    );
+
+    assert.deepEqual(targets, ["/"]);
+});
+
+test("countInternalLinks includes homepage plus deeper same-domain pages", () => {
+    const count = countInternalLinks(
+        [
+            "Read the [homepage](https://shop.example.com/).",
+            "Then browse [dispatches](https://shop.example.com/blog).",
+        ].join("\n"),
+        "https://shop.example.com",
+    );
+
+    assert.equal(count, 2);
 });
 
 test("website intelligence classifies ecommerce collection, product, and brand pages", async () => {
