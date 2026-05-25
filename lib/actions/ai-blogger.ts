@@ -70,6 +70,7 @@ import { validatePublishedMetadata, formatMetadataValidationResult } from "../ai
 import { sendWebhookToAgency, buildWebhookPayload, logWebhookDelivery, pingWebhookEndpoint } from "../ai-blogger-webhook";
 import {
     fetchAIBloggerKeywordTrendResult,
+    fetchAIBloggerTrendNewsSources,
     fetchAIBloggerTrendSignals,
     type AIBloggerKeywordTrendResult,
     type AIBloggerTrendSignals,
@@ -10857,6 +10858,63 @@ function getMatchingViralTrend(
     return bestMatch;
 }
 
+async function getTrendNewsGroundingUrls(input: {
+    selectedTopic: string;
+    trendSignals: AIBloggerTrendSignals | null;
+    trendsConfig: AIBloggerConfig["trends"] | undefined;
+}) {
+    const matchingTrend = getMatchingViralTrend(input.selectedTopic, input.trendSignals?.viralTrends)?.trend;
+    if (!matchingTrend?.newsPageToken || input.trendsConfig?.enabled === false) {
+        return {
+            urls: [] as string[],
+            sourceCount: 0,
+            usedFallbackKey: false,
+            error: "",
+        };
+    }
+
+    try {
+        const newsResult = await fetchAIBloggerTrendNewsSources(matchingTrend, input.trendsConfig, {
+            timeoutMs: 10_000,
+        });
+        return {
+            urls: sanitizeStringArray(
+                newsResult.sources.map((source) => source.link),
+                6,
+                500,
+            ),
+            sourceCount: newsResult.sources.length,
+            usedFallbackKey: newsResult.usedFallbackKey,
+            error: "",
+        };
+    } catch (error) {
+        return {
+            urls: [] as string[],
+            sourceCount: 0,
+            usedFallbackKey: false,
+            error: sanitizeText(getErrorMessage(error), 220),
+        };
+    }
+}
+
+function mergeGroundingSourceUrls(...urlGroups: Array<string[] | undefined>) {
+    const seen = new Set<string>();
+    const urls: string[] = [];
+
+    for (const url of urlGroups.flatMap((group) => group || [])) {
+        const cleanUrl = sanitizeText(url, 500);
+        const key = cleanUrl.toLowerCase();
+        if (!cleanUrl || seen.has(key)) {
+            continue;
+        }
+
+        seen.add(key);
+        urls.push(cleanUrl);
+    }
+
+    return urls;
+}
+
 function topicLooksTooBroadForWebsite(topic: string) {
     const tokens = tokenizeTopicSelection(topic);
     return tokens.length > 0 && tokens.length <= 3 && !topicHasSpecificityCue(topic);
@@ -21588,8 +21646,26 @@ export async function generateBlogStudioDraftImpl(
 
             let groundedResearchDiagnostics: GroundedSourceFetchDiagnostic[] = [];
             let groundedResearchDiagnosticsSummary = "";
+            let groundedResearchSourceUrlCount = serpAnalysis?.topResultUrls?.length || 0;
 
             try {
+                const trendNewsGrounding = await getTrendNewsGroundingUrls({
+                    selectedTopic: selectedTopicForRun,
+                    trendSignals: capturedTrendSignals,
+                    trendsConfig: liveTrendsConfig,
+                });
+                const groundingSourceUrls = mergeGroundingSourceUrls(
+                    trendNewsGrounding.urls,
+                    serpAnalysis?.topResultUrls,
+                );
+                groundedResearchSourceUrlCount = groundingSourceUrls.length;
+                if (trendNewsGrounding.error) {
+                    blogLogStep("GROUNDED-RESEARCH", "Trend news source fetch skipped", {
+                        topic: selectedTopicForRun,
+                        error: trendNewsGrounding.error,
+                    });
+                }
+
                 const groundedResearchResult = await getAIBloggerGroundedResearch(selectedTopicForRun, {
                     agencyId: agency.id,
                     location: resolveExternalSearchLocation(
@@ -21598,7 +21674,7 @@ export async function generateBlogStudioDraftImpl(
                         settings.seo.defaultLocation,
                     ),
                     refreshWindowHours: aiBloggerConfig?.groundedResearch?.refreshWindowHours || 24,
-                    sourceUrls: serpAnalysis?.topResultUrls,
+                    sourceUrls: groundingSourceUrls,
                     groundedResearchConfig: aiBloggerConfig?.groundedResearch,
                 });
 
@@ -21726,7 +21802,7 @@ export async function generateBlogStudioDraftImpl(
             }
 
             // Flag whether grounded research was actually attempted (not just disabled)
-            const groundedResearchAttempted = groundedResearchStepStatus !== "skipped" || (serpAnalysis?.topResultUrls?.length || 0) > 0;
+            const groundedResearchAttempted = groundedResearchStepStatus !== "skipped" || groundedResearchSourceUrlCount > 0;
 
             // Log Step 4: Grounded Research
             if (jobId) {
@@ -21738,7 +21814,7 @@ export async function generateBlogStudioDraftImpl(
                 await generationLogger.logStep(
                     4,
                     "Grounded Research",
-                    { topic: selectedTopicForRun, sourceUrls: serpAnalysis?.topResultUrls?.length || 0 },
+                    { topic: selectedTopicForRun, sourceUrls: groundedResearchSourceUrlCount },
                     {
                         startedAt: groundedResearchStepStartedAt,
                         completedAt: step4EndTime,
@@ -25531,8 +25607,26 @@ export async function runBlogStudioDraftResearchPhase(
             emitStepStart("grounded-research", "Grounded Research");
             let groundedResearchDiagnostics: GroundedSourceFetchDiagnostic[] = [];
             let groundedResearchDiagnosticsSummary = "";
+            let groundedResearchSourceUrlCount = serpAnalysis?.topResultUrls?.length || 0;
 
             try {
+                const trendNewsGrounding = await getTrendNewsGroundingUrls({
+                    selectedTopic: selectedTopicForRun,
+                    trendSignals: capturedTrendSignals,
+                    trendsConfig: liveTrendsConfig,
+                });
+                const groundingSourceUrls = mergeGroundingSourceUrls(
+                    trendNewsGrounding.urls,
+                    serpAnalysis?.topResultUrls,
+                );
+                groundedResearchSourceUrlCount = groundingSourceUrls.length;
+                if (trendNewsGrounding.error) {
+                    blogLogStep("GROUNDED-RESEARCH", "Trend news source fetch skipped", {
+                        topic: selectedTopicForRun,
+                        error: trendNewsGrounding.error,
+                    });
+                }
+
                 const groundedResearchResult = await getAIBloggerGroundedResearch(selectedTopicForRun, {
                     agencyId: agency.id,
                     location: resolveExternalSearchLocation(
@@ -25541,7 +25635,7 @@ export async function runBlogStudioDraftResearchPhase(
                         settings.seo.defaultLocation,
                     ),
                     refreshWindowHours: aiBloggerConfig?.groundedResearch?.refreshWindowHours || 24,
-                    sourceUrls: serpAnalysis?.topResultUrls,
+                    sourceUrls: groundingSourceUrls,
                     groundedResearchConfig: aiBloggerConfig?.groundedResearch,
                 });
 
@@ -25666,7 +25760,7 @@ export async function runBlogStudioDraftResearchPhase(
                 );
             }
 
-            const groundedResearchAttempted = groundedResearchStepStatus !== "skipped" || (serpAnalysis?.topResultUrls?.length || 0) > 0;
+            const groundedResearchAttempted = groundedResearchStepStatus !== "skipped" || groundedResearchSourceUrlCount > 0;
 
             if (jobId) {
                 const groundedResearchEndTime = getNowIso();
@@ -25677,7 +25771,7 @@ export async function runBlogStudioDraftResearchPhase(
                 await generationLogger.logStep(
                     4,
                     "Grounded Research",
-                    { topic: selectedTopicForRun, sourceUrls: serpAnalysis?.topResultUrls?.length || 0 },
+                    { topic: selectedTopicForRun, sourceUrls: groundedResearchSourceUrlCount },
                     {
                         startedAt: groundedResearchStartedAt,
                         completedAt: groundedResearchEndTime,

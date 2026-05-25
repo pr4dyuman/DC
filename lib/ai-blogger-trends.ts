@@ -28,6 +28,8 @@ export type AIBloggerViralTrendSignal = {
     categories: string[];
     trendBreakdown: string[];
     relatedQueries: string[];
+    newsPageToken?: string;
+    newsUrls?: string[];
     reasons: string[];
     sourceRank?: number;
     sourceGeo?: string;
@@ -100,6 +102,14 @@ type FetchTrendSignalsInput = {
     primaryKeyword?: string;
     location?: string;
     fallbackCandidates?: string[];
+};
+
+export type AIBloggerTrendNewsSource = {
+    title: string;
+    link: string;
+    source: string;
+    date: string;
+    snippet: string;
 };
 
 function getTokenList(value: string) {
@@ -586,6 +596,8 @@ function buildViralTrendScore(input: {
     startedAt?: string;
     categories: string[];
     trendBreakdown: string[];
+    newsPageToken?: string;
+    newsUrls?: string[];
     fitHints: string[];
     sourceRank?: number;
     sourceGeo?: string;
@@ -628,6 +640,8 @@ function buildViralTrendScore(input: {
         categories: input.categories,
         trendBreakdown: input.trendBreakdown,
         relatedQueries: sanitizeStringArray(input.trendBreakdown, 8, 120),
+        newsPageToken: sanitizeText(input.newsPageToken, 500),
+        newsUrls: sanitizeStringArray(input.newsUrls || [], 8, 500),
         reasons,
         sourceRank: input.sourceRank,
         sourceGeo: input.sourceGeo,
@@ -658,6 +672,8 @@ function extractTrendingNowViralTrends(
             start_timestamp?: number | string;
             categories?: Array<{ name?: string } | string>;
             trend_breakdown?: string[];
+            news_page_token?: string;
+            serpapi_news_link?: string;
         }>;
         daily_searches?: Array<{
             searches?: Array<{
@@ -693,6 +709,8 @@ function extractTrendingNowViralTrends(
                 startedAt: toIsoFromUnixSeconds(item.start_timestamp),
                 categories,
                 trendBreakdown,
+                newsPageToken: item.news_page_token,
+                newsUrls: [item.serpapi_news_link || ""],
                 fitHints,
                 sourceRank: index + 1,
                 sourceGeo: source?.geo,
@@ -759,6 +777,8 @@ function mergeViralTrendSignals(
         categories: sanitizeStringArray([...best.categories, ...other.categories], 8, 80),
         trendBreakdown: sanitizeStringArray([...best.trendBreakdown, ...other.trendBreakdown], 12, 120),
         relatedQueries: sanitizeStringArray([...best.relatedQueries, ...other.relatedQueries], 12, 120),
+        newsPageToken: best.newsPageToken || other.newsPageToken,
+        newsUrls: sanitizeStringArray([...(best.newsUrls || []), ...(other.newsUrls || [])], 12, 500),
         reasons: sanitizeStringArray([...best.reasons, ...other.reasons], 8, 100),
         sourceRank: sourceRanks.length ? Math.min(...sourceRanks) : undefined,
     };
@@ -1383,6 +1403,62 @@ export async function fetchAIBloggerKeywordTrendResult(
     options?: { timeoutMs?: number },
 ) {
     return fetchKeywordTrendResult(keyword, location, config, options);
+}
+
+export async function fetchAIBloggerTrendNewsSources(
+    trend: AIBloggerViralTrendSignal | null | undefined,
+    config: AIBloggerTrendsConfig | undefined,
+    options?: { timeoutMs?: number },
+): Promise<{ sources: AIBloggerTrendNewsSource[]; usedFallbackKey: boolean }> {
+    const newsPageToken = sanitizeText(trend?.newsPageToken, 500);
+    if (!trend || !config?.enabled || !newsPageToken) {
+        return { sources: [], usedFallbackKey: false };
+    }
+
+    const { data, usedFallbackKey } = await fetchSerpApiJson<{
+        articles?: Array<{
+            title?: string;
+            link?: string;
+            source?: string;
+            date?: string;
+            snippet?: string;
+        }>;
+        news_results?: Array<{
+            title?: string;
+            link?: string;
+            source?: string;
+            date?: string;
+            snippet?: string;
+        }>;
+    }>(
+        {
+            engine: "google_trends_news",
+            page_token: newsPageToken,
+            hl: "en",
+        },
+        config,
+        { timeoutMs: options?.timeoutMs ?? 10_000 },
+    );
+
+    const seen = new Set<string>();
+    const sources = [...(data.articles || []), ...(data.news_results || [])]
+        .map((article) => ({
+            title: sanitizeText(article.title, 180),
+            link: sanitizeText(article.link, 500),
+            source: sanitizeText(article.source, 120),
+            date: sanitizeText(article.date, 80),
+            snippet: sanitizeText(article.snippet, 240),
+        }))
+        .filter((source) => {
+            if (!source.link || seen.has(source.link)) {
+                return false;
+            }
+            seen.add(source.link);
+            return true;
+        })
+        .slice(0, 8);
+
+    return { sources, usedFallbackKey };
 }
 
 function buildLiveTrendSummary(
