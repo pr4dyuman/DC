@@ -86,8 +86,11 @@ const LOW_VALUE_WEBSITE_CATEGORIES = new Set<BlogStudioSitePriorityPageCategory>
 
 const LINK_HEALTH_CHECK_TIMEOUT_MS = 6_000;
 const LINK_HEALTH_CHECK_CONCURRENCY = 6;
+const LINK_HEALTH_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const LINK_HEALTH_CACHE_MAX_ENTRIES = 300;
 const LINK_HEALTH_USER_AGENT =
     "Mozilla/5.0 (compatible; AIBloggerInternalLinkChecker/1.0; +https://example.com/ai-blogger)";
+const linkHealthCache = new Map<string, { reachable: boolean; expiresAt: number }>();
 
 function resolveSiteOrigin(value?: string) {
     const rawValue = value?.trim();
@@ -101,6 +104,22 @@ function resolveSiteOrigin(value?: string) {
     } catch {
         return "";
     }
+}
+
+function normalizeOriginHostname(origin: string) {
+    try {
+        return new URL(origin).hostname.replace(/^www\./, "").toLowerCase();
+    } catch {
+        return "";
+    }
+}
+
+function isSameSiteOrigin(leftOrigin: string, rightOrigin: string) {
+    if (!leftOrigin || !rightOrigin) {
+        return false;
+    }
+
+    return normalizeOriginHostname(leftOrigin) === normalizeOriginHostname(rightOrigin);
 }
 
 function resolvePostSiteUrl(post: BlogStudioPost, siteUrl?: string) {
@@ -144,30 +163,34 @@ function buildPublishedBlogHref(siteUrl: string | undefined, slug: string) {
         : blogPath;
 }
 
-/**
- * Resolves the best available href for a published blog post.
- * Priority: canonicalUrl (set by publishing webhook response) > /blog/publishedEntrySlug > /blog/slug
- */
-function resolvePublishedBlogHref(siteUrl: string | undefined, slug: string, publishedEntrySlug?: string, canonicalUrl?: string): string {
-    const resolvedSiteUrl = resolveSiteOrigin(siteUrl);
+function resolveTrustedPublishedBlogHref(siteUrl: string | undefined, canonicalUrl?: string): string {
+    const canonicalValue = canonicalUrl?.trim();
 
-    // Use canonicalUrl when it's an absolute URL on the same domain
-    if (canonicalUrl?.trim()) {
-        try {
-            const canonical = new URL(canonicalUrl.trim());
-            if (!resolvedSiteUrl || canonical.origin === resolveSiteOrigin(resolvedSiteUrl)) {
-                canonical.hash = "";
-                if (canonical.pathname !== "/" && canonical.pathname.endsWith("/")) {
-                    canonical.pathname = canonical.pathname.slice(0, -1);
-                }
-                return canonical.toString();
-            }
-        } catch {
-            // fall through
-        }
+    if (!canonicalValue) {
+        return "";
     }
 
-    return buildPublishedBlogHref(siteUrl, publishedEntrySlug || slug);
+    const resolvedSiteUrl = resolveSiteOrigin(siteUrl);
+
+    try {
+        const canonical = new URL(canonicalValue);
+        if (canonical.protocol !== "http:" && canonical.protocol !== "https:") {
+            return "";
+        }
+
+        if (resolvedSiteUrl && !isSameSiteOrigin(canonical.origin, resolvedSiteUrl)) {
+            return "";
+        }
+
+        canonical.hash = "";
+        if (canonical.pathname !== "/" && canonical.pathname.endsWith("/")) {
+            canonical.pathname = canonical.pathname.slice(0, -1);
+        }
+
+        return canonical.toString();
+    } catch {
+        return "";
+    }
 }
 
 /**
@@ -175,6 +198,7 @@ function resolvePublishedBlogHref(siteUrl: string | undefined, slug: string, pub
  * Preserves connecting words (with, for, in, on, of) to keep the phrase readable.
  * E.g. "How to Manage Your Company Using AI in 2026" → "manage company with ai"
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function toNaturalAnchor(title: string): string {
     // Strip year tokens and special chars first
     const cleaned = title
@@ -307,12 +331,9 @@ function isReachableLinkStatus(status: number) {
 }
 
 function shouldRetryLinkHealthWithGet(status: number) {
-    return status === 400 ||
-        status === 404 ||
-        status === 405 ||
-        status === 410 ||
-        status === 451 ||
-        status >= 500;
+    // A definite HEAD 404/410 means the page is missing. Retrying with GET
+    // doubles customer traffic and can trigger expensive page functions.
+    return status === 405 || status === 501;
 }
 
 async function fetchLinkHealthStatus(href: string, method: "HEAD" | "GET") {
@@ -341,18 +362,29 @@ async function isReachableCandidateHref(href: string) {
         return true;
     }
 
+    const cacheKey = href.trim();
+    const now = Date.now();
+    const cached = linkHealthCache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+        return cached.reachable;
+    }
+
     try {
         const headStatus = await fetchLinkHealthStatus(href, "HEAD");
         if (isReachableLinkStatus(headStatus)) {
+            rememberLinkHealth(cacheKey, true);
             return true;
         }
 
         if (!shouldRetryLinkHealthWithGet(headStatus)) {
+            rememberLinkHealth(cacheKey, false);
             return false;
         }
 
         const getStatus = await fetchLinkHealthStatus(href, "GET");
-        return isReachableLinkStatus(getStatus);
+        const reachable = isReachableLinkStatus(getStatus);
+        rememberLinkHealth(cacheKey, reachable);
+        return reachable;
     } catch {
         // Network errors can be transient or caused by bot protection. Keep the
         // candidate unless the server gave us a definite broken HTTP status.
@@ -360,34 +392,82 @@ async function isReachableCandidateHref(href: string) {
     }
 }
 
+function rememberLinkHealth(cacheKey: string, reachable: boolean) {
+    if (!cacheKey) {
+        return;
+    }
+
+    if (linkHealthCache.size >= LINK_HEALTH_CACHE_MAX_ENTRIES) {
+        const oldestKey = linkHealthCache.keys().next().value;
+        if (oldestKey) {
+            linkHealthCache.delete(oldestKey);
+        }
+    }
+
+    linkHealthCache.set(cacheKey, {
+        reachable,
+        expiresAt: Date.now() + LINK_HEALTH_CACHE_TTL_MS,
+    });
+}
+
+function shouldLiveValidateCandidate(candidate: LinkCandidate) {
+    // Blog candidates come from our published records or from crawl-discovered
+    // pages. Do not probe customer /blog routes during generation; a run with
+    // many candidate posts can otherwise create thousands of unique 404s.
+    return candidate.source !== "blog";
+}
+
 async function validateReachableLinkCandidates(candidates: LinkCandidate[]): Promise<LinkCandidate[]> {
     if (candidates.length === 0) {
         return [];
     }
 
-    if (!candidates.some((candidate) => isHttpCandidateHref(candidate.href))) {
-        return validateBlogHrefs(candidates);
+    const trustedHrefs = new Set(
+        candidates
+            .filter((candidate) => !shouldLiveValidateCandidate(candidate))
+            .map((candidate) => candidate.href),
+    );
+    const candidatesToCheck = candidates.filter((candidate) => shouldLiveValidateCandidate(candidate));
+
+    if (candidatesToCheck.length === 0) {
+        return candidates;
     }
 
-    const keepCandidate = new Array<boolean>(candidates.length).fill(true);
+    if (!candidatesToCheck.some((candidate) => isHttpCandidateHref(candidate.href))) {
+        const reachableCheckedHrefs = new Set((await validateBlogHrefs(candidatesToCheck)).map((candidate) => candidate.href));
+
+        return candidates.filter((candidate) =>
+            trustedHrefs.has(candidate.href) || reachableCheckedHrefs.has(candidate.href)
+        );
+    }
+
+    const keepCandidate = new Array<boolean>(candidatesToCheck.length).fill(true);
     let nextIndex = 0;
 
     async function worker() {
-        while (nextIndex < candidates.length) {
+        while (nextIndex < candidatesToCheck.length) {
             const index = nextIndex;
             nextIndex += 1;
-            keepCandidate[index] = await isReachableCandidateHref(candidates[index].href);
+            keepCandidate[index] = await isReachableCandidateHref(candidatesToCheck[index].href);
         }
     }
 
     await Promise.all(
         Array.from(
-            { length: Math.min(LINK_HEALTH_CHECK_CONCURRENCY, candidates.length) },
+            { length: Math.min(LINK_HEALTH_CHECK_CONCURRENCY, candidatesToCheck.length) },
             () => worker(),
         ),
     );
 
-    return candidates.filter((_, index) => keepCandidate[index]);
+    const reachableCheckedHrefs = new Set(
+        candidatesToCheck
+            .filter((_, index) => keepCandidate[index])
+            .map((candidate) => candidate.href),
+    );
+
+    return candidates.filter((candidate) =>
+        trustedHrefs.has(candidate.href) || reachableCheckedHrefs.has(candidate.href)
+    );
 }
 
 async function filterReachableRankedCandidates(ranked: RankedLinkCandidate[]) {
@@ -1112,7 +1192,9 @@ async function getPublishedAIBloggerCandidates(post: BlogStudioPost, siteUrl?: s
             agencyId: post.agencyId,
             slug: { $ne: post.slug },
             status: "Published",
+            deliveryStatus: "success",
             publishedEntrySlug: { $exists: true, $ne: "" },
+            canonicalUrl: { $exists: true, $ne: "" },
         })
             .select("id slug title excerpt brief tags draftBrief generationDiagnostics contentClusterId parentTopicSlug publishedEntrySlug canonicalUrl")
             .sort({ publishedAt: -1, updatedAt: -1 })
@@ -1120,11 +1202,16 @@ async function getPublishedAIBloggerCandidates(post: BlogStudioPost, siteUrl?: s
             .lean();
 
         const filteredPosts = posts.filter((candidatePost) => {
+            const trustedHref = resolveTrustedPublishedBlogHref(siteUrl, candidatePost.canonicalUrl);
             const topicIntegrity = candidatePost.generationDiagnostics?.scorecard?.topicIntegrity;
             const websiteTopicAccepted = candidatePost.generationDiagnostics?.scorecard?.websiteTopicAccepted;
             const businessFitScore =
                 candidatePost.draftBrief?.businessFitScore ??
                 candidatePost.generationDiagnostics?.businessFitScore;
+
+            if (!trustedHref) {
+                return false;
+            }
 
             if (candidatePost.brief?.sourceMode === "website" && websiteTopicAccepted === false) {
                 return false;
@@ -1144,12 +1231,7 @@ async function getPublishedAIBloggerCandidates(post: BlogStudioPost, siteUrl?: s
         const candidates: LinkCandidate[] = filteredPosts.map((candidatePost) => ({
             id: `ai-blogger-${candidatePost.id || candidatePost.slug}`,
             title: candidatePost.title,
-            href: resolvePublishedBlogHref(
-                siteUrl,
-                candidatePost.slug,
-                candidatePost.publishedEntrySlug,
-                candidatePost.canonicalUrl,
-            ),
+            href: resolveTrustedPublishedBlogHref(siteUrl, candidatePost.canonicalUrl),
             source: "blog" as const,
             description: candidatePost.excerpt || "Published AI Blogger article on the blog archive.",
             suggestedAnchor: toPreferredAnchor(candidatePost.title),
