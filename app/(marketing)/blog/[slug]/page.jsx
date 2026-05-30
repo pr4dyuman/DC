@@ -258,10 +258,22 @@ const BLOG_SERVICE_LINK_OVERRIDES = {
     "social-media-marketing",
     "ai-blogger",
   ],
+  "best-seo-agency-in-jaipur-choose-an-ethical-partner": [
+    "seo",
+    "ai-blogger",
+    "web-development",
+    "ppc",
+  ],
   "brand-voice-insurance-editorial-guardrails-for-ai-generated-assets": [
     "ai-blogger",
     "seo",
     "influencer-marketing",
+  ],
+  "conversion-funnel-mapping-and-optimization-to-stop-leaks": [
+    "ppc",
+    "ai-blogger",
+    "web-development",
+    "social-media-marketing",
   ],
   "digital-production-vs-digital-marketing-strategy-the-2026-gap": [
     "video-production-ad",
@@ -295,6 +307,18 @@ const BLOG_SERVICE_LINK_OVERRIDES = {
   "how-to-manage-your-company-with-ai-driven-workflows-in-2026": [
     "manage-company",
     "ai-blogger",
+  ],
+  "how-to-measure-video-production-success-the-performance-framework": [
+    "video-production-ad",
+    "ai-blogger",
+    "ppc",
+    "social-media-marketing",
+  ],
+  "how-to-scale-influencer-content-with-paid-media-playbook": [
+    "influencer-marketing",
+    "ai-blogger",
+    "ppc",
+    "social-media-marketing",
   ],
   "media-strategy-guide-2026-scaling-impact-with-hybrid-models": [
     "ppc",
@@ -338,6 +362,12 @@ const BLOG_SERVICE_LINK_OVERRIDES = {
     "video-production-ad",
     "social-media-marketing",
     "ai-blogger",
+  ],
+  "what-is-included-in-ppc-advertising-services-the-video-edge": [
+    "ppc",
+    "ai-blogger",
+    "video-production-ad",
+    "seo",
   ],
   "youtube-influencer-marketing-campaign-best-practices-the-roi-guide": [
     "influencer-marketing",
