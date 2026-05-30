@@ -46,3 +46,4 @@ next-env.d.ts
 # Local generation logs
 logs/
 .tmp/
+exports/gsc/

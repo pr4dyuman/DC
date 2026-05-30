@@ -12,6 +12,9 @@
     "audit:email-templates": "node scripts/audit-email-templates.mjs",
     "audit:links": "node scripts/internal-link-audit.mjs",
     "audit:seo": "node scripts/seo-qa.mjs",
+    "gsc": "node scripts/gsc-console.mjs",
+    "gsc:auth": "node scripts/gsc-console.mjs auth",
+    "gsc:report": "node scripts/gsc-console.mjs report",
     "lint": "eslint"
   },
   "dependencies": {
