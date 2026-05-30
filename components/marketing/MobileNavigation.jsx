@@ -166,6 +166,17 @@ export default function MobileNavigation({ servicesList }) {
             </div>
 
             <Link
+              href="/blog"
+              prefetch={false}
+              className={`block py-2 border-b border-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] ${
+                isActive("/blog") ? "text-[#F5EE30]" : "hover:text-[#F5EE30]"
+              }`}
+              onClick={() => setMobileOpen(false)}
+            >
+              BLOG
+            </Link>
+
+            <Link
               href="/about"
               prefetch={false}
               className={`block py-2 border-b border-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] ${

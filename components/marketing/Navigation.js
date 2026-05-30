@@ -34,7 +34,7 @@ export default function Navigation() {
         </Link>
 
         {/* Desktop Links */}
-        <ul className="hidden md:flex space-x-14 text-xl font-glacial-bold tracking-wide">
+        <ul className="hidden md:flex space-x-8 lg:space-x-12 xl:space-x-14 text-xl font-glacial-bold tracking-wide">
           <li>
             <Link
               href="/"
@@ -70,6 +70,16 @@ export default function Navigation() {
                 ))}
               </div>
             </div>
+          </li>
+          <li>
+            <Link
+              href="/blog"
+              prefetch={false}
+              data-nav-path="/blog"
+              className="transition-all duration-200 hover:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
+            >
+              BLOG
+            </Link>
           </li>
           <li>
             <Link
