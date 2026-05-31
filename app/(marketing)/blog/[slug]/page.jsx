@@ -320,6 +320,12 @@ const BLOG_SERVICE_LINK_OVERRIDES = {
     "ppc",
     "social-media-marketing",
   ],
+  "influencer-marketing-attribution-models-beyond-promo-codes": [
+    "influencer-marketing",
+    "ai-blogger",
+    "ppc",
+    "seo",
+  ],
   "media-strategy-guide-2026-scaling-impact-with-hybrid-models": [
     "ppc",
     "video-production-ad",
