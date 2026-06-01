@@ -215,6 +215,29 @@ Updated conclusion:
 - The browser-agent statement that these URLs return direct `200` responses is not supported by raw production headers.
 - Do not resubmit or validate yet; wait for Google to recrawl the corrected first-hop redirects.
 
+## Independent Redirect-Chain Verification
+
+An external redirect-chain check was completed through `httpstatus.io` using a Googlebot smartphone user-agent.
+
+Verified chains:
+
+| Tested URL | First hop | Final URL | Final status |
+|---|---:|---|---:|
+| `https://www.digitalcorvids.com/contact` | 308 | `https://digitalcorvids.com/contact` | 200 |
+| `https://digitalcorvids.com/influencer-marketing.html` | 301 | `https://digitalcorvids.com/services/influencer-marketing` | 200 |
+| `https://digitalcorvids.com/social-media-marketing.html` | 301 | `https://digitalcorvids.com/services/social-media-marketing` | 200 |
+| `https://digitalcorvids.com/video-production.html` | 301 | `https://digitalcorvids.com/services/video-production-ad` | 200 |
+| `https://digitalcorvids.com/contact` | no redirect | `https://digitalcorvids.com/contact` | 200 |
+
+External verification conclusion:
+
+- Redirect targets are live.
+- Canonical landing URLs return `200`.
+- Legacy `.html` redirects are single-hop `301` redirects.
+- `www` to non-www is a single-hop permanent `308` redirect.
+- No redirect loops, duplicate hops, or soft 404 behavior were detected.
+- No further redirect code change is indicated.
+
 ## Do Not Do Yet
 
 - Do not request indexing again.
