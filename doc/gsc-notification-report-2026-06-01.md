@@ -187,6 +187,34 @@ Validation:
 
 After deployment, browser-agent should live-test the affected redirect URLs again and confirm the first response is `301`, then wait for Google to recrawl. Do not request indexing or validate fixes immediately.
 
+## Post-Deployment Header Verification
+
+After the browser-agent live test reported `200` responses on old/wrong URLs, raw production headers were checked directly with normal requests and a Googlebot smartphone user-agent.
+
+Findings:
+
+| Tested URL | Raw first response | Location | Final target status | Assessment |
+|---|---:|---|---:|---|
+| `https://www.digitalcorvids.com/contact` | 308 Permanent Redirect | `https://digitalcorvids.com/contact` | 200 | Permanent redirect exists; GSC/browser report likely read the final fetch, not the first hop |
+| `https://digitalcorvids.com/influencer-marketing.html` | 301 Moved Permanently | `/services/influencer-marketing` | 200 | Fixed |
+| `https://digitalcorvids.com/social-media-marketing.html` | 301 Moved Permanently | `/services/social-media-marketing` | 200 | Fixed |
+| `https://digitalcorvids.com/video-production.html` | 301 Moved Permanently | `/services/video-production-ad` | 200 | Fixed |
+| `https://digitalcorvids.com/services/video-production-ad` | 200 OK | N/A | 200 | Canonical target exists |
+
+The `www` redirect still appears as `308`, even after the app-level redirect was changed to explicit `301`. This suggests Vercel is applying a domain-level redirect before the request reaches the Next.js redirect rule. Vercel treats `308` as a permanent redirect, so this should still consolidate canonical signals, but if the goal is literally `301` for the `www` host, that must be checked in Vercel's domain/project redirect settings.
+
+DNS check:
+
+- `digitalcorvids.com` resolves to Vercel.
+- `www.digitalcorvids.com` is a CNAME to a Vercel DNS target.
+
+Updated conclusion:
+
+- The three legacy `.html` URLs are fixed as `301`.
+- The `www` host does redirect to non-www, but Vercel currently returns `308`, not `301`.
+- The browser-agent statement that these URLs return direct `200` responses is not supported by raw production headers.
+- Do not resubmit or validate yet; wait for Google to recrawl the corrected first-hop redirects.
+
 ## Do Not Do Yet
 
 - Do not request indexing again.
