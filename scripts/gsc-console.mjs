@@ -1,10 +1,12 @@
-import "dotenv/config";
+import { config as loadEnv } from "dotenv";
 
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { URL, URLSearchParams } from "node:url";
+
+loadEnv({ path: [".env.local", ".env"], quiet: true });
 
 const DEFAULT_SITE_URL = process.env.GSC_SITE_URL || "sc-domain:digitalcorvids.com";
 const DEFAULT_BASE_URL =

@@ -238,6 +238,146 @@ External verification conclusion:
 - No redirect loops, duplicate hops, or soft 404 behavior were detected.
 - No further redirect code change is indicated.
 
+## Fresh Read-Only GSC API Audit After Local Auth Restore
+
+Generated: `2026-06-01T15:56:54.611Z`
+
+No Request Indexing, sitemap submission, or Validate Fix action was performed.
+
+The local helper was updated to load `.env.local` first and fall back to `.env`, matching local Next.js configuration behavior. This restored read-only GSC API access using the OAuth credentials already present locally.
+
+Fresh sitemap URL inspection summary:
+
+| Coverage state | Count |
+|---|---:|
+| Submitted and indexed | 21 |
+| URL is unknown to Google | 23 |
+| Crawled - currently not indexed | 1 |
+| Duplicate, Google chose different canonical than user | 1 |
+| Total sitemap URLs inspected | 46 |
+
+Positive change since the previous successful API snapshot:
+
+| URL | Previous state | Current state | Last crawl |
+|---|---|---|---|
+| `https://digitalcorvids.com/services/social-media-marketing` | URL is unknown to Google | Submitted and indexed | `2026-05-31T19:30:28Z` |
+
+The new crawl selected the correct non-www canonical:
+
+```text
+https://digitalcorvids.com/services/social-media-marketing
+```
+
+The five service-page queue is now:
+
+| URL | Current state |
+|---|---|
+| `https://digitalcorvids.com/services/social-media-marketing` | Submitted and indexed |
+| `https://digitalcorvids.com/services/seo` | URL is unknown to Google |
+| `https://digitalcorvids.com/services/web-development` | URL is unknown to Google |
+| `https://digitalcorvids.com/services/ai-blogger` | URL is unknown to Google |
+| `https://digitalcorvids.com/services/manage-company` | URL is unknown to Google |
+
+The `/contact` canonical conflict remains in Google's indexed-version data:
+
+| URL | Current GSC state | Last crawl | Live behavior |
+|---|---|---|---|
+| `https://digitalcorvids.com/contact` | Duplicate, Google chose different canonical than user | `2026-05-30T15:36:34Z` | 200 with non-www self-canonical |
+| `https://www.digitalcorvids.com/contact` | Submitted and indexed | `2026-04-27T00:33:19Z` | 308 to non-www `/contact` |
+
+This still appears to be stale index data. Google has not recrawled the `www` contact URL since April 27, 2026.
+
+Notification legacy/assets inspection remains consistent with stale indexed-version data:
+
+| URL | Current GSC state | Last crawl | Live behavior |
+|---|---|---|---|
+| `/influencer-marketing.html` | Crawled - currently not indexed | `2026-02-25T22:28:36Z` | 301 to canonical service URL |
+| `/social-media-marketing.html` | Crawled - currently not indexed | `2026-02-25T22:28:36Z` | 301 to canonical service URL |
+| `/video-production.html` | Crawled - currently not indexed | `2026-02-25T22:28:36Z` | 301 to canonical service URL |
+| `/favicon.ico` | Crawled - currently not indexed | `2026-05-07T18:38:15Z` | harmless favicon asset |
+| `www /favicon.ico?...` | Crawled - currently not indexed | `2026-01-12T10:08:32Z` | harmless redirected favicon asset |
+
+No redirect or asset code fix is indicated by these rows.
+
+### Additional Content-Level Finding
+
+One sitemap blog URL changed from indexed to crawled-not-indexed:
+
+```text
+https://digitalcorvids.com/blog/how-to-manage-your-company-using-ai-powered-tools-2026-strategy
+```
+
+GSC indexed-version data:
+
+| Field | Value |
+|---|---|
+| Coverage | Crawled - currently not indexed |
+| Last crawl | `2026-05-18T19:28:42Z` |
+| User canonical | self-canonical |
+| Google canonical | self-canonical |
+| Page fetch | successful |
+| Referring URLs | sitemap.xml and `/blog` |
+
+The page is technically healthy and internally linked, but it targets substantially similar search intent to this indexed page:
+
+```text
+https://digitalcorvids.com/blog/how-to-manage-your-company-with-ai-driven-workflows-in-2026
+```
+
+Content comparison:
+
+| Page | Published | Approx. rendered words | Main intent |
+|---|---|---:|---|
+| `how-to-manage-your-company-using-ai-powered-tools-2026-strategy` | April 9, 2026 | 2,693 | AI-powered company management tools and operations |
+| `how-to-manage-your-company-with-ai-driven-workflows-in-2026` | April 11, 2026 | 2,444 | AI-driven company workflow management |
+
+The pages share approximately 35% of unique terms and overlap in sections such as operational integration and the `10-20-70` framework. The indexed workflow article is the one receiving visible governance-related queries.
+
+Recommendation before any resubmission:
+
+1. Choose one primary manage-company article.
+2. Merge valuable unique sections into the primary page.
+3. Redirect the overlapping secondary slug to the primary page.
+4. Remove the redirected slug from the sitemap and blog listing.
+
+Do not perform the consolidation silently: it is an editorial decision because both articles contain substantial content.
+
+### Fresh Production QA
+
+Production SEO QA:
+
+```text
+PASS 704 | WARN 1 | FAIL 0
+```
+
+The warning remains the non-blocking local webmaster-verification-env warning.
+
+Production internal-link QA:
+
+```text
+PASS 108 | WARN 0 | FAIL 0
+```
+
+The internal-link warning from the attribution blog post is now cleared after deployment.
+
+### Fresh Search Performance Snapshot
+
+Last 90 days:
+
+| Metric | Value |
+|---|---:|
+| Pages with visible performance rows | 29 |
+| Clicks | 63 |
+| Impressions | 1,265 |
+
+Highest-impression content page:
+
+| URL | Clicks | Impressions | CTR | Average position |
+|---|---:|---:|---:|---:|
+| `/blog/2026-social-media-marketing-trends-operationalizing-ai-and-creative` | 0 | 251 | 0% | 7.78 |
+
+The updated title/meta work for this article still needs time to be reflected in Google snippets and measured over a new reporting window.
+
 ## Do Not Do Yet
 
 - Do not request indexing again.

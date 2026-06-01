@@ -12,7 +12,7 @@ It cannot click **Request Indexing**, run the **Live Test**, or validate fixes i
 
 ## One-Time OAuth Setup
 
-If AI Blogger Search Console OAuth is already configured, reuse the same Google OAuth client. The helper automatically looks for these existing `.env` values:
+If AI Blogger Search Console OAuth is already configured, reuse the same Google OAuth client. The helper loads `.env.local` first, falls back to `.env`, and automatically looks for these existing values:
 
 ```text
 GOOGLE_CLIENT_ID
