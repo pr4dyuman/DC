@@ -15,7 +15,8 @@
     "gsc": "node scripts/gsc-console.mjs",
     "gsc:auth": "node scripts/gsc-console.mjs auth",
     "gsc:report": "node scripts/gsc-console.mjs report",
-    "lint": "eslint"
+    "lint": "eslint",
+    "security:secrets": "node scripts/scan-secrets.mjs"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.31.0",

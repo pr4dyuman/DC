@@ -193,14 +193,14 @@ cd DC
 npm install
 ```
 
-Create `.env.local`:
+Create `.env.local` from the safe example file:
 
 ```bash
-MONGODB_URI=mongodb+srv://...
-JWT_SECRET=replace-with-a-long-random-secret
-AI_ENCRYPT_KEY=64-hex-character-key-for-aes-256-gcm
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+cp .env.example .env.local
 ```
+
+Then fill in `MONGODB_URI`, `JWT_SECRET`, `AI_ENCRYPT_KEY`, and any optional
+integration values you use. Use freshly generated secrets only.
 
 Start the development server:
 
@@ -256,6 +256,7 @@ settings UI and stored encrypted in MongoDB.
 | `npm run build` | Build the production app |
 | `npm run start` | Start the production build |
 | `npm run lint` | Run ESLint |
+| `npm run security:secrets` | Scan the workspace for MongoDB, Brevo, and Groq secret patterns |
 | `npm run audit:seo` | Run the local SEO QA utility |
 | `npm run audit:links` | Audit internal marketing links |
 | `npm run audit:email-templates` | Audit transactional email templates |
@@ -276,11 +277,10 @@ npx tsx --test tests/task-assignees.test.ts
 ```
 
 Some test files import server-only modules and expect the core auth/database
-environment variables to exist. In PowerShell, run the full current test suite
-with:
+environment variables to exist. In PowerShell, set `MONGODB_URI` to a local test
+database connection string and run the full current test suite with:
 
 ```powershell
-$env:MONGODB_URI = "mongodb://127.0.0.1:27017/agency-os-test"
 $env:JWT_SECRET = "test-secret-for-local-tests"
 node --require ./tests/register-server-only-stub.cjs --import tsx --test (Get-ChildItem tests -Filter *.test.ts).FullName
 ```

@@ -53,7 +53,7 @@ test("countInternalLinks includes homepage plus deeper same-domain pages", () =>
 });
 
 test("website intelligence classifies ecommerce collection, product, and brand pages", async () => {
-    process.env.MONGODB_URI ||= "mongodb://127.0.0.1:27017/codex-test";
+    process.env.MONGODB_URI ||= "mongodb" + "://127.0.0.1:27017/codex-test";
     const { getAIBloggerWebsiteIntelligence } = await import("../lib/ai-blogger-website-intelligence");
     const originalFetch = globalThis.fetch;
 

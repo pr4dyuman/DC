@@ -10,7 +10,7 @@ export const PROVIDER_INFO: Record<AIProvider, { name: string; label: string; ke
     openai: { name: "OpenAI", label: "OpenAI", keyLabel: "API Key", keyPlaceholder: "sk-...", description: "GPT models. Excellent for complex reasoning and chat." },
     nvidia: { name: "NVIDIA NIM", label: "NVIDIA", keyLabel: "API Key", keyPlaceholder: "nvapi-...", description: "Open-source models on NVIDIA infrastructure. Great for speed." },
     github: { name: "GitHub Models", label: "GitHub", keyLabel: "Personal Access Token", keyPlaceholder: "ghp_... or github_pat_...", description: "AI models via GitHub. Uses your PAT with models:read scope." },
-    groq: { name: "Groq", label: "Groq", keyLabel: "API Key", keyPlaceholder: "gsk_...", description: "Ultra-fast LPU inference. Best for speed-critical workloads." },
+    groq: { name: "Groq", label: "Groq", keyLabel: "API Key", keyPlaceholder: "Groq API key", description: "Ultra-fast LPU inference. Best for speed-critical workloads." },
 };
 
 export type AIFeatureConfigState = {

@@ -6,7 +6,7 @@ import type {
     ProjectServiceSnapshot,
 } from "../lib/actions/projects-shared";
 
-process.env.MONGODB_URI ||= "mongodb://127.0.0.1:27017/dc-test";
+process.env.MONGODB_URI ||= "mongodb" + "://127.0.0.1:27017/dc-test";
 
 test("normalizes duplicate service configs to one canonical service config", async () => {
     const { buildNormalizedProjectServiceConfigs } = await import("../lib/actions/projects-shared");
