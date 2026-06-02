@@ -300,10 +300,6 @@ const BLOG_SERVICE_LINK_OVERRIDES = {
     "social-media-marketing",
     "ai-blogger",
   ],
-  "how-to-manage-your-company-using-ai-powered-tools-2026-strategy": [
-    "manage-company",
-    "ai-blogger",
-  ],
   "how-to-manage-your-company-with-ai-driven-workflows-in-2026": [
     "manage-company",
     "ai-blogger",

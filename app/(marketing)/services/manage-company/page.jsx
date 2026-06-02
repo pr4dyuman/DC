@@ -66,10 +66,10 @@ const relatedManageCompanyArticles = [
     description: "Explore practical ways AI workflows can organize projects, teams, and recurring agency tasks.",
   },
   {
-    title: "Manage Your Company Using AI-Powered Tools",
-    href: "/blog/how-to-manage-your-company-using-ai-powered-tools-2026-strategy",
-    category: "AI Tools",
-    description: "Review a strategy for using AI-powered tools across planning, tracking, and management.",
+    title: "Enterprise AI Distribution Strategy",
+    href: "/blog/enterprise-ai-distribution-strategy-2026-scaling-agentic-workflows",
+    category: "AI Operations",
+    description: "Plan how agentic workflows, content distribution, and operations systems can scale together.",
   },
 ];
 

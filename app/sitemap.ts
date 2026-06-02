@@ -24,6 +24,10 @@ type MarketingSitemapBlog = {
     createdAt?: string | Date;
 };
 
+const REDIRECTED_BLOG_SLUGS = new Set([
+    "how-to-manage-your-company-using-ai-powered-tools-2026-strategy",
+]);
+
 function toDate(value?: string | Date) {
     if (!value) {
         return undefined;
@@ -112,6 +116,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         for (const blog of blogs as MarketingSitemapBlog[]) {
             const slug = blog.slug?.trim();
             if (!slug) {
+                continue;
+            }
+            if (REDIRECTED_BLOG_SLUGS.has(slug)) {
                 continue;
             }
 

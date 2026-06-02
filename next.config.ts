@@ -51,6 +51,11 @@ const nextConfig: NextConfig = {
       { source: '/video-production.html', destination: '/services/video-production-ad', statusCode: 301 },
       { source: '/influencer-marketing.html', destination: '/services/influencer-marketing', statusCode: 301 },
       { source: '/manage-company.html', destination: '/services/manage-company', statusCode: 301 },
+      {
+        source: '/blog/how-to-manage-your-company-using-ai-powered-tools-2026-strategy',
+        destination: '/blog/how-to-manage-your-company-with-ai-driven-workflows-in-2026',
+        statusCode: 301,
+      },
     ];
   },
 };
