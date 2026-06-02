@@ -48,3 +48,5 @@ next-env.d.ts
 logs/
 .tmp/
 exports/gsc/
+
+.env*

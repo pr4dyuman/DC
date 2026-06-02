@@ -1,0 +1,424 @@
+i need full search console report visit on every page , note everything and give me proper report include all points of all pages
+Completed 49 steps
+Google Search Console Full Report — digitalcorvids.com
+Report Date: May 30, 2026 | Property Added: January 5, 2026 | Account: Go Digital (godigitalwithus0@gmail.com)
+
+1. OVERVIEW PAGE
+Performance Summary
+59 total web search clicks (last 3 months)
+
+Recommendations
+A trending page received +159% higher impressions than usual
+
+URL: https://digitalcorvids.com/blog/2026-social-media-marketing-trends-operationalizing-ai-and-creative
+
+Action: Check page performance to investigate the spike
+
+Indexing Status
+48 pages not indexed / 19 pages indexed
+
+Experience
+Core Web Vitals: No data for Mobile & Desktop
+
+HTTPS: 8 pages HTTPS, 0 Non-HTTPS
+
+Enhancements
+Breadcrumbs: 3 valid, 0 invalid
+
+FAQ: 3 valid, 0 invalid
+
+2. INSIGHTS PAGE (Last 28 Days)
+Key Metrics
+Metric	Value	Change
+Clicks	25	+32%
+Impressions	310	+80%
+Top Content (by Clicks)
+Page	Clicks	Change
+https://digitalcorvids.com/	17	Previously 0
+https://www.digitalcorvids.com/	7	-53%
+https://www.digitalcorvids.com/login	1	Previously 0
+Top Query
+"digital corvids": 19 clicks (+217%)
+
+Trending Up
+"digital corvids": +217%, +13 clicks
+
+Trending Down
+No queries are trending down for this time period
+
+Top Countries (by Clicks)
+Country	Clicks
+India	100%
+Albania	<1%
+UAE	<1%
+Argentina	<1%
+Australia	<1%
+3. PERFORMANCE PAGE (3 Months: Feb 28 – May 27, 2026)
+Overall Metrics
+Metric	Value
+Total Clicks	59
+Total Impressions	448
+Average CTR	13.2%
+Average Position	7.3
+Top Queries
+Query	Clicks	Impressions
+digital corvids	35	58
+marketing trends 2026 ai content social commerce	0	14
+erie insurance independent agents network strength	0	4
+digital marketing company	0	4
+digital marketing company in malviya nagar jaipur	0	3
+digital marketing company near me	0	3
+social media marketing	0	2
+ai-driven social media marketing trends 2026	0	2
+influencer marketing agency near me	0	1
+"ppc brand protection"	0	1
+Top Pages
+Page	Clicks	Impressions
+https://www.digitalcorvids.com/	36	113
+https://digitalcorvids.com/	17	52
+https://www.digitalcorvids.com/about	3	93
+https://www.digitalcorvids.com/contact	2	129
+http://www.digitalcorvids.com/	2	128
+https://www.digitalcorvids.com/login	1	73
+/blog/2026-social-media-marketing-trends-operationalizing-ai-and-creative	0	191
+https://www.digitalcorvids.com/services	0	93
+https://www.digitalcorvids.com/services/social-media-marketing	0	79
+https://www.digitalcorvids.com/services/ppc	0	63
+Top Countries
+Country	Clicks	Impressions
+India	59	167
+United States	0	166
+Canada	0	16
+United Kingdom	0	8
+Brazil	0	8
+Singapore	0	4
+France	0	4
+Mexico	0	4
+Netherlands	0	4
+Poland	0	3
+Device Breakdown
+Device	Clicks	Impressions
+Desktop	30	359
+Mobile	29	88
+Tablet	0	1
+4. INDEXING > PAGES
+Indexing Summary (Last updated: 5/25/26)
+19 pages indexed
+
+48 pages not indexed (6 reasons)
+
+Why Pages Aren't Indexed
+Reason	Pages	Validation Status
+Discovered – currently not indexed	25	Not Started
+Crawled – currently not indexed	6	Not Started
+Not found (404)	7	Not Started
+Page with redirect	7	Not Started
+Excluded by 'noindex' tag	2	Not Started
+Soft 404	1	Not Started
+5. INDEXING > SITEMAPS
+Submitted Sitemaps (1–2 of 2)
+Sitemap	Type	Submitted	Last Read	Status	Discovered Pages
+https://digitalcorvids.com/sitemap.xml	Sitemap	May 25, 2026	May 29, 2026	Success	43
+https://www.digitalcorvids.com/sitemap.xml	Sitemap	Apr 26, 2026	May 4, 2026	Success	39
+6. INDEXING > REMOVALS
+No requests submitted in the last 6 months
+
+Cache updates are no longer available (can still request snippet updates)
+
+7. EXPERIENCE > CORE WEB VITALS
+Source: Chrome UX report | Last updated: 5/28/26
+
+Mobile: Not enough usage data in the last 90 days
+
+Desktop: Not enough usage data in the last 90 days
+
+8. EXPERIENCE > HTTPS
+Last updated: 5/29/26
+
+Non-HTTPS URLs: 0 (No critical issues)
+
+HTTPS URLs: 8
+
+9. ENHANCEMENTS > AMP
+Last updated: 5/29/26
+
+No Accelerated Mobile Pages found on the site
+
+10. ENHANCEMENTS > BREADCRUMBS
+Last updated: 5/28/26
+
+Valid: 3 | Invalid: 0 (No critical issues)
+
+11. ENHANCEMENTS > FAQ
+Last updated: 5/28/26
+
+Valid: 3 | Invalid: 0 (No critical issues)
+
+Deprecation Notice: FAQ rich results are no longer appearing in Google Search as of May 7, 2026. The FAQ rich result report will be removed in June 2026.
+
+12. LINKS REPORT
+External Links (Total: 8)
+Top Linked Pages:
+
+Page	External Links
+https://digitalcorvids.com/	4
+https://www.digitalcorvids.com/	4
+Top Linking Sites:
+
+Site	Links
+drjack.world	2
+seol.store	2
+signalhire.com	2
+trustedrevie.ws	2
+Anchor Text: "digitalcorvids com", "digitalcorvids com visit website"
+
+Internal Links (Total: 101)
+Top Linked Pages:
+
+Page	Internal Links
+https://digitalcorvids.com/	13
+https://digitalcorvids.com/about	13
+https://www.digitalcorvids.com/about	13
+https://www.digitalcorvids.com/services/ppc	13
+https://www.digitalcorvids.com/	10
+https://www.digitalcorvids.com/services	10
+https://www.digitalcorvids.com/services/social-media-marketing	10
+https://www.digitalcorvids.com/services/video-production-ad	10
+https://www.digitalcorvids.com/contact	9
+13. SETTINGS & CRAWL STATS
+General Settings
+Ownership verification: Verified owner
+
+Users: Go Digital
+
+Property added: January 5, 2026
+
+Crawling
+robots.txt: All 4 files are valid (Fetched, 258 bytes each)
+
+https://digitalcorvids.com/robots.txt
+
+https://www.digitalcorvids.com/robots.txt
+
+http://www.digitalcorvids.com/robots.txt
+
+http://digitalcorvids.com/robots.txt
+
+Bulk data export: Daily export to BigQuery (configured)
+
+Crawl Stats (Last 90 days, Last updated: 5/28/26)
+Metric	Value
+Total Crawl Requests	4.25K
+Total Download Size	63.1M
+Average Response Time	235 ms
+By Host:
+
+Host	Requests	Status
+digitalcorvids.com	2,454	No problems
+www.digitalcorvids.com	1,795	No problems
+By Response Code:
+
+Response	Percentage
+OK (200)	94%
+Moved permanently (301)	3%
+Not found (404)	2%
+Moved temporarily (302)	<1%
+By Purpose:
+
+Purpose	Percentage
+Refresh	96%
+Discovery	4%
+By File Type:
+
+File Type	Percentage
+Other	32%
+JavaScript	29%
+Image	17%
+HTML	10%
+CSS	6%
+By Googlebot Type:
+
+Bot Type	Percentage
+Page resource load	42%
+Desktop	39%
+Smartphone	9%
+Image	5%
+Other	3%
+KEY OBSERVATIONS & RECOMMENDATIONS
+Strong Indexing Gap: 48 pages not indexed vs 19 indexed — the largest issue is "Discovered – currently not indexed" (25 pages). Consider improving crawlability and internal linking.
+
+404 Errors: 7 pages returning 404 and 1 Soft 404 — these need to be fixed or redirected.
+
+www vs non-www Duplication: Both www.digitalcorvids.com and digitalcorvids.com are getting traffic separately (36 vs 17 clicks). Set a proper canonical/preferred domain to consolidate ranking signals.
+
+Content Performance: The blog post on "2026 social media marketing trends" has 191 impressions but 0 clicks — consider improving the title/meta description for better CTR.
+
+Geographic Reach: 100% clicks from India, but impressions from the US (166) — there's international visibility but no engagement. Consider international SEO optimization.
+
+Mobile Traffic Gap: Desktop (30 clicks) vs Mobile (29 clicks) is nearly equal, but impressions are much higher on desktop (359 vs 88). The blog post's 191 impressions contribute significantly to desktop impressions.
+
+Core Web Vitals: No data available for Mobile or Desktop — need more real-user traffic to generate reports.
+
+External Backlinks: Only 8 external links from 4 sites — consider building more quality backlinks to improve domain authority.
+
+FAQ Deprecation: FAQ rich results are being deprecated by Google (May 2026). While your 3 FAQ schema markups are valid, they won't appear in search results anymore.
+
+Crawl Health: Excellent crawl stats — 94% successful responses, 235ms average response time, no crawl errors on either host.
+
+i need this report in text file also did you include every miner points ? dont miss anything
+Completed 96 steps
+Google Search Console — Page Indexing Audit for digitalcorvids.com
+Here's the full breakdown of your Page Indexing report, along with actionable recommendations.
+
+Overall Indexing Status
+Status	Count
+Indexed	19 pages
+Not Indexed	48 pages (6 reasons)
+Total Known	67 pages
+Your indexed pages count (19) is climbing — the graph shows steady growth from ~8 in early March to ~19 by late May — which is positive. However, you still have 48 unindexed pages that need attention.
+
+Issue-by-Issue Breakdown
+1. Discovered — Currently Not Indexed (25 pages) — HIGHEST PRIORITY
+These are pages Google knows about (via sitemap or links) but hasn't crawled yet. This is your biggest volume issue.
+
+URLs affected (all with N/A crawl date):
+
+/blog and 17 blog post URLs (e.g., /blog/ai-powered-financial-intelligence, /blog/conversion-funnel-mapping, /blog/sustainable-seo-strategy-blueprint, etc.)
+
+/contact, /get-started
+
+Service pages: /services/ai-blogger, /services/manage-company, /services/seo, /services/social-media-marketing, /services/web-development
+
+Why: Googlebot is likely deprioritizing these pages due to crawl budget constraints or because the pages lack backlinks/signals.
+
+Recommendations:
+
+Request manual indexing via the URL Inspection Tool for high-priority pages (especially service pages and key blog posts)
+
+Improve internal linking — ensure service pages and blog posts are linked from your homepage and navigation
+
+Build backlinks to signal to Google that these pages are important
+
+Upgrade hosting/crawl delay if server response times are slow
+
+2. Not Found (404) (7 pages)
+These pages are returning actual 404 errors. Confirmed — I visited one and it showed a styled 404 error page.
+
+URLs affected:
+
+/blog/glass-city-marathon-2026-content-strategy-scaling-event-production — May 22, 2026
+
+/blog/mastering-country-calling-2026-content-strategy-ai-production — May 22, 2026
+
+/index.html — May 14, 2026
+
+www./index.html — May 13, 2026
+
+/Aboutus.html — Jan 4, 2026
+
+/Contactus/Contactus.html — Jan 4, 2026
+
+/search-engine-optimization.html — Jan 3, 2026
+
+Recommendations:
+
+Fix orphaned blog posts: The two blog posts (#1, #2) appear to have been deleted. Either restore them or set up 301 redirects to relevant existing posts or the /blog page
+
+Remove www./index.html and /index.html from sitemap: These shouldn't be in your sitemap since your site uses Next.js clean URLs
+
+Redirect old /Aboutus.html, /Contactus/Contactus.html, and /search-engine-optimization.html to their new equivalents (/about-us, /contact, /services/seo)
+
+Update the sitemap to exclude non-existent URLs
+
+3. Page with Redirect (7 pages)
+These pages redirect to other URLs (likely HTTP→HTTPS and www→non-www redirects).
+
+URLs affected:
+
+http://digitalcorvids.com/ → May 27, 2026
+
+https://www.digitalcorvids.com/services/video-production-ad → May 24, 2026
+
+https://www.digitalcorvids.com/about → May 23, 2026
+
+https://www.digitalcorvids.com/services/ppc → May 22, 2026
+
+https://www.digitalcorvids.com/services → May 21, 2026
+
+http://www.digitalcorvids.com/ → May 18, 2026
+
+https://www.digitalcorvids.com/ → May 18, 2026
+
+Recommendations:
+
+This is mostly normal — HTTP→HTTPS and www→non-www canonicalization redirects are expected
+
+Key issue: /services/video-production-ad and /services/ppc redirect but don't seem to exist as standalone pages. Either create them or remove from sitemap
+
+Ensure all canonicals use https://digitalcorvids.com/ (non-www, HTTPS) consistently
+
+4. Excluded by 'noindex' Tag (2 pages)
+URLs affected:
+
+/login (both www and non-www versions)
+
+Recommendations:
+
+This is correct and intentional — login pages should NOT be indexed. No action needed here.
+
+5. Soft 404 (1 page)
+URL: /blog — Though it loads and shows 30 articles with categories, Google is treating it as empty/thin content.
+
+Recommendations:
+
+Add more substantial content to the /blog index page — a longer description, featured articles, or category summaries
+
+Ensure the page returns proper HTTP 200 status (not 200 with empty content)
+
+Check meta robots to ensure noindex isn't accidentally set
+
+Verify server-side rendering — if this is a Next.js site, ensure the blog listing is rendered server-side, not just client-side
+
+6. Crawled — Currently Not Indexed (6 pages)
+Google crawled these but chose not to index them.
+
+URLs affected:
+
+/favicon.ico — May 8, 2026
+
+/influencer-marketing.html — Feb 26, 2026
+
+/social-media-marketing.html — Feb 26, 2026
+
+/video-production.html — Feb 26, 2026
+
+www./_next/static/media/caa3a2e1cccd8315-s.p.853070df.woff2 — Feb 25, 2026
+
+www./favicon.ico?favicon.7667253a.ico — Jan 12, 2026
+
+Recommendations:
+
+Static assets (#1, #5, #6) — favicon and font files should be blocked from crawling via robots.txt. Don't waste crawl budget on these.
+
+Old .html service pages (#2, #3, #4) — These look like legacy pages that may have been replaced by your Next.js routes (/services/influencer-marketing, /services/social-media-marketing, /services/video-production). Set up 301 redirects from the old URLs to the new ones, or remove them.
+
+7. Duplicate Without User-Selected Canonical (0 pages)
+No issues here — good sign.
+
+Sitemap Status
+Both sitemaps are submitting successfully:
+
+digitalcorvids.com/sitemap.xml → 43 discovered pages, Success
+
+www.digitalcorvids.com/sitemap.xml → 39 discovered pages, Success
+
+Priority Action Plan
+Priority	Action	Impact
+Priority	Action	Impact
+1	Request indexing for 25 "Discovered" pages via URL Inspection Tool	High — these are your live service & blog pages
+2	Fix 404 errors — redirect old blog posts to relevant content, remove dead URLs from sitemap	Medium — improves crawl efficiency
+3	Fix the Soft 404 on /blog — add more content, verify SSR rendering	Medium — this is your main content hub
+4	Block static assets in robots.txt (favicon.ico, .woff2, etc.)	Low — cleaner crawl budget
+5	Redirect legacy .html pages to new Next.js routes	Medium — eliminates confusion
+6	Update sitemap to remove non-existent URLs	Low — prevents Google from wasting crawl budget
+The upward trend in indexed pages is encouraging. With these fixes, you should see that number continue to climb.
