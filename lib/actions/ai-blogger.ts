@@ -1890,6 +1890,26 @@ function getCurrentYearTitleGuardPrompt() {
     return `Use ${currentYear} in titles, meta titles, title directions, entities, section headings, and named frameworks only when the selected topic, primary keyword, user topic, trend focus, SERP title, or grounded source explicitly makes the article annual or current-year specific with words like trends, report, benchmark, forecast, statistics, regulation, update, or deadline. A generic guide or best-practices topic is not enough by itself. Otherwise treat ${currentYear} only as freshness context and do not add it as title decoration.`;
 }
 
+function resolveGroundedResearchConfigForAnnualTopic(
+    groundedResearchConfig: AIBloggerConfig["groundedResearch"] | undefined,
+    topic: string | undefined,
+    currentYearContext: string[] = [],
+) {
+    if (
+        !groundedResearchConfig ||
+        groundedResearchConfig.enabled === false ||
+        groundedResearchConfig.freshnessPreference !== "balanced" ||
+        !currentYearIsJustifiedForTitle(topic || "", currentYearContext)
+    ) {
+        return groundedResearchConfig;
+    }
+
+    return {
+        ...groundedResearchConfig,
+        freshnessPreference: "recent-first" as const,
+    };
+}
+
 function getNumericClaimGuardrailPrompt() {
     return "Do not introduce precise numeric frameworks, named numeric rules, statistics, percentages, timeframes, counts, ranges, performance lifts, revenue claims, or benchmark numbers unless the exact number and unit are present in the grounded source context. If a number is useful for SEO but not source-backed, keep the keyword intent and rewrite the claim qualitatively.";
 }
@@ -9521,7 +9541,11 @@ async function recoverGroundedResearchAfterSourceMismatch(input: {
                 refreshWindowHours: input.groundedResearchConfig?.refreshWindowHours || 24,
                 bypassCache: true,
                 sourceUrls: rescueSerpAnalysis.topResultUrls,
-                groundedResearchConfig: input.groundedResearchConfig,
+                groundedResearchConfig: resolveGroundedResearchConfigForAnnualTopic(
+                    input.groundedResearchConfig,
+                    candidate.query,
+                    [candidate.topic],
+                ),
             });
 
             const rescueGroundedResearch = groundedResearchResult.result;
@@ -19575,7 +19599,16 @@ export async function refreshBlogStudioPostGroundedResearchImpl(
         refreshWindowHours: aiBloggerConfig?.groundedResearch?.refreshWindowHours || 24,
         bypassCache: true,
         sourceUrls: sourceUrlsForGrounding,
-        groundedResearchConfig: aiBloggerConfig?.groundedResearch,
+        groundedResearchConfig: resolveGroundedResearchConfigForAnnualTopic(
+            aiBloggerConfig?.groundedResearch,
+            query,
+            [
+                currentPost.title,
+                currentPost.metaTitle || "",
+                currentPost.brief.primaryKeyword || "",
+                currentPost.brief.trendFocus || "",
+            ],
+        ),
     });
     const groundedResearch = groundedResearchResult.result;
 
@@ -21675,7 +21708,15 @@ export async function generateBlogStudioDraftImpl(
                     ),
                     refreshWindowHours: aiBloggerConfig?.groundedResearch?.refreshWindowHours || 24,
                     sourceUrls: groundingSourceUrls,
-                    groundedResearchConfig: aiBloggerConfig?.groundedResearch,
+                    groundedResearchConfig: resolveGroundedResearchConfigForAnnualTopic(
+                        aiBloggerConfig?.groundedResearch,
+                        selectedTopicForRun,
+                        [
+                            brief.primaryKeyword || "",
+                            brief.trendFocus || "",
+                            ...(serpAnalysis?.topResultTitles?.slice(0, 5) || []),
+                        ],
+                    ),
                 });
 
                 groundedResearch = groundedResearchResult.result;
@@ -21708,7 +21749,15 @@ export async function generateBlogStudioDraftImpl(
                             minimumFitScore: minimumWebsiteTrendFitScore,
                             serpConfig: aiBloggerConfig?.serp,
                             trendsConfig: liveTrendsConfig,
-                            groundedResearchConfig: aiBloggerConfig?.groundedResearch,
+                            groundedResearchConfig: resolveGroundedResearchConfigForAnnualTopic(
+                                aiBloggerConfig?.groundedResearch,
+                                selectedTopicForRun,
+                                [
+                                    brief.primaryKeyword || "",
+                                    brief.trendFocus || "",
+                                    ...(serpAnalysis?.topResultTitles?.slice(0, 5) || []),
+                                ],
+                            ),
                             location: resolveExternalSearchLocation(
                                 aiBloggerConfig?.serp?.defaultLocation,
                                 brief.location,
@@ -25636,7 +25685,15 @@ export async function runBlogStudioDraftResearchPhase(
                     ),
                     refreshWindowHours: aiBloggerConfig?.groundedResearch?.refreshWindowHours || 24,
                     sourceUrls: groundingSourceUrls,
-                    groundedResearchConfig: aiBloggerConfig?.groundedResearch,
+                    groundedResearchConfig: resolveGroundedResearchConfigForAnnualTopic(
+                        aiBloggerConfig?.groundedResearch,
+                        selectedTopicForRun,
+                        [
+                            brief.primaryKeyword || "",
+                            brief.trendFocus || "",
+                            ...(serpAnalysis?.topResultTitles?.slice(0, 5) || []),
+                        ],
+                    ),
                 });
 
                 groundedResearch = groundedResearchResult.result;
@@ -25669,7 +25726,15 @@ export async function runBlogStudioDraftResearchPhase(
                             minimumFitScore: minimumWebsiteTrendFitScore,
                             serpConfig: aiBloggerConfig?.serp,
                             trendsConfig: liveTrendsConfig,
-                            groundedResearchConfig: aiBloggerConfig?.groundedResearch,
+                            groundedResearchConfig: resolveGroundedResearchConfigForAnnualTopic(
+                                aiBloggerConfig?.groundedResearch,
+                                selectedTopicForRun,
+                                [
+                                    brief.primaryKeyword || "",
+                                    brief.trendFocus || "",
+                                    ...(serpAnalysis?.topResultTitles?.slice(0, 5) || []),
+                                ],
+                            ),
                             location: resolveExternalSearchLocation(
                                 aiBloggerConfig?.serp?.defaultLocation,
                                 brief.location,
