@@ -56,6 +56,16 @@ const nextConfig: NextConfig = {
         destination: '/blog/how-to-manage-your-company-with-ai-driven-workflows-in-2026',
         statusCode: 301,
       },
+      {
+        source: '/blog/glass-city-marathon-2026-content-strategy-scaling-event-production',
+        destination: '/blog/pre-production-strategy-for-digital-content-engines-scale-in-2026',
+        statusCode: 301,
+      },
+      {
+        source: '/blog/mastering-country-calling-2026-content-strategy-ai-production',
+        destination: '/blog/media-strategy-guide-2026-scaling-impact-with-hybrid-models',
+        statusCode: 301,
+      },
     ];
   },
 };

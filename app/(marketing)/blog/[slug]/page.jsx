@@ -248,6 +248,12 @@ const BLOG_SERVICE_LINK_OVERRIDES = {
     "video-production-ad",
     "influencer-marketing",
   ],
+  "ai-trends-for-content-creators-2026-the-geo-playbook": [
+    "ai-blogger",
+    "social-media-marketing",
+    "video-production-ad",
+    "influencer-marketing",
+  ],
   "ajio-22feet-a-winning-fashion-e-commerce-digital-expansion-strategy": [
     "ppc",
     "web-development",
@@ -268,6 +274,12 @@ const BLOG_SERVICE_LINK_OVERRIDES = {
     "ai-blogger",
     "seo",
     "influencer-marketing",
+  ],
+  "building-data-driven-ppc-campaigns-the-modern-roi-framework": [
+    "ppc",
+    "ai-blogger",
+    "seo",
+    "social-media-marketing",
   ],
   "conversion-funnel-mapping-and-optimization-to-stop-leaks": [
     "ppc",
@@ -316,6 +328,12 @@ const BLOG_SERVICE_LINK_OVERRIDES = {
     "ppc",
     "social-media-marketing",
   ],
+  "influencer-marketing-strategy-that-drives-results-5-step-guide": [
+    "influencer-marketing",
+    "ai-blogger",
+    "social-media-marketing",
+    "video-production-ad",
+  ],
   "influencer-marketing-attribution-models-beyond-promo-codes": [
     "influencer-marketing",
     "ai-blogger",
@@ -338,6 +356,12 @@ const BLOG_SERVICE_LINK_OVERRIDES = {
     "social-media-marketing",
     "influencer-marketing",
     "ai-blogger",
+  ],
+  "scaling-performance-influencer-marketing-with-paid-media-allowlisting": [
+    "influencer-marketing",
+    "ai-blogger",
+    "ppc",
+    "social-media-marketing",
   ],
   "the-2026-production-mandate-balancing-speed-and-quality": [
     "video-production-ad",
