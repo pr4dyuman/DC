@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import {
     Dialog,
@@ -24,14 +24,16 @@ import {
     CreateProjectWizardFormData,
     ServiceOption,
 } from "./create-project-wizard-shared";
+import type { CurrentUserResult } from "@/lib/actions";
 
 interface CreateProjectWizardProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onProjectCreated?: () => void;
+    currentUser?: Pick<CurrentUserResult, "id" | "name" | "role">;
 }
 
-export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: CreateProjectWizardProps) {
+export function CreateProjectWizard({ open, onOpenChange, onProjectCreated, currentUser }: CreateProjectWizardProps) {
     const fmt = useDateFormat();
     const { symbol } = useCurrency();
     const [step, setStep] = useState(1);
@@ -51,24 +53,28 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
         dueDate: "",
     });
 
+    const loadData = useCallback(async () => {
+        try {
+            const [loadedClients, loadedServices] = await Promise.all([getClients(), getServices()]);
+            setClients(loadedClients);
+            setServices(loadedServices);
+            if (currentUser?.role === "client") {
+                const ownClientId = loadedClients.find((client) => client.id === currentUser.id)?.id || currentUser.id;
+                setFormData((prev) => ({ ...prev, clientIds: [ownClientId] }));
+            }
+        } catch (error) {
+            console.error("Failed to load data", error);
+            setFormError(error instanceof Error ? error.message : "Failed to load project form data.");
+        }
+    }, [currentUser?.id, currentUser?.role]);
+
     useEffect(() => {
         if (open) {
             setStep(1);
             setFormError("");
             loadData();
         }
-    }, [open]);
-
-    const loadData = async () => {
-        try {
-            const [loadedClients, loadedServices] = await Promise.all([getClients(), getServices()]);
-            setClients(loadedClients);
-            setServices(loadedServices);
-        } catch (error) {
-            console.error("Failed to load data", error);
-            setFormError(error instanceof Error ? error.message : "Failed to load project form data.");
-        }
-    };
+    }, [loadData, open]);
 
     const handleNext = () => {
         if (step === 2) {
@@ -245,6 +251,7 @@ export function CreateProjectWizard({ open, onOpenChange, onProjectCreated }: Cr
                             formData={formData}
                             clients={clients}
                             symbol={symbol}
+                            lockClientSelection={currentUser?.role === "client"}
                             setFormData={setFormData}
                         />
                     )}

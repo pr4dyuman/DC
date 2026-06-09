@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "jetro": {
+      "command": "C:\\Users\\chand\\.jetro\\runtime\\node-win32-x64.exe",
+      "args": [
+        "C:\\Users\\chand\\.jetro\\mcp-server\\index.js"
+      ],
+      "env": {
+        "JET_WORKSPACE": "d:\\agency\\DC",
+        "JET_API_URL": "https://api.jetro.ai",
+        "PATH": "C:\\Users\\chand\\.jetro\\runtime;C:\\Program Files\\Python311\\Scripts\\;C:\\Program Files\\Python311\\;D:\\Program Files (x86)\\VMware\\VMware Workstation\\bin\\;C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.15.6-hotspot\\bin;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\WINDOWS\\System32\\Wbem;C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\;C:\\WINDOWS\\System32\\OpenSSH\\;C:\\chromedriver-win64;c:\\Users\\chand\\AppData\\Local\\Programs\\cursor\\resources\\app\\bin;C:\\ProgramData\\chocolatey\\bin;%NVM_HOME%;%NVM_SYMLINK%;C:\\Program Files\\dotnet\\;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\WINDOWS\\System32\\Wbem;C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\;C:\\WINDOWS\\System32\\OpenSSH\\;C:\\Program Files\\GitHub CLI\\;C:\\Program Files\\Git\\cmd;C:\\Users\\chand\\.cargo\\bin;c:\\Users\\chand\\AppData\\Local\\Programs\\Trae\\bin;C:\\Users\\chand\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\;C:\\Users\\chand\\AppData\\Local\\Programs\\Python\\Python313\\;C:\\Users\\chand\\AppData\\Local\\Microsoft\\WindowsApps;C:\\chromedriver-win64;C:\\Users\\chand\\AppData\\Roaming\\npm;C:\\Users\\chand\\AppData\\Local\\Programs\\Microsoft VS Code\\bin;C:\\Users\\chand\\AppData\\Local\\nvm;C:\\nvm4w\\nodejs;C:\\Users\\chand\\AppData\\Local\\Programs\\Windsurf\\bin;C:\\Users\\chand\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Users\\chand\\AppData\\Local\\Programs\\Antigravity\\bin;C:\\Users\\chand\\AppData\\Local\\Programs\\Antigravity IDE\\bin;C:\\Users\\chand\\AppData\\Local\\Python\\bin;C:\\Users\\chand\\AppData\\Local\\Programs\\Zed\\bin;C:\\Users\\chand\\AppData\\Local\\Programs\\Kiro\\bin"
+      }
+    }
+  }
+}

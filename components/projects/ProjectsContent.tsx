@@ -5,7 +5,7 @@ import { Plus, Search, LayoutGrid, List, Loader2 } from "lucide-react";
 import { CreateProjectWizard } from "@/components/projects/CreateProjectWizard";
 import { useProgressiveList } from "@/hooks/use-infinite-scroll";
 import { toLocalCalendarDay } from "@/lib/date-utils";
-import { Project, Task } from "@/lib/types";
+import { Project, Task, UserPermissions, getDefaultUserPermissionsForRole } from "@/lib/types";
 import { getTaskAssigneeIds } from "@/lib/task-assignees";
 import type { CurrentUserResult } from "@/lib/actions";
 import { ProjectSummaryCard } from "./ProjectSummaryCard";
@@ -22,7 +22,8 @@ interface ProjectsContentProps {
     initialServices: ProjectServiceSummary[];
     initialTasks: Task[];
     initialUsers: ProjectAssignee[];
-    currentUser: Pick<CurrentUserResult, "role">;
+    currentUser: Pick<CurrentUserResult, "id" | "name" | "role">;
+    permissions?: UserPermissions;
 }
 
 export function ProjectsContent({
@@ -31,6 +32,7 @@ export function ProjectsContent({
     initialTasks,
     initialUsers,
     currentUser,
+    permissions,
 }: ProjectsContentProps) {
     const [projects, setProjects] = useState<Project[]>(initialProjects);
     const [services] = useState<ProjectServiceSummary[]>(initialServices);
@@ -44,7 +46,8 @@ export function ProjectsContent({
     const [sortBy, setSortBy] = useState<SortOption>("dueDate");
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-    const isAdmin = currentUser?.role === "admin" || currentUser?.role === "manager";
+    const effectivePermissions = permissions ?? getDefaultUserPermissionsForRole(currentUser?.role);
+    const canCreateProject = effectivePermissions.canCreateProject;
     const today = useMemo(() => toLocalCalendarDay(new Date()) ?? new Date(), []);
 
     const projectData = useMemo(() => {
@@ -161,7 +164,7 @@ export function ProjectsContent({
                         </button>
                     </div>
 
-                    {isAdmin && (
+                    {canCreateProject && (
                         <button
                             onClick={() => setShowWizard(true)}
                             className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 transition-colors"
@@ -191,6 +194,7 @@ export function ProjectsContent({
                 open={showWizard}
                 onOpenChange={setShowWizard}
                 onProjectCreated={handleProjectCreated}
+                currentUser={currentUser}
             />
 
             {filtered.length === 0 ? (

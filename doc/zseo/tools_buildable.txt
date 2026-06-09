@@ -1,0 +1,275 @@
+﻿Buildable tools (in-house) (grouped by category) (pricing/bundles excluded)
+Total unique tools: 210
+CATEGORY: Advanced Reports (9)
+Crawl Budget Efficiency Report - Crawl budget spent vs available
+Crawl Performance Report - Crawl duration and efficiency
+Crawlability Report - Bot access and crawlability issues
+Insecure Content Report - HTTP/HTTPS mixed content issues
+Issue Priority Report - Prioritized issue recommendations
+Orphan Pages Report - Isolated pages without internal links
+Pagination Issue Report - Pagination rel=next/prev errors
+Redirect Chain Report - Incomplete or broken redirect chains
+Segmentation Analysis Report - Custom URL groupings and analysis
+
+CATEGORY: Agency Growth Kit (4)
+Agency Performance Reports - Track agency metrics and KPIs
+Client Portals - White-label portals for client access
+Team Management - Manage agency team members and permissions
+White-Label Platform - Full white-label solution for agencies
+
+CATEGORY: AI & Semantic Analysis (9)
+AI Image Extraction - Intelligent image data extraction
+Content Clustering - AI-powered visual content grouping
+Low-Relevance Page Detection - Pages below relevance threshold to site theme
+Relevance Threshold Scoring - Adjustable similarity thresholds 0.5-0.95
+Semantic Search Functionality - Search queries matched to relevant pages via embeddings
+Semantic Similarity Analysis - LLM embeddings for semantic meaning comparison
+Semantically Similar Pages Detection - Pages covering same topics with different phrasing
+Topical Authority Assessment - Topical authority and cohesion assessment
+Vector Embedding Analysis - Vector-based content similarity scoring
+
+CATEGORY: App Center (6)
+Brand Monitoring - Monitor brand mentions across web and social
+Competitor Monitoring (EyeOn) - Track competitor activity automatically
+Kompyte (Competitive Intelligence) - Automated competitive intelligence dashboards
+Prowly (PR Management) - Manage press releases and media relations
+Sensor - Tracks Google SERP volatility and algorithm changes
+SplitSignal (SEO A/B Testing) - Conduct SEO experiments and test changes
+
+CATEGORY: Bulk Export & Reporting (9)
+Automated Report Generation - Auto-generate comprehensive reports
+Bulk Column Configurator - Customize all report columns
+CSV Export Functionality - Export crawl data to CSV format
+Custom Export Configuration - Choose which columns to include/exclude
+Email Report Delivery - Email reports to stakeholders
+Excel Export Capability - Export crawl data to Excel XLS/XLSX
+Google Sheets Real-Time Sync - Real-time Google Sheets synchronization
+Report Scheduling - Schedule reports to run automatically
+Report Template Selection - Pre-built report templates
+
+CATEGORY: Content Analysis (8)
+Content Freshness Tracking - Publication date and last update tracking
+Duplicate Content Detection - Exact duplicate page detection
+Heading Structure Analysis - Proper H1 H2 H3 sequence
+Near Duplicate Detection - Similar pages with different content
+Readability Analysis - Flesch-Kincaid readability scores
+Spelling & Grammar Check - Spelling and grammar issues
+Text Length Metrics - Character counts and variations
+Word Count Analysis - Total word count per page
+
+CATEGORY: Content Strategy (4)
+Content Performance Analytics - Track content ROI and engagement
+Gap Analysis - Find content gaps in your strategy
+Search Intent Analysis - Understand user search intent
+Topic Research - Discover trending content topics
+
+CATEGORY: Content Toolkit (5)
+AI-Powered Content Ideas - Generate 100+ content post ideas daily
+Content Audit - Analyze existing content performance and optimization
+SEO Content Template - Get recommendations for SEO-friendly structure
+SEO Writing Assistant - Real-time content optimization in Google Docs WordPress
+Topic Finder - Discover content ideas with search volume data
+
+CATEGORY: Context Menu Features (4)
+Open in Browser Option - Open URL in default browser
+Right-Click Indexation Check - Right-click to check Google Search Console indexation
+URL Copy to Clipboard - Copy current URL to clipboard
+Wayback Machine Access - Direct access to Wayback Machine snapshots
+
+CATEGORY: Core Website Crawling (8)
+Audio Content Detection - Audio content detection
+CSS File Analysis - CSS file detection and analysis
+HTML Crawling - HTML page analysis and parsing
+Image Crawling - Image file detection and cataloging
+JavaScript Detection - JavaScript resource detection
+Resource Blocking Detection - Blocked resource identification
+URL Crawling - Comprehensive website crawling spider
+Video Content Detection - Video content discovery and tracking
+
+CATEGORY: Crawl Analysis & Health (8)
+Crawl Budget Optimization - Crawl budget allocation and efficiency
+Crawl Completion Status - Crawl completion percentage and status
+Crawl Efficiency Metrics - Optimal crawl speed recommendations
+Crawl Health Assessment - Overall site crawlability score
+Crawl Speed Analysis - Requests per second analysis
+Historical Crawl Comparison - Compare crawls over time
+Resource Consumption Tracking - Memory and CPU usage during crawl
+Server Response Analysis - Server response time tracking
+
+CATEGORY: Crawl Configuration (10)
+Authentication Configuration - Form-based login authentication
+Crawl Comparison Mode - Compare two separate crawls side-by-side
+Custom User Agent Setup - Custom Bot identification strings
+Include/Exclude URL Filters - Include or exclude URLs by pattern
+List Mode URL Import - Upload and crawl predefined URL list
+Port Specification - Custom port specification not 80/443
+Protocol Override - HTTP vs HTTPS override
+Spider Mode Crawling - Standard automatic crawl mode
+Subdirectory Crawling - Crawl specific subdirectories only
+User Agent Modification - Change User-Agent string
+
+CATEGORY: Custom Extraction & Data (8)
+Attribute Value Extraction - Extract element attributes href src etc.
+CSS Path Extraction - CSS selector for element targeting
+Custom Data Validation - Validation of extracted data quality
+Custom XPath Extraction - XPath syntax for precise element selection
+Form Field Detection - Contact form and input detection
+HTML Element Extraction - Extract full HTML elements
+Multi-Field Custom Extraction - Up to 10 simultaneous custom fields
+Regex Extraction Patterns - Regular expression pattern matching
+
+CATEGORY: JavaScript & Rendering (6)
+AJAX Content Detection - AJAX-loaded content detection
+AMP Page Detection - AMP version detection and validation
+Blocked Resource Detection - Unblocked vs blocked resource identification
+JavaScript Error Tracking - JavaScript errors and warnings
+JavaScript Rendering - Render JavaScript with headless browser
+Rendered Page Screenshots - Before/after JS rendering screenshots
+
+CATEGORY: Link Analysis (14)
+Anchor Text Extraction - Exact anchor text from links
+Broken External Links - External links returning 4xx/5xx
+External Link Count - Count of external links per page
+Hash Duplicate Detection - MD5/SHA256 hash comparison for exact duplicates
+Hreflang Link Validation - Language/region targeting validation
+Internal Link Count - Count of internal links per page
+Link Context Analysis - Surrounding paragraph text context
+Link Placement Analysis - Header footer sidebar placement
+Link Status Tracking - Real-time link health tracking
+Link Type Categorization - Internal vs external categorization
+Link Velocity Tracking - Link discovery pattern tracking
+Redirect Chain Analysis - Chain redirects 3 or more hops
+Redirect Detection - All redirects 301 302 etc.
+Response Code Tracking - Status code for all links
+
+CATEGORY: Log File Analysis Tool (6)
+AI Bot Detection - GPTBot Claude-Web Perplexity bot detection
+Bot Activity Tracking - Googlebot Bingbot and AI bot tracking
+Carbon Footprint Calculation - CO2 emissions calculation per crawl
+IP Address Analysis - Request frequency and pattern analysis
+Server Log File Upload - Drag-and-drop server log imports Apache IIS Nginx
+User-Agent Verification - IP address verification against known bots
+
+CATEGORY: Metadata Analysis (8)
+Canonical Chain Detection - Redirect chain canonicals
+Canonical Tag Detection - Canonical tag extraction
+Canonical URL Extraction - Canonical URL values
+Meta Charset Detection - Character encoding detection
+Meta Viewport Detection - Viewport meta tag analysis
+Open Graph Analysis - OG:Title OG:Description OG:Image analysis
+Self-Referential Canonicals - Self-referencing canonical verification
+Twitter Card Analysis - Twitter Card validation
+
+CATEGORY: Mobile & Device (4)
+Desktop User Agent Crawling - Crawl as desktop Googlebot
+Device Viewport Configuration - Viewport size configuration 320px-1920px
+Mobile User Agent Crawling - Crawl as mobile Googlebot
+Tablet User Agent Support - Tablet device crawling
+
+CATEGORY: My Reports Tool (3)
+Client Portal Sharing - Share reports with clients and stakeholders
+Custom PDF Reports - Create white-label branded PDF reports
+Scheduled Reports - Automate report generation and delivery
+
+CATEGORY: On-Page SEO Analysis (9)
+External Link Analysis - External hyperlink detection
+Internal Link Analysis - Internal hyperlink extraction
+Internal Link Anchor Distribution - Internal link anchor text distribution
+Link Depth Analysis - Internal link depth tracking
+Link Path Type Detection - Absolute relative protocol root path detection
+Link Position Classification - Navigation vs content vs footer classification
+Link Ratio Analysis - Inlink to outlink ratio analysis
+Link Source Classification - Header footer sidebar link categorization
+Outbound Link Audit - Outbound link quality assessment
+
+CATEGORY: Performance Analysis (4)
+Page Speed Metrics - Load time and response metrics
+Resource Load Time Tracking - CSS JS image resource load tracking
+Response Time Analysis - Server response time analysis
+Time to First Byte - First byte delivery time
+
+CATEGORY: Reporting & Analytics (4)
+Error Warnings and Notices - Monitor site health issues over time
+Estimated Organic Traffic - Calculate traffic from organic rankings
+Historical Data - Access 6 months+ of historical analytics
+Position Visibility Tracking - Track overall domain visibility score
+
+CATEGORY: Security & SSL (4)
+HTTPS Detection - HTTPS encryption verification
+Mixed Content Detection - HTTP + HTTPS content mixing detection
+Security Header Analysis - X-Frame-Options CSP header detection
+SSL Certificate Validation - SSL certificate chain validation
+
+CATEGORY: SEO Toolkit (4)
+Bulk Analysis - Benchmark backlinks across multiple competitors
+Link Building Tool - Find link prospects and manage outreach campaigns
+On-Page SEO Checker - Get actionable SEO optimization recommendations
+Site Audit - Scan 140+ technical SEO issues and get health score
+
+CATEGORY: Sitemap Management (8)
+Multiple Sitemap Downloads - Download multiple sitemaps at once
+Multi-Sitemap Crawling - Crawl multiple sitemaps simultaneously
+Sitemap Comparison - Compare sitemap versions
+Sitemap Download Tool - Standalone sitemap download tool
+Sitemap Index Creation - Multi-sitemap index file creation
+Sitemap URL Verification - Verify all URLs in sitemap exist and return 200
+Sitemap Validation - Validation of existing sitemaps
+XML Sitemap Generation - Automatic XML sitemap creation
+
+CATEGORY: Storage & Database (4)
+Crawl History Tracking - Access previous crawl history
+Database Storage Mode - Persistent database storage on disk
+Persistent Crawl Storage - Long-term crawl data archival
+RAM Storage Mode - In-memory crawl data storage
+
+CATEGORY: Structured Data (7)
+JSON-LD Validation - JSON-LD validation and parsing
+Microdata Detection - Microdata itemscope detection
+RDFa Markup Detection - RDFa markup detection
+Rich Snippet Analysis - Rich snippet compatibility checking
+Schema Markup Type Classification - Classification of schema types Product Article etc.
+Schema.org Detection - Schema.org markup detection
+Structured Data Errors - Structured data errors and warnings
+
+CATEGORY: Technical SEO (8)
+Broken Links Detection - Find broken internal and external links
+Crawlability Audit - Identify and fix crawlability issues
+Duplicate Content Detection - Find duplicate pages and thin content
+HTTPS Errors - Detect mixed content and SSL issues
+Internal Link Analysis - Review site structure and internal linking
+Mobile Usability - Check mobile optimization and usability
+Page Speed Issues - Identify slow-loading pages and resources
+Redirect Chains - Detect inefficient redirect chains
+
+CATEGORY: Technical SEO Audit (12)
+Broken Link Detection - 404 errors and broken links
+Follow/Nofollow Analysis - Link follow/nofollow attribute analysis
+H1 Tag Analysis - H1 heading detection
+H2 Tag Analysis - H2 heading detection
+HTTP Status Code Analysis - HTTP 2xx 3xx 4xx 5xx response codes
+Image Alt Text Analysis - Missing alt text identification
+Indexation Status Detection - Noindex and canonical status
+Meta Description Analysis - Meta description extraction
+Meta Robots Analysis - Meta robots tag analysis
+Noindex Detection - Noindex tag detection
+Page Title Analysis - Title tag extraction and issues
+Redirect Chain Detection - Multi-hop redirect identification
+
+CATEGORY: URL Management & Filtering (8)
+Crawl Scope Definition - Set crawl boundaries and depth
+Dynamic URL Handling - Track dynamic URL generation
+Parameter Handling - Handle and analyze URL parameters
+Query String Management - Manage tracking codes and session IDs
+URL Grouping Options - Organize URLs into logical groups
+URL List Import - Bulk URL import from CSV/TXT
+URL Pattern Matching - Wildcard and regex URL patterns
+URL Segmentation - Segment URLs by type status or custom criteria
+
+CATEGORY: Visualization (7)
+Content Cluster Visualization - Semantic content clusters visualization
+Directory Tree Graph - Tree structure of site hierarchy
+Force-Directed Graph - Force-directed network graph
+Interactive Tree View - Expandable/collapsible tree navigation
+SERP Preview - SERP preview with rich snippets
+Site Architecture Mapping - Complete URL structure mapping
+Sunburst Chart Visualization - Radial/concentric site map

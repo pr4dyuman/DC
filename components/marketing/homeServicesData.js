@@ -63,7 +63,7 @@ export const servicesData = [
     id: "07",
     title: "Manage",
     titleHighlight: "Company",
-    image: "/dashboard-mockup-service-564-q84.jpg",
+      image: "/dashboard-mockup-service-1200-q92.webp",
     description:
       "AI-powered agency management platform for projects, finances, invoicing, and operational visibility.",
     link: "/services/manage-company",

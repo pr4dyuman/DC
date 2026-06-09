@@ -1,7 +1,14 @@
 import { requireRole } from "@/lib/actions/access";
 import { getCurrentAgency } from "@/lib/agency-context";
 import { getAIBloggerAccessState } from "@/lib/ai-blogger-access";
-import { getPipelineJobSnapshot, subscribePipelineEvents, type PipelineEvent } from "@/lib/ai-blogger-pipeline-events";
+import {
+    getPipelineJobSnapshot,
+    isPipelineJobStale,
+    PIPELINE_TIMEOUT_MESSAGE,
+    subscribePipelineEvents,
+    type PipelineEvent,
+} from "@/lib/ai-blogger-pipeline-events";
+import { resumeInterruptedPipelineJob } from "@/lib/ai-blogger-pipeline-resume";
 import { isMongoConnectionIssue } from "@/lib/mongodb-connection";
 
 export const dynamic = "force-dynamic";
@@ -224,7 +231,7 @@ export async function GET(request: Request) {
                 const pollSnapshot = async () => {
                     pollCount += 1;
                     try {
-                        const snapshot = await getPipelineJobSnapshot(jobId);
+                        let snapshot = await getPipelineJobSnapshot(jobId);
                         if (!snapshot.exists || snapshot.agencyId !== agency.id) {
                             console.log(`[SSE] Poll #${pollCount}: Job not found or unauthorized`);
                             sendEvent({
@@ -237,6 +244,12 @@ export async function GET(request: Request) {
                                 pollInterval = null;
                             }
                             return;
+                        }
+
+                        if (isPipelineJobStale(snapshot)) {
+                            console.warn(`[SSE] Poll #${pollCount}: Job ${jobId} is stale; attempting resume.`);
+                            await resumeInterruptedPipelineJob(jobId, snapshot, request);
+                            snapshot = await getPipelineJobSnapshot(jobId);
                         }
 
                         const nextEvents = snapshot.events.slice(emittedCount);
@@ -255,6 +268,13 @@ export async function GET(request: Request) {
                         const hasTerminalEvent = snapshot.events.some(
                             (e) => e.type === "complete" || e.type === "error",
                         );
+                        if (snapshot.status === "error" && !hasTerminalEvent) {
+                            sendEvent({
+                                type: "error",
+                                message: PIPELINE_TIMEOUT_MESSAGE,
+                                timestamp: new Date().toISOString(),
+                            });
+                        }
                         if (snapshot.status !== "running" && hasTerminalEvent && nextEvents.length === 0) {
                             if (pollInterval) {
                                 clearInterval(pollInterval);

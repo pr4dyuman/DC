@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/actions/access";
 import { getCurrentAgency } from "@/lib/agency-context";
 import { getAIBloggerAccessState } from "@/lib/ai-blogger-access";
-import { getPipelineJobSnapshot } from "@/lib/ai-blogger-pipeline-events";
+import {
+    getPipelineJobSnapshot,
+    isPipelineJobStale,
+    PIPELINE_TIMEOUT_MESSAGE,
+} from "@/lib/ai-blogger-pipeline-events";
+import { resumeInterruptedPipelineJob } from "@/lib/ai-blogger-pipeline-resume";
 import { isMongoConnectionIssue } from "@/lib/mongodb-connection";
 
 export const dynamic = "force-dynamic";
@@ -33,9 +38,14 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        const snapshot = await getPipelineJobSnapshot(jobId);
+        let snapshot = await getPipelineJobSnapshot(jobId);
         if (!snapshot.exists || snapshot.agencyId !== agency.id) {
             return NextResponse.json({ error: "Job not found" }, { status: 404 });
+        }
+
+        if (isPipelineJobStale(snapshot)) {
+            await resumeInterruptedPipelineJob(jobId, snapshot, request);
+            snapshot = await getPipelineJobSnapshot(jobId);
         }
 
         let status: "running" | "completed" | "failed";
@@ -44,27 +54,14 @@ export async function GET(request: Request) {
         } else if (snapshot.status === "error") {
             status = "failed";
         } else {
-            const STALE_THRESHOLD_MS = 320_000;
-            const createdAtMs = snapshot.createdAt ? new Date(snapshot.createdAt).getTime() : 0;
-            const updatedAtMs = snapshot.updatedAt ? new Date(snapshot.updatedAt).getTime() : 0;
-            const lastEventMs = snapshot.events.length > 0
-                ? new Date(snapshot.events[snapshot.events.length - 1]?.timestamp || 0).getTime()
-                : 0;
-            const lastActivityMs = Math.max(createdAtMs, updatedAtMs, lastEventMs);
-            const hasTerminal = snapshot.events.some((event) => event.type === "complete" || event.type === "error");
-
-            if (!hasTerminal && lastActivityMs > 0 && Date.now() - lastActivityMs > STALE_THRESHOLD_MS) {
-                status = "failed";
-            } else {
-                status = "running";
-            }
+            status = "running";
         }
 
         const completeEvent = snapshot.events.find((event) => event.type === "complete");
         const errorEvent = snapshot.events.find((event) => event.type === "error");
         const staleError =
             status === "failed" && !errorEvent
-                ? "The generation worker stopped reporting progress before completion. Try again."
+                ? PIPELINE_TIMEOUT_MESSAGE
                 : null;
 
         return NextResponse.json({

@@ -1190,11 +1190,23 @@ export async function getServiceTaskCount(projectId: string, serviceName: string
 }
 
 export async function createProject(project: Omit<ProjectLike, "id" | "status" | "createdAt" | "agencyId">) {
-    const currentUser = await requireRole('admin', 'manager');
+    const currentUser = await requireAuth();
     const agency = await getCurrentAgency();
     if (!agency?.id) throw new Error('No agency context');
+    const permissions = await getUserPermissionsImpl(agency.id, currentUser.id);
+    if (!permissions.canCreateProject) {
+        throw new Error('Unauthorized: You do not have permission to create projects.');
+    }
+
+    const projectToCreate = { ...project };
+    if (currentUser.role === 'client') {
+        projectToCreate.clientId = currentUser.id;
+        projectToCreate.clientIds = [currentUser.id];
+        projectToCreate.client = currentUser.name;
+    }
+
     return createProjectImpl(
-        project,
+        projectToCreate,
         { id: currentUser.id, name: currentUser.name },
         agency.id
     );
@@ -1326,10 +1338,17 @@ export async function addComment(taskId: string, userId: string, text: string, t
 
 
 export async function createTask(task: Omit<TaskEffectRecord, "id" | "agencyId">) {
-    await requireRole('admin', 'manager');
     const currentUser = await requireAuth();
     const agency = await getCurrentAgency();
     if (!agency?.id) throw new Error('Agency context required');
+    const permissions = await getUserPermissionsImpl(agency.id, currentUser.id);
+    if (!permissions.canManageTasks) {
+        throw new Error('Unauthorized: You do not have permission to create tasks.');
+    }
+    const canAccessProject = await canCurrentUserAccessProject(task.projectId, agency.id);
+    if (!canAccessProject) {
+        throw new Error('Unauthorized: You cannot create tasks in this project.');
+    }
     return createTaskImpl(task, { id: agency.id, settings: agency.settings }, { id: currentUser.id, name: currentUser.name });
 }
 
@@ -1337,9 +1356,20 @@ export async function createTask(task: Omit<TaskEffectRecord, "id" | "agencyId">
 // --- Client Actions ---
 
 export async function getClients() {
-    await requireRole('admin', 'manager');
+    const caller = await requireAuth();
     const agency = await getCurrentAgency();
     if (!agency?.id) throw new Error('Agency context required');
+    const canViewAllClients = caller.role === 'admin' || caller.role === 'manager';
+    if (!canViewAllClients) {
+        const permissions = await getUserPermissionsImpl(agency.id, caller.id);
+        if (!permissions.canCreateProject) {
+            throw new Error('Unauthorized: You do not have permission to view clients.');
+        }
+        if (caller.role === 'client') {
+            const client = await getClientByIdImpl(agency.id, caller.id);
+            return client ? [client] : [];
+        }
+    }
     return getClientsImpl(agency.id);
 }
 

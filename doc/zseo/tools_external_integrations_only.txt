@@ -1,0 +1,101 @@
+﻿External but doable via integrations/APIs (grouped by category) (pricing/bundles excluded)
+Total unique tools: 38
+CATEGORY: Agency Growth Kit (1)
+CRM Integration - Manage clients and campaigns in one place
+  NEEDS: One or more third-party APIs/datasets, auth (OAuth/API keys), and rate-limit handling
+
+CATEGORY: AI PR Toolkit (6)
+Earned Media Attribution - Attribute earned press to pitches sent
+  NEEDS: Monitoring data + campaign/pitch tracking IDs, attribution model
+Email Analytics - Track email open rates and engagement
+  NEEDS: Email provider (SES/SendGrid/etc), tracking (pixels/links), unsubscribe + compliance
+Media Database - Access contacts of journalists and outlets
+  NEEDS: Licensed journalist/outlet contacts dataset (or partner), GDPR/consent + suppression lists
+Media Monitoring - Monitor mentions across news blogs and forums
+  NEEDS: News/blog crawling or monitoring provider, entity matching, dedupe, alerting
+Mention Alerts - Get real-time alerts for brand mentions
+  NEEDS: Monitoring provider or web crawl + alert delivery (email/webhooks), dedupe
+Press Release Distribution - Create and distribute press releases to media
+  NEEDS: Wire/distribution partners OR outbound email infrastructure + deliverability + compliance
+
+CATEGORY: API Integrations (9)
+Ahrefs API Integration - Ahrefs keyword and backlink data
+  NEEDS: Ahrefs API subscription + token, endpoints for backlinks/keywords, rate limits
+Claude API Integration - Anthropic Claude API integration
+  NEEDS: Anthropic API key, model access, rate limits
+Gemini AI Integration - Google Gemini AI integration
+  NEEDS: Gemini access (AI Studio or Vertex AI), API key/OAuth, quotas
+Google Analytics Integration - GA traffic and bounce rate data
+  NEEDS: Google Analytics 4 Data API, OAuth, property access
+Google Search Console Integration - GSC data import queries CTR impressions
+  NEEDS: Google Search Console APIs (Search Analytics + URL Inspection), OAuth, verified property access
+Majestic API Integration - Majestic backlink and trust flow data
+  NEEDS: Majestic API subscription + key, backlink endpoints, rate limits
+Ollama Integration - Ollama local LLM integration
+  NEEDS: Ollama runtime (self-hosted) + models, server URL
+OpenAI Integration - OpenAI content generation and analysis
+  NEEDS: OpenAI API key, model access, quotas, safety filters
+PageSpeed Insights Integration - PageSpeed Insights CWV metrics
+  NEEDS: PageSpeed Insights API and/or CrUX API, API key, quotas + caching
+
+CATEGORY: App Center (4)
+Google Analytics Integration - Pull GA data into Semrush dashboards
+  NEEDS: Google Analytics 4 Data API, OAuth, property access
+Google Search Console Integration - Sync GSC data for complete visibility
+  NEEDS: Google Search Console APIs (Search Analytics + URL Inspection), OAuth, verified property access
+Looker Studio Integration - Create custom data visualization dashboards
+  NEEDS: Looker Studio connector/export path, Google OAuth
+Slack Integration - Get Semrush alerts and updates in Slack
+  NEEDS: Slack app (OAuth scopes) + Events/Webhooks, workspace install
+
+CATEGORY: Context Menu Features (2)
+GSC Coverage Status Check - GSC coverage status quick check
+  NEEDS: Google Search Console APIs (Search Analytics + URL Inspection), OAuth, verified property access
+Quick Search Console Lookup - Quick GSC URL inspection API lookup
+  NEEDS: One or more third-party APIs/datasets, auth (OAuth/API keys), and rate-limit handling
+
+CATEGORY: Local Toolkit (6)
+Citation Building - Create local business citations and manage accuracy
+  NEEDS: Listing/citation providers (aggregator or manual submission workflows), NAP consistency rules
+Google Business Profile AI Agent - Automatically optimize GBP and manage activities
+  NEEDS: Google Business Profile APIs, OAuth, location/business permissions
+Local Competitor Analysis - Analyze competitor local performance and reviews
+  NEEDS: GBP/Maps data source (official APIs where possible), geo queries, rate limits
+Local Listing Management - Manage all local directory listings in one place
+  NEEDS: Listing directory APIs/aggregators (Yext/Uberall/etc or per-directory), business verification flows
+Local Rank Tracking - Track visibility on Google Maps and local directories
+  NEEDS: One or more third-party APIs/datasets, auth (OAuth/API keys), and rate-limit handling
+Review Management - Generate and respond to customer reviews automatically
+  NEEDS: Review platform APIs (GBP + others if supported), OAuth/keys, reply/post permissions
+
+CATEGORY: My Reports Tool (1)
+Multi-Source Integration - Combine data from GA GSC Google Ads Facebook
+  NEEDS: Connectors for GA4 + GSC + Ads + Meta, OAuth, unified schema + mapping
+
+CATEGORY: Performance Analysis (1)
+Core Web Vitals Integration - LCP FID CLS metrics
+  NEEDS: PageSpeed Insights API and/or CrUX API, API key, quotas + caching
+
+CATEGORY: SEO Toolkit (1)
+Organic Traffic Insights - Blend GA GSC and Semrush data for full visibility
+  NEEDS: GA4 Data API + GSC Search Analytics API + URL mapping logic
+
+CATEGORY: Social Toolkit (9)
+Influencer Analytics - Find influencers on Instagram TikTok YouTube Twitch
+  NEEDS: Social platform APIs (Meta/Instagram, LinkedIn, X, TikTok, YouTube), OAuth, app reviews, rate limits
+Influencer Campaign Management - Plan launch and manage influencer campaigns
+  NEEDS: Social platform APIs (Meta/Instagram, LinkedIn, X, TikTok, YouTube), OAuth, app reviews, rate limits
+Social Analytics - Analyze social media performance and engagement
+  NEEDS: Social platform APIs (Meta/Instagram, LinkedIn, X, TikTok, YouTube), OAuth, app reviews, rate limits
+Social Content AI - Generate 100+ social posts daily with AI
+  NEEDS: Social platform APIs (Meta/Instagram, LinkedIn, X, TikTok, YouTube), OAuth, app reviews, rate limits
+Social Content Insights - Discover what content performs best for your audience
+  NEEDS: Social platform APIs (Meta/Instagram, LinkedIn, X, TikTok, YouTube), OAuth, app reviews, rate limits
+Social Dashboard - Get quick overview of social media statistics
+  NEEDS: Social platform APIs (Meta/Instagram, LinkedIn, X, TikTok, YouTube), OAuth, app reviews, rate limits
+Social Listening - Monitor brand conversations across social media
+  NEEDS: Social platform APIs (Meta/Instagram, LinkedIn, X, TikTok, YouTube), OAuth, app reviews, rate limits
+Social Poster - Schedule posts across multiple social platforms
+  NEEDS: Social platform APIs (Meta/Instagram, LinkedIn, X, TikTok, YouTube), OAuth, app reviews, rate limits
+Social Tracker - Monitor competitor social strategies and trends
+  NEEDS: Social platform APIs (Meta/Instagram, LinkedIn, X, TikTok, YouTube), OAuth, app reviews, rate limits

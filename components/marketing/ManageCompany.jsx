@@ -88,10 +88,10 @@ export default function ManageCompanySection({ headingLevel = "h2", imagePriorit
                         <div className="absolute -inset-4 bg-gradient-to-br from-[#F5EE30]/10 via-transparent to-[#F5EE30]/5 rounded-2xl blur-xl"></div>
                         <div className="relative rounded-xl overflow-hidden border border-white/10 shadow-2xl shadow-[#F5EE30]/5">
                             <Image
-                                src="/dashboard-mockup-640-q84.jpg"
+                                src="/dashboard-mockup-1600-q92.webp"
                                 alt="Agency OS Dashboard — AI-powered company management platform"
-                                width={800}
-                                height={500}
+                                width={1600}
+                                height={1000}
                                 sizes="(min-width: 1280px) 576px, (min-width: 1024px) 45vw, (min-width: 640px) 90vw, 100vw"
                                 className="w-full h-auto"
                                 priority={imagePriority}

@@ -96,7 +96,8 @@ export function TaskCard({
         return () => document.removeEventListener("mousedown", handler);
     }, []);
 
-    const canEdit = !readOnly && (
+    const canManageTaskFields = !readOnly && effectivePermissions.canManageTasks;
+    const canOpenEditModal = !readOnly && (
         effectivePermissions.canManageTasks ||
         effectivePermissions.deleteAccess === "any" ||
         (effectivePermissions.deleteAccess === "own" && task.createdBy === currentUserId)
@@ -141,16 +142,16 @@ export function TaskCard({
 
     const handlePriorityClick = (event: React.MouseEvent) => {
         event.stopPropagation();
-        if (!canEdit) return;
+        if (!canManageTaskFields) return;
         const current = (task.priority as TaskPriority) || "Medium";
         const next = PRIORITY_CYCLE[(PRIORITY_CYCLE.indexOf(current) + 1) % PRIORITY_CYCLE.length];
         onQuickEdit?.(task.id, { priority: next });
         startTransition(async () => {
             try {
                 await updateTask(task.id, { priority: next });
-            } catch {
+            } catch (error) {
                 onQuickEdit?.(task.id, { priority: current });
-                toast.error("Failed to update priority");
+                toast.error(error instanceof Error ? error.message : "Failed to update priority");
             }
         });
     };
@@ -165,9 +166,9 @@ export function TaskCard({
         startTransition(async () => {
             try {
                 await updateTask(task.id, { assigneeIds: nextAssigneeIds, assigneeId: nextAssigneeIds[0] || "" });
-            } catch {
+            } catch (error) {
                 onQuickEdit?.(task.id, { assigneeIds: previousAssigneeIds, assigneeId: previousAssigneeIds[0] || "" });
-                toast.error("Failed to update assignees");
+                toast.error(error instanceof Error ? error.message : "Failed to update assignees");
             }
         });
     };
@@ -179,9 +180,9 @@ export function TaskCard({
         startTransition(async () => {
             try {
                 await updateTask(task.id, { assigneeIds: [], assigneeId: "" });
-            } catch {
+            } catch (error) {
                 onQuickEdit?.(task.id, { assigneeIds: previousAssigneeIds, assigneeId: previousAssigneeIds[0] || "" });
-                toast.error("Failed to update assignees");
+                toast.error(error instanceof Error ? error.message : "Failed to update assignees");
             }
         });
     };
@@ -226,13 +227,13 @@ export function TaskCard({
                                 <div className="flex items-center gap-1 shrink-0">
                                     <button
                                         onClick={handlePriorityClick}
-                                        title={canEdit ? `Priority: ${priority || "None"} - click to change` : `Priority: ${priority || "None"}`}
-                                        className={`text-[10px] sm:text-[9px] font-bold px-2 py-1 sm:px-1.5 sm:py-0.5 rounded-full transition-colors ${priority ? PRIORITY_STYLES[priority] : "bg-muted text-muted-foreground hover:bg-muted/80"} ${canEdit ? "cursor-pointer" : "cursor-default"}`}
+                                        title={canManageTaskFields ? `Priority: ${priority || "None"} - click to change` : `Priority: ${priority || "None"}`}
+                                        className={`text-[10px] sm:text-[9px] font-bold px-2 py-1 sm:px-1.5 sm:py-0.5 rounded-full transition-colors ${priority ? PRIORITY_STYLES[priority] : "bg-muted text-muted-foreground hover:bg-muted/80"} ${canManageTaskFields ? "cursor-pointer" : "cursor-default"}`}
                                     >
                                         {priority || "—"}
                                     </button>
 
-                                    {canEdit && (
+                                    {canOpenEditModal && (
                                         <button
                                             onClick={handleEditClick}
                                             className="max-sm:opacity-100 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 sm:p-1 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground shrink-0"

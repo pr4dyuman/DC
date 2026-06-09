@@ -170,9 +170,9 @@ export function KanbanBoard({ initialTasks, users, currentUserId, currentUserRol
 
         try {
             await updateTaskStatus(taskId, newStatus as Task['status']);
-        } catch {
+        } catch (error) {
             setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: draggedTask.status } : t));
-            toast.error("Failed to move task");
+            toast.error(error instanceof Error ? error.message : "Failed to move task");
         }
     };
 
@@ -199,9 +199,9 @@ export function KanbanBoard({ initialTasks, users, currentUserId, currentUserRol
         try {
             await updateTaskStatus(taskId, newStatus);
             toast.success(`Moved to ${newStatus}`);
-        } catch {
+        } catch (error) {
             setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: oldStatus } : t));
-            toast.error("Failed to move task");
+            toast.error(error instanceof Error ? error.message : "Failed to move task");
         }
     };
 

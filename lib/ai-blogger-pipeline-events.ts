@@ -41,6 +41,8 @@ type PipelineExecutionState = {
     claimedPhase?: string;
     claimId?: string;
     claimExpiresAt?: string;
+    resumeAttempts?: number;
+    lastResumeAt?: string;
     updatedAt?: string;
 };
 
@@ -56,7 +58,7 @@ type PipelineJob = {
     completedAt?: number;
 };
 
-type PipelineJobSnapshot = {
+export type PipelineJobSnapshot = {
     exists: boolean;
     jobId?: string;
     agencyId?: string;
@@ -92,7 +94,14 @@ type PipelineGlobalStore = typeof globalThis & {
 const EVENT_TTL_MS = 5 * 60 * 1000;
 const JOB_RETENTION_MS = 24 * 60 * 60 * 1000;
 const MAX_EVENTS_PER_JOB = 200;
-const PHASE_CLAIM_LEASE_MS = 10 * 60 * 1000;
+const PHASE_CLAIM_LEASE_MS = 315_000;
+
+export const PIPELINE_STALE_THRESHOLD_MS = 330_000;
+export const PIPELINE_STALE_RESUME_MAX_ATTEMPTS = 3;
+export const PIPELINE_TIMEOUT_MESSAGE =
+    "Generation reached the server time budget before the current stage finished. Retry with a shorter word target or fewer research features enabled.";
+export const PIPELINE_RESUME_MESSAGE =
+    "Generation was interrupted, so the workflow is resuming the current stage.";
 
 const pipelineGlobal = globalThis as PipelineGlobalStore;
 const jobs = pipelineGlobal.__aiBloggerPipelineJobs ?? (pipelineGlobal.__aiBloggerPipelineJobs = new Map<string, PipelineJob>());
@@ -280,6 +289,12 @@ function normalizeExecutionState(value: unknown): PipelineExecutionState | undef
     }
     if (typeof raw.claimExpiresAt === "string") {
         execution.claimExpiresAt = raw.claimExpiresAt;
+    }
+    if (typeof raw.resumeAttempts === "number" && Number.isFinite(raw.resumeAttempts)) {
+        execution.resumeAttempts = Math.max(0, Math.floor(raw.resumeAttempts));
+    }
+    if (typeof raw.lastResumeAt === "string") {
+        execution.lastResumeAt = raw.lastResumeAt;
     }
     if (typeof raw.updatedAt === "string") {
         execution.updatedAt = raw.updatedAt;
@@ -621,9 +636,194 @@ export function releaseLocalPipelineJob(jobId: string): void {
     }
 }
 
+export function getPipelineJobLastActivityMs(snapshot: PipelineJobSnapshot): number {
+    const createdAtMs = snapshot.createdAt ? new Date(snapshot.createdAt).getTime() : 0;
+    const updatedAtMs = snapshot.updatedAt ? new Date(snapshot.updatedAt).getTime() : 0;
+    const lastEventMs = snapshot.events.length > 0
+        ? new Date(snapshot.events[snapshot.events.length - 1]?.timestamp || 0).getTime()
+        : 0;
+
+    return Math.max(createdAtMs, updatedAtMs, lastEventMs);
+}
+
+export function isPipelineJobStale(snapshot: PipelineJobSnapshot, now = Date.now()): boolean {
+    if (!snapshot.exists || snapshot.status !== "running") {
+        return false;
+    }
+
+    const hasTerminal = snapshot.events.some((event) => event.type === "complete" || event.type === "error");
+    if (hasTerminal) {
+        return false;
+    }
+
+    const lastActivityMs = getPipelineJobLastActivityMs(snapshot);
+    return lastActivityMs > 0 && now - lastActivityMs > PIPELINE_STALE_THRESHOLD_MS;
+}
+
+type PipelineJobResumeResult =
+    | {
+        ok: true;
+        phase: string;
+        attempts: number;
+    }
+    | {
+        ok: false;
+        reason: "not-running" | "missing-execution" | "max-attempts" | "already-resumed";
+        attempts?: number;
+    };
+
+export async function preparePipelineJobResume(
+    jobId: string,
+    snapshot: PipelineJobSnapshot,
+): Promise<PipelineJobResumeResult> {
+    if (!snapshot.exists || snapshot.status !== "running") {
+        return { ok: false, reason: "not-running" };
+    }
+
+    const phase = snapshot.execution?.phase?.trim() || "";
+    if (!phase || !snapshot.execution?.request) {
+        return { ok: false, reason: "missing-execution" };
+    }
+
+    const attempts = Math.max(0, Math.floor(snapshot.execution.resumeAttempts || 0));
+    if (attempts >= PIPELINE_STALE_RESUME_MAX_ATTEMPTS) {
+        return { ok: false, reason: "max-attempts", attempts };
+    }
+
+    const nowIso = new Date().toISOString();
+    const filter: Record<string, unknown> = {
+        id: jobId,
+        status: "running",
+        "execution.phase": phase,
+        $or: [
+            { "execution.resumeAttempts": { $exists: false } },
+            { "execution.resumeAttempts": { $lt: PIPELINE_STALE_RESUME_MAX_ATTEMPTS } },
+        ],
+    };
+    if (snapshot.updatedAt) {
+        filter.updatedAt = snapshot.updatedAt;
+    }
+
+    await connectDB();
+
+    const resumedDoc = await BlogStudioPipelineJobModel.findOneAndUpdate(
+        filter,
+        {
+            $set: {
+                updatedAt: nowIso,
+                expiresAt: new Date(Date.now() + JOB_RETENTION_MS),
+                "execution.updatedAt": nowIso,
+                "execution.lastResumeAt": nowIso,
+            },
+            $inc: {
+                "execution.resumeAttempts": 1,
+            },
+            $unset: {
+                "execution.claimedPhase": 1,
+                "execution.claimId": 1,
+                "execution.claimExpiresAt": 1,
+            },
+        },
+        { returnDocument: "after" },
+    ).lean();
+
+    if (!resumedDoc) {
+        return { ok: false, reason: "already-resumed", attempts };
+    }
+
+    const docRecord = resumedDoc as Record<string, unknown>;
+    const execution = normalizeExecutionState(docRecord.execution);
+    const rawEvents = Array.isArray((resumedDoc as { events?: unknown[] }).events)
+        ? ((resumedDoc as { events?: unknown[] }).events ?? [])
+        : [];
+    const events = rawEvents
+        .map((event) => normalizePipelineEvent(event))
+        .filter((event): event is PipelineEvent => Boolean(event));
+
+    applySnapshotToMemoryJob(jobId, {
+        exists: true,
+        jobId,
+        agencyId: typeof docRecord.agencyId === "string" ? docRecord.agencyId : undefined,
+        createdBy: typeof docRecord.createdBy === "string" ? docRecord.createdBy : undefined,
+        status: (typeof docRecord.status === "string" ? docRecord.status : "running") as PipelineJobStatus,
+        events,
+        createdAt: typeof docRecord.createdAt === "string" ? docRecord.createdAt : undefined,
+        updatedAt: typeof docRecord.updatedAt === "string" ? docRecord.updatedAt : nowIso,
+        completedAt: typeof docRecord.completedAt === "string" ? docRecord.completedAt : undefined,
+        execution,
+    });
+
+    return {
+        ok: true,
+        phase,
+        attempts: Math.max(1, Math.floor(execution?.resumeAttempts || attempts + 1)),
+    };
+}
+
+export async function failPipelineJobIfRunning(jobId: string, message = PIPELINE_TIMEOUT_MESSAGE): Promise<boolean> {
+    const timestamp = new Date().toISOString();
+    const fullEvent: PipelineEvent = {
+        type: "error",
+        message,
+        timestamp,
+    };
+    let updatedMemory = false;
+    let updatedPersisted = false;
+    const job = jobs.get(jobId);
+
+    if (job?.status === "running") {
+        if (job.events.length < MAX_EVENTS_PER_JOB) {
+            job.events.push(fullEvent);
+        }
+        job.status = "error";
+        job.updatedAt = Date.now();
+        job.completedAt = Date.now();
+        delete job.execution;
+        job.emitter.emit("event", fullEvent);
+        updatedMemory = true;
+    }
+
+    await queuePersistence(jobId, async () => {
+        await connectDB();
+
+        const result = await BlogStudioPipelineJobModel.updateOne(
+            { id: jobId, status: "running" },
+            {
+                $push: {
+                    events: {
+                        $each: [toPersistedEvent(fullEvent)],
+                        $slice: -MAX_EVENTS_PER_JOB,
+                    },
+                },
+                $set: {
+                    status: "error",
+                    completedAt: timestamp,
+                    updatedAt: timestamp,
+                    errorMessage: message,
+                    expiresAt: new Date(Date.now() + JOB_RETENTION_MS),
+                },
+                $unset: {
+                    execution: 1,
+                    result: 1,
+                },
+            },
+        );
+
+        updatedPersisted = result.modifiedCount > 0 || result.matchedCount > 0;
+    });
+
+    return updatedMemory || updatedPersisted;
+}
+
 export function emitPipelineEvent(jobId: string, event: Omit<PipelineEvent, "timestamp">) {
     console.log(`[PIPELINE] emitPipelineEvent: ${jobId} - ${event.type}${event.step ? ` (${event.step})` : ''}`);
     const job = ensureMemoryJob(jobId);
+
+    if (job.status !== "running") {
+        console.warn(`[PIPELINE] Ignoring late ${event.type} event for terminal job ${jobId} (${job.status}).`);
+        return Promise.resolve();
+    }
+
     const fullEvent: PipelineEvent = {
         ...event,
         timestamp: new Date().toISOString(),
@@ -692,7 +892,7 @@ export function emitPipelineEvent(jobId: string, event: Omit<PipelineEvent, "tim
             updateDoc.$unset = unsetPayload;
         }
 
-        await BlogStudioPipelineJobModel.updateOne({ id: jobId }, updateDoc, { upsert: true });
+        await BlogStudioPipelineJobModel.updateOne({ id: jobId, status: "running" }, updateDoc);
     }).catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
         console.warn(`[PIPELINE] Failed to persist event for ${jobId}: ${message}`);

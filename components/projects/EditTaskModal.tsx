@@ -79,8 +79,8 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId,
             toast.success("Task updated successfully");
             setOpen(false);
             router.refresh();
-        } catch {
-            toast.error("Failed to update task");
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to update task");
         } finally {
             setLoading(false);
         }
@@ -93,8 +93,8 @@ export function EditTaskModal({ task, open, setOpen, permissions, currentUserId,
             toast.success("Task deleted");
             setOpen(false);
             router.refresh();
-        } catch {
-            toast.error("Failed to delete task");
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to delete task");
         } finally {
             setLoading(false);
         }

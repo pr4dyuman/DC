@@ -944,6 +944,8 @@ type BlogStudioPipelineJobExecution = {
     claimedPhase?: string;
     claimId?: string;
     claimExpiresAt?: string;
+    resumeAttempts?: number;
+    lastResumeAt?: string;
     updatedAt?: string;
 };
 
@@ -986,6 +988,8 @@ const BlogStudioPipelineJobExecutionSchema = new Schema<BlogStudioPipelineJobExe
         claimedPhase: { type: String },
         claimId: { type: String },
         claimExpiresAt: { type: String },
+        resumeAttempts: { type: Number },
+        lastResumeAt: { type: String },
         updatedAt: { type: String },
     },
     { _id: false }

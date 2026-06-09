@@ -46,8 +46,9 @@ export default function Footer() {
           </div>
 
           {/* Center: Navigation Links */}
-          <div className="flex gap-8 md:gap-12 mt-4 lg:mt-12 font-bold text-sm tracking-widest font-glacial">
+          <div className="flex flex-wrap gap-6 md:gap-12 mt-4 lg:mt-12 font-bold text-sm tracking-widest font-glacial">
             <Link href="/about" prefetch={false} className="hover:text-gray-300 transition-colors uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#D4E647]">ABOUT US</Link>
+            <Link href="/portfolio" prefetch={false} className="hover:text-gray-300 transition-colors uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#D4E647]">PORTFOLIO</Link>
             <Link href="/contact" prefetch={false} className="hover:text-gray-300 transition-colors uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#D4E647]">CONTACT US</Link>
             <Link href="/blog" prefetch={false} className="hover:text-gray-300 transition-colors uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#D4E647]">BLOG</Link>
           </div>

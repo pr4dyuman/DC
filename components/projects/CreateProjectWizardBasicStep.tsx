@@ -9,6 +9,7 @@ type CreateProjectWizardBasicStepProps = {
     formData: CreateProjectWizardFormData;
     clients: ClientOption[];
     symbol: string;
+    lockClientSelection?: boolean;
     setFormData: React.Dispatch<React.SetStateAction<CreateProjectWizardFormData>>;
 };
 
@@ -16,6 +17,7 @@ export function CreateProjectWizardBasicStep({
     formData,
     clients,
     symbol,
+    lockClientSelection = false,
     setFormData,
 }: CreateProjectWizardBasicStepProps) {
     return (
@@ -70,8 +72,10 @@ export function CreateProjectWizardBasicStep({
                                 <input
                                     type="checkbox"
                                     checked={isChecked}
+                                    disabled={lockClientSelection}
                                     className="rounded border-input"
                                     onChange={() => {
+                                        if (lockClientSelection) return;
                                         setFormData((prev) => ({
                                             ...prev,
                                             clientIds: isChecked

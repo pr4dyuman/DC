@@ -870,6 +870,7 @@ function buildPipelineStepStates(
 
 // BUG-12: module-level constant so it isn't re-created on every component render.
 const STORAGE_KEY = "ai-blogger-active-job";
+const ACTIVE_JOB_RECOVERY_MAX_AGE_MS = 45 * 60 * 1000;
 
 export function AIBloggerDraftBuilder({
     settings,
@@ -1112,6 +1113,10 @@ export function AIBloggerDraftBuilder({
                     activeJobIdRef.current = null;
                     streamReconnectNoticeRef.current = false;
                     try { localStorage.removeItem(STORAGE_KEY); } catch {}
+                    if (statusPollIntervalRef.current) {
+                        clearInterval(statusPollIntervalRef.current);
+                        statusPollIntervalRef.current = null;
+                    }
 
                     // Stop elapsed time tracking
                     if (elapsedTimeIntervalRef.current) {
@@ -1159,6 +1164,10 @@ export function AIBloggerDraftBuilder({
                     activeJobIdRef.current = null;
                     streamReconnectNoticeRef.current = false;
                     try { localStorage.removeItem(STORAGE_KEY); } catch {}
+                    if (statusPollIntervalRef.current) {
+                        clearInterval(statusPollIntervalRef.current);
+                        statusPollIntervalRef.current = null;
+                    }
 
                     // Stop elapsed time tracking
                     if (elapsedTimeIntervalRef.current) {
@@ -1427,10 +1436,9 @@ export function AIBloggerDraftBuilder({
     }, []);
 
     // On mount: check localStorage for an active job and reconnect
-    // ONLY if the job was started within the last 30 minutes (max generation window).
+    // ONLY if the job was started within the active recovery window.
     // This prevents stale job IDs from auto-triggering the pipeline on every page visit.
     useEffect(() => {
-        const MAX_JOB_AGE_MS = 30 * 60 * 1000; // 30 minutes
         let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
         try {
             const stored = localStorage.getItem(STORAGE_KEY);
@@ -1447,7 +1455,7 @@ export function AIBloggerDraftBuilder({
                     localStorage.removeItem(STORAGE_KEY);
                 }
 
-                if (jobId && ts && Date.now() - ts < MAX_JOB_AGE_MS) {
+                if (jobId && ts && Date.now() - ts < ACTIVE_JOB_RECOVERY_MAX_AGE_MS) {
                     // Job is recent enough - reconnect to the live stream.
                     reconnectTimeout = setTimeout(() => {
                         setPipelineVisible(true);
@@ -1463,6 +1471,7 @@ export function AIBloggerDraftBuilder({
                         }, 1000);
                         setPipelineLogs([{ id: "reconnect", level: "info", label: "Workflow", message: "Reconnecting to the active generation workflow...", timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) }]);
                         connectSSE(jobId);
+                        startStatusPolling(jobId);
                     }, 0);
                 } else if (jobId) {
                     // Job is too old — clear the stale entry silently.

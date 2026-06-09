@@ -79,6 +79,81 @@
   font-family: "Suifak", sans-serif;
 }
 
+/* Portfolio motion-preview frames */
+.portfolio-browser-window {
+  position: relative;
+  height: 18rem;
+  overflow: hidden;
+  background: #050505;
+}
+
+.portfolio-browser-window::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 32%;
+  background: linear-gradient(180deg, transparent 0%, #050505 92%);
+  pointer-events: none;
+}
+
+.portfolio-browser-track {
+  min-height: 132%;
+  animation: portfolio-reel-scroll 9s ease-in-out infinite;
+  will-change: transform;
+}
+
+.portfolio-scanline {
+  position: absolute;
+  left: 0.75rem;
+  right: 0.75rem;
+  top: 0.75rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245, 238, 48, 0.85), transparent);
+  opacity: 0.8;
+  animation: portfolio-scanline 4.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes portfolio-reel-scroll {
+  0%,
+  18% {
+    transform: translateY(0);
+  }
+
+  50%,
+  68% {
+    transform: translateY(-18%);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes portfolio-scanline {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+
+  12%,
+  72% {
+    opacity: 0.85;
+  }
+
+  100% {
+    transform: translateY(17rem);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portfolio-browser-track,
+  .portfolio-scanline {
+    animation: none;
+  }
+}
+
 input[type=number]::-webkit-outer-spin-button,
 input[type=number]::-webkit-inner-spin-button {
   -webkit-appearance: none;

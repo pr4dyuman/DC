@@ -12,7 +12,7 @@ export const metadata = buildMarketingMetadata({
   description:
     "Your all-in-one agency management platform. Track projects, manage finances, automate invoicing, and let AI handle the heavy lifting.",
   path: "/services/manage-company",
-  image: "/dashboard-mockup-640-q84.jpg",
+  image: "/dashboard-mockup-1600-q92.webp",
   keywords: ["agency management software", "Agency OS", "AI agency management", "project finance automation"],
 });
 

@@ -1,0 +1,153 @@
+﻿External and hard (needs proprietary datasets) (grouped by category) (pricing/bundles excluded)
+Total unique tools: 59
+CATEGORY: Advertising Toolkit (8)
+AdClarity - Spy on display video and social ads across 50+ markets
+  NEEDS: Ads intelligence dataset (SERP ads scraping + partners), creative storage, historical tracking
+Ads History - Track ad changes and historical ad performance
+  NEEDS: Ads intelligence dataset (SERP ads scraping + partners), creative storage, historical tracking
+Ads Launch Assistant - Create ads with AI-generated copy images templates
+  NEEDS: Ads intelligence dataset (SERP ads scraping + partners), creative storage, historical tracking
+Advertising Research - Uncover competitor ad strategies and spend analysis
+  NEEDS: Ads intelligence dataset (SERP ads scraping + partners), creative storage, historical tracking
+Campaign Performance Optimization - Get AI-powered recommendations to improve campaigns
+  NEEDS: Ads intelligence dataset (SERP ads scraping + partners), creative storage, historical tracking
+Competitive Ad Analysis - Analyze competitor PPC strategies and budgets
+  NEEDS: Ads intelligence dataset (SERP ads scraping + partners), creative storage, historical tracking
+PLA Research - Analyze product listing ads and shopping campaigns
+  NEEDS: Ads intelligence dataset (SERP ads scraping + partners), creative storage, historical tracking
+PPC Keyword Tool - Build and refine keyword lists for campaigns
+  NEEDS: Ads intelligence dataset (SERP ads scraping + partners), creative storage, historical tracking
+
+CATEGORY: AI & Semantic Analysis (1)
+Topical Authority Assessment - Topical authority and cohesion assessment
+  NEEDS: Large-scale datasets + continuous collection pipeline (crawl/SERP/panel), storage + refresh jobs
+
+CATEGORY: AI Visibility Toolkit (5)
+AI-Powered Content Analysis - Get content recommendations for AI visibility
+  NEEDS: LLM answer monitoring at scale (prompt suites/regions) + capture/scoring pipeline + provider access
+ChatGPT Visibility - Track brand visibility mentions in ChatGPT responses
+  NEEDS: LLM answer monitoring at scale (prompt suites/regions) + capture/scoring pipeline + provider access
+Gemini Visibility - Track visibility in Google Gemini AI responses
+  NEEDS: Gemini access (AI Studio or Vertex AI), API key/OAuth, quotas
+LLM Mention Tracking - Track mentions across all major LLM platforms
+  NEEDS: LLM answer monitoring at scale (prompt suites/regions) + capture/scoring pipeline + provider access
+Perplexity Visibility - Monitor mentions in Perplexity AI search results
+  NEEDS: LLM answer monitoring at scale (prompt suites/regions) + capture/scoring pipeline + provider access
+
+CATEGORY: Backlink Analysis (7)
+Anchor Text Analysis - See what anchor text competitors use
+  NEEDS: Web-scale crawler + backlink index, recrawl scheduling, spam/toxicity scoring signals
+Authority Score - Proprietary domain authority metric
+  NEEDS: Web-scale crawler + backlink index, recrawl scheduling, spam/toxicity scoring signals
+Backlink Growth Tracking - Monitor new and lost links over time
+  NEEDS: Web-scale crawler + backlink index, recrawl scheduling, spam/toxicity scoring signals
+Follow vs Nofollow - Categorize links by attribute
+  NEEDS: Web-scale crawler + backlink index, recrawl scheduling, spam/toxicity scoring signals
+Referring Domains - Count of unique sites linking to you
+  NEEDS: Web-scale crawler + backlink index, recrawl scheduling, spam/toxicity scoring signals
+Spam Score Assessment - Identify potentially toxic backlinks
+  NEEDS: Web-scale crawler + backlink index, recrawl scheduling, spam/toxicity scoring signals
+Total Backlinks - Complete backlink count and database
+  NEEDS: Web-scale crawler + backlink index, recrawl scheduling, spam/toxicity scoring signals
+
+CATEGORY: Competitor Research (6)
+Advertising Benchmarking - Compare PPC metrics with competitors
+  NEEDS: SERP monitoring at scale + historical storage, multi-country/device support
+Competitor Ads Research - Analyze competitor paid search strategies
+  NEEDS: SERP monitoring at scale + historical storage, multi-country/device support
+Competitor Backlinks - See who links to competitors
+  NEEDS: SERP monitoring at scale + historical storage, multi-country/device support
+Competitor Organic Keywords - Identify competitor keyword rankings
+  NEEDS: SERP monitoring at scale + historical storage, multi-country/device support
+Market Explorer - Analyze market landscape and key players
+  NEEDS: SERP monitoring at scale + historical storage, multi-country/device support
+Share of Voice - Track your vs competitors visibility over time
+  NEEDS: SERP monitoring at scale + historical storage, multi-country/device support
+
+CATEGORY: Content Toolkit (1)
+Topic Finder - Discover content ideas with search volume data
+  NEEDS: Large-scale datasets + continuous collection pipeline (crawl/SERP/panel), storage + refresh jobs
+
+CATEGORY: Context Menu Features (1)
+Quick Backlink Lookup - Ahrefs/Majestic backlink counts
+  NEEDS: Large-scale datasets + continuous collection pipeline (crawl/SERP/panel), storage + refresh jobs
+
+CATEGORY: Keyword Research (7)
+Competitive Density - See competition level for keywords
+  NEEDS: Keyword dataset provider (volume/CPC/competition) OR build SERP collection at scale + clickstream partnerships
+Cost Per Click (CPC) - PPC pricing for keywords
+  NEEDS: Keyword dataset provider (volume/CPC/competition) OR build SERP collection at scale + clickstream partnerships
+Keyword Difficulty Score - Personalized difficulty based on your domain
+  NEEDS: Keyword dataset provider (volume/CPC/competition) OR build SERP collection at scale + clickstream partnerships
+Long-tail Keywords - Find longer less competitive keywords
+  NEEDS: Keyword dataset provider (volume/CPC/competition) OR build SERP collection at scale + clickstream partnerships
+Question Keywords - Discover FAQ and question-based queries
+  NEEDS: Keyword dataset provider (volume/CPC/competition) OR build SERP collection at scale + clickstream partnerships
+Related Keywords - Discover semantically related terms
+  NEEDS: Keyword dataset provider (volume/CPC/competition) OR build SERP collection at scale + clickstream partnerships
+Search Volume Data - Historical and current search volume
+  NEEDS: Keyword dataset provider (volume/CPC/competition) OR build SERP collection at scale + clickstream partnerships
+
+CATEGORY: On-Page SEO Analysis (1)
+Anchor Text Analysis - Anchor text collection and analysis
+  NEEDS: Web-scale crawler + backlink index, recrawl scheduling, spam/toxicity scoring signals
+
+CATEGORY: Reporting & Analytics (2)
+Competitor Benchmarking - Compare performance metrics with competitors
+  NEEDS: Clickstream/panel traffic dataset (licensed/partner), modeling + privacy compliance
+Custom Dashboards - Build personalized analytics dashboards
+  NEEDS: Clickstream/panel traffic dataset (licensed/partner), modeling + privacy compliance
+
+CATEGORY: SEO Toolkit (11)
+Backlink Analytics - Analyze any website backlink profile and authority
+  NEEDS: Large-scale datasets + continuous collection pipeline (crawl/SERP/panel), storage + refresh jobs
+Backlink Audit - Identify toxic spammy links and create disavow lists
+  NEEDS: Large-scale datasets + continuous collection pipeline (crawl/SERP/panel), storage + refresh jobs
+Backlink Gap - Discover backlink sources you haven't tapped
+  NEEDS: Large-scale datasets + continuous collection pipeline (crawl/SERP/panel), storage + refresh jobs
+Domain Overview - Analyze organic traffic SEO metrics and competitor data
+  NEEDS: Large-scale datasets + continuous collection pipeline (crawl/SERP/panel), storage + refresh jobs
+Keyword Gap - Find keywords competitors rank for that you don't
+  NEEDS: Large-scale datasets + continuous collection pipeline (crawl/SERP/panel), storage + refresh jobs
+Keyword Magic Tool - Research 26+ billion keywords with advanced filtering
+  NEEDS: Large-scale datasets + continuous collection pipeline (crawl/SERP/panel), storage + refresh jobs
+Keyword Overview - Get search volume keyword difficulty CPC metrics
+  NEEDS: Large-scale datasets + continuous collection pipeline (crawl/SERP/panel), storage + refresh jobs
+Keyword Strategy Builder - Organize keywords by intent and assign to pages
+  NEEDS: Large-scale datasets + continuous collection pipeline (crawl/SERP/panel), storage + refresh jobs
+Organic Research - Spy on competitor keywords and performance
+  NEEDS: Large-scale datasets + continuous collection pipeline (crawl/SERP/panel), storage + refresh jobs
+Position Tracking - Monitor daily ranking changes and visibility scores
+  NEEDS: Large-scale datasets + continuous collection pipeline (crawl/SERP/panel), storage + refresh jobs
+SERP Features Report - Track featured snippets AI overviews Things to Know
+  NEEDS: Large-scale datasets + continuous collection pipeline (crawl/SERP/panel), storage + refresh jobs
+
+CATEGORY: SERP Analysis (5)
+Featured Snippet Tracker - Track positions and opportunities
+  NEEDS: SERP scraping/monitoring infra (geo/device), SERP feature extraction, anti-bot handling
+People Also Ask - Monitor PAA box opportunities
+  NEEDS: SERP scraping/monitoring infra (geo/device), SERP feature extraction, anti-bot handling
+SERP Feature Distribution - Understand what features appear
+  NEEDS: SERP scraping/monitoring infra (geo/device), SERP feature extraction, anti-bot handling
+SERP Features Tracking - Monitor featured snippets and rich results
+  NEEDS: SERP scraping/monitoring infra (geo/device), SERP feature extraction, anti-bot handling
+Top Pages by Keyword - See which pages rank for keywords
+  NEEDS: SERP scraping/monitoring infra (geo/device), SERP feature extraction, anti-bot handling
+
+CATEGORY: Storage & Database (1)
+Database Storage Mode - Persistent database storage on disk
+  NEEDS: Large-scale datasets + continuous collection pipeline (crawl/SERP/panel), storage + refresh jobs
+
+CATEGORY: Traffic & Market Toolkit (6)
+Audience Insights - Understand audience demographics and behavior
+  NEEDS: Clickstream/panel traffic dataset (licensed/partner), modeling + privacy compliance
+Competitor Benchmarking - Compare traffic data with competitors
+  NEEDS: Clickstream/panel traffic dataset (licensed/partner), modeling + privacy compliance
+Competitor Traffic Spying - View traffic sources and visitor behavior
+  NEEDS: Clickstream/panel traffic dataset (licensed/partner), modeling + privacy compliance
+Custom Dashboards - Create personalized analytics dashboards
+  NEEDS: Clickstream/panel traffic dataset (licensed/partner), modeling + privacy compliance
+Market Trends - Identify industry trends and growth opportunities
+  NEEDS: Clickstream/panel traffic dataset (licensed/partner), modeling + privacy compliance
+Traffic Analytics - Analyze website traffic and engagement metrics
+  NEEDS: Clickstream/panel traffic dataset (licensed/partner), modeling + privacy compliance

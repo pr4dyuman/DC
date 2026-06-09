@@ -112,8 +112,8 @@ export function CreateTaskModal({ projectId, assigneeId: defaultAssignee = "" }:
             setOpen(false);
             resetForm();
             router.refresh();
-        } catch {
-            toast.error("Failed to create task");
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to create task");
         } finally {
             setLoading(false);
         }
