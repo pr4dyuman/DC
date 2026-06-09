@@ -17,6 +17,9 @@ const height = Number(process.argv[6] || 800);
 const fps = Number(process.argv[7] || 12);
 const screenshotQuality = 88;
 const videoBitrate = 6500000;
+const desktopUserAgent =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+  "(KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36";
 
 const chromeCandidates = [
   process.env.CHROME_PATH,
@@ -145,11 +148,11 @@ async function evaluate(client, expression) {
   return result.result?.value;
 }
 
-function frameCursor(x = width * 0.72, y = height * 0.18, click = false) {
+function frameCursor(x = width * 0.72, y = height * 0.18, options = {}) {
   return {
     cursorX: Math.round(clamp(x, 22, width - 22)),
     cursorY: Math.round(clamp(y, 22, height - 22)),
-    click,
+    ...options,
   };
 }
 
@@ -174,6 +177,17 @@ async function captureHold(client, frames, count, cursor) {
   }
 }
 
+async function captureScrollTo(client, frames, targetY, frameCount, cursor) {
+  const startY = await evaluate(client, "window.scrollY");
+  for (let index = 0; index < frameCount; index += 1) {
+    const progress = frameCount <= 1 ? 1 : index / (frameCount - 1);
+    const y = Math.round(startY + (targetY - startY) * easeInOut(progress));
+    await evaluate(client, `window.scrollTo({ top: ${y}, behavior: "instant" })`);
+    await sleep(70);
+    await captureFrame(client, frames, cursor);
+  }
+}
+
 async function captureScroll(client, frames, frameCount, maxScrollCap, cursor) {
   const pageInfo = await evaluate(
     client,
@@ -182,28 +196,72 @@ async function captureScroll(client, frames, frameCount, maxScrollCap, cursor) {
     }))()`,
   );
   const maxScroll = pageInfo?.maxScroll || 0;
+  await captureScrollTo(client, frames, maxScroll, frameCount, cursor);
+}
 
-  for (let index = 0; index < frameCount; index += 1) {
-    const progress = frameCount <= 1 ? 0 : index / (frameCount - 1);
-    const y = Math.round(maxScroll * easeInOut(progress));
-    await evaluate(client, `window.scrollTo({ top: ${y}, behavior: "instant" })`);
-    await sleep(80);
-    await captureFrame(client, frames, cursor);
-  }
+function visibleNodeExpression(selector, body) {
+  return `(() => {
+    const nodes = Array.from(document.querySelectorAll(${JSON.stringify(selector)}));
+    const node = nodes.find((candidate) => {
+      const rect = candidate.getBoundingClientRect();
+      const style = getComputedStyle(candidate);
+      return rect.width > 2 &&
+        rect.height > 2 &&
+        style.display !== "none" &&
+        style.visibility !== "hidden" &&
+        Number(style.opacity || 1) > 0;
+    });
+    if (!node) return null;
+    const rect = node.getBoundingClientRect();
+    ${body}
+  })()`;
 }
 
 async function selectorCenter(client, selector, fallback = frameCursor()) {
-  return evaluate(
+  const result = await evaluate(
     client,
-    `(() => {
-      const node = document.querySelector(${JSON.stringify(selector)});
-      if (!node) return ${JSON.stringify(fallback)};
-      const rect = node.getBoundingClientRect();
-      return {
+    visibleNodeExpression(
+      selector,
+      `return {
         cursorX: Math.round(rect.left + rect.width / 2),
         cursorY: Math.round(rect.top + rect.height / 2)
-      };
-    })()`,
+      };`,
+    ),
+  );
+  return result || fallback;
+}
+
+async function renderedNodeScrollTarget(client, selector) {
+  return evaluate(
+    client,
+    visibleNodeExpression(
+      selector,
+      `return {
+        targetY: Math.max(0, Math.round(window.scrollY + rect.top - (window.innerHeight - rect.height) / 2))
+      };`,
+    ),
+  );
+}
+
+async function scrollRenderedNodeIntoView(client, frames, selector, cursor) {
+  const result = await renderedNodeScrollTarget(client, selector);
+  if (!result || typeof result.targetY !== "number") return false;
+  await captureScrollTo(client, frames, result.targetY, 24, cursor);
+  await captureHold(client, frames, 5, cursor);
+  return true;
+}
+
+async function clickVisibleNode(client, selector) {
+  return evaluate(
+    client,
+    visibleNodeExpression(
+      selector,
+      `node.click();
+      return {
+        clicked: true,
+        text: (node.textContent || "").trim().slice(0, 80)
+      };`,
+    ),
   );
 }
 
@@ -218,18 +276,24 @@ async function moveCursor(client, frames, from, to, count = 10) {
   }
 }
 
+async function captureClickEffect(client, frames, destination) {
+  const phases = [0, 0.12, 0.26, 0.42, 0.6, 0.78, 0.92, 1];
+  for (const clickPhase of phases) {
+    await captureFrame(
+      client,
+      frames,
+      frameCursor(destination.cursorX, destination.cursorY, { clickPhase }),
+    );
+    await sleep(55);
+  }
+}
+
 async function clickSelector(client, frames, selector, cursor, expectedPath) {
   const destination = await selectorCenter(client, selector, cursor);
-  await moveCursor(client, frames, cursor, destination, 10);
-  const clickCursor = frameCursor(destination.cursorX, destination.cursorY, true);
-  await captureHold(client, frames, 5, clickCursor);
-  await evaluate(
-    client,
-    `(() => {
-      const node = document.querySelector(${JSON.stringify(selector)});
-      if (node) node.click();
-    })()`,
-  );
+  await moveCursor(client, frames, cursor, destination, 14);
+  await captureHold(client, frames, 4, frameCursor(destination.cursorX, destination.cursorY, { hover: true }));
+  await captureClickEffect(client, frames, destination);
+  await clickVisibleNode(client, selector);
   await sleep(2200);
 
   if (expectedPath) {
@@ -242,16 +306,127 @@ async function clickSelector(client, frames, selector, cursor, expectedPath) {
   return frameCursor(destination.cursorX, destination.cursorY);
 }
 
+async function animateSelectorClick(client, frames, selector, cursor) {
+  const destination = await selectorCenter(client, selector, cursor);
+  await moveCursor(client, frames, cursor, destination, 14);
+  await captureHold(
+    client,
+    frames,
+    4,
+    frameCursor(destination.cursorX, destination.cursorY, { hover: true }),
+  );
+  await captureClickEffect(client, frames, destination);
+  return frameCursor(destination.cursorX, destination.cursorY);
+}
+
 async function clickVisibleLinkByHref(client, frames, href, cursor, expectedPath) {
+  const selector = `a[href="${href}"]`;
+  await scrollRenderedNodeIntoView(client, frames, selector, cursor);
+  return clickSelector(client, frames, selector, cursor, expectedPath);
+}
+
+async function dismissTransientAlerts(client) {
   await evaluate(
     client,
     `(() => {
-      const node = document.querySelector(${JSON.stringify(`a[href="${href}"]`)});
-      if (node) node.scrollIntoView({ block: "center", inline: "center" });
+      const styleId = "dc-capture-cleanup";
+      if (!document.getElementById(styleId)) {
+        const style = document.createElement("style");
+        style.id = styleId;
+        style.textContent = \`
+          [role="alert"],
+          .Toastify,
+          .Toastify__toast-container,
+          [class*="toast-container"],
+          [class*="ToastContainer"],
+          [class*="toaster"],
+          [class*="Toaster"] {
+            display: none !important;
+          }
+        \`;
+        document.head.appendChild(style);
+      }
+      const selectors = [
+        '[role="alert"]',
+        '.Toastify',
+        '.Toastify__toast-container',
+        '[class*="toast-container"]',
+        '[class*="ToastContainer"]',
+        '[class*="toaster"]',
+        '[class*="Toaster"]'
+      ];
+      for (const selector of selectors) {
+        for (const node of document.querySelectorAll(selector)) node.remove();
+      }
+      const cleanup = () => {
+        for (const node of document.querySelectorAll('body *')) {
+          const text = (node.textContent || '').trim();
+          if (text === 'Network error. Please check your connection.') {
+            (node.closest('[role="alert"]') || node.parentElement || node).remove();
+          }
+        }
+      };
+      cleanup();
+      if (!window.__dcCaptureCleanupObserver) {
+        window.__dcCaptureCleanupObserver = new MutationObserver(cleanup);
+        window.__dcCaptureCleanupObserver.observe(document.body, {
+          childList: true,
+          subtree: true
+        });
+      }
+      return true;
     })()`,
   );
-  await sleep(700);
-  return clickSelector(client, frames, `a[href="${href}"]`, cursor, expectedPath);
+}
+
+async function getCapturePageState(client) {
+  return evaluate(
+    client,
+    `(() => ({
+      text: (document.body?.innerText || "").trim().slice(0, 500),
+      textLength: (document.body?.innerText || "").trim().length,
+      imageCount: document.images?.length || 0,
+      linkCount: document.links?.length || 0
+    }))()`,
+  );
+}
+
+function isHealthyCaptureState(state) {
+  const isErrorState =
+    !state ||
+    state.text.startsWith("Oops, there is an error!") ||
+    state.text.includes("Try again?");
+
+  return (
+    !isErrorState &&
+    state.textLength > 100 &&
+    state.imageCount > 2 &&
+    state.linkCount > 3
+  );
+}
+
+async function ensureHealthyPage(client, url) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const state = await getCapturePageState(client);
+    if (isHealthyCaptureState(state)) return;
+
+    await navigate(client, url);
+    await sleep(2500);
+  }
+
+  throw new Error(`The page at ${url} stayed in an error state; capture aborted.`);
+}
+
+async function loadCleanHealthyPage(client, url) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await navigate(client, url);
+    await sleep(4200);
+    await dismissTransientAlerts(client);
+    const state = await getCapturePageState(client);
+    if (isHealthyCaptureState(state)) return;
+  }
+
+  throw new Error(`The page at ${url} did not stay healthy for capture.`);
 }
 
 async function encodeWebm(client, frames) {
@@ -295,33 +470,45 @@ async function encodeWebm(client, frames) {
         const x = frame.cursorX;
         const y = frame.cursorY;
         context.save();
-        if (frame.click) {
+        context.beginPath();
+        context.arc(x + 7, y + 8, frame.hover ? 22 : 17, 0, Math.PI * 2);
+        context.fillStyle = frame.hover ? "rgba(245,238,48,.18)" : "rgba(245,238,48,.10)";
+        context.fill();
+        context.strokeStyle = frame.hover ? "rgba(245,238,48,.75)" : "rgba(245,238,48,.38)";
+        context.lineWidth = frame.hover ? 2.5 : 1.5;
+        context.stroke();
+
+        if (typeof frame.clickPhase === "number") {
+          const phase = frame.clickPhase;
+          const radius = 16 + phase * 34;
           context.beginPath();
-          context.arc(x + 6, y + 6, 30, 0, Math.PI * 2);
-          context.strokeStyle = "rgba(245,238,48,.95)";
-          context.lineWidth = 5;
+          context.arc(x + 7, y + 8, radius, 0, Math.PI * 2);
+          context.strokeStyle = \`rgba(245,238,48,\${0.95 - phase * 0.82})\`;
+          context.lineWidth = 5 - phase * 2.5;
           context.stroke();
+
           context.beginPath();
-          context.arc(x + 6, y + 6, 18, 0, Math.PI * 2);
-          context.fillStyle = "rgba(245,238,48,.22)";
+          context.arc(x + 7, y + 8, Math.max(8, 17 - phase * 7), 0, Math.PI * 2);
+          context.fillStyle = \`rgba(245,238,48,\${0.32 - phase * 0.2})\`;
           context.fill();
         }
-        context.shadowColor = "rgba(0,0,0,.8)";
-        context.shadowBlur = 6;
-        context.shadowOffsetX = 1;
-        context.shadowOffsetY = 2;
+
+        context.shadowColor = "rgba(245,238,48,.42)";
+        context.shadowBlur = 8;
+        context.shadowOffsetX = 0;
+        context.shadowOffsetY = 0;
         context.beginPath();
         context.moveTo(x, y);
-        context.lineTo(x, y + 34);
-        context.lineTo(x + 9, y + 26);
-        context.lineTo(x + 17, y + 43);
-        context.lineTo(x + 25, y + 39);
-        context.lineTo(x + 17, y + 23);
-        context.lineTo(x + 31, y + 23);
+        context.lineTo(x + 1, y + 32);
+        context.lineTo(x + 10, y + 24);
+        context.lineTo(x + 18, y + 41);
+        context.lineTo(x + 27, y + 37);
+        context.lineTo(x + 18, y + 21);
+        context.lineTo(x + 32, y + 20);
         context.closePath();
-        context.fillStyle = "#ffffff";
+        context.fillStyle = "#F5EE30";
         context.fill();
-        context.lineWidth = 2.5;
+        context.lineWidth = 3;
         context.strokeStyle = "#050505";
         context.stroke();
         context.restore();
@@ -359,14 +546,16 @@ async function recordWalkthrough(client, frames) {
   let cursor = frameCursor(width * 0.72, height * 0.16);
 
   await navigate(client, targetUrl);
+  await ensureHealthyPage(client, targetUrl);
   await evaluate(client, "window.scrollTo(0, 0)");
   await sleep(900);
   const posterBase64 = await captureFrame(client, frames, cursor);
   await captureHold(client, frames, 20, cursor);
   await captureScroll(client, frames, 52, 1750, frameCursor(width * 0.82, height * 0.72));
 
-  await evaluate(client, "window.scrollTo(0, 0)");
-  await sleep(700);
+  cursor = frameCursor(width * 0.82, height * 0.72);
+  await captureScrollTo(client, frames, 0, 34, cursor);
+  await captureHold(client, frames, 6, cursor);
   cursor = await clickSelector(client, frames, 'a[data-nav-path="/services"]', cursor, "/services");
   await captureHold(client, frames, 24, cursor);
   await captureScroll(client, frames, 48, 1550, frameCursor(width * 0.82, height * 0.72));
@@ -375,11 +564,52 @@ async function recordWalkthrough(client, frames) {
   await captureHold(client, frames, 20, cursor);
   await captureScroll(client, frames, 46, 1700, frameCursor(width * 0.82, height * 0.72));
 
-  await evaluate(client, "window.scrollTo(0, 0)");
-  await sleep(700);
+  cursor = frameCursor(width * 0.82, height * 0.72);
+  await captureScrollTo(client, frames, 0, 34, cursor);
+  await captureHold(client, frames, 6, cursor);
   cursor = await clickSelector(client, frames, 'a[data-nav-path="/blog"]', cursor, "/blog");
   await captureHold(client, frames, 24, cursor);
   await captureScroll(client, frames, 34, 1100, frameCursor(width * 0.82, height * 0.72));
+
+  return posterBase64;
+}
+
+async function recordDriftingWoodWalkthrough(client, frames) {
+  let cursor = frameCursor(width * 0.82, height * 0.72);
+  const shopPath = "/shop";
+  const collectionPath = "/collection";
+
+  await loadCleanHealthyPage(client, targetUrl);
+  await evaluate(client, "window.scrollTo(0, 0)");
+  await sleep(900);
+  const posterBase64 = await captureFrame(client, frames, cursor);
+  await captureHold(client, frames, 18, cursor);
+  await captureScrollTo(client, frames, 950, 36, cursor);
+  await captureHold(client, frames, 8, cursor);
+  await captureScrollTo(client, frames, 2100, 36, cursor);
+  await captureHold(client, frames, 8, cursor);
+
+  await captureScrollTo(client, frames, 0, 28, cursor);
+  await captureHold(client, frames, 5, cursor);
+  cursor = await animateSelectorClick(client, frames, `a[href="${shopPath}"]`, cursor);
+  await loadCleanHealthyPage(client, new URL(shopPath, targetUrl).toString());
+  await captureHold(client, frames, 18, cursor);
+  cursor = frameCursor(width * 0.84, height * 0.72);
+  await captureScrollTo(client, frames, 620, 34, cursor);
+  await captureHold(client, frames, 12, cursor);
+
+  await captureScrollTo(client, frames, 0, 28, cursor);
+  cursor = await animateSelectorClick(
+    client,
+    frames,
+    `a[href="${collectionPath}"]`,
+    cursor,
+  );
+  await loadCleanHealthyPage(client, new URL(collectionPath, targetUrl).toString());
+  await captureHold(client, frames, 18, cursor);
+  cursor = frameCursor(width * 0.84, height * 0.72);
+  await captureScrollTo(client, frames, 1250, 34, cursor);
+  await captureHold(client, frames, 10, cursor);
 
   return posterBase64;
 }
@@ -393,7 +623,10 @@ async function main() {
     "--headless=new",
     "--disable-gpu",
     "--disable-dev-shm-usage",
+    "--disable-blink-features=AutomationControlled",
     "--hide-scrollbars",
+    "--lang=en-US",
+    `--user-agent=${desktopUserAgent}`,
     `--remote-debugging-port=${port}`,
     `--window-size=${width},${height}`,
     `--user-data-dir=${userDataDir}`,
@@ -412,6 +645,12 @@ async function main() {
     await client.ready();
     await client.send("Page.enable");
     await client.send("Runtime.enable");
+    await client.send("Network.enable");
+    await client.send("Network.setUserAgentOverride", {
+      userAgent: desktopUserAgent,
+      acceptLanguage: "en-US,en;q=0.9",
+      platform: "Windows",
+    });
     await client.send("Emulation.setDeviceMetricsOverride", {
       width,
       height,
@@ -420,8 +659,12 @@ async function main() {
     });
 
     const frames = [];
-    const posterBase64 = await recordWalkthrough(client, frames);
+    const isDriftingWood = new URL(targetUrl).hostname.includes("driftingwood");
+    const posterBase64 = isDriftingWood
+      ? await recordDriftingWoodWalkthrough(client, frames)
+      : await recordWalkthrough(client, frames);
 
+    await client.send("Emulation.setScriptExecutionDisabled", { value: false });
     await navigate(client, "about:blank");
     const webmBase64 = await encodeWebm(client, frames);
 
