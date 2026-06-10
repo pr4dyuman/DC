@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 
+import { BlogIndexAnalyticsTracker } from "./BlogAnalyticsTrackers";
 import BlogCard from "./BlogCard";
 import {
   isRemoteMarketingImageSrc,
@@ -18,7 +19,15 @@ function FeaturedPost({ post }) {
   const isSvgImage = hasImage && isSvgMarketingImageSrc(normalizedImageSrc);
 
   return (
-    <Link href={`/blog/${post.slug}`} className="group block">
+    <Link
+      href={`/blog/${post.slug}`}
+      className="group block"
+      data-blog-card-link="featured"
+      data-blog-slug={post.slug}
+      data-blog-category={post.category}
+      data-blog-position="1"
+      data-blog-featured="true"
+    >
       <article className={`grid overflow-hidden rounded-[32px] border border-white/10 bg-[#070707] ${hasImage ? "lg:grid-cols-[1.15fr_0.85fr]" : ""}`}>
         {hasImage ? (
           <div className="relative min-h-[320px] border-b border-white/10 lg:min-h-[520px] lg:border-b-0 lg:border-r">
@@ -104,6 +113,7 @@ const BlogList = ({ posts, categories, activeCategory = "ALL" }) => {
 
   return (
     <div className="flex min-h-screen flex-col bg-black font-glacial">
+      <BlogIndexAnalyticsTracker />
       <section className="relative overflow-hidden px-4 pb-12 pt-32 sm:px-6 md:px-10 lg:px-16">
         <div className="pointer-events-none absolute right-0 top-0 h-[500px] w-[500px] rounded-full bg-[#F5EE30] opacity-5 blur-[150px]" />
         <div className="pointer-events-none absolute left-0 top-24 h-[420px] w-[420px] rounded-full bg-white opacity-[0.03] blur-[160px]" />
@@ -136,6 +146,8 @@ const BlogList = ({ posts, categories, activeCategory = "ALL" }) => {
                 prefetch={false}
                 scroll={false}
                 aria-current={activeCategory === cat ? "page" : undefined}
+                data-blog-category-filter="true"
+                data-blog-category={cat}
                 className={`inline-flex items-center gap-3 rounded-full border px-6 py-3 text-sm font-bold tracking-[0.16em] transition-all duration-300 ${
                   activeCategory === cat
                     ? "border-[#F5EE30] bg-[#F5EE30] text-black"
@@ -189,9 +201,13 @@ const BlogList = ({ posts, categories, activeCategory = "ALL" }) => {
               </div>
 
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3">
-                {remainingPosts.map((post) => (
+                {remainingPosts.map((post, index) => (
                   <div key={post._id || post.id} className="h-full">
-                    <BlogCard {...post} />
+                    <BlogCard
+                      {...post}
+                      analyticsSource="archive"
+                      analyticsPosition={index + 2}
+                    />
                   </div>
                 ))}
               </div>

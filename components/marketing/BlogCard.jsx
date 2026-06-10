@@ -8,7 +8,17 @@ import {
   normalizeMarketingImageSrc,
 } from "@/lib/marketing-blog-utils";
 
-const BlogCard = ({ title, category, excerpt, image, imageAlt, slug, date }) => {
+const BlogCard = ({
+  title,
+  category,
+  excerpt,
+  image,
+  imageAlt,
+  slug,
+  date,
+  analyticsSource = "archive",
+  analyticsPosition,
+}) => {
   const normalizedImageSrc = normalizeMarketingImageSrc(image, "");
   const isDefaultImage = normalizedImageSrc?.includes("ai-blogger.svg");
   const hasImage = Boolean(normalizedImageSrc) && !isDefaultImage;
@@ -16,7 +26,15 @@ const BlogCard = ({ title, category, excerpt, image, imageAlt, slug, date }) => 
   const isSvgImage = hasImage && isSvgMarketingImageSrc(normalizedImageSrc);
 
   return (
-    <Link href={`/blog/${slug}`} className="group block h-full w-full">
+    <Link
+      href={`/blog/${slug}`}
+      className="group block h-full w-full"
+      data-blog-card-link={analyticsSource}
+      data-blog-slug={slug}
+      data-blog-category={category}
+      data-blog-position={analyticsPosition}
+      data-blog-featured="false"
+    >
       <article className="relative flex h-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[#080808] transition-all duration-300 group-hover:-translate-y-1 group-hover:border-white/20 group-hover:shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
         <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_right,_rgba(245,238,48,0.15),_transparent_55%)] pointer-events-none" />
 

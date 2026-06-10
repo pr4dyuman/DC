@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Calendar, User, Clock, ChevronDown, Share2 } from "lucide-react";
+import { BlogPostAnalyticsTracker } from "@/components/marketing/BlogAnalyticsTrackers";
 import dbConnect from "@/lib/marketing-db";
 import { BlogStudioPostModel, connectDB as connectPrimaryDb } from "@/lib/mongodb";
 import Blog from "@/models/marketing/Blog";
@@ -880,6 +881,7 @@ export default async function BlogPost({ params }) {
 
   return (
     <div className="bg-black min-h-screen flex flex-col font-glacial text-white selection:bg-[#F5EE30] selection:text-black">
+      <BlogPostAnalyticsTracker slug={post.slug} category={category} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: seo.schemaMarkup }} />
 
       <article className="flex-grow">
@@ -979,6 +981,7 @@ export default async function BlogPost({ params }) {
                         <a
                           key={heading.id}
                           href={`#${heading.id}`}
+                          data-blog-analytics="toc"
                           className={`block text-sm py-1.5 px-3 rounded-lg transition-all hover:bg-[#F5EE30]/5 hover:text-[#F5EE30] ${
                             heading.level === 2
                               ? "text-gray-300 font-medium"
@@ -1011,6 +1014,7 @@ export default async function BlogPost({ params }) {
                           <a
                             key={heading.id}
                             href={`#${heading.id}`}
+                            data-blog-analytics="toc"
                             className={`block text-sm py-1.5 transition-colors hover:text-[#F5EE30] ${
                               heading.level === 2
                                 ? "text-gray-300 font-medium"
@@ -1067,6 +1071,7 @@ export default async function BlogPost({ params }) {
                         <Link
                           key={service.href}
                           href={service.href}
+                          data-blog-analytics="related-service"
                           className="group block py-4 transition-colors hover:bg-white/[0.02]"
                         >
                           <span className="block text-base font-bold uppercase text-white transition-colors group-hover:text-[#F5EE30]">
@@ -1094,6 +1099,7 @@ export default async function BlogPost({ params }) {
                             href={source.href}
                             target="_blank"
                             rel="noopener noreferrer"
+                            data-blog-analytics="source"
                             className="text-gray-200 underline decoration-[#F5EE30]/40 underline-offset-4 hover:text-[#F5EE30]"
                           >
                             {source.title}
@@ -1123,7 +1129,11 @@ export default async function BlogPost({ params }) {
                           className="group bg-black/30 border border-white/[0.06] rounded-xl overflow-hidden hover:border-white/[0.12] transition-all"
                           open={index === 0}
                         >
-                          <summary className="flex items-start justify-between cursor-pointer p-5 hover:bg-white/[0.02] transition-colors gap-4">
+                          <summary
+                            className="flex items-start justify-between cursor-pointer p-5 hover:bg-white/[0.02] transition-colors gap-4"
+                            data-blog-faq-toggle="true"
+                            data-blog-faq-position={index + 1}
+                          >
                             <span className="font-etna text-base text-white leading-snug">{item.question}</span>
                             <ChevronDown className="w-4 h-4 text-[#F5EE30] transition-transform group-open:rotate-180 flex-shrink-0 mt-0.5" />
                           </summary>
@@ -1161,6 +1171,8 @@ export default async function BlogPost({ params }) {
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`Share on ${platform.name}`}
+                          data-blog-analytics="share"
+                          data-share-platform={platform.name}
                           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/[0.12] text-gray-300 hover:border-[#F5EE30] hover:text-black hover:bg-[#F5EE30] transition-all duration-200 text-xs font-bold uppercase tracking-wide"
                         >
                           {platform.icon}
