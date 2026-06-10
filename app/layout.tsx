@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { PointerEventsRestorer } from "@/components/providers/PointerEventsRestorer";
 import { VercelAnalytics } from "@/components/providers/VercelAnalytics";
 import { VercelSpeedInsights } from "@/components/providers/VercelSpeedInsights";
+import { CookieConsentBanner } from "@/components/providers/CookieConsentBanner";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -45,6 +46,7 @@ export default function RootLayout({
           {children}
           <Toaster richColors position="top-right" />
         </ThemeProvider>
+        <CookieConsentBanner />
         <VercelAnalytics />
         <VercelSpeedInsights />
       </body>

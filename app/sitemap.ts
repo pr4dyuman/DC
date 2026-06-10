@@ -100,6 +100,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         staticEntry("/services/manage-company", "monthly", 0.75),
         staticEntry("/services/ai-blogger", "monthly", 0.75),
         staticEntry("/contact", "monthly", 0.7),
+        staticEntry("/privacy", "yearly", 0.3),
         staticEntry("/get-started", "monthly", 0.7),
         staticEntry("/blog", "daily", 0.9),
     ];

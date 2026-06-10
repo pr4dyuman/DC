@@ -2,6 +2,7 @@ import { Instagram, Linkedin } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import NewsletterForm from "./NewsletterForm";
+import CookieSettingsButton from "./CookieSettingsButton";
 
 export default function Footer() {
   return (
@@ -67,6 +68,20 @@ export default function Footer() {
                 Email - flytheraven@digitalcorvids.com
               </a>
             </div>
+          </div>
+        </div>
+
+        <div className="mt-12 flex flex-col gap-4 border-t border-white/15 pt-6 font-glacial text-sm text-gray-400 sm:flex-row sm:items-center sm:justify-between">
+          <p>© {new Date().getFullYear()} Digital Corvids. All rights reserved.</p>
+          <div className="flex flex-wrap gap-x-6 gap-y-3">
+            <Link
+              href="/privacy"
+              prefetch={false}
+              className="hover:text-white transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#D4E647]"
+            >
+              Privacy &amp; Cookies
+            </Link>
+            <CookieSettingsButton />
           </div>
         </div>
       </div>
