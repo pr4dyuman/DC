@@ -4,22 +4,24 @@ import Link from "next/link";
 import { ArrowRight, ExternalLink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-const filters = ["All", "Websites"];
+const filters = ["All", "Web Apps", "Websites"];
 
 const projects = [
   {
-    id: "digital-corvids",
-    category: "Websites",
+    id: "ezyprep",
+    category: "Web Apps",
     index: "01",
-    eyebrow: "Agency Website",
-    title: "Digital Corvids",
+    eyebrow: "AI Production SaaS",
+    title: "EzyPrep",
     description:
-      "A responsive agency website that brings services, insights, proof, and enquiry paths into one coherent experience.",
-    scope: ["Strategy", "Web Design", "Development", "SEO Foundation"],
-    href: "https://digitalcorvids.com",
-    action: "Visit Live Website",
+      "A production planning workspace for script breakdowns, scheduling, reports, shot lists, call sheets, and film-prep handoffs.",
+    scope: ["SaaS Product", "AI Workflow", "Script Editor", "Production Planning"],
+    href: "https://ezyprep.onrender.com/",
+    action: "Visit Live App",
     external: true,
     featured: true,
+    video: "/portfolio/ezyprep-demo-script.webm?v=20260610-demo-tabs",
+    poster: "/portfolio/ezyprep-demo-script-poster.jpg?v=20260610-demo-tabs",
   },
   {
     id: "drifting-wood",
@@ -35,6 +37,21 @@ const projects = [
     external: true,
     video: "/portfolio/drifting-wood-website.webm?v=20260610-shop-collection",
     poster: "/portfolio/drifting-wood-website-poster.jpg?v=20260610-shop-collection",
+  },
+  {
+    id: "design-dwellers",
+    category: "Websites",
+    index: "03",
+    eyebrow: "Interior Design Website",
+    title: "Design Dwellers Studio",
+    description:
+      "A live preview for an interior design studio website with portfolio storytelling, service detail, consultation paths, and polished project browsing.",
+    scope: ["Interior Design", "Web Design", "Development", "Live Preview"],
+    href: "https://design-dwellers.vercel.app/",
+    action: "Visit Live Preview",
+    external: true,
+    video: "/portfolio/design-dwellers-website.webm?v=20260610-preview",
+    poster: "/portfolio/design-dwellers-website-poster.jpg?v=20260610-preview",
   },
 ];
 
@@ -144,9 +161,9 @@ function FeaturedProject({ project }) {
     <article className="grid overflow-hidden rounded-lg border border-white/10 bg-white/[0.02] lg:grid-cols-[1.45fr_0.55fr]">
       <div className="min-w-0 border-b border-white/10 bg-[#050505] p-2 sm:p-3 lg:border-b-0 lg:border-r">
         <PortfolioVideo
-          src="/portfolio/digital-corvids-website.webm?v=20260610-clean"
-          poster="/portfolio/digital-corvids-website-poster.jpg?v=20260610-clean"
-          label="Digital Corvids website walkthrough"
+          src={project.video}
+          poster={project.poster}
+          label={`${project.title} product walkthrough`}
           className="rounded-md"
         />
       </div>

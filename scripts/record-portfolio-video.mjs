@@ -17,6 +17,8 @@ const height = Number(process.argv[6] || 800);
 const fps = Number(process.argv[7] || 12);
 const screenshotQuality = 88;
 const videoBitrate = 6500000;
+const ezyprepEmail = process.env.EZYPREP_EMAIL || "";
+const ezyprepPassword = process.env.EZYPREP_PASSWORD || "";
 const desktopUserAgent =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36";
@@ -265,6 +267,55 @@ async function clickVisibleNode(client, selector) {
   );
 }
 
+function visibleTextNodeExpression(text, body) {
+  return `(() => {
+    const expected = ${JSON.stringify(text.trim().toLowerCase())};
+    const nodes = Array.from(document.querySelectorAll("a, button, [role='tab'], [role='button'], .tab-item"));
+    const node = nodes.find((candidate) => {
+      const rect = candidate.getBoundingClientRect();
+      const style = getComputedStyle(candidate);
+      const candidateText = (candidate.textContent || "").trim().toLowerCase();
+      return candidateText === expected &&
+        rect.width > 2 &&
+        rect.height > 2 &&
+        style.display !== "none" &&
+        style.visibility !== "hidden" &&
+        Number(style.opacity || 1) > 0;
+    });
+    if (!node) return null;
+    const rect = node.getBoundingClientRect();
+    ${body}
+  })()`;
+}
+
+async function visibleTextNodeCenter(client, text, fallback = frameCursor()) {
+  const result = await evaluate(
+    client,
+    visibleTextNodeExpression(
+      text,
+      `return {
+        cursorX: Math.round(rect.left + rect.width / 2),
+        cursorY: Math.round(rect.top + rect.height / 2)
+      };`,
+    ),
+  );
+  return result || fallback;
+}
+
+async function clickVisibleTextNode(client, text) {
+  return evaluate(
+    client,
+    visibleTextNodeExpression(
+      text,
+      `node.click();
+      return {
+        clicked: true,
+        text: (node.textContent || "").trim().slice(0, 80)
+      };`,
+    ),
+  );
+}
+
 async function moveCursor(client, frames, from, to, count = 10) {
   for (let index = 0; index < count; index += 1) {
     const progress = count <= 1 ? 1 : index / (count - 1);
@@ -317,6 +368,39 @@ async function animateSelectorClick(client, frames, selector, cursor) {
   );
   await captureClickEffect(client, frames, destination);
   return frameCursor(destination.cursorX, destination.cursorY);
+}
+
+async function clickTextNode(client, frames, text, cursor) {
+  const destination = await visibleTextNodeCenter(client, text, cursor);
+  await moveCursor(client, frames, cursor, destination, 14);
+  await captureHold(
+    client,
+    frames,
+    4,
+    frameCursor(destination.cursorX, destination.cursorY, { hover: true }),
+  );
+  await captureClickEffect(client, frames, destination);
+  await clickVisibleTextNode(client, text);
+  await sleep(2600);
+  return frameCursor(destination.cursorX, destination.cursorY);
+}
+
+async function waitForPath(client, expectedPath, fallbackUrl) {
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    const currentPath = await evaluate(client, "window.location.pathname");
+    if (currentPath === expectedPath) return;
+    await sleep(300);
+  }
+
+  await navigate(client, fallbackUrl);
+  await sleep(2200);
+}
+
+async function clickEzyPrepTab(client, frames, tab, expectedPath, cursor) {
+  const nextCursor = await clickTextNode(client, frames, tab, cursor);
+  await waitForPath(client, expectedPath, new URL(expectedPath, targetUrl).toString());
+  await sleep(900);
+  return nextCursor;
 }
 
 async function clickVisibleLinkByHref(client, frames, href, cursor, expectedPath) {
@@ -427,6 +511,146 @@ async function loadCleanHealthyPage(client, url) {
   }
 
   throw new Error(`The page at ${url} did not stay healthy for capture.`);
+}
+
+async function dismissDesignDwellersQuote(client) {
+  const dismissed = await evaluate(
+    client,
+    `(() => {
+      const buttons = Array.from(document.querySelectorAll("button, [role='button']"));
+      const closeButton = buttons.find((button) => {
+        const rect = button.getBoundingClientRect();
+        const text = (button.textContent || "").trim().toLowerCase();
+        const label = (button.getAttribute("aria-label") || "").trim().toLowerCase();
+        const looksClose = text === "x" ||
+          text.charCodeAt(0) === 215 ||
+          label.includes("close") ||
+          label.includes("dismiss");
+
+        return looksClose &&
+          rect.width > 8 &&
+          rect.height > 8 &&
+          getComputedStyle(button).visibility !== "hidden";
+      });
+
+      if (closeButton) {
+        closeButton.click();
+        return true;
+      }
+
+      return false;
+    })()`,
+  );
+
+  if (dismissed) await sleep(450);
+}
+
+async function loadDesignDwellersPage(client, pathOrUrl) {
+  const url = pathOrUrl.startsWith("http")
+    ? pathOrUrl
+    : new URL(pathOrUrl, targetUrl).toString();
+
+  await loadCleanHealthyPage(client, url);
+  await dismissDesignDwellersQuote(client);
+  await evaluate(client, "window.scrollTo(0, 0)");
+  await sleep(700);
+}
+
+async function viewportClick(client, point) {
+  await client.send("Input.dispatchMouseEvent", {
+    type: "mouseMoved",
+    x: point.cursorX,
+    y: point.cursorY,
+  });
+  await client.send("Input.dispatchMouseEvent", {
+    type: "mousePressed",
+    x: point.cursorX,
+    y: point.cursorY,
+    button: "left",
+    clickCount: 1,
+  });
+  await client.send("Input.dispatchMouseEvent", {
+    type: "mouseReleased",
+    x: point.cursorX,
+    y: point.cursorY,
+    button: "left",
+    clickCount: 1,
+  });
+}
+
+async function requiredSelectorCenter(client, selector) {
+  const result = await evaluate(
+    client,
+    visibleNodeExpression(
+      selector,
+      `return {
+        cursorX: Math.round(rect.left + rect.width / 2),
+        cursorY: Math.round(rect.top + rect.height / 2)
+      };`,
+    ),
+  );
+
+  if (!result) throw new Error(`Could not find visible selector: ${selector}`);
+  return result;
+}
+
+async function typeIntoSelector(client, selector, text) {
+  const center = await requiredSelectorCenter(client, selector);
+  await viewportClick(client, center);
+  await client.send("Input.insertText", { text });
+  await sleep(400);
+}
+
+async function getPageSummary(client) {
+  return evaluate(
+    client,
+    `(() => ({
+      href: location.href,
+      path: location.pathname,
+      text: (document.body?.innerText || "").trim().slice(0, 1600)
+    }))()`,
+  );
+}
+
+function isEzyPrepEditorReady(summary) {
+  return Boolean(
+    summary?.text?.includes("The Last Horizon") &&
+      summary?.text?.includes("Script") &&
+      summary?.path?.includes("/editor/demo/script"),
+  );
+}
+
+async function loginToEzyPrepEditor(client) {
+  if (!ezyprepEmail || !ezyprepPassword) {
+    throw new Error("Set EZYPREP_EMAIL and EZYPREP_PASSWORD before recording EzyPrep.");
+  }
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await navigate(client, targetUrl);
+    await sleep(3500);
+
+    let summary = await getPageSummary(client);
+    if (isEzyPrepEditorReady(summary)) return;
+
+    if (!summary.path.includes("/signin")) {
+      await navigate(client, new URL("/signin", targetUrl).toString());
+      await sleep(2500);
+    }
+
+    await typeIntoSelector(client, 'input[type="email"]', ezyprepEmail);
+    await typeIntoSelector(client, 'input[type="password"]', ezyprepPassword);
+
+    const signInCenter = await visibleTextNodeCenter(client, "Sign In");
+    await viewportClick(client, signInCenter);
+    await sleep(8500);
+
+    await navigate(client, targetUrl);
+    await sleep(4500);
+    summary = await getPageSummary(client);
+    if (isEzyPrepEditorReady(summary)) return;
+  }
+
+  throw new Error("EzyPrep login succeeded neither through redirect nor direct demo route.");
 }
 
 async function encodeWebm(client, frames) {
@@ -614,6 +838,76 @@ async function recordDriftingWoodWalkthrough(client, frames) {
   return posterBase64;
 }
 
+async function recordDesignDwellersWalkthrough(client, frames) {
+  let cursor = frameCursor(width * 0.82, height * 0.72);
+
+  await loadDesignDwellersPage(client, targetUrl);
+  const posterBase64 = await captureFrame(client, frames, cursor);
+  await captureHold(client, frames, 12, cursor);
+  await captureScrollTo(client, frames, 1050, 24, cursor);
+  await captureHold(client, frames, 5, cursor);
+  await captureScrollTo(client, frames, 2200, 24, cursor);
+  await captureHold(client, frames, 5, cursor);
+
+  await captureScrollTo(client, frames, 0, 18, cursor);
+  await captureHold(client, frames, 4, cursor);
+  cursor = await animateSelectorClick(client, frames, 'a[href="/portfolio"]', cursor);
+  await loadDesignDwellersPage(client, "/portfolio");
+  await captureHold(client, frames, 12, cursor);
+  cursor = frameCursor(width * 0.84, height * 0.72);
+  await captureScrollTo(client, frames, 1100, 24, cursor);
+  await captureHold(client, frames, 5, cursor);
+  await captureScrollTo(client, frames, 2350, 22, cursor);
+  await captureHold(client, frames, 5, cursor);
+
+  await captureScrollTo(client, frames, 0, 18, cursor);
+  await captureHold(client, frames, 4, cursor);
+  cursor = await animateSelectorClick(client, frames, 'a[href="/service"]', cursor);
+  await loadDesignDwellersPage(client, "/service");
+  await captureHold(client, frames, 12, cursor);
+  cursor = frameCursor(width * 0.84, height * 0.72);
+  await captureScrollTo(client, frames, 1350, 24, cursor);
+  await captureHold(client, frames, 7, cursor);
+
+  await captureScrollTo(client, frames, 0, 18, cursor);
+  await captureHold(client, frames, 4, cursor);
+  cursor = await animateSelectorClick(client, frames, 'a[href="/contact"]', cursor);
+  await loadDesignDwellersPage(client, "/contact");
+  await captureHold(client, frames, 14, cursor);
+  cursor = frameCursor(width * 0.84, height * 0.72);
+  await captureScrollTo(client, frames, 900, 20, cursor);
+  await captureHold(client, frames, 7, cursor);
+
+  return posterBase64;
+}
+
+async function recordEzyPrepWalkthrough(client, frames) {
+  let cursor = frameCursor(width * 0.83, height * 0.72);
+
+  await loginToEzyPrepEditor(client);
+  await evaluate(client, "window.scrollTo(0, 0)");
+  await sleep(1300);
+
+  const posterBase64 = await captureFrame(client, frames, cursor);
+  await captureHold(client, frames, 24, cursor);
+
+  const tabs = [
+    ["Storyboard", "/editor/demo/storyboard"],
+    ["Scheduling", "/editor/demo/scheduling"],
+    ["DOOD", "/editor/demo/dood"],
+  ];
+
+  for (const [tab, expectedPath] of tabs) {
+    cursor = await clickEzyPrepTab(client, frames, tab, expectedPath, cursor);
+    await captureHold(client, frames, 32, cursor);
+  }
+
+  cursor = await clickEzyPrepTab(client, frames, "Script", "/editor/demo/script", cursor);
+  await captureHold(client, frames, 18, cursor);
+
+  return posterBase64;
+}
+
 async function main() {
   const chromePath = await findChrome();
   const port = 9233 + Math.floor(Math.random() * 400);
@@ -659,10 +953,18 @@ async function main() {
     });
 
     const frames = [];
-    const isDriftingWood = new URL(targetUrl).hostname.includes("driftingwood");
-    const posterBase64 = isDriftingWood
-      ? await recordDriftingWoodWalkthrough(client, frames)
-      : await recordWalkthrough(client, frames);
+    const targetHost = new URL(targetUrl).hostname;
+    let posterBase64;
+
+    if (targetHost.includes("driftingwood")) {
+      posterBase64 = await recordDriftingWoodWalkthrough(client, frames);
+    } else if (targetHost.includes("design-dwellers")) {
+      posterBase64 = await recordDesignDwellersWalkthrough(client, frames);
+    } else if (targetHost.includes("ezyprep")) {
+      posterBase64 = await recordEzyPrepWalkthrough(client, frames);
+    } else {
+      posterBase64 = await recordWalkthrough(client, frames);
+    }
 
     await client.send("Emulation.setScriptExecutionDisabled", { value: false });
     await navigate(client, "about:blank");

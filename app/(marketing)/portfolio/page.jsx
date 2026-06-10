@@ -7,14 +7,15 @@ import { buildMarketingMetadata } from "@/lib/marketing-seo";
 export const metadata = buildMarketingMetadata({
   title: "Selected Work | Digital Corvids Portfolio",
   description:
-    "Explore selected Digital Corvids website work, including live walkthroughs, external project links, and launch-ready digital experiences.",
+    "Explore selected Digital Corvids web app and website work, including live walkthroughs, external project links, and launch-ready digital experiences.",
   path: "/portfolio",
   keywords: [
     "Digital Corvids portfolio",
     "digital agency portfolio Jaipur",
+    "web app development portfolio",
     "website development portfolio",
     "ecommerce website portfolio",
-    "external website projects",
+    "external digital projects",
   ],
 });
 
@@ -71,7 +72,7 @@ export default function PortfolioPage() {
 
             <div className="max-w-xl lg:justify-self-end">
               <p className="text-base leading-7 text-gray-300 sm:text-lg">
-                A growing collection of external website projects with live
+                A growing collection of external web app and website projects with live
                 walkthroughs, launch context, and direct links to the work.
               </p>
               <div className="mt-7 flex flex-col gap-3 sm:flex-row">
