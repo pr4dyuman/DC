@@ -267,6 +267,31 @@ async function commandFetchedUrls() {
   await writeOutput(rows, Object.keys(rows[0] || {}), "fetched-urls");
 }
 
+async function commandSimpleSiteRead(method, fallbackName) {
+  const siteUrl = getSiteUrl();
+  const rows = normalizeRows(await bingRequest(method, { siteUrl }));
+  await writeOutput(rows, Object.keys(rows[0] || {}), fallbackName);
+}
+
+async function commandLinkCounts() {
+  const siteUrl = getSiteUrl();
+  const page = getArg("page", "0");
+  const rows = normalizeRows(await bingRequest("GetLinkCounts", { siteUrl, page }));
+  await writeOutput(rows, Object.keys(rows[0] || {}), "link-counts");
+}
+
+async function commandUrlLinks() {
+  const siteUrl = getSiteUrl();
+  const input = getArg("url");
+  if (!input) {
+    throw new Error("Pass --url=/path");
+  }
+  const url = toAbsoluteUrl(input);
+  const page = getArg("page", "0");
+  const rows = normalizeRows(await bingRequest("GetUrlLinks", { siteUrl, url, page }));
+  await writeOutput(rows, Object.keys(rows[0] || {}), "url-links");
+}
+
 async function commandUrlInfo() {
   const siteUrl = getSiteUrl();
   const urls = [...getArgs("url")];
@@ -475,12 +500,30 @@ async function commandReport() {
   const exportDir = getArg("dir", DEFAULT_EXPORT_DIR);
   await ensureDir(exportDir);
 
-  const [sites, feeds, crawlIssues, crawlStats, trafficStats, pageStats, queryStats, quota] =
-    await Promise.all([
+  const [
+    sites,
+    feeds,
+    crawlIssues,
+    crawlStats,
+    crawlSettings,
+    blockedUrls,
+    queryParameters,
+    countrySettings,
+    linkCounts,
+    trafficStats,
+    pageStats,
+    queryStats,
+    quota,
+  ] = await Promise.all([
     bingRequest("GetUserSites"),
     bingRequest("GetFeeds", { siteUrl }),
     bingRequest("GetCrawlIssues", { siteUrl }),
     bingRequest("GetCrawlStats", { siteUrl }),
+    bingRequest("GetCrawlSettings", { siteUrl }),
+    bingRequest("GetBlockedUrls", { siteUrl }),
+    bingRequest("GetQueryParameters", { siteUrl }),
+    bingRequest("GetCountryRegionSettings", { siteUrl }),
+    bingRequest("GetLinkCounts", { siteUrl, page: "0" }),
     bingRequest("GetRankAndTrafficStats", { siteUrl }),
     bingRequest("GetPageStats", { siteUrl }),
     bingRequest("GetQueryStats", { siteUrl }),
@@ -499,6 +542,11 @@ async function commandReport() {
     feeds: normalizeRows(feeds),
     crawlIssues: normalizedCrawlIssues,
     crawlStats: normalizeRows(crawlStats),
+    crawlSettings: normalizeRows(crawlSettings),
+    blockedUrls: normalizeRows(blockedUrls),
+    queryParameters: normalizeRows(queryParameters),
+    countrySettings: normalizeRows(countrySettings),
+    linkCounts: normalizeRows(linkCounts),
     trafficStats: normalizeRows(trafficStats),
     pageStats: normalizeRows(pageStats),
     queryStats: normalizeRows(queryStats),
@@ -535,6 +583,12 @@ Read-only commands:
   npm run bing -- crawl-stats --output=auto
   npm run bing -- traffic-stats --output=auto
   npm run bing -- fetched-urls --output=auto
+  npm run bing -- crawl-settings
+  npm run bing -- blocked-urls --output=auto
+  npm run bing -- query-parameters --output=auto
+  npm run bing -- country-settings --output=auto
+  npm run bing -- link-counts --output=auto
+  npm run bing -- url-links --url=/portfolio --output=auto
   npm run bing -- url-info --url=/portfolio --url=/blog --output=auto
   npm run bing -- url-info --sitemap --output=auto
   npm run bing -- page-stats --output=auto
@@ -583,6 +637,24 @@ async function main() {
       break;
     case "fetched-urls":
       await commandFetchedUrls();
+      break;
+    case "crawl-settings":
+      await commandSimpleSiteRead("GetCrawlSettings", "crawl-settings");
+      break;
+    case "blocked-urls":
+      await commandSimpleSiteRead("GetBlockedUrls", "blocked-urls");
+      break;
+    case "query-parameters":
+      await commandSimpleSiteRead("GetQueryParameters", "query-parameters");
+      break;
+    case "country-settings":
+      await commandSimpleSiteRead("GetCountryRegionSettings", "country-settings");
+      break;
+    case "link-counts":
+      await commandLinkCounts();
+      break;
+    case "url-links":
+      await commandUrlLinks();
       break;
     case "url-info":
       await commandUrlInfo();
