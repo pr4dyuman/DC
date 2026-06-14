@@ -3,7 +3,7 @@
  * Receives published blogs from AI Blogger system and stores them locally
  */
 
-import { timingSafeEqual } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
@@ -73,8 +73,28 @@ type IncomingWebhookPayload = {
     };
 };
 
+const ZSEO_SIGNATURE_WINDOW_MS = 15 * 60 * 1000;
+
+type ZseoPayloadRecord = Record<string, unknown>;
+
 function hasNonEmptyString(value: unknown): value is string {
     return typeof value === "string" && value.trim().length > 0;
+}
+
+function isRecord(value: unknown): value is ZseoPayloadRecord {
+    return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function getString(value: unknown, fallback = "") {
+    return hasNonEmptyString(value) ? value.trim() : fallback;
+}
+
+function getRecord(value: unknown): ZseoPayloadRecord {
+    return isRecord(value) ? value : {};
+}
+
+function getArray(value: unknown): unknown[] {
+    return Array.isArray(value) ? value : [];
 }
 
 function isValidDateString(value: string): boolean {
@@ -150,6 +170,202 @@ function normalizeExternalSources(
             };
         })
         .filter((item) => item !== null);
+}
+
+function getJsonString(value: unknown) {
+    if (!value) {
+        return undefined;
+    }
+
+    if (typeof value === "string") {
+        return value.trim() || undefined;
+    }
+
+    if (typeof value === "object") {
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return undefined;
+        }
+    }
+
+    return undefined;
+}
+
+function collectFaqItemsFromSchemaNode(value: unknown): Array<{ question: string; answer: string }> {
+    if (!isRecord(value)) {
+        return [];
+    }
+
+    const type = value["@type"];
+    const types = Array.isArray(type) ? type : [type];
+    const isFaqPage = types.some((item) => getString(item).toLowerCase() === "faqpage");
+
+    if (isFaqPage) {
+        return getArray(value.mainEntity)
+            .map((item) => {
+                const question = getRecord(item);
+                const acceptedAnswer = getRecord(question.acceptedAnswer);
+                const answerText =
+                    getString(acceptedAnswer.text) ||
+                    getString(acceptedAnswer.answer) ||
+                    getString(question.answer);
+
+                return {
+                    question: getString(question.name),
+                    answer: answerText,
+                };
+            })
+            .filter((item) => item.question && item.answer);
+    }
+
+    return [
+        ...getArray(value["@graph"]).flatMap(collectFaqItemsFromSchemaNode),
+        ...getArray(value.mainEntity).flatMap(collectFaqItemsFromSchemaNode),
+    ];
+}
+
+function normalizeZseoInternalLinks(
+    items: unknown,
+): NonNullable<IncomingWebhookPayload["blog"]["internalLinks"]> {
+    return getArray(items)
+        .map((item) => {
+            const link = getRecord(item);
+            const href = getString(link.targetUrl) || getString(link.href);
+            const anchorText = getString(link.anchorText);
+
+            return {
+                href,
+                title: getString(link.targetTitle) || anchorText || href,
+                anchorText: anchorText || getString(link.placementText) || href,
+                source: "zseo",
+                relationType: getString(link.relationType) || "contextual",
+                score: 0,
+            };
+        })
+        .filter((link) => link.href && link.anchorText);
+}
+
+function normalizeZseoCitations(
+    items: unknown,
+): NonNullable<IncomingWebhookPayload["blog"]["externalSources"]> {
+    return getArray(items)
+        .map((item) => {
+            const source = getRecord(item);
+            const url = getString(source.sourceUrl) || getString(source.url);
+            if (!url) {
+                return null;
+            }
+
+            return {
+                id: getString(source.sourceKey) || undefined,
+                title: getString(source.sourceTitle) || url,
+                url,
+                domain: (() => {
+                    try {
+                        return new URL(url).hostname;
+                    } catch {
+                        return "";
+                    }
+                })(),
+                summary: getString(source.claimSummary),
+                type: "citation",
+                freshness: "",
+                trustLevel: "",
+                publishedAt: "",
+                keyClaims: getString(source.claimSummary)
+                    ? [getString(source.claimSummary)].slice(0, 1)
+                    : [],
+                citationBlock: getString(source.citationLabel),
+            };
+        })
+        .filter((source) => source !== null);
+}
+
+function isZseoIntegrationTestPayload(payload: unknown) {
+    return isRecord(payload) && payload.event === "zseo.integration.test";
+}
+
+function isZseoPublishPayload(payload: unknown) {
+    return isRecord(payload) && payload.event === "zseo.content.publish";
+}
+
+function normalizeZseoPublishPayload(payload: unknown): IncomingWebhookPayload | null {
+    if (!isRecord(payload)) {
+        return null;
+    }
+
+    const content = getRecord(payload.payload);
+    const title = getString(content.title);
+    const slug = getString(content.slug);
+    const canonicalUrl = getString(content.canonicalUrl);
+    const bodyHtml = getString(content.bodyHtml);
+    const bodyMarkdown = getString(content.bodyMarkdown);
+    const contentHtml = bodyHtml || bodyMarkdown;
+    const image = getRecord(content.image);
+    const imageUrl = getString(image.url);
+    const openGraph = getRecord(content.openGraph);
+    const publishedAt = new Date().toISOString();
+
+    if (!title || !slug || !canonicalUrl || !contentHtml) {
+        return null;
+    }
+
+    return {
+        event: "blog.published",
+        blog: {
+            id:
+                getString(payload.deliveryHash) ||
+                getString(payload.idempotencyKey) ||
+                `zseo-${slug}`,
+            title,
+            slug,
+            content: contentHtml,
+            excerpt: getString(content.excerpt) || bodyMarkdown.slice(0, 260) || title,
+            metaTitle: getString(openGraph.title) || title,
+            metaDescription: getString(content.metaDescription),
+            canonicalUrl,
+            ...(imageUrl
+                ? {
+                    image: imageUrl,
+                    imageAlt: getString(image.altText) || title,
+                }
+                : {}),
+            schemaMarkup: getJsonString(content.schemaJson),
+            category: "zSEO Content Studio",
+            faqItems: collectFaqItemsFromSchemaNode(content.schemaJson),
+            externalSources: normalizeZseoCitations(content.citations),
+            peopleAlsoAsk: collectFaqItemsFromSchemaNode(content.schemaJson).map(
+                (item) => item.question,
+            ),
+            internalLinks: normalizeZseoInternalLinks(content.internalLinks),
+            contentClusterId: getString(content.contentClusterId) || undefined,
+            parentTopicSlug: getString(content.parentTopicSlug) || undefined,
+            publishedAt,
+        },
+        source: {
+            agencyId: "zseo",
+            agencyName: "zSEO.ai",
+            publishedAt,
+            targetKey: getString(payload.idempotencyKey),
+            targetLabel: "zSEO Content Studio",
+            targetWebsiteUrl: (() => {
+                try {
+                    return new URL(canonicalUrl).origin;
+                } catch {
+                    return undefined;
+                }
+            })(),
+        },
+    };
+}
+
+function normalizeIncomingWebhookPayload(payload: unknown): unknown {
+    if (isZseoPublishPayload(payload)) {
+        return normalizeZseoPublishPayload(payload);
+    }
+
+    return payload;
 }
 
 let cachedMainMongoClientPromise: Promise<MongoClient> | null = null;
@@ -352,7 +568,105 @@ function secretsMatch(left: string, right: string) {
     return timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-async function authorizeWebhookRequest(request: NextRequest, payload?: unknown) {
+function getConfiguredZseoWebhookSecrets() {
+    const expectedSecrets = new Set<string>();
+    const explicitSecrets = [
+        process.env.ZSEO_WEBHOOK_SECRET,
+        process.env.CONTENT_STUDIO_WEBHOOK_SECRET,
+        process.env.CONTENT_STUDIO_WEBHOOK_SECRET_DIGITALCORVIDS,
+        process.env.AI_BLOGGER_WEBHOOK_SECRET,
+    ];
+
+    for (const secret of explicitSecrets) {
+        if (secret?.trim()) {
+            expectedSecrets.add(secret.trim());
+        }
+    }
+
+    for (const [key, value] of Object.entries(process.env)) {
+        if (key.startsWith("CONTENT_STUDIO_WEBHOOK_SECRET_") && value?.trim()) {
+            expectedSecrets.add(value.trim());
+        }
+    }
+
+    return Array.from(expectedSecrets);
+}
+
+function isZseoSignedRequest(request: NextRequest, payload?: unknown) {
+    return Boolean(
+        request.headers.get("x-zseo-signature") ||
+        isZseoPublishPayload(payload) ||
+        isZseoIntegrationTestPayload(payload),
+    );
+}
+
+function authorizeZseoWebhookRequest(request: NextRequest, rawBody?: string) {
+    if (!rawBody) {
+        return {
+            ok: false,
+            status: 400,
+            message: "zSEO webhook requests require a raw JSON body.",
+        };
+    }
+
+    const signatureHeader = request.headers.get("x-zseo-signature")?.trim() || "";
+    const timestamp = request.headers.get("x-zseo-timestamp")?.trim() || "";
+    const providedSignature = signatureHeader.startsWith("sha256=")
+        ? signatureHeader.slice("sha256=".length).trim().toLowerCase()
+        : "";
+
+    if (!/^[a-f0-9]{64}$/.test(providedSignature)) {
+        return {
+            ok: false,
+            status: 401,
+            message: "Missing or invalid zSEO webhook signature.",
+        };
+    }
+
+    const timestampMs = Date.parse(timestamp);
+    if (
+        !Number.isFinite(timestampMs) ||
+        Math.abs(Date.now() - timestampMs) > ZSEO_SIGNATURE_WINDOW_MS
+    ) {
+        return {
+            ok: false,
+            status: 401,
+            message: "zSEO webhook timestamp is missing, invalid, or expired.",
+        };
+    }
+
+    const expectedSecrets = getConfiguredZseoWebhookSecrets();
+    if (expectedSecrets.length === 0) {
+        return {
+            ok: false,
+            status: 503,
+            message:
+                "zSEO webhook secret is not configured. Add CONTENT_STUDIO_WEBHOOK_SECRET_DIGITALCORVIDS or ZSEO_WEBHOOK_SECRET.",
+        };
+    }
+
+    for (const secret of expectedSecrets) {
+        const expectedSignature = createHmac("sha256", secret)
+            .update(`${timestamp}.${rawBody}`)
+            .digest("hex");
+
+        if (secretsMatch(providedSignature, expectedSignature)) {
+            return { ok: true, status: 200, message: "" };
+        }
+    }
+
+    return {
+        ok: false,
+        status: 401,
+        message: "Unauthorized zSEO webhook request.",
+    };
+}
+
+async function authorizeWebhookRequest(request: NextRequest, payload?: unknown, rawBody?: string) {
+    if (isZseoSignedRequest(request, payload)) {
+        return authorizeZseoWebhookRequest(request, rawBody);
+    }
+
     const presentedSecret = getPresentedWebhookSecret(request);
     if (!presentedSecret) {
         return {
@@ -531,19 +845,36 @@ export async function POST(request: NextRequest) {
     try {
         const startTime = Date.now();
 
-        // Parse request body
+        // Parse request body. zSEO signatures are calculated over the exact raw
+        // JSON body, so do not use request.json() before authorization.
         let payload: unknown;
+        let rawBody = "";
         try {
-            payload = await request.json();
+            rawBody = await request.text();
+            payload = JSON.parse(rawBody);
         } catch (e) {
             console.warn("[Webhook] Invalid JSON payload", e);
             return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
         }
 
-        const auth = await authorizeWebhookRequest(request, payload);
+        const auth = await authorizeWebhookRequest(request, payload, rawBody);
         if (!auth.ok) {
             return NextResponse.json({ error: auth.message }, { status: auth.status });
         }
+
+        if (isZseoIntegrationTestPayload(payload)) {
+            return NextResponse.json(
+                {
+                    success: true,
+                    message: "zSEO signed webhook test accepted.",
+                    service: "Digital Corvids Blog Webhook Receiver",
+                    timestamp: new Date().toISOString(),
+                },
+                { status: 200 },
+            );
+        }
+
+        payload = normalizeIncomingWebhookPayload(payload);
 
         // Validate payload structure
         if (!validateWebhookPayload(payload)) {

@@ -238,6 +238,8 @@ Open http://localhost:3000.
 | `GOOGLE_OAUTH_REDIRECT_URI` | Explicit Google OAuth redirect URI |
 | `GSC_SITE_URL` | Search Console property for CLI utilities |
 | `AI_BLOGGER_WEBHOOK_SECRET` | Verifies inbound blog webhook requests |
+| `CONTENT_STUDIO_WEBHOOK_SECRET_*` | Verifies inbound zSEO signed publish webhooks; suffix can match the zSEO secret reference, for example `CONTENT_STUDIO_WEBHOOK_SECRET_DIGITALCORVIDS` |
+| `ZSEO_WEBHOOK_SECRET` | Optional shared zSEO webhook secret fallback |
 | `AI_BLOGGER_WORKER_SECRET` | Protects AI Blogger worker endpoints |
 | `AI_BLOGGER_SCHEDULE_SECRET` | Protects scheduled AI Blogger routes |
 | `AI_BLOGGER_PERFORMANCE_SECRET` | Protects performance sync routes |
