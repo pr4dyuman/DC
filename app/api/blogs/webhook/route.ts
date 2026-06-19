@@ -97,6 +97,17 @@ function getArray(value: unknown): unknown[] {
     return Array.isArray(value) ? value : [];
 }
 
+function getNumber(value: unknown, fallback = 0) {
+    const parsed =
+        typeof value === "number"
+            ? value
+            : typeof value === "string"
+              ? Number.parseFloat(value)
+              : Number.NaN;
+
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function isValidDateString(value: string): boolean {
     const date = new Date(value);
     return !Number.isNaN(date.getTime());
@@ -172,6 +183,61 @@ function normalizeExternalSources(
         .filter((item) => item !== null);
 }
 
+function inferInternalLinkSource(href: string): "service" | "page" | "blog" {
+    try {
+        const parsed = new URL(href, "https://digitalcorvids.com");
+        const pathname = parsed.pathname.toLowerCase();
+
+        if (pathname.startsWith("/blog")) {
+            return "blog";
+        }
+
+        if (pathname.startsWith("/services")) {
+            return "service";
+        }
+    } catch {
+        // Fall back to a generic page link below.
+    }
+
+    return "page";
+}
+
+function normalizeZseoRelationType(
+    value: string,
+    href: string,
+): NonNullable<IncomingWebhookPayload["blog"]["internalLinks"]>[number]["relationType"] {
+    const normalized = value.trim().toLowerCase();
+    const source = inferInternalLinkSource(href);
+
+    switch (normalized) {
+        case "cluster-pillar":
+        case "cluster-parent":
+            return "cluster-parent";
+        case "cluster-support":
+        case "cluster-supporting":
+            return "cluster-supporting";
+        case "pillar-parent":
+            return "pillar-parent";
+        case "pillar-supporting":
+            return "pillar-supporting";
+        case "service-authority":
+            return "service-authority";
+        case "related-reading":
+        case "contextual":
+            return "related-reading";
+        case "site-supporting":
+            return "site-supporting";
+        case "conversion":
+            return source === "service" ? "service-authority" : "related-reading";
+        default:
+            if (source === "service") {
+                return "service-authority";
+            }
+
+            return source === "blog" ? "related-reading" : "site-supporting";
+    }
+}
+
 function getJsonString(value: unknown) {
     if (!value) {
         return undefined;
@@ -228,22 +294,34 @@ function collectFaqItemsFromSchemaNode(value: unknown): Array<{ question: string
 function normalizeZseoInternalLinks(
     items: unknown,
 ): NonNullable<IncomingWebhookPayload["blog"]["internalLinks"]> {
+    const seenHrefs = new Set<string>();
+
     return getArray(items)
         .map((item) => {
             const link = getRecord(item);
             const href = getString(link.targetUrl) || getString(link.href);
             const anchorText = getString(link.anchorText);
 
+            if (!href || !anchorText || seenHrefs.has(href)) {
+                return null;
+            }
+
+            seenHrefs.add(href);
+
             return {
                 href,
                 title: getString(link.targetTitle) || anchorText || href,
                 anchorText: anchorText || getString(link.placementText) || href,
-                source: "zseo",
-                relationType: getString(link.relationType) || "contextual",
-                score: 0,
+                source: inferInternalLinkSource(href),
+                relationType: normalizeZseoRelationType(
+                    getString(link.relationType),
+                    href,
+                ),
+                score: getNumber(link.score, 0),
+                matchReason: getString(link.placementText),
             };
         })
-        .filter((link) => link.href && link.anchorText);
+        .filter((link) => link !== null);
 }
 
 function normalizeZseoCitations(
