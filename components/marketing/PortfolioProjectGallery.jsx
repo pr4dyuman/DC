@@ -20,6 +20,9 @@ const projects = [
     action: "Visit Live App",
     external: true,
     featured: true,
+    type: "SaaS Web App",
+    status: "Live App",
+    urlLabel: "ezyprep.onrender.com/editor/demo/script",
     video: "/portfolio/ezyprep-demo-script.webm?v=20260610-demo-tabs",
     poster: "/portfolio/ezyprep-demo-script-poster.jpg?v=20260610-demo-tabs",
   },
@@ -35,6 +38,9 @@ const projects = [
     href: "https://driftingwood.in/",
     action: "Visit Live Website",
     external: true,
+    type: "E-commerce Website",
+    status: "Live Website",
+    urlLabel: "driftingwood.in",
     video: "/portfolio/drifting-wood-website.webm?v=20260610-shop-collection",
     poster: "/portfolio/drifting-wood-website-poster.jpg?v=20260610-shop-collection",
   },
@@ -50,6 +56,9 @@ const projects = [
     href: "https://design-dwellers.vercel.app/",
     action: "Visit Live Preview",
     external: true,
+    type: "Interior Design Website",
+    status: "Live Preview",
+    urlLabel: "design-dwellers.vercel.app",
     video: "/portfolio/design-dwellers-website.webm?v=20260610-preview",
     poster: "/portfolio/design-dwellers-website-poster.jpg?v=20260610-preview",
   },
@@ -156,15 +165,68 @@ function PortfolioVideo({ src, poster, label, className = "" }) {
   );
 }
 
-function FeaturedProject({ project }) {
+function ProjectBrowserFrame({ project, label, className = "" }) {
   return (
-    <article className="grid overflow-hidden rounded-lg border border-white/10 bg-white/[0.02] lg:grid-cols-[1.45fr_0.55fr]">
-      <div className="min-w-0 border-b border-white/10 bg-[#050505] p-2 sm:p-3 lg:border-b-0 lg:border-r">
+    <div
+      className={`overflow-hidden rounded-md border border-white/10 bg-[#050505] transition-colors group-hover:border-[#F5EE30]/45 ${className}`}
+    >
+      <div className="flex min-h-10 items-center gap-2 border-b border-white/10 bg-white/[0.035] px-3">
+        <div className="flex gap-1.5" aria-hidden="true">
+          <span className="h-2.5 w-2.5 rounded-full bg-[#F5EE30]" />
+          <span className="h-2.5 w-2.5 rounded-full bg-white/30" />
+          <span className="h-2.5 w-2.5 rounded-full bg-white/18" />
+        </div>
+        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-white/10 bg-black px-3 py-1.5">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#F5EE30]" aria-hidden="true" />
+          <span className="truncate text-[11px] font-bold tracking-[0.08em] text-white/60">
+            {project.urlLabel}
+          </span>
+        </div>
+        <span className="hidden shrink-0 rounded-full border border-[#F5EE30]/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#F5EE30] sm:inline-flex">
+          {project.status}
+        </span>
+      </div>
+      <div className="bg-black p-1.5 sm:p-2">
         <PortfolioVideo
           src={project.video}
           poster={project.poster}
+          label={label}
+          className="rounded-sm"
+        />
+      </div>
+    </div>
+  );
+}
+
+function ProjectSpecs({ project }) {
+  const specs = [
+    ["Type", project.type],
+    ["Status", project.status],
+  ];
+
+  return (
+    <dl className="grid grid-cols-2 border-y border-white/10">
+      {specs.map(([label, value]) => (
+        <div key={label} className="border-r border-white/10 py-4 pr-4 last:border-r-0 last:pl-4 last:pr-0">
+          <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">
+            {label}
+          </dt>
+          <dd className="mt-2 text-xs font-bold uppercase tracking-[0.12em] text-white/80">
+            {value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function FeaturedProject({ project }) {
+  return (
+    <article className="group grid overflow-hidden rounded-lg border border-white/10 bg-white/[0.02] transition-colors hover:border-white/20 lg:grid-cols-[1.45fr_0.55fr]">
+      <div className="min-w-0 border-b border-white/10 bg-[#050505] p-2 sm:p-3 lg:border-b-0 lg:border-r">
+        <ProjectBrowserFrame
+          project={project}
           label={`${project.title} product walkthrough`}
-          className="rounded-md"
         />
       </div>
 
@@ -183,7 +245,10 @@ function FeaturedProject({ project }) {
         <p className="mt-6 text-sm leading-6 text-gray-300 sm:text-base sm:leading-7">
           {project.description}
         </p>
-        <div className="mt-6 border-t border-white/10 pt-5">
+        <div className="mt-6">
+          <ProjectSpecs project={project} />
+        </div>
+        <div className="mt-6">
           <ScopeList scope={project.scope} />
         </div>
         <ProjectAction project={project} className="mt-auto pt-8" />
@@ -195,12 +260,10 @@ function FeaturedProject({ project }) {
 function WorkProject({ project }) {
   return (
     <article className="group grid overflow-hidden rounded-lg border border-white/10 bg-white/[0.025] transition-colors hover:border-white/25">
-      <div className="relative aspect-[16/10] overflow-hidden border-b border-white/10 bg-[#080808] p-2">
-        <PortfolioVideo
-          src={project.video}
-          poster={project.poster}
+      <div className="relative overflow-hidden border-b border-white/10 bg-[#080808] p-2">
+        <ProjectBrowserFrame
+          project={project}
           label={`${project.title} website walkthrough`}
-          className="rounded-md"
         />
       </div>
 
@@ -222,6 +285,9 @@ function WorkProject({ project }) {
         <p className="mt-5 text-sm leading-6 text-gray-300 sm:text-base sm:leading-7">
           {project.description}
         </p>
+        <div className="mt-6">
+          <ProjectSpecs project={project} />
+        </div>
         <div className="mt-6">
           <ScopeList scope={project.scope} />
         </div>

@@ -13,7 +13,7 @@ export default function Footer() {
         lg:-top-32 lg:bottom-auto lg:right-0 lg:w-[45%] lg:h-[140%] lg:opacity-20">
         <Image
           src="/footer.svg"
-          alt=""
+          alt="Digital Corvids brand wing illustration"
           fill
           sizes="(min-width: 1024px) 45vw, 100vw"
           className="object-contain object-bottom lg:object-right-top"

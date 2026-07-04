@@ -53,28 +53,58 @@ const workingPrinciples = [
   "Measured improvement",
 ];
 
+const portfolioStats = [
+  {
+    value: "03",
+    label: "selected projects",
+  },
+  {
+    value: "02",
+    label: "live websites",
+  },
+  {
+    value: "01",
+    label: "product app",
+  },
+];
+
 export default function PortfolioPage() {
   return (
     <main className="bg-black text-white">
-      <section className="border-b border-white/10 px-6 pb-14 pt-12 sm:pb-16 sm:pt-16 lg:pb-20 lg:pt-20">
+      <section className="border-b border-white/10 px-6 pb-10 pt-10 sm:pb-12 sm:pt-12 lg:pb-14 lg:pt-14">
         <div className="mx-auto max-w-7xl">
-          <div className="grid gap-8 lg:grid-cols-[1.12fr_0.88fr] lg:items-end">
+          <div className="grid gap-8 lg:grid-cols-[0.98fr_0.62fr] lg:items-end">
             <div>
-              <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">
-                Selected Work
+              <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30]">
+                Portfolio / Selected Work
               </p>
-              <h1 className="mt-5 max-w-5xl font-suifak text-[clamp(3.4rem,9vw,8rem)] uppercase leading-[0.84]">
+              <h1 className="mt-5 max-w-4xl font-suifak text-[clamp(3.1rem,7.2vw,6.4rem)] uppercase leading-[0.86]">
                 Built By
                 <br />
                 Digital Corvids
               </h1>
             </div>
 
-            <div className="max-w-xl lg:justify-self-end">
+            <div className="max-w-xl border-t border-white/15 pt-6 lg:justify-self-end">
               <p className="text-base leading-7 text-gray-300 sm:text-lg">
                 A growing collection of external web app and website projects with live
                 walkthroughs, launch context, and direct links to the work.
               </p>
+              <dl className="mt-7 grid grid-cols-3 border-y border-white/10">
+                {portfolioStats.map((stat) => (
+                  <div
+                    key={stat.label}
+                    className="border-r border-white/10 py-4 pr-4 last:border-r-0 last:pr-0"
+                  >
+                    <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">
+                      {stat.label}
+                    </dt>
+                    <dd className="mt-2 text-2xl font-bold tracking-[0.06em] text-white">
+                      {stat.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
               <div className="mt-7 flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="#selected-projects"
@@ -94,14 +124,14 @@ export default function PortfolioPage() {
             </div>
           </div>
 
-          <div className="mt-12 grid border-y border-white/10 sm:grid-cols-2 lg:mt-16 lg:grid-cols-4">
+          <div className="mt-10 grid border-y border-white/10 sm:grid-cols-2 lg:grid-cols-4">
             {workingPrinciples.map((principle) => (
               <div
                 key={principle}
-                className="flex min-h-16 items-center gap-3 border-b border-white/10 py-4 sm:[&:nth-child(n+3)]:border-b-0 lg:border-b-0 lg:border-r lg:px-5 lg:first:pl-0 lg:last:border-r-0"
+                className="flex min-h-14 items-center gap-3 border-b border-white/10 py-3 sm:[&:nth-child(n+3)]:border-b-0 lg:border-b-0 lg:border-r lg:px-5 lg:first:pl-0 lg:last:border-r-0"
               >
                 <Check className="h-4 w-4 shrink-0 text-[#F5EE30]" aria-hidden="true" />
-                <span className="text-sm font-bold uppercase tracking-[0.12em] text-white/85">
+                <span className="text-xs font-bold uppercase tracking-[0.14em] text-white/85">
                   {principle}
                 </span>
               </div>

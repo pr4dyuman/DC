@@ -12,6 +12,8 @@ import {
 } from "@/lib/cookie-consent";
 
 const INTERNAL_PATH_PREFIXES = ["/dashboard", "/super-admin", "/admin", "/api"];
+const choiceButtonClassName =
+  "rounded-full border border-white bg-white px-6 py-3 text-sm font-bold uppercase tracking-wider text-black transition-colors hover:bg-gray-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]";
 
 function isInternalPath(pathname: string) {
   return INTERNAL_PATH_PREFIXES.some(
@@ -61,7 +63,6 @@ export function CookieConsentBanner() {
 
   return (
     <section
-      role="dialog"
       aria-labelledby="cookie-consent-title"
       aria-describedby="cookie-consent-description"
       className="fixed inset-x-3 bottom-3 z-[100] mx-auto max-w-5xl rounded-2xl border border-white/20 bg-[#090909]/95 p-5 text-white shadow-[0_24px_80px_rgba(0,0,0,0.65)] backdrop-blur-xl sm:inset-x-6 sm:bottom-6 sm:p-6"
@@ -82,18 +83,18 @@ export function CookieConsentBanner() {
 
       <div className={canClose ? "pr-10" : ""}>
         <p className="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-[#F5EE30]">
-          Your privacy choices
+          Cookie &amp; privacy preferences
         </p>
         <h2 id="cookie-consent-title" className="font-suifak text-3xl sm:text-4xl">
-          Cookies and analytics
+          Privacy choices
         </h2>
         <p
           id="cookie-consent-description"
           className="mt-2 max-w-3xl font-glacial text-sm leading-6 text-gray-300 sm:text-base"
         >
-          We use essential storage for features such as login, security, and preferences.
-          With your permission, we also use Google Analytics, Vercel Analytics, and Speed
-          Insights to understand and improve the website.
+          We use essential cookies and storage for login, security, forms, and preferences.
+          With your permission, we also use analytics to understand website performance and
+          improve the site.
         </p>
       </div>
 
@@ -105,7 +106,7 @@ export function CookieConsentBanner() {
                 <Check className="h-4 w-4" aria-hidden="true" />
               </span>
               <div>
-                <h3 className="font-glacial-bold text-base">Essential</h3>
+                <h3 className="font-glacial-bold text-base">Essential cookies</h3>
                 <p className="mt-1 font-glacial text-sm leading-5 text-gray-400">
                   Required for authentication, security, forms, consent choices, and appearance
                   preferences. These cannot be switched off.
@@ -116,7 +117,7 @@ export function CookieConsentBanner() {
 
           <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-white/15 bg-white/[0.04] p-4">
             <span>
-              <span className="block font-glacial-bold text-base">Analytics</span>
+              <span className="block font-glacial-bold text-base">Optional analytics</span>
               <span className="mt-1 block font-glacial text-sm leading-5 text-gray-400">
                 Helps us measure visits and improve performance. Disabled unless you allow it.
               </span>
@@ -145,14 +146,14 @@ export function CookieConsentBanner() {
             <button
               type="button"
               onClick={() => decide(true)}
-              className="rounded-full bg-[#F5EE30] px-6 py-3 text-sm font-bold uppercase tracking-wider text-black transition-colors hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
+              className={choiceButtonClassName}
             >
               Accept analytics
             </button>
             <button
               type="button"
               onClick={() => decide(false)}
-              className="rounded-full border border-white bg-white px-6 py-3 text-sm font-bold uppercase tracking-wider text-black transition-colors hover:bg-gray-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
+              className={choiceButtonClassName}
             >
               Reject analytics
             </button>
