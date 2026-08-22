@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Calendar, User, Clock, ChevronDown, Share2 } from "lucide-react";
 import { BlogPostAnalyticsTracker } from "@/components/marketing/BlogAnalyticsTrackers";
+import { BlogThemeToggle } from "@/components/marketing/blog/BlogThemeToggle";
 import dbConnect from "@/lib/marketing-db";
 import { BlogStudioPostModel, connectDB as connectPrimaryDb } from "@/lib/mongodb";
 import Blog from "@/models/marketing/Blog";
@@ -880,14 +881,14 @@ export default async function BlogPost({ params }) {
   ];
 
   return (
-    <div className="bg-black min-h-screen flex flex-col font-glacial text-white selection:bg-[#F5EE30] selection:text-black">
+    <div className="min-h-screen bg-[var(--blog-bg)] font-sans text-[var(--blog-text)] selection:bg-[var(--blog-accent)] selection:text-[var(--blog-accent-ink)]">
       <BlogPostAnalyticsTracker slug={post.slug} category={category} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: seo.schemaMarkup }} />
 
-      <article className="flex-grow">
+      <article>
         {/* ── Hero Image ── */}
         {showImage && (
-          <div className="relative w-full h-[60vh] min-h-[420px] max-h-[700px] overflow-hidden">
+          <div className="relative h-[34vh] min-h-[240px] max-h-[720px] w-full overflow-hidden sm:h-[46vh] sm:min-h-[340px] lg:h-[58vh] lg:min-h-[440px]">
             {useNativeHeroImage ? (
               <img
                 src={heroImageSrc}
@@ -905,75 +906,74 @@ export default async function BlogPost({ params }) {
                 unoptimized={isSvgHeroImage}
               />
             )}
-            {/* multi-stop gradient for smooth content merge */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
-            {/* subtle vignette sides */}
-            <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-black/30" />
+            <div
+              className="absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(to top, var(--blog-bg) 0%, color-mix(in srgb, var(--blog-bg) 72%, transparent) 42%, transparent 78%)",
+              }}
+            />
           </div>
         )}
 
-        {/* ── Main Content Area ── */}
-        <div className={`relative ${showImage ? "-mt-32 z-10" : "pt-16"}`}>
-          <div className="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8">
-
-            {/* ── Header Card ── */}
-            <div className="bg-[#0d0d0d] border border-white/[0.07] rounded-2xl p-8 md:p-12 mb-8 shadow-2xl">
-
-              {/* breadcrumb + category */}
-              <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+        {/* ── Wide article shell ── */}
+        <div className={`relative ${showImage ? "-mt-20 z-10 sm:-mt-28 lg:-mt-36" : "pt-8 sm:pt-12 lg:pt-16"}`}>
+          <div className="mx-auto w-full max-w-[1760px] px-4 sm:px-6 lg:px-8 xl:px-12">
+            {/* ── Article header ── */}
+            <header className="-mx-4 mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-4 py-7 shadow-[var(--blog-shadow)] sm:mx-0 sm:rounded-2xl sm:border sm:p-8 lg:p-10 xl:p-12">
+              <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
                 <Link
                   href="/blog"
-                  className="inline-flex items-center gap-2 text-gray-400 hover:text-[#F5EE30] transition-colors text-sm font-medium group"
+                  className="group inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--blog-muted)] transition-colors hover:text-[var(--blog-link)]"
                 >
-                  <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+                  <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
                   All Articles
                 </Link>
-                <span className="inline-flex items-center gap-1.5 bg-[#F5EE30]/10 border border-[#F5EE30]/20 text-[#F5EE30] px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-full">
-                  {category}
-                </span>
+
+                <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+                  <span className="inline-flex items-center rounded-full border border-[var(--blog-border)] bg-[var(--blog-surface-muted)] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--blog-link)] sm:px-4">
+                    {category}
+                  </span>
+                  <BlogThemeToggle />
+                </div>
               </div>
 
-              {/* title */}
-              <h1 className="font-etna text-3xl sm:text-4xl md:text-5xl lg:text-[3.25rem] leading-[1.15] mb-6 text-white">
+              <h1 className="mb-6 text-balance font-sans text-3xl font-extrabold leading-[1.04] tracking-[-0.035em] text-[var(--blog-heading)] sm:text-5xl lg:text-6xl xl:text-[4.5rem]">
                 {post.title}
               </h1>
 
-              {/* description */}
-              <p className="text-gray-300 text-lg md:text-xl leading-relaxed mb-8 max-w-3xl">
+              <p className="mb-8 w-full text-lg leading-8 text-[var(--blog-text)] sm:text-xl sm:leading-9 lg:text-2xl lg:leading-10">
                 {seo.displayDescription}
               </p>
 
-              {/* meta row */}
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-6 border-t border-white/[0.07]">
-                <div className="flex items-center gap-2 text-gray-400 text-sm">
-                  <div className="w-7 h-7 rounded-full bg-[#F5EE30]/10 border border-[#F5EE30]/20 flex items-center justify-center flex-shrink-0">
-                    <User className="w-3.5 h-3.5 text-[#F5EE30]" />
-                  </div>
-                  <span className="font-medium text-gray-300">{author}</span>
+              <div className="flex flex-wrap items-center gap-x-7 gap-y-4 border-t border-[var(--blog-border)] pt-6 text-sm text-[var(--blog-muted)]">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--blog-border)] bg-[var(--blog-surface-muted)]">
+                    <User className="h-4 w-4 text-[var(--blog-link)]" />
+                  </span>
+                  <span className="font-semibold text-[var(--blog-text)]">{author}</span>
                 </div>
-                <div className="flex items-center gap-2 text-gray-400 text-sm">
-                  <div className="w-7 h-7 rounded-full bg-[#F5EE30]/10 border border-[#F5EE30]/20 flex items-center justify-center flex-shrink-0">
-                    <Calendar className="w-3.5 h-3.5 text-[#F5EE30]" />
-                  </div>
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--blog-border)] bg-[var(--blog-surface-muted)]">
+                    <Calendar className="h-4 w-4 text-[var(--blog-link)]" />
+                  </span>
                   <span>{dateStr}</span>
                 </div>
-                <div className="flex items-center gap-2 text-gray-400 text-sm">
-                  <div className="w-7 h-7 rounded-full bg-[#F5EE30]/10 border border-[#F5EE30]/20 flex items-center justify-center flex-shrink-0">
-                    <Clock className="w-3.5 h-3.5 text-[#F5EE30]" />
-                  </div>
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--blog-border)] bg-[var(--blog-surface-muted)]">
+                    <Clock className="h-4 w-4 text-[var(--blog-link)]" />
+                  </span>
                   <span>{readTime}</span>
                 </div>
               </div>
-            </div>
+            </header>
 
-            {/* ── Two-column layout: Sidebar + Content ── */}
-            <div className="flex gap-8 items-start">
-
-              {/* ── Left: TOC Sidebar (desktop) ── */}
+            <div className="flex items-start gap-8 xl:gap-10 2xl:gap-12">
+              {/* ── Desktop TOC ── */}
               {shouldShowToc && (
-                <aside className="hidden lg:block w-64 flex-shrink-0 sticky top-8">
-                  <div className="bg-[#0d0d0d] border border-white/[0.07] rounded-xl p-6">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F5EE30] mb-4">
+                <aside className="sticky top-8 hidden w-72 shrink-0 xl:block">
+                  <div className="rounded-2xl border border-[var(--blog-border)] bg-[var(--blog-surface)] p-6 shadow-[var(--blog-shadow)]">
+                    <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--blog-link)]">
                       On This Page
                     </p>
                     <nav className="space-y-1">
@@ -982,10 +982,10 @@ export default async function BlogPost({ params }) {
                           key={heading.id}
                           href={`#${heading.id}`}
                           data-blog-analytics="toc"
-                          className={`block text-sm py-1.5 px-3 rounded-lg transition-all hover:bg-[#F5EE30]/5 hover:text-[#F5EE30] ${
+                          className={`block rounded-lg px-3 py-2 transition-colors hover:bg-[var(--blog-surface-muted)] hover:text-[var(--blog-link)] ${
                             heading.level === 2
-                              ? "text-gray-300 font-medium"
-                              : "text-gray-500 ml-3 text-xs"
+                              ? "text-sm font-semibold text-[var(--blog-text)]"
+                              : "ml-3 text-xs text-[var(--blog-muted)]"
                           }`}
                         >
                           {heading.text}
@@ -996,29 +996,27 @@ export default async function BlogPost({ params }) {
                 </aside>
               )}
 
-              {/* ── Right: Main Article Content ── */}
-              <div className="flex-1 min-w-0">
-
-                {/* Mobile TOC */}
+              <div className="min-w-0 flex-1">
+                {/* Collapsible TOC below desktop */}
                 {shouldShowToc && (
-                  <details className="lg:hidden mb-6 bg-[#0d0d0d] border border-white/[0.07] rounded-xl overflow-hidden group">
-                    <summary className="flex items-center justify-between cursor-pointer px-6 py-4 hover:bg-white/[0.02] transition-colors">
-                      <span className="text-xs font-bold uppercase tracking-[0.15em] text-[#F5EE30]">
+                  <details className="group -mx-4 mb-6 overflow-hidden border-y border-[var(--blog-border)] bg-[var(--blog-surface)] sm:mx-0 sm:rounded-2xl sm:border xl:hidden">
+                    <summary className="flex cursor-pointer items-center justify-between gap-4 px-4 py-4 transition-colors hover:bg-[var(--blog-surface-muted)] sm:px-6">
+                      <span className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--blog-link)]">
                         On This Page
                       </span>
-                      <ChevronDown className="w-4 h-4 text-gray-400 transition-transform group-open:rotate-180" />
+                      <ChevronDown className="h-4 w-4 shrink-0 text-[var(--blog-muted)] transition-transform group-open:rotate-180" />
                     </summary>
-                    <div className="border-t border-white/[0.07] px-6 py-4">
+                    <div className="border-t border-[var(--blog-border)] px-4 py-4 sm:px-6">
                       <nav className="space-y-1">
                         {headings.map((heading) => (
                           <a
                             key={heading.id}
                             href={`#${heading.id}`}
                             data-blog-analytics="toc"
-                            className={`block text-sm py-1.5 transition-colors hover:text-[#F5EE30] ${
+                            className={`flex min-h-11 items-center py-2 transition-colors hover:text-[var(--blog-link)] ${
                               heading.level === 2
-                                ? "text-gray-300 font-medium"
-                                : "text-gray-500 ml-4 text-xs"
+                                ? "text-sm font-semibold text-[var(--blog-text)]"
+                                : "ml-4 text-xs text-[var(--blog-muted)]"
                             }`}
                           >
                             {heading.text}
@@ -1031,26 +1029,28 @@ export default async function BlogPost({ params }) {
 
                 {/* People Also Ask */}
                 {peopleAlsoAsk.length > 0 && (
-                  <div className="mb-8 bg-[#0d0d0d] border border-white/[0.07] rounded-xl p-6 md:p-8">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F5EE30] mb-3">
+                  <section className="-mx-4 mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-4 py-7 sm:mx-0 sm:rounded-2xl sm:border sm:p-8">
+                    <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--blog-link)]">
                       Search Intent
                     </p>
-                    <h2 className="font-etna text-2xl text-white mb-5">People Also Ask</h2>
-                    <div className="grid sm:grid-cols-2 gap-3">
+                    <h2 className="mb-5 font-sans text-2xl font-bold tracking-tight text-[var(--blog-heading)] sm:text-3xl">
+                      People Also Ask
+                    </h2>
+                    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
                       {peopleAlsoAsk.map((question, index) => (
                         <div
                           key={`paa-${index}`}
-                          className="bg-black/40 border border-white/[0.06] rounded-lg p-4 hover:border-[#F5EE30]/20 hover:bg-[#F5EE30]/[0.02] transition-all cursor-default"
+                          className="cursor-default rounded-xl border border-[var(--blog-border)] bg-[var(--blog-surface-muted)] p-4 transition-colors hover:border-[var(--blog-accent)]"
                         >
-                          <p className="text-gray-300 text-sm leading-relaxed">{question}</p>
+                          <p className="text-sm leading-6 text-[var(--blog-text)]">{question}</p>
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </section>
                 )}
 
                 {/* ── Article Body ── */}
-                <div className="bg-[#0d0d0d] border border-white/[0.07] rounded-xl p-6 md:p-10 mb-8">
+                <div className="-mx-4 mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-4 py-8 sm:mx-0 sm:rounded-2xl sm:border sm:p-8 lg:p-10 2xl:p-14">
                   <div
                     className="blog-prose"
                     dangerouslySetInnerHTML={{ __html: sanitizedContent }}
@@ -1058,26 +1058,28 @@ export default async function BlogPost({ params }) {
                 </div>
 
                 {relatedServiceLinks.length > 0 && (
-                  <section className="mb-8 bg-[#0d0d0d] border border-white/[0.07] rounded-xl p-6 md:p-8">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F5EE30] mb-3">
+                  <section className="-mx-4 mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-4 py-7 sm:mx-0 sm:rounded-2xl sm:border sm:p-8">
+                    <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--blog-link)]">
                       Related Services
                     </p>
-                    <h2 className="font-etna text-2xl text-white mb-3">Turn This Strategy Into Execution</h2>
-                    <p className="text-sm leading-relaxed text-gray-400 mb-6">
+                    <h2 className="mb-3 font-sans text-2xl font-bold tracking-tight text-[var(--blog-heading)] sm:text-3xl">
+                      Turn This Strategy Into Execution
+                    </h2>
+                    <p className="mb-6 text-sm leading-6 text-[var(--blog-muted)] sm:text-base">
                       Explore the Digital Corvids services that connect most directly with this article.
                     </p>
-                    <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
+                    <div className="divide-y divide-[var(--blog-border)] border-y border-[var(--blog-border)]">
                       {relatedServiceLinks.map((service) => (
                         <Link
                           key={service.href}
                           href={service.href}
                           data-blog-analytics="related-service"
-                          className="group block py-4 transition-colors hover:bg-white/[0.02]"
+                          className="group block px-1 py-5 transition-colors hover:bg-[var(--blog-surface-muted)] sm:px-3"
                         >
-                          <span className="block text-base font-bold uppercase text-white transition-colors group-hover:text-[#F5EE30]">
+                          <span className="block text-base font-bold text-[var(--blog-heading)] transition-colors group-hover:text-[var(--blog-link)]">
                             {service.title}
                           </span>
-                          <span className="mt-1 block text-sm leading-relaxed text-gray-400">
+                          <span className="mt-1.5 block text-sm leading-6 text-[var(--blog-muted)]">
                             {service.description}
                           </span>
                         </Link>
@@ -1087,58 +1089,64 @@ export default async function BlogPost({ params }) {
                 )}
 
                 {visibleSources.length > 0 && (
-                  <div className="mb-8 bg-[#0d0d0d] border border-white/[0.07] rounded-xl p-6 md:p-8">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F5EE30] mb-3">
+                  <section className="-mx-4 mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-4 py-7 sm:mx-0 sm:rounded-2xl sm:border sm:p-8">
+                    <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--blog-link)]">
                       Sources
                     </p>
-                    <h2 className="font-etna text-2xl text-white mb-5">Research References</h2>
+                    <h2 className="mb-5 font-sans text-2xl font-bold tracking-tight text-[var(--blog-heading)] sm:text-3xl">
+                      Research References
+                    </h2>
                     <ol className="space-y-3">
                       {visibleSources.map((source, index) => (
-                        <li key={`${source.href}-${index}`} className="text-sm leading-relaxed text-gray-300">
+                        <li key={`${source.href}-${index}`} className="text-sm leading-6 text-[var(--blog-text)]">
                           <a
                             href={source.href}
                             target="_blank"
                             rel="noopener noreferrer"
                             data-blog-analytics="source"
-                            className="text-gray-200 underline decoration-[#F5EE30]/40 underline-offset-4 hover:text-[#F5EE30]"
+                            className="font-semibold text-[var(--blog-link)] underline decoration-[var(--blog-border)] underline-offset-4 transition-colors hover:decoration-[var(--blog-link)]"
                           >
                             {source.title}
                           </a>
                           {source.domain ? (
-                            <span className="ml-2 text-gray-500">({source.domain})</span>
+                            <span className="ml-2 text-[var(--blog-muted)]">({source.domain})</span>
                           ) : null}
                         </li>
                       ))}
                     </ol>
-                  </div>
+                  </section>
                 )}
 
                 {/* FAQ Section */}
                 {faqItems.length > 0 && (
-                  <div className="mb-8 bg-[#0d0d0d] border border-white/[0.07] rounded-xl overflow-hidden">
-                    <div className="px-6 md:px-8 pt-6 md:pt-8 pb-4">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F5EE30] mb-3">
+                  <section className="-mx-4 mb-6 overflow-hidden border-y border-[var(--blog-border)] bg-[var(--blog-surface)] sm:mx-0 sm:rounded-2xl sm:border">
+                    <div className="px-4 pb-4 pt-7 sm:px-8 sm:pt-8">
+                      <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--blog-link)]">
                         FAQ
                       </p>
-                      <h2 className="font-etna text-2xl text-white">Frequently Asked Questions</h2>
+                      <h2 className="font-sans text-2xl font-bold tracking-tight text-[var(--blog-heading)] sm:text-3xl">
+                        Frequently Asked Questions
+                      </h2>
                     </div>
-                    <div className="px-6 md:px-8 pb-6 md:pb-8 space-y-3">
+                    <div className="space-y-3 px-4 pb-7 sm:px-8 sm:pb-8">
                       {faqItems.map((item, index) => (
                         <details
                           key={`faq-${index}`}
-                          className="group bg-black/30 border border-white/[0.06] rounded-xl overflow-hidden hover:border-white/[0.12] transition-all"
+                          className="group overflow-hidden rounded-xl border border-[var(--blog-border)] bg-[var(--blog-surface-muted)] transition-colors hover:border-[var(--blog-accent)]"
                           open={index === 0}
                         >
                           <summary
-                            className="flex items-start justify-between cursor-pointer p-5 hover:bg-white/[0.02] transition-colors gap-4"
+                            className="flex cursor-pointer items-start justify-between gap-4 p-5 transition-colors hover:bg-[var(--blog-surface)]"
                             data-blog-faq-toggle="true"
                             data-blog-faq-position={index + 1}
                           >
-                            <span className="font-etna text-base text-white leading-snug">{item.question}</span>
-                            <ChevronDown className="w-4 h-4 text-[#F5EE30] transition-transform group-open:rotate-180 flex-shrink-0 mt-0.5" />
+                            <span className="font-sans text-base font-bold leading-snug text-[var(--blog-heading)]">
+                              {item.question}
+                            </span>
+                            <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-[var(--blog-link)] transition-transform group-open:rotate-180" />
                           </summary>
                           <div
-                            className="px-5 pb-5 border-t border-white/[0.06] pt-4 blog-prose blog-prose-sm"
+                            className="blog-prose blog-prose-sm border-t border-[var(--blog-border)] px-5 pb-5 pt-4"
                             dangerouslySetInnerHTML={{
                               __html: serverSanitizeHtml(
                                 buildMarketingBlogHtml(item.answer, { siteUrl: SITE_URL })
@@ -1148,22 +1156,22 @@ export default async function BlogPost({ params }) {
                         </details>
                       ))}
                     </div>
-                  </div>
+                  </section>
                 )}
 
                 {/* Share Section */}
-                <div className="bg-[#0d0d0d] border border-white/[0.07] rounded-xl p-6 md:p-8">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+                <section className="-mx-4 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-4 py-6 sm:mx-0 sm:rounded-2xl sm:border sm:p-8">
+                  <div className="flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#F5EE30]/10 border border-[#F5EE30]/20 flex items-center justify-center flex-shrink-0">
-                        <Share2 className="w-4 h-4 text-[#F5EE30]" />
-                      </div>
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--blog-accent)] text-[var(--blog-accent-ink)]">
+                        <Share2 className="h-4 w-4" />
+                      </span>
                       <div>
-                        <p className="text-white font-etna text-lg">Share this article</p>
-                        <p className="text-gray-500 text-xs mt-0.5">Spread the knowledge</p>
+                        <p className="font-sans text-lg font-bold text-[var(--blog-heading)]">Share this article</p>
+                        <p className="mt-0.5 text-xs text-[var(--blog-muted)]">Spread the knowledge</p>
                       </div>
                     </div>
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="flex flex-wrap gap-2">
                       {shareLinks.map((platform) => (
                         <a
                           key={platform.name}
@@ -1173,7 +1181,7 @@ export default async function BlogPost({ params }) {
                           aria-label={`Share on ${platform.name}`}
                           data-blog-analytics="share"
                           data-share-platform={platform.name}
-                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/[0.12] text-gray-300 hover:border-[#F5EE30] hover:text-black hover:bg-[#F5EE30] transition-all duration-200 text-xs font-bold uppercase tracking-wide"
+                          className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-[var(--blog-border)] px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-[var(--blog-text)] transition-colors hover:border-[var(--blog-accent)] hover:bg-[var(--blog-accent)] hover:text-[var(--blog-accent-ink)]"
                         >
                           {platform.icon}
                           <span className="hidden sm:inline">{platform.name}</span>
@@ -1181,15 +1189,14 @@ export default async function BlogPost({ params }) {
                       ))}
                     </div>
                   </div>
-                </div>
+                </section>
 
-                {/* Back to Blog */}
                 <div className="mt-8 text-center">
                   <Link
                     href="/blog"
-                    className="inline-flex items-center gap-2 text-gray-400 hover:text-[#F5EE30] transition-colors text-sm group"
+                    className="group inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[var(--blog-muted)] transition-colors hover:text-[var(--blog-link)]"
                   >
-                    <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+                    <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
                     Back to all articles
                   </Link>
                 </div>
@@ -1198,8 +1205,7 @@ export default async function BlogPost({ params }) {
           </div>
         </div>
 
-        {/* bottom spacing */}
-        <div className="pb-20" />
+        <div className="pb-16 sm:pb-20" />
       </article>
     </div>
   );

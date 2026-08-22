@@ -59,7 +59,7 @@ export default function MobileNavigation({ servicesList }) {
         aria-label="Open mobile menu"
         aria-controls={mobileMenuId}
         aria-expanded={mobileOpen}
-        className="md:hidden text-white focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-white transition-colors hover:bg-white/10 focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] md:hidden"
         onClick={() => setMobileOpen(true)}
       >
         <Menu className="w-7 h-7" aria-hidden="true" />
@@ -84,21 +84,21 @@ export default function MobileNavigation({ servicesList }) {
 
         {/* Slide-in Panel */}
         <div
-          className={`absolute top-0 right-0 w-4/5 max-w-sm h-full transform bg-black shadow-[-5px_0_15px_rgba(0,0,0,0.5)] p-8 flex flex-col transition-transform duration-300 ease-in-out ${
+          className={`absolute right-0 top-0 flex h-full min-h-0 w-4/5 max-w-sm transform flex-col overflow-y-auto overscroll-contain bg-black p-6 shadow-[-5px_0_15px_rgba(0,0,0,0.5)] transition-transform duration-300 ease-in-out sm:p-8 ${
             mobileOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
           {/* Close Icon */}
           <button
             aria-label="Close menu"
-            className="self-end text-white hover:text-[#F5EE30] mb-10 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
+            className="mb-6 inline-flex size-11 shrink-0 items-center justify-center self-end rounded-full text-white transition-colors hover:bg-white/10 hover:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] sm:mb-10"
             onClick={() => setMobileOpen(false)}
           >
             <X className="w-8 h-8" aria-hidden="true" />
           </button>
 
           {/* Links */}
-          <nav className="space-y-5 text-2xl font-semibold uppercase">
+          <nav className="space-y-3 text-xl font-semibold uppercase sm:space-y-5 sm:text-2xl">
             <Link
               href="/"
               prefetch={false}
@@ -141,7 +141,7 @@ export default function MobileNavigation({ servicesList }) {
                 id={mobileServicesId}
                 aria-hidden={!mobileServicesOpen}
                 className={`overflow-hidden transition-all duration-300 ${
-                  mobileServicesOpen ? "max-h-96" : "max-h-0"
+                  mobileServicesOpen ? "max-h-[40rem]" : "max-h-0"
                 }`}
               >
                 <div className="pl-4 space-y-2 py-2">

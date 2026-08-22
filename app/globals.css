@@ -520,18 +520,75 @@ body {
 .singularity-calling-pulse { animation: singularity-border-pulse 1.5s ease-in-out infinite; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   Blog reading theme
+   Scoped to /blog so the marketing site and Agency OS theme remain isolated.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.blog-theme-shell {
+  --blog-bg: #ffffff;
+  --blog-surface: #ffffff;
+  --blog-surface-muted: #f6f7f8;
+  --blog-heading: #111111;
+  --blog-text: #171717;
+  --blog-muted: #4b5563;
+  --blog-border: #dfe3e8;
+  --blog-accent: #f5ee30;
+  --blog-accent-ink: #111111;
+  --blog-link: #665f00;
+  --blog-link-hover: #403c00;
+  --blog-code-bg: #f1f3f5;
+  --blog-row-hover: #fafaf5;
+  --blog-shadow: 0 18px 60px rgba(17, 24, 39, 0.09);
+  min-height: 100vh;
+  background: var(--blog-bg);
+  color: var(--blog-text);
+  color-scheme: light;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.blog-theme-shell[data-blog-theme="dark"] {
+  --blog-bg: #0b0b0b;
+  --blog-surface: #141414;
+  --blog-surface-muted: #1c1c1c;
+  --blog-heading: #ffffff;
+  --blog-text: #f5f5f5;
+  --blog-muted: #c7c7c7;
+  --blog-border: #333333;
+  --blog-link: #f5ee30;
+  --blog-link-hover: #fffbd1;
+  --blog-code-bg: #1b1b1b;
+  --blog-row-hover: #1a1a1a;
+  --blog-shadow: 0 20px 70px rgba(0, 0, 0, 0.38);
+  color-scheme: dark;
+}
+
+.blog-theme-shell ::selection {
+  background: var(--blog-accent);
+  color: var(--blog-accent-ink);
+}
+
+.blog-theme-shell [id^="heading-"] {
+  scroll-margin-top: 2rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    Blog Article Prose Styles (.blog-prose)
-   Applied to dangerouslySetInnerHTML content from the AI Blogger pipeline.
-   This is intentionally scoped and not reliant solely on Tailwind prose utils.
+   Applied to sanitized HTML from the existing AI Blogger/ZSEO pipeline.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .blog-prose {
-  color: #d1d5db; /* gray-300 */
-  font-family: "Glacial Indifference", sans-serif;
-  font-size: 1.0625rem;
-  line-height: 1.85;
+  width: 100%;
+  color: var(--blog-text);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 1.125rem;
+  line-height: 1.72;
+  letter-spacing: -0.005em;
   word-break: break-word;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+
+.blog-prose > :where(p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, hr) {
+  max-inline-size: 78ch;
 }
 
 /* Headings */
@@ -541,34 +598,34 @@ body {
 .blog-prose h4,
 .blog-prose h5,
 .blog-prose h6 {
-  font-family: "Etna", sans-serif;
-  color: #ffffff;
+  color: var(--blog-heading);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   line-height: 1.2;
-  font-weight: 400;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
 }
 
 .blog-prose h2 {
-  font-size: 1.875rem;
-  margin-top: 3rem;
+  font-size: clamp(1.75rem, 2.4vw, 2.25rem);
+  margin-top: 3.25rem;
   margin-bottom: 1.25rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--blog-border);
 }
 
 .blog-prose h3 {
-  font-size: 1.375rem;
-  margin-top: 2.25rem;
-  margin-bottom: 1rem;
+  font-size: clamp(1.375rem, 1.8vw, 1.65rem);
+  margin-top: 2.4rem;
+  margin-bottom: 0.9rem;
 }
 
 .blog-prose h4 {
-  font-size: 1.125rem;
-  margin-top: 1.75rem;
+  font-size: 1.1875rem;
+  margin-top: 1.9rem;
   margin-bottom: 0.75rem;
-  color: #e5e7eb;
 }
 
-/* First heading — no top margin */
 .blog-prose > h2:first-child,
 .blog-prose > h3:first-child,
 .blog-prose > h4:first-child {
@@ -577,36 +634,44 @@ body {
 
 /* Paragraphs */
 .blog-prose p {
-  margin-bottom: 1.5rem;
-  color: #d1d5db;
+  margin-bottom: 1.45rem;
+  color: var(--blog-text);
 }
 
 .blog-prose p:last-child {
   margin-bottom: 0;
 }
 
-/* Links — internal and external */
+/* Links — visible without relying on color alone */
 .blog-prose a {
-  color: #F5EE30;
-  text-decoration: none;
-  font-weight: 500;
-  border-bottom: 1px solid rgba(245, 238, 48, 0.3);
-  transition: border-color 0.15s ease, color 0.15s ease;
+  color: var(--blog-link);
+  font-weight: 600;
+  text-decoration-line: underline;
+  text-decoration-color: color-mix(in srgb, var(--blog-link) 48%, transparent);
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.18em;
+  transition: color 150ms ease, text-decoration-color 150ms ease;
 }
 
 .blog-prose a:hover {
-  color: #fffde0;
-  border-bottom-color: #F5EE30;
+  color: var(--blog-link-hover);
+  text-decoration-color: currentColor;
+}
+
+.blog-prose a:focus-visible {
+  border-radius: 0.2rem;
+  outline: 3px solid var(--blog-accent);
+  outline-offset: 3px;
 }
 
 /* Strong & Em */
 .blog-prose strong {
-  color: #ffffff;
-  font-weight: 700;
+  color: var(--blog-heading);
+  font-weight: 750;
 }
 
 .blog-prose em {
-  color: #e5e7eb;
+  color: var(--blog-text);
   font-style: italic;
 }
 
@@ -620,9 +685,9 @@ body {
 
 .blog-prose ul li,
 .blog-prose ol li {
-  margin-bottom: 0.5rem;
-  color: #d1d5db;
-  line-height: 1.75;
+  margin-bottom: 0.55rem;
+  color: var(--blog-text);
+  line-height: 1.7;
 }
 
 .blog-prose ul {
@@ -633,16 +698,11 @@ body {
   list-style-type: decimal;
 }
 
-.blog-prose ul li::marker {
-  color: #F5EE30;
-}
-
-.blog-prose ol li::marker {
-  color: #F5EE30;
+.blog-prose li::marker {
+  color: var(--blog-link);
   font-weight: 700;
 }
 
-/* Nested lists */
 .blog-prose ul ul,
 .blog-prose ol ol,
 .blog-prose ul ol,
@@ -655,14 +715,14 @@ body {
 .blog-prose blockquote {
   margin: 2rem 0;
   padding: 1.25rem 1.5rem;
-  border-left: 3px solid #F5EE30;
-  background: rgba(245, 238, 48, 0.04);
-  border-radius: 0 0.5rem 0.5rem 0;
-  font-style: italic;
+  border-left: 4px solid var(--blog-accent);
+  background: color-mix(in srgb, var(--blog-accent) 12%, var(--blog-surface-muted));
+  border-radius: 0 0.75rem 0.75rem 0;
+  font-style: normal;
 }
 
 .blog-prose blockquote p {
-  color: #9ca3af;
+  color: var(--blog-text);
   margin-bottom: 0;
 }
 
@@ -670,27 +730,30 @@ body {
 .blog-prose code {
   font-family: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
   font-size: 0.875em;
-  color: #F5EE30;
-  background: rgba(245, 238, 48, 0.08);
+  color: var(--blog-link);
+  background: var(--blog-code-bg);
+  border: 1px solid var(--blog-border);
   padding: 0.15em 0.45em;
-  border-radius: 0.25rem;
+  border-radius: 0.3rem;
   font-style: normal;
 }
 
 /* Code — block */
 .blog-prose pre {
+  width: 100%;
   margin: 1.75rem 0;
   padding: 1.5rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--blog-code-bg);
+  border: 1px solid var(--blog-border);
   border-radius: 0.75rem;
   overflow-x: auto;
 }
 
 .blog-prose pre code {
   background: none;
+  border: 0;
   padding: 0;
-  color: #d1d5db;
+  color: var(--blog-text);
   font-size: 0.875rem;
   line-height: 1.7;
 }
@@ -698,18 +761,39 @@ body {
 /* Horizontal Rule */
 .blog-prose hr {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  margin: 2.5rem 0;
+  border-top: 1px solid var(--blog-border);
+  margin: 2.75rem 0;
 }
 
 /* Images */
 .blog-prose img {
+  width: auto;
   max-width: 100%;
   height: auto;
   border-radius: 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--blog-border);
   margin: 1.75rem 0;
   display: block;
+}
+
+/* Keep fixed-width media and wrappers received from external blog sources
+   inside the reading column without changing the webhook payload. */
+.blog-prose :where(div, figure, iframe, video, svg) {
+  max-width: 100%;
+}
+
+.blog-prose figure {
+  margin-inline: 0;
+}
+
+.blog-prose video {
+  height: auto;
+}
+
+.blog-prose .marketing-table-wrapper {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Tables */
@@ -718,30 +802,28 @@ body {
   border-collapse: collapse;
   margin: 1.75rem 0;
   font-size: 0.9375rem;
-  overflow: hidden;
-  border-radius: 0.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--blog-border);
 }
 
 .blog-prose thead {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--blog-surface-muted);
 }
 
 .blog-prose th {
-  color: #ffffff;
-  font-weight: 600;
+  color: var(--blog-heading);
+  font-weight: 700;
   text-align: left;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--blog-border);
   font-size: 0.875rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .blog-prose td {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  color: #d1d5db;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--blog-border);
+  color: var(--blog-text);
   vertical-align: top;
 }
 
@@ -750,13 +832,13 @@ body {
 }
 
 .blog-prose tr:hover td {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--blog-row-hover);
 }
 
 /* Smaller variant for FAQ answers */
 .blog-prose-sm {
-  font-size: 0.9375rem;
-  line-height: 1.75;
+  font-size: 1rem;
+  line-height: 1.7;
 }
 
 .blog-prose-sm p {
@@ -772,17 +854,22 @@ body {
 /* Responsive adjustments */
 @media (max-width: 640px) {
   .blog-prose {
-    font-size: 1rem;
+    font-size: 1.0625rem;
+    line-height: 1.68;
   }
 
   .blog-prose h2 {
-    font-size: 1.5rem;
-    margin-top: 2rem;
+    font-size: 1.625rem;
+    margin-top: 2.25rem;
   }
 
   .blog-prose h3 {
-    font-size: 1.25rem;
-    margin-top: 1.75rem;
+    font-size: 1.35rem;
+    margin-top: 1.8rem;
+  }
+
+  .blog-prose blockquote {
+    padding: 1rem 1.1rem;
   }
 
   .blog-prose pre {

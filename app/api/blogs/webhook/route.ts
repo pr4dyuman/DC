@@ -9,7 +9,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 import dbConnect from "@/lib/marketing-db";
 import { stripStandaloneFaqSection } from "@/lib/marketing-blog-content";
-import { normalizeMarketingCanonicalUrl, normalizeMarketingImageSrc } from "@/lib/marketing-blog-utils";
+import {
+    buildMarketingWebhookSuccessReceipt,
+    normalizeMarketingCanonicalUrl,
+    normalizeMarketingImageSrc,
+    normalizeMarketingShortDescription,
+} from "@/lib/marketing-blog-utils";
 import { decryptApiKey } from "@/lib/mongodb";
 import Blog from "@/models/marketing/Blog";
 import BlogPublishingAudit from "@/models/marketing/BlogPublishingAudit";
@@ -383,6 +388,7 @@ function normalizeZseoPublishPayload(payload: unknown): IncomingWebhookPayload |
     const image = getRecord(content.image);
     const imageUrl = getString(image.url);
     const openGraph = getRecord(content.openGraph);
+    const metaDescription = getString(content.metaDescription);
     const publishedAt = new Date().toISOString();
 
     if (!title || !slug || !canonicalUrl || !contentHtml) {
@@ -399,9 +405,14 @@ function normalizeZseoPublishPayload(payload: unknown): IncomingWebhookPayload |
             title,
             slug,
             content: contentHtml,
-            excerpt: getString(content.excerpt) || bodyMarkdown.slice(0, 260) || title,
+            excerpt: normalizeMarketingShortDescription([
+                getString(content.excerpt),
+                metaDescription,
+                getString(openGraph.description),
+                title,
+            ]),
             metaTitle: getString(openGraph.title) || title,
-            metaDescription: getString(content.metaDescription),
+            metaDescription,
             canonicalUrl,
             ...(imageUrl
                 ? {
@@ -1055,7 +1066,14 @@ export async function POST(request: NextRequest) {
             imageAlt: normalizedImage
                 ? normalizeBrandSpelling(payload.blog.imageAlt || payload.blog.title)
                 : "",
-            shortDescription: normalizeBrandSpelling(payload.blog.excerpt),
+            shortDescription: normalizeBrandSpelling(
+                normalizeMarketingShortDescription([
+                    payload.blog.excerpt,
+                    payload.blog.metaDescription,
+                    payload.blog.metaTitle,
+                    payload.blog.title,
+                ]),
+            ),
             category: normalizeBrandSpelling(payload.blog.category || "AI Blogger"),
             status: "published",
             metaKeywords: hasNonEmptyString(payload.blog.metaKeywords) ? normalizeBrandSpelling(payload.blog.metaKeywords.trim()) : "",
@@ -1176,17 +1194,16 @@ export async function POST(request: NextRequest) {
 
         // Return success response
         return NextResponse.json(
-            {
-                success: true,
-                message: isUpdate ? "Blog updated successfully" : "Blog created successfully",
+            buildMarketingWebhookSuccessReceipt({
                 blog: {
                     id: savedBlog._id.toString(),
                     slug: savedBlog.slug,
                     title: savedBlog.title,
                     status: savedBlog.status,
                 },
+                isUpdate,
                 processingTime: `${Date.now() - startTime}ms`,
-            },
+            }),
             { status: isUpdate ? 200 : 201 },
         );
     } catch (error) {
