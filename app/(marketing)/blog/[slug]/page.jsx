@@ -7,6 +7,12 @@ import dbConnect from "@/lib/marketing-db";
 import { BlogStudioPostModel, connectDB as connectPrimaryDb } from "@/lib/mongodb";
 import Blog from "@/models/marketing/Blog";
 import { checkAuth } from "@/lib/authMiddleware";
+import {
+  cleanStoredBlogSchema,
+  getMarketingBlogPublicCategory,
+  isRemovedMarketingBlogSlug,
+  rewriteMarketingSiteLinksToRelative,
+} from "@/lib/marketing-blog-cleanup";
 import { buildMarketingBlogHtml, stripStandaloneFaqSection } from "@/lib/marketing-blog-content";
 import {
   isRemoteMarketingImageSrc,
@@ -101,22 +107,8 @@ function normalizeFaqItems(items = []) {
     .filter((item) => item.question && item.answer);
 }
 
-function normalizeQuestionList(items = []) {
-  if (!Array.isArray(items)) {
-    return [];
-  }
-
-  return items
-    .filter((item) => typeof item === "string" && item.trim())
-    .map((item) => item.trim());
-}
-
 function getStoredFaqItems(blog) {
   return normalizeFaqItems(blog?.faqItems);
-}
-
-function getPeopleAlsoAskQuestions(blog) {
-  return normalizeQuestionList(blog?.peopleAlsoAsk);
 }
 
 function getExternalSourceHref(source) {
@@ -611,7 +603,13 @@ function buildFallbackSchemaMarkup(blog) {
 function resolveSchemaMarkup(blog) {
   if (blog.schemaMarkup?.trim()) {
     try {
-      return serializeJsonLd(preferBlogPostingSchemaType(JSON.parse(blog.schemaMarkup)));
+      return serializeJsonLd(
+        cleanStoredBlogSchema(
+          preferBlogPostingSchemaType(JSON.parse(blog.schemaMarkup)),
+          blog.category || "Insights",
+          SITE_NAME,
+        ),
+      );
     } catch {
       return buildFallbackSchemaMarkup(blog);
     }
@@ -668,6 +666,10 @@ async function canViewDraftBlog() {
 }
 
 async function getBlog(slug) {
+  if (isRemovedMarketingBlogSlug(slug)) {
+    return null;
+  }
+
   try {
     await dbConnect();
     const isAdmin = await canViewDraftBlog();
@@ -720,6 +722,7 @@ async function getBlog(slug) {
     return {
       ...blog,
       _id: blog._id.toString(),
+      category: getMarketingBlogPublicCategory(blog),
       image: normalizeMarketingImageSrc(blog.image, ""),
       canonicalUrl: normalizeMarketingCanonicalUrl(blog.canonicalUrl, blog.slug),
       publishedAt: toIsoDate(blog.publishedAt),
@@ -814,7 +817,6 @@ export default async function BlogPost({ params }) {
     day: "numeric",
   });
   const faqItems = getStoredFaqItems(post);
-  const peopleAlsoAsk = getPeopleAlsoAskQuestions(post).slice(0, 6);
   const renderedContent = buildMarketingBlogHtml(post.content, {
     internalLinks: post.internalLinks,
     siteUrl: SITE_URL,
@@ -838,7 +840,7 @@ export default async function BlogPost({ params }) {
   const contentWithHeadingIds = shouldShowToc
     ? addHeadingIdsToHtml(contentWithoutInlineFaq, headings)
     : contentWithoutInlineFaq;
-  const sanitizedContent = serverSanitizeHtml(contentWithHeadingIds);
+  const sanitizedContent = rewriteMarketingSiteLinksToRelative(serverSanitizeHtml(contentWithHeadingIds));
   const readTime = getReadTimeLabel(contentWithoutInlineFaq || post.content);
   const relatedServiceLinks = getRelatedServiceLinks(post);
 
@@ -1027,28 +1029,6 @@ export default async function BlogPost({ params }) {
                   </details>
                 )}
 
-                {/* People Also Ask */}
-                {peopleAlsoAsk.length > 0 && (
-                  <section className="-mx-4 mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-4 py-7 sm:mx-0 sm:rounded-2xl sm:border sm:p-8">
-                    <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--blog-link)]">
-                      Search Intent
-                    </p>
-                    <h2 className="mb-5 font-sans text-2xl font-bold tracking-tight text-[var(--blog-heading)] sm:text-3xl">
-                      People Also Ask
-                    </h2>
-                    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                      {peopleAlsoAsk.map((question, index) => (
-                        <div
-                          key={`paa-${index}`}
-                          className="cursor-default rounded-xl border border-[var(--blog-border)] bg-[var(--blog-surface-muted)] p-4 transition-colors hover:border-[var(--blog-accent)]"
-                        >
-                          <p className="text-sm leading-6 text-[var(--blog-text)]">{question}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
                 {/* ── Article Body ── */}
                 <div className="-mx-4 mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-4 py-8 sm:mx-0 sm:rounded-2xl sm:border sm:p-8 lg:p-10 2xl:p-14">
                   <div
@@ -1148,8 +1128,10 @@ export default async function BlogPost({ params }) {
                           <div
                             className="blog-prose blog-prose-sm border-t border-[var(--blog-border)] px-5 pb-5 pt-4"
                             dangerouslySetInnerHTML={{
-                              __html: serverSanitizeHtml(
-                                buildMarketingBlogHtml(item.answer, { siteUrl: SITE_URL })
+                              __html: rewriteMarketingSiteLinksToRelative(
+                                serverSanitizeHtml(
+                                  buildMarketingBlogHtml(item.answer, { siteUrl: SITE_URL })
+                                )
                               ),
                             }}
                           />

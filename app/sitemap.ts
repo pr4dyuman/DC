@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 
+import { REMOVED_BLOG_SLUGS } from "@/lib/marketing-blog-cleanup";
 import dbConnect from "@/lib/marketing-db";
 import { normalizeMarketingCanonicalUrl, toAbsoluteMarketingImageUrl } from "@/lib/marketing-blog-utils";
 import Blog from "@/models/marketing/Blog";
@@ -120,7 +121,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             if (!slug) {
                 continue;
             }
-            if (REDIRECTED_BLOG_SLUGS.has(slug)) {
+            if (REDIRECTED_BLOG_SLUGS.has(slug) || REMOVED_BLOG_SLUGS.has(slug)) {
                 continue;
             }
 

@@ -18,6 +18,7 @@ import {
 import { decryptApiKey } from "@/lib/mongodb";
 import Blog from "@/models/marketing/Blog";
 import BlogPublishingAudit from "@/models/marketing/BlogPublishingAudit";
+import { getMarketingBlogPublicCategory } from "@/lib/marketing-blog-cleanup";
 
 /**
  * Type for incoming webhook payload
@@ -421,7 +422,7 @@ function normalizeZseoPublishPayload(payload: unknown): IncomingWebhookPayload |
                 }
                 : {}),
             schemaMarkup: getJsonString(content.schemaJson),
-            category: "zSEO Content Studio",
+            category: getMarketingBlogPublicCategory({ slug, title }),
             faqItems: collectFaqItemsFromSchemaNode(content.schemaJson),
             externalSources: normalizeZseoCitations(content.citations),
             peopleAlsoAsk: collectFaqItemsFromSchemaNode(content.schemaJson).map(
