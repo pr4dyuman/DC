@@ -39,10 +39,24 @@ function variants(find, replace, field) {
     return pairs.filter((pair, index) => pairs.findIndex((other) => other[0] === pair[0]) === index);
 }
 
+// An edit's find/replace may be a pair of arrays: alternatives for HTML and
+// markdown storage (for example around <strong> or **). The first that matches wins.
+function editAlternatives(edit) {
+    return Array.isArray(edit.find)
+        ? edit.find.map((find, index) => [find, edit.replace[index]])
+        : [[edit.find, edit.replace]];
+}
+
+function editLabel(edit) {
+    return Array.isArray(edit.find) ? edit.find[0] : edit.find;
+}
+
 function applyEdit(text, edit, field) {
-    for (const [find, replace] of variants(edit.find, edit.replace, field)) {
-        if (find && text.includes(find)) {
-            return { text: text.split(find).join(replace), count: text.split(find).length - 1 };
+    for (const [findText, replaceText] of editAlternatives(edit)) {
+        for (const [find, replace] of variants(findText, replaceText, field)) {
+            if (find && text.includes(find)) {
+                return { text: text.split(find).join(replace), count: text.split(find).length - 1 };
+            }
         }
     }
     return { text, count: 0 };
@@ -95,10 +109,10 @@ try {
 
             if (hits.length) {
                 applied += 1;
-                console.log(`  ok    ${edit.find.slice(0, 70)} -> [${hits.join(", ")}]`);
+                console.log(`  ok    ${editLabel(edit).slice(0, 70)} -> [${hits.join(", ")}]`);
             } else {
                 skipped += 1;
-                console.log(`  SKIP  not found, do by hand: ${edit.find.slice(0, 90)}`);
+                console.log(`  SKIP  not found, do by hand: ${editLabel(edit).slice(0, 90)}`);
             }
         }
 
