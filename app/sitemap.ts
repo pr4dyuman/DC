@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-import { REMOVED_BLOG_SLUGS } from "@/lib/marketing-blog-cleanup";
+import { LEGACY_REDIRECTED_BLOG_SLUGS, REMOVED_BLOG_SLUGS } from "@/lib/marketing-blog-cleanup";
 import dbConnect from "@/lib/marketing-db";
 import { normalizeMarketingCanonicalUrl, toAbsoluteMarketingImageUrl } from "@/lib/marketing-blog-utils";
 import Blog from "@/models/marketing/Blog";
@@ -24,10 +24,6 @@ type MarketingSitemapBlog = {
     publishedAt?: string | Date;
     createdAt?: string | Date;
 };
-
-const REDIRECTED_BLOG_SLUGS = new Set([
-    "how-to-manage-your-company-using-ai-powered-tools-2026-strategy",
-]);
 
 function toDate(value?: string | Date) {
     if (!value) {
@@ -121,7 +117,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             if (!slug) {
                 continue;
             }
-            if (REDIRECTED_BLOG_SLUGS.has(slug) || REMOVED_BLOG_SLUGS.has(slug)) {
+            if (LEGACY_REDIRECTED_BLOG_SLUGS.has(slug) || REMOVED_BLOG_SLUGS.has(slug)) {
                 continue;
             }
 
