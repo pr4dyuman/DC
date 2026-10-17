@@ -12,8 +12,9 @@ export const REMOVED_BLOG_SLUGS = new Set<string>([
 ]);
 
 // Older posts whose URLs were already redirected in next.config.ts before the
-// cleanup, but whose database records are still published. Hide them wherever
-// posts are listed so no list links to a redirect.
+// cleanup, but whose database records are still published. The blog list, the
+// sitemap and the related/latest post links hide them so they never link to a
+// redirect.
 export const LEGACY_REDIRECTED_BLOG_SLUGS = new Set<string>([
     "how-to-manage-your-company-using-ai-powered-tools-2026-strategy",
     "glass-city-marathon-2026-content-strategy-scaling-event-production",

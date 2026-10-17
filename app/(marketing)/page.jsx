@@ -16,8 +16,8 @@ import {
 } from "@/components/marketing/HomeSliders";
 
 // The latest-posts block reads MongoDB, so regenerate the homepage at most
-// once an hour instead of only on each deploy.
-export const revalidate = 3600;
+// every 5 minutes instead of only on each deploy.
+export const revalidate = 300;
 
 const HeroSection = async () => {
   const latestPosts = (await getMarketingBlogLinks()).slice(0, 3);
