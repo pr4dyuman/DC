@@ -54,7 +54,7 @@ function ServicesSectionPlaceholder() {
 
         <div className="absolute inset-0 flex items-center overflow-hidden">
           <div className="flex w-full gap-3 sm:gap-4 px-4 sm:px-6 lg:px-8">
-            {servicesData.slice(0, 4).map((service) => (
+            {servicesData.map((service) => (
               <Link
                 key={service.id}
                 href={service.link}

@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-import { REMOVED_BLOG_SLUGS } from "@/lib/marketing-blog-cleanup";
+import { LEGACY_REDIRECTED_BLOG_SLUGS, REMOVED_BLOG_SLUGS } from "@/lib/marketing-blog-cleanup";
 import dbConnect from "@/lib/marketing-db";
 import { normalizeMarketingCanonicalUrl, toAbsoluteMarketingImageUrl } from "@/lib/marketing-blog-utils";
 import Blog from "@/models/marketing/Blog";
@@ -14,7 +14,6 @@ const SITE_URL = (
     process.env.NEXT_PUBLIC_APP_URL ||
     "https://digitalcorvids.com"
 ).replace(/\/+$/, "");
-const STATIC_LAST_MODIFIED = new Date("2026-05-17");
 
 type MarketingSitemapBlog = {
     slug?: string;
@@ -24,10 +23,6 @@ type MarketingSitemapBlog = {
     publishedAt?: string | Date;
     createdAt?: string | Date;
 };
-
-const REDIRECTED_BLOG_SLUGS = new Set([
-    "how-to-manage-your-company-using-ai-powered-tools-2026-strategy",
-]);
 
 function toDate(value?: string | Date) {
     if (!value) {
@@ -73,6 +68,9 @@ function toSitemapImageUrl(value?: string) {
     return /^https?:\/\//i.test(imageUrl) ? imageUrl : withSiteUrl(imageUrl);
 }
 
+// Static pages have no tracked modification date, so they get no lastmod
+// instead of a fixed date that goes stale. /blog takes the newest post's date
+// further down.
 function staticEntry(
     path: string,
     changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"],
@@ -80,7 +78,6 @@ function staticEntry(
 ): MetadataRoute.Sitemap[number] {
     return {
         url: withSiteUrl(path),
-        lastModified: STATIC_LAST_MODIFIED,
         changeFrequency,
         priority,
     };
@@ -121,7 +118,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             if (!slug) {
                 continue;
             }
-            if (REDIRECTED_BLOG_SLUGS.has(slug) || REMOVED_BLOG_SLUGS.has(slug)) {
+            if (LEGACY_REDIRECTED_BLOG_SLUGS.has(slug) || REMOVED_BLOG_SLUGS.has(slug)) {
                 continue;
             }
 
@@ -141,6 +138,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
                 priority: 0.75,
                 images: imageUrl ? [imageUrl] : undefined,
             });
+        }
+
+        // The /blog listing changes whenever a post is published or updated.
+        let newestPostModified: Date | undefined;
+        for (const entry of blogEntries) {
+            if (
+                entry.lastModified instanceof Date &&
+                (!newestPostModified || entry.lastModified > newestPostModified)
+            ) {
+                newestPostModified = entry.lastModified;
+            }
+        }
+
+        const blogIndexEntry = staticEntries.find((entry) => entry.url === withSiteUrl("/blog"));
+        if (blogIndexEntry && newestPostModified) {
+            blogIndexEntry.lastModified = newestPostModified;
         }
 
         return [...staticEntries, ...blogEntries];

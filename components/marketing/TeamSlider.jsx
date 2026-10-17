@@ -6,6 +6,7 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import Image from "next/image";
+import Link from "next/link";
 
 const teamMembers = [
   { name: "Garima khurana", role: "Content Write & Strategist", img: "/garima.webp" },
@@ -108,8 +109,15 @@ export default function TeamSlider() {
           </h2>
 
           <p className="text-gray-300 text-sm lg:text-base leading-relaxed lg:w-1/3">
-            Our diverse team of experts brings years of experience in digital marketing,
-            web development, and creative strategy to every project.
+            Our diverse team of experts brings years of experience in digital marketing,{" "}
+            <Link
+              href="/services/web-development"
+              prefetch={false}
+              className="text-[#F5EE30] underline underline-offset-4 hover:text-white"
+            >
+              web development
+            </Link>
+            , and creative strategy to every project.
           </p>
         </div>
       </div>

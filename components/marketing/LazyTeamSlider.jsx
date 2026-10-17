@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 const TeamSlider = dynamic(() => import("./TeamSlider"), {
@@ -26,8 +27,15 @@ function TeamSliderPlaceholder() {
           </h2>
 
           <p className="text-gray-300 text-sm lg:text-base leading-relaxed lg:w-1/3">
-            Our diverse team of experts brings years of experience in digital marketing,
-            web development, and creative strategy to every project.
+            Our diverse team of experts brings years of experience in digital marketing,{" "}
+            <Link
+              href="/services/web-development"
+              prefetch={false}
+              className="text-[#F5EE30] underline underline-offset-4 hover:text-white"
+            >
+              web development
+            </Link>
+            , and creative strategy to every project.
           </p>
         </div>
       </div>

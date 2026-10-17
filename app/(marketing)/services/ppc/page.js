@@ -85,22 +85,22 @@ const relatedPpcLinks = [
 
 const relatedPpcArticles = [
   {
-    title: "High-ROI Content Distribution Engine",
-    href: "/blog/how-to-build-a-high-roi-content-distribution-engine-for-2026",
+    title: "Building Data-Driven PPC Campaigns",
+    href: "/blog/building-data-driven-ppc-campaigns-the-modern-roi-framework",
     category: "Campaign ROI",
-    description: "Learn how to move content and campaign assets across channels so paid traffic supports bigger growth.",
+    description: "Build transparent, data-driven PPC campaigns that pair clean data analysis with performance creative.",
   },
   {
-    title: "AJIO 22feet Ecommerce Expansion Strategy",
-    href: "/blog/ajio-22feet-a-winning-fashion-e-commerce-digital-expansion-strategy",
-    category: "Ecommerce Growth",
-    description: "Review a fashion ecommerce strategy lens for acquisition, positioning, and scalable digital demand.",
+    title: "What PPC Services Include: The Video Edge",
+    href: "/blog/what-is-included-in-ppc-advertising-services-the-video-edge",
+    category: "PPC Deliverables",
+    description: "See what PPC advertising services include, from video-integrated deliverables to platform management.",
   },
   {
-    title: "Media Strategy Guide 2026",
-    href: "/blog/media-strategy-guide-2026-scaling-impact-with-hybrid-models",
-    category: "Paid Media",
-    description: "Build a more resilient media mix across paid, owned, creator, and campaign channels.",
+    title: "Local Services Ads Vs Google Business Profile For Plumbers",
+    href: "/blog/local-service-ads-vs-google-business-plumber-leads",
+    category: "Local Leads",
+    description: "Compare Local Services Ads and Google Business Profile for emergency repairs and scheduled installations.",
   },
 ];
 
@@ -524,7 +524,7 @@ export default function PPCAdvertising() {
           <RelatedArticlesSection
             eyebrow="PPC Reading List"
             title="Guides For Smarter Paid Growth"
-            description="Use these articles to connect paid media planning with content distribution, ecommerce demand, and campaign measurement."
+            description="Use these articles to connect paid media planning with campaign measurement, video-led ad deliverables, and local lead generation."
             articles={relatedPpcArticles}
           />
 
