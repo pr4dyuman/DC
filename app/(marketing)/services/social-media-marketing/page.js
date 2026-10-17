@@ -91,16 +91,16 @@ const relatedSocialMediaArticles = [
     description: "See how AI, creative systems, and sharper planning are changing social media execution.",
   },
   {
-    title: "Platform-Specific Social Strategy",
-    href: "/blog/2026-platform-specific-social-media-strategy-framework-ai-scaling",
-    category: "Platform Planning",
-    description: "Map ideas to the right platform behavior instead of forcing every post into the same format.",
+    title: "How To Build A Storytelling Campaign Strategy",
+    href: "/blog/how-to-build-a-storytelling-campaign-strategy-the-2026-model",
+    category: "Campaign Strategy",
+    description: "Build a storytelling campaign strategy with the 5 C's and the 3-3-3 rule to scale your brand narrative.",
   },
   {
-    title: "Viral-Worthy Content Calendar Strategy",
-    href: "/blog/2026-viral-worthy-content-calendar-strategy-for-reels-and-carousels",
-    category: "Content Calendar",
-    description: "Plan reels, carousels, and recurring content themes with a stronger operating rhythm.",
+    title: "Scale Influencer Content With Paid Media",
+    href: "/blog/how-to-scale-influencer-content-with-paid-media-playbook",
+    category: "Paid Social",
+    description: "Use creator licensing and whitelisting to scale influencer content with paid media across Meta and TikTok.",
   },
 ];
 

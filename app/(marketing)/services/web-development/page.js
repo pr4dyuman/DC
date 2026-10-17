@@ -85,22 +85,22 @@ const relatedWebDevelopmentLinks = [
 
 const relatedWebDevelopmentArticles = [
   {
-    title: "Digital Production Vs Marketing Strategy",
-    href: "/blog/digital-production-vs-digital-marketing-strategy-the-2026-gap",
-    category: "Website Strategy",
-    description: "Understand why stronger production systems and clearer strategy need to meet before a site launch.",
+    title: "Custom Web App Architecture For Growing Businesses",
+    href: "/blog/customized-web-application-development-architecture",
+    category: "Web Architecture",
+    description: "See how custom web application architecture replaces rigid templates and balances scalability with maintainability.",
   },
   {
-    title: "The 2026 Production Mandate",
-    href: "/blog/the-2026-production-mandate-balancing-speed-and-quality",
-    category: "Quality Systems",
-    description: "Plan web and content workflows that move quickly without sacrificing structure, QA, or brand quality.",
+    title: "Technical SEO Vs On-Page SEO Priorities",
+    href: "/blog/technical-seo-vs-on-page-key-implementation-priorities",
+    category: "Technical SEO",
+    description: "Learn where the core boundaries sit between technical SEO work and on-page SEO work.",
   },
   {
-    title: "Pre-Production For Content Engines",
-    href: "/blog/pre-production-strategy-for-digital-content-engines-scale-in-2026",
-    category: "Launch Planning",
-    description: "Use pre-production thinking to prepare website content, page hierarchy, and campaign assets before build.",
+    title: "Conversion Funnel Mapping And Optimization",
+    href: "/blog/conversion-funnel-mapping-and-optimization-to-stop-leaks",
+    category: "Conversion Paths",
+    description: "Map your conversion funnel, track leaks in GA4, analyze behavior, and optimize touchpoints for conversions.",
   },
 ];
 

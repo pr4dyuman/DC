@@ -85,22 +85,22 @@ const relatedInfluencerLinks = [
 
 const relatedInfluencerArticles = [
   {
-    title: "Vertical-Specific Influencer Campaign Management",
-    href: "/blog/vertical-specific-influencer-campaign-management-the-framework",
+    title: "Influencer Marketing Strategy That Drives Results",
+    href: "/blog/influencer-marketing-strategy-that-drives-results-5-step-guide",
     category: "Creator Strategy",
-    description: "Build influencer campaigns around niche, audience fit, platform behavior, and measurable goals.",
+    description: "Build an influencer marketing strategy around creator assets and paid distribution instead of vanity metrics.",
   },
   {
-    title: "YouTube Influencer Marketing ROI Guide",
-    href: "/blog/youtube-influencer-marketing-campaign-best-practices-the-roi-guide",
-    category: "YouTube Campaigns",
-    description: "Plan YouTube creator campaigns with stronger briefs, tracking, content usage, and ROI expectations.",
+    title: "Influencer Contracts And Usage Rights",
+    href: "/blog/influencer-collaboration-contracts-usage-rights",
+    category: "Usage Rights",
+    description: "Draft influencer contracts with clear usage rights, using a framework and checklist to define content ownership.",
   },
   {
-    title: "AI For Influencer Marketing ROI",
-    href: "/blog/using-ai-to-optimize-influencer-marketing-roi-a-2026-strategy",
+    title: "Influencer Attribution Beyond Promo Codes",
+    href: "/blog/influencer-marketing-attribution-models-beyond-promo-codes",
     category: "Campaign Analytics",
-    description: "Use AI-assisted analysis to improve creator selection, campaign tracking, and performance decisions.",
+    description: "Use attribution models and multi-touch tracking to measure creator ROI instead of relying on promo codes.",
   },
 ];
 

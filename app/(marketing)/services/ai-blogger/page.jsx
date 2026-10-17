@@ -59,22 +59,22 @@ const relatedAIBloggerServices = [
 
 const relatedAIBloggerArticles = [
   {
-    title: "The 2026 SEO Management Workflow",
-    href: "/blog/the-2026-seo-management-workflow-scaling-content-with-ai",
-    category: "SEO Workflow",
-    description: "See how AI-assisted content, editorial checks, and SEO operations can work together.",
+    title: "Restructure Headings For Passage Ranking",
+    href: "/blog/restructure-content-headings-passage-ranking-visibility",
+    category: "SEO Writing",
+    description: "Turn long-form headings into modular, answer-focused sections that search engines can evaluate and surface.",
   },
   {
-    title: "Brand Voice Guardrails For AI Assets",
-    href: "/blog/brand-voice-insurance-editorial-guardrails-for-ai-generated-assets",
+    title: "Is AI-Generated Content Good For SEO?",
+    href: "/blog/is-ai-generated-content-good-for-seo-the-strategic-playbook",
     category: "Editorial Quality",
-    description: "Build review guardrails that keep AI-generated content consistent, useful, and brand-safe.",
+    description: "See how AI-generated content affects SEO, what search guidelines say, and how to build a safe, human-led workflow.",
   },
   {
-    title: "High-ROI Content Distribution",
-    href: "/blog/how-to-build-a-high-roi-content-distribution-engine-for-2026",
-    category: "Distribution",
-    description: "Turn published blog content into a wider distribution engine across search and campaigns.",
+    title: "2026 Social Media Marketing Trends",
+    href: "/blog/2026-social-media-marketing-trends-operationalizing-ai-and-creative",
+    category: "Social Trends",
+    description: "See the trends shaping AI content, social commerce, and social media workflows, with practical next steps.",
   },
 ];
 

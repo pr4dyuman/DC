@@ -85,22 +85,22 @@ const relatedVideoProductionLinks = [
 
 const relatedVideoProductionArticles = [
   {
-    title: "Scaling B2B Video Production On LinkedIn",
-    href: "/blog/scaling-b2b-video-production-on-linkedin-beyond-the-feed",
-    category: "B2B Video",
-    description: "Plan LinkedIn video systems that support thought leadership, demand generation, and sales conversations.",
+    title: "How To Measure Video Production Success",
+    href: "/blog/how-to-measure-video-production-success-the-performance-framework",
+    category: "Video Performance",
+    description: "Measure video production success with behavioral metrics, performance pillars, and business ROI, not vanity views.",
   },
   {
-    title: "Pre-Production Strategy For Content Engines",
-    href: "/blog/pre-production-strategy-for-digital-content-engines-scale-in-2026",
-    category: "Pre-Production",
-    description: "Use stronger planning to make shoots, edits, approvals, and distribution easier to scale.",
+    title: "How To Build A Storytelling Campaign Strategy",
+    href: "/blog/how-to-build-a-storytelling-campaign-strategy-the-2026-model",
+    category: "Campaign Strategy",
+    description: "Use a 2026 production guide to plan a storytelling campaign strategy and scale your brand narrative.",
   },
   {
-    title: "The 2026 Production Mandate",
-    href: "/blog/the-2026-production-mandate-balancing-speed-and-quality",
-    category: "Production Quality",
-    description: "Balance speed, brand quality, and repeatable creative workflows before production becomes chaotic.",
+    title: "What PPC Services Include: The Video Edge",
+    href: "/blog/what-is-included-in-ppc-advertising-services-the-video-edge",
+    category: "Video Ads",
+    description: "See how video-integrated deliverables and platform management fit into PPC advertising services.",
   },
 ];
 

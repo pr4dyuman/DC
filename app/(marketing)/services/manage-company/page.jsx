@@ -54,22 +54,22 @@ const relatedManageCompanyServices = [
 
 const relatedManageCompanyArticles = [
   {
-    title: "AI-Powered Financial Intelligence For Agency Operations",
-    href: "/blog/how-ai-powered-financial-intelligence-improves-agency-operations-2026",
-    category: "Agency Finance",
-    description: "See how AI can improve agency finance visibility, operations decisions, and workflow control.",
+    title: "Custom Web App Architecture For Growing Businesses",
+    href: "/blog/customized-web-application-development-architecture",
+    category: "Business Systems",
+    description: "Learn how custom web application architecture connects core layers and balances scalability with maintainability.",
   },
   {
-    title: "Manage Your Company With AI-Driven Workflows",
-    href: "/blog/how-to-manage-your-company-with-ai-driven-workflows-in-2026",
-    category: "Operations",
-    description: "Explore practical ways AI workflows can organize projects, teams, and recurring agency tasks.",
+    title: "Conversion Funnel Mapping And Optimization",
+    href: "/blog/conversion-funnel-mapping-and-optimization-to-stop-leaks",
+    category: "Performance Tracking",
+    description: "Track funnel leaks in GA4, analyze user behavior, and optimize touchpoints across your conversion funnel.",
   },
   {
-    title: "Enterprise AI Distribution Strategy",
-    href: "/blog/enterprise-ai-distribution-strategy-2026-scaling-agentic-workflows",
-    category: "AI Operations",
-    description: "Plan how agentic workflows, content distribution, and operations systems can scale together.",
+    title: "Building Data-Driven PPC Campaigns",
+    href: "/blog/building-data-driven-ppc-campaigns-the-modern-roi-framework",
+    category: "Growth Tracking",
+    description: "Merge clean data analysis with performance creative to run transparent PPC campaigns and improve ROI.",
   },
 ];
 

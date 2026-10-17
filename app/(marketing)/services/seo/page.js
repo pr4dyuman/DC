@@ -85,22 +85,22 @@ const relatedSeoLinks = [
 
 const relatedSeoArticles = [
   {
-    title: "The 2026 SEO Management Workflow",
-    href: "/blog/the-2026-seo-management-workflow-scaling-content-with-ai",
-    category: "SEO Workflow",
-    description: "See how SEO operations, content production, and AI review can work together without losing quality.",
+    title: "Technical SEO Vs On-Page SEO Priorities",
+    href: "/blog/technical-seo-vs-on-page-key-implementation-priorities",
+    category: "Technical SEO",
+    description: "Learn where the core boundaries sit between technical SEO work and on-page SEO work.",
   },
   {
-    title: "Brand Voice Guardrails For AI Assets",
-    href: "/blog/brand-voice-insurance-editorial-guardrails-for-ai-generated-assets",
+    title: "Is AI-Generated Content Good For SEO?",
+    href: "/blog/is-ai-generated-content-good-for-seo-the-strategic-playbook",
     category: "Content Quality",
-    description: "Build editorial checks that keep AI-assisted content useful, consistent, and search-ready.",
+    description: "Understand how AI content affects SEO, the E-E-A-T risks to watch, and how to build a human-led workflow.",
   },
   {
-    title: "High-ROI Content Distribution",
-    href: "/blog/how-to-build-a-high-roi-content-distribution-engine-for-2026",
-    category: "Organic Growth",
-    description: "Turn SEO content into a wider distribution system across owned, social, and campaign channels.",
+    title: "Competitor Keyword Analysis Framework",
+    href: "/blog/competitor-keyword-analysis-framework-map-gaps-win-traffic",
+    category: "Keyword Strategy",
+    description: "Use a competitor keyword analysis framework to find organic search gaps and target high-intent rankings.",
   },
 ]
 
