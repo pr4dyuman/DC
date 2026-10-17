@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import AboutAgency from "@/components/marketing/AboutAgency";
 import LazyServicesSection from "@/components/marketing/LazyServicesSection";
 import ManageCompanySection from "@/components/marketing/ManageCompany";
@@ -59,7 +60,23 @@ const HeroSection = () => {
               <br className="hidden sm:block" />
               campaigns that elevate your brand, engage your audience, and drive real results
               <br className="hidden sm:block" />
-              From SEO to social media, we turn ideas into impact
+              From{" "}
+              <Link
+                href="/services/seo"
+                prefetch={false}
+                className="text-[#F5EE30] underline underline-offset-4 hover:text-white"
+              >
+                SEO
+              </Link>{" "}
+              to{" "}
+              <Link
+                href="/services/social-media-marketing"
+                prefetch={false}
+                className="text-[#F5EE30] underline underline-offset-4 hover:text-white"
+              >
+                social media
+              </Link>
+              , we turn ideas into impact
             </p>
           </div>
         </div>
