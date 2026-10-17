@@ -98,7 +98,7 @@ export default function AIBloggerPage() {
           <RelatedArticlesSection
             eyebrow="AI Content Reading List"
             title="Guides For Better AI-Assisted Content"
-            description="Use these Digital Corvids articles to connect AI content production with SEO, brand voice, and distribution."
+            description="Use these Digital Corvids articles to connect AI content production with SEO writing, editorial quality, and social trends."
             articles={relatedAIBloggerArticles}
           />
         </div>

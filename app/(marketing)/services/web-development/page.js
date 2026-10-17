@@ -429,7 +429,7 @@ export default function WebDevelopment() {
         <RelatedArticlesSection
           eyebrow="Website Reading List"
           title="Planning Guides For Better Builds"
-          description="Use these articles to connect website structure, launch planning, content operations, and performance-minded production."
+          description="Use these articles to connect website architecture, technical SEO, and conversion-focused performance."
           articles={relatedWebDevelopmentArticles}
         />
 

@@ -467,7 +467,7 @@ export default function SEOServices() {
         <RelatedArticlesSection
           eyebrow="SEO Reading List"
           title="Search Strategy Guides"
-          description="Use these Digital Corvids articles to connect technical SEO, content quality, and distribution into one organic growth plan."
+          description="Use these Digital Corvids articles to connect technical SEO, content quality, and competitor keyword research into one organic growth plan."
           articles={relatedSeoArticles}
         />
 

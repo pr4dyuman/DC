@@ -91,9 +91,9 @@ export default function ManageCompanyPage() {
             actionLabel="Explore Service"
           />
           <RelatedArticlesSection
-            eyebrow="Agency Operations Reading List"
-            title="Guides For AI-Powered Management"
-            description="Use these Digital Corvids articles to plan more organized agency workflows, finance visibility, and management systems."
+            eyebrow="Growth Systems Reading List"
+            title="Guides For Connected Business Systems"
+            description="Use these Digital Corvids articles to plan scalable business systems, funnel tracking, and data-driven growth reporting."
             articles={relatedManageCompanyArticles}
           />
         </div>

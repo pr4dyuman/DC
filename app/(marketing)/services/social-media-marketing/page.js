@@ -473,7 +473,7 @@ export default function SocialMediaMarketing() {
         <RelatedArticlesSection
           eyebrow="Social Reading List"
           title="Guides For Stronger Social Content"
-          description="Use these articles to sharpen platform strategy, creative planning, and content calendars for social growth."
+          description="Use these articles to sharpen social trend planning, storytelling campaigns, and paid amplification for social growth."
           articles={relatedSocialMediaArticles}
         />
 

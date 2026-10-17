@@ -97,7 +97,7 @@ const relatedPpcArticles = [
     description: "See what PPC advertising services include, from video-integrated deliverables to platform management.",
   },
   {
-    title: "Local Services Ads Vs Google Business Profile",
+    title: "Local Services Ads Vs Google Business Profile For Plumbers",
     href: "/blog/local-service-ads-vs-google-business-plumber-leads",
     category: "Local Leads",
     description: "Compare Local Services Ads and Google Business Profile for emergency repairs and scheduled installations.",
@@ -524,7 +524,7 @@ export default function PPCAdvertising() {
           <RelatedArticlesSection
             eyebrow="PPC Reading List"
             title="Guides For Smarter Paid Growth"
-            description="Use these articles to connect paid media planning with content distribution, ecommerce demand, and campaign measurement."
+            description="Use these articles to connect paid media planning with campaign measurement, video-led ad deliverables, and local lead generation."
             articles={relatedPpcArticles}
           />
 

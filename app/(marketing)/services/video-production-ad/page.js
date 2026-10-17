@@ -476,7 +476,7 @@ export default function VideoProduction() {
         <RelatedArticlesSection
           eyebrow="Video Reading List"
           title="Guides For Better Production Systems"
-          description="Use these articles to connect video strategy, pre-production, platform planning, and campaign-ready creative assets."
+          description="Use these articles to connect video performance measurement, storytelling campaigns, and video-led ad creative."
           articles={relatedVideoProductionArticles}
         />
 
