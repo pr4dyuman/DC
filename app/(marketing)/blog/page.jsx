@@ -2,6 +2,7 @@ import React from "react";
 import { unstable_cache } from 'next/cache';
 import dbConnect from '@/lib/marketing-db';
 import Blog from '@/models/marketing/Blog';
+import { REMOVED_BLOG_SLUGS, getMarketingBlogPublicCategory } from '@/lib/marketing-blog-cleanup';
 import BlogList from '@/components/marketing/BlogList';
 import { buildMarketingMetadata } from '@/lib/marketing-seo';
 
@@ -89,10 +90,11 @@ const getPublishedBlogList = unstable_cache(
     await dbConnect();
 
     // Fetch only card/listing fields; full content belongs on detail pages.
-    const blogs = await Blog.find({ status: 'published' })
+    const storedBlogs = await Blog.find({ status: 'published', slug: { $nin: [...REMOVED_BLOG_SLUGS] } })
       .select('title category shortDescription metaDescription image imageAlt slug publishedAt createdAt')
       .sort({ publishedAt: -1, createdAt: -1 })
       .lean();
+    const blogs = storedBlogs.map((blog) => ({ ...blog, category: getMarketingBlogPublicCategory(blog) }));
 
     const categoryNames = [
       'ALL',

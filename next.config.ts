@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+import removedBlogPosts from "./lib/marketing-blog-removed-posts.json";
+
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
@@ -53,19 +55,25 @@ const nextConfig: NextConfig = {
       { source: '/manage-company.html', destination: '/services/manage-company', statusCode: 301 },
       {
         source: '/blog/how-to-manage-your-company-using-ai-powered-tools-2026-strategy',
-        destination: '/blog/how-to-manage-your-company-with-ai-driven-workflows-in-2026',
+        destination: '/services/manage-company',
         statusCode: 301,
       },
       {
         source: '/blog/glass-city-marathon-2026-content-strategy-scaling-event-production',
-        destination: '/blog/pre-production-strategy-for-digital-content-engines-scale-in-2026',
+        destination: '/services/video-production-ad',
         statusCode: 301,
       },
       {
         source: '/blog/mastering-country-calling-2026-content-strategy-ai-production',
-        destination: '/blog/media-strategy-guide-2026-scaling-impact-with-hybrid-models',
+        destination: '/blog/how-to-build-a-storytelling-campaign-strategy-the-2026-model',
         statusCode: 301,
       },
+      // Blog posts removed in the 2026-10 content cleanup (see lib/marketing-blog-cleanup.ts).
+      ...Object.entries(removedBlogPosts.redirects).map(([slug, destination]) => ({
+        source: `/blog/${slug}`,
+        destination,
+        statusCode: 301 as const,
+      })),
     ];
   },
 };
