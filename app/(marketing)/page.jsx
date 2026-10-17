@@ -8,12 +8,20 @@ import HomeRotatingWord from "@/components/marketing/HomeRotatingWord";
 import LazyCompanionsSlider from "@/components/marketing/LazyCompanionsSlider";
 import LazyTeamSlider from "@/components/marketing/LazyTeamSlider";
 import LazyTestimonialSection from "@/components/marketing/LazyTestimonialSection";
+import RelatedArticlesSection from "@/components/marketing/RelatedArticlesSection";
+import { getMarketingBlogLinks } from "@/lib/marketing-blog-links";
 import {
   DigitalPartnersSlider,
   ServicesTicker,
 } from "@/components/marketing/HomeSliders";
 
-const HeroSection = () => {
+// The latest-posts block reads MongoDB, so regenerate the homepage at most
+// once an hour instead of only on each deploy.
+export const revalidate = 3600;
+
+const HeroSection = async () => {
+  const latestPosts = (await getMarketingBlogLinks()).slice(0, 3);
+
   return (
     <div className="font-glacial text-white bg-black">
       <section className="relative overflow-hidden mx-4 sm:mx-6 md:mx-8 lg:mx-10 xl:mx-12 pt-12 sm:pt-16 md:pt-20 text-center flex items-center justify-start min-h-[300px] sm:min-h-[350px] md:min-h-[400px] lg:min-h-[450px]">
@@ -106,6 +114,17 @@ const HeroSection = () => {
       </section>
 
       <LazyTestimonialSection />
+
+      {latestPosts.length > 0 && (
+        <div className="mx-auto max-w-7xl px-4 pt-16 sm:px-6 lg:px-8">
+          <RelatedArticlesSection
+            eyebrow="From The Blog"
+            title="Latest Articles"
+            articles={latestPosts}
+            actionLabel="Read Article"
+          />
+        </div>
+      )}
 
       {/* Commands Slider Moved Here */}
       <section className="bg-black py-12 w-full overflow-hidden">

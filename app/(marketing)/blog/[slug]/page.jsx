@@ -14,6 +14,7 @@ import {
   rewriteMarketingSiteLinksToRelative,
 } from "@/lib/marketing-blog-cleanup";
 import { buildMarketingBlogHtml, stripStandaloneFaqSection } from "@/lib/marketing-blog-content";
+import { getMarketingBlogLinks, pickRelatedMarketingBlogLinks } from "@/lib/marketing-blog-links";
 import {
   isRemoteMarketingImageSrc,
   isSvgMarketingImageSrc,
@@ -802,7 +803,10 @@ export async function generateMetadata({ params }) {
 
 export default async function BlogPost({ params }) {
   const resolvedParams = await params;
-  const post = await getBlog(resolvedParams.slug);
+  const [post, blogLinks] = await Promise.all([
+    getBlog(resolvedParams.slug),
+    getMarketingBlogLinks(),
+  ]);
 
   if (!post) {
     notFound();
@@ -843,6 +847,7 @@ export default async function BlogPost({ params }) {
   const sanitizedContent = rewriteMarketingSiteLinksToRelative(serverSanitizeHtml(contentWithHeadingIds));
   const readTime = getReadTimeLabel(contentWithoutInlineFaq || post.content);
   const relatedServiceLinks = getRelatedServiceLinks(post);
+  const relatedPosts = pickRelatedMarketingBlogLinks(blogLinks, post);
 
   const heroImageSrc = normalizeMarketingImageSrc(post.image, "");
   const isDefaultImage = heroImageSrc?.includes("ai-blogger.svg");
@@ -1136,6 +1141,36 @@ export default async function BlogPost({ params }) {
                             }}
                           />
                         </details>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {relatedPosts.length > 0 && (
+                  <section className="-mx-4 mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-4 py-7 sm:mx-0 sm:rounded-2xl sm:border sm:p-8">
+                    <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--blog-link)]">
+                      Related Articles
+                    </p>
+                    <h2 className="mb-6 font-sans text-2xl font-bold tracking-tight text-[var(--blog-heading)] sm:text-3xl">
+                      Keep Reading
+                    </h2>
+                    <div className="divide-y divide-[var(--blog-border)] border-y border-[var(--blog-border)]">
+                      {relatedPosts.map((related) => (
+                        <Link
+                          key={related.href}
+                          href={related.href}
+                          data-blog-analytics="related-post"
+                          className="group block px-1 py-5 transition-colors hover:bg-[var(--blog-surface-muted)] sm:px-3"
+                        >
+                          <span className="block text-base font-bold text-[var(--blog-heading)] transition-colors group-hover:text-[var(--blog-link)]">
+                            {related.title}
+                          </span>
+                          {related.description ? (
+                            <span className="mt-1.5 block text-sm leading-6 text-[var(--blog-muted)]">
+                              {related.description}
+                            </span>
+                          ) : null}
+                        </Link>
                       ))}
                     </div>
                   </section>
