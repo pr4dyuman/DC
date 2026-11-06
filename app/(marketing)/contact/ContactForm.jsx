@@ -1,8 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { MARKETING_EVENTS, trackMarketingEvent } from "@/lib/marketing-analytics";
+import {
+  getMarketingTemplateCatalogEntry,
+  getTemplateContactMessage,
+} from "@/lib/marketing-templates-catalog";
 
 const fieldClass =
   "w-full bg-transparent border-b border-white/30 pb-3 text-white text-[15px] md:text-[16px] placeholder:text-white/30 outline-none focus:border-[#F5EE30] focus-visible:ring-2 focus-visible:ring-[#F5EE30]/40 transition-colors duration-300";
@@ -11,10 +15,14 @@ export default function ContactForm() {
   const [toast, setToast] = useState({ show: false, message: "", isSuccess: true });
   const [buttonTransform, setButtonTransform] = useState({ x: 0, y: 0 });
 
+  const templateRequestRef = useRef(null);
+
   const {
     register,
     handleSubmit,
     reset,
+    getValues,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: {
@@ -27,6 +35,21 @@ export default function ContactForm() {
     },
     mode: "onChange",
   });
+
+  // Links from /templates arrive as /contact?template=<slug>[&intent=customise]:
+  // start the message with the template already named.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const intent = params.get("intent") === "customise" ? "customise" : "buy";
+    const entry = getMarketingTemplateCatalogEntry(params.get("template"));
+    const message = getTemplateContactMessage(entry?.slug, intent);
+    if (!message) return;
+
+    templateRequestRef.current = { template: entry?.slug || "any", intent };
+    if (!getValues("message")) {
+      setValue("message", message, { shouldDirty: true });
+    }
+  }, [getValues, setValue]);
 
   const showToast = (message, isSuccess = true) => {
     setToast({ show: true, message, isSuccess });
@@ -67,6 +90,8 @@ export default function ContactForm() {
         source: "contact_page",
         hasCompanyName: Boolean(data.companyName),
         hasPhone: Boolean(data.phone),
+        template: templateRequestRef.current?.template,
+        templateIntent: templateRequestRef.current?.intent,
       });
       reset();
     } catch (error) {

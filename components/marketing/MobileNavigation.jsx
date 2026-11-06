@@ -177,6 +177,17 @@ export default function MobileNavigation({ servicesList }) {
             </Link>
 
             <Link
+              href="/templates"
+              prefetch={false}
+              className={`block py-2 border-b border-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] ${
+                pathname.startsWith("/templates") ? "text-[#F5EE30]" : "hover:text-[#F5EE30]"
+              }`}
+              onClick={() => setMobileOpen(false)}
+            >
+              TEMPLATES
+            </Link>
+
+            <Link
               href="/blog"
               prefetch={false}
               className={`block py-2 border-b border-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] ${

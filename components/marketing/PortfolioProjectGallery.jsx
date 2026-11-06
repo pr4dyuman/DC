@@ -311,7 +311,7 @@ export default function PortfolioProjectGallery() {
         <div className="flex flex-col gap-6 border-b border-white/10 pb-8 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">
-              Projects
+              Client Projects
             </p>
             <h2 className="mt-4 text-4xl font-bold uppercase leading-none sm:text-5xl">
               Selected Work

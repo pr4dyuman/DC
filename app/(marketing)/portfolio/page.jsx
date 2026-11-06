@@ -2,12 +2,14 @@ import Link from "next/link";
 import { ArrowRight, Check, ExternalLink } from "lucide-react";
 
 import PortfolioProjectGallery from "@/components/marketing/PortfolioProjectGallery";
+import TemplateTile from "@/components/marketing/templates/TemplateTile";
+import { getMarketingTemplatePageTotal, getMarketingTemplates } from "@/lib/marketing-templates";
 import { buildMarketingMetadata } from "@/lib/marketing-seo";
 
 export const metadata = buildMarketingMetadata({
   title: "Selected Work | Digital Corvids Portfolio",
   description:
-    "Explore selected Digital Corvids web app and website work, including live walkthroughs, external project links, and launch-ready digital experiences.",
+    "Explore selected Digital Corvids client websites and web apps with live walkthroughs, plus the website templates we design and sell.",
   path: "/portfolio",
   keywords: [
     "Digital Corvids portfolio",
@@ -15,7 +17,7 @@ export const metadata = buildMarketingMetadata({
     "web app development portfolio",
     "website development portfolio",
     "ecommerce website portfolio",
-    "external digital projects",
+    "website templates",
   ],
 });
 
@@ -53,22 +55,27 @@ const workingPrinciples = [
   "Measured improvement",
 ];
 
-const portfolioStats = [
-  {
-    value: "03",
-    label: "selected projects",
-  },
-  {
-    value: "02",
-    label: "live websites",
-  },
-  {
-    value: "01",
-    label: "product app",
-  },
-];
+function padCount(value) {
+  return String(value).padStart(2, "0");
+}
 
 export default function PortfolioPage() {
+  const templates = getMarketingTemplates();
+  const portfolioStats = [
+    {
+      value: "03",
+      label: "client projects",
+    },
+    {
+      value: padCount(templates.length),
+      label: "website templates",
+    },
+    {
+      value: padCount(getMarketingTemplatePageTotal()),
+      label: "template pages",
+    },
+  ];
+
   return (
     <main className="bg-black text-white">
       <section className="border-b border-white/10 px-6 pb-10 pt-10 sm:pb-12 sm:pt-12 lg:pb-14 lg:pt-14">
@@ -87,8 +94,8 @@ export default function PortfolioPage() {
 
             <div className="max-w-xl border-t border-white/15 pt-6 lg:justify-self-end">
               <p className="text-base leading-7 text-gray-300 sm:text-lg">
-                A growing collection of external web app and website projects with live
-                walkthroughs, launch context, and direct links to the work.
+                Client websites and web apps with live walkthroughs and direct links to the work,
+                plus the ready-made website templates we design and sell.
               </p>
               <dl className="mt-7 grid grid-cols-3 border-y border-white/10">
                 {portfolioStats.map((stat) => (
@@ -141,6 +148,43 @@ export default function PortfolioPage() {
       </section>
 
       <PortfolioProjectGallery />
+
+      {templates.length ? (
+        <section id="templates" className="border-t border-white/10 px-6 py-14 sm:py-16 lg:py-20">
+          <div className="mx-auto max-w-6xl">
+            <div className="flex flex-col gap-6 border-b border-white/10 pb-8 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">
+                  Our Own Products
+                </p>
+                <h2 className="mt-4 text-4xl font-bold uppercase leading-none sm:text-5xl">
+                  Templates We Design And Sell
+                </h2>
+              </div>
+              <div className="max-w-md">
+                <p className="text-sm leading-6 text-gray-400">
+                  Ready-made websites for restaurants, estate agencies, clinics and law firms. Buy one, or let us
+                  set it up for you.
+                </p>
+                <Link
+                  href="/templates"
+                  prefetch={false}
+                  className="mt-4 inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-[#F5EE30] transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
+                >
+                  Browse All Templates
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </div>
+            </div>
+
+            <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
+              {templates.map((template) => (
+                <TemplateTile key={template.slug} template={template} />
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="border-y border-white/10 bg-[#F5EE30] px-6 py-14 text-black sm:py-16 lg:py-20">
         <div className="mx-auto max-w-7xl">
