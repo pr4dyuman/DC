@@ -3,7 +3,7 @@ import Link from "next/link";
 import AboutAgency from "@/components/marketing/AboutAgency";
 import LazyServicesSection from "@/components/marketing/LazyServicesSection";
 import ManageCompanySection from "@/components/marketing/ManageCompany";
-import HeroBackground from "@/components/marketing/HeroBackground";
+import HeroFlightPath from "@/components/marketing/HeroFlightPath";
 import HomeRotatingWord from "@/components/marketing/HomeRotatingWord";
 import LazyCompanionsSlider from "@/components/marketing/LazyCompanionsSlider";
 import LazyTeamSlider from "@/components/marketing/LazyTeamSlider";
@@ -25,8 +25,8 @@ const HeroSection = async () => {
   return (
     <div className="font-glacial text-white bg-black">
       <section className="relative overflow-hidden mx-4 sm:mx-6 md:mx-8 lg:mx-10 xl:mx-12 pt-12 sm:pt-16 md:pt-20 text-center flex items-center justify-start min-h-[300px] sm:min-h-[350px] md:min-h-[400px] lg:min-h-[450px]">
-        {/* Animated canvas background */}
-        <HeroBackground />
+        {/* Still grid and a flight path that draws once */}
+        <HeroFlightPath />
 
         <div className="relative z-10 w-full px-4 sm:px-6 md:px-8 lg:px-10">
           <h1 className="text-start font-semibold tracking-wider uppercase">
@@ -35,7 +35,7 @@ const HeroSection = async () => {
             </span>
 
             {/* SINGLE LIFT-UP TEXT ANIMATION */}
-            <span className="block relative h-[1.2em] overflow-hidden text-[clamp(1.5rem,6vw,5rem)] leading-[1] mt-1 sm:mt-2 font-bold text-[#F5EE30]">
+            <span className="block relative h-[1.45em] overflow-hidden text-[clamp(1.5rem,6vw,5rem)] leading-[1] mt-1 sm:mt-2 font-bold text-[#F5EE30]">
               <HomeRotatingWord />
             </span>
           </h1>

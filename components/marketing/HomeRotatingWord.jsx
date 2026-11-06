@@ -15,6 +15,7 @@ export default function HomeRotatingWord() {
   const wordRef = useRef(null);
   const [index, setIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [hasRotated, setHasRotated] = useState(false);
 
   useEffect(() => {
     const word = wordRef.current;
@@ -46,6 +47,7 @@ export default function HomeRotatingWord() {
       setIsAnimating(true);
       transitionTimer = window.setTimeout(() => {
         setIndex((i) => (i + 1) % words.length);
+        setHasRotated(true);
         setIsAnimating(false);
       }, 800);
     };
@@ -106,7 +108,27 @@ export default function HomeRotatingWord() {
         opacity: isAnimating ? 0 : 1,
       }}
     >
-      {words[index]}
+      <span className="inline-flex flex-col gap-[0.06em]">
+        {words[index]}
+        {/* Marker underline, redrawn for each word (styles in globals.css). */}
+        <svg
+          key={index}
+          aria-hidden="true"
+          viewBox="0 0 600 24"
+          preserveAspectRatio="none"
+          fill="none"
+          className="block h-[0.16em] w-full"
+        >
+          <path
+            className={hasRotated ? "dc-marker-underline" : "dc-marker-underline dc-marker-underline-intro"}
+            pathLength="1"
+            d="M4 15 C 120 5, 260 19, 420 10 S 560 7, 596 13"
+            stroke="currentColor"
+            strokeWidth="11"
+            strokeLinecap="round"
+          />
+        </svg>
+      </span>
     </span>
   );
 }
