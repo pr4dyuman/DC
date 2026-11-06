@@ -18,7 +18,8 @@
     "bing": "node scripts/bing-webmaster.mjs",
     "bing:report": "node scripts/bing-webmaster.mjs report",
     "lint": "eslint",
-    "security:secrets": "node scripts/scan-secrets.mjs"
+    "security:secrets": "node scripts/scan-secrets.mjs",
+    "templates:images": "node scripts/template-images.mjs"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.31.0",
