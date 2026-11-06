@@ -13,7 +13,6 @@ const SERVICE_PATHS = [
   "/services/video-production-ad",
   "/services/influencer-marketing",
   "/services/manage-company",
-  "/services/ai-blogger",
 ];
 
 const TOPIC_KEYWORDS = new Map([
@@ -24,7 +23,6 @@ const TOPIC_KEYWORDS = new Map([
   ["/services/video-production-ad", ["video", "ad film", "production", "creative"]],
   ["/services/influencer-marketing", ["influencer", "creator", "campaign"]],
   ["/services/manage-company", ["agency management", "operations", "project management", "finance"]],
-  ["/services/ai-blogger", ["ai blogger", "blog", "content workflow", "ai content"]],
 ]);
 
 const GENERIC_ANCHOR_TEXT = new Set([

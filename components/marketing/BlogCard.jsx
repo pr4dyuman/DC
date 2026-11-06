@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import {
+  isMarketingBlogPlaceholderImage,
   isRemoteMarketingImageSrc,
   isSvgMarketingImageSrc,
   normalizeMarketingImageSrc,
@@ -20,8 +21,7 @@ const BlogCard = ({
   analyticsPosition,
 }) => {
   const normalizedImageSrc = normalizeMarketingImageSrc(image, "");
-  const isDefaultImage = normalizedImageSrc?.includes("ai-blogger.svg");
-  const hasImage = Boolean(normalizedImageSrc) && !isDefaultImage;
+  const hasImage = Boolean(normalizedImageSrc) && !isMarketingBlogPlaceholderImage(normalizedImageSrc);
   const useNativeImage = hasImage && isRemoteMarketingImageSrc(normalizedImageSrc);
   const isSvgImage = hasImage && isSvgMarketingImageSrc(normalizedImageSrc);
 

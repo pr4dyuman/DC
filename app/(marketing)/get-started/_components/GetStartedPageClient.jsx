@@ -12,10 +12,7 @@ import GetStartedAISpotlight from "./GetStartedAISpotlight";
 import GetStartedStepsSection from "./GetStartedStepsSection";
 import GetStartedSignupForm from "./GetStartedSignupForm";
 
-export default function GetStartedPageClient({
-    directAuthMode = false,
-    isAIBloggerFlow = false,
-}) {
+export default function GetStartedPageClient({ directAuthMode = false }) {
     const [formData, setFormData] = useState({
         agencyName: "",
         ownerName: "",
@@ -41,7 +38,7 @@ export default function GetStartedPageClient({
     const [loginError, setLoginError] = useState("");
     const [loginLoading, setLoginLoading] = useState(false);
     const [showLoginPassword, setShowLoginPassword] = useState(false);
-    const getStartedFlow = getGetStartedFlow({ isAIBloggerFlow, directAuthMode });
+    const getStartedFlow = getGetStartedFlow({ directAuthMode });
 
     const clearLoggedInCookie = () => {
         document.cookie = "logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
@@ -254,7 +251,7 @@ export default function GetStartedPageClient({
                     <div className="mb-10 text-center">
                         <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#F5EE30]/30 bg-[#F5EE30]/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-[#F5EE30] sm:text-sm">
                             <Sparkles className="h-4 w-4" />
-                            {isAIBloggerFlow ? "AI Blogger Access" : "Direct Signup Access"}
+                            Direct Signup Access
                         </div>
 
                         <h1 className="text-4xl font-bold uppercase leading-tight sm:text-5xl lg:text-6xl">
@@ -264,9 +261,7 @@ export default function GetStartedPageClient({
                         </h1>
 
                         <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-gray-300 sm:text-lg">
-                            {isAIBloggerFlow
-                                ? "Start with AI Blogger right away. New accounts are verified using a 6-digit email OTP delivered through Brevo."
-                                : "Start your DC account right away. New accounts are verified using a 6-digit email OTP delivered through Brevo."}
+                            Start your DC account right away. New accounts are verified using a 6-digit email OTP delivered through Brevo.
                         </p>
 
                         <div className="mt-8 flex flex-wrap justify-center gap-4">

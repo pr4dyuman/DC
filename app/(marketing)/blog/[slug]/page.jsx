@@ -11,11 +11,14 @@ import {
   cleanStoredBlogSchema,
   getMarketingBlogPublicCategory,
   isRemovedMarketingBlogSlug,
+  replaceAIBloggerReferences,
   rewriteMarketingSiteLinksToRelative,
+  rewriteRetiredMarketingBlogLinks,
 } from "@/lib/marketing-blog-cleanup";
 import { buildMarketingBlogHtml, stripStandaloneFaqSection } from "@/lib/marketing-blog-content";
 import { getMarketingBlogLinks, pickRelatedMarketingBlogLinks } from "@/lib/marketing-blog-links";
 import {
+  isMarketingBlogPlaceholderImage,
   isRemoteMarketingImageSrc,
   isSvgMarketingImageSrc,
   normalizeMarketingCanonicalUrl,
@@ -51,6 +54,15 @@ function serverSanitizeHtml(html = "") {
     .replace(/javascript\s*:/gi, "void:");
 }
 // ────────────────────────────────────────────────────────────────────────────────
+
+// Sanitized post HTML as readers get it: links to this site are root-relative,
+// links to retired posts go straight to their redirect target, and AI Blogger
+// references point at zSEO.ai.
+function toPublicPostHtml(html = "", slug = "") {
+  return replaceAIBloggerReferences(
+    rewriteRetiredMarketingBlogLinks(rewriteMarketingSiteLinksToRelative(serverSanitizeHtml(html)), slug)
+  );
+}
 
 export const revalidate = 60;
 
@@ -217,183 +229,80 @@ const MARKETING_SERVICE_LINKS = [
     keywords: ["agency operations", "financial intelligence", "manage your company", "company", "workflows"],
   },
   {
-    key: "ai-blogger",
-    title: "AI Blogger",
-    href: "/services/ai-blogger",
-    description: "Plan, generate, optimize, and schedule SEO-focused blog content from one workflow.",
-    keywords: ["ai blogger", "ai", "blog", "content workflow", "content", "generated assets"],
+    // Added to every post's list below, so it has no keywords to match.
+    key: "zseo",
+    title: "zSEO.ai",
+    href: "https://zseo.ai",
+    description: "Plan SEO work, build source-backed content strategy, and review every article before it publishes.",
+    keywords: [],
   },
 ];
 
 const BLOG_SERVICE_LINK_OVERRIDES = {
-  "2026-platform-specific-social-media-strategy-framework-ai-scaling": [
-    "social-media-marketing",
-    "ai-blogger",
-    "video-production-ad",
-    "influencer-marketing",
-  ],
   "2026-social-media-marketing-trends-operationalizing-ai-and-creative": [
     "social-media-marketing",
-    "ai-blogger",
+    "zseo",
     "video-production-ad",
-  ],
-  "2026-viral-worthy-content-calendar-strategy-for-reels-and-carousels": [
-    "social-media-marketing",
-    "ai-blogger",
-    "video-production-ad",
-    "influencer-marketing",
-  ],
-  "ai-trends-for-content-creators-2026-the-geo-playbook": [
-    "ai-blogger",
-    "social-media-marketing",
-    "video-production-ad",
-    "influencer-marketing",
-  ],
-  "ajio-22feet-a-winning-fashion-e-commerce-digital-expansion-strategy": [
-    "ppc",
-    "web-development",
-    "ai-blogger",
-  ],
-  "amplify-your-brand-voice-with-authentic-content-and-influencer-marketing": [
-    "influencer-marketing",
-    "social-media-marketing",
-    "ai-blogger",
   ],
   "best-seo-agency-in-jaipur-choose-an-ethical-partner": [
     "seo",
-    "ai-blogger",
+    "zseo",
     "web-development",
     "ppc",
   ],
-  "brand-voice-insurance-editorial-guardrails-for-ai-generated-assets": [
-    "ai-blogger",
-    "seo",
-    "influencer-marketing",
-  ],
   "building-data-driven-ppc-campaigns-the-modern-roi-framework": [
     "ppc",
-    "ai-blogger",
+    "zseo",
     "seo",
     "social-media-marketing",
   ],
   "conversion-funnel-mapping-and-optimization-to-stop-leaks": [
     "ppc",
-    "ai-blogger",
+    "zseo",
     "web-development",
     "social-media-marketing",
-  ],
-  "digital-production-vs-digital-marketing-strategy-the-2026-gap": [
-    "video-production-ad",
-    "web-development",
-    "ai-blogger",
-  ],
-  "enterprise-ai-distribution-strategy-2026-scaling-agentic-workflows": [
-    "ai-blogger",
-    "manage-company",
-    "seo",
-  ],
-  "how-ai-powered-financial-intelligence-improves-agency-operations-2026": [
-    "manage-company",
-    "ai-blogger",
-  ],
-  "how-to-build-a-high-roi-content-distribution-engine-for-2026": [
-    "ai-blogger",
-    "ppc",
-    "seo",
   ],
   "how-to-build-a-storytelling-campaign-strategy-the-2026-model": [
     "video-production-ad",
     "influencer-marketing",
     "social-media-marketing",
-    "ai-blogger",
-  ],
-  "how-to-manage-your-company-with-ai-driven-workflows-in-2026": [
-    "manage-company",
-    "ai-blogger",
+    "zseo",
   ],
   "how-to-measure-video-production-success-the-performance-framework": [
     "video-production-ad",
-    "ai-blogger",
+    "zseo",
     "ppc",
     "social-media-marketing",
   ],
   "how-to-scale-influencer-content-with-paid-media-playbook": [
     "influencer-marketing",
-    "ai-blogger",
+    "zseo",
     "ppc",
     "social-media-marketing",
   ],
   "influencer-marketing-strategy-that-drives-results-5-step-guide": [
     "influencer-marketing",
-    "ai-blogger",
+    "zseo",
     "social-media-marketing",
     "video-production-ad",
   ],
   "influencer-marketing-attribution-models-beyond-promo-codes": [
     "influencer-marketing",
-    "ai-blogger",
+    "zseo",
     "ppc",
     "seo",
-  ],
-  "media-strategy-guide-2026-scaling-impact-with-hybrid-models": [
-    "ppc",
-    "video-production-ad",
-    "influencer-marketing",
-    "ai-blogger",
-  ],
-  "pre-production-strategy-for-digital-content-engines-scale-in-2026": [
-    "video-production-ad",
-    "web-development",
-    "ai-blogger",
-  ],
-  "scaling-b2b-video-production-on-linkedin-beyond-the-feed": [
-    "video-production-ad",
-    "social-media-marketing",
-    "influencer-marketing",
-    "ai-blogger",
   ],
   "scaling-performance-influencer-marketing-with-paid-media-allowlisting": [
     "influencer-marketing",
-    "ai-blogger",
+    "zseo",
     "ppc",
     "social-media-marketing",
-  ],
-  "the-2026-production-mandate-balancing-speed-and-quality": [
-    "video-production-ad",
-    "ai-blogger",
-    "manage-company",
-    "seo",
-  ],
-  "the-2026-seo-management-workflow-scaling-content-with-ai": [
-    "seo",
-    "ai-blogger",
-  ],
-  "using-ai-to-optimize-influencer-marketing-roi-a-2026-strategy": [
-    "influencer-marketing",
-    "ai-blogger",
-    "ppc",
-  ],
-  "vertical-specific-influencer-campaign-management-the-framework": [
-    "influencer-marketing",
-    "ai-blogger",
-    "video-production-ad",
-  ],
-  "vertical-specific-marketing-strategies-a-production-first-framework": [
-    "influencer-marketing",
-    "video-production-ad",
-    "social-media-marketing",
-    "ai-blogger",
   ],
   "what-is-included-in-ppc-advertising-services-the-video-edge": [
     "ppc",
-    "ai-blogger",
+    "zseo",
     "video-production-ad",
     "seo",
-  ],
-  "youtube-influencer-marketing-campaign-best-practices-the-roi-guide": [
-    "influencer-marketing",
-    "video-production-ad",
-    "ai-blogger",
   ],
 };
 
@@ -418,10 +327,10 @@ function getRelatedServiceLinks(blog) {
     .toLowerCase();
 
   const matchedKeys = MARKETING_SERVICE_LINKS.filter((service) =>
-    service.key !== "ai-blogger" && service.keywords.some((keyword) => searchText.includes(keyword))
+    service.keywords.some((keyword) => searchText.includes(keyword))
   ).map((service) => service.key);
 
-  return uniqueServiceKeys([...explicitKeys, ...matchedKeys, "ai-blogger"])
+  return uniqueServiceKeys([...explicitKeys, ...matchedKeys, "zseo"])
     .map((key) => serviceByKey.get(key))
     .filter(Boolean)
     .slice(0, 4);
@@ -724,7 +633,9 @@ async function getBlog(slug) {
       ...blog,
       _id: blog._id.toString(),
       category: getMarketingBlogPublicCategory(blog),
-      image: normalizeMarketingImageSrc(blog.image, ""),
+      // Without an image the page falls back to /og-image for social cards
+      // and leaves the image out of the article schema.
+      image: isMarketingBlogPlaceholderImage(blog.image) ? "" : normalizeMarketingImageSrc(blog.image, ""),
       canonicalUrl: normalizeMarketingCanonicalUrl(blog.canonicalUrl, blog.slug),
       publishedAt: toIsoDate(blog.publishedAt),
       createdAt: toIsoDate(blog.createdAt) || new Date().toISOString(),
@@ -847,14 +758,13 @@ export default async function BlogPost({ params }) {
   const contentWithHeadingIds = shouldShowToc
     ? addHeadingIdsToHtml(contentWithoutInlineFaq, headings)
     : contentWithoutInlineFaq;
-  const sanitizedContent = rewriteMarketingSiteLinksToRelative(serverSanitizeHtml(contentWithHeadingIds));
+  const sanitizedContent = toPublicPostHtml(contentWithHeadingIds, post.slug);
   const readTime = getReadTimeLabel(contentWithoutInlineFaq || post.content);
   const relatedServiceLinks = getRelatedServiceLinks(post);
   const relatedPosts = pickRelatedMarketingBlogLinks(blogLinks, post);
 
   const heroImageSrc = normalizeMarketingImageSrc(post.image, "");
-  const isDefaultImage = heroImageSrc?.includes("ai-blogger.svg");
-  const showImage = Boolean(heroImageSrc) && !isDefaultImage;
+  const showImage = Boolean(heroImageSrc);
   const useNativeHeroImage = isRemoteMarketingImageSrc(heroImageSrc);
   const isSvgHeroImage = isSvgMarketingImageSrc(heroImageSrc);
 
@@ -1136,10 +1046,9 @@ export default async function BlogPost({ params }) {
                           <div
                             className="blog-prose blog-prose-sm border-t border-[var(--blog-border)] px-5 pb-5 pt-4"
                             dangerouslySetInnerHTML={{
-                              __html: rewriteMarketingSiteLinksToRelative(
-                                serverSanitizeHtml(
-                                  buildMarketingBlogHtml(item.answer, { siteUrl: SITE_URL })
-                                )
+                              __html: toPublicPostHtml(
+                                buildMarketingBlogHtml(item.answer, { siteUrl: SITE_URL }),
+                                post.slug
                               ),
                             }}
                           />

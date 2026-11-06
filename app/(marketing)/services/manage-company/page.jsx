@@ -33,10 +33,10 @@ const structuredData = [
 
 const relatedManageCompanyServices = [
   {
-    title: "AI Blogger",
-    href: "/services/ai-blogger",
+    title: "zSEO.ai",
+    href: "https://zseo.ai",
     category: "Content Operations",
-    description: "Add a structured AI content workflow to your agency operating system.",
+    description: "Plan SEO work, build source-backed content strategy, and review every article before it publishes.",
   },
   {
     title: "Web Development",

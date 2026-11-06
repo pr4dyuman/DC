@@ -9,17 +9,11 @@ function getSearchParamValue(searchParams, key) {
 
 export default async function GetStartedPage({ searchParams }) {
     const resolvedSearchParams = await searchParams;
-    const mode = getSearchParamValue(resolvedSearchParams, "mode");
-    const source = getSearchParamValue(resolvedSearchParams, "source");
-    const isAIBloggerFlow = source === "ai-blogger";
-    const directAuthMode = mode === "auth" || isAIBloggerFlow;
+    const directAuthMode = getSearchParamValue(resolvedSearchParams, "mode") === "auth";
 
     return (
         <Suspense fallback={<GetStartedLoadingScreen />}>
-            <GetStartedPageClient
-                directAuthMode={directAuthMode}
-                isAIBloggerFlow={isAIBloggerFlow}
-            />
+            <GetStartedPageClient directAuthMode={directAuthMode} />
         </Suspense>
     );
 }

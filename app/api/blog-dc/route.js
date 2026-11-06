@@ -5,6 +5,7 @@ import { checkAuth } from '@/lib/authMiddleware';
 import DOMPurify from 'isomorphic-dompurify';
 import { sanitizeName, sanitizeString, validateCsrfOrigin } from '@/lib/validation';
 import { normalizeMarketingCanonicalUrl } from '@/lib/marketing-blog-utils';
+import { LEGACY_REDIRECTED_BLOG_SLUGS, REMOVED_BLOG_SLUGS } from '@/lib/marketing-blog-cleanup';
 
 // Cache for 60 seconds - public blog list doesn't need real-time updates
 export const revalidate = 60;
@@ -27,6 +28,7 @@ export async function GET(request) {
       }
     } else {
       query.status = 'published';
+      query.slug = { $nin: [...REMOVED_BLOG_SLUGS, ...LEGACY_REDIRECTED_BLOG_SLUGS] };
     }
 
     const selectFields = isAdmin

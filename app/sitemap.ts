@@ -2,7 +2,11 @@ import type { MetadataRoute } from "next";
 
 import { LEGACY_REDIRECTED_BLOG_SLUGS, REMOVED_BLOG_SLUGS } from "@/lib/marketing-blog-cleanup";
 import dbConnect from "@/lib/marketing-db";
-import { normalizeMarketingCanonicalUrl, toAbsoluteMarketingImageUrl } from "@/lib/marketing-blog-utils";
+import {
+    isMarketingBlogPlaceholderImage,
+    normalizeMarketingCanonicalUrl,
+    toAbsoluteMarketingImageUrl,
+} from "@/lib/marketing-blog-utils";
 import Blog from "@/models/marketing/Blog";
 
 // Published blogs are stored in MongoDB, so keep the sitemap fresh for crawlers
@@ -60,6 +64,10 @@ function toSitemapPageUrl(value: string, fallbackPath: string) {
 }
 
 function toSitemapImageUrl(value?: string) {
+    if (isMarketingBlogPlaceholderImage(value)) {
+        return undefined;
+    }
+
     const imageUrl = toAbsoluteMarketingImageUrl(value, "");
     if (!imageUrl) {
         return undefined;
@@ -96,7 +104,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         staticEntry("/services/video-production-ad", "monthly", 0.75),
         staticEntry("/services/influencer-marketing", "monthly", 0.75),
         staticEntry("/services/manage-company", "monthly", 0.75),
-        staticEntry("/services/ai-blogger", "monthly", 0.75),
         staticEntry("/contact", "monthly", 0.7),
         staticEntry("/privacy", "yearly", 0.3),
         staticEntry("/get-started", "monthly", 0.7),

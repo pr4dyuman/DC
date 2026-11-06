@@ -12,7 +12,7 @@ import {
 export const metadata = buildMarketingMetadata({
     title: "Digital Corvids | Digital Marketing Agency in Jaipur",
     description:
-        "Digital Corvids helps businesses grow with SEO, PPC, social media marketing, web development, video production, influencer marketing, and AI blogging.",
+        "Digital Corvids helps businesses grow with SEO, PPC, social media marketing, web development, video production, and influencer marketing.",
     path: "/",
     keywords: [
         "Digital Corvids",

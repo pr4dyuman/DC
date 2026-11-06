@@ -1,9 +1,10 @@
 import removedBlogPosts from "./marketing-blog-removed-posts.json";
+import { isMarketingBlogPlaceholderImage } from "./marketing-blog-utils";
 
 // Blog posts removed in the 2026-10 content cleanup. Posts listed under
 // "redirects" are permanently redirected in next.config.ts; posts under "gone"
-// have no close replacement and return 404. Both are hidden from the blog list
-// and the sitemap even before their database records are deleted.
+// have no close replacement and return 404. Both are hidden from the blog list,
+// the sitemap and llms.txt even before their database records are deleted.
 export const REMOVED_BLOG_REDIRECTS: Record<string, string> = removedBlogPosts.redirects;
 
 export const REMOVED_BLOG_SLUGS = new Set<string>([
@@ -13,16 +14,72 @@ export const REMOVED_BLOG_SLUGS = new Set<string>([
 
 // Older posts whose URLs were already redirected in next.config.ts before the
 // cleanup, but whose database records are still published. The blog list, the
-// sitemap and the related/latest post links hide them so they never link to a
-// redirect.
-export const LEGACY_REDIRECTED_BLOG_SLUGS = new Set<string>([
-    "how-to-manage-your-company-using-ai-powered-tools-2026-strategy",
-    "glass-city-marathon-2026-content-strategy-scaling-event-production",
-    "mastering-country-calling-2026-content-strategy-ai-production",
-]);
+// sitemap, llms.txt and the related/latest post links hide them so they never
+// link to a redirect.
+export const LEGACY_BLOG_REDIRECTS: Record<string, string> = removedBlogPosts.legacyRedirects;
+
+export const LEGACY_REDIRECTED_BLOG_SLUGS = new Set<string>(Object.keys(LEGACY_BLOG_REDIRECTS));
+
+const RETIRED_BLOG_REDIRECTS: Record<string, string> = {
+    ...LEGACY_BLOG_REDIRECTS,
+    ...REMOVED_BLOG_REDIRECTS,
+};
 
 export function isRemovedMarketingBlogSlug(slug?: string) {
     return Boolean(slug && REMOVED_BLOG_SLUGS.has(slug.trim()));
+}
+
+const ANCHOR_PATTERN = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+const HREF_ATTRIBUTE_PATTERN = /\bhref\s*=\s*(["'])([^"']*)\1/i;
+const SITE_BLOG_POST_HREF_PATTERN =
+    /^(?:https?:\/\/(?:www\.)?digitalcorvids\.com)?\/blog\/([^/?#]+)\/?(?:[?#]|$)/i;
+
+/**
+ * Points links to retired posts at their redirect target and unlinks posts
+ * that are gone, keeping the link text. Stored post HTML and internalLinks
+ * keep linking to retired posts until their database records are cleaned up.
+ * A link whose target is the post being rendered (currentSlug) is unlinked too.
+ */
+export function rewriteRetiredMarketingBlogLinks(html = "", currentSlug = "") {
+    return html.replace(ANCHOR_PATTERN, (anchor: string, attributes: string, inner: string) => {
+        const href = attributes.match(HREF_ATTRIBUTE_PATTERN)?.[2]?.trim() || "";
+        const slug = href.match(SITE_BLOG_POST_HREF_PATTERN)?.[1]?.toLowerCase();
+        if (!slug || !(REMOVED_BLOG_SLUGS.has(slug) || LEGACY_REDIRECTED_BLOG_SLUGS.has(slug))) {
+            return anchor;
+        }
+
+        const destination = RETIRED_BLOG_REDIRECTS[slug];
+        if (!destination || (currentSlug && destination === `/blog/${currentSlug.trim()}`)) {
+            return inner;
+        }
+
+        return `<a${attributes.replace(HREF_ATTRIBUTE_PATTERN, () => `href="${destination}"`)}>${inner}</a>`;
+    });
+}
+
+const ZSEO_URL = "https://zseo.ai";
+const AI_BLOGGER_PAGE_HREF_PATTERN =
+    /^(?:https?:\/\/(?:www\.)?digitalcorvids\.com)?\/services\/ai-blogger\/?(?:[?#]|$)/i;
+const AI_BLOGGER_NAME_PATTERN = /\bAI Blogger\b/gi;
+
+/**
+ * AI Blogger moved to its own website, zSEO.ai. Stored post HTML still links
+ * to the old service page and uses the old name, so point those links at
+ * zSEO.ai and use the new name in the text (never inside tags or URLs).
+ */
+export function replaceAIBloggerReferences(html = "") {
+    return html
+        .replace(ANCHOR_PATTERN, (anchor: string, attributes: string, inner: string) => {
+            const href = attributes.match(HREF_ATTRIBUTE_PATTERN)?.[2]?.trim() || "";
+            if (!AI_BLOGGER_PAGE_HREF_PATTERN.test(href)) {
+                return anchor;
+            }
+
+            return `<a${attributes.replace(HREF_ATTRIBUTE_PATTERN, () => `href="${ZSEO_URL}"`)}>${inner}</a>`;
+        })
+        .replace(/(^|>)([^<]+)/g, (_match, tagEnd: string, text: string) =>
+            `${tagEnd}${text.replace(AI_BLOGGER_NAME_PATTERN, "zSEO.ai")}`,
+        );
 }
 
 // Pipeline labels that were stored as the post category or schema fields but
@@ -85,11 +142,29 @@ function isBlogPostingNode(node: JsonLdNode) {
     return types.some((item) => item === "BlogPosting" || item === "Article");
 }
 
+function isPlaceholderSchemaImage(image: unknown) {
+    const node = image && typeof image === "object" ? (image as JsonLdNode) : null;
+    const urls = node ? [node.url, node.contentUrl] : [image];
+    return urls.some((url) => typeof url === "string" && isMarketingBlogPlaceholderImage(url));
+}
+
 function cleanBlogPostingNode(node: JsonLdNode, publicCategory: string, siteName: string): JsonLdNode {
     const next: JsonLdNode = { ...node };
 
     if (typeof next.articleSection !== "string" || isInternalMarketingBlogLabel(next.articleSection)) {
         next.articleSection = publicCategory;
+    }
+
+    // Drop the AI Blogger illustration that was stored for posts without an image.
+    if (Array.isArray(next.image)) {
+        const images = next.image.filter((image) => !isPlaceholderSchemaImage(image));
+        if (images.length > 0) {
+            next.image = images;
+        } else {
+            delete next.image;
+        }
+    } else if (isPlaceholderSchemaImage(next.image)) {
+        delete next.image;
     }
 
     const author = next.author as JsonLdNode | JsonLdNode[] | undefined;

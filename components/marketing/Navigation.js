@@ -10,7 +10,7 @@ const servicesList = [
   { name: "PPC", href: "/services/ppc" },
   { name: "Influencer Marketing", href: "/services/influencer-marketing" },
   { name: "Manage Company", href: "/services/manage-company" },
-  { name: "AI Blogger", href: "/services/ai-blogger" },
+  { name: "zSEO.ai", href: "https://zseo.ai" },
 ];
 
 export default function Navigation() {

@@ -1,3 +1,4 @@
+import { LEGACY_REDIRECTED_BLOG_SLUGS, REMOVED_BLOG_SLUGS } from "@/lib/marketing-blog-cleanup";
 import dbConnect from "@/lib/marketing-db";
 import Blog from "@/models/marketing/Blog";
 import {
@@ -89,11 +90,6 @@ const SERVICE_PAGES = [
         path: "/services/manage-company",
         description: "Agency management platform for projects, finance, invoicing, team workflows, and AI assistance.",
     },
-    {
-        title: "AI Blogger",
-        path: "/services/ai-blogger",
-        description: "AI-assisted blog planning, drafting, SEO review, scheduling, and publishing workflow.",
-    },
 ];
 
 function normalizeHost(hostname: string) {
@@ -146,7 +142,10 @@ async function getPublishedBlogs(limit: number) {
     try {
         await dbConnect();
 
-        return (await Blog.find({ status: "published" })
+        return (await Blog.find({
+            status: "published",
+            slug: { $nin: [...REMOVED_BLOG_SLUGS, ...LEGACY_REDIRECTED_BLOG_SLUGS] },
+        })
             .select("title slug shortDescription metaDescription category canonicalUrl updatedAt publishedAt createdAt")
             .sort({ publishedAt: -1, createdAt: -1 })
             .limit(limit)
@@ -185,7 +184,7 @@ export async function buildMarketingLlmsText({ full = false } = {}) {
         "",
         `> ${MARKETING_DEFAULT_DESCRIPTION}`,
         "",
-        "Digital Corvids is a Jaipur, Rajasthan based digital marketing agency serving businesses that need SEO, paid media, social media marketing, web development, video production, influencer marketing, AI blogging, and practical growth systems.",
+        "Digital Corvids is a Jaipur, Rajasthan based digital marketing agency serving businesses that need SEO, paid media, social media marketing, web development, video production, influencer marketing, and practical growth systems.",
         "",
         "This file is a navigation aid for AI assistants and research tools. Respect robots.txt, page metadata, and applicable site terms.",
         "",
@@ -213,7 +212,7 @@ export async function buildMarketingLlmsText({ full = false } = {}) {
             "- For agency background and trust signals: use About Digital Corvids.",
             "- For service discovery: use Services and the individual service pages.",
             "- For project inquiries: use Contact or Get Started.",
-            "- For AI-assisted publishing and content workflow research: use AI Blogger and the blog index.",
+            "- For AI-assisted SEO planning and content publishing tools: use zSEO.ai (https://zseo.ai).",
             "- For agency operations software: use Manage Your Company With AI.",
             "",
             "## Public Crawling Notes",

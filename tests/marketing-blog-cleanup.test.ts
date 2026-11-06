@@ -2,20 +2,95 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  LEGACY_BLOG_REDIRECTS,
+  LEGACY_REDIRECTED_BLOG_SLUGS,
   REMOVED_BLOG_REDIRECTS,
   cleanStoredBlogSchema,
   getMarketingBlogPublicCategory,
   isInternalMarketingBlogLabel,
   isRemovedMarketingBlogSlug,
+  replaceAIBloggerReferences,
   rewriteMarketingSiteLinksToRelative,
+  rewriteRetiredMarketingBlogLinks,
 } from "../lib/marketing-blog-cleanup";
+import { isMarketingBlogPlaceholderImage } from "../lib/marketing-blog-utils";
 
-test("removed blog redirects point at service pages or kept posts, never at removed posts", () => {
-  for (const [slug, destination] of Object.entries(REMOVED_BLOG_REDIRECTS)) {
-    assert.match(destination, /^\/(services|blog)\//, slug);
+test("retired blog redirects point at service pages, kept posts or zSEO.ai, never at retired pages", () => {
+  for (const [slug, destination] of Object.entries({ ...LEGACY_BLOG_REDIRECTS, ...REMOVED_BLOG_REDIRECTS })) {
+    assert.match(destination, /^(?:\/(?:services|blog)\/|https:\/\/zseo\.ai$)/, slug);
+    // /services/ai-blogger itself redirects to zSEO.ai.
+    assert.notEqual(destination, "/services/ai-blogger", slug);
     const targetSlug = destination.startsWith("/blog/") ? destination.slice("/blog/".length) : "";
     assert.equal(isRemovedMarketingBlogSlug(targetSlug), false, `${slug} -> ${destination}`);
+    assert.equal(LEGACY_REDIRECTED_BLOG_SLUGS.has(targetSlug), false, `${slug} -> ${destination}`);
   }
+});
+
+test("links to retired posts point at the redirect target, links to gone posts are unlinked", () => {
+  const html = [
+    '<a href="/blog/choose-seo-services-guide">SEO guide</a>',
+    '<a class="x" href="https://www.digitalcorvids.com/blog/the-2026-seo-management-workflow-scaling-content-with-ai/">workflow</a>',
+    "<a href='/blog/mastering-country-calling-2026-content-strategy-ai-production#intro'>story</a>",
+    '<a href="/blog/ux-design-research-guide"><strong>UX research</strong></a>',
+    '<a href="/blog/technical-seo-vs-on-page-key-implementation-priorities">kept</a>',
+    '<a href="/services/seo">service</a>',
+  ].join(" ");
+
+  assert.equal(
+    rewriteRetiredMarketingBlogLinks(html),
+    [
+      '<a href="/services/seo">SEO guide</a>',
+      '<a class="x" href="https://zseo.ai">workflow</a>',
+      '<a href="/blog/how-to-build-a-storytelling-campaign-strategy-the-2026-model">story</a>',
+      "<strong>UX research</strong>",
+      '<a href="/blog/technical-seo-vs-on-page-key-implementation-priorities">kept</a>',
+      '<a href="/services/seo">service</a>',
+    ].join(" "),
+  );
+});
+
+test("a retired post that redirects to the post being rendered is unlinked, not self-linked", () => {
+  const html =
+    '<a href="/blog/brand-voice-insurance-editorial-guardrails-for-ai-generated-assets">editorial guardrails</a>';
+
+  assert.equal(
+    rewriteRetiredMarketingBlogLinks(html, "is-ai-generated-content-good-for-seo-the-strategic-playbook"),
+    "editorial guardrails",
+  );
+  assert.equal(
+    rewriteRetiredMarketingBlogLinks(html, "technical-seo-vs-on-page-key-implementation-priorities"),
+    '<a href="/blog/is-ai-generated-content-good-for-seo-the-strategic-playbook">editorial guardrails</a>',
+  );
+});
+
+test("AI Blogger links and mentions in post HTML point at zSEO.ai", () => {
+  const html = [
+    '<p>pairing these pipelines with a high-capacity <a href="/services/ai-blogger">ai blogger platform</a> allows you</p>',
+    '<p>an advanced <a class="x" href="https://www.digitalcorvids.com/services/ai-blogger/">AI Blogger platform</a></p>',
+    '<p>our Sovereign Production or AI Blogger <a href="/services">services</a></p>',
+    '<img alt="AI Blogger" src="/ai-blogger.svg">',
+    '<a href="/services/ai-bloggers">other</a>',
+  ].join("");
+
+  assert.equal(
+    replaceAIBloggerReferences(html),
+    [
+      '<p>pairing these pipelines with a high-capacity <a href="https://zseo.ai">zSEO.ai platform</a> allows you</p>',
+      '<p>an advanced <a class="x" href="https://zseo.ai">zSEO.ai platform</a></p>',
+      '<p>our Sovereign Production or zSEO.ai <a href="/services">services</a></p>',
+      '<img alt="AI Blogger" src="/ai-blogger.svg">',
+      '<a href="/services/ai-bloggers">other</a>',
+    ].join(""),
+  );
+});
+
+test("the AI Blogger illustration counts as a placeholder, not a post image", () => {
+  assert.equal(isMarketingBlogPlaceholderImage("/ai-blogger.svg"), true);
+  assert.equal(isMarketingBlogPlaceholderImage("https://digitalcorvids.com/ai-blogger.svg"), true);
+  assert.equal(isMarketingBlogPlaceholderImage("https://cdn.example.com/posts/cover.jpg"), false);
+  assert.equal(isMarketingBlogPlaceholderImage("/uploads/my-ai-blogger.svg"), false);
+  assert.equal(isMarketingBlogPlaceholderImage(""), false);
+  assert.equal(isMarketingBlogPlaceholderImage(undefined), false);
 });
 
 test("internal pipeline labels are replaced by a topic category", () => {
@@ -65,4 +140,17 @@ test("stored BlogPosting schema loses internal section and author labels", () =>
   assert.equal(cleaned["@graph"][0].articleSection, "SEO");
   assert.deepEqual(cleaned["@graph"][0].author, { "@type": "Organization", name: "Digital Corvids" });
   assert.deepEqual(cleaned["@graph"][1], { "@type": "BreadcrumbList" });
+});
+
+test("stored BlogPosting schema drops the AI Blogger placeholder image", () => {
+  const placeholder = { "@type": "ImageObject", url: "https://digitalcorvids.com/ai-blogger.svg" };
+  const cover = { "@type": "ImageObject", url: "https://cdn.example.com/cover.jpg" };
+  const clean = (image: unknown) =>
+    cleanStoredBlogSchema({ "@type": "BlogPosting", image }, "SEO", "Digital Corvids") as Record<string, unknown>;
+
+  assert.equal("image" in clean([placeholder]), false);
+  assert.equal("image" in clean(placeholder), false);
+  assert.equal("image" in clean("/ai-blogger.svg"), false);
+  assert.deepEqual(clean([placeholder, cover]).image, [cover]);
+  assert.deepEqual(clean(cover).image, cover);
 });

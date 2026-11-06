@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const MARKETING_SITE_NAME = "Digital Corvids";
 
 export const MARKETING_DEFAULT_DESCRIPTION =
-    "Digital Corvids is a Jaipur-based digital marketing agency for SEO, PPC, social media marketing, web development, video production, influencer marketing, and AI blogging.";
+    "Digital Corvids is a Jaipur-based digital marketing agency for SEO, PPC, social media marketing, web development, video production, and influencer marketing.";
 
 export const MARKETING_EMAIL = "flytheraven@digitalcorvids.com";
 export const MARKETING_PHONE = "+91-8003177679";
@@ -61,11 +61,6 @@ const marketingOfferCatalog = [
         name: "Influencer Marketing",
         url: "/services/influencer-marketing",
         serviceType: "Influencer Marketing",
-    },
-    {
-        name: "AI Blogger",
-        url: "/services/ai-blogger",
-        serviceType: "AI-assisted Blog Planning and Publishing",
     },
 ];
 
@@ -258,7 +253,6 @@ export function getMarketingOrganizationJsonLd() {
             "Web Development",
             "Video Production",
             "Influencer Marketing",
-            "AI Blogging",
         ],
         hasOfferCatalog: {
             "@type": "OfferCatalog",
@@ -299,7 +293,7 @@ export function getMarketingContactPageJsonLd() {
         name: "Contact Digital Corvids",
         url: marketingAbsoluteUrl("/contact"),
         description:
-            "Contact Digital Corvids in Jaipur for SEO, PPC, social media marketing, web development, video production, influencer marketing, and AI blogging support.",
+            "Contact Digital Corvids in Jaipur for SEO, PPC, social media marketing, web development, video production, and influencer marketing support.",
         inLanguage: "en-IN",
         isPartOf: {
             "@id": `${MARKETING_SITE_URL}/#website`,

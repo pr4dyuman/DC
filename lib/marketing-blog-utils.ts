@@ -178,6 +178,14 @@ export function normalizeMarketingCanonicalUrl(value?: string, slug?: string) {
     return raw;
 }
 
+// AI Blogger stored its own illustration as the image of posts that had none.
+// It stands in for a missing image, so public pages treat it as no image.
+const PLACEHOLDER_BLOG_IMAGE_PATTERN = /(?:^|\/)ai-blogger\.svg(?:[?#]|$)/i;
+
+export function isMarketingBlogPlaceholderImage(value?: string) {
+    return PLACEHOLDER_BLOG_IMAGE_PATTERN.test(value?.trim() || "");
+}
+
 export function normalizeMarketingImageSrc(value?: string, fallback: string = "/ai-blogger.svg") {
     const raw = value?.trim() || "";
     if (!raw) {
