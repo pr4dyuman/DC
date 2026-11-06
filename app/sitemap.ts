@@ -7,6 +7,7 @@ import {
     normalizeMarketingCanonicalUrl,
     toAbsoluteMarketingImageUrl,
 } from "@/lib/marketing-blog-utils";
+import { getMarketingTemplates } from "@/lib/marketing-templates";
 import Blog from "@/models/marketing/Blog";
 
 // Published blogs are stored in MongoDB, so keep the sitemap fresh for crawlers
@@ -96,6 +97,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         staticEntry("/", "weekly", 1),
         staticEntry("/about", "monthly", 0.8),
         staticEntry("/portfolio", "monthly", 0.8),
+        staticEntry("/templates", "monthly", 0.8),
+        ...getMarketingTemplates().map((template) => staticEntry(template.path, "monthly", 0.7)),
         staticEntry("/services", "monthly", 0.9),
         staticEntry("/services/seo", "monthly", 0.85),
         staticEntry("/services/web-development", "monthly", 0.85),

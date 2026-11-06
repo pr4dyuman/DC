@@ -55,6 +55,17 @@ export default function MarketingConversionTracker() {
       const anchor = target.closest("a[href]");
       if (!anchor) return;
 
+      // Template store buttons: buy, request, demo and customise.
+      const templateAction = anchor.getAttribute("data-template-cta");
+      if (templateAction) {
+        trackMarketingEvent(MARKETING_EVENTS.templateCtaClick, {
+          action: templateAction,
+          template: anchor.getAttribute("data-template-slug") || undefined,
+          sourcePath: window.location.pathname,
+        });
+        return;
+      }
+
       const conversion = getAnchorDestination(anchor);
       if (!conversion) return;
 

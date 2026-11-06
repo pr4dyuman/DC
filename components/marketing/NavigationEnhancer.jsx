@@ -22,8 +22,14 @@ export default function NavigationEnhancer() {
     document.querySelectorAll("[data-nav-path]").forEach((element) => {
       const path = element.getAttribute("data-nav-path");
       const group = element.getAttribute("data-nav-group");
+      const prefixes = element.getAttribute("data-nav-prefixes");
 
       let active = pathname === path;
+      if (prefixes) {
+        active = prefixes
+          .split(",")
+          .some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+      }
       if (group === "auth") {
         active = pathname === "/login" || pathname === "/dashboard";
       }

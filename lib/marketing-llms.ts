@@ -8,6 +8,7 @@ import {
     marketingAbsoluteUrl,
 } from "@/lib/marketing-seo";
 import { normalizeMarketingCanonicalUrl } from "@/lib/marketing-blog-utils";
+import { getMarketingTemplates } from "@/lib/marketing-templates";
 
 type LlmsBlog = {
     title?: string;
@@ -36,6 +37,16 @@ const CORE_PAGES = [
         title: "Services",
         path: "/services",
         description: "Index of Digital Corvids digital marketing, web, content, and AI services.",
+    },
+    {
+        title: "Portfolio",
+        path: "/portfolio",
+        description: "Selected client websites and web apps, plus the website templates Digital Corvids designs and sells.",
+    },
+    {
+        title: "Website Templates",
+        path: "/templates",
+        description: "Ready-made HTML and Tailwind CSS website templates with page tours, prices, and customisation options.",
     },
     {
         title: "Blog",
@@ -201,6 +212,15 @@ export async function buildMarketingLlmsText({ full = false } = {}) {
         "## Services",
         ...SERVICE_PAGES.map(linkLine),
         "",
+        "## Website Templates",
+        ...getMarketingTemplates().map((template) =>
+            linkLine({
+                title: `${template.name}: ${template.title}`,
+                path: template.path,
+                description: `${template.summary} ${template.pageCount} pages, ${template.priceLabel} USD.`,
+            }),
+        ),
+        "",
         "## Published Insights",
         ...(blogLines.length > 0 ? blogLines : ["- Blog list unavailable right now. Use the main blog index and sitemap."]),
         "",
@@ -212,6 +232,7 @@ export async function buildMarketingLlmsText({ full = false } = {}) {
             "- For agency background and trust signals: use About Digital Corvids.",
             "- For service discovery: use Services and the individual service pages.",
             "- For project inquiries: use Contact or Get Started.",
+            "- For ready-made website templates to buy or have customised: use Website Templates.",
             "- For AI-assisted SEO planning and content publishing tools: use zSEO.ai (https://zseo.ai).",
             "- For agency operations software: use Manage Your Company With AI.",
             "",

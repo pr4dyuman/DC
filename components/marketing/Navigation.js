@@ -13,6 +13,11 @@ const servicesList = [
   { name: "zSEO.ai", href: "https://zseo.ai" },
 ];
 
+const workList = [
+  { name: "Client Work", href: "/portfolio" },
+  { name: "Templates", href: "/templates" },
+];
+
 export default function Navigation() {
   return (
     <nav aria-label="Primary navigation" className="bg-black text-white shadow-md py-6 md:py-7 font-glacial relative z-50">
@@ -71,15 +76,32 @@ export default function Navigation() {
               </div>
             </div>
           </li>
-          <li>
+          <li className="relative group">
             <Link
               href="/portfolio"
               prefetch={false}
               data-nav-path="/portfolio"
+              data-nav-prefixes="/portfolio,/templates"
               className="transition-all duration-200 hover:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
             >
               PORTFOLIO
             </Link>
+            {/* Dropdown Menu */}
+            <div className="absolute left-1/2 -translate-x-1/2 top-full pt-4 hidden group-hover:block group-focus-within:block w-48">
+              <div className="bg-black/50 border border-white/10 shadow-xl rounded-sm overflow-hidden flex flex-col">
+                {workList.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    prefetch={false}
+                    data-nav-path={item.href}
+                    className="px-4 py-3 hover:bg-white/10 hover:text-[#F5EE30] focus-visible:bg-white/10 focus-visible:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#F5EE30] transition-colors border-b border-white/5 last:border-0 text-white"
+                  >
+                    {item.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
           </li>
           <li>
             <Link
