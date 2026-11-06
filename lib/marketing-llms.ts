@@ -8,6 +8,7 @@ import {
     marketingAbsoluteUrl,
 } from "@/lib/marketing-seo";
 import { normalizeMarketingCanonicalUrl } from "@/lib/marketing-blog-utils";
+import { getPortfolioCaseStudies, hasCaseStudyPage } from "@/lib/marketing-portfolio";
 import { getMarketingTemplates } from "@/lib/marketing-templates";
 
 type LlmsBlog = {
@@ -186,6 +187,25 @@ function renderBlogLines(blogs: LlmsBlog[]) {
         .filter(Boolean);
 }
 
+function renderCaseStudyLines() {
+    const studies = getPortfolioCaseStudies().filter(hasCaseStudyPage);
+    if (!studies.length) {
+        return [];
+    }
+
+    return [
+        "## Case Studies",
+        ...studies.map((study) =>
+            linkLine({
+                title: study.headline ? `${study.client}: ${study.headline.value} ${study.headline.label}` : study.client,
+                path: `/portfolio/${study.slug}`,
+                description: compactDescription(study.summary),
+            }),
+        ),
+        "",
+    ];
+}
+
 export async function buildMarketingLlmsText({ full = false } = {}) {
     const blogLimit = full ? 50 : 8;
     const blogs = await getPublishedBlogs(blogLimit);
@@ -212,6 +232,7 @@ export async function buildMarketingLlmsText({ full = false } = {}) {
         "## Services",
         ...SERVICE_PAGES.map(linkLine),
         "",
+        ...renderCaseStudyLines(),
         "## Website Templates",
         ...getMarketingTemplates().map((template) =>
             linkLine({

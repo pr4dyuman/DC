@@ -5,7 +5,7 @@ import { Monitor, Smartphone } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 
 import TemplateActionLink from "./TemplateActionLink";
-import TemplateBrowserFrame from "./TemplateBrowserFrame";
+import BrowserFrame from "@/components/marketing/BrowserFrame";
 
 const PHONE_QUERY = "(max-width: 639px)";
 
@@ -131,7 +131,7 @@ export default function TemplatePageTour({ templateName, templateSlug, pages, de
             </div>
           </div>
         ) : (
-          <TemplateBrowserFrame label={`${templateName} / ${activePage.label}`} status="Desktop · 1440 px">
+          <BrowserFrame label={`${templateName} / ${activePage.label}`} status="Desktop · 1440 px">
             <div
               key={`${activePage.id}-desktop`}
               tabIndex={0}
@@ -148,7 +148,7 @@ export default function TemplatePageTour({ templateName, templateSlug, pages, de
                 className="block h-auto w-full"
               />
             </div>
-          </TemplateBrowserFrame>
+          </BrowserFrame>
         )}
       </div>
     </div>

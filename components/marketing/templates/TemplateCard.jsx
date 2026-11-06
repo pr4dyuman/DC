@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 import TemplateActionLink from "./TemplateActionLink";
-import TemplateBrowserFrame from "./TemplateBrowserFrame";
+import BrowserFrame from "@/components/marketing/BrowserFrame";
 import TemplateScrollPreview from "./TemplateScrollPreview";
 
 // One template in a grid. The title link stretches over the whole card, so the
@@ -18,7 +18,7 @@ export default function TemplateCard({
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-lg border border-white/10 bg-white/[0.025] transition-colors hover:border-white/25 focus-within:border-white/25">
       <div className="border-b border-white/10 bg-[#080808] p-2">
-        <TemplateBrowserFrame
+        <BrowserFrame
           label={`${template.name} · ${template.niche}`}
           status={template.demoUrl ? "Live demo" : `${template.pageCount} pages`}
         >
@@ -28,7 +28,7 @@ export default function TemplateCard({
             sizes={sizes}
             priority={priority}
           />
-        </TemplateBrowserFrame>
+        </BrowserFrame>
       </div>
 
       <div className="flex flex-1 flex-col p-5 sm:p-7">

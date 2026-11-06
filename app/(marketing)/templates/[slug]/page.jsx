@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowRight, Check } from "lucide-react";
 
 import TemplateActionLink from "@/components/marketing/templates/TemplateActionLink";
-import TemplateBrowserFrame from "@/components/marketing/templates/TemplateBrowserFrame";
+import BrowserFrame from "@/components/marketing/BrowserFrame";
 import TemplateCard from "@/components/marketing/templates/TemplateCard";
 import TemplateCustomiseBand from "@/components/marketing/templates/TemplateCustomiseBand";
 import TemplatePageTour from "@/components/marketing/templates/TemplatePageTour";
@@ -198,7 +198,7 @@ export default async function TemplatePage({ params }) {
             </div>
 
             <div className="group min-w-0">
-              <TemplateBrowserFrame
+              <BrowserFrame
                 label={`${template.name} · home page`}
                 status={template.demoUrl ? "Live demo" : "Preview"}
               >
@@ -209,7 +209,7 @@ export default async function TemplatePage({ params }) {
                   priority
                   className="aspect-[16/11]"
                 />
-              </TemplateBrowserFrame>
+              </BrowserFrame>
             </div>
           </div>
 
