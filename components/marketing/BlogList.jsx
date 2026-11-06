@@ -7,6 +7,7 @@ import { BlogIndexAnalyticsTracker } from "./BlogAnalyticsTrackers";
 import BlogCard from "./BlogCard";
 import BlogThemeToggle from "@/components/marketing/blog/BlogThemeToggle";
 import {
+  isMarketingBlogPlaceholderImage,
   isRemoteMarketingImageSrc,
   isSvgMarketingImageSrc,
   normalizeMarketingImageSrc,
@@ -14,8 +15,7 @@ import {
 
 function FeaturedPost({ post }) {
   const normalizedImageSrc = normalizeMarketingImageSrc(post.image, "");
-  const isDefaultImage = normalizedImageSrc?.includes("ai-blogger.svg");
-  const hasImage = Boolean(normalizedImageSrc) && !isDefaultImage;
+  const hasImage = Boolean(normalizedImageSrc) && !isMarketingBlogPlaceholderImage(normalizedImageSrc);
   const useNativeImage = hasImage && isRemoteMarketingImageSrc(normalizedImageSrc);
   const isSvgImage = hasImage && isSvgMarketingImageSrc(normalizedImageSrc);
 

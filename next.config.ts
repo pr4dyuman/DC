@@ -53,27 +53,17 @@ const nextConfig: NextConfig = {
       { source: '/video-production.html', destination: '/services/video-production-ad', statusCode: 301 },
       { source: '/influencer-marketing.html', destination: '/services/influencer-marketing', statusCode: 301 },
       { source: '/manage-company.html', destination: '/services/manage-company', statusCode: 301 },
-      {
-        source: '/blog/how-to-manage-your-company-using-ai-powered-tools-2026-strategy',
-        destination: '/services/manage-company',
-        statusCode: 301,
-      },
-      {
-        source: '/blog/glass-city-marathon-2026-content-strategy-scaling-event-production',
-        destination: '/services/video-production-ad',
-        statusCode: 301,
-      },
-      {
-        source: '/blog/mastering-country-calling-2026-content-strategy-ai-production',
-        destination: '/blog/how-to-build-a-storytelling-campaign-strategy-the-2026-model',
-        statusCode: 301,
-      },
-      // Blog posts removed in the 2026-10 content cleanup (see lib/marketing-blog-cleanup.ts).
-      ...Object.entries(removedBlogPosts.redirects).map(([slug, destination]) => ({
-        source: `/blog/${slug}`,
-        destination,
-        statusCode: 301 as const,
-      })),
+      // AI Blogger moved to its own website.
+      { source: '/services/ai-blogger', destination: 'https://zseo.ai', statusCode: 301 },
+      // Retired blog posts: older redirects and the 2026-10 content cleanup
+      // (see lib/marketing-blog-cleanup.ts).
+      ...Object.entries({ ...removedBlogPosts.legacyRedirects, ...removedBlogPosts.redirects }).map(
+        ([slug, destination]) => ({
+          source: `/blog/${slug}`,
+          destination,
+          statusCode: 301 as const,
+        }),
+      ),
     ];
   },
 };

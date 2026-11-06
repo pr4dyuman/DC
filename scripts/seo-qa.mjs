@@ -16,7 +16,6 @@ const REQUIRED_PUBLIC_PATHS = [
   "/services/video-production-ad",
   "/services/influencer-marketing",
   "/services/manage-company",
-  "/services/ai-blogger",
   "/contact",
   "/get-started",
   "/blog",
@@ -49,7 +48,6 @@ const SERVICE_DETAIL_PATHS = [
   "/services/video-production-ad",
   "/services/influencer-marketing",
   "/services/manage-company",
-  "/services/ai-blogger",
 ];
 
 const SERVICE_FAQ_PATHS = [

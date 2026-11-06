@@ -72,9 +72,9 @@ const relatedSeoLinks = [
     description: "Pair organic growth with immediate paid search demand.",
   },
   {
-    title: "AI Blogger",
-    href: "/services/ai-blogger",
-    description: "Plan and publish SEO-focused blog content at scale.",
+    title: "zSEO.ai",
+    href: "https://zseo.ai",
+    description: "Plan SEO work and review every article before it publishes.",
   },
   {
     title: "Digital Marketing Blog",

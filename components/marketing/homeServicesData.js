@@ -69,14 +69,4 @@ export const servicesData = [
     link: "/services/manage-company",
     gradientColor: "#F5EE30",
   },
-  {
-    id: "08",
-    title: "AI",
-    titleHighlight: "Blogger",
-    image: "/ai-blogger.svg",
-    description:
-      "Plan, generate, optimize, and schedule SEO-focused blogs in one workflow built for agencies and growth teams.",
-    link: "/services/ai-blogger",
-    gradientColor: "#F5EE30",
-  },
 ];

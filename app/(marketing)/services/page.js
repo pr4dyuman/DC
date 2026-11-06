@@ -82,17 +82,6 @@ export default function Services() {
       tagline: "AI-POWERED MANAGEMENT",
       ctaLabel: "Explore Manage Company",
     },
-    {
-      id: "08",
-      title: "AI",
-      titleHighlight: "Blogger",
-      image: "/ai-blogger.svg",
-      description:
-        "Plan, generate, optimize, and schedule SEO-focused blogs from one clean workflow built for agencies and growth teams.",
-      link: "/services/ai-blogger",
-      tagline: "CONTENT ENGINE FOR GROWTH",
-      ctaLabel: "Explore AI Blogger",
-    },
   ];
 
   return (
