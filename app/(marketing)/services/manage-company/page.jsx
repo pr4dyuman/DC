@@ -80,7 +80,12 @@ export default function ManageCompanyPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
       />
-      <ManageCompanySection headingLevel="h1" imagePriority />
+      <ManageCompanySection
+        headingLevel="h1"
+        eyebrow="manage your company with Agency OS"
+        showServiceLink={false}
+        showFeatures
+      />
       <div className="bg-black text-white">
         <div className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 sm:pb-20 lg:px-8 lg:pb-24">
           <RelatedArticlesSection
