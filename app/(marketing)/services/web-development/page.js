@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import ServiceCaseStudies from "@/components/marketing/portfolio/ServiceCaseStudies";
 import RelatedArticlesSection from "@/components/marketing/RelatedArticlesSection";
 import {
   getMarketingBreadcrumbJsonLd,
@@ -425,6 +426,9 @@ export default function WebDevelopment() {
             </div>
           </div>
         </section>
+
+        <ServiceCaseStudies services={["web", "app"]} title="Websites And Web Apps" linkLabel="See all web projects" />
+
 
         <RelatedArticlesSection
           eyebrow="Website Reading List"

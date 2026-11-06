@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import ServiceCaseStudies from "@/components/marketing/portfolio/ServiceCaseStudies";
 import RelatedArticlesSection from "@/components/marketing/RelatedArticlesSection";
 import {
   getMarketingBreadcrumbJsonLd,
@@ -520,6 +521,9 @@ export default function PPCAdvertising() {
               </div>
             </div>
           </section>
+
+          <ServiceCaseStudies services={["ads"]} title="Ad Campaigns" linkLabel="See all ad campaigns" />
+
 
           <RelatedArticlesSection
             eyebrow="PPC Reading List"

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import ServiceCaseStudies from "@/components/marketing/portfolio/ServiceCaseStudies";
 import RelatedArticlesSection from "@/components/marketing/RelatedArticlesSection";
 import {
   getMarketingBreadcrumbJsonLd,
@@ -469,6 +470,9 @@ export default function SocialMediaMarketing() {
             </div>
           </div>
         </section>
+
+        <ServiceCaseStudies services={["social"]} title="Social Media Results" linkLabel="See all social work" />
+
 
         <RelatedArticlesSection
           eyebrow="Social Reading List"

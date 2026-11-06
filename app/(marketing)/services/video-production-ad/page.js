@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import ServiceCaseStudies from "@/components/marketing/portfolio/ServiceCaseStudies";
 import RelatedArticlesSection from "@/components/marketing/RelatedArticlesSection";
 import {
   getMarketingBreadcrumbJsonLd,
@@ -472,6 +473,9 @@ export default function VideoProduction() {
             </div>
           </div>
         </section>
+
+        <ServiceCaseStudies services={["video"]} title="Video Work" linkLabel="See all video work" />
+
 
         <RelatedArticlesSection
           eyebrow="Video Reading List"
