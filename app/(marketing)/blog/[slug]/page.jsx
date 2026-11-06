@@ -693,8 +693,9 @@ export async function generateMetadata({ params }) {
         images: [
           {
             url: seo.imageUrl,
-            width: 1200,
-            height: 630,
+            // Only the default /og-image is known to be 1200x630; a post's own
+            // image keeps its real size (Content Studio images are square).
+            ...(blog.image ? {} : { width: 1200, height: 630 }),
             alt: seo.imageAlt,
           },
         ],
@@ -806,38 +807,8 @@ export default async function BlogPost({ params }) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: seo.schemaMarkup }} />
 
       <article>
-        {/* ── Hero Image ── */}
-        {showImage && (
-          <div className="relative h-[34vh] min-h-[240px] max-h-[720px] w-full overflow-hidden sm:h-[46vh] sm:min-h-[340px] lg:h-[58vh] lg:min-h-[440px]">
-            {useNativeHeroImage ? (
-              <img
-                src={heroImageSrc}
-                alt={seo.imageAlt}
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            ) : (
-              <Image
-                src={heroImageSrc}
-                alt={seo.imageAlt}
-                fill
-                sizes="100vw"
-                className="object-cover"
-                priority
-                unoptimized={isSvgHeroImage}
-              />
-            )}
-            <div
-              className="absolute inset-0"
-              style={{
-                background:
-                  "linear-gradient(to top, var(--blog-bg) 0%, color-mix(in srgb, var(--blog-bg) 72%, transparent) 42%, transparent 78%)",
-              }}
-            />
-          </div>
-        )}
-
         {/* ── Wide article shell ── */}
-        <div className={`relative ${showImage ? "-mt-20 z-10 sm:-mt-28 lg:-mt-36" : "pt-8 sm:pt-12 lg:pt-16"}`}>
+        <div className="relative pt-8 sm:pt-12 lg:pt-16">
           <div className="mx-auto w-full max-w-[1760px] px-4 sm:px-6 lg:px-8 xl:px-12">
             {/* ── Article header ── */}
             <header className="-mx-4 mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-4 py-7 shadow-[var(--blog-shadow)] sm:mx-0 sm:rounded-2xl sm:border sm:p-8 lg:p-10 xl:p-12">
@@ -858,33 +829,80 @@ export default async function BlogPost({ params }) {
                 </div>
               </div>
 
-              <h1 className="mb-6 text-balance font-sans text-3xl font-extrabold leading-[1.04] tracking-[-0.035em] text-[var(--blog-heading)] sm:text-5xl lg:text-6xl xl:text-[4.5rem]">
-                {post.title}
-              </h1>
+              {/* The featured image keeps its own shape (Content Studio images
+                  are square), next to the title on wide screens and above it
+                  on small ones. */}
+              <div
+                className={
+                  showImage
+                    ? "grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] xl:grid-cols-[minmax(0,1fr)_minmax(320px,440px)] xl:gap-12"
+                    : undefined
+                }
+              >
+                <div className="min-w-0">
+                  <h1
+                    className={`mb-6 text-balance font-sans text-3xl font-extrabold leading-[1.04] tracking-[-0.035em] text-[var(--blog-heading)] sm:text-5xl ${
+                      showImage ? "xl:text-[3.5rem] 2xl:text-[4rem]" : "lg:text-6xl xl:text-[4.5rem]"
+                    }`}
+                  >
+                    {post.title}
+                  </h1>
 
-              <p className="mb-8 w-full text-lg leading-8 text-[var(--blog-text)] sm:text-xl sm:leading-9 lg:text-2xl lg:leading-10">
-                {seo.displayDescription}
-              </p>
+                  <p
+                    className={`mb-8 w-full text-lg leading-8 text-[var(--blog-text)] sm:text-xl sm:leading-9 ${
+                      showImage ? "" : "lg:text-2xl lg:leading-10"
+                    }`}
+                  >
+                    {seo.displayDescription}
+                  </p>
 
-              <div className="flex flex-wrap items-center gap-x-7 gap-y-4 border-t border-[var(--blog-border)] pt-6 text-sm text-[var(--blog-muted)]">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--blog-border)] bg-[var(--blog-surface-muted)]">
-                    <User className="h-4 w-4 text-[var(--blog-link)]" />
-                  </span>
-                  <span className="font-semibold text-[var(--blog-text)]">{author}</span>
+                  <div className="flex flex-wrap items-center gap-x-7 gap-y-4 border-t border-[var(--blog-border)] pt-6 text-sm text-[var(--blog-muted)]">
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--blog-border)] bg-[var(--blog-surface-muted)]">
+                        <User className="h-4 w-4 text-[var(--blog-link)]" />
+                      </span>
+                      <span className="font-semibold text-[var(--blog-text)]">{author}</span>
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--blog-border)] bg-[var(--blog-surface-muted)]">
+                        <Calendar className="h-4 w-4 text-[var(--blog-link)]" />
+                      </span>
+                      <span>{dateStr}</span>
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--blog-border)] bg-[var(--blog-surface-muted)]">
+                        <Clock className="h-4 w-4 text-[var(--blog-link)]" />
+                      </span>
+                      <span>{readTime}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2.5">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--blog-border)] bg-[var(--blog-surface-muted)]">
-                    <Calendar className="h-4 w-4 text-[var(--blog-link)]" />
-                  </span>
-                  <span>{dateStr}</span>
-                </div>
-                <div className="flex items-center gap-2.5">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--blog-border)] bg-[var(--blog-surface-muted)]">
-                    <Clock className="h-4 w-4 text-[var(--blog-link)]" />
-                  </span>
-                  <span>{readTime}</span>
-                </div>
+
+                {showImage ? (
+                  <figure className="order-first m-0 w-full max-w-[440px] justify-self-center lg:order-none lg:max-w-none">
+                    <div className="relative aspect-square overflow-hidden rounded-2xl border border-[var(--blog-border)] bg-[var(--blog-surface-muted)]">
+                      {useNativeHeroImage ? (
+                        <img
+                          src={heroImageSrc}
+                          alt={seo.imageAlt}
+                          fetchPriority="high"
+                          decoding="async"
+                          className="absolute inset-0 h-full w-full object-contain"
+                        />
+                      ) : (
+                        <Image
+                          src={heroImageSrc}
+                          alt={seo.imageAlt}
+                          fill
+                          sizes="(min-width: 1280px) 440px, (min-width: 1024px) 340px, (min-width: 480px) 440px, 100vw"
+                          className="object-contain"
+                          priority
+                          unoptimized={isSvgHeroImage}
+                        />
+                      )}
+                    </div>
+                  </figure>
+                ) : null}
               </div>
             </header>
 

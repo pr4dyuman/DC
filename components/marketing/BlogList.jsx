@@ -57,7 +57,6 @@ function FeaturedPost({ post }) {
                 unoptimized={isSvgImage}
               />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/25 to-transparent" />
             <div className="absolute left-6 top-6">
               <span className="inline-flex items-center rounded-full bg-[var(--blog-accent)] px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.22em] text-[var(--blog-accent-ink)]">
                 Featured
