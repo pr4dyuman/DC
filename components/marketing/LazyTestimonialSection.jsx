@@ -10,8 +10,8 @@ const TestimonialSection = dynamic(() => import("./testomonial"), {
 
 function TestimonialPlaceholder() {
   return (
-    <section className="bg-black text-white py-20 px-6">
-      <div className="max-w-7xl mx-auto text-center">
+    <section className="bg-black text-white py-20 px-[var(--site-gutter)]">
+      <div className="max-w-[var(--site-content)] mx-auto text-center">
         <p className="text-gray-400">Loading testimonials...</p>
       </div>
     </section>

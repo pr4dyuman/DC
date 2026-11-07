@@ -94,7 +94,7 @@ export default function TeamSlider() {
   return (
     <section ref={sectionRef} className="bg-black py-12 sm:py-16 lg:py-20">
       {/* Header */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12 sm:mb-16">
+      <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] mb-12 sm:mb-16">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-2.5 h-2.5 bg-[#F5EE30] rounded-sm"></div>
           <p className="text-white font-bold text-sm sm:text-base uppercase tracking-widest">
@@ -123,7 +123,7 @@ export default function TeamSlider() {
       </div>
 
       {/* Swiper Slider */}
-      <div className="relative px-4 sm:px-6 lg:px-8">
+      <div className="relative mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)]">
         <Swiper
           modules={[Autoplay, Navigation, Pagination]}
           loop={true}

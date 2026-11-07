@@ -85,8 +85,8 @@ export default function Services() {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="max-w-7xl mx-auto px-6 pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12">
+    <main className="min-h-screen bg-black text-white">
+      <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12">
         {/* Header */}
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-bold uppercase tracking-wide mb-4">SERVICES</h1>
@@ -155,7 +155,7 @@ export default function Services() {
           );
         })}
       </div>
-    </div>
+    </main>
   );
 }
 

@@ -23,8 +23,9 @@ const HeroSection = async () => {
   const latestPosts = (await getMarketingBlogLinks()).slice(0, 3);
 
   return (
-    <div className="font-glacial text-white bg-black">
-      <section className="relative overflow-hidden mx-4 sm:mx-6 md:mx-8 lg:mx-10 xl:mx-12 pt-12 sm:pt-16 md:pt-20 text-center flex items-center justify-start min-h-[300px] sm:min-h-[350px] md:min-h-[400px] lg:min-h-[450px]">
+    <main className="font-glacial text-white bg-black">
+      <div className="px-[var(--site-gutter)]">
+      <section className="relative mx-auto max-w-[var(--site-content)] overflow-hidden pt-12 sm:pt-16 md:pt-20 text-center flex items-center justify-start min-h-[300px] sm:min-h-[350px] md:min-h-[400px] lg:min-h-[450px]">
         {/* Still grid and a flight path that draws once */}
         <HeroFlightPath />
 
@@ -41,11 +42,12 @@ const HeroSection = async () => {
           </h1>
         </div>
       </section>
+      </div>
 
       {/* Content Section */}
-      <section className="bg-black px-4 sm:px-6 md:px-10 lg:px-2 py-4 sm:py-6 md:py-8 justify-start">
+      <section className="bg-black px-[var(--site-gutter)] py-4 sm:py-6 md:py-8 justify-start">
         {/* Stats Container */}
-        <div className="flex flex-row justify-start items-start gap-3 sm:gap-4 md:gap-6 mb-8 sm:mb-12 md:mb-16">
+        <div className="mx-auto flex max-w-[var(--site-content)] flex-row justify-start items-start gap-3 sm:gap-4 md:gap-6 mb-8 sm:mb-12 md:mb-16">
           <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 lg:w-36 lg:h-36 flex-shrink-0">
             <div className="w-full h-full rounded-full p-1.5">
               <div className="w-full h-full flex items-top justify-end">
@@ -64,9 +66,9 @@ const HeroSection = async () => {
               SMART STRATEGIES, BOLD RESULTS.
             </p>
             <p className="text-gray-300 text-xs sm:text-sm md:text-base leading-relaxed max-w-xl">
-              At Digital Corvids, we blend creativity with data to build powerful digital marketing
+              At Digital Corvids, we blend creativity with data to build powerful digital marketing{" "}
               <br className="hidden sm:block" />
-              campaigns that elevate your brand, engage your audience, and drive real results
+              campaigns that elevate your brand, engage your audience, and drive real results.{" "}
               <br className="hidden sm:block" />
               From{" "}
               <Link
@@ -116,7 +118,7 @@ const HeroSection = async () => {
       <LazyTestimonialSection />
 
       {latestPosts.length > 0 && (
-        <div className="mx-auto max-w-7xl px-4 pt-16 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] pt-16">
           <RelatedArticlesSection
             eyebrow="From The Blog"
             title="Latest Articles"
@@ -138,7 +140,7 @@ const HeroSection = async () => {
         </div>
       </section>
       <LazyTeamSlider />
-    </div>
+    </main>
   );
 };
 

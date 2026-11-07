@@ -257,29 +257,26 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Marketing page width. Pages keep an 80rem content column by default. Pages
-   whose <main> has data-site-width="wide" (portfolio, case studies, templates)
-   use up to 100rem with gutters that grow with the screen, and the shared
-   header and footer widen with them. Without :has() support, pages fall back
-   to the default width. */
+/* Marketing page width: content up to 100rem (1600px) with gutters that grow
+   with the screen. The header, footer and the full-width pages use these, so
+   their edges line up and the header stays in the same place on every page.
+   Containers: a section gets px-[var(--site-gutter)] and its inner wrapper
+   mx-auto max-w-[var(--site-content)]; a single element that carries both the
+   padding and the width uses max-w-[var(--site-frame)]. */
 body {
-  --site-content: 80rem;
+  --site-content: 100rem;
   --site-gutter: 1.5rem;
   --site-frame: calc(var(--site-content) + 2 * var(--site-gutter));
 }
 
-body:has(main[data-site-width="wide"]) {
-  --site-content: 100rem;
-}
-
 @media (min-width: 640px) {
-  body:has(main[data-site-width="wide"]) {
+  body {
     --site-gutter: 2rem;
   }
 }
 
 @media (min-width: 1024px) {
-  body:has(main[data-site-width="wide"]) {
+  body {
     --site-gutter: 3rem;
   }
 }

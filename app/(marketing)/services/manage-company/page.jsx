@@ -75,7 +75,7 @@ const relatedManageCompanyArticles = [
 
 export default function ManageCompanyPage() {
   return (
-    <>
+    <main>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
@@ -87,7 +87,7 @@ export default function ManageCompanyPage() {
         showFeatures
       />
       <div className="bg-black text-white">
-        <div className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 sm:pb-20 lg:px-8 lg:pb-24">
+        <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] pb-16 sm:pb-20 lg:pb-24">
           <RelatedArticlesSection
             eyebrow="Connected Services"
             title="Build The Operating System Around Growth"
@@ -103,6 +103,6 @@ export default function ManageCompanyPage() {
           />
         </div>
       </div>
-    </>
+    </main>
   );
 }
