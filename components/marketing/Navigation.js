@@ -14,9 +14,21 @@ const servicesList = [
 ];
 
 const workList = [
-  { name: "Client Work", href: "/portfolio" },
-  { name: "Templates", href: "/templates" },
+  {
+    name: "Our Work",
+    href: "/portfolio",
+    description: "Websites, apps and marketing we have delivered for clients",
+  },
+  {
+    name: "Website Templates",
+    href: "/templates",
+    description: "Ready-made websites you can try live, then buy",
+  },
 ];
+
+// Dropdown panels are solid, so the page underneath never shows through.
+const dropdownPanel =
+  "flex flex-col overflow-hidden rounded-md border border-white/12 bg-[#0c0c0c] shadow-[0_24px_60px_-18px_rgba(0,0,0,0.95)]";
 
 export default function Navigation() {
   return (
@@ -60,15 +72,15 @@ export default function Navigation() {
               SERVICES
             </Link>
             {/* Dropdown Menu */}
-            <div className="absolute left-1/2 -translate-x-1/2 top-full pt-4 hidden group-hover:block group-focus-within:block w-56">
-              <div className="bg-black/50 border border-white/10 shadow-xl rounded-sm overflow-hidden flex flex-col">
+            <div className="absolute left-1/2 -translate-x-1/2 top-full pt-4 hidden group-hover:block group-focus-within:block w-60">
+              <div className={dropdownPanel}>
                 {servicesList.map((service) => (
                   <Link
                     key={service.href}
                     href={service.href}
                     prefetch={false}
                     data-nav-path={service.href}
-                    className="px-4 py-3 hover:bg-white/10 hover:text-[#F5EE30] focus-visible:bg-white/10 focus-visible:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#F5EE30] transition-colors border-b border-white/5 last:border-0 text-white"
+                    className="border-b border-white/[0.07] px-5 py-3 text-base leading-6 text-white transition-colors last:border-0 hover:bg-white/[0.06] hover:text-[#F5EE30] focus-visible:bg-white/[0.06] focus-visible:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#F5EE30]"
                   >
                     {service.name}
                   </Link>
@@ -87,17 +99,21 @@ export default function Navigation() {
               PORTFOLIO
             </Link>
             {/* Dropdown Menu */}
-            <div className="absolute left-1/2 -translate-x-1/2 top-full pt-4 hidden group-hover:block group-focus-within:block w-48">
-              <div className="bg-black/50 border border-white/10 shadow-xl rounded-sm overflow-hidden flex flex-col">
+            <div className="absolute left-1/2 -translate-x-1/2 top-full pt-4 hidden group-hover:block group-focus-within:block w-80">
+              <div className={dropdownPanel}>
                 {workList.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
                     prefetch={false}
                     data-nav-path={item.href}
-                    className="px-4 py-3 hover:bg-white/10 hover:text-[#F5EE30] focus-visible:bg-white/10 focus-visible:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#F5EE30] transition-colors border-b border-white/5 last:border-0 text-white"
+                    data-nav-prefixes={item.href}
+                    className="group/item block border-b border-white/[0.07] px-5 py-4 text-white transition-colors last:border-0 hover:bg-white/[0.06] focus-visible:bg-white/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#F5EE30]"
                   >
-                    {item.name}
+                    <span className="block text-base leading-6 transition-colors group-hover/item:text-[#F5EE30]">{item.name}</span>
+                    <span className="mt-1 block whitespace-normal font-glacial text-sm leading-5 tracking-normal text-white/55">
+                      {item.description}
+                    </span>
                   </Link>
                 ))}
               </div>

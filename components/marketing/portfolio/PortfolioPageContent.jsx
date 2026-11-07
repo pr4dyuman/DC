@@ -1,32 +1,26 @@
 import Link from "next/link";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, ExternalLink } from "lucide-react";
 
+import TemplateRail from "@/components/marketing/templates/TemplateRail";
 import TemplateTile from "@/components/marketing/templates/TemplateTile";
 import { getPortfolioCaseStudies, getPortfolioServiceCounts } from "@/lib/marketing-portfolio";
 import { getMarketingTemplatePageTotal, getMarketingTemplates } from "@/lib/marketing-templates";
 
 import PortfolioCaseCard from "./PortfolioCaseCard";
+import PortfolioFilterLink from "./PortfolioFilterLink";
 import PortfolioWorkGrid from "./PortfolioWorkGrid";
 import PreviewBanner from "./PreviewBanner";
-
-// Desktop columns for the templates shelf, so the tiles fill one even row.
-const TEMPLATE_SHELF_COLUMNS = [
-  "",
-  "lg:grid-cols-1",
-  "lg:grid-cols-2",
-  "lg:grid-cols-3",
-  "lg:grid-cols-4",
-  "sm:grid-cols-3 lg:grid-cols-5",
-];
 
 const focusRing =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]";
 
+const WHATSAPP_URL = "https://wa.me/918003177679";
+
 const workingPrinciples = [
-  "Clear business purpose",
-  "Useful, responsive interfaces",
-  "Maintainable systems",
-  "Measured improvement",
+  "Clear goals from day one",
+  "Design that fits the brand",
+  "Fast, easy-to-update builds",
+  "Honest, measured reporting",
 ];
 
 const SERVICE_PAGES = [
@@ -68,14 +62,27 @@ const SERVICE_PAGES = [
   },
 ];
 
+const WEBSITE_SERVICE_IDS = ["web", "app"];
+
 function padCount(value) {
   return String(value).padStart(2, "0");
 }
 
 function joinLabels(labels) {
   const words = labels.map((label) => (label === label.toUpperCase() ? label : label.toLowerCase()));
-  const text = words.length > 1 ? `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}` : words[0];
-  return text.charAt(0).toUpperCase() + text.slice(1);
+  return words.length > 1 ? `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}` : words[0];
+}
+
+function SectionIntro({ eyebrow, title, children }) {
+  return (
+    <div className="flex flex-col gap-5 border-b border-white/10 pb-8 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">{eyebrow}</p>
+        <h2 className="mt-4 text-4xl font-bold uppercase leading-none sm:text-5xl">{title}</h2>
+      </div>
+      {children ? <div className="max-w-md">{children}</div> : null}
+    </div>
+  );
 }
 
 // The /portfolio page. With `preview`, sample case studies are mixed in to
@@ -84,11 +91,14 @@ export default function PortfolioPageContent({ preview = false }) {
   const studies = getPortfolioCaseStudies({ includeSamples: preview });
   const counts = getPortfolioServiceCounts(studies);
   const templates = getMarketingTemplates();
-  const websitesOnly = counts.every(({ service }) => service.id === "web" || service.id === "app");
+  const marketingServices = counts.filter(({ service }) => !WEBSITE_SERVICE_IDS.includes(service.id));
+  const websitesOnly = marketingServices.length === 0;
 
   const intro = websitesOnly
-    ? "Client websites and web apps with live walkthroughs and direct links to the work, plus the ready-made website templates we design and sell."
-    : `${joinLabels(counts.map(({ service }) => service.label))} work, each with the results behind it, plus the website templates we design and sell.`;
+    ? "Websites and web apps we have built for clients, each with a walkthrough and a link to the live product. Plus the website templates we design and sell."
+    : `Websites and web apps we have built, and the ${joinLabels(
+        marketingServices.map(({ service }) => service.label),
+      )} work behind our clients' growth. Plus the website templates we design and sell.`;
 
   const stats = websitesOnly
     ? [
@@ -97,7 +107,7 @@ export default function PortfolioPageContent({ preview = false }) {
         { label: "Template pages", value: padCount(getMarketingTemplatePageTotal()) },
       ]
     : [
-        { label: "Case studies", value: padCount(studies.length) },
+        { label: "Projects", value: padCount(studies.length) },
         { label: "Services", value: padCount(counts.length) },
         { label: "Website templates", value: padCount(templates.length) },
       ];
@@ -108,8 +118,8 @@ export default function PortfolioPageContent({ preview = false }) {
     <main className="bg-black text-white">
       {preview ? (
         <PreviewBanner>
-          Real projects mixed with sample case studies, marked “Sample”, to show every service. Samples never
-          appear on the public portfolio, and this page is hidden from search engines.
+          Real projects plus sample case studies, marked “Sample”, to show every service. Samples never appear on the
+          public portfolio, and search engines don’t index this page.
         </PreviewBanner>
       ) : null}
 
@@ -117,9 +127,7 @@ export default function PortfolioPageContent({ preview = false }) {
         <div className="mx-auto max-w-[var(--site-content)]">
           <div className="grid gap-8 lg:grid-cols-[0.98fr_0.62fr] lg:items-end">
             <div>
-              <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30]">
-                Portfolio / Selected Work
-              </p>
+              <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30]">Portfolio</p>
               <h1 className="mt-5 max-w-4xl font-suifak text-[clamp(3.1rem,7.2vw,6.4rem)] uppercase leading-[0.86]">
                 Built By
                 <br />
@@ -145,7 +153,7 @@ export default function PortfolioPageContent({ preview = false }) {
                   href="#work"
                   className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#F5EE30] px-6 py-3 text-sm font-bold uppercase tracking-[0.16em] text-black transition-colors hover:bg-white ${focusRing}`}
                 >
-                  Explore Work
+                  See The Work
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
                 <Link
@@ -175,21 +183,15 @@ export default function PortfolioPageContent({ preview = false }) {
 
       <section id="work" className="scroll-mt-6 px-[var(--site-gutter)] py-14 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-[var(--site-content)]">
-          <div className="flex flex-col gap-4 border-b border-white/10 pb-8 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">
-                Client Projects
-              </p>
-              <h2 className="mt-4 text-4xl font-bold uppercase leading-none sm:text-5xl">Selected Work</h2>
-            </div>
-            <p className="max-w-md text-sm leading-6 text-gray-400">
+          <SectionIntro eyebrow="Our Work" title="Selected Projects">
+            <p className="text-sm leading-6 text-gray-400">
               {websitesOnly
-                ? "Every project links to the live product, with a walkthrough of how it works."
-                : "Pick a service to see the work and the numbers behind it. Open any case study for the full story."}
+                ? "Every project has a walkthrough and a link to the live product."
+                : "Filter by service to see the work and the numbers behind it. Open a case study for the full story."}
             </p>
-          </div>
+          </SectionIntro>
 
-          <div className="mt-8">
+          <div className="mt-6">
             <PortfolioWorkGrid
               filters={counts.map(({ service, count }) => ({ id: service.id, label: service.label, count }))}
               items={studies.map((study) => ({
@@ -207,35 +209,45 @@ export default function PortfolioPageContent({ preview = false }) {
       </section>
 
       {templates.length ? (
-        <section id="templates" className="border-t border-white/10 px-[var(--site-gutter)] py-14 sm:py-16 lg:py-20">
+        <section id="templates" className="overflow-hidden border-t border-white/10 px-[var(--site-gutter)] py-14 sm:py-16 lg:py-20">
           <div className="mx-auto max-w-[var(--site-content)]">
-            <div className="flex flex-col gap-6 border-b border-white/10 pb-8 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">
-                  Our Own Products
-                </p>
-                <h2 className="mt-4 text-4xl font-bold uppercase leading-none sm:text-5xl">Templates We Design And Sell</h2>
-              </div>
-              <div className="max-w-md">
-                <p className="text-sm leading-6 text-gray-400">
-                  Ready-made websites for academies, restaurants, estate agencies, clinics and law firms. Try a live demo,
-                  buy one, or let us set it up for you.
-                </p>
+            <SectionIntro eyebrow="Our Own Products" title="Templates We Design And Sell">
+              <p className="text-sm leading-6 text-gray-400">
+                Ready-made websites for academies, restaurants, estate agencies, clinics and law firms. Try a live demo,
+                buy one, or have us set it up for you.
+              </p>
+              <Link
+                href="/templates"
+                prefetch={false}
+                className={`mt-4 inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-[#F5EE30] transition-colors hover:text-white ${focusRing}`}
+              >
+                Browse All Templates
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            </SectionIntro>
+
+            <div className="mt-8">
+              <TemplateRail label="Website templates">
+                {templates.map((template) => (
+                  <TemplateTile key={template.slug} template={template} />
+                ))}
                 <Link
+                  key="all-templates"
                   href="/templates"
                   prefetch={false}
-                  className={`mt-4 inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-[#F5EE30] transition-colors hover:text-white ${focusRing}`}
+                  className={`group flex flex-col justify-between gap-8 rounded-lg border border-dashed border-white/20 bg-white/[0.02] p-5 transition-colors hover:border-[#F5EE30] sm:p-6 ${focusRing}`}
                 >
-                  Browse All Templates
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">All templates</span>
+                  <span>
+                    <span className="block font-suifak text-6xl leading-none text-[#F5EE30]">{padCount(templates.length)}</span>
+                    <span className="mt-4 block text-xl font-bold uppercase leading-tight">See every template</span>
+                    <span className="mt-2 block text-sm leading-6 text-white/60">Live demos, page tours and prices.</span>
+                  </span>
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#F5EE30] text-black transition-transform group-hover:translate-x-1">
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </span>
                 </Link>
-              </div>
-            </div>
-
-            <div className={`mt-8 grid grid-cols-2 gap-3 sm:gap-5 ${TEMPLATE_SHELF_COLUMNS[templates.length] || "lg:grid-cols-4"}`}>
-              {templates.map((template) => (
-                <TemplateTile key={template.slug} template={template} />
-              ))}
+              </TemplateRail>
             </div>
           </div>
         </section>
@@ -244,17 +256,20 @@ export default function PortfolioPageContent({ preview = false }) {
       <section className="border-y border-white/10 bg-[#F5EE30] px-[var(--site-gutter)] py-14 text-black sm:py-16 lg:py-20">
         <div className="mx-auto grid max-w-[var(--site-content)] gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
           <div>
-            <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-black/60 sm:text-sm">
-              Across The Work
-            </p>
+            <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-black/60 sm:text-sm">What We Do</p>
             <h2 className="mt-4 max-w-xl text-4xl font-bold uppercase leading-[0.96] sm:text-5xl lg:text-6xl">
-              Different outputs. One connected approach.
+              One team for every channel.
             </h2>
+            <p className="mt-6 max-w-md text-base leading-7 text-black/75">
+              Websites, search, social, ads, video and creator campaigns, planned together so each one makes the others
+              work harder.
+            </p>
           </div>
 
           <ul className="grid border-t border-black/20 sm:grid-cols-2">
             {SERVICE_PAGES.map((page) => {
               const count = serviceCount(page.ids);
+              const filterIds = page.ids.filter((id) => counts.some(({ service }) => service.id === id));
 
               return (
                 <li
@@ -263,19 +278,23 @@ export default function PortfolioPageContent({ preview = false }) {
                 >
                   <h3 className="text-xl font-bold uppercase leading-tight">{page.label}</h3>
                   <p className="mt-3 max-w-sm text-sm leading-6 text-black/70">{page.description}</p>
-                  <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-2 pt-5">
+                  <div className="mt-auto flex flex-wrap items-center gap-x-6 gap-y-2 pt-5">
                     <Link
                       href={page.href}
                       prefetch={false}
                       className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-black underline decoration-black/30 underline-offset-4 transition-colors hover:decoration-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black"
                     >
-                      Service details
+                      About the service
                       <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                     </Link>
                     {count ? (
-                      <span className="text-xs font-bold uppercase tracking-[0.16em] text-black/55">
-                        {count} {count === 1 ? "project" : "projects"} above
-                      </span>
+                      <PortfolioFilterLink
+                        serviceIds={filterIds}
+                        className="inline-flex items-center gap-2 rounded-full bg-black px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#F5EE30] transition-colors hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black"
+                      >
+                        See {count} {count === 1 ? "project" : "projects"}
+                        <span className="sr-only"> for {page.label}</span>
+                      </PortfolioFilterLink>
                     ) : null}
                   </div>
                 </li>
@@ -290,20 +309,35 @@ export default function PortfolioPageContent({ preview = false }) {
           <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
               <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">
-                Start A Conversation
+                Start A Project
               </p>
               <h2 className="mt-4 max-w-4xl text-4xl font-bold uppercase leading-[0.95] sm:text-5xl lg:text-7xl">
-                Have a project that needs a sharper digital direction?
+                Have a project in mind?
               </h2>
+              <p className="mt-5 max-w-xl text-base leading-7 text-gray-300 sm:text-lg">
+                Tell us what you want to build or grow. We usually reply within 24{"\u00a0"}hours.
+              </p>
             </div>
-            <Link
-              href="/contact"
-              prefetch={false}
-              className={`inline-flex min-h-14 items-center justify-center gap-3 rounded-full bg-white px-7 py-4 text-sm font-bold uppercase tracking-[0.16em] text-black transition-colors hover:bg-[#F5EE30] ${focusRing}`}
-            >
-              Discuss Your Project
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
+            <div className="flex flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
+              <Link
+                href="/contact"
+                prefetch={false}
+                className={`inline-flex min-h-14 items-center justify-center gap-3 rounded-full bg-white px-7 py-4 text-sm font-bold uppercase tracking-[0.16em] text-black transition-colors hover:bg-[#F5EE30] ${focusRing}`}
+              >
+                Start A Project
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+              <a
+                href={WHATSAPP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex min-h-14 items-center justify-center gap-3 rounded-full border border-white/25 px-7 py-4 text-sm font-bold uppercase tracking-[0.16em] text-white transition-colors hover:border-[#F5EE30] hover:text-[#F5EE30] ${focusRing}`}
+              >
+                Chat On WhatsApp
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            </div>
           </div>
         </div>
       </section>

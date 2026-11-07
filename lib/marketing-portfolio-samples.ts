@@ -228,7 +228,7 @@ export const MARKETING_SAMPLE_CASE_STUDIES: PortfolioCaseStudy[] = [
         headline: { value: "1.2M", label: "Views across Reels and Shorts" },
         summary: "A 30-second launch film for a residential tower, cut for Reels, Shorts and paid social.",
         kpis: [
-            { value: "41%", label: "average watched" },
+            { value: "41%", label: "average view completion" },
             { value: "320", label: "site visits booked" },
         ],
         proof: {
