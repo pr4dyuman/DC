@@ -168,14 +168,14 @@ export default function TemplatesPage() {
   ];
 
   return (
-    <main className="bg-black text-white">
+    <main data-site-width="wide" className="bg-black text-white">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
       />
 
-      <section className="border-b border-white/10 px-6 pb-10 pt-10 sm:pb-12 sm:pt-12 lg:pb-14 lg:pt-14">
-        <div className="mx-auto max-w-7xl">
+      <section className="border-b border-white/10 px-[var(--site-gutter)] pb-10 pt-10 sm:pb-12 sm:pt-12 lg:pb-14 lg:pt-14">
+        <div className="mx-auto max-w-[var(--site-content)]">
           <div className="grid gap-8 lg:grid-cols-[0.98fr_0.62fr] lg:items-end">
             <div>
               <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30]">
@@ -238,8 +238,8 @@ export default function TemplatesPage() {
         </div>
       </section>
 
-      <section id="templates" className="scroll-mt-6 px-6 py-14 sm:py-16 lg:py-20">
-        <div className="mx-auto max-w-6xl">
+      <section id="templates" className="scroll-mt-6 px-[var(--site-gutter)] py-14 sm:py-16 lg:py-20">
+        <div className="mx-auto max-w-[var(--site-content)]">
           <div className="flex flex-col gap-5 border-b border-white/10 pb-8 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">
@@ -274,8 +274,8 @@ export default function TemplatesPage() {
         </div>
       </section>
 
-      <section className="border-t border-white/10 px-6 py-14 sm:py-16 lg:py-20">
-        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
+      <section className="border-t border-white/10 px-[var(--site-gutter)] py-14 sm:py-16 lg:py-20">
+        <div className="mx-auto grid max-w-[var(--site-content)] gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
           <div>
             <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">
               In Every Download
@@ -300,8 +300,8 @@ export default function TemplatesPage() {
         </div>
       </section>
 
-      <section className="border-t border-white/10 px-6 py-14 sm:py-16 lg:py-20">
-        <div className="mx-auto max-w-7xl">
+      <section className="border-t border-white/10 px-[var(--site-gutter)] py-14 sm:py-16 lg:py-20">
+        <div className="mx-auto max-w-[var(--site-content)]">
           <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">
             How It Works
           </p>
@@ -320,8 +320,8 @@ export default function TemplatesPage() {
 
       <TemplateCustomiseBand />
 
-      <section className="px-6 py-16 sm:py-20 lg:py-24">
-        <div className="mx-auto max-w-7xl">
+      <section className="px-[var(--site-gutter)] py-16 sm:py-20 lg:py-24">
+        <div className="mx-auto max-w-[var(--site-content)]">
           <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">FAQ</p>
           <h2 className="mt-4 text-4xl font-bold uppercase leading-none sm:text-5xl">Before You Buy</h2>
           <div className="mt-10 grid gap-5 md:grid-cols-2">

@@ -22,7 +22,7 @@ export default function Navigation() {
   return (
     <nav aria-label="Primary navigation" className="bg-black text-white shadow-md py-6 md:py-7 font-glacial relative z-50">
       <NavigationEnhancer />
-      <div className="max-w-7xl mx-auto flex items-center justify-between px-6">
+      <div className="mx-auto flex max-w-[var(--site-frame)] items-center justify-between px-[var(--site-gutter)]">
         {/* Logo Section */}
         <Link
           href="/"
