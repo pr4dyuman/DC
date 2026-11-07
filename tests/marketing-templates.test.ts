@@ -9,7 +9,7 @@ import {
   getTemplateContactMessage,
   toSafeTemplateUrl,
 } from "../lib/marketing-templates-catalog";
-import { getMarketingTemplate, getMarketingTemplates } from "../lib/marketing-templates";
+import { getMarketingTemplate, getMarketingTemplates, getNextMarketingTemplates } from "../lib/marketing-templates";
 
 const PUBLIC_DIR = path.join(process.cwd(), "public");
 
@@ -48,6 +48,37 @@ test("only https links become buttons", () => {
   assert.equal(toSafeTemplateUrl("sugo-demo.pages.dev"), null);
   assert.equal(toSafeTemplateUrl(""), null);
   assert.equal(toSafeTemplateUrl(null), null);
+});
+
+test("every demo link in the catalogue is a working https link", () => {
+  for (const entry of MARKETING_TEMPLATE_CATALOG) {
+    if (entry.demoUrl === null) continue;
+    assert.equal(toSafeTemplateUrl(entry.demoUrl), entry.demoUrl, `${entry.slug}: demoUrl must be a full https:// link`);
+  }
+
+  for (const template of getMarketingTemplates()) {
+    const entry = MARKETING_TEMPLATE_CATALOG.find((item) => item.slug === template.slug);
+    assert.equal(template.demoUrl, toSafeTemplateUrl(entry?.demoUrl));
+  }
+});
+
+test("more templates lists the next templates, never the current one, and reaches every template", () => {
+  const templates = getMarketingTemplates();
+  const recommended = new Set<string>();
+
+  for (const template of templates) {
+    const next = getNextMarketingTemplates(template.slug, 3);
+    assert.equal(next.length, Math.min(3, templates.length - 1));
+    assert.ok(!next.some((item) => item.slug === template.slug), `${template.slug} recommends itself`);
+    assert.equal(new Set(next.map((item) => item.slug)).size, next.length);
+    next.forEach((item) => recommended.add(item.slug));
+  }
+
+  assert.equal(recommended.size, templates.length);
+  assert.deepEqual(
+    getNextMarketingTemplates("not-a-template", 2).map((item) => item.slug),
+    templates.slice(0, 2).map((item) => item.slug),
+  );
 });
 
 test("templates without a checkout link ask for a request through the contact form", () => {

@@ -9,6 +9,16 @@ import PortfolioCaseCard from "./PortfolioCaseCard";
 import PortfolioWorkGrid from "./PortfolioWorkGrid";
 import PreviewBanner from "./PreviewBanner";
 
+// Desktop columns for the templates shelf, so the tiles fill one even row.
+const TEMPLATE_SHELF_COLUMNS = [
+  "",
+  "lg:grid-cols-1",
+  "lg:grid-cols-2",
+  "lg:grid-cols-3",
+  "lg:grid-cols-4",
+  "sm:grid-cols-3 lg:grid-cols-5",
+];
+
 const focusRing =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]";
 
@@ -208,8 +218,8 @@ export default function PortfolioPageContent({ preview = false }) {
               </div>
               <div className="max-w-md">
                 <p className="text-sm leading-6 text-gray-400">
-                  Ready-made websites for restaurants, estate agencies, clinics and law firms. Buy one, or let us set it up
-                  for you.
+                  Ready-made websites for academies, restaurants, estate agencies, clinics and law firms. Try a live demo,
+                  buy one, or let us set it up for you.
                 </p>
                 <Link
                   href="/templates"
@@ -222,7 +232,7 @@ export default function PortfolioPageContent({ preview = false }) {
               </div>
             </div>
 
-            <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
+            <div className={`mt-8 grid grid-cols-2 gap-3 sm:gap-5 ${TEMPLATE_SHELF_COLUMNS[templates.length] || "lg:grid-cols-4"}`}>
               {templates.map((template) => (
                 <TemplateTile key={template.slug} template={template} />
               ))}

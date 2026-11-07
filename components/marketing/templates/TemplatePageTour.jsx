@@ -27,8 +27,9 @@ const focusRing =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]";
 
 // Page-by-page screenshots of a template, in a browser or phone frame. Works
-// without a hosted demo; the live demo link appears once one is configured.
-export default function TemplatePageTour({ templateName, templateSlug, pages, demoUrl }) {
+// without a hosted demo; the live demo link (to the full-screen demo page)
+// appears once one is configured.
+export default function TemplatePageTour({ templateName, templateSlug, pages, demoHref }) {
   const [activeId, setActiveId] = useState(pages[0]?.id);
   const [chosenDevice, setChosenDevice] = useState(null);
   const isPhone = useSyncExternalStore(subscribeToPhoneQuery, getPhoneSnapshot, getServerPhoneSnapshot);
@@ -95,8 +96,8 @@ export default function TemplatePageTour({ templateName, templateSlug, pages, de
             })}
           </div>
 
-          {demoUrl ? (
-            <TemplateActionLink href={demoUrl} external action="demo" templateSlug={templateSlug} variant="text">
+          {demoHref ? (
+            <TemplateActionLink href={demoHref} action="demo" templateSlug={templateSlug} variant="text">
               Open live demo
             </TemplateActionLink>
           ) : null}

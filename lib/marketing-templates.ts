@@ -67,6 +67,115 @@ function image(slug: string, file: string, width: number, height: number): Marke
 }
 
 const TEMPLATE_CONTENT: Record<string, MarketingTemplateContent> = {
+    "meridian-academy": {
+        title: "Timetable-Style Education Academy HTML Template",
+        metaTitle: "Meridian Academy Education Website Template",
+        summary:
+            "A timetable-style website for academies, coaching institutes and language or music schools, with a departure board of upcoming course starts.",
+        description: [
+            "Meridian Academy is a complete website for coaching institutes, training academies, language and music schools, tutoring centres and course creators. Its timetable design, chrome yellow and black with condensed display type and a departure board of upcoming course starts, puts what visitors come for, when a course starts and what it costs, in front of them within seconds.",
+            "Courses, teachers, workshops and dates all come from one JSON data file, so editing it updates the home page board, the catalogue, every course page and the events list. Start dates are worked out in the visitor's browser, so the demo never shows a past date. The catalogue filters by subject, level, format and duration, and each course page carries a curriculum, a batch schedule, fees with an instalment option and a validated enquiry form.",
+        ],
+        accent: "#FFC72C",
+        pageCount: 12,
+        stack: ["HTML5", "Tailwind CSS 3.4", "Plain JavaScript"],
+        fonts: "Sofia Sans and Sofia Sans Extra Condensed, self-hosted (OFL)",
+        version: "1.0.0",
+        signature: [
+            {
+                title: "Departure-board home page",
+                text: "The next course starts, with live countdowns worked out from the visitor's date, so the board never shows a start that has passed.",
+            },
+            {
+                title: "One data file runs the site",
+                text: "Courses, teachers, workshops and dates live in one JSON file. Edit it and every board, list and course page updates.",
+            },
+            {
+                title: "Filterable course catalogue",
+                text: "Filter by subject, level, format and duration, with subject counts that always match the results.",
+            },
+            {
+                title: "Course pages that answer everything",
+                text: "Outcomes, a curriculum accordion, a batch schedule, fees with a three-instalment option, the teacher and an enquiry form.",
+            },
+        ],
+        features: [
+            "12 page designs, with 12 course pages and 7 teacher profiles in the demo",
+            "Departure-board home page with live countdowns to the next course starts",
+            "One JSON data file for courses, teachers, events and dates",
+            "Course catalogue with subject, level, format and duration filters",
+            "Course pages with curriculum accordion, batch schedule table and fees with an instalment option",
+            "Teacher profile pages built from the same data file",
+            "Workshops and events list with dates, prices and detail panels",
+            "Admissions and fees page with a full fee table, payment rules and FAQ accordion",
+            "Enquiry and contact forms with browser validation, inline errors and announced confirmations",
+            "Student stories, a journal index and a full journal article page",
+            "Self-hosted fonts, inline SVG icons and lazy-loaded WebP images",
+            "Tailwind source and build script plus compiled, minified CSS",
+            "WCAG AA contrast, keyboard support, visible focus and reduced-motion support",
+            "No jQuery, no libraries and no analytics or external scripts",
+        ],
+        pages: [
+            "Home",
+            "Courses",
+            "Course detail ×12",
+            "Teachers",
+            "Teacher profile ×7",
+            "Admissions and fees",
+            "Workshops and events",
+            "Student stories",
+            "Journal",
+            "Journal post",
+            "Contact",
+            "404",
+        ],
+        card: image("meridian-academy", "card.webp", 960, 3200),
+        tour: [
+            {
+                id: "home",
+                label: "Home",
+                desktop: image("meridian-academy", "index-desktop.webp", 1440, 10361),
+                mobile: image("meridian-academy", "index-mobile.webp", 390, 16380),
+            },
+            {
+                id: "courses",
+                label: "Courses",
+                desktop: image("meridian-academy", "courses-desktop.webp", 1440, 2860),
+                mobile: image("meridian-academy", "courses-mobile.webp", 390, 4877),
+            },
+            {
+                id: "course",
+                label: "Course page",
+                desktop: image("meridian-academy", "course-pottery-wheel-basics-desktop.webp", 1440, 6452),
+                mobile: image("meridian-academy", "course-pottery-wheel-basics-mobile.webp", 390, 11547),
+            },
+            {
+                id: "teachers",
+                label: "Teachers",
+                desktop: image("meridian-academy", "teachers-desktop.webp", 1440, 2866),
+                mobile: image("meridian-academy", "teachers-mobile.webp", 390, 4488),
+            },
+            {
+                id: "admissions",
+                label: "Admissions & fees",
+                desktop: image("meridian-academy", "admissions-desktop.webp", 1440, 3596),
+                mobile: image("meridian-academy", "admissions-mobile.webp", 390, 5845),
+            },
+            {
+                id: "workshops",
+                label: "Workshops",
+                desktop: image("meridian-academy", "workshops-desktop.webp", 1440, 2518),
+                mobile: image("meridian-academy", "workshops-mobile.webp", 390, 4177),
+            },
+        ],
+        keywords: [
+            "education website template",
+            "academy website template",
+            "coaching institute website template",
+            "language school website template",
+            "Tailwind education template",
+        ],
+    },
     "sugo-restaurant": {
         title: "Poster Restaurant, Café & Wine Bar HTML Template",
         metaTitle: "SUGO Restaurant & Café Website Template",
@@ -570,6 +679,20 @@ export function getMarketingTemplates() {
 
 export function getMarketingTemplate(slug: string | null | undefined) {
     return MARKETING_TEMPLATES.find((template) => template.slug === slug);
+}
+
+/**
+ * The next `count` templates after `slug` in catalogue order, wrapping round,
+ * for "More templates": every template gets recommended from somewhere and
+ * the row is always full.
+ */
+export function getNextMarketingTemplates(slug: string, count = 3) {
+    const position = MARKETING_TEMPLATES.findIndex((template) => template.slug === slug);
+    if (position === -1) {
+        return MARKETING_TEMPLATES.slice(0, count);
+    }
+
+    return [...MARKETING_TEMPLATES.slice(position + 1), ...MARKETING_TEMPLATES.slice(0, position)].slice(0, count);
 }
 
 export function getMarketingTemplatePageTotal() {
