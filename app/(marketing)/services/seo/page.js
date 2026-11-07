@@ -134,13 +134,13 @@ const structuredData = [
 
 export default function SEOServices() {
   return (
-    <div className="min-h-screen bg-black text-white">
+    <main className="min-h-screen bg-black text-white">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
       />
 
-      <div className="max-w-7xl mx-auto px-6 pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12">
+      <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12">
         {/* Header Section */}
         <div className="text-center mb-16">
           <Link href="/services">
@@ -509,7 +509,7 @@ export default function SEOServices() {
         </h2>
 
         {/* Features Section */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center py-10 px-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center py-10 mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)]">
           <div className="px-2">
             <h3 className="text-base sm:text-lg md:text-xl font-bold">DATA-DRIVEN APPROACH</h3>
             <p className="text-xs sm:text-sm md:text-base mt-2 text-gray-300 leading-relaxed">
@@ -543,7 +543,7 @@ export default function SEOServices() {
 
 
         {/* Transform Section */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-10 px-6 md:px-16 pb-12 mt-4">
+        <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] flex flex-col md:flex-row items-center justify-between gap-10 pb-12 mt-4">
 
           <div className="text-center md:text-left max-w-xl">
             <h3 className="text-2xl md:text-3xl font-extrabold leading-snug">
@@ -569,8 +569,8 @@ export default function SEOServices() {
           PROOF WE TRACK
         </h2>
 
-        <div className="relative w-full flex flex-col items-center justify-center px-6 py-12">
-          <div className="w-full max-w-6xl flex flex-col md:flex-row items-center md:justify-between text-center gap-10">
+        <div className="relative w-full flex flex-col items-center justify-center px-[var(--site-gutter)] py-12">
+          <div className="w-full max-w-[var(--site-content)] flex flex-col md:flex-row items-center md:justify-between text-center gap-10">
 
             {/* Stat */}
             <div className="flex flex-col items-center flex-1">
@@ -612,7 +612,7 @@ export default function SEOServices() {
 
       {/* Footer Section */}
 
-    </div>
+    </main>
   )
 }
 

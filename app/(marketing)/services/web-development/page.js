@@ -134,13 +134,13 @@ const structuredData = [
 
 export default function WebDevelopment() {
   return (
-    <div className="min-h-screen bg-black text-white">
+    <main className="min-h-screen bg-black text-white">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
       />
       
-      <div className="max-w-7xl mx-auto px-6 pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12">
+      <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12">
         <div className="text-center mb-16">
               <Link href="/services">
                 <h2 className="text-4xl md:text-5xl font-bold uppercase tracking-wide mb-4 cursor-pointer">
@@ -465,7 +465,7 @@ export default function WebDevelopment() {
       </h2>
 
       {/* Features Section */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-8 text-center py-10">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-8 text-center py-10 mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)]">
         <div>
           <h3 className="text-lg md:text-xl font-bold">STRATEGIC APPROACH</h3>
           <p className="text-sm md:text-base mt-2 text-gray-300 max-w-[200px] mx-auto leading-relaxed">
@@ -493,7 +493,7 @@ export default function WebDevelopment() {
       </div>
 
       {/* Transform Section */}
-      <div className="flex flex-col md:flex-row items-center justify-between mt-12 gap-6 px-6 md:px-16">
+      <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] flex flex-col md:flex-row items-center justify-between mt-12 gap-6">
         <div className="text-center md:text-left max-w-2xl">
           <h3 className="text-2xl md:text-3xl font-extrabold leading-snug">
             READY TO TRANSFORM <br />
@@ -505,7 +505,7 @@ export default function WebDevelopment() {
         </div>
 
         {/* Circle Button */}
-        <div className="flex justify-center md:justify-end px-6 md:px-16">
+        <div className="flex justify-center md:justify-end">
           <a href="/get-started" className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white text-black font-bold flex items-center justify-center shadow-lg hover:bg-yellow-400 transition-all">GET STARTED</a>
         </div>
       </div>
@@ -513,7 +513,7 @@ export default function WebDevelopment() {
       
       {/* Footer Section */}
      
-    </div>
+    </main>
   );
 }
 

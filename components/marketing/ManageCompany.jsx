@@ -202,9 +202,9 @@ export default function ManageCompanySection({
     return (
         <section
             aria-labelledby="agency-os-heading"
-            className="bg-black px-4 py-12 font-glacial sm:px-6 sm:py-16 md:px-8 lg:px-10 lg:py-20 xl:px-12"
+            className="bg-black px-[var(--site-gutter)] py-12 font-glacial sm:py-16 lg:py-20"
         >
-            <div className="mx-auto max-w-[1440px] bg-[#F5EE30] px-5 py-10 text-[#0b0b0b] sm:p-12 lg:p-[72px]">
+            <div className="mx-auto max-w-[var(--site-content)] bg-[#F5EE30] px-5 py-10 text-[#0b0b0b] sm:p-12 lg:p-[72px]">
                 <div className="mx-auto flex max-w-[1200px] flex-col gap-10 lg:gap-12">
                     <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:gap-16">
                         <div className="flex flex-col gap-3.5 lg:flex-[1_1_560px]">
@@ -274,7 +274,7 @@ export default function ManageCompanySection({
             </div>
 
             {showFeatures ? (
-                <ul className="mx-auto mb-0 mt-14 grid max-w-7xl list-none gap-8 border-t border-white/15 p-0 pt-8 text-white sm:grid-cols-2 lg:grid-cols-4">
+                <ul className="mx-auto mb-0 mt-14 grid max-w-[var(--site-content)] list-none gap-8 border-t border-white/15 p-0 pt-8 text-white sm:grid-cols-2 lg:grid-cols-4">
                     {agencyOsFeatures.map((feature, index) => (
                         <li key={feature.title} className="flex flex-col gap-2.5">
                             <span aria-hidden="true" className="font-etna text-xl text-[#F5EE30]">

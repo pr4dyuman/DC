@@ -134,7 +134,7 @@ const ContactPage = () => {
             <div className="border-t border-white/20 pt-6">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <h3 className="text-[16px] md:text-[18px] font-bold uppercase tracking-wide">SOCIAL</h3>
-                <div className="flex gap-6 text-[13px] md:text-[14px] font-medium">
+                <div className="flex flex-wrap gap-x-6 gap-y-2 text-[13px] md:text-[14px] font-medium">
                   <Link href="https://www.facebook.com/profile.php?id=61571171168177" target="_blank" rel="noopener noreferrer" className="hover:text-[#F5EE30] transition-colors uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]">
                     Facebook
                   </Link>

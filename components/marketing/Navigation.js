@@ -39,7 +39,7 @@ export default function Navigation() {
         </Link>
 
         {/* Desktop Links */}
-        <ul className="hidden md:flex space-x-6 lg:space-x-10 xl:space-x-12 text-lg lg:text-xl font-glacial-bold tracking-wide">
+        <ul className="hidden lg:flex lg:space-x-6 xl:space-x-12 lg:text-base xl:text-xl font-glacial-bold tracking-wide whitespace-nowrap">
           <li>
             <Link
               href="/"
@@ -137,11 +137,11 @@ export default function Navigation() {
         </ul>
 
         {/* Desktop CTA */}
-        <div className="hidden md:block">
+        <div className="hidden lg:block">
           <Link
             href="/contact"
             prefetch={false}
-            className="text-4xl font-bold hover:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] transition-all duration-200 font-etna"
+            className="whitespace-nowrap text-2xl xl:text-4xl font-bold hover:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] transition-all duration-200 font-etna"
           >
             GET IN TOUCH
           </Link>

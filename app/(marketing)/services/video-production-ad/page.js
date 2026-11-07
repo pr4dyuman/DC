@@ -134,13 +134,13 @@ const structuredData = [
 
 export default function VideoProduction() {
   return (
-    <div className="min-h-screen bg-black text-white">
+    <main className="min-h-screen bg-black text-white">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
       />
       
-      <div className="max-w-7xl mx-auto px-6 pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12">
+      <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12">
         {/* Header Section */}
        <div className="text-center mb-16">
               <Link href="/services">
@@ -518,7 +518,7 @@ export default function VideoProduction() {
   </h2>
 
   {/* Features Section */}
-<div className="grid grid-cols-3 lg:grid-cols-5 gap-6 text-center py-10 px-4">
+<div className="grid grid-cols-3 lg:grid-cols-5 gap-6 text-center py-10 mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)]">
   
   {/* Card 1 */}
   <div className="flex flex-col items-center px-2">
@@ -574,7 +574,7 @@ export default function VideoProduction() {
 
 
   {/* Transform Section */}
-  <div className="flex flex-col md:flex-row items-center justify-between gap-10 px-6 md:px-16 pb-12 mt-4">
+  <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] flex flex-col md:flex-row items-center justify-between gap-10 pb-12 mt-4">
     
     <div className="text-center md:text-left max-w-xl">
       <h3 className="text-2xl md:text-3xl font-extrabold leading-snug">
@@ -595,7 +595,7 @@ export default function VideoProduction() {
       
       {/* Footer Section */}
       
-    </div>
+    </main>
   );
 }
 

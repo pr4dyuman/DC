@@ -4,8 +4,8 @@ import CountUp from "./CountUp";
 
 export default function AboutAgency() {
   return (
-    <section className="bg-black text-white min-h-screen py-8 sm:py-12 md:py-16 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-20">
-      <div className="max-w-7xl mx-auto">
+    <section className="bg-black text-white min-h-screen py-8 sm:py-12 md:py-16 px-[var(--site-gutter)]">
+      <div className="max-w-[var(--site-content)] mx-auto">
         {/* Header */}
         <div className="mb-6 sm:mb-8">
           <p className="text-[#F5EE30] text-xs sm:text-sm font-glacial-bold tracking-wide mb-3 sm:mb-4">

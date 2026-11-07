@@ -141,7 +141,7 @@ export default function SocialMediaMarketing() {
       />
       
       <main className="flex-grow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8  w-full">
+        <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] w-full">
         {/* Header Section */}
         <div className="text-center pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12 lg:pb-16 mb-16">
               <Link href="/services">
@@ -513,7 +513,7 @@ export default function SocialMediaMarketing() {
           </h2>
 
           {/* Features Section */}
-        <div className="grid grid-cols-3 lg:grid-cols-5 gap-6 text-center py-10 px-4">
+        <div className="grid grid-cols-3 lg:grid-cols-5 gap-6 text-center py-10 mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)]">
           
           {/* Card 1 */}
           <div className="flex flex-col items-center px-2">
@@ -569,7 +569,7 @@ export default function SocialMediaMarketing() {
 
 
           {/* Transform Section */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-10 px-6 md:px-16 pb-12 mt-4">
+          <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] flex flex-col md:flex-row items-center justify-between gap-10 pb-12 mt-4">
             
             <div className="text-center md:text-left max-w-xl">
               <h3 className="text-2xl md:text-3xl font-extrabold leading-snug">
@@ -595,8 +595,8 @@ export default function SocialMediaMarketing() {
     PROOF WE TRACK
   </h2>
 
-  <div className="relative w-full flex flex-col items-center justify-center px-6 py-12">
-    <div className="w-full max-w-6xl flex flex-col md:flex-row items-center md:justify-between text-center gap-10">
+  <div className="relative w-full flex flex-col items-center justify-center px-[var(--site-gutter)] py-12">
+    <div className="w-full max-w-[var(--site-content)] flex flex-col md:flex-row items-center md:justify-between text-center gap-10">
 
       {/* Stat */}
       <div className="flex flex-col items-center flex-1">

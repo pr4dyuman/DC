@@ -108,7 +108,7 @@ export default async function TemplatePage({ params }) {
   ];
 
   return (
-    <main data-site-width="wide" className="bg-black text-white">
+    <main className="bg-black text-white">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}

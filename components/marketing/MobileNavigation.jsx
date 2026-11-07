@@ -59,7 +59,7 @@ export default function MobileNavigation({ servicesList }) {
         aria-label="Open mobile menu"
         aria-controls={mobileMenuId}
         aria-expanded={mobileOpen}
-        className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-white transition-colors hover:bg-white/10 focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] md:hidden"
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-white transition-colors hover:bg-white/10 focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] lg:hidden"
         onClick={() => setMobileOpen(true)}
       >
         <Menu className="w-7 h-7" aria-hidden="true" />
@@ -72,7 +72,7 @@ export default function MobileNavigation({ servicesList }) {
         role="dialog"
         aria-modal="true"
         aria-label="Mobile navigation"
-        className={`fixed left-0 top-0 z-50 h-[100dvh] w-screen max-w-[100vw] overflow-hidden transition-opacity duration-300 ease-in-out md:hidden ${
+        className={`fixed left-0 top-0 z-50 h-[100dvh] w-screen max-w-[100vw] overflow-hidden transition-opacity duration-300 ease-in-out lg:hidden ${
           mobileOpen ? "block pointer-events-auto opacity-100" : "hidden pointer-events-none opacity-0"
         }`}
       >

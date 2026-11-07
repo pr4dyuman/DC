@@ -140,7 +140,7 @@ export default function PPCAdvertising() {
         dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
       />
       <main className="flex-grow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] w-full">
           {/* Header Section */}
           <div className="text-center pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12 lg:pb-16 mb-16">
             <Link href="/services">
@@ -176,7 +176,7 @@ export default function PPCAdvertising() {
             <div className="w-full lg:w-1/2">
               <h3 className="text-sm sm:text-base lg:text-lg font-semibold mb-3 sm:mb-4 uppercase tracking-wide flex items-start">
                 <span className="w-2 h-2 sm:w-3 sm:h-3 bg-[#F5EE30] rounded-full mr-2 sm:mr-3 mt-1 sm:mt-1.5 flex-shrink-0"></span>
-                <span className="leading-relaxed whitespace-normal xl:whitespace-nowrap">Get Instant Visibility, Drive Qualified Traffic, and Maximize ROI</span>
+                <span className="leading-relaxed whitespace-normal 2xl:whitespace-nowrap">Get Instant Visibility, Drive Qualified Traffic, and Maximize ROI</span>
               </h3>
               <h1 className="text-2xl sm:text-4xl md:text-2xl lg:text-3xl xl:text-4xl font-['Etna'] font-bold mb-4 sm:mb-6 text-[#F5EE30] whitespace-normal break-words xl:whitespace-nowrap leading-tight">
                 PAY-PER-CLICK (PPC) ADVERTISING
@@ -565,7 +565,7 @@ export default function PPCAdvertising() {
           </h2>
 
           {/* Features Section */}
-          <div className="grid grid-cols-3 lg:grid-cols-5 gap-6 text-center py-10 px-4">
+          <div className="grid grid-cols-3 lg:grid-cols-5 gap-6 text-center py-10 mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)]">
 
             {/* Card 1 */}
             <div className="flex flex-col items-center px-2">
@@ -622,7 +622,7 @@ export default function PPCAdvertising() {
 
 
           {/* Transform Section */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-10 px-6 md:px-16 pb-12 mt-4">
+          <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] flex flex-col md:flex-row items-center justify-between gap-10 pb-12 mt-4">
 
             <div className="text-center md:text-left max-w-xl">
               <h3 className="text-2xl md:text-3xl font-extrabold leading-snug">

@@ -100,8 +100,8 @@ export default function TestimonialSection() {
 
   if (loading) {
     return (
-      <section className="bg-black text-white py-20 px-6">
-        <div className="max-w-7xl mx-auto text-center">
+      <section className="bg-black text-white py-20 px-[var(--site-gutter)]">
+        <div className="max-w-[var(--site-content)] mx-auto text-center">
           <p className="text-gray-400">Loading testimonials...</p>
         </div>
       </section>
@@ -113,8 +113,8 @@ export default function TestimonialSection() {
   }
 
   return (
-    <section ref={sectionRef} className="bg-black text-white py-20 px-6">
-      <div className="max-w-7xl mx-auto">
+    <section ref={sectionRef} className="bg-black text-white py-20 px-[var(--site-gutter)]">
+      <div className="max-w-[var(--site-content)] mx-auto">
         {/* Header */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-16 gap-8">
           <div>

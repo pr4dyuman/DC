@@ -80,7 +80,7 @@ export default function CaseStudyPageContent({ study, preview = false }) {
   ].filter(Boolean);
 
   return (
-    <main data-site-width="wide" className="bg-black text-white">
+    <main className="bg-black text-white">
       {sample ? (
         <PreviewBanner>
           A sample case study with an invented client and numbers, to show the layout. It is never shown on the

@@ -95,7 +95,7 @@ export default function PortfolioPageContent({ preview = false }) {
   const serviceCount = (ids) => studies.filter((study) => study.services.some((id) => ids.includes(id))).length;
 
   return (
-    <main data-site-width="wide" className="bg-black text-white">
+    <main className="bg-black text-white">
       {preview ? (
         <PreviewBanner>
           Real projects mixed with sample case studies, marked “Sample”, to show every service. Samples never
