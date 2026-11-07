@@ -1,5 +1,6 @@
 import Image from "next/image"
 import Link from "next/link"
+import ServiceCaseStudies from "@/components/marketing/portfolio/ServiceCaseStudies";
 import RelatedArticlesSection from "@/components/marketing/RelatedArticlesSection"
 import {
   getMarketingBreadcrumbJsonLd,
@@ -463,6 +464,9 @@ export default function SEOServices() {
             </div>
           </div>
         </section>
+
+        <ServiceCaseStudies services={["seo"]} title="SEO Results" linkLabel="See all SEO work" />
+
 
         <RelatedArticlesSection
           eyebrow="SEO Reading List"

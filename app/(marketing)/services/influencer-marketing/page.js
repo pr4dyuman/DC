@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import ServiceCaseStudies from "@/components/marketing/portfolio/ServiceCaseStudies";
 import RelatedArticlesSection from "@/components/marketing/RelatedArticlesSection";
 import {
   getMarketingBreadcrumbJsonLd,
@@ -471,6 +472,9 @@ export default function InfluencerMarketing() {
             </div>
           </div>
         </section>
+
+        <ServiceCaseStudies services={["influencer"]} title="Influencer Campaigns" linkLabel="See all influencer work" />
+
 
         <RelatedArticlesSection
           eyebrow="Influencer Reading List"

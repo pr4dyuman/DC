@@ -1,5 +1,5 @@
-// Browser chrome around a template preview, matching the portfolio project frames.
-export default function TemplateBrowserFrame({ label, status, children, className = "" }) {
+// Browser chrome around a website preview, used by the portfolio and the templates store.
+export default function BrowserFrame({ label, status, children, className = "" }) {
   return (
     <div
       className={`overflow-hidden rounded-md border border-white/10 bg-[#050505] transition-colors group-hover:border-[#F5EE30]/45 ${className}`}
