@@ -80,7 +80,7 @@ export default function CaseStudyPageContent({ study, preview = false }) {
   ].filter(Boolean);
 
   return (
-    <main className="bg-black text-white">
+    <main data-site-width="wide" className="bg-black text-white">
       {sample ? (
         <PreviewBanner>
           A sample case study with an invented client and numbers, to show the layout. It is never shown on the
@@ -88,8 +88,8 @@ export default function CaseStudyPageContent({ study, preview = false }) {
         </PreviewBanner>
       ) : null}
 
-      <section className="border-b border-white/10 px-6 pb-12 pt-8 sm:pt-10 lg:pb-16">
-        <div className="mx-auto max-w-7xl">
+      <section className="border-b border-white/10 px-[var(--site-gutter)] pb-12 pt-8 sm:pt-10 lg:pb-16">
+        <div className="mx-auto max-w-[var(--site-content)]">
           <nav aria-label="Breadcrumb">
             <ol className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-white/50">
               <li>
@@ -155,8 +155,8 @@ export default function CaseStudyPageContent({ study, preview = false }) {
         </div>
       </section>
 
-      <section className="px-6 py-14 sm:py-16 lg:py-20">
-        <div className="mx-auto max-w-7xl">
+      <section className="px-[var(--site-gutter)] py-14 sm:py-16 lg:py-20">
+        <div className="mx-auto max-w-[var(--site-content)]">
           <Eyebrow>The Proof</Eyebrow>
           <p className="mt-4 text-3xl font-bold uppercase leading-tight sm:text-4xl">{PROOF_TITLES[study.proof.type]}</p>
           <div className="mt-8">
@@ -169,8 +169,8 @@ export default function CaseStudyPageContent({ study, preview = false }) {
       </section>
 
       {story ? (
-        <section className="border-t border-white/10 px-6 py-14 sm:py-16 lg:py-24">
-          <div className="mx-auto grid max-w-7xl grid-cols-1 gap-12 lg:grid-cols-[minmax(0,0.34fr)_minmax(0,0.66fr)]">
+        <section className="border-t border-white/10 px-[var(--site-gutter)] py-14 sm:py-16 lg:py-24">
+          <div className="mx-auto grid max-w-[var(--site-content)] grid-cols-1 gap-12 lg:grid-cols-[minmax(0,0.34fr)_minmax(0,0.66fr)]">
             <aside className="lg:sticky lg:top-8 lg:self-start">
               <Eyebrow>At A Glance</Eyebrow>
               <dl className="mt-5 divide-y divide-white/10 border-y border-white/10">
@@ -228,7 +228,7 @@ export default function CaseStudyPageContent({ study, preview = false }) {
       ) : null}
 
       {study.testimonial ? (
-        <section className="border-t border-white/10 px-6 py-16 sm:py-20">
+        <section className="border-t border-white/10 px-[var(--site-gutter)] py-16 sm:py-20">
           <figure className="mx-auto max-w-4xl">
             <Quote className="h-10 w-10 text-[#F5EE30]" aria-hidden="true" />
             <blockquote className="mt-6 font-suifak text-3xl leading-[1.15] sm:text-5xl">
@@ -242,8 +242,8 @@ export default function CaseStudyPageContent({ study, preview = false }) {
       ) : null}
 
       {next ? (
-        <section className="border-t border-white/10 px-6 py-16 sm:py-20">
-          <div className="mx-auto max-w-7xl">
+        <section className="border-t border-white/10 px-[var(--site-gutter)] py-16 sm:py-20">
+          <div className="mx-auto max-w-[var(--site-content)]">
             <div className="flex flex-col gap-4 border-b border-white/10 pb-8 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <Eyebrow>Next Case Study</Eyebrow>
@@ -265,8 +265,8 @@ export default function CaseStudyPageContent({ study, preview = false }) {
         </section>
       ) : null}
 
-      <section className="border-t border-white/10 bg-[#F5EE30] px-6 py-14 text-black sm:py-16 lg:py-20">
-        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
+      <section className="border-t border-white/10 bg-[#F5EE30] px-[var(--site-gutter)] py-14 text-black sm:py-16 lg:py-20">
+        <div className="mx-auto grid max-w-[var(--site-content)] gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
             <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-black/60 sm:text-sm">
               Start A Conversation

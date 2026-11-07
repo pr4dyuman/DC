@@ -108,14 +108,14 @@ export default async function TemplatePage({ params }) {
   ];
 
   return (
-    <main className="bg-black text-white">
+    <main data-site-width="wide" className="bg-black text-white">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
       />
 
-      <section className="border-b border-white/10 px-6 pb-12 pt-8 sm:pt-10 lg:pb-16">
-        <div className="mx-auto max-w-7xl">
+      <section className="border-b border-white/10 px-[var(--site-gutter)] pb-12 pt-8 sm:pt-10 lg:pb-16">
+        <div className="mx-auto max-w-[var(--site-content)]">
           <nav aria-label="Breadcrumb">
             <ol className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-white/50">
               <li>
@@ -224,8 +224,8 @@ export default async function TemplatePage({ params }) {
         </div>
       </section>
 
-      <section id="tour" className="scroll-mt-6 px-6 py-14 sm:py-16 lg:py-20">
-        <div className="mx-auto max-w-6xl">
+      <section id="tour" className="scroll-mt-6 px-[var(--site-gutter)] py-14 sm:py-16 lg:py-20">
+        <div className="mx-auto max-w-[var(--site-content)]">
           <div className="flex flex-col gap-4 border-b border-white/10 pb-8 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">
@@ -250,8 +250,8 @@ export default async function TemplatePage({ params }) {
         </div>
       </section>
 
-      <section className="border-t border-white/10 px-6 py-14 sm:py-16 lg:py-20">
-        <div className="mx-auto max-w-7xl">
+      <section className="border-t border-white/10 px-[var(--site-gutter)] py-14 sm:py-16 lg:py-20">
+        <div className="mx-auto max-w-[var(--site-content)]">
           <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">
             Signature Features
           </p>
@@ -270,8 +270,8 @@ export default async function TemplatePage({ params }) {
         </div>
       </section>
 
-      <section className="border-t border-white/10 px-6 py-14 sm:py-16 lg:py-20">
-        <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.95fr_1.05fr]">
+      <section className="border-t border-white/10 px-[var(--site-gutter)] py-14 sm:py-16 lg:py-20">
+        <div className="mx-auto grid max-w-[var(--site-content)] gap-12 lg:grid-cols-[0.95fr_1.05fr]">
           <div>
             <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">
               About {template.name}
@@ -312,8 +312,8 @@ export default async function TemplatePage({ params }) {
         </div>
       </section>
 
-      <section className="border-t border-white/10 px-6 py-14 sm:py-16 lg:py-20">
-        <div className="mx-auto max-w-7xl">
+      <section className="border-t border-white/10 px-[var(--site-gutter)] py-14 sm:py-16 lg:py-20">
+        <div className="mx-auto max-w-[var(--site-content)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">
@@ -340,8 +340,8 @@ export default async function TemplatePage({ params }) {
       <TemplateCustomiseBand template={template} />
 
       {otherTemplates.length ? (
-        <section className="px-6 py-16 sm:py-20">
-          <div className="mx-auto max-w-7xl">
+        <section className="px-[var(--site-gutter)] py-16 sm:py-20">
+          <div className="mx-auto max-w-[var(--site-content)]">
             <div className="flex flex-col gap-4 border-b border-white/10 pb-8 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">

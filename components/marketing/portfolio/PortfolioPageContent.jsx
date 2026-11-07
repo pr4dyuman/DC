@@ -95,7 +95,7 @@ export default function PortfolioPageContent({ preview = false }) {
   const serviceCount = (ids) => studies.filter((study) => study.services.some((id) => ids.includes(id))).length;
 
   return (
-    <main className="bg-black text-white">
+    <main data-site-width="wide" className="bg-black text-white">
       {preview ? (
         <PreviewBanner>
           Real projects mixed with sample case studies, marked “Sample”, to show every service. Samples never
@@ -103,8 +103,8 @@ export default function PortfolioPageContent({ preview = false }) {
         </PreviewBanner>
       ) : null}
 
-      <section className="border-b border-white/10 px-6 pb-10 pt-10 sm:pb-12 sm:pt-12 lg:pb-14 lg:pt-14">
-        <div className="mx-auto max-w-7xl">
+      <section className="border-b border-white/10 px-[var(--site-gutter)] pb-10 pt-10 sm:pb-12 sm:pt-12 lg:pb-14 lg:pt-14">
+        <div className="mx-auto max-w-[var(--site-content)]">
           <div className="grid gap-8 lg:grid-cols-[0.98fr_0.62fr] lg:items-end">
             <div>
               <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30]">
@@ -163,8 +163,8 @@ export default function PortfolioPageContent({ preview = false }) {
         </div>
       </section>
 
-      <section id="work" className="scroll-mt-6 px-6 py-14 sm:py-16 lg:py-20">
-        <div className="mx-auto max-w-6xl">
+      <section id="work" className="scroll-mt-6 px-[var(--site-gutter)] py-14 sm:py-16 lg:py-20">
+        <div className="mx-auto max-w-[var(--site-content)]">
           <div className="flex flex-col gap-4 border-b border-white/10 pb-8 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">
@@ -197,8 +197,8 @@ export default function PortfolioPageContent({ preview = false }) {
       </section>
 
       {templates.length ? (
-        <section id="templates" className="border-t border-white/10 px-6 py-14 sm:py-16 lg:py-20">
-          <div className="mx-auto max-w-6xl">
+        <section id="templates" className="border-t border-white/10 px-[var(--site-gutter)] py-14 sm:py-16 lg:py-20">
+          <div className="mx-auto max-w-[var(--site-content)]">
             <div className="flex flex-col gap-6 border-b border-white/10 pb-8 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">
@@ -231,8 +231,8 @@ export default function PortfolioPageContent({ preview = false }) {
         </section>
       ) : null}
 
-      <section className="border-y border-white/10 bg-[#F5EE30] px-6 py-14 text-black sm:py-16 lg:py-20">
-        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
+      <section className="border-y border-white/10 bg-[#F5EE30] px-[var(--site-gutter)] py-14 text-black sm:py-16 lg:py-20">
+        <div className="mx-auto grid max-w-[var(--site-content)] gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
           <div>
             <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-black/60 sm:text-sm">
               Across The Work
@@ -275,8 +275,8 @@ export default function PortfolioPageContent({ preview = false }) {
         </div>
       </section>
 
-      <section className="px-6 py-16 sm:py-20 lg:py-24">
-        <div className="mx-auto max-w-7xl border-t border-white/15 pt-10">
+      <section className="px-[var(--site-gutter)] py-16 sm:py-20 lg:py-24">
+        <div className="mx-auto max-w-[var(--site-content)] border-t border-white/15 pt-10">
           <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
               <p className="font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">

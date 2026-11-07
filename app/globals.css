@@ -257,6 +257,33 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Marketing page width. Pages keep an 80rem content column by default. Pages
+   whose <main> has data-site-width="wide" (portfolio, case studies, templates)
+   use up to 100rem with gutters that grow with the screen, and the shared
+   header and footer widen with them. Without :has() support, pages fall back
+   to the default width. */
+body {
+  --site-content: 80rem;
+  --site-gutter: 1.5rem;
+  --site-frame: calc(var(--site-content) + 2 * var(--site-gutter));
+}
+
+body:has(main[data-site-width="wide"]) {
+  --site-content: 100rem;
+}
+
+@media (min-width: 640px) {
+  body:has(main[data-site-width="wide"]) {
+    --site-gutter: 2rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  body:has(main[data-site-width="wide"]) {
+    --site-gutter: 3rem;
+  }
+}
+
 /* Premium Scrollbars */
 ::-webkit-scrollbar {
   width: 8px;
