@@ -802,16 +802,16 @@ export default async function BlogPost({ params }) {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--blog-bg)] font-sans text-[var(--blog-text)] selection:bg-[var(--blog-accent)] selection:text-[var(--blog-accent-ink)]">
+    <main className="min-h-screen bg-[var(--blog-bg)] font-sans text-[var(--blog-text)] selection:bg-[var(--blog-accent)] selection:text-[var(--blog-accent-ink)]">
       <BlogPostAnalyticsTracker slug={post.slug} category={category} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: seo.schemaMarkup }} />
 
       <article>
         {/* ── Wide article shell ── */}
         <div className="relative pt-8 sm:pt-12 lg:pt-16">
-          <div className="mx-auto w-full max-w-[1760px] px-4 sm:px-6 lg:px-8 xl:px-12">
+          <div className="mx-auto w-full max-w-[var(--site-frame)] px-[var(--site-gutter)]">
             {/* ── Article header ── */}
-            <header className="-mx-4 mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-4 py-7 shadow-[var(--blog-shadow)] sm:mx-0 sm:rounded-2xl sm:border sm:p-8 lg:p-10 xl:p-12">
+            <header className="-mx-[var(--site-gutter)] mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-[var(--site-gutter)] py-7 shadow-[var(--blog-shadow)] sm:mx-0 sm:rounded-2xl sm:border sm:p-8 lg:p-10 xl:p-12">
               <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
                 <Link
                   href="/blog"
@@ -937,14 +937,14 @@ export default async function BlogPost({ params }) {
               <div className="min-w-0 flex-1">
                 {/* Collapsible TOC below desktop */}
                 {shouldShowToc && (
-                  <details className="group -mx-4 mb-6 overflow-hidden border-y border-[var(--blog-border)] bg-[var(--blog-surface)] sm:mx-0 sm:rounded-2xl sm:border xl:hidden">
-                    <summary className="flex cursor-pointer items-center justify-between gap-4 px-4 py-4 transition-colors hover:bg-[var(--blog-surface-muted)] sm:px-6">
+                  <details className="group -mx-[var(--site-gutter)] mb-6 overflow-hidden border-y border-[var(--blog-border)] bg-[var(--blog-surface)] sm:mx-0 sm:rounded-2xl sm:border xl:hidden">
+                    <summary className="flex cursor-pointer items-center justify-between gap-4 px-[var(--site-gutter)] py-4 transition-colors hover:bg-[var(--blog-surface-muted)] sm:px-6">
                       <span className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--blog-link)]">
                         On This Page
                       </span>
                       <ChevronDown className="h-4 w-4 shrink-0 text-[var(--blog-muted)] transition-transform group-open:rotate-180" />
                     </summary>
-                    <div className="border-t border-[var(--blog-border)] px-4 py-4 sm:px-6">
+                    <div className="border-t border-[var(--blog-border)] px-[var(--site-gutter)] py-4 sm:px-6">
                       <nav className="space-y-1">
                         {headings.map((heading) => (
                           <a
@@ -966,7 +966,7 @@ export default async function BlogPost({ params }) {
                 )}
 
                 {/* ── Article Body ── */}
-                <div className="-mx-4 mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-4 py-8 sm:mx-0 sm:rounded-2xl sm:border sm:p-8 lg:p-10 2xl:p-14">
+                <div className="-mx-[var(--site-gutter)] mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-[var(--site-gutter)] py-8 sm:mx-0 sm:rounded-2xl sm:border sm:p-8 lg:p-10 2xl:p-14">
                   <div
                     className="blog-prose"
                     dangerouslySetInnerHTML={{ __html: sanitizedContent }}
@@ -974,7 +974,7 @@ export default async function BlogPost({ params }) {
                 </div>
 
                 {relatedServiceLinks.length > 0 && (
-                  <section className="-mx-4 mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-4 py-7 sm:mx-0 sm:rounded-2xl sm:border sm:p-8">
+                  <section className="-mx-[var(--site-gutter)] mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-[var(--site-gutter)] py-7 sm:mx-0 sm:rounded-2xl sm:border sm:p-8">
                     <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--blog-link)]">
                       Related Services
                     </p>
@@ -1005,7 +1005,7 @@ export default async function BlogPost({ params }) {
                 )}
 
                 {visibleSources.length > 0 && (
-                  <section className="-mx-4 mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-4 py-7 sm:mx-0 sm:rounded-2xl sm:border sm:p-8">
+                  <section className="-mx-[var(--site-gutter)] mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-[var(--site-gutter)] py-7 sm:mx-0 sm:rounded-2xl sm:border sm:p-8">
                     <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--blog-link)]">
                       Sources
                     </p>
@@ -1035,8 +1035,8 @@ export default async function BlogPost({ params }) {
 
                 {/* FAQ Section */}
                 {faqItems.length > 0 && (
-                  <section className="-mx-4 mb-6 overflow-hidden border-y border-[var(--blog-border)] bg-[var(--blog-surface)] sm:mx-0 sm:rounded-2xl sm:border">
-                    <div className="px-4 pb-4 pt-7 sm:px-8 sm:pt-8">
+                  <section className="-mx-[var(--site-gutter)] mb-6 overflow-hidden border-y border-[var(--blog-border)] bg-[var(--blog-surface)] sm:mx-0 sm:rounded-2xl sm:border">
+                    <div className="px-[var(--site-gutter)] pb-4 pt-7 sm:px-8 sm:pt-8">
                       <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--blog-link)]">
                         FAQ
                       </p>
@@ -1044,7 +1044,7 @@ export default async function BlogPost({ params }) {
                         Frequently Asked Questions
                       </h2>
                     </div>
-                    <div className="space-y-3 px-4 pb-7 sm:px-8 sm:pb-8">
+                    <div className="space-y-3 px-[var(--site-gutter)] pb-7 sm:px-8 sm:pb-8">
                       {faqItems.map((item, index) => (
                         <details
                           key={`faq-${index}`}
@@ -1077,7 +1077,7 @@ export default async function BlogPost({ params }) {
                 )}
 
                 {relatedPosts.length > 0 && (
-                  <section className="-mx-4 mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-4 py-7 sm:mx-0 sm:rounded-2xl sm:border sm:p-8">
+                  <section className="-mx-[var(--site-gutter)] mb-6 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-[var(--site-gutter)] py-7 sm:mx-0 sm:rounded-2xl sm:border sm:p-8">
                     <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--blog-link)]">
                       Related Articles
                     </p>
@@ -1107,7 +1107,7 @@ export default async function BlogPost({ params }) {
                 )}
 
                 {/* Share Section */}
-                <section className="-mx-4 border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-4 py-6 sm:mx-0 sm:rounded-2xl sm:border sm:p-8">
+                <section className="-mx-[var(--site-gutter)] border-y border-[var(--blog-border)] bg-[var(--blog-surface)] px-[var(--site-gutter)] py-6 sm:mx-0 sm:rounded-2xl sm:border sm:p-8">
                   <div className="flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
                     <div className="flex items-center gap-3">
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--blog-accent)] text-[var(--blog-accent-ink)]">
@@ -1154,6 +1154,6 @@ export default async function BlogPost({ params }) {
 
         <div className="pb-16 sm:pb-20" />
       </article>
-    </div>
+    </main>
   );
 }
