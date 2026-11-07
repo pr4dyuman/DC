@@ -91,6 +91,17 @@ export type SeoProof = {
     points: Array<{ label: string; value: number }>;
     startIndex?: number;
     startLabel?: string;
+    /**
+     * A Search Console style report for the case study page: first and last
+     * month figures, impressions to plot beside the clicks, and numbered
+     * markers that match the story's steps.
+     */
+    report?: {
+        title: string;
+        metrics: Array<{ label: string; before: string; after: string }>;
+        impressions: Array<{ label: string; value: number }>;
+        markers?: Array<{ index: number; label: string }>;
+    };
     keywords?: Array<{ term: string; before: number | null; after: number }>;
     serp?: { siteName: string; url: string; title: string; description: string; position: number };
 };
@@ -99,6 +110,8 @@ export type SocialProof = {
     type: "social";
     platform: string;
     handle: string;
+    /** Name, bio lines and button shown in the large phone view. */
+    profile?: { name: string; bio: string[]; action?: string };
     avatar: PortfolioImage;
     posts: PortfolioImage[];
     profileStats: Array<{ label: string; value: string }>;
@@ -144,6 +157,85 @@ export type BrandingProof = {
 
 export type PortfolioProof = WebsiteProof | SeoProof | SocialProof | AdsProof | VideoProof | InfluencerProof | BrandingProof;
 
+type Series = Array<{ label: string; value: number }>;
+
+/**
+ * Extra visuals for a case study page, shown under the main proof in this
+ * order. `wide` spans the full width on large screens; the rest pair up.
+ * Each type is drawn by components/marketing/portfolio/insights.
+ */
+export type PortfolioInsight = { title: string; note?: string; wide?: boolean } & (
+    | {
+          type: "search-results";
+          query: string;
+          position: number;
+          result: { siteName: string; url: string; title: string; description: string };
+          mapPack?: { name: string; rating: number; reviews: number; detail: string };
+          /** Show the result as a paid ad at the top instead of an organic result. */
+          ad?: { sitelinks?: string[]; call?: string };
+      }
+    | {
+          type: "rank-movement";
+          keywords: Array<{ term: string; before: number | null; after: number; volume?: string }>;
+      }
+    | { type: "score-rings"; scores: Array<{ label: string; before: number; after: number }> }
+    | {
+          type: "message-inbox";
+          messages: Array<{ from: string; text: string; time: string; reply: string }>;
+          summary: Array<{ label: string; value: string }>;
+      }
+    | {
+          type: "post-stats";
+          image: PortfolioImage;
+          caption: string;
+          headline: PortfolioKpi;
+          stats: PortfolioKpi[];
+      }
+    | { type: "bars"; bars: Series; prefix?: string; suffix?: string }
+    | {
+          type: "weekly-combo";
+          labels: string[];
+          bars: { label: string; values: number[] };
+          line: { label: string; values: number[]; prefix?: string };
+      }
+    | { type: "funnel"; stages: Array<{ label: string; value: number }> }
+    | {
+          type: "landing-page";
+          url: string;
+          eyebrow: string;
+          heading: string;
+          price: string;
+          points: string[];
+          fields: string[];
+          cta: string;
+      }
+    | {
+          type: "retention";
+          points: Array<{ second: number; percent: number }>;
+          hook: { until: number; label: string };
+      }
+    | {
+          type: "cuts";
+          versions: Array<{ label: string; ratio: "16:9" | "9:16" | "1:1"; image: PortfolioImage; use: string }>;
+      }
+    | { type: "split"; total: string; parts: Series }
+    | {
+          type: "creator-leaderboard";
+          creators: Array<{ handle: string; initials: string; followers: number; code: string; signups: number }>;
+      }
+    | {
+          type: "logo-versions";
+          name: string;
+          monogram: string;
+          tagline: string;
+          colors: { dark: string; mid: string; accent: string; light: string };
+      }
+    | {
+          type: "type-specimen";
+          faces: Array<{ name: string; role: string; family: "display" | "text"; sample: string }>;
+      }
+);
+
 export type PortfolioCaseStudy = {
     slug: string;
     status: "published" | "sample";
@@ -165,11 +257,14 @@ export type PortfolioCaseStudy = {
     /** Adding a story gives the case study its own page. */
     story?: {
         challenge: string;
-        steps: Array<{ title: string; text: string }>;
+        /** `when` is a short date for the step, such as "Mar 2026" or "Week 2". */
+        steps: Array<{ title: string; text: string; when?: string }>;
         result: string;
         source?: string;
     };
     testimonial?: { quote: string; name: string; role: string };
+    /** Extra visuals for the case study page. */
+    insights?: PortfolioInsight[];
 };
 
 /** Which proof each main service uses. */
@@ -287,6 +382,15 @@ export function getPortfolioService(id: PortfolioServiceId) {
 
 export function hasCaseStudyPage(study: PortfolioCaseStudy) {
     return Boolean(study.story);
+}
+
+/**
+ * Width of a title's longest word in ems of a wide display face, so headings
+ * can size themselves to their column and never break a word apart.
+ */
+export function getTitleFitFactor(text: string) {
+    const longest = Math.max(7, ...text.split(/\s+/).map((word) => word.length));
+    return Number((longest * 0.78).toFixed(2));
 }
 
 export function getCaseStudyHref(study: PortfolioCaseStudy, { preview = false } = {}) {

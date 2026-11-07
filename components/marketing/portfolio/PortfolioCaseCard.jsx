@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, ExternalLink } from "lucide-react";
 
-import { getCaseStudyHref, hasCaseStudyPage } from "@/lib/marketing-portfolio";
+import { getCaseStudyHref, getTitleFitFactor, hasCaseStudyPage } from "@/lib/marketing-portfolio";
 
 import KpiNumber from "./KpiNumber";
 import ServiceTags from "./ServiceTags";
@@ -69,7 +69,12 @@ export default function PortfolioCaseCard({
 
         <div className="flex min-w-0 flex-col p-5 sm:p-7 @4xl:p-8">
           <ServiceTags services={study.services} />
-          <Heading className="mt-4 text-3xl font-bold uppercase leading-none sm:text-4xl @4xl:font-suifak @4xl:text-[3.2rem] @4xl:font-normal">
+          {/* In the wide layout the title column is about 30% of the card: size the
+              title to it and its longest word, so names never break mid-word. */}
+          <Heading
+            className="mt-4 text-3xl font-bold uppercase leading-none sm:text-4xl @4xl:font-suifak @4xl:text-[length:var(--card-title)] @4xl:font-normal"
+            style={{ "--card-title": `min(3.2rem, calc((30cqi - 4rem) / ${getTitleFitFactor(study.client)}))` }}
+          >
             {pageHref ? (
               <Link
                 href={pageHref}

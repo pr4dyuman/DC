@@ -998,6 +998,11 @@ body {
     transition: transform 1.1s cubic-bezier(0.2, 0.7, 0.2, 1) 0.15s;
   }
 
+  .reveal-rise {
+    transform-origin: center bottom;
+    transition: transform 1s cubic-bezier(0.2, 0.7, 0.2, 1) 0.15s;
+  }
+
   [data-reveal="hidden"] .reveal-line {
     stroke-dashoffset: 1;
     transition: none;
@@ -1010,6 +1015,11 @@ body {
 
   [data-reveal="hidden"] .reveal-bar {
     transform: scaleX(0);
+    transition: none;
+  }
+
+  [data-reveal="hidden"] .reveal-rise {
+    transform: scaleY(0);
     transition: none;
   }
 }

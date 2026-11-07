@@ -27,7 +27,23 @@ function ContentTile({ item, className = "", sizes }) {
 }
 
 // Influencer: who posted, and what they made.
-export default function ProofInfluencer({ proof, size = "card", sample = false }) {
+// `details: false` shows only the creators' content, when the case study page
+// lists the creators in a fuller leaderboard.
+export default function ProofInfluencer({ proof, size = "card", sample = false, details = true }) {
+  if (size === "large" && !details) {
+    return (
+      <ProofStage sample={sample}>
+        <ul className="mx-auto grid max-w-4xl grid-cols-3 gap-3 p-4 sm:gap-5 sm:p-8">
+          {proof.content.map((item) => (
+            <li key={item.src}>
+              <ContentTile item={item} className="aspect-[9/16]" sizes="(min-width: 1024px) 18rem, 33vw" />
+            </li>
+          ))}
+        </ul>
+      </ProofStage>
+    );
+  }
+
   if (size === "large") {
     return (
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">

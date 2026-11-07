@@ -75,6 +75,22 @@ export function formatComparisonValue(value: number, format: ComparisonFormat) {
     }
 }
 
+/**
+ * Average share of a video watched, from audience retention points (seconds
+ * and percent still watching): the area under the curve over the length.
+ */
+export function averageWatchedPercent(points: Array<{ second: number; percent: number }>) {
+    if (points.length < 2) {
+        return points[0]?.percent ?? 0;
+    }
+    let area = 0;
+    for (let index = 1; index < points.length; index += 1) {
+        const width = points[index].second - points[index - 1].second;
+        area += (width * (points[index].percent + points[index - 1].percent)) / 2;
+    }
+    return Math.round(area / (points[points.length - 1].second - points[0].second));
+}
+
 /** Percentage change from before to after, rounded: 640 → 210 is -67. */
 export function percentChange(before: number, after: number) {
     if (!before) {
