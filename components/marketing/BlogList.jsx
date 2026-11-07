@@ -116,13 +116,13 @@ const BlogList = ({ posts, categories, activeCategory = "ALL" }) => {
   const remainingPosts = featuredPost ? filteredPosts.slice(1) : [];
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--blog-bg)] font-sans text-[var(--blog-text)] transition-colors duration-300">
+    <main className="flex min-h-screen flex-col bg-[var(--blog-bg)] font-sans text-[var(--blog-text)] transition-colors duration-300">
       <BlogIndexAnalyticsTracker />
-      <section className="relative overflow-hidden px-4 pb-12 pt-16 sm:px-6 sm:pt-20 lg:px-8 lg:pt-24 xl:px-12">
+      <section className="relative overflow-hidden px-[var(--site-gutter)] pb-12 pt-16 sm:pt-20 lg:pt-24">
         <div className="pointer-events-none absolute right-0 top-0 h-[500px] w-[500px] rounded-full bg-[var(--blog-accent)] opacity-[0.08] blur-[150px]" />
         <div className="pointer-events-none absolute left-0 top-24 h-[420px] w-[420px] rounded-full bg-[var(--blog-surface-muted)] opacity-60 blur-[160px]" />
 
-        <div className="relative z-10 mx-auto max-w-[1760px]">
+        <div className="relative z-10 mx-auto max-w-[var(--site-content)]">
           <div className="mb-8 flex items-start justify-between gap-6">
             <p className="pt-2 text-[11px] font-bold uppercase tracking-[0.28em] text-[var(--blog-link)]">
               Digital Corvids Journal
@@ -171,8 +171,8 @@ const BlogList = ({ posts, categories, activeCategory = "ALL" }) => {
         </div>
       </section>
 
-      <section className="px-4 pb-24 sm:px-6 lg:px-8 lg:pb-32 xl:px-12">
-        <div className="mx-auto max-w-[1760px]">
+      <section className="px-[var(--site-gutter)] pb-24 lg:pb-32">
+        <div className="mx-auto max-w-[var(--site-content)]">
           {filteredPosts.length === 0 && (
             <div className="rounded-[24px] border border-[var(--blog-border)] bg-[var(--blog-surface)] px-6 py-20 text-center shadow-[var(--blog-shadow)]">
               <p className="mb-4 text-sm font-bold uppercase tracking-[0.22em] text-[var(--blog-link)]">No Results</p>
@@ -222,7 +222,7 @@ const BlogList = ({ posts, categories, activeCategory = "ALL" }) => {
           )}
         </div>
       </section>
-    </div>
+    </main>
   );
 };
 

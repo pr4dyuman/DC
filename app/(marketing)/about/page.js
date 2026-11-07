@@ -4,21 +4,21 @@ import CountUp from '@/components/marketing/CountUp';
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-black text-white overflow-hidden">
+    <main className="min-h-screen bg-black text-white overflow-hidden">
 
       {/* Header */}
-      <header className="text-center pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12 lg:pb-16 px-4 sm:px-6 lg:px-8">
+      <header className="text-center pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12 lg:pb-16 px-[var(--site-gutter)]">
         <h1 className="text-4xl md:text-5xl font-bold tracking-wider mb-4">
           ABOUT US
         </h1>
       </header>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-8 sm:py-12">
+      <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] py-8 sm:py-12">
         {/* Two Column Layout */}
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 xl:gap-16 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 xl:gap-16 items-start">
           {/* Left Content */}
-          <div className="space-y-6 flex flex-col justify-center px-2 sm:px-4 lg:px-0">
+          <div className="space-y-6 flex flex-col justify-center">
             {/* Section Label */}
             <div className="flex items-center gap-3">
               <div
@@ -32,10 +32,10 @@ export default function AboutPage() {
 
             {/* Main Heading */}
             <div className="space-y-1">
-              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight mb-2">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight text-balance mb-2">
                 DIGITAL MARKETING BUILT FOR
               </h2>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight text-gray-500">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight text-balance text-gray-500">
                 MEASURABLE GROWTH
               </h2>
             </div>
@@ -64,7 +64,7 @@ export default function AboutPage() {
           </div>
 
           {/* Right Content */}
-          <div className="flex flex-col items-center justify-start px-2 sm:px-4 lg:px-0 space-y-6">
+          <div className="flex flex-col items-center justify-start space-y-6">
             {/* Image (slightly smaller with controlled height) */}
             <div className="w-full max-w-md xl:max-w-lg relative h-[360px] sm:h-[420px] lg:h-[460px]">
               <Image
@@ -138,9 +138,9 @@ export default function AboutPage() {
 
         {/* Why Us Section */}
         <div className="mt-16 sm:mt-20 lg:mt-24">
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 xl:gap-16 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 xl:gap-16 items-center">
             {/* Left Content - Image */}
-            <div className="flex flex-col items-center justify-center px-2 sm:px-4 lg:px-0 order-2 lg:order-1">
+            <div className="flex flex-col items-center justify-center order-2 lg:order-1">
               <div className="w-full max-w-md xl:max-w-lg relative h-[360px] sm:h-[420px] lg:h-[460px]">
                 <Image
                   src="/about2.png"
@@ -153,7 +153,7 @@ export default function AboutPage() {
             </div>
 
             {/* Right Content - Text */}
-            <div className="space-y-6 flex flex-col justify-center px-2 sm:px-4 lg:px-0 order-1 lg:order-2">
+            <div className="space-y-6 flex flex-col justify-center order-1 lg:order-2">
               {/* Section Label */}
               <div className="flex items-center gap-3">
                 <div
@@ -167,10 +167,10 @@ export default function AboutPage() {
 
               {/* Main Heading */}
               <div className="space-y-1">
-                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight mb-2">
+                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight text-balance mb-2">
                   WING TO WING
                 </h2>
-                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight text-gray-500">
+                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight text-balance text-gray-500">
                   COMMITMENT
                 </h2>
               </div>
@@ -201,7 +201,7 @@ export default function AboutPage() {
 
       {/* Bottom spacing for mobile */}
       <div className="pb-8 sm:pb-12"></div>
-      <div className="bg-black text-white py-16 px-6 lg:px-20 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-20 items-center">
+      <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] grid grid-cols-1 items-center gap-10 bg-black py-16 text-white lg:grid-cols-2 lg:gap-20">
         {/* Left Side - Content */}
         <div>
           {/* Label */}
@@ -213,7 +213,7 @@ export default function AboutPage() {
           </div>
 
           {/* Headline */}
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold leading-tight">
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold leading-tight text-balance">
             THE INTELLIGENCE BEHIND EVERY{" "}
             <span className="text-gray-500">STRATEGY</span>
           </h2>
@@ -258,7 +258,7 @@ export default function AboutPage() {
         </div>
 
         {/* Right Side - Image */}
-        <div className="flex justify-center lg:justify-end relative w-[280px] h-[280px] md:w-[380px] md:h-[380px] lg:w-[460px] lg:h-[460px] mx-auto lg:mx-0">
+        <div className="flex justify-center lg:justify-end relative w-[280px] h-[280px] md:w-[380px] md:h-[380px] lg:w-[460px] lg:h-[460px] mx-auto">
           <Image
             src="/about3.png"
             alt="Objective Illustration"
@@ -269,7 +269,6 @@ export default function AboutPage() {
         </div>
       </div>
       <TeamSlider />
-
-    </div>
+    </main>
   );
 }

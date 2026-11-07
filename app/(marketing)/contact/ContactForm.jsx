@@ -247,7 +247,7 @@ export default function ContactForm() {
                 className={`absolute right-0 bottom-0 w-24 h-24 md:w-32 md:h-32 rounded-full bg-white text-black flex items-center justify-center 
                   hover:bg-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] transition-colors duration-300 shadow-lg z-20
                   ${isSubmitting ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}
-                  [--tx:0%] md:[--tx:25%] lg:[--tx:40%] [--ty:50%]`}
+                  [--tx:0%] md:[--tx:12%] lg:[--tx:20%] [--ty:50%]`}
                 style={{
                   transform: `translate(calc(var(--tx) + ${buttonTransform.x}px), calc(var(--ty) + ${buttonTransform.y}px))`,
                 }}

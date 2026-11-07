@@ -10,14 +10,14 @@ const ContactPage = () => {
   const structuredData = getMarketingContactPageJsonLd();
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <main className="min-h-screen bg-black text-white">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
       />
       {/* Hero Section */}
-      <div className="relative px-6 md:px-12 lg:px-16 pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12">
-        <div className="max-w-7xl mx-auto">
+      <div className="relative px-[var(--site-gutter)] pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12">
+        <div className="mx-auto max-w-[var(--site-content)]">
           {/* Title */}
           <div className="text-center mb-8">
             <h1 className="text-4xl md:text-5xl font-bold uppercase leading-tight mb-2">
@@ -33,7 +33,7 @@ const ContactPage = () => {
           </div>
 
           {/* Main Content Grid */}
-          <div className="grid lg:grid-cols-2  lg:gap-16 items-start lg:items-end ">
+          <div className="grid grid-cols-1 lg:grid-cols-2 lg:gap-16 items-start lg:items-end">
             {/* Left Side - Text Content */}
             <div className="space-y-6 lg:h-full lg:flex lg:flex-col lg:justify-end">
               <h2 className="text-[28px] md:text-[36px] lg:text-[42px] font-bold leading-tight uppercase">
@@ -76,7 +76,7 @@ const ContactPage = () => {
           {/* Contact Form */}
           <ContactForm />
 
-          <div className="grid lg:grid-cols-2 lg:gap-16 items-center mt-20">
+          <div className="grid grid-cols-1 lg:grid-cols-2 lg:gap-16 items-center mt-20">
             {/* Left Side - Illustration */}
             <div className="flex justify-center lg:justify-start">
               <div className="relative w-full max-w-[500px] lg:max-w-[450px]">
@@ -153,7 +153,7 @@ const ContactPage = () => {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 };
 

@@ -257,14 +257,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Marketing page width: content up to 100rem (1600px) with gutters that grow
+/* Marketing page width: content up to 110rem (1760px) with gutters that grow
    with the screen. The header, footer and the full-width pages use these, so
    their edges line up and the header stays in the same place on every page.
    Containers: a section gets px-[var(--site-gutter)] and its inner wrapper
    mx-auto max-w-[var(--site-content)]; a single element that carries both the
    padding and the width uses max-w-[var(--site-frame)]. */
 body {
-  --site-content: 100rem;
+  --site-content: 110rem;
   --site-gutter: 1.5rem;
   --site-frame: calc(var(--site-content) + 2 * var(--site-gutter));
 }
