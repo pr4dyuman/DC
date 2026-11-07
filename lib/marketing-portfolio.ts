@@ -193,7 +193,7 @@ const PUBLISHED_CASE_STUDIES: PortfolioCaseStudy[] = [
         services: ["app"],
         featured: true,
         summary:
-            "A production planning workspace for script breakdowns, scheduling, reports, shot lists, call sheets, and film-prep handoffs.",
+            "A production planning workspace for script breakdowns, scheduling, reports, shot lists, call sheets and film-prep handoffs.",
         scope: ["SaaS Product", "AI Workflow", "Script Editor", "Production Planning"],
         proof: {
             type: "website",
@@ -217,7 +217,7 @@ const PUBLISHED_CASE_STUDIES: PortfolioCaseStudy[] = [
         industry: "Furniture e-commerce",
         services: ["web"],
         summary:
-            "An online furniture storefront designed around visual discovery, clear collections, detailed product pages, and direct purchase journeys.",
+            "An online furniture store built around browsing by collection, detailed product pages and a direct path to purchase.",
         scope: ["E-commerce", "Web Design", "Development", "Product Catalogue"],
         proof: {
             type: "website",
@@ -241,8 +241,8 @@ const PUBLISHED_CASE_STUDIES: PortfolioCaseStudy[] = [
         industry: "Interior design studio",
         services: ["web"],
         summary:
-            "A live preview for an interior design studio website with portfolio storytelling, service detail, consultation paths, and polished project browsing.",
-        scope: ["Interior Design", "Web Design", "Development", "Live Preview"],
+            "A website for an interior design studio, with portfolio stories, service pages, consultation requests and easy project browsing.",
+        scope: ["Web Design", "Development", "Portfolio Pages", "Consultation Requests"],
         proof: {
             type: "website",
             projectType: "Interior Design Website",
