@@ -20,13 +20,14 @@ import {
 export const metadata = buildMarketingMetadata({
   title: "Website Templates | Digital Corvids",
   description:
-    "HTML and Tailwind CSS website templates for restaurants, estate agencies, dental clinics and law firms. Tour every page, then buy one or have it customised.",
+    "HTML and Tailwind CSS website templates for academies, restaurants, estate agencies, clinics and law firms. Try the live demos, then buy one or have it customised.",
   path: "/templates",
   image: "/templates/og.jpg",
   keywords: [
     "website templates",
     "HTML website templates",
     "Tailwind CSS templates",
+    "education website template",
     "restaurant website template",
     "real estate website template",
     "dental clinic website template",
@@ -113,6 +114,9 @@ export default function TemplatesPage() {
   const lowestPrice = getLowestMarketingTemplatePrice();
   const samePrice = templates.every((template) => template.priceUsd === lowestPrice);
   const buyingCopy = getBuyingCopy(templates);
+  // With an odd number of templates, the first (newest) spans the grid so the
+  // two-column rows below it stay even.
+  const hasFeatured = templates.length % 2 === 1;
   const faqs = getFaqs(buyingCopy);
 
   const stats = [
@@ -124,7 +128,7 @@ export default function TemplatesPage() {
   const steps = [
     {
       title: "Explore",
-      text: "Tour every page on desktop and mobile before you decide, or open the live demo where one is available.",
+      text: "Try the live demo and tour every page on desktop and mobile before you decide.",
     },
     { title: "Buy", text: buyingCopy.step },
     {
@@ -190,8 +194,8 @@ export default function TemplatesPage() {
 
             <div className="max-w-xl border-t border-white/15 pt-6 lg:justify-self-end">
               <p className="text-base leading-7 text-gray-300 sm:text-lg">
-                Launch-ready websites for restaurants, estate agencies, clinics and law firms, from the Digital
-                Corvids team. Tour every page, then buy a template or let us set it up for you.
+                Launch-ready websites for academies, restaurants, estate agencies, clinics and law firms, from the
+                Digital Corvids team. Try each live demo, then buy a template or let us set it up for you.
               </p>
               <dl className="mt-7 grid grid-cols-3 border-y border-white/10">
                 {stats.map((stat) => (
@@ -248,14 +252,20 @@ export default function TemplatesPage() {
               <h2 className="mt-4 text-4xl font-bold uppercase leading-none sm:text-5xl">Pick A Starting Point</h2>
             </div>
             <p className="max-w-md text-sm leading-6 text-gray-400">
-              <span className="hidden lg:inline">Hover a preview to scroll its home page. </span>
-              Open a template to tour every page on desktop and mobile.
+              Press “Try live demo” to click around the real site right in its box.
+              <span className="hidden lg:inline"> Hover a preview to scroll its home page.</span> Open a template
+              to tour every page on desktop and mobile.
             </p>
           </div>
 
-          <div className="mt-8 grid gap-5 lg:grid-cols-2">
+          <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-2">
             {templates.map((template, index) => (
-              <TemplateCard key={template.slug} template={template} priority={index < 2} />
+              <TemplateCard
+                key={template.slug}
+                template={template}
+                featured={hasFeatured && index === 0}
+                priority={hasFeatured ? index === 0 : index < 2}
+              />
             ))}
           </div>
 

@@ -1,5 +1,6 @@
 // Browser chrome around a website preview, used by the portfolio and the templates store.
-export default function BrowserFrame({ label, status, children, className = "" }) {
+// `actions` (buttons or links) replace the status chip at the right of the bar.
+export default function BrowserFrame({ label, status, actions, children, className = "" }) {
   return (
     <div
       className={`overflow-hidden rounded-md border border-white/10 bg-[#050505] transition-colors group-hover:border-[#F5EE30]/45 ${className}`}
@@ -14,7 +15,9 @@ export default function BrowserFrame({ label, status, children, className = "" }
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#F5EE30]" aria-hidden="true" />
           <span className="truncate text-[11px] font-bold tracking-[0.08em] text-white/60">{label}</span>
         </div>
-        {status ? (
+        {actions ? (
+          <div className="relative z-10 flex shrink-0 items-center gap-1">{actions}</div>
+        ) : status ? (
           <span className="hidden shrink-0 rounded-full border border-[#F5EE30]/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#F5EE30] sm:inline-flex">
             {status}
           </span>

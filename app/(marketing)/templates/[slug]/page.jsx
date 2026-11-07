@@ -3,15 +3,15 @@ import { notFound } from "next/navigation";
 import { ArrowRight, Check } from "lucide-react";
 
 import TemplateActionLink from "@/components/marketing/templates/TemplateActionLink";
-import BrowserFrame from "@/components/marketing/BrowserFrame";
 import TemplateCard from "@/components/marketing/templates/TemplateCard";
 import TemplateCustomiseBand from "@/components/marketing/templates/TemplateCustomiseBand";
+import TemplateLivePreview from "@/components/marketing/templates/TemplateLivePreview";
 import TemplatePageTour from "@/components/marketing/templates/TemplatePageTour";
-import TemplateScrollPreview from "@/components/marketing/templates/TemplateScrollPreview";
 import {
   MARKETING_TEMPLATE_INCLUDES,
   getMarketingTemplate,
   getMarketingTemplates,
+  getNextMarketingTemplates,
 } from "@/lib/marketing-templates";
 import {
   MARKETING_SITE_NAME,
@@ -90,7 +90,8 @@ export default async function TemplatePage({ params }) {
     notFound();
   }
 
-  const otherTemplates = getMarketingTemplates().filter((item) => item.slug !== template.slug);
+  const otherTemplates = getNextMarketingTemplates(template.slug, 3);
+  const demoHref = template.demoUrl ? `${template.path}/demo` : null;
   const structuredData = [
     getMarketingBreadcrumbJsonLd([
       { name: "Home", path: "/" },
@@ -162,14 +163,8 @@ export default async function TemplatePage({ params }) {
                 >
                   {template.purchase.label}
                 </TemplateActionLink>
-                {template.demoUrl ? (
-                  <TemplateActionLink
-                    href={template.demoUrl}
-                    external
-                    action="demo"
-                    templateSlug={template.slug}
-                    variant="secondary"
-                  >
+                {demoHref ? (
+                  <TemplateActionLink href={demoHref} action="demo" templateSlug={template.slug} variant="secondary">
                     Live Demo
                   </TemplateActionLink>
                 ) : (
@@ -198,18 +193,18 @@ export default async function TemplatePage({ params }) {
             </div>
 
             <div className="group min-w-0">
-              <BrowserFrame
+              <TemplateLivePreview
+                name={template.name}
+                slug={template.slug}
+                demoUrl={template.demoUrl}
                 label={`${template.name} · home page`}
-                status={template.demoUrl ? "Live demo" : "Preview"}
-              >
-                <TemplateScrollPreview
-                  image={template.card}
-                  alt={`${template.name} template home page`}
-                  sizes="(min-width: 1024px) 40rem, 100vw"
-                  priority
-                  className="aspect-[16/11]"
-                />
-              </BrowserFrame>
+                status={`${template.pageCount} pages`}
+                image={template.card}
+                alt={`${template.name} template home page`}
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                priority
+                aspectClass="aspect-[16/11]"
+              />
             </div>
           </div>
 
@@ -235,7 +230,7 @@ export default async function TemplatePage({ params }) {
             </div>
             <p className="max-w-md text-sm leading-6 text-gray-400">
               Full-page captures of the demo, on desktop and on a phone.
-              {template.demoUrl ? " Or open the live demo and click through it yourself." : ""}
+              {demoHref ? " Or open the live demo and click through it yourself." : ""}
             </p>
           </div>
 
@@ -244,7 +239,7 @@ export default async function TemplatePage({ params }) {
               templateName={template.name}
               templateSlug={template.slug}
               pages={template.tour}
-              demoUrl={template.demoUrl}
+              demoHref={demoHref}
             />
           </div>
         </div>
@@ -358,7 +353,7 @@ export default async function TemplatePage({ params }) {
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
             </div>
-            <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 md:[&>*:nth-child(3)]:hidden lg:[&>*:nth-child(3)]:flex">
               {otherTemplates.map((item) => (
                 <TemplateCard
                   key={item.slug}

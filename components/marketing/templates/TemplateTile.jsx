@@ -12,7 +12,7 @@ export default function TemplateTile({ template }) {
             image={template.card}
             alt={`${template.name} ${template.niche.toLowerCase()} template home page`}
             sizes="(min-width: 1024px) 17rem, 50vw"
-            className="aspect-[4/5]"
+            className="relative aspect-[4/5]"
           />
         </div>
       </div>

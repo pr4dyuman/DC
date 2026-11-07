@@ -5,7 +5,9 @@
  * full https:// URL:
  *
  * - demoUrl: the live demo, for example the Cloudflare Pages link
- *   (https://<project>.pages.dev/). Adds "Live demo" buttons.
+ *   (https://<project>.pages.dev/<template>/). Lets visitors try the demo
+ *   inside the template's preview box and on its full-screen demo page
+ *   (/templates/<slug>/demo).
  * - checkoutUrl: a direct payment link (Razorpay, Lemon Squeezy, Gumroad...).
  *   Turns the main button into "Buy now".
  * - marketplaceUrl: the Codester listing. Used for the main button when
@@ -28,13 +30,24 @@ export type MarketingTemplateCatalogEntry = {
     marketplaceUrl: string | null;
 };
 
+// Shown in this order on /templates, newest first. With an odd number of
+// templates, the first one gets the wide card at the top of the grid.
 export const MARKETING_TEMPLATE_CATALOG: MarketingTemplateCatalogEntry[] = [
+    {
+        slug: "meridian-academy",
+        name: "Meridian Academy",
+        niche: "Education academy",
+        priceUsd: 29,
+        demoUrl: "https://dc-template-previews.pages.dev/meridian-academy/",
+        checkoutUrl: null,
+        marketplaceUrl: null,
+    },
     {
         slug: "sugo-restaurant",
         name: "SUGO",
         niche: "Restaurant, café & wine bar",
         priceUsd: 29,
-        demoUrl: null,
+        demoUrl: "https://dc-template-previews.pages.dev/sugo/",
         checkoutUrl: null,
         marketplaceUrl: null,
     },
@@ -43,7 +56,7 @@ export const MARKETING_TEMPLATE_CATALOG: MarketingTemplateCatalogEntry[] = [
         name: "Vesper",
         niche: "Real estate agency",
         priceUsd: 29,
-        demoUrl: null,
+        demoUrl: "https://dc-template-previews.pages.dev/vesper/",
         checkoutUrl: null,
         marketplaceUrl: null,
     },
@@ -52,7 +65,7 @@ export const MARKETING_TEMPLATE_CATALOG: MarketingTemplateCatalogEntry[] = [
         name: "Marlowe Dental",
         niche: "Dental & medical clinic",
         priceUsd: 29,
-        demoUrl: null,
+        demoUrl: "https://dc-template-previews.pages.dev/marlowe-dental/",
         checkoutUrl: null,
         marketplaceUrl: null,
     },
@@ -61,19 +74,14 @@ export const MARKETING_TEMPLATE_CATALOG: MarketingTemplateCatalogEntry[] = [
         name: "Mensah & Hart",
         niche: "Law firm & consultancy",
         priceUsd: 29,
-        demoUrl: null,
+        demoUrl: "https://dc-template-previews.pages.dev/mensah-hart/",
         checkoutUrl: null,
         marketplaceUrl: null,
     },
 ];
 
 /** Templates still being designed, shown as "next up" on /templates. */
-export const MARKETING_TEMPLATES_IN_DESIGN = [
-    {
-        name: "Academy",
-        niche: "Education academy",
-    },
-];
+export const MARKETING_TEMPLATES_IN_DESIGN: Array<{ name: string; niche: string }> = [];
 
 export function getMarketingTemplateCatalogEntry(slug: string | null | undefined) {
     if (!slug) {

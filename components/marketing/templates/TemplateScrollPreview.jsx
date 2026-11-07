@@ -3,15 +3,16 @@ import Image from "next/image";
 // Shows the top of a tall home-page screenshot. Hovering (or focusing a link in)
 // the surrounding `group` scrolls slowly to the bottom, like browsing the page.
 // The scroll is skipped for visitors who prefer reduced motion.
+// `className` sets the box: it must position it (relative or absolute) and size it.
 export default function TemplateScrollPreview({
   image,
   alt,
   sizes,
   priority = false,
-  className = "aspect-[16/10]",
+  className = "relative aspect-[16/10]",
 }) {
   return (
-    <div className={`relative overflow-hidden bg-black ${className}`}>
+    <div className={`overflow-hidden bg-black ${className}`}>
       <Image
         src={image.src}
         alt={alt}
