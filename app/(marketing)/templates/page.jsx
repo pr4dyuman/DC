@@ -20,7 +20,7 @@ import {
 export const metadata = buildMarketingMetadata({
   title: "Website Templates | Digital Corvids",
   description:
-    "HTML and Tailwind CSS website templates for academies, restaurants, estate agencies, clinics and law firms. Try the live demos, then buy one or have it customised.",
+    "HTML and Tailwind CSS website templates for AI startups, academies, restaurants, estate agencies, clinics and law firms. Try the live demos, then buy one or have it customised.",
   path: "/templates",
   image: "/templates/og.jpg",
   keywords: [
@@ -194,7 +194,7 @@ export default function TemplatesPage() {
 
             <div className="max-w-xl border-t border-white/15 pt-6 lg:justify-self-end">
               <p className="text-base leading-7 text-gray-300 sm:text-lg">
-                Launch-ready websites for academies, restaurants, estate agencies, clinics and law firms, from the
+                Launch-ready websites for AI startups, academies, restaurants, estate agencies, clinics and law firms, from the
                 Digital Corvids team. Try each live demo, then buy a template or let us set it up for you.
               </p>
               <dl className="mt-7 grid grid-cols-3 border-y border-white/10">

@@ -49,17 +49,18 @@ never navigate our page away.
 
 ### Publish a demo
 
-The demos live in one Cloudflare Pages project, `dc-template-previews`, with a
+The demos live in one Cloudflare Pages project, `dc-template-demos`, with a
 folder per template, so each one is at
-`https://dc-template-previews.pages.dev/<folder>/`.
+`https://dc-template-demos.pages.dev/<folder>/`. (An older project,
+`dc-template-previews`, holds outdated copies and is no longer linked.)
 
 1. Copy each template's `demo` folder from `codester-themes` into a folder
-   named after the template (`sugo`, `vesper`, `marlowe-dental`,
+   named after the template (`oscilla`, `sugo`, `vesper`, `marlowe-dental`,
    `mensah-hart`, `meridian-academy`...).
 2. **In each copy, delete `package.json`, `tailwind.config.js` and the `src`
    folder.** The demo only loads the compiled `assets/css/style.css`; those
    three files are the template's editable source, which buyers pay for.
-3. In Cloudflare, open Workers & Pages → `dc-template-previews` → Create
+3. In Cloudflare, open Workers & Pages → `dc-template-demos` → Create
    deployment, and upload the folder that holds all the template folders.
 4. Paste each link into `demoUrl`, ending with `/`.
 
@@ -92,6 +93,11 @@ codester-themes to the templates store". To do it by hand:
      for step 3.
    - If it says sharp did not load, run `npm install --no-save sharp` and try
      again.
+   - A template that is not in `codester-themes` yet can be captured from its
+     live demo instead: full-page screenshots at 1440 and 390 pixels wide,
+     named `<page>-1440.png` and `<page>-390.png`. Oscilla's were made this
+     way, with `?still` on each address and reduced motion turned on, so its
+     WebGL plates and counters hold still.
 
 2. **Add the settings.** In `lib/marketing-templates-catalog.ts`, add an entry
    to `MARKETING_TEMPLATE_CATALOG` with the same `slug`, plus `name`, `niche`,
