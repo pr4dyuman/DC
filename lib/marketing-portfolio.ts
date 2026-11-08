@@ -444,6 +444,68 @@ export function getPortfolioServiceCounts(studies: PortfolioCaseStudy[]) {
     })).filter((entry) => entry.count > 0);
 }
 
+/**
+ * What each service's example shows. Until a service has a published case
+ * study, its sample appears on the portfolio and its service page as an
+ * example: marked "Example", with no client name or headline result, and a
+ * note that the numbers are illustrative. Publishing a real case study for
+ * the service replaces it.
+ */
+export const SERVICE_EXAMPLES: Partial<Record<PortfolioServiceId, { title: string; text: string; includes: string[] }>> = {
+    seo: {
+        title: "Monthly SEO report",
+        text: "Organic clicks from Google Search Console each month, the keywords that moved and how the site shows up on Google.",
+        includes: ["Organic clicks and impressions by month", "The site's result on Google", "Keyword positions, before and after", "Page speed scores"],
+    },
+    social: {
+        title: "Social media report",
+        text: "The profile and posts we run, follower growth each month, and the messages that turn into bookings.",
+        includes: ["The profile and posts we create", "Follower growth by month", "The best post or reel", "Messages and enquiries"],
+    },
+    ads: {
+        title: "Ad campaign report",
+        text: "The ads we run, the page they lead to, and leads and cost per lead week by week.",
+        includes: ["The ad on the Google search page", "The landing page it leads to", "Leads and cost per lead each week", "Every step from search to enquiry"],
+    },
+    video: {
+        title: "Video production",
+        text: "The film, the cuts made for each channel, and how long people keep watching.",
+        includes: ["The film and stills from the shoot", "Cuts for each channel", "How long people watched", "Views by channel"],
+    },
+    influencer: {
+        title: "Influencer campaign report",
+        text: "The creators we brief, the content they post, and the sign-ups each creator's code brings in.",
+        includes: ["The creators and their content", "Sign-ups by creator code", "Every step from reach to sign-up", "Cost per sign-up"],
+    },
+};
+
+export const EXAMPLE_MARK = "Example";
+
+export type ServiceExample = {
+    service: PortfolioService;
+    study: PortfolioCaseStudy;
+    copy: { title: string; text: string; includes: string[] };
+};
+
+/**
+ * Examples for services that have a service page but no published case study
+ * yet, in menu order, drawn from each service's sample in `list`. With
+ * `serviceIds`, only those services.
+ */
+export function getServiceExamples(list: PortfolioCaseStudy[], serviceIds?: PortfolioServiceId[]): ServiceExample[] {
+    const published = selectCaseStudies(list);
+    const examples: ServiceExample[] = [];
+    for (const service of PORTFOLIO_SERVICES) {
+        const copy = SERVICE_EXAMPLES[service.id];
+        if (!copy || !service.href) continue;
+        if (serviceIds && !serviceIds.includes(service.id)) continue;
+        if (published.some((study) => study.services.includes(service.id))) continue;
+        const study = list.find((item) => item.status === "sample" && item.services[0] === service.id);
+        if (study) examples.push({ service, study, copy });
+    }
+    return examples;
+}
+
 /** Published built-in case studies for a service page (pages use the store). */
 export function getServiceCaseStudies(serviceIds: PortfolioServiceId[]) {
     return filterServiceCaseStudies(getBuiltInCaseStudies(), serviceIds);

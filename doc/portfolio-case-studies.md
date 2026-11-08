@@ -10,6 +10,15 @@ A service with nothing published shows no section at all.
 Case studies are managed in **Super Admin → Case Studies**
 (`/super-admin/case-studies`) and stored in the marketing database.
 
+**Examples for services without published work.** Until a service (SEO,
+social media, ads, video, influencer) has a published case study, the
+portfolio's "How We Report Each Service" section and that service's page show
+its sample as an example: every visual is marked "Example", there is no client
+name or headline result, and a note says the numbers are illustrative. The
+words for each example are in `SERVICE_EXAMPLES` in `lib/marketing-portfolio.ts`.
+Publishing a real case study for the service replaces its example; deleting
+the service's sample in Super Admin removes it.
+
 | File | What it holds |
 |---|---|
 | `app/super-admin/case-studies/`, `components/super-admin/case-studies/` | The Super Admin list and editor. |
@@ -19,13 +28,15 @@ Case studies are managed in **Super Admin → Case Studies**
 | `lib/marketing-portfolio-editor.ts` | The editor's fields for every proof and visual. |
 | `lib/marketing-portfolio.ts`, `lib/marketing-portfolio-samples.ts` | The data shape, the services, and the built-in case studies and samples. |
 | `public/portfolio/` | Videos, posters and images for the built-in case studies. Sample images are in `public/portfolio/samples/`. |
-| `components/marketing/portfolio/` | The cards, the proof visuals, the spotlight and the pages. |
+| `components/marketing/portfolio/` | The cards, the proof visuals, the spotlight, the service examples and the pages. |
 
 ## Real results only
 
-Only case studies with the status **Published** appear on the public site.
-Drafts and samples appear only on the preview, `/portfolio/preview`, which is
-hidden from search engines and linked from nowhere. Before publishing:
+Only case studies with the status **Published** appear on the public site as
+client work. Drafts and samples appear as case studies only on the preview,
+`/portfolio/preview`, which is hidden from search engines and linked from
+nowhere; publicly, a sample only ever appears as a marked example (above).
+Before publishing:
 
 - Get the client's permission in writing. If they prefer privacy, describe
   them instead ("Dental clinic, Jaipur").

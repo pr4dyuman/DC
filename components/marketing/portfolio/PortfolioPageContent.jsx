@@ -3,14 +3,15 @@ import { ArrowRight, Check, ExternalLink } from "lucide-react";
 
 import TemplateRail from "@/components/marketing/templates/TemplateRail";
 import TemplateTile from "@/components/marketing/templates/TemplateTile";
-import { getPortfolioServiceCounts } from "@/lib/marketing-portfolio";
-import { loadCaseStudies } from "@/lib/marketing-portfolio-store";
+import { getPortfolioServiceCounts, getServiceExamples, selectCaseStudies } from "@/lib/marketing-portfolio";
+import { loadAllCaseStudies } from "@/lib/marketing-portfolio-store";
 import { getMarketingTemplatePageTotal, getMarketingTemplates } from "@/lib/marketing-templates";
 
 import PortfolioCaseCard from "./PortfolioCaseCard";
 import PortfolioFilterLink from "./PortfolioFilterLink";
 import PortfolioWorkGrid from "./PortfolioWorkGrid";
 import PreviewBanner from "./PreviewBanner";
+import ServiceExampleCard from "./ServiceExampleCard";
 
 const focusRing =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]";
@@ -89,17 +90,28 @@ function SectionIntro({ eyebrow, title, children }) {
 // The /portfolio page. With `preview`, sample case studies are mixed in to
 // show every service; that version lives at the noindex /portfolio/preview.
 export default async function PortfolioPageContent({ preview = false }) {
-  const studies = await loadCaseStudies({ includeSamples: preview });
+  const all = await loadAllCaseStudies();
+  const studies = selectCaseStudies(all, { includeSamples: preview });
+  // The preview already shows each sample in the grid.
+  const examples = preview ? [] : getServiceExamples(all);
   const counts = getPortfolioServiceCounts(studies);
   const templates = getMarketingTemplates();
   const marketingServices = counts.filter(({ service }) => !WEBSITE_SERVICE_IDS.includes(service.id));
   const websitesOnly = marketingServices.length === 0;
 
-  const intro = websitesOnly
-    ? "Websites and web apps we have built for clients, each with a walkthrough and a link to the live product. Plus the website templates we design and sell."
-    : `Websites and web apps we have built, and the ${joinLabels(
-        marketingServices.map(({ service }) => service.label),
-      )} work behind our clients' growth. Plus the website templates we design and sell.`;
+  const exampleLabels = examples.map(({ service }) => service.label);
+  const exampleLine = exampleLabels.length ? `Examples of how we report ${joinLabels(exampleLabels)} work.` : null;
+  const intro = [
+    websitesOnly
+      ? "Websites and web apps we have built for clients, each with a walkthrough and a link to the live product."
+      : `Websites and web apps we have built, and the ${joinLabels(
+          marketingServices.map(({ service }) => service.label),
+        )} work behind our clients' growth.`,
+    exampleLine,
+    "Plus the website templates we design and sell.",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const stats = websitesOnly
     ? [
@@ -209,6 +221,31 @@ export default async function PortfolioPageContent({ preview = false }) {
         </div>
       </section>
 
+      {examples.length ? (
+        <section id="every-service" className="scroll-mt-6 border-t border-white/10 px-[var(--site-gutter)] py-14 sm:py-16 lg:py-20">
+          <div className="mx-auto max-w-[var(--site-content)]">
+            <SectionIntro eyebrow="Every Service" title="How We Report Each Service">
+              <p className="text-sm leading-6 text-gray-400">
+                {`Examples of the reports and visuals you get for ${joinLabels(
+                  exampleLabels,
+                )} work. The numbers are illustrative, not a client's results.`}
+              </p>
+            </SectionIntro>
+
+            <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-2">
+              {examples.map((example, index) => (
+                <div
+                  key={example.service.id}
+                  className={examples.length % 2 === 1 && index === examples.length - 1 ? "lg:col-span-2" : undefined}
+                >
+                  <ServiceExampleCard example={example} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {templates.length ? (
         <section id="templates" className="overflow-hidden border-t border-white/10 px-[var(--site-gutter)] py-14 sm:py-16 lg:py-20">
           <div className="mx-auto max-w-[var(--site-content)]">
@@ -271,6 +308,7 @@ export default async function PortfolioPageContent({ preview = false }) {
             {SERVICE_PAGES.map((page) => {
               const count = serviceCount(page.ids);
               const filterIds = page.ids.filter((id) => counts.some(({ service }) => service.id === id));
+              const example = examples.find(({ service }) => page.ids.includes(service.id));
 
               return (
                 <li
@@ -296,6 +334,14 @@ export default async function PortfolioPageContent({ preview = false }) {
                         See {count} {count === 1 ? "project" : "projects"}
                         <span className="sr-only"> for {page.label}</span>
                       </PortfolioFilterLink>
+                    ) : example ? (
+                      <a
+                        href={`#example-${example.service.id}`}
+                        className="inline-flex items-center gap-2 rounded-full border border-black/40 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-black transition-colors hover:bg-black hover:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black"
+                      >
+                        See an example
+                        <span className="sr-only"> for {page.label}</span>
+                      </a>
                     ) : null}
                   </div>
                 </li>

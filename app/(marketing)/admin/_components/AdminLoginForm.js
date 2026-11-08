@@ -43,6 +43,13 @@ export function AdminLoginForm({
             LOGIN
           </button>
         </form>
+        <p className="mt-6 text-center text-sm text-gray-400 font-glacial">
+          Super admin?{' '}
+          <a href="/login" className="text-white underline underline-offset-4 hover:text-gray-200">
+            Sign in to the app
+          </a>
+          , then open this page again.
+        </p>
       </div>
     </div>
   );
