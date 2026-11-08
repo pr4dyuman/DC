@@ -1,4 +1,4 @@
-import Image from "next/image";
+import Image from "../PortfolioImage";
 
 import { formatGroupedNumber } from "@/lib/marketing-portfolio-charts";
 

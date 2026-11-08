@@ -1,26 +1,26 @@
 import { notFound } from "next/navigation";
 
 import CaseStudyPageContent from "@/components/marketing/portfolio/CaseStudyPageContent";
-import { getPortfolioCaseStudies, getPortfolioCaseStudy, hasCaseStudyPage } from "@/lib/marketing-portfolio";
+import { hasCaseStudyPage } from "@/lib/marketing-portfolio";
+import { loadCaseStudies, loadCaseStudy } from "@/lib/marketing-portfolio-store";
 import { buildMarketingMetadata } from "@/lib/marketing-seo";
 
-export const dynamicParams = false;
-
-// Every case study page, samples included, for the noindex preview.
-export function generateStaticParams() {
-  return getPortfolioCaseStudies({ includeSamples: true })
+// Every case study page, samples and drafts included, for the noindex preview.
+// Case studies added in Super Admin after a deploy render on first visit.
+export async function generateStaticParams() {
+  return (await loadCaseStudies({ includeSamples: true }))
     .filter(hasCaseStudyPage)
     .map((study) => ({ slug: study.slug }));
 }
 
-function getPreviewStudy(slug) {
-  const study = getPortfolioCaseStudy(slug, { includeSamples: true });
+async function getPreviewStudy(slug) {
+  const study = await loadCaseStudy(slug, { includeSamples: true });
   return study && hasCaseStudyPage(study) ? study : null;
 }
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const study = getPreviewStudy(slug);
+  const study = await getPreviewStudy(slug);
   if (!study) {
     return {};
   }
@@ -35,7 +35,7 @@ export async function generateMetadata({ params }) {
 
 export default async function CaseStudyPreviewPage({ params }) {
   const { slug } = await params;
-  const study = getPreviewStudy(slug);
+  const study = await getPreviewStudy(slug);
   if (!study) {
     notFound();
   }

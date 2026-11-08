@@ -1,4 +1,4 @@
-import Image from "next/image";
+import Image from "../PortfolioImage";
 import { Bookmark, Heart, MessageCircle, Play, Send } from "lucide-react";
 
 import InsightPanel from "./InsightPanel";
