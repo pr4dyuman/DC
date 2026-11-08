@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { ArrowRight, ExternalLink, Quote } from "lucide-react";
 
-import { getNextCaseStudy, getPortfolioService, getTitleFitFactor } from "@/lib/marketing-portfolio";
+import { findNextCaseStudy, getPortfolioService, getStudyMark, getTitleFitFactor } from "@/lib/marketing-portfolio";
+import { loadCaseStudies } from "@/lib/marketing-portfolio-store";
 
+import CaseStudySpotlight from "./CaseStudySpotlight";
 import KpiNumber from "./KpiNumber";
 import PortfolioCaseCard from "./PortfolioCaseCard";
 import PreviewBanner from "./PreviewBanner";
@@ -43,14 +45,17 @@ function Eyebrow({ children, className = "" }) {
 }
 
 // A case study page: the result first, then the proof, then how it happened.
-export default function CaseStudyPageContent({ study, preview = false }) {
-  const sample = study.status === "sample";
-  const next = getNextCaseStudy(study, { includeSamples: preview });
+export default async function CaseStudyPageContent({ study, preview = false }) {
+  const sample = getStudyMark(study);
+  const next = findNextCaseStudy(study, await loadCaseStudies({ includeSamples: preview }));
   const portfolioHref = preview ? "/portfolio/preview" : "/portfolio";
   const meta = [study.industry, study.location, study.period].filter(Boolean);
   const kpis = study.kpis || [];
   const story = study.story;
   const insights = study.insights || [];
+  // On the preview, show how a results case study will look on its service page.
+  const servicePage = getPortfolioService(study.services[0]);
+  const showServicePreview = preview && study.proof.type !== "website" && Boolean(servicePage?.href);
 
   const glance = [
     ["Client", study.client],
@@ -83,10 +88,14 @@ export default function CaseStudyPageContent({ study, preview = false }) {
 
   return (
     <main className="bg-black text-white">
-      {sample ? (
+      {sample === "Sample" ? (
         <PreviewBanner>
           A sample case study with an invented client and numbers, to show the layout. It is never shown on the
           public portfolio.
+        </PreviewBanner>
+      ) : sample === "Draft" ? (
+        <PreviewBanner>
+          A draft from Super Admin → Case Studies. Only this preview shows it until it is published.
         </PreviewBanner>
       ) : null}
 
@@ -252,6 +261,33 @@ export default function CaseStudyPageContent({ study, preview = false }) {
               {study.testimonial.name} · {study.testimonial.role}
             </figcaption>
           </figure>
+        </section>
+      ) : null}
+
+      {showServicePreview ? (
+        <section className="border-t border-dashed border-[#F5EE30]/40 bg-[#F5EE30]/[0.03] px-[var(--site-gutter)] py-16 sm:py-20">
+          <div className="mx-auto max-w-[var(--site-content)]">
+            <div className="flex flex-col gap-4 border-b border-white/10 pb-8 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <Eyebrow>Preview Only</Eyebrow>
+                <p className="mt-4 text-4xl font-bold uppercase leading-none sm:text-5xl">On The Service Page</p>
+              </div>
+              <p className="max-w-md text-sm leading-6 text-gray-400">
+                {study.status === "published" ? "This is how it shows on " : "Once published, it shows like this on "}
+                <Link
+                  href={servicePage.href}
+                  prefetch={false}
+                  className={`font-bold text-white underline decoration-[#F5EE30] underline-offset-4 hover:text-[#F5EE30] ${focusRing}`}
+                >
+                  {servicePage.href}
+                </Link>
+                . Samples never show there.
+              </p>
+            </div>
+            <div className="mt-8">
+              <CaseStudySpotlight study={study} preview headingLevel="p" />
+            </div>
+          </div>
         </section>
       ) : null}
 

@@ -1,29 +1,31 @@
 import { notFound } from "next/navigation";
 
 import CaseStudyPageContent from "@/components/marketing/portfolio/CaseStudyPageContent";
-import { getPortfolioCaseStudies, getPortfolioCaseStudy, hasCaseStudyPage } from "@/lib/marketing-portfolio";
+import { hasCaseStudyPage } from "@/lib/marketing-portfolio";
+import { loadCaseStudies, loadCaseStudy } from "@/lib/marketing-portfolio-store";
 import {
   buildMarketingMetadata,
   getMarketingBreadcrumbJsonLd,
   serializeMarketingJsonLd,
 } from "@/lib/marketing-seo";
 
-// Published case studies with a story. Samples have no page here: they live
-// only under /portfolio/preview.
-export function generateStaticParams() {
-  return getPortfolioCaseStudies()
+// Published case studies with a story. Samples and drafts have no page here:
+// they live only under /portfolio/preview. Case studies published after a
+// deploy render on first visit.
+export async function generateStaticParams() {
+  return (await loadCaseStudies())
     .filter(hasCaseStudyPage)
     .map((study) => ({ slug: study.slug }));
 }
 
-function getPublishedStudy(slug) {
-  const study = getPortfolioCaseStudy(slug);
+async function getPublishedStudy(slug) {
+  const study = await loadCaseStudy(slug);
   return study && hasCaseStudyPage(study) ? study : null;
 }
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const study = getPublishedStudy(slug);
+  const study = await getPublishedStudy(slug);
   if (!study) {
     return {};
   }
@@ -38,7 +40,7 @@ export async function generateMetadata({ params }) {
 
 export default async function CaseStudyPage({ params }) {
   const { slug } = await params;
-  const study = getPublishedStudy(slug);
+  const study = await getPublishedStudy(slug);
   if (!study) {
     notFound();
   }

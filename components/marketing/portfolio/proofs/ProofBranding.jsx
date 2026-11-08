@@ -1,4 +1,4 @@
-import Image from "next/image";
+import Image from "../PortfolioImage";
 
 import BrandingCompare from "./BrandingCompare";
 import ProofStage from "./ProofStage";

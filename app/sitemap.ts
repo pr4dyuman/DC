@@ -7,7 +7,8 @@ import {
     normalizeMarketingCanonicalUrl,
     toAbsoluteMarketingImageUrl,
 } from "@/lib/marketing-blog-utils";
-import { getPortfolioCaseStudies, hasCaseStudyPage } from "@/lib/marketing-portfolio";
+import { hasCaseStudyPage } from "@/lib/marketing-portfolio";
+import { loadCaseStudies } from "@/lib/marketing-portfolio-store";
 import { getMarketingTemplates } from "@/lib/marketing-templates";
 import Blog from "@/models/marketing/Blog";
 
@@ -98,7 +99,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         staticEntry("/", "weekly", 1),
         staticEntry("/about", "monthly", 0.8),
         staticEntry("/portfolio", "monthly", 0.8),
-        ...getPortfolioCaseStudies()
+        ...(await loadCaseStudies())
             .filter(hasCaseStudyPage)
             .map((study) => staticEntry(`/portfolio/${study.slug}`, "monthly", 0.7)),
         staticEntry("/templates", "monthly", 0.8),

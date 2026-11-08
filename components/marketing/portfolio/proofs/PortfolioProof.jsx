@@ -1,3 +1,5 @@
+import { getStudyMark } from "@/lib/marketing-portfolio";
+
 import ProofAds from "./ProofAds";
 import ProofBranding from "./ProofBranding";
 import ProofInfluencer from "./ProofInfluencer";
@@ -14,7 +16,7 @@ import ProofWebsite from "./ProofWebsite";
 // fuller versions of them as insights.
 export default function PortfolioProof({ study, size = "card", media = "video", priority = false, details = true }) {
   const { proof } = study;
-  const sample = study.status === "sample";
+  const sample = getStudyMark(study);
 
   switch (proof.type) {
     case "website":

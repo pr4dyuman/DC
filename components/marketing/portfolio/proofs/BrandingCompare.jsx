@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image from "../PortfolioImage";
 import { MoveHorizontal } from "lucide-react";
 import { useState } from "react";
 
@@ -30,7 +30,12 @@ export default function BrandingCompare({ before, after, sample = false }) {
       <span className="pointer-events-none absolute right-3 top-3 rounded bg-black/70 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white">
         After
       </span>
-      {sample ? <SampleChip className="pointer-events-none absolute bottom-3 right-3" /> : null}
+      {sample ? (
+        <SampleChip
+          label={typeof sample === "string" ? sample : "Sample"}
+          className="pointer-events-none absolute bottom-3 right-3"
+        />
+      ) : null}
 
       <input
         type="range"

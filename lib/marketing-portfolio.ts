@@ -6,9 +6,13 @@ import {
 /**
  * Portfolio case studies for /portfolio, /portfolio/<slug> and the service pages.
  *
- * Only `status: "published"` entries appear on the public site. Sample case
- * studies (lib/marketing-portfolio-samples.ts) show the layout for each service
- * and appear only on the noindex preview at /portfolio/preview. Publish real
+ * Case studies are edited in Super Admin → Case Studies and read through
+ * lib/marketing-portfolio-store.ts. The ones in this file and the samples
+ * (lib/marketing-portfolio-samples.ts) are built in: the site shows them until
+ * case studies are set up in Super Admin, and new drafts start from them.
+ *
+ * Only `status: "published"` entries appear on the public site. Samples and
+ * drafts appear only on the noindex preview at /portfolio/preview. Publish real
  * results only, with the client's permission. See doc/portfolio-case-studies.md.
  */
 
@@ -238,7 +242,8 @@ export type PortfolioInsight = { title: string; note?: string; wide?: boolean } 
 
 export type PortfolioCaseStudy = {
     slug: string;
-    status: "published" | "sample";
+    /** published: on the public site. sample and draft: only on the noindex preview. */
+    status: "published" | "sample" | "draft";
     client: string;
     industry: string;
     location?: string;
@@ -366,10 +371,44 @@ function orderForPreview(studies: PortfolioCaseStudy[]) {
     );
 }
 
+/**
+ * The case studies built into the code. The site reads case studies from the
+ * database (Super Admin → Case Studies) and falls back to these until they are
+ * imported there; see lib/marketing-portfolio-store.ts.
+ */
+export function getBuiltInCaseStudies() {
+    return orderForPreview(ALL_CASE_STUDIES);
+}
+
+/** The chip an unpublished case study carries on the preview: "Sample", "Draft", or false when published. */
+export function getStudyMark(study: Pick<PortfolioCaseStudy, "status">): "Sample" | "Draft" | false {
+    if (study.status === "published") return false;
+    return study.status === "draft" ? "Draft" : "Sample";
+}
+
+/** What a page may show: everything on the noindex preview, published case studies elsewhere. */
+export function selectCaseStudies(list: PortfolioCaseStudy[], { includeSamples = false } = {}) {
+    return includeSamples ? list : list.filter((study) => study.status === "published");
+}
+
+/** Published case studies for a service page. */
+export function filterServiceCaseStudies(list: PortfolioCaseStudy[], serviceIds: PortfolioServiceId[]) {
+    return selectCaseStudies(list).filter((study) => study.services.some((id) => serviceIds.includes(id)));
+}
+
+/** The next case study in `list` that has its own page, wrapping round. */
+export function findNextCaseStudy(study: PortfolioCaseStudy, list: PortfolioCaseStudy[]) {
+    const withPages = list.filter(hasCaseStudyPage);
+    if (withPages.length < 2) {
+        return null;
+    }
+
+    const index = withPages.findIndex((item) => item.slug === study.slug);
+    return withPages[(index + 1) % withPages.length];
+}
+
 export function getPortfolioCaseStudies({ includeSamples = false } = {}) {
-    return includeSamples
-        ? orderForPreview(ALL_CASE_STUDIES)
-        : ALL_CASE_STUDIES.filter((study) => study.status === "published");
+    return selectCaseStudies(getBuiltInCaseStudies(), { includeSamples });
 }
 
 export function getPortfolioCaseStudy(slug: string | null | undefined, { includeSamples = false } = {}) {
@@ -405,18 +444,12 @@ export function getPortfolioServiceCounts(studies: PortfolioCaseStudy[]) {
     })).filter((entry) => entry.count > 0);
 }
 
-/** Published case studies for a service page. */
+/** Published built-in case studies for a service page (pages use the store). */
 export function getServiceCaseStudies(serviceIds: PortfolioServiceId[]) {
-    return getPortfolioCaseStudies().filter((study) => study.services.some((id) => serviceIds.includes(id)));
+    return filterServiceCaseStudies(getBuiltInCaseStudies(), serviceIds);
 }
 
-/** The next case study that has its own page, wrapping round. */
+/** The next built-in case study that has its own page, wrapping round. */
 export function getNextCaseStudy(study: PortfolioCaseStudy, { includeSamples = false } = {}) {
-    const withPages = getPortfolioCaseStudies({ includeSamples }).filter(hasCaseStudyPage);
-    if (withPages.length < 2) {
-        return null;
-    }
-
-    const index = withPages.findIndex((item) => item.slug === study.slug);
-    return withPages[(index + 1) % withPages.length];
+    return findNextCaseStudy(study, getPortfolioCaseStudies({ includeSamples }));
 }

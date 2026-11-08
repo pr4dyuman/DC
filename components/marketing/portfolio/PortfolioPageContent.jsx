@@ -3,7 +3,8 @@ import { ArrowRight, Check, ExternalLink } from "lucide-react";
 
 import TemplateRail from "@/components/marketing/templates/TemplateRail";
 import TemplateTile from "@/components/marketing/templates/TemplateTile";
-import { getPortfolioCaseStudies, getPortfolioServiceCounts } from "@/lib/marketing-portfolio";
+import { getPortfolioServiceCounts } from "@/lib/marketing-portfolio";
+import { loadCaseStudies } from "@/lib/marketing-portfolio-store";
 import { getMarketingTemplatePageTotal, getMarketingTemplates } from "@/lib/marketing-templates";
 
 import PortfolioCaseCard from "./PortfolioCaseCard";
@@ -87,8 +88,8 @@ function SectionIntro({ eyebrow, title, children }) {
 
 // The /portfolio page. With `preview`, sample case studies are mixed in to
 // show every service; that version lives at the noindex /portfolio/preview.
-export default function PortfolioPageContent({ preview = false }) {
-  const studies = getPortfolioCaseStudies({ includeSamples: preview });
+export default async function PortfolioPageContent({ preview = false }) {
+  const studies = await loadCaseStudies({ includeSamples: preview });
   const counts = getPortfolioServiceCounts(studies);
   const templates = getMarketingTemplates();
   const marketingServices = counts.filter(({ service }) => !WEBSITE_SERVICE_IDS.includes(service.id));

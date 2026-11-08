@@ -2,22 +2,30 @@
 
 The portfolio shows every kind of work as a case study card: websites and web
 apps, SEO, social media, ads, video, influencer campaigns and branding. A case
-study with a story also gets its own page at `/portfolio/<slug>`, and each
-service page shows its case studies under "From the portfolio".
+study with a story also gets its own page at `/portfolio/<slug>`. Each service
+page shows its published case studies under "From the portfolio": up to two
+as a spotlight with their charts and visuals, then website projects as cards.
+A service with nothing published shows no section at all.
+
+Case studies are managed in **Super Admin → Case Studies**
+(`/super-admin/case-studies`) and stored in the marketing database.
 
 | File | What it holds |
 |---|---|
-| `lib/marketing-portfolio.ts` | The published case studies, the services list and the data shape. |
-| `lib/marketing-portfolio-samples.ts` | Sample case studies with invented clients and numbers, one per service. |
-| `public/portfolio/` | Videos, posters and images. Sample images are in `public/portfolio/samples/`. |
-| `components/marketing/portfolio/` | The cards, the proof visuals, the pages. |
+| `app/super-admin/case-studies/`, `components/super-admin/case-studies/` | The Super Admin list and editor. |
+| `lib/actions/super-admin-case-studies.ts` | Saving, publishing, ordering and deleting (super admins only). |
+| `lib/marketing-portfolio-store.ts` | How pages read case studies: from the database through a cache, or the built-in ones. |
+| `lib/marketing-portfolio-validation.ts` | The checks every case study passes before it is saved or shown. |
+| `lib/marketing-portfolio-editor.ts` | The editor's fields for every proof and visual. |
+| `lib/marketing-portfolio.ts`, `lib/marketing-portfolio-samples.ts` | The data shape, the services, and the built-in case studies and samples. |
+| `public/portfolio/` | Videos, posters and images for the built-in case studies. Sample images are in `public/portfolio/samples/`. |
+| `components/marketing/portfolio/` | The cards, the proof visuals, the spotlight and the pages. |
 
 ## Real results only
 
-Only case studies with `status: "published"` appear on the public site. The
-samples show the layout and appear only on the preview page,
-`/portfolio/preview`, which is hidden from search engines and linked from
-nowhere. Before publishing a case study:
+Only case studies with the status **Published** appear on the public site.
+Drafts and samples appear only on the preview, `/portfolio/preview`, which is
+hidden from search engines and linked from nowhere. Before publishing:
 
 - Get the client's permission in writing. If they prefer privacy, describe
   them instead ("Dental clinic, Jaipur").
@@ -25,23 +33,64 @@ nowhere. Before publishing a case study:
   screenshot behind every number.
 - Lead with a business number: leads, sales, cost per lead, organic clicks.
 
-The tests (`npx tsx --test tests/marketing-portfolio.test.ts`) fail if a
-published case study uses a sample image, an image file is missing, or a
-sample could reach the public site.
+Publishing asks you to confirm that the numbers, images and quotes are real and
+the client agreed; Super Admin records who confirmed it and when. A published
+case study cannot use the sample images or a `sample-` address.
 
-## Add a case study
+## Manage case studies in Super Admin
 
-1. Copy the sample for the same service from
-   `lib/marketing-portfolio-samples.ts` into `PUBLISHED_CASE_STUDIES` in
-   `lib/marketing-portfolio.ts`.
-2. Give it a new `slug` (lowercase words with hyphens, not starting with
-   `sample-`) and set `status: "published"`.
-3. Replace every word, number and image with the client's real ones. Put
-   images in `public/portfolio/<slug>/`.
-4. Check it at `/portfolio` and `/portfolio/<slug>` with `npm run dev`, run the
-   tests, then commit and push.
+**First time.** The site starts with the case studies built into the code.
+Open Case Studies and choose **Set up case studies**: this copies them into the
+database so they can be edited. Nothing changes on the site. From then on the
+database alone decides what shows; deleting every case study leaves the
+portfolio empty rather than bringing the built-in ones back. Until setup, and
+whenever the database cannot be reached, the site uses the built-in ones.
 
-When the real case study for a service exists, delete that service's sample.
+**Add one.** Choose **New case study** and its main service. The draft starts
+as a copy of that service's example, so every field shows what it expects.
+Replace every word, number and image, then set the status to Published and
+save. The case study appears on the portfolio, its own page (if it has a
+story) and every matching service page straight away.
+
+**Images.** Upload (stored in Vercel Blob, or Azure when Blob is full) or
+paste a link. Width and height fill in from the image. Uploaded images load as
+they are, without Next.js resizing, so export them at the size shown (posts
+600×600, posters 1440×900) as WebP or JPEG under about 1 MB.
+
+**Videos.** Upload an MP4 or WebM file (up to 200 MB; it goes straight to
+Vercel Blob, which needs `BLOB_READ_WRITE_TOKEN`), or paste a link to one.
+Website walkthroughs can be recorded with `scripts/record-portfolio-video.mjs`.
+
+**Order.** The arrows on the list set the order on `/portfolio` and on the
+service pages. On a case study, the first two extra visuals also show on the
+service page; the preview of each case study shows that section under "On The
+Service Page".
+
+**Other tools.** Duplicate a case study as a new draft, delete one, or add
+back deleted examples from the list. On a case study, **Advanced: edit as
+JSON** shows the whole case study as data, for copying between case studies or
+pasting many numbers at once.
+
+**If something is wrong.** Every save is checked, and the editor lists what to
+fix before it saves. A case study that fails the checks (for example after an
+edit made directly in the database) is hidden from the site and marked "to
+fix" in the list.
+
+### Built-in case studies
+
+`lib/marketing-portfolio.ts` holds the built-in published case studies and
+`lib/marketing-portfolio-samples.ts` one sample per service. They are what the
+site shows before setup, what **Set up case studies** copies, and the examples
+new drafts start from. After setup, edit case studies in Super Admin: changes
+to these files no longer reach the site.
+
+The tests check the built-in case studies, the editor and the checks:
+
+```bash
+node --require ./tests/register-server-only-stub.cjs --import tsx --test tests/marketing-portfolio.test.ts tests/marketing-portfolio-admin.test.ts
+```
+
+The fields below are the same in the editor and in **Advanced: edit as JSON**.
 
 ### Fields every case study has
 
@@ -71,8 +120,8 @@ When the real case study for a service exists, delete that service's sample.
 | Influencer | `influencer`: `creators` (name, handle, followers, initials) and three vertical `content` images (9:16). | Creators' insight screenshots; discount-code or tracked-link reports. |
 | Branding | `branding`: `before` and `after` logos at the same size (16:10 works best), `palette` (name and hex), three `applications` (4:3). | The design files. |
 
-Images are served through Next.js image optimisation, so a large JPEG, PNG or
-WebP is fine; keep each under about 1 MB.
+Images in `public/` are served through Next.js image optimisation; uploaded
+images load directly from their storage (see Images above).
 
 ### Extra visuals (`insights`)
 
@@ -100,6 +149,6 @@ creator list). The samples show every type with realistic data.
 | `logo-versions` | The full, stacked and monogram logos in the brand colours. | `name`, `monogram`, `tagline`, `colors` (dark, mid, accent, light). |
 | `type-specimen` | The brand's typefaces with samples. | `faces`: name, role, `family` (`display` or `text`), sample. |
 
-`tests/marketing-portfolio.test.ts` checks that insight numbers hang together
-(funnels shrink, parts add up, retention starts at 100%), so a typo shows up
-before it reaches the page.
+The checks make insight numbers hang together (funnels shrink, retention
+starts at 100%, combo charts have one value per label), so a typo shows up in
+the editor before it reaches the page.

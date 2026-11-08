@@ -16,6 +16,7 @@ import {
     Sparkles,
     BookOpen,
     MessageSquare,
+    Trophy,
 } from "lucide-react";
 import { logout } from "@/lib/auth";
 
@@ -28,6 +29,7 @@ const navigation = [
     { name: "AI Blogger", href: "/super-admin/ai-blogger", icon: Sparkles },
     { name: "Contact Submissions", href: "/super-admin/contact-submissions", icon: MessageSquare },
     { name: "Blog Management", href: "/super-admin/blogs", icon: BookOpen },
+    { name: "Case Studies", href: "/super-admin/case-studies", icon: Trophy },
     { name: "Billing", href: "/super-admin/billing", icon: CreditCard },
     { name: "System Logs", href: "/super-admin/logs", icon: FileText },
     { name: "Settings", href: "/super-admin/settings", icon: Settings },

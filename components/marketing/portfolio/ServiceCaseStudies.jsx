@@ -1,17 +1,23 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
-import { getServiceCaseStudies } from "@/lib/marketing-portfolio";
+import { loadServiceCaseStudies } from "@/lib/marketing-portfolio-store";
 
+import CaseStudySpotlight from "./CaseStudySpotlight";
 import PortfolioCaseCard from "./PortfolioCaseCard";
 
-// Published case studies on a service page. Renders nothing until the service
-// has at least one, so service pages never show an empty section.
-export default function ServiceCaseStudies({ services, title, linkLabel }) {
-  const studies = getServiceCaseStudies(services).slice(0, 3);
+// Published case studies on a service page: results-led work as a spotlight
+// with its charts and visuals, website projects as cards. Renders nothing until
+// the service has a published case study, so service pages never show an empty
+// section or sample numbers. Case studies are managed in Super Admin.
+export default async function ServiceCaseStudies({ services, title, linkLabel }) {
+  const studies = (await loadServiceCaseStudies(services)).slice(0, 4);
   if (!studies.length) {
     return null;
   }
+
+  const spotlights = studies.filter((study) => study.proof.type !== "website").slice(0, 2);
+  const cards = studies.filter((study) => study.proof.type === "website").slice(0, 3);
 
   return (
     <section className="mb-20 lg:mb-32">
@@ -28,7 +34,7 @@ export default function ServiceCaseStudies({ services, title, linkLabel }) {
           </h2>
         </div>
         <Link
-          href={`/portfolio?service=${services[0]}#work`}
+          href={`/portfolio?service=${services.join(",")}#work`}
           prefetch={false}
           className="inline-flex shrink-0 items-center gap-2 font-glacial-bold text-sm uppercase tracking-widest text-[#F5EE30] transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
         >
@@ -37,11 +43,21 @@ export default function ServiceCaseStudies({ services, title, linkLabel }) {
         </Link>
       </div>
 
-      <div className={`grid grid-cols-1 gap-5 ${studies.length >= 3 ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
-        {studies.map((study) => (
-          <PortfolioCaseCard key={study.slug} study={study} media="poster" />
-        ))}
-      </div>
+      {spotlights.length ? (
+        <div className="grid grid-cols-1 gap-6">
+          {spotlights.map((study) => (
+            <CaseStudySpotlight key={study.slug} study={study} />
+          ))}
+        </div>
+      ) : null}
+
+      {cards.length ? (
+        <div className={`grid grid-cols-1 gap-5 ${spotlights.length ? "mt-6" : ""} ${cards.length >= 3 ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
+          {cards.map((study) => (
+            <PortfolioCaseCard key={study.slug} study={study} media="poster" />
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
