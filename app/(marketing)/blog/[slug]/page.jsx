@@ -29,6 +29,7 @@ import {
   getMarketingVerificationMetadata,
   marketingAbsoluteUrl,
 } from "@/lib/marketing-seo";
+import { sanitizeMarketingBlogHtml } from "@/lib/marketing-blog-sanitize";
 import { notFound } from "next/navigation";
 
 // Blog detail pages depend on MongoDB and draft auth checks, so render them at
@@ -36,31 +37,12 @@ import { notFound } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 
-// ─── Server-safe HTML sanitizer ────────────────────────────────────────────────
-// isomorphic-dompurify is intentionally NOT used here — in Next.js 16 production,
-// dompurify accesses browser globals (window/document) at module init time,
-// causing a Server Component crash BEFORE rendering begins. Since our HTML content
-// is already AI-generated and passed through buildMarketingBlogHtml, a targeted
-// strip of dangerous patterns is both safe and sufficient.
-function serverSanitizeHtml(html = "") {
-  return html
-    // Remove script blocks entirely
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-    // Remove style blocks entirely
-    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
-    // Strip inline event handlers (onclick, onload, onerror, etc.)
-    .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, "")
-    // Neutralise javascript: URIs
-    .replace(/javascript\s*:/gi, "void:");
-}
-// ────────────────────────────────────────────────────────────────────────────────
-
 // Sanitized post HTML as readers get it: links to this site are root-relative,
 // links to retired posts go straight to their redirect target, and AI Blogger
 // references point at zSEO.ai.
 function toPublicPostHtml(html = "", slug = "") {
   return replaceAIBloggerReferences(
-    rewriteRetiredMarketingBlogLinks(rewriteMarketingSiteLinksToRelative(serverSanitizeHtml(html)), slug)
+    rewriteRetiredMarketingBlogLinks(rewriteMarketingSiteLinksToRelative(sanitizeMarketingBlogHtml(html)), slug)
   );
 }
 
