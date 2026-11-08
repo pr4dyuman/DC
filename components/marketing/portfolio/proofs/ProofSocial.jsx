@@ -25,6 +25,16 @@ function Phone({ proof, size }) {
           />
           <span className={`truncate font-bold ${large ? "text-sm" : "text-[10px]"}`}>{proof.handle}</span>
         </div>
+        {large && proof.profile ? (
+          <div className="px-4 pb-3 text-[12px] leading-[1.35]">
+            <p className="font-bold">{proof.profile.name}</p>
+            {proof.profile.bio.map((line) => (
+              <p key={line} className="text-black/70">
+                {line}
+              </p>
+            ))}
+          </div>
+        ) : null}
         <dl className={`grid text-center ${large ? "grid-cols-3 px-3 pb-3" : "grid-cols-2 px-2 pb-2"}`}>
           {proof.profileStats.slice(0, large ? 3 : 2).map((stat) => (
             <div key={stat.label} className="flex flex-col-reverse">
@@ -33,6 +43,13 @@ function Phone({ proof, size }) {
             </div>
           ))}
         </dl>
+        {large && proof.profile?.action ? (
+          <div className="px-3 pb-3">
+            <span className="block rounded-lg bg-[#0095f6] py-1.5 text-center text-xs font-bold text-white">
+              {proof.profile.action}
+            </span>
+          </div>
+        ) : null}
         <div className="grid grid-cols-3 gap-px bg-black/10">
           {proof.posts.slice(0, 9).map((post) => (
             <div key={post.src} className="relative aspect-square">
@@ -54,7 +71,7 @@ export default function ProofSocial({ study, proof, size = "card", sample = fals
   if (size === "large") {
     return (
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-        <ProofStage sample={sample} className="flex items-center justify-center">
+        <ProofStage sample={sample}>
           <div className="flex h-full items-center justify-center p-6 sm:p-10">
             <Phone proof={proof} size="large" />
           </div>

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { ArrowRight, ExternalLink, Quote } from "lucide-react";
 
-import { getNextCaseStudy, getPortfolioService } from "@/lib/marketing-portfolio";
+import { getNextCaseStudy, getPortfolioService, getTitleFitFactor } from "@/lib/marketing-portfolio";
 
 import KpiNumber from "./KpiNumber";
 import PortfolioCaseCard from "./PortfolioCaseCard";
 import PreviewBanner from "./PreviewBanner";
 import ServiceTags from "./ServiceTags";
+import PortfolioInsights from "./insights/PortfolioInsights";
 import PortfolioProof from "./proofs/PortfolioProof";
 
 const focusRing =
@@ -49,6 +50,7 @@ export default function CaseStudyPageContent({ study, preview = false }) {
   const meta = [study.industry, study.location, study.period].filter(Boolean);
   const kpis = study.kpis || [];
   const story = study.story;
+  const insights = study.insights || [];
 
   const glance = [
     ["Client", study.client],
@@ -105,9 +107,13 @@ export default function CaseStudyPageContent({ study, preview = false }) {
           </nav>
 
           <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-end">
-            <div className="min-w-0">
+            <div className="@container min-w-0">
               <ServiceTags services={study.services} linked />
-              <h1 className="mt-5 break-words font-suifak text-[clamp(3rem,7.5vw,6.4rem)] uppercase leading-[0.86]">
+              {/* Sized to the column and the longest word, so names never break mid-word. */}
+              <h1
+                className="mt-5 font-suifak text-[length:var(--title-size)] uppercase leading-[0.86] [overflow-wrap:normal]"
+                style={{ "--title-size": `clamp(2rem, calc(100cqi / ${getTitleFitFactor(study.client)}), 6.4rem)` }}
+              >
                 {study.client}
               </h1>
               {meta.length ? (
@@ -160,8 +166,13 @@ export default function CaseStudyPageContent({ study, preview = false }) {
           <Eyebrow>The Proof</Eyebrow>
           <p className="mt-4 text-3xl font-bold uppercase leading-tight sm:text-4xl">{PROOF_TITLES[study.proof.type]}</p>
           <div className="mt-8">
-            <PortfolioProof study={study} size="large" />
+            <PortfolioProof study={study} size="large" details={!insights.length} />
           </div>
+          {insights.length ? (
+            <div className="mt-5">
+              <PortfolioInsights insights={insights} slug={study.slug} sample={sample} />
+            </div>
+          ) : null}
           {story?.source && !study.headline ? (
             <p className="mt-4 text-xs leading-5 text-white/50">Source: {story.source}</p>
           ) : null}
@@ -210,6 +221,9 @@ export default function CaseStudyPageContent({ study, preview = false }) {
                         {padCount(index + 1)}
                       </span>
                       <div>
+                        {step.when ? (
+                          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">{step.when}</p>
+                        ) : null}
                         <h3 className="text-lg font-bold uppercase leading-snug">{step.title}</h3>
                         <p className="mt-2 text-base leading-7 text-gray-300">{step.text}</p>
                       </div>

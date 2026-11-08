@@ -16,6 +16,7 @@ import {
 } from "../lib/marketing-portfolio";
 import { MARKETING_SAMPLE_PREVIEW_ORDER } from "../lib/marketing-portfolio-samples";
 import {
+    averageWatchedPercent,
     buildLineChart,
     formatCompactNumber,
     formatComparisonValue,
@@ -78,14 +79,14 @@ test("sample case studies never reach the public portfolio or service pages", ()
 
 test("published case studies never use sample images", () => {
     for (const study of PUBLISHED) {
-        const samples = collectSources(study.proof).filter((src) => src.startsWith("/portfolio/samples/"));
+        const samples = collectSources([study.proof, study.insights]).filter((src) => src.startsWith("/portfolio/samples/"));
         assert.deepEqual(samples, [], `${study.slug} uses sample images`);
     }
 });
 
 test("every image and video a case study uses exists in public/", () => {
     for (const study of ALL) {
-        for (const src of collectSources(study.proof)) {
+        for (const src of collectSources([study.proof, study.insights])) {
             const file = path.join(PUBLIC_DIR, src.split("?")[0]);
             assert.ok(existsSync(file), `${study.slug}: missing ${src}`);
         }
@@ -176,4 +177,101 @@ test("numbers are formatted the way the cards show them", () => {
         assert.ok(parsed, value);
         assert.equal(formatParsedKpi(parsed, parsed.number), value);
     }
+});
+
+test("insight data is complete and consistent enough to draw", () => {
+    for (const study of ALL) {
+        for (const insight of study.insights || []) {
+            const where = `${study.slug}: ${insight.type}`;
+            assert.ok(insight.title, `${where} needs a title`);
+
+            switch (insight.type) {
+                case "search-results":
+                    assert.ok(insight.position >= 1, where);
+                    assert.ok(insight.result.title && insight.result.url, where);
+                    break;
+                case "rank-movement":
+                    for (const keyword of insight.keywords) {
+                        assert.ok(keyword.after >= 1, `${where}: ${keyword.term}`);
+                        assert.ok(keyword.before === null || keyword.before > keyword.after, `${where}: ${keyword.term} should climb`);
+                    }
+                    break;
+                case "score-rings":
+                    for (const score of insight.scores) {
+                        for (const value of [score.before, score.after]) {
+                            assert.ok(value >= 0 && value <= 100, `${where}: ${score.label}`);
+                        }
+                    }
+                    break;
+                case "weekly-combo":
+                    assert.equal(insight.bars.values.length, insight.labels.length, where);
+                    assert.equal(insight.line.values.length, insight.labels.length, where);
+                    break;
+                case "funnel":
+                    insight.stages.slice(1).forEach((stage, index) => {
+                        assert.ok(stage.value < insight.stages[index].value, `${where}: ${stage.label} should be smaller`);
+                    });
+                    break;
+                case "retention":
+                    assert.deepEqual(insight.points[0], { second: 0, percent: 100 }, where);
+                    insight.points.slice(1).forEach((point, index) => {
+                        assert.ok(point.second > insight.points[index].second, where);
+                        assert.ok(point.percent <= insight.points[index].percent, where);
+                    });
+                    break;
+                case "split":
+                    assert.equal(
+                        formatCompactNumber(insight.parts.reduce((total, part) => total + part.value, 0)),
+                        insight.total,
+                        `${where}: parts should add up to the total`,
+                    );
+                    break;
+                case "bars":
+                    assert.ok(insight.bars.every((bar) => bar.value > 0), where);
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+});
+
+test("an SEO report lines up with its clicks and story", () => {
+    for (const study of ALL) {
+        if (study.proof.type !== "seo" || !study.proof.report) continue;
+        const { points, report } = study.proof;
+        assert.equal(report.impressions.length, points.length, study.slug);
+        assert.deepEqual(
+            report.impressions.map((point) => point.label),
+            points.map((point) => point.label),
+            study.slug,
+        );
+        for (const marker of report.markers || []) {
+            assert.ok(marker.index >= 0 && marker.index < points.length, `${study.slug}: marker ${marker.label}`);
+        }
+        assert.ok((report.markers || []).length <= (study.story?.steps.length || 0), study.slug);
+    }
+});
+
+test("sample numbers agree from one panel to the next", () => {
+    const video = getPortfolioCaseStudy("sample-video-real-estate", { includeSamples: true });
+    const retention = video?.insights?.find((insight) => insight.type === "retention");
+    assert.ok(retention && retention.type === "retention");
+    const completion = video?.kpis?.find((kpi) => kpi.label === "average view completion");
+    assert.equal(`${averageWatchedPercent(retention.points)}%`, completion?.value);
+
+    const ads = getPortfolioCaseStudy("sample-ads-dental-clinic", { includeSamples: true });
+    const weekly = ads?.insights?.find((insight) => insight.type === "weekly-combo");
+    assert.ok(weekly && weekly.type === "weekly-combo" && ads?.proof.type === "ads");
+    const leads = ads.proof.comparisons.find((comparison) => comparison.label === "Leads per month");
+    const monthStarts = weekly.labels.flatMap((label, index) => (label ? [index] : []));
+    const monthTotal = (start: number, end: number) => weekly.bars.values.slice(start, end).reduce((a, b) => a + b, 0);
+    assert.equal(monthTotal(monthStarts[0], monthStarts[1]), leads?.before);
+    assert.equal(monthTotal(monthStarts[monthStarts.length - 1], weekly.labels.length), leads?.after);
+
+    const influencer = getPortfolioCaseStudy("sample-influencer-skincare", { includeSamples: true });
+    const board = influencer?.insights?.find((insight) => insight.type === "creator-leaderboard");
+    assert.ok(board && board.type === "creator-leaderboard");
+    const signups = board.creators.reduce((total, creator) => total + creator.signups, 0);
+    assert.ok(signups <= Number(influencer?.headline?.value.replace(/,/g, "")), "top creators cannot beat the total");
 });

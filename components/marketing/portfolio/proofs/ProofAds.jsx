@@ -31,9 +31,9 @@ function AdMock({ ad, platform, compact }) {
   );
 }
 
-function ComparisonBars({ comparisons, compact }) {
+function ComparisonBars({ comparisons, compact, columns = false }) {
   return (
-    <div className={compact ? "space-y-4" : "space-y-8"}>
+    <div className={compact ? "space-y-4" : columns ? "grid gap-8 lg:grid-cols-2 lg:gap-12" : "space-y-8"}>
       {comparisons.map((comparison) => {
         const max = Math.max(comparison.before, comparison.after) || 1;
         const change = percentChange(comparison.before, comparison.after);
@@ -77,7 +77,20 @@ function ComparisonBars({ comparisons, compact }) {
 }
 
 // Ads: the winning ad as people saw it, and the numbers before and after.
-export default function ProofAds({ proof, size = "card", sample = false }) {
+// `details: false` leaves out the ad card when the case study page shows the
+// ad on a full search results page instead.
+export default function ProofAds({ proof, size = "card", sample = false, details = true }) {
+  if (size === "large" && !details) {
+    return (
+      <ProofStage sample={sample}>
+        <RevealOnView className="p-5 sm:p-8">
+          <p className="mb-6 text-[10px] font-bold uppercase tracking-[0.2em] text-white/55">Before and after</p>
+          <ComparisonBars comparisons={proof.comparisons} compact={false} columns />
+        </RevealOnView>
+      </ProofStage>
+    );
+  }
+
   if (size === "large") {
     return (
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
