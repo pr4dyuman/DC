@@ -76,7 +76,7 @@ function CreateBlogForm() {
   const loadBlogData = async (id) => {
     try {
       setIsLoading(true);
-      const res = await fetch(`/api/blog/${id}`);
+      const res = await fetch(`/api/blog-dc/${id}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         const blog = data.data;
@@ -128,8 +128,15 @@ function CreateBlogForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title || !content || (!imageFile && !existingImageUrl)) {
-      setFormStatus('Please fill in all required fields.');
+    const missing = [
+      !title.trim() && 'title',
+      !shortDescription.trim() && 'short description',
+      !category && 'category',
+      !content.replace(/<[^>]*>/g, '').trim() && 'content',
+      !imageFile && !existingImageUrl && 'cover image',
+    ].filter(Boolean);
+    if (missing.length) {
+      setFormStatus(`Please add the ${missing.join(', ')}.`);
       return;
     }
 
@@ -145,13 +152,15 @@ function CreateBlogForm() {
         const formData = new FormData();
         formData.append('file', imageFile);
 
-        const uploadRes = await fetch('/api/upload', {
+        const uploadRes = await fetch('/api/blog-dc/image', {
           method: 'POST',
           body: formData,
         });
 
-        if (!uploadRes.ok) throw new Error('Image upload failed');
-        const uploadData = await uploadRes.json();
+        const uploadData = await uploadRes.json().catch(() => ({}));
+        if (!uploadRes.ok || !uploadData.url) {
+          throw new Error(uploadData.error || (uploadRes.status === 413 ? 'The image is too large. Try one under 4 MB.' : 'Image upload failed'));
+        }
         imageUrl = uploadData.url;
       }
 
@@ -168,13 +177,13 @@ function CreateBlogForm() {
 
       let res;
       if (isEditing) {
-        res = await fetch(`/api/blog/${blogId}`, {
+        res = await fetch(`/api/blog-dc/${blogId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
       } else {
-        res = await fetch('/api/blog', {
+        res = await fetch('/api/blog-dc', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -330,7 +339,7 @@ function CreateBlogForm() {
               ) : (
                 <div className="text-center">
                   <p className="text-lg mb-2">📁 Click to upload image</p>
-                  <p className="text-sm text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                  <p className="text-sm text-gray-500">PNG, JPG, GIF or WebP, under 4 MB</p>
                 </div>
               )}
             </div>

@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/marketing-db';
 import Blog from '@/models/marketing/Blog';
 import { checkAuth } from '@/lib/authMiddleware';
-import DOMPurify from 'isomorphic-dompurify';
-import { sanitizeName, sanitizeString, validateCsrfOrigin } from '@/lib/validation';
+import { sanitizeName, validateCsrfOrigin } from '@/lib/validation';
+import { logBlogAuditChange } from '@/lib/blog-audit-log';
+import { revalidateBlogPublicPaths } from '@/lib/marketing-blog-maintenance';
+import { describeBlogSaveError, missingBlogFields, readBlogInput } from '@/lib/marketing-blog-input';
 import { normalizeMarketingCanonicalUrl } from '@/lib/marketing-blog-utils';
 import { LEGACY_REDIRECTED_BLOG_SLUGS, REMOVED_BLOG_SLUGS } from '@/lib/marketing-blog-cleanup';
 
@@ -69,19 +71,20 @@ export async function POST(req) {
       ? normalizeMarketingCanonicalUrl(String(body.canonicalUrl), body.slug ? sanitizeName(body.slug, 500) : undefined)
       : '';
     const blogData = {
-      title: body.title ? sanitizeName(body.title, 500) : undefined,
-      shortDescription: body.shortDescription ? sanitizeString(body.shortDescription, 1000) : undefined,
-      content: body.content ? DOMPurify.sanitize(body.content) : undefined,
-      category: body.category ? sanitizeName(body.category, 200) : undefined,
-      status: body.status === 'published' || body.status === 'draft' ? body.status : 'draft',
-      image: body.image ? sanitizeString(body.image, 2000) : undefined,
+      ...readBlogInput(body),
       slug: body.slug ? sanitizeName(body.slug, 500) : undefined,
       canonicalUrl: normalizedCanonicalUrl || undefined,
     };
+    blogData.status = blogData.status || 'draft';
+    if (blogData.status === 'published') {
+      blogData.publishedAt = new Date();
+    }
     // Remove undefined fields
     Object.keys(blogData).forEach(k => blogData[k] === undefined && delete blogData[k]);
-    if (!blogData.title) {
-      return NextResponse.json({ success: false, error: 'Title is required' }, { status: 400 });
+
+    const missing = missingBlogFields(blogData);
+    if (missing.length) {
+      return NextResponse.json({ success: false, error: `Please add the ${missing.join(', ')}.` }, { status: 400 });
     }
 
     if (blogData.canonicalUrl) {
@@ -95,22 +98,13 @@ export async function POST(req) {
     }
 
     const blog = await Blog.create(blogData);
+    await logBlogAuditChange(blog._id.toString(), 'create', `Created blog: ${blog.title}`);
+    await revalidateBlogPublicPaths([blog.slug]);
 
     return NextResponse.json({ success: true, data: blog }, { status: 201 });
   } catch (error) {
     console.error('Error creating blog:', error);
-    if (error && typeof error === 'object' && error.code === 11000) {
-      const duplicateField = Object.keys(error.keyPattern || error.keyValue || {})[0] || '';
-      const duplicateMessage = duplicateField === 'canonicalUrl'
-        ? 'Canonical URL already exists'
-        : duplicateField === 'slug'
-          ? 'Slug already exists'
-          : 'Duplicate blog value already exists';
-      return NextResponse.json({ success: false, error: duplicateMessage }, { status: 409 });
-    }
-
-    return NextResponse.json({ success: false, error: 'Server Error' }, { status: 500 });
+    const { status, message } = describeBlogSaveError(error);
+    return NextResponse.json({ success: false, error: message }, { status });
   }
 }
-
-

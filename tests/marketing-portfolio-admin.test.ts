@@ -4,9 +4,11 @@ import assert from "node:assert/strict";
 import {
     PORTFOLIO_SERVICES,
     PROOF_TYPE_FOR_SERVICE,
+    SERVICE_EXAMPLES,
     filterServiceCaseStudies,
     findNextCaseStudy,
     getBuiltInCaseStudies,
+    getServiceExamples,
     getStudyMark,
     hasCaseStudyPage,
     selectCaseStudies,
@@ -215,4 +217,41 @@ test("pages pick what to show from any list of case studies", () => {
     assert.ok(withPages.length >= 2);
     assert.equal(findNextCaseStudy(withPages[withPages.length - 1], list)?.slug, withPages[0].slug, "wraps round");
     assert.equal(findNextCaseStudy(list[0], [list[0]]), null);
+});
+
+test("services without published work show their example, and only those", () => {
+    const examples = getServiceExamples(BUILT_IN);
+    const withPages = PORTFOLIO_SERVICES.filter((service) => service.href && !["web", "app"].includes(service.id));
+    assert.deepEqual(
+        examples.map(({ service }) => service.id),
+        withPages.map((service) => service.id),
+        "every service with a page and no published work has an example",
+    );
+    for (const { service, study, copy } of examples) {
+        assert.equal(study.status, "sample", service.id);
+        assert.equal(study.services[0], service.id);
+        assert.ok(copy.title && copy.text && copy.includes.length >= 3, service.id);
+    }
+
+    assert.deepEqual(getServiceExamples(BUILT_IN, ["seo"]).map(({ service }) => service.id), ["seo"]);
+    assert.deepEqual(getServiceExamples(BUILT_IN, ["web", "app"]), [], "websites have real projects");
+
+    const realSeo = { ...clone(BUILT_IN.find((study) => study.proof.type === "seo") as PortfolioCaseStudy), slug: "real-seo", status: "published" as const };
+    const withRealSeo = [...BUILT_IN, realSeo];
+    assert.equal(getServiceExamples(withRealSeo, ["seo"]).length, 0, "a published case study replaces the example");
+
+    const realVideoWithAds = {
+        ...clone(BUILT_IN.find((study) => study.proof.type === "video") as PortfolioCaseStudy),
+        slug: "real-video",
+        status: "published" as const,
+        services: ["video", "ads"] as PortfolioCaseStudy["services"],
+    };
+    assert.equal(getServiceExamples([...BUILT_IN, realVideoWithAds], ["ads"]).length, 0, "secondary services count as covered");
+
+    const withoutSamples = BUILT_IN.filter((study) => study.status !== "sample");
+    assert.deepEqual(getServiceExamples(withoutSamples), [], "deleting a sample removes its example");
+
+    for (const id of Object.keys(SERVICE_EXAMPLES)) {
+        assert.ok(PORTFOLIO_SERVICES.some((service) => service.id === id && service.href), `${id} has a service page`);
+    }
 });

@@ -14,9 +14,10 @@ import ProofWebsite from "./ProofWebsite";
 // details: false leaves out parts of the large proof (the SEO result card and
 // keyword table, the ad card, the creator list) when the case study page shows
 // fuller versions of them as insights.
-export default function PortfolioProof({ study, size = "card", media = "video", priority = false, details = true }) {
+// mark: the chip's text, to override the study's own ("Sample", "Draft").
+export default function PortfolioProof({ study, size = "card", media = "video", priority = false, details = true, mark }) {
   const { proof } = study;
-  const sample = getStudyMark(study);
+  const sample = mark ?? getStudyMark(study);
 
   switch (proof.type) {
     case "website":

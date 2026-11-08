@@ -10,6 +10,7 @@ import { AdminTestimonialsPanel } from './_components/AdminTestimonialsPanel';
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -49,11 +50,13 @@ export default function AdminPage() {
 
   const checkAuth = async () => {
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await fetch('/api/auth-dc/me', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         if (data.authenticated) {
           setIsAuthenticated(true);
+          setIsSuperAdmin(data.superAdmin === true);
+          if (data.email) setEmail(data.email);
         }
       }
     } catch (e) {
@@ -65,7 +68,7 @@ export default function AdminPage() {
 
   const fetchBlogs = async () => {
     try {
-      const res = await fetch('/api/blog');
+      const res = await fetch('/api/blog-dc?limit=100', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setBlogs(data.data || []);
@@ -104,7 +107,7 @@ export default function AdminPage() {
     setLoginError('');
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch('/api/auth-dc/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -113,6 +116,7 @@ export default function AdminPage() {
       const data = await res.json();
 
       if (res.ok && data.success) {
+        setPassword('');
         setIsAuthenticated(true);
       } else {
         setLoginError(data.error || 'Login failed');
@@ -176,18 +180,29 @@ export default function AdminPage() {
     if (!confirm('Are you sure you want to delete this blog?')) return;
 
     try {
-      const res = await fetch(`/api/blog/${id}`, {
+      const res = await fetch(`/api/blog-dc/${id}`, {
         method: 'DELETE',
       });
 
       if (res.ok) {
         fetchBlogs();
       } else {
-        alert('Failed to delete blog');
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Failed to delete blog');
       }
     } catch (error) {
       console.error('Error deleting blog:', error);
       alert('Error deleting blog');
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth-dc/logout', { method: 'POST' });
+    } finally {
+      setIsAuthenticated(false);
+      setBlogs([]);
+      setEmail('');
     }
   };
 
@@ -302,9 +317,25 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-black text-white p-6 font-glacial">
       <div className="max-w-6xl mx-auto">
-        <header className="flex justify-between items-center mb-12 border-b border-zinc-800 pb-6">
+        <header className="flex flex-wrap justify-between items-center gap-4 mb-12 border-b border-zinc-800 pb-6">
           <h1 className="text-4xl font-etna">Admin Dashboard</h1>
-          <div className="text-sm text-gray-400">Logged in as {email}</div>
+          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
+            <span>
+              {isSuperAdmin ? 'Signed in with your super admin account' : `Logged in as ${email || 'admin'}`}
+            </span>
+            <a href="/" target="_blank" rel="noreferrer" className="hover:text-white">
+              View site
+            </a>
+            {isSuperAdmin ? (
+              <a href="/super-admin" className="hover:text-white">
+                Super Admin
+              </a>
+            ) : (
+              <button type="button" onClick={handleLogout} className="rounded border border-zinc-700 px-3 py-1.5 text-white hover:border-white">
+                Log out
+              </button>
+            )}
+          </div>
         </header>
 
         <main className="space-y-8">
