@@ -67,6 +67,126 @@ function image(slug: string, file: string, width: number, height: number): Marke
 }
 
 const TEMPLATE_CONTENT: Record<string, MarketingTemplateContent> = {
+    // Written from the live demo: Oscilla is not in codester-themes yet. When
+    // its listing/listing.md is added, check this copy against it.
+    "oscilla-ai-startup": {
+        title: "Instrument-Style AI & Deep-Tech Startup HTML Template",
+        metaTitle: "Oscilla AI Startup Website Template",
+        summary:
+            "An instrument-style website for AI labs, SaaS and deep-tech startups, with live WebGL hero plates, pricing and a product console.",
+        description: [
+            "Oscilla is a complete website for AI labs, developer tools, SaaS products and deep-tech startups. Its scientific-instrument design, ink black with signal orange, Geologica type and monospace readouts, makes a technical product look measured and credible. Three home pages show its range: an AI reasoning lab, an orbital manufacturing company and a story-driven space game.",
+            "Each home page opens on a live WebGL plate, a wave field, orbiting bodies or a black hole, that answers the pointer and scroll, pauses when off screen and can be held with one button. Without WebGL, or for visitors who prefer reduced motion, a still image takes its place. Behind the home pages sit product, pricing, careers, journal and changelog pages, sign-in and sign-up, and a three-page console with a dashboard, analytics and settings.",
+        ],
+        accent: "#FF4D00",
+        pageCount: 21,
+        stack: ["HTML5", "Tailwind CSS 4.3", "Plain JavaScript", "WebGL"],
+        fonts: "Geologica and Fragment Mono, self-hosted (OFL)",
+        version: "1.0.0",
+        signature: [
+            {
+                title: "Live WebGL hero plates",
+                text: "A wave field, orbiting bodies and a black hole that follow the pointer and scroll, pause off screen and fall back to a still image.",
+            },
+            {
+                title: "Three home pages",
+                text: "An AI lab, an orbital manufacturing company and a space game, each with its own story, sections and plate.",
+            },
+            {
+                title: "A product console",
+                text: "A dashboard with runs, system status, usage and alerts, an analytics page and settings for API keys, team and billing.",
+            },
+            {
+                title: "Pricing made for SaaS",
+                text: "Three tiers with a monthly and yearly switch, a tier comparison, metered usage notes and an FAQ.",
+            },
+        ],
+        features: [
+            "21 page designs, including three home pages for different kinds of company",
+            "Live WebGL plates that answer the pointer and scroll, with a Hold button and a still-image fallback",
+            "Plates pause when off screen or in a background tab, and respect reduced motion",
+            "Product page with model specs, a replayable run, tools and three ways to get access",
+            "Pricing with three tiers, a monthly and yearly switch, a tier comparison and an FAQ accordion",
+            "Console dashboard, analytics charts and settings with API keys, copy buttons, team, billing and notifications",
+            "Careers page with team filters, and a job page with an application form",
+            "Lab notebook journal with ten posts and a long-form article page",
+            "Changelog, coming-soon launch page, terms, privacy and 404",
+            "Sign-in and sign-up with password show and hide",
+            "Contact, application and account forms with inline validation",
+            "Scroll-drawn diagrams and count-up figures",
+            "Mobile menu that traps focus and closes with Escape",
+            "Self-hosted fonts, no frameworks and no external scripts",
+        ],
+        pages: [
+            "Home: AI reasoning lab",
+            "Home 2: orbital manufacturing",
+            "Home 3: space game",
+            "Product",
+            "Pricing",
+            "About",
+            "Careers",
+            "Job post",
+            "Lab notebook (journal)",
+            "Article",
+            "Changelog",
+            "Contact",
+            "Sign in",
+            "Sign up",
+            "Console: Mission control",
+            "Console: Analytics",
+            "Console: Settings",
+            "Coming soon",
+            "Terms",
+            "Privacy",
+            "404",
+        ],
+        card: image("oscilla-ai-startup", "card.webp", 960, 3200),
+        tour: [
+            {
+                id: "home",
+                label: "Home",
+                desktop: image("oscilla-ai-startup", "index-desktop.webp", 1440, 9237),
+                mobile: image("oscilla-ai-startup", "index-mobile.webp", 390, 14467),
+            },
+            {
+                id: "home-2",
+                label: "Orbital home",
+                desktop: image("oscilla-ai-startup", "home-2-desktop.webp", 1440, 9412),
+                mobile: image("oscilla-ai-startup", "home-2-mobile.webp", 390, 12382),
+            },
+            {
+                id: "home-3",
+                label: "Game home",
+                desktop: image("oscilla-ai-startup", "home-3-desktop.webp", 1440, 8593),
+                mobile: image("oscilla-ai-startup", "home-3-mobile.webp", 390, 13093),
+            },
+            {
+                id: "product",
+                label: "Product",
+                desktop: image("oscilla-ai-startup", "product-desktop.webp", 1440, 4865),
+                mobile: image("oscilla-ai-startup", "product-mobile.webp", 390, 7660),
+            },
+            {
+                id: "pricing",
+                label: "Pricing",
+                desktop: image("oscilla-ai-startup", "pricing-desktop.webp", 1440, 4014),
+                mobile: image("oscilla-ai-startup", "pricing-mobile.webp", 390, 6388),
+            },
+            {
+                id: "console",
+                label: "Console",
+                desktop: image("oscilla-ai-startup", "console-desktop.webp", 1440, 1728),
+                mobile: image("oscilla-ai-startup", "console-mobile.webp", 390, 2449),
+            },
+        ],
+        keywords: [
+            "AI startup website template",
+            "SaaS website template",
+            "deep tech startup website template",
+            "Tailwind CSS SaaS template",
+            "WebGL website template",
+        ],
+    },
     "meridian-academy": {
         title: "Timetable-Style Education Academy HTML Template",
         metaTitle: "Meridian Academy Education Website Template",

@@ -251,7 +251,7 @@ export default async function PortfolioPageContent({ preview = false }) {
           <div className="mx-auto max-w-[var(--site-content)]">
             <SectionIntro eyebrow="Our Own Products" title="Templates We Design And Sell">
               <p className="text-sm leading-6 text-gray-400">
-                Ready-made websites for academies, restaurants, estate agencies, clinics and law firms. Try a live demo,
+                Ready-made websites for AI startups, academies, restaurants, estate agencies, clinics and law firms. Try a live demo,
                 buy one, or have us set it up for you.
               </p>
               <Link
