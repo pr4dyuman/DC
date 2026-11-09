@@ -14,7 +14,7 @@ const geistSans = localFont({
     { path: "./fonts/geist-latin-ext.woff2", weight: "100 900", style: "normal" },
   ],
   display: "swap",
-  preload: false,
+  preload: true,
   variable: "--font-geist-sans",
 });
 
