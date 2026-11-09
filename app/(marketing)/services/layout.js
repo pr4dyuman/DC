@@ -5,6 +5,7 @@ export const metadata = buildMarketingMetadata({
   description:
     "SEO, Google and Meta ads, social media, website development, video production and influencer marketing from one team in Jaipur. Start with a free plan.",
   path: "/services",
+  image: "/og-image?title=Digital%20Marketing%20Services%20in%20Jaipur",
   keywords: ["digital marketing services in Jaipur", "digital marketing packages Jaipur", "SEO services Jaipur", "Google Ads agency Jaipur", "social media marketing Jaipur", "website development Jaipur"],
 });
 

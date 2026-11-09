@@ -5,6 +5,7 @@ export const metadata = buildMarketingMetadata({
   description:
     "Google Ads, Meta, LinkedIn and Microsoft ads managed from Jaipur: campaign planning, ad copy, bidding and tracking, with reports on leads, sales and ROAS.",
   path: "/services/ppc",
+  image: "/og-image?title=PPC%20%26%20Google%20Ads%20in%20Jaipur",
   keywords: ["Google Ads agency in Jaipur", "PPC company in Jaipur", "Facebook ads agency Jaipur", "Meta ads agency Jaipur", "performance marketing agency Jaipur"],
 });
 
