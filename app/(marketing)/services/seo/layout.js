@@ -1,11 +1,11 @@
 import { buildMarketingMetadata } from "@/lib/marketing-seo";
 
 export const metadata = buildMarketingMetadata({
-  title: "SEO Services in Jaipur | Digital Corvids",
+  title: "SEO Company in Jaipur | Local SEO Services | Digital Corvids",
   description:
-    "Improve organic visibility with Digital Corvids SEO services: technical SEO, keyword strategy, content planning, on-page optimization, and transparent reporting.",
+    "SEO services in Jaipur: technical SEO, keyword research, content, local SEO and Google Business Profile, with monthly ranking and lead reports.",
   path: "/services/seo",
-  keywords: ["SEO services Jaipur", "technical SEO", "SEO agency Jaipur", "keyword research"],
+  keywords: ["SEO company in Jaipur", "SEO services in Jaipur", "local SEO services Jaipur", "Google Business Profile optimization Jaipur", "technical SEO"],
 });
 
 export default function SeoLayout({ children }) {

@@ -4,8 +4,10 @@ import type { ServicePageData } from "./index";
 const page: ServicePageData = {
     slug: "seo",
     path: "/services/seo",
-    title: "Search Engine Optimization",
-    titleParts: ["Search Engine", "Optimization"],
+    title: "SEO Services in Jaipur",
+    titleParts: ["SEO Services", "in Jaipur"],
+    cardTitle: ["Search Engine", "Optimization"],
+    titleSize: "md",
     eyebrow: "Rank higher, grow faster",
     summary: "We help your business show up when customers search on Google. We fix the technical basics, write pages around what people really search for, strengthen your local listing and build your site's authority, then report traffic, rankings and enquiries every month.",
     cardText: "SEO is the backbone of organic growth. We optimize your website to rank higher on Google, drive targeted traffic, and turn visitors into loyal customers.",
@@ -139,6 +141,18 @@ const page: ServicePageData = {
         {
             question: "Can SEO help a Jaipur or India-focused business?",
             answer: "Yes. We can support local search visibility with location-aware landing pages, Google Business Profile alignment, service-page optimization, and relevant local content."
+        },
+        {
+            question: "How much do SEO services cost in Jaipur?",
+            answer: "It depends on how competitive your market is and how much work your website needs. We price each plan after a free consultation, and you see the full plan and price before you commit to anything."
+        },
+        {
+            question: "Do you set up and optimise Google Business Profile?",
+            answer: "Yes. Local SEO includes setting up and optimising your Google Business Profile, targeting local and “near me” searches, building local citations with a consistent name, address and phone number, and writing content that answers what nearby customers search for."
+        },
+        {
+            question: "How will I know what you are working on?",
+            answer: "Every client gets a login to Agency OS, our project portal, to follow each task and find files and invoices whenever they like. You also get monthly reports on rankings, traffic and enquiries."
         }
     ],
     relatedLinks: [

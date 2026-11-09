@@ -4,8 +4,10 @@ import type { ServicePageData } from "./index";
 const page: ServicePageData = {
     slug: "influencer-marketing",
     path: "/services/influencer-marketing",
-    title: "Influencer Marketing",
-    titleParts: ["Influencer", "Marketing"],
+    title: "Influencer Marketing in Jaipur",
+    titleParts: ["Influencer Marketing", "in Jaipur"],
+    cardTitle: ["Influencer", "Marketing"],
+    titleSize: "md",
     eyebrow: "Creators that convert",
     summary: "We match your brand with credible creators, plan campaigns that feel natural, handle briefs and approvals, and track every post to visits and sales.",
     cardText: "Partner with influencers who align with your brand to reach highly engaged audiences.",
@@ -139,6 +141,18 @@ const page: ServicePageData = {
         {
             question: "How do you measure influencer campaign success?",
             answer: "We track metrics such as reach, engagement quality, traffic, conversions, creator-level performance, cost per result, content reuse value, and campaign ROI."
+        },
+        {
+            question: "How much does influencer marketing cost?",
+            answer: "It depends on the number and size of the creators, the content you need and how long the campaign runs. We price each plan after a free consultation, and you see the full plan and price before you commit to anything."
+        },
+        {
+            question: "Do you work with micro-influencers?",
+            answer: "Yes. We pick nano, micro and larger creators to fit your goals and budget, and check each one's audience and engagement before you approve them."
+        },
+        {
+            question: "Who can use the content creators make for us?",
+            answer: "Usage rights are agreed in the campaign brief and contract before any content is made, so you know where and for how long you can use each piece, including in paid ads."
         }
     ],
     relatedLinks: [

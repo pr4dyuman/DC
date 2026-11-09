@@ -1,11 +1,11 @@
 import { buildMarketingMetadata } from "@/lib/marketing-seo";
 
 export const metadata = buildMarketingMetadata({
-  title: "PPC Advertising Services | Digital Corvids",
+  title: "Google Ads & PPC Agency in Jaipur | Digital Corvids",
   description:
-    "Launch performance-focused PPC campaigns with Digital Corvids across Google, Bing, and social platforms, with testing, tracking, bid management, and ROI reporting.",
+    "Google Ads, Meta, LinkedIn and Microsoft ads managed from Jaipur: campaign planning, ad copy, bidding and tracking, with reports on leads, sales and ROAS.",
   path: "/services/ppc",
-  keywords: ["PPC advertising services", "Google Ads agency", "paid media agency", "PPC agency Jaipur"],
+  keywords: ["Google Ads agency in Jaipur", "PPC company in Jaipur", "Facebook ads agency Jaipur", "Meta ads agency Jaipur", "performance marketing agency Jaipur"],
 });
 
 export default function PpcLayout({ children }) {

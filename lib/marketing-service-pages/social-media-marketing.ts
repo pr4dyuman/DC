@@ -4,8 +4,10 @@ import type { ServicePageData } from "./index";
 const page: ServicePageData = {
     slug: "social-media-marketing",
     path: "/services/social-media-marketing",
-    title: "Social Media Marketing",
-    titleParts: ["Social Media", "Marketing"],
+    title: "Social Media Marketing in Jaipur",
+    titleParts: ["Social Media Marketing", "in Jaipur"],
+    cardTitle: ["Social Media", "Marketing"],
+    titleSize: "md",
     eyebrow: "Build community",
     summary: "We plan, create and run your Instagram, Facebook and LinkedIn so your brand stays visible and your audience turns into customers. Organic posts and paid campaigns work together, and you get a monthly report on what is working.",
     cardText: "Build a loyal audience and amplify your brand's voice across platforms like Facebook, Instagram, LinkedIn, and Pinterest.",
@@ -139,6 +141,18 @@ const page: ServicePageData = {
         {
             question: "How do you measure social media marketing success?",
             answer: "We track metrics such as reach, engagement quality, follower growth, website clicks, leads, conversions, cost per result, creative performance, and audience insights."
+        },
+        {
+            question: "How much does social media marketing cost?",
+            answer: "It depends on the platforms, how often you post and whether you also want paid social ads. We price each plan after a free consultation, and you see the full plan and price before you commit to anything."
+        },
+        {
+            question: "Do you create the photos, videos and reels?",
+            answer: "Yes. We develop the ideas, shoot photo and video for your feeds, write the captions, and plan posts, reels, stories and carousels for each platform."
+        },
+        {
+            question: "Can you manage our Instagram and Facebook pages?",
+            answer: "Yes. We plan the content calendar, create and publish the content, engage with your community, and can run paid social campaigns alongside it, with analytics on what is working."
         }
     ],
     relatedLinks: [

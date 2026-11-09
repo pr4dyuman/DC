@@ -11,17 +11,18 @@ import {
 } from "@/lib/marketing-seo";
 
 export const metadata = buildMarketingMetadata({
-    title: "Digital Corvids | Digital Marketing Agency in Jaipur",
+    title: "Digital Marketing Agency in Jaipur | Digital Corvids",
     description:
-        "Digital Corvids helps businesses grow with SEO, PPC, social media marketing, web development, video production, and influencer marketing.",
+        "Digital marketing agency in Jaipur for SEO, Google and Meta ads, social media, websites, video and influencer marketing. Ask for a free marketing plan.",
     path: "/",
     keywords: [
+        "digital marketing agency in Jaipur",
+        "digital marketing company in Jaipur",
         "Digital Corvids",
-        "digital marketing agency Jaipur",
-        "SEO agency Jaipur",
-        "PPC advertising agency",
-        "social media marketing agency",
-        "web development agency",
+        "SEO company in Jaipur",
+        "Google Ads agency Jaipur",
+        "social media marketing agency Jaipur",
+        "website development company Jaipur",
     ],
 });
 
@@ -39,23 +40,23 @@ export default function MarketingLayout({
         <div className="min-h-screen bg-black text-white">
             <link
                 rel="preload"
-                href="/fonts/etna.otf"
+                href="/fonts/etna.woff2"
                 as="font"
-                type="font/otf"
+                type="font/woff2"
                 crossOrigin="anonymous"
             />
             <link
                 rel="preload"
-                href="/fonts/Glacial.otf"
+                href="/fonts/Glacial.woff2"
                 as="font"
-                type="font/otf"
+                type="font/woff2"
                 crossOrigin="anonymous"
             />
             <link
                 rel="preload"
-                href="/fonts/Glacial-bold.otf"
+                href="/fonts/Glacial-bold.woff2"
                 as="font"
-                type="font/otf"
+                type="font/woff2"
                 crossOrigin="anonymous"
             />
             <script

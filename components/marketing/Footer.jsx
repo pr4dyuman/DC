@@ -4,6 +4,27 @@ import Link from "next/link";
 import NewsletterForm from "./NewsletterForm";
 import CookieSettingsButton from "./CookieSettingsButton";
 
+// Every page links to the six services and the company pages from here.
+const footerServices = [
+  { label: "SEO Services", href: "/services/seo" },
+  { label: "Google Ads & PPC", href: "/services/ppc" },
+  { label: "Social Media Marketing", href: "/services/social-media-marketing" },
+  { label: "Website Development", href: "/services/web-development" },
+  { label: "Video Production", href: "/services/video-production-ad" },
+  { label: "Influencer Marketing", href: "/services/influencer-marketing" },
+];
+
+const footerCompany = [
+  { label: "About Us", href: "/about" },
+  { label: "Portfolio", href: "/portfolio" },
+  { label: "Products", href: "/products" },
+  { label: "Blog", href: "/blog" },
+  { label: "Contact Us", href: "/contact" },
+];
+
+const footerLinkClass =
+  "font-bold uppercase tracking-widest text-white transition-colors hover:text-gray-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#D4E647]";
+
 export default function Footer() {
   return (
     <footer className="relative bg-black text-white w-full border-t-[5px] border-white/30 ">
@@ -29,7 +50,8 @@ export default function Footer() {
           <div className="flex flex-col max-w-md">
             <h2 className="text-5xl md:text-6xl font-suifak mb-4 text-white">Digital Corvids</h2>
             <p className="text-gray-400 text-sm leading-relaxed mb-6 font-glacial">
-              A digital marketing agency specializing in SEO, social media, content, and ads—helping brands grow through smart, creative strategy.
+              A digital marketing agency in Jaipur specialising in SEO, social media, content, ads, websites and video,
+              helping brands grow through smart, creative strategy.
             </p>
 
             {/* Divider Line */}
@@ -47,14 +69,33 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Center: Navigation Links */}
-          <div className="flex flex-wrap gap-6 md:gap-12 mt-4 lg:mt-12 font-bold text-sm tracking-widest font-glacial">
-            <Link href="/about" prefetch={false} className="hover:text-gray-300 transition-colors uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#D4E647]">ABOUT US</Link>
-            <Link href="/portfolio" prefetch={false} className="hover:text-gray-300 transition-colors uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#D4E647]">PORTFOLIO</Link>
-            <Link href="/products" prefetch={false} className="hover:text-gray-300 transition-colors uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#D4E647]">PRODUCTS</Link>
-            <Link href="/contact" prefetch={false} className="hover:text-gray-300 transition-colors uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#D4E647]">CONTACT US</Link>
-            <Link href="/blog" prefetch={false} className="hover:text-gray-300 transition-colors uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#D4E647]">BLOG</Link>
-          </div>
+          {/* Center: the services and the company pages */}
+          <nav aria-label="Footer" className="mt-4 grid grid-cols-2 gap-x-12 gap-y-8 font-glacial text-sm sm:gap-x-16 lg:mt-12">
+            <div>
+              <p className="m-0 mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[#F5EE30]">Services</p>
+              <ul className="m-0 flex list-none flex-col gap-3 p-0">
+                {footerServices.map((link) => (
+                  <li key={link.href}>
+                    <Link href={link.href} prefetch={false} className={footerLinkClass}>
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="m-0 mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[#F5EE30]">Company</p>
+              <ul className="m-0 flex list-none flex-col gap-3 p-0">
+                {footerCompany.map((link) => (
+                  <li key={link.href}>
+                    <Link href={link.href} prefetch={false} className={footerLinkClass}>
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </nav>
 
           {/* Right: Newsletter & Contact */}
           <div className="flex flex-col w-full max-w-sm mt-4 lg:mt-12">
@@ -69,6 +110,7 @@ export default function Footer() {
               <a href="mailto:flytheraven@digitalcorvids.com" className="hover:text-white transition-colors block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#D4E647]">
                 Email - flytheraven@digitalcorvids.com
               </a>
+              <p className="m-0">Malviya Nagar, Jaipur, Rajasthan, India</p>
             </div>
           </div>
         </div>

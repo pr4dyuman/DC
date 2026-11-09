@@ -4,8 +4,10 @@ import type { ServicePageData } from "./index";
 const page: ServicePageData = {
     slug: "web-development",
     path: "/services/web-development",
-    title: "Web Development",
-    titleParts: ["Web", "Development"],
+    title: "Website Development in Jaipur",
+    titleParts: ["Website Development", "in Jaipur"],
+    cardTitle: ["Web", "Development"],
+    titleSize: "md",
     eyebrow: "Building digital experiences",
     summary: "We design and build fast, mobile-friendly websites and web apps that explain what you do and turn visitors into enquiries. Every site is search-friendly from day one and easy for your team to update.",
     cardText: "Your website is your digital storefront. We build fast, secure, and user-friendly sites optimized for conversions.",
@@ -141,6 +143,18 @@ const page: ServicePageData = {
         {
             question: "Can you improve an existing website instead of rebuilding it?",
             answer: "Yes. We can audit an existing site for speed, UX, technical SEO, content structure, conversion paths, and code quality before deciding whether optimization or rebuilding is the better route."
+        },
+        {
+            question: "How much does a website cost in Jaipur?",
+            answer: "It depends on the number of pages, the features and the integrations you need. We price each plan after a free consultation, and you see the full plan and price before you commit to anything. For a smaller budget, our ready-made website templates are a quicker, lower-cost option."
+        },
+        {
+            question: "Can you build an online store?",
+            answer: "Yes. We build ecommerce websites and integrate content management systems such as Shopify and WordPress, with product pages, checkout and the tools your store needs."
+        },
+        {
+            question: "Will I be able to update the website myself?",
+            answer: "If you want to edit pages and products yourself, we can build your site on a content management system such as WordPress or Shopify, so everyday updates do not need a developer."
         }
     ],
     relatedLinks: [

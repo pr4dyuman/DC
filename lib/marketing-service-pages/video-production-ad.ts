@@ -4,8 +4,9 @@ import type { ServicePageData } from "./index";
 const page: ServicePageData = {
     slug: "video-production-ad",
     path: "/services/video-production-ad",
-    title: "Video Production & Ad Films",
-    titleParts: ["Video Production &", "Ad Films"],
+    title: "Video Production & Ad Films in Jaipur",
+    titleParts: ["Video Production & Ad Films", "in Jaipur"],
+    cardTitle: ["Video Production", "& Ad Films"],
     titleSize: "md",
     eyebrow: "Story-led content",
     summary: "From the first idea to the final edit, we produce ad films, reels, explainers and brand videos, and cut each one for the platform where your audience will watch it.",
@@ -153,6 +154,18 @@ const page: ServicePageData = {
         {
             question: "How do you measure video production success?",
             answer: "We connect creative decisions to goals such as watch time, engagement, click-through rate, conversions, social shares, audience retention, and campaign performance."
+        },
+        {
+            question: "How much does an ad film or video cost?",
+            answer: "It depends on the concept, the number of shoot days, locations, cast and the edits you need. We price each plan after a free consultation, and you see the full plan and price before you commit to anything."
+        },
+        {
+            question: "What kinds of videos do you make?",
+            answer: "Ad films and TV commercials, social media video campaigns and reels, product demos and explainers, testimonials and brand stories, and influencer content."
+        },
+        {
+            question: "Can you help our videos reach more people?",
+            answer: "Yes. Distribution is part of the service: we cut each video for the platforms where your audience watches, such as YouTube, Instagram and LinkedIn, and can promote it with paid campaigns."
         }
     ],
     relatedLinks: [

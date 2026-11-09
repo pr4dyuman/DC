@@ -26,6 +26,12 @@ const nextConfig: NextConfig = {
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
         ],
       },
+      {
+        // Fonts change only when a developer replaces them, so returning
+        // visitors can reuse them for 30 days instead of re-checking each visit.
+        source: '/fonts/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=2592000, stale-while-revalidate=86400' }],
+      },
     ];
   },
   async redirects() {

@@ -1,11 +1,11 @@
 import { buildMarketingMetadata } from "@/lib/marketing-seo";
 
 export const metadata = buildMarketingMetadata({
-  title: "Video Production and Ad Films | Digital Corvids",
+  title: "Video Production & Ad Film Company in Jaipur | Digital Corvids",
   description:
-    "Create high-impact videos and ad films with Digital Corvids, from pre-production and scripting to production, post-production, distribution, and performance creative.",
+    "Video production and ad films in Jaipur: concept, scripting, shoots, editing and distribution for ads, reels, YouTube and brand stories.",
   path: "/services/video-production-ad",
-  keywords: ["video production agency", "ad films", "brand videos", "video production Jaipur"],
+  keywords: ["video production company in Jaipur", "ad film production house in Jaipur", "ad film makers in Jaipur", "corporate video production Jaipur", "reels production Jaipur"],
 });
 
 export default function VideoProductionLayout({ children }) {

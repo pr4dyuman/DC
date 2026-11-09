@@ -201,7 +201,17 @@ export function getMarketingOrganizationJsonLd() {
         name: MARKETING_SITE_NAME,
         alternateName: "DC Digital Corvids",
         url: MARKETING_SITE_URL,
-        logo: marketingAbsoluteUrl("/favicon.ico"),
+        logo: {
+            "@type": "ImageObject",
+            url: marketingAbsoluteUrl("/logo.png"),
+            width: 512,
+            height: 512,
+        },
+        // As listed on the About page's team section.
+        founder: {
+            "@type": "Person",
+            name: "Nagendra Indoria",
+        },
         image: marketingAbsoluteUrl(DEFAULT_SOCIAL_IMAGE_PATH),
         description: MARKETING_DEFAULT_DESCRIPTION,
         email: MARKETING_EMAIL,

@@ -4,8 +4,8 @@ import type { ServicePageData } from "./index";
 const page: ServicePageData = {
     slug: "ppc",
     path: "/services/ppc",
-    title: "Pay-Per-Click (PPC) Advertising",
-    titleParts: ["Pay-Per-Click (PPC)", "Advertising"],
+    title: "PPC & Google Ads in Jaipur",
+    titleParts: ["PPC & Google Ads", "in Jaipur"],
     cardTitle: ["PPC", "Advertising"],
     titleSize: "md",
     eyebrow: "Immediate results",
@@ -154,6 +154,18 @@ const page: ServicePageData = {
         {
             question: "How do you measure PPC success?",
             answer: "We track metrics that connect ad spend to business outcomes, including conversions, cost per lead, conversion rate, ROAS, wasted spend, lead quality, and campaign-level trends."
+        },
+        {
+            question: "How much does Google Ads management cost?",
+            answer: "It depends on your goals, the platforms you need and how much you want to spend on ads. We price each plan after a free consultation, and you see the full plan and price before any campaign goes live."
+        },
+        {
+            question: "Can you run Google Ads for a local business in Jaipur?",
+            answer: "Yes. Campaigns can focus on people searching near your business, with bids adjusted by location, device and time of day, so shops, clinics and service firms reach nearby customers who are ready to buy."
+        },
+        {
+            question: "Will I be able to see results while campaigns run?",
+            answer: "Yes. Every client gets a login to Agency OS, our project portal, and our reports focus on leads, sales and return on ad spend rather than vanity metrics."
         }
     ],
     relatedLinks: [
