@@ -49,7 +49,6 @@ const services = [
     "Social Media Marketing",
     "Web Design",
     "Branding",
-    "Agency Management",
   ]);
 
 export function ToolLogosSlider() {

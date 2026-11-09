@@ -69,12 +69,16 @@ function getWhatsAppTopic(pathname: string) {
         return `your ${service.label} services`;
     }
 
-    if (pathname.startsWith("/services/manage-company") || pathname.startsWith("/get-started")) {
+    if (pathname.startsWith("/agency-os") || pathname.startsWith("/get-started")) {
         return "Agency OS";
     }
 
     if (pathname.startsWith("/templates")) {
         return "your website templates";
+    }
+
+    if (pathname.startsWith("/products")) {
+        return "your products";
     }
 
     return "your services";

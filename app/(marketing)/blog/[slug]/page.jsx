@@ -204,11 +204,11 @@ const MARKETING_SERVICE_LINKS = [
     keywords: ["influencer", "creator", "youtube", "campaign", "brand voice"],
   },
   {
-    key: "manage-company",
-    title: "Manage Company",
-    href: "/services/manage-company",
-    description: "Connect agency operations, projects, finances, workflows, and AI-powered management.",
-    keywords: ["agency operations", "financial intelligence", "manage your company", "company", "workflows"],
+    key: "agency-os",
+    title: "Agency OS",
+    href: "/agency-os",
+    description: "Run your agency's projects, finances, team and client portal in one place, with AI assistance.",
+    keywords: ["agency os", "agency operations", "financial intelligence", "manage your company", "company", "workflows"],
   },
   {
     // Added to every post's list below, so it has no keywords to match.

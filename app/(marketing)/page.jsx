@@ -3,7 +3,8 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import AboutAgency from "@/components/marketing/AboutAgency";
 import LazyServicesSection from "@/components/marketing/LazyServicesSection";
-import ManageCompanySection from "@/components/marketing/ManageCompany";
+import ClientPortalSection from "@/components/marketing/ClientPortalSection";
+import ProductCards from "@/components/marketing/ProductCards";
 import HeroFlightPath from "@/components/marketing/HeroFlightPath";
 import HomeRotatingWord from "@/components/marketing/HomeRotatingWord";
 import LazyCompanionsSlider from "@/components/marketing/LazyCompanionsSlider";
@@ -123,9 +124,6 @@ const HeroSection = async () => {
         </div>
       </section>
 
-      {/* Manage Company Section — Agency OS Showcase */}
-      <ManageCompanySection />
-
       {/* Logos of the tools we work with */}
       <section className="w-full bg-black py-10">
         <div className="text-center max-w-6xl mx-auto px-4 mb-8">
@@ -137,6 +135,10 @@ const HeroSection = async () => {
       </section>
 
       <LazyServicesSection />
+
+      {/* What working with us looks like: every client's Agency OS portal */}
+      <ClientPortalSection />
+
       <AboutAgency />
 
       {/* New Auto-Width Services Slider */}
@@ -171,6 +173,32 @@ const HeroSection = async () => {
         </div>
       </section>
       <LazyTeamSlider />
+
+      {/* Our products, kept apart from the services above */}
+      <section aria-labelledby="home-products-heading" className="bg-black px-[var(--site-gutter)] pb-16 pt-4 sm:pb-20 lg:pb-24">
+        <div className="mx-auto max-w-[var(--site-content)] border-t border-white/10 pt-12 sm:pt-16">
+          <div className="mb-8 flex flex-col gap-5 sm:mb-10 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="mb-5 flex items-center gap-3">
+                <div className="h-2.5 w-2.5 rounded-sm bg-[#F5EE30]"></div>
+                <p className="font-glacial-bold text-sm uppercase tracking-widest text-white sm:text-base">Our Products</p>
+              </div>
+              <h2 id="home-products-heading" className="text-3xl font-bold uppercase leading-tight text-white sm:text-4xl lg:text-5xl">
+                Also Made By <span className="text-[#F5EE30]">Digital Corvids</span>
+              </h2>
+            </div>
+            <Link
+              href="/products"
+              prefetch={false}
+              className="inline-flex items-center gap-2 font-glacial-bold text-sm uppercase tracking-widest text-[#F5EE30] transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
+            >
+              See all products
+              <ArrowRight aria-hidden="true" className="h-4 w-4" />
+            </Link>
+          </div>
+          <ProductCards headingLevel="h3" />
+        </div>
+      </section>
     </main>
   );
 };

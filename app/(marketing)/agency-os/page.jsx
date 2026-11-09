@@ -1,58 +1,60 @@
 import ManageCompanySection from "@/components/marketing/ManageCompany";
 import RelatedArticlesSection from "@/components/marketing/RelatedArticlesSection";
+import { MARKETING_PRODUCTS } from "@/lib/marketing-products";
 import {
+  MARKETING_SITE_URL,
   buildMarketingMetadata,
   getMarketingBreadcrumbJsonLd,
-  getMarketingServiceJsonLd,
+  marketingAbsoluteUrl,
   serializeMarketingJsonLd,
 } from "@/lib/marketing-seo";
 
+// Agency OS is a product, so it lives under Products. Its old address,
+// /services/manage-company, redirects here (next.config.ts).
+const DESCRIPTION =
+  "Agency OS gives your team one place for projects, invoices and people, and every client a portal to follow their work. Free for 7 days.";
+
 export const metadata = buildMarketingMetadata({
-  title: "Manage Your Company With AI | Digital Corvids",
-  description:
-    "Your all-in-one agency management platform. Track projects, manage finances, automate invoicing, and let AI handle the heavy lifting.",
-  path: "/services/manage-company",
+  title: "Agency OS: Agency Management Software | Digital Corvids",
+  description: DESCRIPTION,
+  path: "/agency-os",
   image: "/dashboard-mockup-1600-q92.webp",
-  keywords: ["agency management software", "Agency OS", "AI agency management", "project finance automation"],
+  keywords: [
+    "Agency OS",
+    "agency management software",
+    "client portal software",
+    "AI agency management",
+    "project and invoice management",
+  ],
 });
 
 const structuredData = [
-  getMarketingServiceJsonLd({
-    name: "Manage Your Company With AI",
-    description:
-      "Agency management platform for tracking projects, managing finances, automating invoicing, coordinating teams, and using AI assistance across operations.",
-    path: "/services/manage-company",
-    serviceType: "Agency Management Software",
-  }),
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Agency OS",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    description: DESCRIPTION,
+    url: marketingAbsoluteUrl("/agency-os"),
+    image: marketingAbsoluteUrl("/dashboard-mockup-1600-q92.webp"),
+    publisher: { "@id": `${MARKETING_SITE_URL}/#organization` },
+  },
   getMarketingBreadcrumbJsonLd([
     { name: "Home", path: "/" },
-    { name: "Services", path: "/services" },
-    { name: "Manage Your Company With AI", path: "/services/manage-company" },
+    { name: "Products", path: "/products" },
+    { name: "Agency OS", path: "/agency-os" },
   ]),
 ];
 
-const relatedManageCompanyServices = [
-  {
-    title: "zSEO.ai",
-    href: "https://zseo.ai",
-    category: "Content Operations",
-    description: "Plan SEO work, build source-backed content strategy, and review every article before it publishes.",
-  },
-  {
-    title: "Web Development",
-    href: "/services/web-development",
-    category: "Client Portals",
-    description: "Build fast, reliable web experiences that support client and team workflows.",
-  },
-  {
-    title: "PPC Advertising",
-    href: "/services/ppc",
-    category: "Growth Tracking",
-    description: "Connect campaign spend, lead quality, and reporting with clearer business outcomes.",
-  },
-];
+const otherProducts = MARKETING_PRODUCTS.filter((product) => product.id !== "agency-os").map((product) => ({
+  title: product.name,
+  href: product.href,
+  category: product.external ? "Separate website" : "Product",
+  description: product.description,
+}));
 
-const relatedManageCompanyArticles = [
+const relatedAgencyOsArticles = [
   {
     title: "Custom Web App Architecture For Growing Businesses",
     href: "/blog/customized-web-application-development-architecture",
@@ -73,7 +75,7 @@ const relatedManageCompanyArticles = [
   },
 ];
 
-export default function ManageCompanyPage() {
+export default function AgencyOsPage() {
   return (
     <main>
       <script
@@ -89,17 +91,17 @@ export default function ManageCompanyPage() {
       <div className="bg-black text-white">
         <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] pb-16 sm:pb-20 lg:pb-24">
           <RelatedArticlesSection
-            eyebrow="Connected Services"
-            title="Build The Operating System Around Growth"
-            description="Manage Company works best when operations, content, web infrastructure, and campaign reporting stay connected."
-            articles={relatedManageCompanyServices}
-            actionLabel="Explore Service"
+            eyebrow="Also From Digital Corvids"
+            title="More Products"
+            description="Other things our team has built: ready-made websites you can launch quickly, and a tool for planning SEO content."
+            articles={otherProducts}
+            actionLabel="Explore Product"
           />
           <RelatedArticlesSection
             eyebrow="Growth Systems Reading List"
             title="Guides For Connected Business Systems"
             description="Use these Digital Corvids articles to plan scalable business systems, funnel tracking, and data-driven growth reporting."
-            articles={relatedManageCompanyArticles}
+            articles={relatedAgencyOsArticles}
           />
         </div>
       </div>

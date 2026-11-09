@@ -37,7 +37,8 @@ test("contact messages start with the visitor's request", () => {
   assert.match(getMarketingContactMessage("ppc", "plan"), /interested in PPC advertising/);
   assert.equal(getMarketingContactMessage("not-a-service", null), "");
   assert.equal(getMarketingContactMessage(null, "customise"), "");
-  assert.equal(getMarketingContactService("manage-company"), undefined);
+  // Agency OS is a product, not a service a visitor can enquire about here.
+  assert.equal(getMarketingContactService("agency-os"), undefined);
 });
 
 test("the WhatsApp link opens a chat about the page's service", () => {
@@ -46,7 +47,8 @@ test("the WhatsApp link opens a chat about the page's service", () => {
   assert.ok(getMarketingWhatsAppHref("/").startsWith("https://wa.me/918003177679?text="));
   assert.equal(text("/"), "Hi Digital Corvids, I'd like to know more about your services.");
   assert.match(text("/services/seo") ?? "", /your SEO services/);
-  assert.match(text("/services/manage-company") ?? "", /Agency OS/);
+  assert.match(text("/agency-os") ?? "", /Agency OS/);
+  assert.match(text("/products") ?? "", /your products/);
   assert.match(text("/templates/sugo-restaurant") ?? "", /your website templates/);
   assert.match(text(null) ?? "", /your services/);
 });

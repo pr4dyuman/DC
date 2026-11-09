@@ -23,7 +23,7 @@ const taskEstimates = [
     { title: "Launch", hours: "2h" },
 ];
 
-// Shown under the section on the Manage Company page only.
+// Shown under the section on the Agency OS page only.
 const agencyOsFeatures = [
     {
         title: "Projects",
@@ -78,7 +78,8 @@ function HandArrow({ direction, className = "" }) {
     );
 }
 
-function ClientPortalPreview() {
+// Also used on the homepage, where it shows clients their own portal.
+export function ClientPortalPreview() {
     return (
         <figure className="m-0 w-full min-w-0 max-w-[640px] xl:max-w-none">
             <figcaption className="sr-only">
@@ -250,7 +251,7 @@ export default function ManageCompanySection({
                                 </Link>
                                 {showServiceLink ? (
                                     <Link
-                                        href="/services/manage-company"
+                                        href="/agency-os"
                                         prefetch={false}
                                         className="inline-flex min-h-[44px] items-center font-glacial-bold text-base underline decoration-2 underline-offset-[6px] hover:decoration-[3px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0b0b0b]"
                                     >

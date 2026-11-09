@@ -52,7 +52,9 @@ const nextConfig: NextConfig = {
       { source: '/social-media-marketing.html', destination: '/services/social-media-marketing', statusCode: 301 },
       { source: '/video-production.html', destination: '/services/video-production-ad', statusCode: 301 },
       { source: '/influencer-marketing.html', destination: '/services/influencer-marketing', statusCode: 301 },
-      { source: '/manage-company.html', destination: '/services/manage-company', statusCode: 301 },
+      { source: '/manage-company.html', destination: '/agency-os', statusCode: 301 },
+      // Agency OS is a product, not a service: it moved under Products.
+      { source: '/services/manage-company', destination: '/agency-os', statusCode: 301 },
       // AI Blogger moved to its own website.
       { source: '/services/ai-blogger', destination: 'https://zseo.ai', statusCode: 301 },
       // Retired blog posts: older redirects and the 2026-10 content cleanup

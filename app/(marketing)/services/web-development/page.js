@@ -79,6 +79,11 @@ const relatedWebDevelopmentLinks = [
     description: "Support launch campaigns with consistent social visibility.",
   },
   {
+    title: "Website Templates",
+    href: "/templates",
+    description: "Smaller budget? Start from a ready-made website and let us customise it.",
+  },
+  {
     title: "Get Started",
     href: getMarketingContactHref({ service: "web-development" }),
     description: "Share your website goals and plan the next build step.",

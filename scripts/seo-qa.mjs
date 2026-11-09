@@ -15,7 +15,8 @@ const REQUIRED_PUBLIC_PATHS = [
   "/services/social-media-marketing",
   "/services/video-production-ad",
   "/services/influencer-marketing",
-  "/services/manage-company",
+  "/agency-os",
+  "/products",
   "/contact",
   "/get-started",
   "/blog",
@@ -47,7 +48,6 @@ const SERVICE_DETAIL_PATHS = [
   "/services/social-media-marketing",
   "/services/video-production-ad",
   "/services/influencer-marketing",
-  "/services/manage-company",
 ];
 
 const SERVICE_FAQ_PATHS = [
@@ -292,6 +292,14 @@ function getExpectedSchemaTypes(path) {
 
   if (SERVICE_FAQ_PATHS.includes(path)) {
     expected.push("FAQPage");
+  }
+
+  if (path === "/agency-os") {
+    expected.push("SoftwareApplication", "BreadcrumbList");
+  }
+
+  if (path === "/products") {
+    expected.push("BreadcrumbList");
   }
 
   if (/^\/blog\/[^/]+$/.test(path)) {

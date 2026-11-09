@@ -59,14 +59,4 @@ export const servicesData = [
     link: "/services/influencer-marketing",
     gradientColor: "#F5EE30",
   },
-  {
-    id: "07",
-    title: "Manage",
-    titleHighlight: "Company",
-      image: "/dashboard-mockup-service-1200-q92.webp",
-    description:
-      "AI-powered agency management platform for projects, finances, invoicing, and operational visibility.",
-    link: "/services/manage-company",
-    gradientColor: "#F5EE30",
-  },
 ];

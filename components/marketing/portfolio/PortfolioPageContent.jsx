@@ -1,11 +1,8 @@
 import Link from "next/link";
 import { ArrowRight, Check, ExternalLink } from "lucide-react";
 
-import TemplateRail from "@/components/marketing/templates/TemplateRail";
-import TemplateTile from "@/components/marketing/templates/TemplateTile";
 import { getPortfolioServiceCounts, getServiceExamples, selectCaseStudies } from "@/lib/marketing-portfolio";
 import { loadAllCaseStudies } from "@/lib/marketing-portfolio-store";
-import { getMarketingTemplatePageTotal, getMarketingTemplates } from "@/lib/marketing-templates";
 
 import PortfolioCaseCard from "./PortfolioCaseCard";
 import PortfolioFilterLink from "./PortfolioFilterLink";
@@ -95,7 +92,6 @@ export default async function PortfolioPageContent({ preview = false }) {
   // The preview already shows each sample in the grid.
   const examples = preview ? [] : getServiceExamples(all);
   const counts = getPortfolioServiceCounts(studies);
-  const templates = getMarketingTemplates();
   const marketingServices = counts.filter(({ service }) => !WEBSITE_SERVICE_IDS.includes(service.id));
   const websitesOnly = marketingServices.length === 0;
 
@@ -108,21 +104,21 @@ export default async function PortfolioPageContent({ preview = false }) {
           marketingServices.map(({ service }) => service.label),
         )} work behind our clients' growth.`,
     exampleLine,
-    "Plus the website templates we design and sell.",
   ]
     .filter(Boolean)
     .join(" ");
 
+  // Client work only: the templates we sell are under Products (/templates).
   const stats = websitesOnly
     ? [
         { label: "Client projects", value: padCount(studies.length) },
-        { label: "Website templates", value: padCount(templates.length) },
-        { label: "Template pages", value: padCount(getMarketingTemplatePageTotal()) },
+        { label: "Services", value: padCount(SERVICE_PAGES.length) },
+        { label: "Reply within", value: "24h" },
       ]
     : [
         { label: "Projects", value: padCount(studies.length) },
         { label: "Services", value: padCount(counts.length) },
-        { label: "Website templates", value: padCount(templates.length) },
+        { label: "Reply within", value: "24h" },
       ];
 
   const serviceCount = (ids) => studies.filter((study) => study.services.some((id) => ids.includes(id))).length;
@@ -246,50 +242,6 @@ export default async function PortfolioPageContent({ preview = false }) {
         </section>
       ) : null}
 
-      {templates.length ? (
-        <section id="templates" className="overflow-hidden border-t border-white/10 px-[var(--site-gutter)] py-14 sm:py-16 lg:py-20">
-          <div className="mx-auto max-w-[var(--site-content)]">
-            <SectionIntro eyebrow="Our Own Products" title="Templates We Design And Sell">
-              <p className="text-sm leading-6 text-gray-400">
-                Ready-made websites for AI startups, academies, restaurants, estate agencies, clinics and law firms. Try a live demo,
-                buy one, or have us set it up for you.
-              </p>
-              <Link
-                href="/templates"
-                prefetch={false}
-                className={`mt-4 inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-[#F5EE30] transition-colors hover:text-white ${focusRing}`}
-              >
-                Browse All Templates
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-            </SectionIntro>
-
-            <div className="mt-8">
-              <TemplateRail label="Website templates">
-                {templates.map((template) => (
-                  <TemplateTile key={template.slug} template={template} />
-                ))}
-                <Link
-                  key="all-templates"
-                  href="/templates"
-                  prefetch={false}
-                  className={`group flex flex-col justify-between gap-8 rounded-lg border border-dashed border-white/20 bg-white/[0.02] p-5 transition-colors hover:border-[#F5EE30] sm:p-6 ${focusRing}`}
-                >
-                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">All templates</span>
-                  <span>
-                    <span className="block font-suifak text-6xl leading-none text-[#F5EE30]">{padCount(templates.length)}</span>
-                    <span className="mt-4 block text-xl font-bold uppercase leading-tight">See every template</span>
-                    <span className="mt-2 block text-sm leading-6 text-white/60">Live demos, page tours and prices.</span>
-                  </span>
-                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#F5EE30] text-black transition-transform group-hover:translate-x-1">
-                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                </Link>
-              </TemplateRail>
-            </div>
-          </div>
-        </section>
-      ) : null}
 
       <section className="border-y border-white/10 bg-[#F5EE30] px-[var(--site-gutter)] py-14 text-black sm:py-16 lg:py-20">
         <div className="mx-auto grid max-w-[var(--site-content)] gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">

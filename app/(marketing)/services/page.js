@@ -68,20 +68,6 @@ export default function Services() {
       tagline: "CREATORS THAT CONVERT",
       ctaLabel: "Explore Influencer Marketing",
     },
-    {
-      id: "07",
-      title: "Manage",
-      titleHighlight: "Company",
-      image: "/dashboard-mockup-service-1200-q92.webp",
-      imageWidth: 1200,
-      imageHeight: 860,
-      imageClassName: "h-auto w-72 sm:w-[26rem] md:w-[34rem] lg:w-[34rem] max-w-full",
-      imageSizes: "(min-width: 1024px) 544px, (min-width: 768px) 544px, (min-width: 640px) 416px, 288px",
-      description: "AI-powered agency management platform. Track projects, manage finances, automate invoicing, and let AI handle the heavy lifting.",
-      link: "/services/manage-company",
-      tagline: "AI-POWERED MANAGEMENT",
-      ctaLabel: "Explore Manage Company",
-    },
   ];
 
   return (
@@ -154,6 +140,19 @@ export default function Services() {
             </div>
           );
         })}
+
+        {/* Agency OS and the templates used to be listed here; they are products now. */}
+        <p className="mx-auto mb-4 max-w-2xl border-t border-white/10 pt-8 text-center text-base leading-relaxed text-gray-400">
+          Looking for Agency OS, our website templates or zSEO.ai? They are under{" "}
+          <Link
+            href="/products"
+            prefetch={false}
+            className="font-glacial-bold text-[#F5EE30] underline underline-offset-4 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
+          >
+            Products
+          </Link>
+          .
+        </p>
       </div>
     </main>
   );
