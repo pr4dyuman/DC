@@ -78,15 +78,15 @@ export default function Navigation() {
         <Link
           href="/"
           prefetch={false}
-          aria-label="Digital Corvids home"
           className={`flex items-center space-x-3 group ${focusRing}`}
         >
           <span className="text-[#F5EE30] text-5xl sm:text-6xl md:text-7xl font-suifak tracking-tight group-hover:drop-shadow-[0_0_10px_rgba(245,238,48,0.5)] transition-all">
             DC
-          </span>
+          </span>{" "}
           <span className="text-xl sm:text-2xl font-suifak leading-tight text-white group-hover:text-gray-200 transition-colors">
             Digital <br /> Corvids
           </span>
+          <span className="sr-only"> home</span>
         </Link>
 
         {/* Desktop Links. The logo is the link home, which leaves room for

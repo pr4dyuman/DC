@@ -31,7 +31,7 @@ async function ServiceExample({ services, title, contactService }) {
           <h2 className="text-3xl font-extrabold uppercase leading-tight md:text-5xl">
             <span className="text-white">{title}</span>
             <br />
-            <span className="text-[#3E3E3E]">How We Report Them</span>
+            <span className="text-[#6b6b6b]">How We Report Them</span>
           </h2>
         </div>
         <Link
@@ -73,7 +73,7 @@ export default async function ServiceCaseStudies({ services, title, linkLabel, c
           <h2 className="text-3xl font-extrabold uppercase leading-tight md:text-5xl">
             <span className="text-white">{title}</span>
             <br />
-            <span className="text-[#3E3E3E]">We Have Delivered</span>
+            <span className="text-[#6b6b6b]">We Have Delivered</span>
           </h2>
         </div>
         <Link
