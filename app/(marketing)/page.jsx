@@ -14,9 +14,40 @@ import ServicesTicker from "@/components/marketing/ServicesTicker";
 import ServiceShowcase from "@/components/marketing/services/ServiceShowcase";
 import ButtonLink from "@/components/marketing/ui/ButtonLink";
 import CtaBand from "@/components/marketing/ui/CtaBand";
+import FaqList, { getFaqJsonLd } from "@/components/marketing/ui/FaqList";
 import { MOBILE_SCROLLER, MOBILE_SCROLLER_ITEM, PageSection, SectionIntro } from "@/components/marketing/ui/PageSection";
 import { getMarketingBlogLinks } from "@/lib/marketing-blog-links";
 import { getMarketingContactHref } from "@/lib/marketing-contact";
+import { serializeMarketingJsonLd } from "@/lib/marketing-seo";
+
+// Common questions, answered from what the rest of the site already says.
+const homeFaqs = [
+  {
+    question: "What does Digital Corvids do?",
+    answer:
+      "We are a digital marketing agency in Jaipur. We plan and run SEO, Google and Meta ads, social media, websites, video and influencer campaigns for small and growing businesses, and show you the enquiries each one brings in.",
+  },
+  {
+    question: "How much does digital marketing cost?",
+    answer:
+      "It depends on your goals and the channels that fit your business. We start with a free plan, and you see the full plan and price before you commit to anything.",
+  },
+  {
+    question: "Which service should I start with?",
+    answer:
+      "If you are not sure, ask for a free marketing plan. We look at your business and goals and suggest the mix of channels that fits your budget.",
+  },
+  {
+    question: "Do you work with small businesses?",
+    answer:
+      "Yes. Our services are built for small and growing businesses, such as local shops, studios, service firms and online stores, and our reports stay simple: traffic, leads and sales.",
+  },
+  {
+    question: "How do I get started?",
+    answer:
+      "Fill in the contact form or message us on WhatsApp. We reply within 24 hours with any questions and send a free plan for your goals.",
+  },
+];
 
 // The figures the About page also shows.
 const homeStats = [
@@ -37,6 +68,10 @@ const HeroSection = async () => {
 
   return (
     <main className="bg-black text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(getFaqJsonLd(homeFaqs)) }}
+      />
       <div className="px-[var(--site-gutter)] font-glacial">
       <section className="relative mx-auto max-w-[var(--site-content)] overflow-hidden [container-type:inline-size]">
         {/* Still grid and a flight path that draws once */}
@@ -170,6 +205,11 @@ const HeroSection = async () => {
           </ul>
         </PageSection>
       )}
+
+      <PageSection labelledBy="home-faqs">
+        <SectionIntro id="home-faqs" eyebrow="Questions" title="Digital Marketing" accent="In Jaipur, Answered" />
+        <FaqList items={homeFaqs} />
+      </PageSection>
 
       <CtaBand
         title="Want more"
