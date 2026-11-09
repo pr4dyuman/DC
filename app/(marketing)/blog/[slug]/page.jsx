@@ -9,7 +9,7 @@ import Blog from "@/models/marketing/Blog";
 import { checkAuth } from "@/lib/authMiddleware";
 import {
   cleanStoredBlogSchema,
-  getMarketingBlogPublicCategory,
+  getMarketingBlogTopic,
   isRemovedMarketingBlogSlug,
   replaceAIBloggerReferences,
   rewriteMarketingSiteLinksToRelative,
@@ -614,7 +614,8 @@ async function getBlog(slug) {
     return {
       ...blog,
       _id: blog._id.toString(),
-      category: getMarketingBlogPublicCategory(blog),
+      // The topic, so the label matches the blog's filters.
+      category: getMarketingBlogTopic(blog),
       // Without an image the page falls back to /og-image for social cards
       // and leaves the image out of the article schema.
       image: isMarketingBlogPlaceholderImage(blog.image) ? "" : normalizeMarketingImageSrc(blog.image, ""),

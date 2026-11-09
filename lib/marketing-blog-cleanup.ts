@@ -98,8 +98,36 @@ const PUBLIC_CATEGORY_RULES: Array<{ label: string; keywords: string[] }> = [
     { label: "Video Production", keywords: ["video", "storytelling", "production"] },
     { label: "Social Media", keywords: ["social media", "instagram", "linkedin", "reels", "content calendar"] },
     { label: "Web Development", keywords: ["web development", "web application", "website", "cms"] },
-    { label: "SEO", keywords: ["seo", "search", "keyword", "geo", "citation"] },
+    { label: "SEO", keywords: ["seo", "search", "keyword", "geo", "citation", "ranking"] },
 ];
+
+/** The blog's topics in filter order: the six services, then everything else. */
+export const MARKETING_BLOG_TOPICS = [
+    "SEO",
+    "PPC",
+    "Social Media",
+    "Web Development",
+    "Video Production",
+    "Influencer Marketing",
+    "Insights",
+];
+
+function matchBlogTopic(text: string) {
+    const normalized = text.replace(/-/g, " ").toLowerCase();
+    return PUBLIC_CATEGORY_RULES.find((rule) => rule.keywords.some((keyword) => normalized.includes(keyword)))?.label;
+}
+
+/**
+ * The topic readers browse by: one of the six services, or "Insights".
+ * Stored categories are often one-off labels ("2026 social media marketing
+ * trends") or differ only in case ("influencer marketing" and "Influencer
+ * Marketing"), so the blog groups posts by topic instead. An editor's
+ * category decides when it names a service; otherwise the slug and title do.
+ */
+export function getMarketingBlogTopic(blog: { category?: string; slug?: string; title?: string }) {
+    const category = isInternalMarketingBlogLabel(blog.category) ? "" : blog.category!;
+    return (category && matchBlogTopic(category)) || matchBlogTopic(`${blog.slug || ""} ${blog.title || ""}`) || "Insights";
+}
 
 /**
  * Returns the category shown to readers. Real editorial categories are kept;

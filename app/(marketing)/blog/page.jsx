@@ -2,7 +2,7 @@ import React from "react";
 import { unstable_cache } from 'next/cache';
 import dbConnect from '@/lib/marketing-db';
 import Blog from '@/models/marketing/Blog';
-import { LEGACY_REDIRECTED_BLOG_SLUGS, REMOVED_BLOG_SLUGS, getMarketingBlogPublicCategory } from '@/lib/marketing-blog-cleanup';
+import { LEGACY_REDIRECTED_BLOG_SLUGS, MARKETING_BLOG_TOPICS, REMOVED_BLOG_SLUGS, getMarketingBlogTopic } from '@/lib/marketing-blog-cleanup';
 import BlogList from '@/components/marketing/BlogList';
 import { buildMarketingMetadata } from '@/lib/marketing-seo';
 
@@ -94,18 +94,12 @@ const getPublishedBlogList = unstable_cache(
       .select('title category shortDescription metaDescription image imageAlt slug publishedAt createdAt')
       .sort({ publishedAt: -1, createdAt: -1 })
       .lean();
-    const blogs = storedBlogs.map((blog) => ({ ...blog, category: getMarketingBlogPublicCategory(blog) }));
+    // Readers filter by topic (the six services, or Insights), not by the
+    // many one-off categories stored on posts.
+    const blogs = storedBlogs.map((blog) => ({ ...blog, category: getMarketingBlogTopic(blog) }));
 
-    const categoryNames = [
-      'ALL',
-      ...Array.from(
-        new Set(
-          blogs
-            .map((blog) => blog.category?.trim())
-            .filter(Boolean)
-        )
-      ).sort((left, right) => left.localeCompare(right))
-    ];
+    const topicsInUse = new Set(blogs.map((blog) => blog.category));
+    const categoryNames = ['ALL', ...MARKETING_BLOG_TOPICS.filter((topic) => topicsInUse.has(topic))];
 
     // Map DB objects to the format expected by BlogCard/BlogList.
     const formattedBlogs = blogs.map(blog => ({
@@ -125,7 +119,7 @@ const getPublishedBlogList = unstable_cache(
       categories: categoryNames,
     };
   },
-  ['marketing-published-blog-list'],
+  ['marketing-published-blog-list', 'topics'],
   {
     revalidate: 60,
     tags: ['marketing-published-blog-list'],

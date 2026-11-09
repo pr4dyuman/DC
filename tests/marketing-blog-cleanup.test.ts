@@ -6,7 +6,9 @@ import {
   LEGACY_REDIRECTED_BLOG_SLUGS,
   REMOVED_BLOG_REDIRECTS,
   cleanStoredBlogSchema,
+  MARKETING_BLOG_TOPICS,
   getMarketingBlogPublicCategory,
+  getMarketingBlogTopic,
   isInternalMarketingBlogLabel,
   isRemovedMarketingBlogSlug,
   replaceAIBloggerReferences,
@@ -108,6 +110,32 @@ test("internal pipeline labels are replaced by a topic category", () => {
   );
   assert.equal(getMarketingBlogPublicCategory({ category: "SEO Strategy", slug: "x" }), "SEO Strategy");
   assert.equal(getMarketingBlogPublicCategory({ category: "", slug: "misc-notes", title: "Notes" }), "Insights");
+});
+
+// Readers browse by topic. The stored categories on the live blog included
+// case duplicates and one-off labels, which became separate filters.
+test("posts are grouped into the six service topics", () => {
+  const topic = (category: string, slug = "post", title = "Post") => getMarketingBlogTopic({ category, slug, title });
+
+  assert.equal(topic("influencer marketing"), "Influencer Marketing");
+  assert.equal(topic("Influencer Marketing"), "Influencer Marketing");
+  assert.equal(topic("2026 social media marketing trends"), "Social Media");
+  assert.equal(topic("PPC Advertising Services"), "PPC");
+  assert.equal(topic("PPC"), "PPC");
+  assert.equal(topic("SEO Strategy"), "SEO");
+
+  // A category that names no service falls back to the slug and title.
+  assert.equal(topic("Generative AI", "generative-ai-seo-optimization-benefits", "Generative AI SEO Optimization Benefits"), "SEO");
+  assert.equal(topic("Insights", "customized-web-application-development-architecture", "Custom Web Apps"), "Web Development");
+  assert.equal(topic("zSEO Content Studio", "local-service-ads-vs-google-business-plumber-leads", "Local Service Ads"), "PPC");
+  assert.equal(topic("Campaign Notes", "misc-notes", "Notes"), "Insights");
+
+  // An editor's service category wins over words in the title.
+  assert.equal(topic("SEO", "post", "How a new website affects rankings"), "SEO");
+
+  for (const label of ["SEO", "PPC", "Social Media", "Web Development", "Video Production", "Influencer Marketing", "Insights"]) {
+    assert.ok(MARKETING_BLOG_TOPICS.includes(label), `${label} is a topic`);
+  }
 });
 
 test("links to this site become root-relative", () => {
