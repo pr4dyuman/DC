@@ -20,37 +20,6 @@ const toolLogos = [
   "Adobe",
 ].map((name, index) => ({ name, src: `/dc-camp/${index + 1}.png` }));
 
-const services = [
-  "SEO",
-  "PPC Advertising",
-  "Content Marketing",
-  "Email Marketing",
-  "Influencer Marketing",
-  "Social Media Marketing",
-  "Web Design",
-  "Branding",
-]
-  .concat([
-    "SEO",
-    "PPC Advertising",
-    "Content Marketing",
-    "Email Marketing",
-    "Influencer Marketing",
-    "Social Media Marketing",
-    "Web Design",
-    "Branding",
-  ])
-  .concat([
-    "SEO",
-    "PPC Advertising",
-    "Content Marketing",
-    "Email Marketing",
-    "Influencer Marketing",
-    "Social Media Marketing",
-    "Web Design",
-    "Branding",
-  ]);
-
 export function ToolLogosSlider() {
   const repeatedItems = toolLogos.concat(toolLogos);
 
@@ -72,33 +41,6 @@ export function ToolLogosSlider() {
                 className="object-contain hover:scale-105 transition-transform duration-500"
               />
             </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export function ServicesTicker() {
-  const repeatedServices = services.concat(services);
-
-  return (
-    <div className="dc-marquee select-none" aria-label="Digital marketing services">
-      <div className="dc-marquee-track dc-services-marquee-track">
-        {repeatedServices.map((label, idx) => (
-          <div
-            key={`auto-svc-${idx}`}
-            className="dc-service-ticker-item flex items-center"
-            aria-hidden={idx >= services.length}
-          >
-            <span className="font-etna text-black uppercase flex items-center gap-3 md:gap-4">
-              <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-none text-black">
-                &bull;
-              </span>
-              <span className="text-base sm:text-lg md:text-xl lg:text-2xl leading-tight whitespace-nowrap">
-                {label}
-              </span>
-            </span>
           </div>
         ))}
       </div>

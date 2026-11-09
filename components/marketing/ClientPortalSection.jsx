@@ -54,7 +54,7 @@ export default function ClientPortalSection() {
           </div>
         </div>
 
-        <ClientPortalPreview />
+        <ClientPortalPreview compactOnPhones />
       </div>
     </section>
   );

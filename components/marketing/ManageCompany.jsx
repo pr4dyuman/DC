@@ -79,7 +79,9 @@ function HandArrow({ direction, className = "" }) {
 }
 
 // Also used on the homepage, where it shows clients their own portal.
-export function ClientPortalPreview() {
+// `compactOnPhones` (homepage) leaves out the task list on phones; the
+// progress bar and the invoice still show what the portal does.
+export function ClientPortalPreview({ compactOnPhones = false }) {
     return (
         <figure className="m-0 w-full min-w-0 max-w-[640px] xl:max-w-none">
             <figcaption className="sr-only">
@@ -103,7 +105,9 @@ export function ClientPortalPreview() {
                         <div className="w-3/5 rounded-full bg-[#F5EE30]" />
                     </div>
                 </div>
-                <ul className="m-0 flex list-none flex-col border-t border-[#1f1f1f] p-0">
+                <ul
+                    className={`m-0 list-none flex-col border-t border-[#1f1f1f] p-0 ${compactOnPhones ? "hidden sm:flex" : "flex"}`}
+                >
                     {portalTasks.map((task) => (
                         <li
                             key={task.title}

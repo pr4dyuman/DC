@@ -7,12 +7,12 @@ import { Autoplay } from "swiper/modules";
 import "swiper/css";
 
 const companionItems = [
-  { type: "logo", src: "/s1-360-q88.jpg", alt: "Indian Army emblem" },
-  { type: "logo", src: "/s2.png", alt: "Adarsh Group of Education logo" },
-  { type: "logo", src: "/s3.png", alt: "SSP logo" },
+  { type: "logo", src: "/s1-360-q88.jpg", alt: "Indian Army emblem", width: 80, height: 61 },
+  { type: "logo", src: "/s2.png", alt: "Adarsh Group of Education logo", width: 80, height: 80 },
+  { type: "logo", src: "/s3.png", alt: "SSP logo", width: 80, height: 80 },
   { type: "text", label: "STORIES ON SCREEN" },
   { type: "text", label: "MOHIT CHEMICALS" },
-  { type: "logo", src: "/lf-320-q88.jpg", alt: "La Finca logo" },
+  { type: "logo", src: "/lf-320-q88.jpg", alt: "La Finca logo", width: 80, height: 80 },
 ];
 
 export default function CompanionsSlider() {
@@ -117,8 +117,8 @@ export default function CompanionsSlider() {
                 <Image
                   src={item.src}
                   alt={item.alt}
-                  width={80}
-                  height={80}
+                  width={item.width}
+                  height={item.height}
                   className="filter grayscale hover:grayscale-0 opacity-70 hover:opacity-100 transition-all duration-300"
                 />
               ) : (

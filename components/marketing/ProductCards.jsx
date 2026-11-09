@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, ExternalLink } from "lucide-react";
 
+import { MOBILE_SCROLLER, MOBILE_SCROLLER_ITEM } from "@/components/marketing/ui/PageSection";
 import { MARKETING_PRODUCTS } from "@/lib/marketing-products";
 import { getLowestMarketingTemplatePrice } from "@/lib/marketing-templates";
 
@@ -14,12 +15,13 @@ function getProductNote(product) {
 }
 
 // One card per product, on /products and in the homepage's products strip.
-// The whole card is clickable through its single link.
-export default function ProductCards({ headingLevel = "h3" }) {
+// The whole card is clickable through its single link. With `scroller`, phones
+// get a row to swipe through instead of a stack (homepage).
+export default function ProductCards({ headingLevel = "h3", scroller = false }) {
   const Heading = headingLevel;
 
   return (
-    <ul className="m-0 grid list-none gap-5 p-0 md:grid-cols-3">
+    <ul className={`m-0 list-none p-0 ${scroller ? MOBILE_SCROLLER : "grid gap-5 md:grid-cols-3"}`}>
       {MARKETING_PRODUCTS.map((product) => {
         const linkClass = `mt-auto inline-flex items-center gap-2 pt-8 font-glacial-bold text-sm uppercase tracking-[0.16em] text-white transition-colors group-hover:text-[#F5EE30] after:absolute after:inset-0 after:content-[''] ${focusRing}`;
         const label = (
@@ -37,7 +39,7 @@ export default function ProductCards({ headingLevel = "h3" }) {
         );
 
         return (
-          <li key={product.id} className="flex">
+          <li key={product.id} className={`flex ${scroller ? MOBILE_SCROLLER_ITEM : ""}`}>
             <article className="group relative flex w-full flex-col border border-white/10 bg-white/[0.03] p-6 transition-colors hover:border-[#F5EE30]/60 hover:bg-[#F5EE30]/[0.04] sm:p-7">
               <p className="m-0 font-glacial-bold text-xs uppercase tracking-[0.24em] text-[#F5EE30]">
                 {getProductNote(product)}
