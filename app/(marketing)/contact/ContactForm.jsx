@@ -16,7 +16,7 @@ import {
 const fieldClass =
   "w-full bg-transparent border-b border-white/30 pb-3 text-white text-[15px] md:text-[16px] placeholder:text-white/30 outline-none focus:border-[#F5EE30] focus-visible:ring-2 focus-visible:ring-[#F5EE30]/40 transition-colors duration-300";
 
-export default function ContactForm() {
+export default function ContactForm({ className = "mt-16 md:mt-20" }) {
   const [toast, setToast] = useState({ show: false, message: "", isSuccess: true });
   const [buttonTransform, setButtonTransform] = useState({ x: 0, y: 0 });
 
@@ -134,7 +134,7 @@ export default function ContactForm() {
         </div>
       )}
 
-      <form className="mt-16 md:mt-20" id="contact-form" onSubmit={handleSubmit(onSubmit)} noValidate>
+      <form className={`scroll-mt-6 ${className}`} id="contact-form" onSubmit={handleSubmit(onSubmit)} noValidate>
         <div className="hidden" aria-hidden="true">
           <label htmlFor="contact-website">Website</label>
           <input
