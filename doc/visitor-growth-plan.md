@@ -43,11 +43,17 @@ Also:
 
 - Each service page has three more questions: what it costs, a local or
   platform question, and how clients follow their project.
+- The homepage answers five common questions (what we do, cost, where to
+  start, small businesses, getting started), also as FAQ search data.
 - The footer of every page links to the six services and shows the
   Malviya Nagar, Jaipur address.
 - Google gets a proper logo image, and the founder from the team section.
 - Shared links show the page title ("SEO Services in Jaipur").
-- **Speed.** The site's fonts are 77% smaller (464 KB to 105 KB). On a slow phone connection, inner pages
+- **Speed.** The site's fonts are 77% smaller (464 KB to 105 KB).
+- Every page used to be thrown away and rebuilt about 0.2s after loading,
+  because of how the theme provider was written. That is fixed.
+- Lighthouse scores 100 for accessibility, best practices and SEO on the
+  main pages. On a slow phone connection, inner pages
   and blog posts now show their main content in about 1.4s instead of
   2.6-3.1s. Measurements are in `doc/seo.txt`.
 - **Design.** The original visual design is back: illustrations, two-tone
