@@ -33,8 +33,10 @@ export default function ServiceExampleSpotlight({ example }) {
 
         <div className="min-w-0">
           <PortfolioProof study={study} size="large" details={!insights.length} mark={EXAMPLE_MARK} />
+          {/* The extra panels show from tablet width; on phones the summary and
+              main visual tell the story without four screens of charts. */}
           {insights.length ? (
-            <div className="mt-5">
+            <div className="mt-5 hidden md:block">
               <PortfolioInsights insights={insights} slug={`${study.slug}-example`} sample={EXAMPLE_MARK} />
             </div>
           ) : null}
