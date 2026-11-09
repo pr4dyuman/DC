@@ -39,6 +39,7 @@ export default function ServiceCards({ headingLevel = "h3", compact = false }) {
                 />
               ) : null}
             </div>
+            {/* The illustrations are decoration, so phones skip them to keep the list short. */}
             {compact ? null : (
               <Image
                 src={service.image.src}
@@ -46,11 +47,11 @@ export default function ServiceCards({ headingLevel = "h3", compact = false }) {
                 width={260}
                 height={260}
                 loading="lazy"
-                className="mx-auto my-6 h-32 w-auto sm:h-40"
+                className="mx-auto my-6 hidden h-40 w-auto sm:block"
               />
             )}
             <Heading
-              className={`font-bold uppercase leading-tight ${compact ? "mt-3 text-xl sm:mt-5 sm:text-2xl" : "m-0 text-2xl"}`}
+              className={`font-bold uppercase leading-tight ${compact ? "mt-3 text-xl sm:mt-5 sm:text-2xl" : "mt-5 text-2xl sm:mt-0"}`}
             >
               <Link
                 href={service.path}
