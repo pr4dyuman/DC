@@ -79,7 +79,7 @@ export default function AboutPage() {
             {/* Description under Image */}
             <p className="text-gray-300 leading-relaxed max-w-2xl text-sm md:text-base text-center lg:text-left">
               At Digital Corvids, we provide comprehensive digital marketing
-              solutions, such as innovative and adaptable. Recognizing that
+              solutions that are innovative and adaptable. Recognizing that
               every business has unique goals and challenges, we deliver a broad
               spectrum of services designed to help your brand excel in the
               ever-evolving digital arena.
@@ -99,7 +99,7 @@ export default function AboutPage() {
 
           {/* Experience Stats Section */}
           <div className="mt-8 sm:mt-12">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl">
               <div className="text-center">
                 <div className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-2">
                   <CountUp end={100} suffix="+" />
@@ -110,10 +110,10 @@ export default function AboutPage() {
               </div>
               <div className="text-center">
                 <div className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-2">
-                  <CountUp end={50} suffix="L+" />
+                  <CountUp end={50} prefix="₹" suffix="L+" />
                 </div>
                 <div className="text-xs sm:text-sm text-gray-400 tracking-wider font-medium">
-                  AD SPENT
+                  AD SPEND MANAGED
                 </div>
               </div>
               <div className="text-center">
@@ -121,7 +121,7 @@ export default function AboutPage() {
                   <CountUp end={10} suffix="+" />
                 </div>
                 <div className="text-xs sm:text-sm text-gray-400 tracking-wider font-medium">
-                  E-COM PARTNER
+                  E-COM PARTNERS
                 </div>
               </div>
               <div className="text-center">

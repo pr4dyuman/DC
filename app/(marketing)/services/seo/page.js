@@ -7,6 +7,7 @@ import {
   getMarketingServiceJsonLd,
   serializeMarketingJsonLd,
 } from "@/lib/marketing-seo"
+import { getMarketingContactHref } from "@/lib/marketing-contact"
 
 const seoFaqs = [
   {
@@ -248,7 +249,7 @@ export default function SEOServices() {
             <div className="flex items-center gap-3 mb-4">
               <span className="w-2 h-2 bg-[#F5EE30] rounded-full"></span>
               <span className="uppercase tracking-widest text-sm font-glacial-bold text-white">
-                PIXEL-PERFECT WEBSITES THAT ADAPT SEAMLESSLY TO ANY DEVICE
+                TARGET THE SEARCHES YOUR CUSTOMERS ACTUALLY MAKE
               </span>
             </div>
             <h2 className="text-3xl md:text-5xl font-extrabold leading-tight mb-6 text-left">
@@ -313,29 +314,28 @@ export default function SEOServices() {
             {/* Title */}
             <div className="text-start md:text-end">
               {/* Title */}
-              <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-2">
-                TECHNICAL SEO
+              <h2 className="text-3xl md:text-5xl font-extrabold leading-tight mb-8">
+                <span className="text-white">LOCAL SEO</span>
+                <br />
+                <span className="text-[#3E3E3E]">& GOOGLE BUSINESS PROFILE</span>
               </h2>
-              <h3 className="text-3xl md:text-5xl font-extrabold text-[#3E3E3E] mb-8">
-                OPTIMIZATION
-              </h3>
 
               {/* List */}
               <ul className="list-disc list-outside text-left inline-block pl-6 space-y-3 text-white text-lg marker:text-[#F5EE30]">
                 <li className="pl-2">
-                  Core Web Vitals optimization (LCP, FID, CLS)
+                  Google Business Profile setup and optimization
                 </li>
                 <li className="pl-2">
-                  Mobile-first indexing and responsive design fixes
+                  Local keyword and &ldquo;near me&rdquo; search targeting
                 </li>
                 <li className="pl-2">
-                  XML sitemap generation + crawl error resolution
+                  Location and service-area landing pages
                 </li>
                 <li className="pl-2">
-                  Schema markup integration for rich snippets
+                  Local citations with a consistent name, address and phone number
                 </li>
                 <li className="pl-2">
-                  HTTPS migration and duplicate content cleanup
+                  Local content that answers what nearby customers search for
                 </li>
               </ul>
 
@@ -465,7 +465,7 @@ export default function SEOServices() {
           </div>
         </section>
 
-        <ServiceCaseStudies services={["seo"]} title="SEO Results" linkLabel="See all SEO work" />
+        <ServiceCaseStudies contactService="seo" services={["seo"]} title="SEO Results" linkLabel="See all SEO work" />
 
 
         <RelatedArticlesSection
@@ -557,7 +557,7 @@ export default function SEOServices() {
 
           {/* Circle Button */}
           <div className="flex justify-center md:justify-end">
-            <a href="/get-started" className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white text-black font-bold flex items-center justify-center shadow-lg hover:bg-yellow-400 transition-all">GET STARTED</a>
+            <Link href={getMarketingContactHref({ service: "seo" })} prefetch={false} className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white text-black font-bold flex items-center justify-center shadow-lg hover:bg-yellow-400 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]">GET STARTED</Link>
           </div>
         </div>
       </div>

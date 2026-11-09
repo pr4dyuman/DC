@@ -58,12 +58,12 @@ const CORE_PAGES = [
     {
         title: "Contact",
         path: "/contact",
-        description: "Contact details for Digital Corvids in Jaipur, Rajasthan.",
+        description: "Enquiry form and contact details (phone, email, WhatsApp) for Digital Corvids in Jaipur, Rajasthan.",
     },
     {
-        title: "Get Started",
+        title: "Agency OS Free Trial",
         path: "/get-started",
-        description: "Project intake and signup path for new Digital Corvids clients.",
+        description: "Signup for a 7-day free trial of Agency OS, the agency management platform made by Digital Corvids.",
     },
 ];
 

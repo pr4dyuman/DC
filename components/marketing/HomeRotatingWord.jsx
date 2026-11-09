@@ -2,13 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 
+// Completes the homepage headline "More customers from …": one word per
+// service, so the rotation shows what Digital Corvids actually does.
 const words = [
-  "Creative Strategy",
-  "DIGITAL INNOVATION!",
-  "Storytelling",
-  "SEO Excellence",
-  "Analytics Intelligence",
-  "Brand Storytelling",
+  "Google Search",
+  "Paid Ads",
+  "Social Media",
+  "Your Website",
+  "Video Ads",
+  "Influencers",
 ];
 
 export default function HomeRotatingWord() {

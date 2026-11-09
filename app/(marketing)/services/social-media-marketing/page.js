@@ -7,6 +7,7 @@ import {
   getMarketingServiceJsonLd,
   serializeMarketingJsonLd,
 } from "@/lib/marketing-seo";
+import { getMarketingContactHref } from "@/lib/marketing-contact";
 
 const socialMediaFaqs = [
   {
@@ -471,7 +472,7 @@ export default function SocialMediaMarketing() {
           </div>
         </section>
 
-        <ServiceCaseStudies services={["social"]} title="Social Media Results" linkLabel="See all social work" />
+        <ServiceCaseStudies contactService="social-media-marketing" services={["social"]} title="Social Media Results" linkLabel="See all social work" />
 
 
         <RelatedArticlesSection
@@ -583,7 +584,7 @@ export default function SocialMediaMarketing() {
 
             {/* Circle Button */}
             <div className="flex justify-center md:justify-end">
-              <a href="/get-started" className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white text-black font-bold flex items-center justify-center shadow-lg hover:bg-yellow-400 transition-all">GET STARTED</a>
+              <Link href={getMarketingContactHref({ service: "social-media-marketing" })} prefetch={false} className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white text-black font-bold flex items-center justify-center shadow-lg hover:bg-yellow-400 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]">GET STARTED</Link>
             </div>
           </div>
                 </div>

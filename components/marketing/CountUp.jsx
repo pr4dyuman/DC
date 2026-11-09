@@ -2,27 +2,29 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export default function CountUp({ end, duration = 2, suffix = "", decimals = 0 }) {
-  const [count, setCount] = useState(0);
+// Renders `end` on the server, so search engines, link previews and visitors
+// without JavaScript read the real number ("100+", not "0+"). In the browser,
+// a number that starts below the fold drops to 0 and counts up when it
+// scrolls into view; one already on screen, or with reduced motion, stays put.
+export default function CountUp({ end, duration = 2, prefix = "", suffix = "", decimals = 0 }) {
+  const [count, setCount] = useState(end);
   const elementRef = useRef(null);
 
   useEffect(() => {
     const el = elementRef.current;
-    if (!el) return;
+    if (!el || duration <= 0) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-    let animationFrame;
-    let observer;
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight && rect.bottom > 0) return;
+
+    let animationFrame = requestAnimationFrame(() => setCount(0));
     let hasAnimated = false;
-
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (prefersReducedMotion || duration <= 0) {
-      animationFrame = requestAnimationFrame(() => setCount(end));
-      return () => cancelAnimationFrame(animationFrame);
-    }
 
     const startAnimation = () => {
       if (hasAnimated) return;
       hasAnimated = true;
+      cancelAnimationFrame(animationFrame);
 
       const startTime = performance.now();
       const durationMs = duration * 1000;
@@ -31,19 +33,17 @@ export default function CountUp({ end, duration = 2, suffix = "", decimals = 0 }
         const progress = Math.min((now - startTime) / durationMs, 1);
         const easedProgress = 1 - Math.pow(1 - progress, 2);
 
-        setCount(end * easedProgress);
+        setCount(progress < 1 ? end * easedProgress : end);
 
         if (progress < 1) {
           animationFrame = requestAnimationFrame(tick);
-        } else {
-          setCount(end);
         }
       };
 
       animationFrame = requestAnimationFrame(tick);
     };
 
-    observer = new IntersectionObserver(
+    const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           startAnimation();
@@ -56,16 +56,12 @@ export default function CountUp({ end, duration = 2, suffix = "", decimals = 0 }
     observer.observe(el);
 
     return () => {
-      if (animationFrame) {
-        cancelAnimationFrame(animationFrame);
-      }
-      if (observer) {
-        observer.disconnect();
-      }
+      cancelAnimationFrame(animationFrame);
+      observer.disconnect();
     };
   }, [end, duration]);
 
   const formattedCount = count.toFixed(decimals);
 
-  return <span ref={elementRef}>{parseFloat(formattedCount) + suffix}</span>;
+  return <span ref={elementRef}>{prefix + parseFloat(formattedCount) + suffix}</span>;
 }

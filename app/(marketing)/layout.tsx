@@ -1,6 +1,7 @@
 import Navigation from "@/components/marketing/Navigation";
 import Footer from "@/components/marketing/Footer";
 import MarketingConversionTracker from "@/components/marketing/MarketingConversionTracker";
+import WhatsAppButton from "@/components/marketing/WhatsAppButton";
 import { GoogleAnalytics } from "@/components/providers/GoogleAnalytics";
 import {
     buildMarketingMetadata,
@@ -66,6 +67,7 @@ export default function MarketingLayout({
             <Navigation />
             {children}
             <Footer />
+            <WhatsAppButton />
         </div>
     );
 }

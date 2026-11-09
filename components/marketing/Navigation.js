@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getMarketingContactHref } from "@/lib/marketing-contact";
 import MobileNavigation from "./MobileNavigation";
 import NavigationEnhancer from "./NavigationEnhancer";
 
@@ -163,7 +164,18 @@ export default function Navigation() {
           </Link>
         </div>
 
-        <MobileNavigation servicesList={servicesList} />
+        {/* Phones and tablets: a visible way to get in touch next to the menu.
+            Below 360px there is no room beside the logo, so it stays in the menu. */}
+        <div className="flex items-center gap-1.5 lg:hidden">
+          <Link
+            href={getMarketingContactHref()}
+            prefetch={false}
+            className="inline-flex min-h-11 items-center rounded-full bg-[#F5EE30] px-3.5 font-glacial-bold text-xs uppercase tracking-[0.08em] text-black transition-colors hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30] max-[360px]:hidden"
+          >
+            Contact
+          </Link>
+          <MobileNavigation servicesList={servicesList} />
+        </div>
       </div>
     </nav>
   );

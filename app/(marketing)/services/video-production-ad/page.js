@@ -7,6 +7,7 @@ import {
   getMarketingServiceJsonLd,
   serializeMarketingJsonLd,
 } from "@/lib/marketing-seo";
+import { getMarketingContactHref } from "@/lib/marketing-contact";
 
 const videoProductionFaqs = [
   {
@@ -474,7 +475,7 @@ export default function VideoProduction() {
           </div>
         </section>
 
-        <ServiceCaseStudies services={["video"]} title="Video Work" linkLabel="See all video work" />
+        <ServiceCaseStudies contactService="video-production-ad" services={["video"]} title="Video Work" linkLabel="See all video work" />
 
 
         <RelatedArticlesSection
@@ -588,7 +589,7 @@ export default function VideoProduction() {
 
     {/* Circle Button */}
     <div className="flex justify-center md:justify-end">
-      <a href="/get-started" className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white text-black font-bold flex items-center justify-center shadow-lg hover:bg-yellow-400 transition-all">GET STARTED</a>
+      <Link href={getMarketingContactHref({ service: "video-production-ad" })} prefetch={false} className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white text-black font-bold flex items-center justify-center shadow-lg hover:bg-yellow-400 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]">GET STARTED</Link>
     </div>
   </div>
 </div>

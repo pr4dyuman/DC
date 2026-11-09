@@ -7,6 +7,7 @@ import {
   getMarketingServiceJsonLd,
   serializeMarketingJsonLd,
 } from "@/lib/marketing-seo";
+import { getMarketingContactHref } from "@/lib/marketing-contact";
 
 const ppcFaqs = [
   {
@@ -79,7 +80,7 @@ const relatedPpcLinks = [
   },
   {
     title: "Get Started",
-    href: "/get-started",
+    href: getMarketingContactHref({ service: "ppc" }),
     description: "Plan the next paid campaign with clear goals and tracking.",
   },
 ];
@@ -522,7 +523,7 @@ export default function PPCAdvertising() {
             </div>
           </section>
 
-          <ServiceCaseStudies services={["ads"]} title="Ad Campaigns" linkLabel="See all ad campaigns" />
+          <ServiceCaseStudies contactService="ppc" services={["ads"]} title="Ad Campaigns" linkLabel="See all ad campaigns" />
 
 
           <RelatedArticlesSection
@@ -636,7 +637,7 @@ export default function PPCAdvertising() {
 
             {/* Circle Button */}
             <div className="flex justify-center md:justify-end">
-              <a href="/get-started" className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white text-black font-bold flex items-center justify-center shadow-lg hover:bg-yellow-400 transition-all">GET STARTED</a>
+              <Link href={getMarketingContactHref({ service: "ppc" })} prefetch={false} className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white text-black font-bold flex items-center justify-center shadow-lg hover:bg-yellow-400 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]">GET STARTED</Link>
             </div>
           </div>
         </div>

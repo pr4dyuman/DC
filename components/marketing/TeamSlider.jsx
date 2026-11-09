@@ -9,12 +9,12 @@ import Image from "next/image";
 import Link from "next/link";
 
 const teamMembers = [
-  { name: "Garima khurana", role: "Content Write & Strategist", img: "/garima.webp" },
+  { name: "Garima Khurana", role: "Content Writer & Strategist", img: "/garima.webp" },
   { name: "Akash Rinwa", role: "Production Head", img: "/akash.webp" },
   { name: "Tanya Garg", role: "Finance and HR", img: "/tanya.webp" },
   { name: "Divyank Sharma", role: "CEO", img: "/divyank.webp" },
   { name: "Nidhi Indoria", role: "Graphic Designer", img: "/nidhi.webp" },
-  { name: "Chandan Sharma", role: "Web Design/Developer", img: "/chandan.webp" },
+  { name: "Chandan Sharma", role: "Web Designer & Developer", img: "/chandan.webp" },
   { name: "Aman Vashisth", role: "App Developer", img: "/aman.webp" },
   { name: "Nagendra Indoria", role: "Founder", img: "/nagendra.webp" },
   { name: "Sangam Vashisth", role: "PPC Expert", img: "/sangam.jpeg" }

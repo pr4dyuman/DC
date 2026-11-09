@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { getMarketingContactHref } from "@/lib/marketing-contact";
 import CountUp from "./CountUp";
 
 export default function AboutAgency() {
@@ -44,7 +45,7 @@ export default function AboutAgency() {
                   <CountUp end={100} suffix="+" />
                 </p>
                 <p className="text-[#F5EE30] text-xs sm:text-sm font-glacial-bold tracking-wide">
-                  HAPPY CUSTOMERS
+                  HAPPY CLIENTS
                 </p>
               </div>
             </div>
@@ -65,10 +66,10 @@ export default function AboutAgency() {
               </div>
               <div>
                 <p className="text-3xl sm:text-4xl md:text-5xl font-bold">
-                  <CountUp end={50} suffix="L+" />
+                  <CountUp end={50} prefix="₹" suffix="L+" />
                 </p>
                 <p className="text-[#F5EE30] text-xs sm:text-sm font-glacial-bold tracking-wide">
-                  AD SPENTS
+                  AD SPEND MANAGED
                 </p>
               </div>
             </div>
@@ -78,12 +79,16 @@ export default function AboutAgency() {
               {/* White Line */}
               <div className="absolute left-0 top-1/2 -translate-y-1/2 h-[2px] bg-white w-[calc(100%-6rem)] sm:w-[calc(100%-7rem)] md:w-[calc(100%-8rem)]"></div>
 
-              <Link href="/contact" prefetch={false} className="z-10">
+              <Link
+                href={getMarketingContactHref()}
+                prefetch={false}
+                className="z-10 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
+              >
                 <div className="group relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full bg-white text-black font-bold text-xs sm:text-sm flex items-center justify-center overflow-hidden transition-all duration-500 hover:scale-110 hover:shadow-2xl cursor-pointer">
                   <span className="relative z-10 transition-colors duration-500 group-hover:text-black text-center font-glacial-bold leading-tight">
-                    EXPLORE
+                    TALK
                     <br />
-                    MORE
+                    TO US
                   </span>
                   <div className="absolute inset-0 bg-[#F5EE30] scale-0 rounded-full transition-transform duration-500 group-hover:scale-100"></div>
                 </div>

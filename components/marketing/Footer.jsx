@@ -21,8 +21,9 @@ export default function Footer() {
         />
       </div>
 
-      {/* Footer Content */}
-      <div className="relative z-10 mx-auto w-full max-w-[var(--site-frame)] px-[var(--site-gutter)] py-16">
+      {/* Footer Content (extra bottom padding keeps the last row clear of the
+          floating WhatsApp button) */}
+      <div className="relative z-10 mx-auto w-full max-w-[var(--site-frame)] px-[var(--site-gutter)] pt-16 pb-24">
         <div className="flex flex-col lg:flex-row justify-between items-start gap-12">
           {/* Left: Branding & Socials */}
           <div className="flex flex-col max-w-md">

@@ -7,12 +7,12 @@ import { Autoplay } from "swiper/modules";
 import "swiper/css";
 
 const companionItems = [
-  { type: "logo", src: "/s1-360-q88.jpg", alt: "Logo 1" },
-  { type: "logo", src: "/s2.png", alt: "Logo 2" },
-  { type: "logo", src: "/s3.png", alt: "Logo 3" },
+  { type: "logo", src: "/s1-360-q88.jpg", alt: "Indian Army emblem" },
+  { type: "logo", src: "/s2.png", alt: "Adarsh Group of Education logo" },
+  { type: "logo", src: "/s3.png", alt: "SSP logo" },
   { type: "text", label: "STORIES ON SCREEN" },
   { type: "text", label: "MOHIT CHEMICALS" },
-  { type: "logo", src: "/lf-320-q88.jpg", alt: "Logo 6" },
+  { type: "logo", src: "/lf-320-q88.jpg", alt: "La Finca logo" },
 ];
 
 export default function CompanionsSlider() {

@@ -18,7 +18,7 @@ export default function GetStartedAISpotlight() {
                                 </div>
                                 <div className="bg-white/[0.05] rounded-xl rounded-tl-sm px-4 py-3 text-sm text-gray-300 leading-relaxed">
                                     I&apos;ve analyzed the &quot;Website Redesign&quot; project. Based on similar past projects,
-                                    I estimate <span className="text-[#F5EE30] font-bold">120 hours</span> of work.
+                                    I estimate <span className="text-[#F5EE30] font-bold">120 hours</span>{" "}of work.
                                     Here&apos;s the task breakdown:
                                 </div>
                             </div>

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import AboutAgency from "@/components/marketing/AboutAgency";
 import LazyServicesSection from "@/components/marketing/LazyServicesSection";
 import ManageCompanySection from "@/components/marketing/ManageCompany";
@@ -10,8 +11,9 @@ import LazyTeamSlider from "@/components/marketing/LazyTeamSlider";
 import LazyTestimonialSection from "@/components/marketing/LazyTestimonialSection";
 import RelatedArticlesSection from "@/components/marketing/RelatedArticlesSection";
 import { getMarketingBlogLinks } from "@/lib/marketing-blog-links";
+import { getMarketingContactHref } from "@/lib/marketing-contact";
 import {
-  DigitalPartnersSlider,
+  ToolLogosSlider,
   ServicesTicker,
 } from "@/components/marketing/HomeSliders";
 
@@ -25,21 +27,50 @@ const HeroSection = async () => {
   return (
     <main className="font-glacial text-white bg-black">
       <div className="px-[var(--site-gutter)]">
-      <section className="relative mx-auto max-w-[var(--site-content)] overflow-hidden pt-12 sm:pt-16 md:pt-20 text-center flex items-center justify-start min-h-[300px] sm:min-h-[350px] md:min-h-[400px] lg:min-h-[450px]">
+      <section className="relative mx-auto max-w-[var(--site-content)] overflow-hidden [container-type:inline-size]">
         {/* Still grid and a flight path that draws once */}
         <HeroFlightPath />
 
-        <div className="relative z-10 w-full px-4 sm:px-6 md:px-8 lg:px-10">
-          <h1 className="text-start font-semibold tracking-wider uppercase">
+        {/* The flight path fills the top min(14.88cqw, 200px) of the hero and
+            stays above 62% of that band, so the text starts just below it. */}
+        <div className="relative z-10 w-full px-4 pb-10 pt-[calc(min(9.2cqw,124px)_+_2rem)] text-start sm:px-6 sm:pb-12 md:px-8 lg:px-10 lg:pb-14">
+          <h1 className="font-semibold tracking-wider uppercase">
+            <span className="mb-3 block font-glacial-bold text-xs tracking-[0.18em] text-[#F5EE30] sm:mb-4 sm:text-sm sm:tracking-[0.3em]">
+              Digital marketing agency in Jaipur
+            </span>{" "}
             <span className="block text-white text-[clamp(1.5rem,6vw,5rem)] leading-[0.9]">
-              EMPOWERING BRANDS WITH
-            </span>
+              More customers from
+            </span>{" "}
+            <span className="sr-only">Google search, paid ads, social media, your website, video ads and influencers</span>{" "}
 
-            {/* SINGLE LIFT-UP TEXT ANIMATION */}
-            <span className="block relative h-[1.45em] overflow-hidden text-[clamp(1.5rem,6vw,5rem)] leading-[1] mt-1 sm:mt-2 font-bold text-[#F5EE30]">
+            {/* One service at a time, lifting up (the list above is for screen readers) */}
+            <span aria-hidden="true" className="block relative h-[1.45em] overflow-hidden text-[clamp(1.5rem,6vw,5rem)] leading-[1] mt-1 sm:mt-2 font-bold text-[#F5EE30]">
               <HomeRotatingWord />
             </span>
           </h1>
+
+          <p className="mt-5 max-w-2xl text-base leading-relaxed text-gray-300 sm:mt-6 sm:text-lg md:text-xl">
+            We plan and run SEO, Google and Meta ads, social media, websites and video for small and growing
+            businesses, and show you the enquiries each one brings in.
+          </p>
+
+          <div className="mt-7 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:flex-wrap">
+            <Link
+              href={getMarketingContactHref({ intent: "plan" })}
+              prefetch={false}
+              className="group inline-flex min-h-[52px] items-center justify-center gap-2.5 rounded-full bg-[#F5EE30] px-7 font-glacial-bold text-[15px] uppercase tracking-[0.06em] text-black transition-colors hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
+            >
+              Get a free marketing plan
+              <ArrowRight aria-hidden="true" className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Link>
+            <Link
+              href="/portfolio"
+              prefetch={false}
+              className="inline-flex min-h-[52px] items-center justify-center rounded-full border border-white/25 px-7 font-glacial-bold text-[15px] uppercase tracking-[0.06em] text-white transition-colors hover:border-[#F5EE30] hover:text-[#F5EE30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
+            >
+              See our work
+            </Link>
+          </div>
         </div>
       </section>
       </div>
@@ -95,14 +126,14 @@ const HeroSection = async () => {
       {/* Manage Company Section — Agency OS Showcase */}
       <ManageCompanySection />
 
-      {/* Infinite Image Slider (DC Camp) */}
+      {/* Logos of the tools we work with */}
       <section className="w-full bg-black py-10">
         <div className="text-center max-w-6xl mx-auto px-4 mb-8">
           <p className="text-gray-400 text-lg sm:text-xl font-glacial-bold uppercase tracking-widest">
-            Our Digital Partners
+            Tools We Work With
           </p>
         </div>
-        <DigitalPartnersSlider />
+        <ToolLogosSlider />
       </section>
 
       <LazyServicesSection />
@@ -128,11 +159,11 @@ const HeroSection = async () => {
         </div>
       )}
 
-      {/* Commands Slider Moved Here */}
+      {/* Logos of clients we have worked with */}
       <section className="bg-black py-12 w-full overflow-hidden">
         <div className="text-center mb-10">
           <p className="text-gray-400 text-lg sm:text-xl font-glacial-bold uppercase tracking-widest">
-            Our Digital Companions
+            Brands We&apos;ve Worked With
           </p>
         </div>
         <div className="w-full">

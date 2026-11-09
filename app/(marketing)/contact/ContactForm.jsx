@@ -4,6 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { MARKETING_EVENTS, trackMarketingEvent } from "@/lib/marketing-analytics";
 import {
+  MARKETING_CONTACT_PLAN_INTENT,
+  getMarketingContactMessage,
+  getMarketingContactService,
+} from "@/lib/marketing-contact";
+import {
   getMarketingTemplateCatalogEntry,
   getTemplateContactMessage,
 } from "@/lib/marketing-templates-catalog";
@@ -16,6 +21,7 @@ export default function ContactForm() {
   const [buttonTransform, setButtonTransform] = useState({ x: 0, y: 0 });
 
   const templateRequestRef = useRef(null);
+  const enquiryRef = useRef(null);
 
   const {
     register,
@@ -36,17 +42,31 @@ export default function ContactForm() {
     mode: "onChange",
   });
 
-  // Links from /templates arrive as /contact?template=<slug>[&intent=customise]:
-  // start the message with the template already named.
+  // Links can say what the visitor wants, and the message starts with it:
+  // /contact?service=<slug> from a service page, ?intent=plan from the
+  // homepage, and ?template=<slug>[&intent=customise] from /templates.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const intent = params.get("intent") === "customise" ? "customise" : "buy";
-    const entry = getMarketingTemplateCatalogEntry(params.get("template"));
-    const message = getTemplateContactMessage(entry?.slug, intent);
-    if (!message) return;
+    const service = getMarketingContactService(params.get("service"));
+    const wantsPlan = params.get("intent") === MARKETING_CONTACT_PLAN_INTENT;
+    let message;
 
-    templateRequestRef.current = { template: entry?.slug || "any", intent };
-    if (!getValues("message")) {
+    if (service || wantsPlan) {
+      message = getMarketingContactMessage(service?.slug, params.get("intent"));
+      enquiryRef.current = {
+        service: service?.slug,
+        intent: wantsPlan ? MARKETING_CONTACT_PLAN_INTENT : undefined,
+      };
+    } else {
+      const intent = params.get("intent") === "customise" ? "customise" : "buy";
+      const entry = getMarketingTemplateCatalogEntry(params.get("template"));
+      message = getTemplateContactMessage(entry?.slug, intent);
+      if (message) {
+        templateRequestRef.current = { template: entry?.slug || "any", intent };
+      }
+    }
+
+    if (message && !getValues("message")) {
       setValue("message", message, { shouldDirty: true });
     }
   }, [getValues, setValue]);
@@ -92,6 +112,8 @@ export default function ContactForm() {
         hasPhone: Boolean(data.phone),
         template: templateRequestRef.current?.template,
         templateIntent: templateRequestRef.current?.intent,
+        service: enquiryRef.current?.service,
+        intent: enquiryRef.current?.intent,
       });
       reset();
     } catch (error) {

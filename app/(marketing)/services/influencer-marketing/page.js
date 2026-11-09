@@ -7,6 +7,7 @@ import {
   getMarketingServiceJsonLd,
   serializeMarketingJsonLd,
 } from "@/lib/marketing-seo";
+import { getMarketingContactHref } from "@/lib/marketing-contact";
 
 const influencerMarketingFaqs = [
   {
@@ -193,14 +194,14 @@ export default function InfluencerMarketing() {
           </div>
         </div>
 
-        {/* Second Section - Organic Social Media Growth */}
+        {/* Second Section - Influencer Discovery & Vetting */}
         <div className="flex flex-col lg:flex-row-reverse items-center justify-between mb-16 sm:mb-20 lg:mb-32 gap-8 lg:gap-12">
           {/* Right - Image */}
           <div className="w-full lg:w-1/2 flex justify-center">
             <div className="relative w-full max-w-[300px] sm:max-w-[400px] md:max-w-[500px] lg:max-w-[550px]">
               <Image
                 src="/smm2.svg"
-                alt="Organic Social Media Growth"
+                alt="Influencer discovery and vetting illustration"
                 width={500}
                 height={400}
                 className="w-full h-auto"
@@ -223,36 +224,36 @@ export default function InfluencerMarketing() {
             <ul className="space-y-2 sm:space-y-3 text-white text-base sm:text-lg font-['Glacial_Indifference']">
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>Platform-specific strategy (Instagram, LinkedIn, Facebook, X, Pinterest)</span>
+                <span>Creator shortlists matched to your audience, niche and campaign goal</span>
               </li>
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>Viral-worthy content calendars (posts, reels, stories, carousels)</span>
+                <span>Audience quality and engagement authenticity checks</span>
               </li>
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>Community management and real-time engagement</span>
+                <span>Content quality and past brand collaboration review</span>
               </li>
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>Hashtag research and trend-jacking (the right way)</span>
+                <span>Brand safety checks on every shortlisted creator</span>
               </li>
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>User-generated content (UGC) campaigns to amplify authenticity</span>
+                <span>Nano, micro and larger creators to fit your goals and budget</span>
               </li>
             </ul>
           </div>
         </div>
         
-        {/* Paid Social Advertising Section */}
+        {/* Campaign Strategy & Storytelling Section */}
         <div className="mb-16 sm:mb-20 lg:mb-32 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           {/* Left - Image */}
           <div className="w-full flex justify-center">
             <div className="relative w-full max-w-[280px] sm:max-w-[350px] md:max-w-[400px] lg:max-w-[450px]">
               <Image
                 src="/smm3.svg"
-                alt="Paid Social Advertising"
+                alt="Influencer campaign strategy illustration"
                 width={400}
                 height={400}
                 className="w-full h-auto"
@@ -274,36 +275,36 @@ export default function InfluencerMarketing() {
             <ul className="space-y-2 sm:space-y-3 text-white text-base sm:text-lg font-['Glacial_Indifference']">
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>Campaign setup and optimization (Meta Ads, Pinterest Ads, LinkedIn Ads)</span>
+                <span>Campaign goals and key messages set before creators are briefed</span>
               </li>
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>Audience segmentation and lookalike targeting</span>
+                <span>Creative briefs that leave room for each creator&apos;s own voice</span>
               </li>
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>Retargeting campaigns to recover lost leads</span>
+                <span>Deliverables, deadlines and approval workflows agreed up front</span>
               </li>
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>A/B testing for ad creatives, copy, and CTAs</span>
+                <span>Messaging and compliance guardrails for every post</span>
               </li>
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>Influencer-collaboration ads for trusted social proof</span>
+                <span>Posting timelines coordinated across all creators</span>
               </li>
             </ul>
           </div>
         </div>
 
-        {/* Content Creation & Storytelling Section */}
+        {/* Content Collaboration & Amplification Section */}
         <div className="mb-16 sm:mb-20 lg:mb-32 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           {/* Image - Top on mobile, Right on desktop */}
           <div className="w-full flex justify-center order-1 lg:order-2">
             <div className="relative w-full max-w-[280px] sm:max-w-[350px] md:max-w-[400px] lg:max-w-[450px]">
               <Image
                 src="/smm4.svg"
-                alt="Content Creation & Storytelling"
+                alt="Creator content collaboration illustration"
                 width={400}
                 height={400}
                 className="w-full h-auto"
@@ -327,36 +328,36 @@ export default function InfluencerMarketing() {
             <ul className="space-y-2 sm:space-y-3 text-white text-base sm:text-lg font-['Glacial_Indifference']">
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>Creative concept development and mood boards</span>
+                <span>Content coordination and approvals with every creator</span>
               </li>
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>High-quality photo/video shoots for social feeds</span>
+                <span>Paid amplification of the best-performing creator posts</span>
               </li>
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>Meme culture integration (brand-safe and relatable)</span>
+                <span>Creator content repurposed for paid social ads</span>
               </li>
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>Caption writing that blends brand voice with platform trends</span>
+                <span>Creator testimonials for landing pages and product launches</span>
               </li>
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>GIFs, stickers, and AR filters for interactive engagement</span>
+                <span>Usage rights agreed before content is reused beyond the original post</span>
               </li>
             </ul>
           </div>
         </div>
         
-        {/* Social Analytics & Performance Optimization Section */}
+        {/* Performance Analytics & ROI Tracking Section */}
         <div className="mb-16 sm:mb-20 lg:mb-24 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           {/* Left - Image */}
           <div className="w-full flex justify-center">
             <div className="relative w-full max-w-[280px] sm:max-w-[350px] md:max-w-[400px] lg:max-w-[450px]">
               <Image
                 src="/smm5.svg"
-                alt="Social Analytics & Performance Optimization"
+                alt="Influencer campaign analytics illustration"
                 width={400}
                 height={400}
                 className="w-full h-auto"
@@ -379,23 +380,23 @@ export default function InfluencerMarketing() {
             <ul className="space-y-2 sm:space-y-3 text-white text-base sm:text-lg font-['Glacial_Indifference']">
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>Monthly performance reports (engagement, reach, conversions)</span>
+                <span>UTM links and discount codes for every creator</span>
               </li>
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>Competitor benchmarking and gap analysis</span>
+                <span>Creator-level reporting on reach, engagement and clicks</span>
               </li>
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>Sentiment analysis to gauge brand perception</span>
+                <span>Website visits, enquiries and sales traced back to creators</span>
               </li>
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>ROI tracking for paid and organic efforts</span>
+                <span>Cost per result and campaign ROI</span>
               </li>
               <li className="flex items-start">
                 <span className="text-[#F5EE30] mr-2 sm:mr-3 flex-shrink-0">•</span>
-                <span>Platform algorithm updates and pivot strategies</span>
+                <span>Learnings carried into your next campaign</span>
               </li>
             </ul>
           </div>
@@ -473,7 +474,7 @@ export default function InfluencerMarketing() {
           </div>
         </section>
 
-        <ServiceCaseStudies services={["influencer"]} title="Influencer Campaigns" linkLabel="See all influencer work" />
+        <ServiceCaseStudies contactService="influencer-marketing" services={["influencer"]} title="Influencer Campaigns" linkLabel="See all influencer work" />
 
 
         <RelatedArticlesSection
@@ -586,7 +587,7 @@ export default function InfluencerMarketing() {
 
             {/* Circle Button */}
             <div className="flex justify-center md:justify-end">
-              <a href="/get-started" className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white text-black font-bold flex items-center justify-center shadow-lg hover:bg-yellow-400 transition-all">GET STARTED</a>
+              <Link href={getMarketingContactHref({ service: "influencer-marketing" })} prefetch={false} className="w-28 h-28 md:w-32 md:h-32 rounded-full bg-white text-black font-bold flex items-center justify-center shadow-lg hover:bg-yellow-400 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]">GET STARTED</Link>
             </div>
           </div>
                 </div>
