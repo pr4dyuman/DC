@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import ClientPortalSection from "@/components/marketing/ClientPortalSection";
+import CountUp from "@/components/marketing/CountUp";
 import HeroFlightPath from "@/components/marketing/HeroFlightPath";
 import HomeRotatingWord from "@/components/marketing/HomeRotatingWord";
 import HowWeWork from "@/components/marketing/HowWeWork";
 import LazyCompanionsSlider from "@/components/marketing/LazyCompanionsSlider";
+import LazyTeamSlider from "@/components/marketing/LazyTeamSlider";
 import LazyTestimonialSection from "@/components/marketing/LazyTestimonialSection";
 import ProductCards from "@/components/marketing/ProductCards";
 import RecentWork from "@/components/marketing/RecentWork";
-import ServiceCards from "@/components/marketing/services/ServiceCards";
+import ServicesTicker from "@/components/marketing/ServicesTicker";
+import ServiceShowcase from "@/components/marketing/services/ServiceShowcase";
 import ButtonLink from "@/components/marketing/ui/ButtonLink";
 import CtaBand from "@/components/marketing/ui/CtaBand";
 import { MOBILE_SCROLLER, MOBILE_SCROLLER_ITEM, PageSection, SectionIntro } from "@/components/marketing/ui/PageSection";
@@ -17,9 +20,9 @@ import { getMarketingContactHref } from "@/lib/marketing-contact";
 
 // The figures the About page also shows.
 const homeStats = [
-  { label: "Happy clients", value: "100+" },
-  { label: "Ad spend managed", value: "\u20b950L+" },
-  { label: "Years of experience", value: "5+" },
+  { label: "Happy clients", end: 100, suffix: "+" },
+  { label: "Ad spend managed", end: 50, prefix: "\u20b9", suffix: "L+" },
+  { label: "Years of experience", end: 5, suffix: "+" },
 ];
 
 const focusRing =
@@ -91,7 +94,9 @@ const HeroSection = async () => {
             {homeStats.map((stat) => (
               <div key={stat.label} className="flex flex-col-reverse">
                 <dt className="mt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-white/50 sm:text-xs">{stat.label}</dt>
-                <dd className="m-0 font-suifak text-3xl text-white sm:text-5xl">{stat.value}</dd>
+                <dd className="m-0 font-suifak text-3xl text-white sm:text-5xl">
+                  <CountUp end={stat.end} prefix={stat.prefix} suffix={stat.suffix} />
+                </dd>
               </div>
             ))}
           </dl>
@@ -104,32 +109,39 @@ const HeroSection = async () => {
         </div>
       </section>
 
-      <PageSection labelledBy="home-services" bordered={false}>
-        <SectionIntro id="home-services" eyebrow="What We Do" title="Our Services">
-          Six services, one team. Not sure where to start? Ask for a free plan and we will suggest the right mix.
-          <span className="mt-4 block">
-            <ButtonLink href="/services" variant="text" arrow>
-              All services
-            </ButtonLink>
-          </span>
-        </SectionIntro>
-        <div className="mt-8">
-          <ServiceCards compact />
+      {/* Services: illustrated cards over the black-and-white desk photo */}
+      <section aria-labelledby="home-services" className="bg-black text-white">
+        <div className="px-[var(--site-gutter)] pt-14 sm:pt-16 lg:pt-20">
+          <div className="mx-auto max-w-[var(--site-content)]">
+            <SectionIntro id="home-services" eyebrow="Services" title="Your Growth, Fuelled By" accent="Our Expertise">
+              Six services, one team. Not sure where to start? Ask for a free plan and we will suggest the right mix.
+              <span className="mt-4 block">
+                <ButtonLink href="/services" variant="text" arrow>
+                  All services
+                </ButtonLink>
+              </span>
+            </SectionIntro>
+          </div>
         </div>
-      </PageSection>
+        <ServiceShowcase />
+      </section>
 
-      <HowWeWork />
+      <ServicesTicker />
+
+      <HowWeWork tone="dark" />
 
       {/* What working with us looks like: every client's Agency OS portal */}
       <ClientPortalSection />
 
       <RecentWork />
 
+      <LazyTeamSlider />
+
       <LazyTestimonialSection />
 
       {latestPosts.length > 0 && (
         <PageSection labelledBy="home-articles">
-          <SectionIntro id="home-articles" eyebrow="From The Blog" title="Latest Articles">
+          <SectionIntro id="home-articles" eyebrow="From The Blog" title="Latest" accent="Articles">
             <ButtonLink href="/blog" variant="text" arrow>
               All articles
             </ButtonLink>
@@ -160,7 +172,9 @@ const HeroSection = async () => {
       )}
 
       <CtaBand
-        title="Want more customers?"
+        title="Want more"
+        accent="customers?"
+        image={{ src: "/agency-900.png", alt: "Illustration of the Digital Corvids team celebrating with yellow gears", width: 900, height: 830 }}
         text={"Tell us about your business and goals. We usually reply within 24\u00a0hours with questions and a free plan."}
         primaryLabel="Get a free marketing plan"
         primaryHref={getMarketingContactHref({ intent: "plan" })}
@@ -168,7 +182,7 @@ const HeroSection = async () => {
 
       {/* Our products, kept apart from the services above */}
       <PageSection labelledBy="home-products-heading">
-        <SectionIntro id="home-products-heading" eyebrow="Our Products" title="Also Made By Digital Corvids">
+        <SectionIntro id="home-products-heading" eyebrow="Our Products" title="Also Made By" accent="Digital Corvids" accentTone="yellow">
           <ButtonLink href="/products" variant="text" arrow>
             See all products
           </ButtonLink>

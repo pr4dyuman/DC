@@ -1,8 +1,9 @@
+import Image from "next/image";
 import { Clock, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 
 import ButtonLink from "@/components/marketing/ui/ButtonLink";
 import PageHero from "@/components/marketing/ui/PageHero";
-import { PageSection } from "@/components/marketing/ui/PageSection";
+import { Eyebrow, PageSection, TwoToneTitle } from "@/components/marketing/ui/PageSection";
 import { getMarketingWhatsAppHref } from "@/lib/marketing-contact";
 import {
   MARKETING_EMAIL,
@@ -51,6 +52,12 @@ export default function ContactPage() {
       <PageHero
         eyebrow="Contact Us"
         title="Let's Talk"
+        image={{
+          src: "/contact-us1.png",
+          alt: "Illustration of a person climbing to the top of a yellow and white bar chart",
+          width: 532,
+          height: 453,
+        }}
         intro={
           <p className="m-0">
             Tell us about your business and what you want to achieve, whether that is more customers, a new website or
@@ -72,9 +79,9 @@ export default function ContactPage() {
       <PageSection labelledBy="contact-form-heading" bordered={false}>
         <div className="grid gap-12 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,0.65fr)] lg:gap-16">
           <div>
-            <p className="m-0 font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">Send A Message</p>
-            <h2 id="contact-form-heading" className="mt-4 text-3xl font-bold uppercase leading-none sm:text-4xl">
-              Tell Us About Your Project
+            <Eyebrow>Send A Message</Eyebrow>
+            <h2 id="contact-form-heading" className="mt-5 text-4xl font-bold uppercase leading-[1.02] sm:text-5xl">
+              <TwoToneTitle title="Tell Us About" accent="Your Project" accentTone="yellow" />
             </h2>
             <ContactForm className="mt-10" />
           </div>
@@ -133,6 +140,34 @@ export default function ContactPage() {
               </ol>
             </div>
           </aside>
+        </div>
+      </PageSection>
+
+      {/* The original page's closing block and illustration */}
+      <PageSection labelledBy="contact-assist">
+        <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+          <div className="order-2 flex justify-center lg:order-1 lg:justify-start">
+            <Image
+              src="/contact2.svg"
+              alt="Illustration of a team member answering messages at a computer, with yellow gears and a chat bubble"
+              width={546}
+              height={542}
+              loading="lazy"
+              className="h-auto w-64 sm:w-80 lg:w-[26rem]"
+            />
+          </div>
+          <div className="order-1 lg:order-2 lg:text-right">
+            <h2 id="contact-assist" className="m-0 text-4xl font-bold uppercase leading-[1.02] sm:text-5xl xl:text-6xl">
+              <TwoToneTitle title="We Are Happy" accent="To Assist You" accentTone="yellow" />
+            </h2>
+            <p className="mt-6 text-base leading-7 text-gray-300 sm:text-lg lg:ml-auto lg:max-w-xl">
+              Have a question or need a tailored plan? Our team is a message away. Fill out the form or reach us directly,
+              and your enquiry will get the attention it deserves.
+            </p>
+            <p className="mt-4 text-sm font-bold uppercase tracking-[0.14em] text-[#F5EE30]">
+              Average response time: within 24 hours
+            </p>
+          </div>
         </div>
       </PageSection>
     </main>

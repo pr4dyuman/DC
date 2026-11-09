@@ -5,6 +5,7 @@ const page: ServicePageData = {
     slug: "seo",
     path: "/services/seo",
     title: "Search Engine Optimization",
+    titleParts: ["Search Engine", "Optimization"],
     eyebrow: "Rank higher, grow faster",
     summary: "We help your business show up when customers search on Google. We fix the technical basics, write pages around what people really search for, strengthen your local listing and build your site's authority, then report traffic, rankings and enquiries every month.",
     cardText: "SEO is the backbone of organic growth. We optimize your website to rank higher on Google, drive targeted traffic, and turn visitors into loyal customers.",
@@ -37,8 +38,9 @@ const page: ServicePageData = {
     deliverables: [
         {
             title: "Technical SEO",
+            heading: ["Technical SEO", "Optimization"],
+            image: "/seo2.svg",
             text: "Make sure Google can crawl, load and understand every page.",
-            icon: "wrench",
             items: [
                 "Website Speed & Core Web Vitals",
                 "Mobile-First Indexing Optimization",
@@ -49,8 +51,9 @@ const page: ServicePageData = {
         },
         {
             title: "Keyword research & content",
+            heading: ["Keyword Research", "& Content Optimization"],
+            image: "/seo3.svg",
             text: "Target the searches your customers actually make.",
-            icon: "search",
             items: [
                 "Comprehensive keyword research & competitor analysis",
                 "Content strategy development & optimization",
@@ -61,8 +64,9 @@ const page: ServicePageData = {
         },
         {
             title: "Local SEO & Google Business Profile",
+            heading: ["Local SEO", "& Google Business Profile"],
+            image: "/seo4.svg",
             text: "Be the first choice when people nearby search for what you offer.",
-            icon: "map-pin",
             items: [
                 "Google Business Profile setup and optimization",
                 "Local keyword and “near me” search targeting",
@@ -73,8 +77,9 @@ const page: ServicePageData = {
         },
         {
             title: "Link building & authority",
+            heading: ["Link Building", "& Authority"],
+            image: "/seo5.svg",
             text: "Build your site's authority so its rankings last.",
-            icon: "link",
             items: [
                 "High-Quality Backlink Acquisition",
                 "Guest Posting & Content Outreach",
@@ -179,7 +184,8 @@ const page: ServicePageData = {
         }
     ],
     closing: {
-        title: "Ready to dominate Google search results?",
+        title: "Ready to dominate",
+        accent: "Google search results?",
         text: "Let's discuss how our proven SEO strategies can help you outrank competitors and drive qualified organic traffic."
     },
     seo: {

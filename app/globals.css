@@ -330,6 +330,16 @@ body {
   animation-duration: 28s;
 }
 
+/* The homepage's yellow services band */
+.dc-services-marquee-track {
+  animation-duration: 36s;
+}
+
+.dc-service-ticker-item {
+  flex: 0 0 auto;
+  padding-right: 40px;
+}
+
 .dc-partner-item {
   flex: 0 0 29vw;
   min-width: 29vw;

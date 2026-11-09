@@ -2,9 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { Check } from "lucide-react";
 
-// The page header used across the marketing pages, in the Portfolio and
-// Templates style: a yellow eyebrow, a large title, a short intro and the
-// page's main buttons. With `image`, the text sits beside an illustration
+import { Eyebrow, TwoToneTitle } from "./PageSection";
+
+// The page header used across the marketing pages: the section label, a large
+// title (with an optional second line in yellow, `accent`), a short intro and
+// the page's main buttons. With `image`, the text sits beside an illustration
 // (service pages). `breadcrumbs` shows where the page sits in the site.
 const focusRing =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]";
@@ -74,6 +76,7 @@ function Checklist({ items }) {
 export default function PageHero({
   eyebrow,
   title,
+  accent,
   titleSize = "lg",
   intro,
   actions,
@@ -84,8 +87,10 @@ export default function PageHero({
 }) {
   const heading = (
     <>
-      <p className="m-0 font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30]">{eyebrow}</p>
-      <h1 className={`mt-5 max-w-4xl font-suifak uppercase ${titleSizes[titleSize] || titleSizes.lg}`}>{title}</h1>
+      <Eyebrow>{eyebrow}</Eyebrow>
+      <h1 className={`mt-5 max-w-4xl font-suifak uppercase ${titleSizes[titleSize] || titleSizes.lg}`}>
+        <TwoToneTitle title={title} accent={accent} accentTone="yellow" />
+      </h1>
     </>
   );
   const introBlock = intro ? <div className="text-base leading-7 text-gray-300 sm:text-lg">{intro}</div> : null;
@@ -104,16 +109,15 @@ export default function PageHero({
               {stats ? <Stats stats={stats} /> : null}
               {actionsBlock}
             </div>
-            {/* Decorative, so phones skip it and reach the content sooner. */}
-            <div className="hidden justify-center sm:flex lg:justify-end">
+            <div className="flex justify-center lg:justify-end">
               <Image
                 src={image.src}
                 alt={image.alt}
                 width={image.width || 420}
                 height={image.height || 420}
                 priority
-                sizes="(min-width: 1024px) 420px, (min-width: 640px) 320px, 240px"
-                className="h-auto w-60 sm:w-80 lg:w-[26rem]"
+                sizes="(min-width: 1024px) 420px, (min-width: 640px) 320px, 224px"
+                className="h-auto w-56 sm:w-80 lg:w-[26rem]"
               />
             </div>
           </div>

@@ -1,11 +1,12 @@
 import Image from "next/image";
 
+import CountUp from "@/components/marketing/CountUp";
 import { ToolLogosSlider } from "@/components/marketing/HomeSliders";
 import TeamSlider from "@/components/marketing/TeamSlider";
 import ButtonLink from "@/components/marketing/ui/ButtonLink";
 import CtaBand from "@/components/marketing/ui/CtaBand";
 import PageHero from "@/components/marketing/ui/PageHero";
-import { PageSection, SectionIntro } from "@/components/marketing/ui/PageSection";
+import { Eyebrow, PageSection, TwoToneTitle } from "@/components/marketing/ui/PageSection";
 import { getMarketingContactHref } from "@/lib/marketing-contact";
 import { getMarketingBreadcrumbJsonLd, serializeMarketingJsonLd } from "@/lib/marketing-seo";
 
@@ -17,9 +18,12 @@ const structuredData = [
   ]),
 ];
 
-const moreStats = [
-  { label: "E-com partners", value: "10+" },
-  { label: "Team members", value: "25+" },
+// The figures the homepage also shows, plus two more about the team.
+const stats = [
+  { label: "Happy clients", end: 100, suffix: "+" },
+  { label: "Ad spend managed", end: 50, prefix: "₹", suffix: "L+" },
+  { label: "E-com partners", end: 10, suffix: "+" },
+  { label: "Team members", end: 25, suffix: "+" },
 ];
 
 const objectives = [
@@ -27,6 +31,8 @@ const objectives = [
   "We are equally committed to driving digital literacy, particularly in rural areas, by empowering small and medium businesses and young entrepreneurs with the tools they need to succeed in today's digital world.",
   "We also prioritise cyber security awareness, so businesses can operate safely and securely as they embrace digital growth. Through these efforts, we strive to make a meaningful impact on the economy and foster a digitally secure and inclusive environment.",
 ];
+
+const sectionHeading = "mt-5 text-4xl font-bold uppercase leading-[1.02] sm:text-5xl xl:text-6xl";
 
 export default function AboutPage() {
   return (
@@ -45,11 +51,6 @@ export default function AboutPage() {
             social content, websites and video production to help brands turn attention into measurable business growth.
           </p>
         }
-        stats={[
-          { label: "Happy clients", value: "100+" },
-          { label: "Ad spend managed", value: "₹50L+" },
-          { label: "Years of experience", value: "5+" },
-        ]}
         actions={
           <>
             <ButtonLink href={getMarketingContactHref({ intent: "plan" })} arrow>
@@ -65,9 +66,9 @@ export default function AboutPage() {
       <PageSection labelledBy="about-story" bordered={false}>
         <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
           <div>
-            <p className="m-0 font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">Who We Are</p>
-            <h2 id="about-story" className="mt-4 text-4xl font-bold uppercase leading-none sm:text-5xl">
-              Digital Marketing Built For Measurable Growth
+            <Eyebrow>Who We Are</Eyebrow>
+            <h2 id="about-story" className={sectionHeading}>
+              <TwoToneTitle title="Digital Marketing Built For" accent="Measurable Growth" />
             </h2>
             <div className="mt-6 flex flex-col gap-5 text-base leading-7 text-gray-300 sm:text-lg">
               <p className="m-0">
@@ -81,14 +82,13 @@ export default function AboutPage() {
                 unlock new opportunities and drive your success.
               </p>
             </div>
-            <dl className="m-0 mt-8 grid max-w-md grid-cols-2 border-y border-white/10">
-              {moreStats.map((stat) => (
-                <div key={stat.label} className="flex flex-col-reverse border-r border-white/10 py-4 pr-4 last:border-r-0 last:pl-4 last:pr-0">
-                  <dt className="mt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">{stat.label}</dt>
-                  <dd className="m-0 text-2xl font-bold tracking-[0.06em] text-white">{stat.value}</dd>
-                </div>
-              ))}
-            </dl>
+            {/* The yellow experience box from the original page */}
+            <div className="mt-8 inline-flex flex-col items-center justify-center bg-[#F5EE30] px-10 py-6 text-center text-black shadow-lg">
+              <span className="text-4xl font-bold sm:text-5xl">
+                <CountUp end={5} suffix="+" />
+              </span>
+              <span className="mt-1 text-xs font-bold uppercase tracking-wider sm:text-sm">Years of experience</span>
+            </div>
           </div>
           <div className="flex justify-center lg:justify-end">
             <Image
@@ -102,9 +102,20 @@ export default function AboutPage() {
             />
           </div>
         </div>
+
+        <dl className="m-0 mt-14 grid grid-cols-2 gap-y-10 border-y border-white/10 py-10 sm:mt-16 lg:grid-cols-4">
+          {stats.map((stat) => (
+            <div key={stat.label} className="flex flex-col-reverse items-center text-center">
+              <dt className="mt-3 text-xs font-medium uppercase tracking-wider text-gray-400 sm:text-sm">{stat.label}</dt>
+              <dd className="m-0 text-4xl font-bold text-white sm:text-5xl md:text-6xl">
+                <CountUp end={stat.end} prefix={stat.prefix} suffix={stat.suffix} />
+              </dd>
+            </div>
+          ))}
+        </dl>
       </PageSection>
 
-      <PageSection labelledBy="about-why">
+      <PageSection labelledBy="about-why" bordered={false}>
         <div className="grid items-center gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
           <div className="order-2 flex justify-center lg:order-1 lg:justify-start">
             <Image
@@ -117,9 +128,9 @@ export default function AboutPage() {
             />
           </div>
           <div className="order-1 lg:order-2">
-            <p className="m-0 font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">Why Us</p>
-            <h2 id="about-why" className="mt-4 text-4xl font-bold uppercase leading-none sm:text-5xl">
-              Wing To Wing Commitment
+            <Eyebrow>Why Us</Eyebrow>
+            <h2 id="about-why" className={sectionHeading}>
+              <TwoToneTitle title="Wing To Wing" accent="Commitment" />
             </h2>
             <div className="mt-6 flex flex-col gap-5 text-base leading-7 text-gray-300 sm:text-lg">
               <p className="m-0">
@@ -139,19 +150,38 @@ export default function AboutPage() {
         </div>
       </PageSection>
 
-      <PageSection labelledBy="about-objectives" tone="yellow">
-        <SectionIntro id="about-objectives" eyebrow="Our Objectives" title="The Intelligence Behind Every Strategy" tone="yellow" />
-        <ol className="m-0 mt-8 grid list-none gap-px overflow-hidden border border-black/15 bg-black/15 p-0 md:grid-cols-3">
-          {objectives.map((text, index) => (
-            <li key={text} className="bg-[#F5EE30] p-6 sm:p-8">
-              <p className="m-0 font-suifak text-4xl leading-none sm:text-5xl">.{String(index + 1).padStart(2, "0")}</p>
-              <p className="mt-5 text-sm leading-6 text-black/80 sm:text-base sm:leading-7">{text}</p>
-            </li>
-          ))}
-        </ol>
+      <PageSection labelledBy="about-objectives">
+        <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
+          <div>
+            <Eyebrow>Our Objectives</Eyebrow>
+            <h2 id="about-objectives" className={sectionHeading}>
+              <TwoToneTitle title="The Intelligence Behind Every" accent="Strategy" />
+            </h2>
+            <ol className="m-0 mt-8 flex list-none flex-col gap-7 p-0">
+              {objectives.map((text, index) => (
+                <li key={text} className="grid grid-cols-[3.5rem_1fr] gap-4 border-b border-white/10 pb-7 last:border-b-0 last:pb-0">
+                  <span className="font-suifak text-3xl leading-none text-[#F5EE30] sm:text-4xl">
+                    .{String(index + 1).padStart(2, "0")}
+                  </span>
+                  <p className="m-0 text-base leading-7 text-gray-300">{text}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+          <div className="flex justify-center lg:justify-end">
+            <Image
+              src="/about3.png"
+              alt="Illustration of a strategist ticking off a checklist on a yellow clipboard"
+              width={510}
+              height={684}
+              sizes="(min-width: 1024px) 384px, (min-width: 640px) 320px, 240px"
+              className="h-auto w-60 sm:w-80 lg:w-96"
+            />
+          </div>
+        </div>
       </PageSection>
 
-      <section aria-labelledby="about-tools" className="bg-black py-14 sm:py-16">
+      <section aria-labelledby="about-tools" className="border-t border-white/10 bg-black py-14 sm:py-16">
         <h2
           id="about-tools"
           className="m-0 mb-8 text-center font-glacial-bold text-lg uppercase tracking-widest text-gray-400 sm:text-xl"

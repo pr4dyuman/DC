@@ -5,6 +5,7 @@ const page: ServicePageData = {
     slug: "social-media-marketing",
     path: "/services/social-media-marketing",
     title: "Social Media Marketing",
+    titleParts: ["Social Media", "Marketing"],
     eyebrow: "Build community",
     summary: "We plan, create and run your Instagram, Facebook and LinkedIn so your brand stays visible and your audience turns into customers. Organic posts and paid campaigns work together, and you get a monthly report on what is working.",
     cardText: "Build a loyal audience and amplify your brand's voice across platforms like Facebook, Instagram, LinkedIn, and Pinterest.",
@@ -37,8 +38,9 @@ const page: ServicePageData = {
     deliverables: [
         {
             title: "Organic social growth",
+            heading: ["Organic Social", "Media Growth"],
+            image: "/smm2.svg",
             text: "A steady, on-brand presence on the platforms your customers use.",
-            icon: "trending",
             items: [
                 "Platform-specific strategy (Instagram, LinkedIn, Facebook, X, Pinterest)",
                 "Viral-worthy content calendars (posts, reels, stories, carousels)",
@@ -49,8 +51,9 @@ const page: ServicePageData = {
         },
         {
             title: "Paid social ads",
+            heading: ["Paid Social", "Advertising"],
+            image: "/smm3.svg",
             text: "Targeted Meta, Pinterest and LinkedIn ads that bring leads, not just likes.",
-            icon: "megaphone",
             items: [
                 "Campaign setup and optimization (Meta Ads, Pinterest Ads, LinkedIn Ads)",
                 "Audience segmentation and lookalike targeting",
@@ -61,8 +64,9 @@ const page: ServicePageData = {
         },
         {
             title: "Content & storytelling",
+            heading: ["Content Creation", "& Storytelling"],
+            image: "/smm4.svg",
             text: "Photos, videos and captions that tell your brand's story.",
-            icon: "camera",
             items: [
                 "Creative concept development and mood boards",
                 "High-quality photo/video shoots for social feeds",
@@ -73,8 +77,9 @@ const page: ServicePageData = {
         },
         {
             title: "Analytics & optimisation",
+            heading: ["Social Analytics", "& Performance Optimization"],
+            image: "/smm5.svg",
             text: "Monthly reports that show what's working and what to change.",
-            icon: "chart",
             items: [
                 "Monthly performance reports (engagement, reach, conversions)",
                 "Competitor benchmarking and gap analysis",
@@ -179,7 +184,8 @@ const page: ServicePageData = {
         }
     ],
     closing: {
-        title: "Ready to build social momentum?",
+        title: "Ready to build",
+        accent: "social momentum?",
         text: "Let's discuss how social strategy, creative content, and paid campaigns can turn your audience into measurable demand."
     },
     seo: {

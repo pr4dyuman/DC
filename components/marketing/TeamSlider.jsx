@@ -6,9 +6,8 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import Image from "next/image";
-import Link from "next/link";
 
-import { SectionIntro } from "@/components/marketing/ui/PageSection";
+import { TeamSliderHeader } from "./TeamSliderHeader";
 
 const teamMembers = [
   { name: "Garima Khurana", role: "Content Writer & Strategist", img: "/garima.webp" },
@@ -94,21 +93,8 @@ export default function TeamSlider() {
   }, []);
 
   return (
-    <section ref={sectionRef} aria-labelledby="about-team" className="bg-black py-14 sm:py-16 lg:py-20">
-      {/* Header, in the same style as the page's other sections */}
-      <div className="mx-auto mb-10 max-w-[var(--site-frame)] px-[var(--site-gutter)] sm:mb-12">
-        <SectionIntro id="about-team" eyebrow="Meet Our Team" title="The Minds Behind Your Success">
-          Our diverse team of experts brings years of experience in digital marketing,{" "}
-          <Link
-            href="/services/web-development"
-            prefetch={false}
-            className="text-[#F5EE30] underline underline-offset-4 hover:text-white"
-          >
-            web development
-          </Link>
-          , and creative strategy to every project.
-        </SectionIntro>
-      </div>
+    <section ref={sectionRef} aria-labelledby="team-heading" className="bg-black py-14 sm:py-16 lg:py-20">
+      <TeamSliderHeader />
 
       {/* Swiper Slider */}
       <div className="relative mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)]">

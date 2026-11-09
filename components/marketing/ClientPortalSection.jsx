@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 
 import { getMarketingContactHref } from "@/lib/marketing-contact";
-import { ClientPortalPreview } from "./ManageCompany";
+import { ClientPortalPreview, HandArrow } from "./ManageCompany";
 
 const portalPoints = ["Live progress on every task", "All your files in one place", "Invoices you can view and pay"];
 
@@ -54,7 +54,20 @@ export default function ClientPortalSection() {
           </div>
         </div>
 
-        <ClientPortalPreview compactOnPhones />
+        <div className="flex min-w-0 flex-col gap-5">
+          <ClientPortalPreview compactOnPhones />
+          {/* Hand-written notes, as on the original homepage (wide screens only). */}
+          <div aria-hidden="true" className="hidden justify-between gap-10 font-architects text-lg leading-snug lg:flex xl:text-xl">
+            <div className="flex max-w-[15rem] flex-col gap-1">
+              <HandArrow direction="up" />
+              <p className="m-0">your project, live. every task, file and update.</p>
+            </div>
+            <div className="flex max-w-[13rem] flex-col items-end gap-1 text-right">
+              <HandArrow direction="up" />
+              <p className="m-0">pay your invoices here, whenever you like.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );

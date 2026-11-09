@@ -5,6 +5,8 @@ const page: ServicePageData = {
     slug: "ppc",
     path: "/services/ppc",
     title: "Pay-Per-Click (PPC) Advertising",
+    titleParts: ["Pay-Per-Click (PPC)", "Advertising"],
+    cardTitle: ["PPC", "Advertising"],
     titleSize: "md",
     eyebrow: "Immediate results",
     summary: "Paid ads on Google, Meta and LinkedIn put your business in front of people who are ready to buy, from day one. We plan the campaigns, write the ads, keep tuning bids and budgets, and report on leads, sales and return on ad spend.",
@@ -38,8 +40,9 @@ const page: ServicePageData = {
     deliverables: [
         {
             title: "Campaign planning",
+            heading: ["Strategic", "Campaign Planning"],
+            image: "/ppc2.svg",
             text: "Research, campaign structure and budgets planned around your goals.",
-            icon: "target",
             items: [
                 "Comprehensive keyword research and competitor analysis",
                 "Custom campaign architecture tailored to your goals",
@@ -50,8 +53,9 @@ const page: ServicePageData = {
         },
         {
             title: "Ads & copywriting",
+            heading: ["Ad Creation", "& Copywriting"],
+            image: "/ppc3.svg",
             text: "Ads that match what people search for and give them a reason to click.",
-            icon: "pen",
             items: [
                 "High-converting ad copy that speaks to user intent",
                 "Eye-catching display ads and responsive search ads",
@@ -62,8 +66,9 @@ const page: ServicePageData = {
         },
         {
             title: "Platforms we run",
+            heading: ["Platform", "Mastery"],
+            image: "/ppc4.svg",
             text: "Google, Microsoft, Meta, LinkedIn and Amazon: wherever your buyers are.",
-            icon: "layout",
             items: [
                 "Google Ads (Search, Display, Shopping, YouTube)",
                 "Microsoft Advertising (Bing Ads)",
@@ -74,8 +79,9 @@ const page: ServicePageData = {
         },
         {
             title: "Bidding & optimisation",
+            heading: ["Bid Management", "& Optimization"],
+            image: "/ppc5.svg",
             text: "Smart bids and negative keywords that cut wasted spend.",
-            icon: "sliders",
             items: [
                 "Automated and manual bidding strategies",
                 "Real-time bid adjustments based on performance",
@@ -86,8 +92,9 @@ const page: ServicePageData = {
         },
         {
             title: "Tracking & reporting",
+            heading: ["Transparent", "Analytics & Reporting"],
+            image: "/ppc6.svg",
             text: "No vanity metrics: reports on leads, sales and return on ad spend.",
-            icon: "chart",
             items: [
                 "Custom dashboards tracking key performance metrics",
                 "Weekly and monthly performance reports with actionable insights",
@@ -187,7 +194,8 @@ const page: ServicePageData = {
         }
     ],
     closing: {
-        title: "Ready to scale paid acquisition?",
+        title: "Ready to scale",
+        accent: "paid acquisition?",
         text: "Let's discuss how our PPC strategy can help you reach qualified buyers, reduce wasted spend, and turn more clicks into conversions."
     },
     seo: {

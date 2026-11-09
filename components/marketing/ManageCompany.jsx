@@ -54,8 +54,9 @@ const handArrowPaths = {
 };
 
 // Hand-drawn arrows next to the notes: sideways beside the panels on wide
-// screens, up or down at the panels above and below when they stack.
-function HandArrow({ direction, className = "" }) {
+// screens, up or down at the panels above and below when they stack. Also used
+// by the homepage's client portal notes.
+export function HandArrow({ direction, className = "" }) {
     const vertical = direction === "up" || direction === "down";
 
     return (

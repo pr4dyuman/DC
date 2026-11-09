@@ -5,6 +5,7 @@ const page: ServicePageData = {
     slug: "influencer-marketing",
     path: "/services/influencer-marketing",
     title: "Influencer Marketing",
+    titleParts: ["Influencer", "Marketing"],
     eyebrow: "Creators that convert",
     summary: "We match your brand with credible creators, plan campaigns that feel natural, handle briefs and approvals, and track every post to visits and sales.",
     cardText: "Partner with influencers who align with your brand to reach highly engaged audiences.",
@@ -37,8 +38,9 @@ const page: ServicePageData = {
     deliverables: [
         {
             title: "Creator discovery & vetting",
+            heading: ["Influencer", "Discovery & Vetting"],
+            image: "/smm2.svg",
             text: "The right voices for your brand, not just the loudest ones.",
-            icon: "users",
             items: [
                 "Creator shortlists matched to your audience, niche and campaign goal",
                 "Audience quality and engagement authenticity checks",
@@ -49,8 +51,9 @@ const page: ServicePageData = {
         },
         {
             title: "Campaign strategy & briefs",
+            heading: ["Campaign Strategy", "& Briefs"],
+            image: "/smm3.svg",
             text: "Campaigns that feel natural, with clear briefs and approvals.",
-            icon: "clipboard",
             items: [
                 "Campaign goals and key messages set before creators are briefed",
                 "Creative briefs that leave room for each creator's own voice",
@@ -61,8 +64,9 @@ const page: ServicePageData = {
         },
         {
             title: "Content & amplification",
+            heading: ["Content Collaboration", "& Amplification"],
+            image: "/smm4.svg",
             text: "Creator content that works harder across ads, websites and launches.",
-            icon: "repeat",
             items: [
                 "Content coordination and approvals with every creator",
                 "Paid amplification of the best-performing creator posts",
@@ -73,8 +77,9 @@ const page: ServicePageData = {
         },
         {
             title: "Analytics & ROI tracking",
+            heading: ["Performance", "Analytics & ROI Tracking"],
+            image: "/smm5.svg",
             text: "We measure what matters: sales, not just likes.",
-            icon: "chart",
             items: [
                 "UTM links and discount codes for every creator",
                 "Creator-level reporting on reach, engagement and clicks",
@@ -179,7 +184,8 @@ const page: ServicePageData = {
         }
     ],
     closing: {
-        title: "Ready to build creator-led demand?",
+        title: "Ready to build",
+        accent: "creator-led demand?",
         text: "Let's discuss how the right creators, content, and tracking can turn audience trust into measurable campaign results."
     },
     seo: {

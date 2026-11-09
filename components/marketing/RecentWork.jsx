@@ -66,7 +66,7 @@ export default async function RecentWork() {
 
   return (
     <PageSection labelledBy="recent-work">
-      <SectionIntro id="recent-work" eyebrow="Our Work" title="Recent Projects">
+      <SectionIntro id="recent-work" eyebrow="Our Work" title="Recent" accent="Projects">
         <ButtonLink href="/portfolio" variant="text" arrow>
           See all work
         </ButtonLink>

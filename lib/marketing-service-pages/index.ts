@@ -15,34 +15,15 @@ import webDevelopment from "./web-development";
  * Prices: `pricing.from` is null, so the page says "Custom quote". To show a
  * starting price, set it to the text to display, e.g. "₹15,000 a month".
  */
-export type ServiceDeliverableIcon =
-    | "wrench"
-    | "search"
-    | "map-pin"
-    | "link"
-    | "target"
-    | "pen"
-    | "layout"
-    | "sliders"
-    | "chart"
-    | "trending"
-    | "megaphone"
-    | "camera"
-    | "smartphone"
-    | "gauge"
-    | "clipboard"
-    | "video"
-    | "scissors"
-    | "film"
-    | "share"
-    | "users"
-    | "repeat";
-
 export type ServicePageData = {
     slug: MarketingContactServiceSlug;
     path: string;
     /** The H1. */
     title: string;
+    /** The H1 in two parts, the second shown in yellow. Joined with a space they must equal `title`. */
+    titleParts: [string, string];
+    /** A shorter two-tone name for the service cards, when the H1 is long. Defaults to `titleParts`. */
+    cardTitle?: [string, string];
     titleSize?: "lg" | "md";
     eyebrow: string;
     summary: string;
@@ -54,7 +35,18 @@ export type ServicePageData = {
     ctaLabel: string;
     resultsLabel: string;
     audience: { title: string; text: string }[];
-    deliverables: { title: string; text: string; icon: ServiceDeliverableIcon; items: string[] }[];
+    /**
+     * What's included. Each is shown with its illustration and a two-tone
+     * heading (white, then grey), alternating sides as on the original pages.
+     */
+    deliverables: {
+        title: string;
+        heading: [string, string];
+        /** An illustration in /public. */
+        image: string;
+        text: string;
+        items: string[];
+    }[];
     process: { title: string; description: string }[];
     /** What every plan includes: the page's existing promises. */
     expectations: string[];
@@ -63,7 +55,8 @@ export type ServicePageData = {
     faqs: { question: string; answer: string }[];
     relatedLinks: { title: string; href: string; description: string }[];
     relatedArticles: { title: string; href: string; category: string; description: string }[];
-    closing: { title: string; text: string };
+    /** The closing call to action: `title`, then `accent` in yellow. */
+    closing: { title: string; accent: string; text: string };
     /** Search engine data, kept as it was before the redesign. */
     seo: { name: string; description: string; serviceType: string; breadcrumbName: string };
 };

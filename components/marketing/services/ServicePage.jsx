@@ -1,66 +1,18 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  BarChart3,
-  Camera,
-  Check,
-  ClipboardList,
-  ExternalLink,
-  Film,
-  Gauge,
-  LayoutTemplate,
-  Link2,
-  MapPin,
-  Megaphone,
-  PenLine,
-  Repeat,
-  Scissors,
-  Search,
-  Share2,
-  SlidersHorizontal,
-  Smartphone,
-  Target,
-  TrendingUp,
-  Users,
-  Video,
-  Wrench,
-} from "lucide-react";
+import Image from "next/image";
+import { ArrowRight, Check, ExternalLink } from "lucide-react";
 
 import ServiceCaseStudies from "@/components/marketing/portfolio/ServiceCaseStudies";
 import ButtonLink from "@/components/marketing/ui/ButtonLink";
 import CtaBand from "@/components/marketing/ui/CtaBand";
 import PageHero from "@/components/marketing/ui/PageHero";
-import { PageSection, SectionIntro } from "@/components/marketing/ui/PageSection";
+import { Eyebrow, PageSection, SectionIntro, TwoToneTitle } from "@/components/marketing/ui/PageSection";
 import { getMarketingContactHref } from "@/lib/marketing-contact";
 import {
   getMarketingBreadcrumbJsonLd,
   getMarketingServiceJsonLd,
   serializeMarketingJsonLd,
 } from "@/lib/marketing-seo";
-
-const ICONS = {
-  wrench: Wrench,
-  search: Search,
-  "map-pin": MapPin,
-  link: Link2,
-  target: Target,
-  pen: PenLine,
-  layout: LayoutTemplate,
-  sliders: SlidersHorizontal,
-  chart: BarChart3,
-  trending: TrendingUp,
-  megaphone: Megaphone,
-  camera: Camera,
-  smartphone: Smartphone,
-  gauge: Gauge,
-  clipboard: ClipboardList,
-  video: Video,
-  scissors: Scissors,
-  film: Film,
-  share: Share2,
-  users: Users,
-  repeat: Repeat,
-};
 
 function padCount(value) {
   return String(value).padStart(2, "0");
@@ -143,7 +95,6 @@ function getStructuredData(service) {
 // lib/marketing-service-pages.
 export default function ServicePage({ service }) {
   const contactHref = getMarketingContactHref({ service: service.slug });
-  const deliverableColumns = service.deliverables.length === 4 ? "xl:grid-cols-4" : "xl:grid-cols-3";
 
   return (
     <main className="bg-black text-white">
@@ -159,7 +110,8 @@ export default function ServicePage({ service }) {
           { name: service.seo.breadcrumbName },
         ]}
         eyebrow={service.eyebrow}
-        title={service.title}
+        title={service.titleParts[0]}
+        accent={service.titleParts[1]}
         titleSize={service.titleSize}
         intro={<p className="m-0">{service.summary}</p>}
         image={service.image}
@@ -177,7 +129,7 @@ export default function ServicePage({ service }) {
       />
 
       <PageSection labelledBy="service-audience" bordered={false}>
-        <SectionIntro id="service-audience" eyebrow="Who It's For" title="Built For Businesses Like Yours" />
+        <SectionIntro id="service-audience" eyebrow="Who It's For" title="Built For Businesses" accent="Like Yours" />
         <ul className="m-0 mt-8 grid list-none gap-5 p-0 md:grid-cols-3">
           {service.audience.map((item, index) => (
             <li key={item.title} className="border border-white/10 bg-white/[0.03] p-6 sm:p-7">
@@ -190,33 +142,51 @@ export default function ServicePage({ service }) {
       </PageSection>
 
       <PageSection labelledBy="service-deliverables">
-        <SectionIntro id="service-deliverables" eyebrow="What You Get" title="What's Included" />
-        <ul className={`m-0 mt-8 grid list-none gap-5 p-0 md:grid-cols-2 ${deliverableColumns}`}>
-          {service.deliverables.map((group) => {
-            const Icon = ICONS[group.icon] || Check;
+        <SectionIntro id="service-deliverables" eyebrow="What You Get" title="What's" accent="Included" />
+        {/* The original pages' illustrations, alternating sides on wide screens. */}
+        <div className="flex flex-col">
+          {service.deliverables.map((group, index) => {
+            const flip = index % 2 === 1;
             return (
-              <li key={group.title} className="flex flex-col border border-white/10 bg-white/[0.03] p-6 sm:p-7">
-                <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#F5EE30] text-black">
-                  <Icon className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <h3 className="mt-5 text-xl font-bold uppercase leading-tight">{group.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-gray-300">{group.text}</p>
-                <ul className="m-0 mt-5 flex list-none flex-col gap-2.5 border-t border-white/10 p-0 pt-5">
-                  {group.items.map((item) => (
-                    <li key={item} className="flex items-start gap-2.5 text-sm leading-6 text-white/85">
-                      <Check className="mt-1 h-4 w-4 shrink-0 text-[#F5EE30]" aria-hidden="true" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </li>
+              <article
+                key={group.title}
+                className="grid items-center gap-8 border-b border-white/10 py-12 last:border-b-0 last:pb-0 lg:grid-cols-2 lg:gap-16 lg:py-16"
+              >
+                <div className={`flex justify-center ${flip ? "lg:order-2 lg:justify-end" : "lg:justify-start"}`}>
+                  <div className="relative aspect-square w-56 sm:w-72 lg:w-[24rem]">
+                    <Image
+                      src={group.image}
+                      alt=""
+                      fill
+                      loading="lazy"
+                      sizes="(min-width: 1024px) 384px, (min-width: 640px) 288px, 224px"
+                      className="object-contain"
+                    />
+                  </div>
+                </div>
+                <div className={flip ? "lg:order-1" : ""}>
+                  <p className="m-0 font-glacial-bold text-sm tracking-widest text-[#F5EE30]">.{padCount(index + 1)}</p>
+                  <h3 className="mt-3 text-3xl font-extrabold uppercase leading-[1.02] sm:text-4xl xl:text-5xl">
+                    <TwoToneTitle title={group.heading[0]} accent={group.heading[1]} />
+                  </h3>
+                  <p className="mt-5 max-w-xl text-base leading-7 text-gray-300 sm:text-lg">{group.text}</p>
+                  <ul className="m-0 mt-6 flex max-w-xl list-none flex-col gap-3 p-0">
+                    {group.items.map((item) => (
+                      <li key={item} className="flex items-start gap-3 text-base leading-7 text-white/85">
+                        <span aria-hidden="true" className="mt-[11px] h-2 w-2 shrink-0 rounded-full bg-[#F5EE30]" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </article>
             );
           })}
-        </ul>
+        </div>
       </PageSection>
 
       <PageSection labelledBy="service-process" tone="yellow">
-        <SectionIntro id="service-process" eyebrow="How It Works" title="From First Call To Results" tone="yellow" />
+        <SectionIntro id="service-process" eyebrow="How It Works" title="From First Call" accent="To Results" tone="yellow" />
         <ol className="m-0 mt-8 grid list-none gap-px overflow-hidden border border-black/15 bg-black/15 p-0 md:grid-cols-2 lg:grid-cols-4">
           {service.process.map((step, index) => (
             <li key={step.title} className="bg-[#F5EE30] p-6 sm:p-8">
@@ -242,9 +212,9 @@ export default function ServicePage({ service }) {
       <PageSection labelledBy="service-pricing">
         <div className="grid gap-10 lg:grid-cols-2 lg:gap-16">
           <div>
-            <p className="m-0 font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">What It Costs</p>
-            <h2 id="service-pricing" className="mt-4 text-4xl font-bold uppercase leading-none sm:text-5xl">
-              Priced For Your Goals
+            <Eyebrow>What It Costs</Eyebrow>
+            <h2 id="service-pricing" className="mt-5 text-4xl font-bold uppercase leading-[1.02] sm:text-5xl xl:text-6xl">
+              <TwoToneTitle title="Priced For" accent="Your Goals" />
             </h2>
             <p className="mt-8 font-suifak text-5xl uppercase leading-none text-[#F5EE30] sm:text-6xl">
               {service.pricing.from ? `From ${service.pricing.from}` : "Custom quote"}
@@ -274,7 +244,7 @@ export default function ServicePage({ service }) {
       </PageSection>
 
       <PageSection labelledBy="service-faqs">
-        <SectionIntro id="service-faqs" eyebrow="Common Questions" title="Questions We Hear Often" />
+        <SectionIntro id="service-faqs" eyebrow="Common Questions" title="Questions We" accent="Hear Often" />
         <div className="mt-8 border-y border-white/10">
           {service.faqs.map((item, index) => (
             <details key={item.question} open={index === 0} className="group border-b border-white/10 last:border-b-0">
@@ -296,8 +266,8 @@ export default function ServicePage({ service }) {
       <PageSection labelledBy="service-related">
         <div className="grid gap-12 lg:grid-cols-2 lg:gap-16">
           <div>
-            <p className="m-0 font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">Related Services</p>
-            <h2 id="service-related" className="mt-4 text-3xl font-bold uppercase leading-none sm:text-4xl">
+            <Eyebrow>Related Services</Eyebrow>
+            <h2 id="service-related" className="mt-5 text-3xl font-bold uppercase leading-none sm:text-4xl">
               Works Well With
             </h2>
             <LinkList
@@ -307,8 +277,8 @@ export default function ServicePage({ service }) {
             />
           </div>
           <div>
-            <p className="m-0 font-glacial-bold text-xs uppercase tracking-[0.35em] text-[#F5EE30] sm:text-sm">From The Blog</p>
-            <h2 className="mt-4 text-3xl font-bold uppercase leading-none sm:text-4xl">Guides From Our Team</h2>
+            <Eyebrow>From The Blog</Eyebrow>
+            <h2 className="mt-5 text-3xl font-bold uppercase leading-none sm:text-4xl">Guides From Our Team</h2>
             <LinkList
               items={service.relatedArticles.map((article) => ({
                 href: article.href,
@@ -322,6 +292,7 @@ export default function ServicePage({ service }) {
 
       <CtaBand
         title={service.closing.title}
+        accent={service.closing.accent}
         text={service.closing.text}
         primaryLabel={service.ctaLabel}
         primaryHref={contactHref}

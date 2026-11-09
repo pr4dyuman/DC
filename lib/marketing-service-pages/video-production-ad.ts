@@ -5,6 +5,7 @@ const page: ServicePageData = {
     slug: "video-production-ad",
     path: "/services/video-production-ad",
     title: "Video Production & Ad Films",
+    titleParts: ["Video Production &", "Ad Films"],
     titleSize: "md",
     eyebrow: "Story-led content",
     summary: "From the first idea to the final edit, we produce ad films, reels, explainers and brand videos, and cut each one for the platform where your audience will watch it.",
@@ -38,8 +39,9 @@ const page: ServicePageData = {
     deliverables: [
         {
             title: "Pre-production",
+            heading: ["Pre-Production", "& Planning"],
+            image: "/vpd2.svg",
             text: "Concept, script and schedule agreed before the cameras roll.",
-            icon: "clipboard",
             items: [
                 "Concept Development & Creative Briefs",
                 "Scriptwriting & Storyboarding",
@@ -50,8 +52,9 @@ const page: ServicePageData = {
         },
         {
             title: "Production",
+            heading: ["High-Impact", "Production"],
+            image: "/vpd3.svg",
             text: "A crew, lighting and sound to capture your story properly.",
-            icon: "video",
             items: [
                 "Multi-Camera Shoots & Cinematography",
                 "Professional Lighting & Sound Design",
@@ -62,8 +65,9 @@ const page: ServicePageData = {
         },
         {
             title: "Post-production & editing",
+            heading: ["Post-Production", "& Editing"],
+            image: "/vpd4.svg",
             text: "Editing, colour, sound and motion graphics that finish the story.",
-            icon: "scissors",
             items: [
                 "Video Editing & Story Assembly",
                 "Color Grading & Cinematic Enhancement",
@@ -74,8 +78,9 @@ const page: ServicePageData = {
         },
         {
             title: "Ad films & commercials",
+            heading: ["Ad Films", "& Commercials"],
+            image: "/vpd5.svg",
             text: "Ads people remember, from TV spots to social campaigns.",
-            icon: "film",
             items: [
                 "TV Commercials & Broadcast Ads",
                 "Social Media Video Campaigns",
@@ -86,8 +91,9 @@ const page: ServicePageData = {
         },
         {
             title: "Distribution",
+            heading: ["Distribution", "Strategy"],
+            image: "/vpd6.svg",
             text: "Each video cut and placed for the platforms where your audience watches.",
-            icon: "share",
             items: [
                 "Platform-Specific Optimization (YouTube, Instagram, LinkedIn)",
                 "Paid Media Campaigns & Targeting",
@@ -192,7 +198,8 @@ const page: ServicePageData = {
         }
     ],
     closing: {
-        title: "Ready to create video that performs?",
+        title: "Ready to create",
+        accent: "video that performs?",
         text: "Let's discuss how video strategy, production, editing, and distribution can turn your story into campaign-ready assets."
     },
     seo: {

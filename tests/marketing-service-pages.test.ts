@@ -19,17 +19,21 @@ test("every service page has complete content", () => {
     const label = page.path;
     assert.equal(page.path, `/services/${page.slug}`, `${label} path`);
     assert.ok(existsSync(path.join(process.cwd(), "public", page.image.src)), `${label} illustration exists`);
+    // The H1 is shown in two tones; the parts must still read as the H1.
+    assert.equal(page.titleParts.join(" "), page.title, `${label} title parts make up the H1`);
     assert.equal(page.highlights.length, 4, `${label} has four highlights`);
     assert.equal(page.audience.length, 3, `${label} says who it is for`);
     assert.ok(page.deliverables.length >= 4, `${label} lists what is included`);
     for (const group of page.deliverables) {
       assert.ok(group.items.length >= 4 && group.text, `${label}: ${group.title} has a description and items`);
+      assert.equal(group.heading.length, 2, `${label}: ${group.title} has a two-tone heading`);
+      assert.ok(existsSync(path.join(process.cwd(), "public", group.image)), `${label}: ${group.title} illustration exists`);
     }
     assert.equal(page.process.length, 4, `${label} has four process steps`);
     assert.ok(page.faqs.length >= 4, `${label} keeps its FAQs`);
     assert.ok(page.expectations.length >= 4, `${label} keeps its promises`);
     assert.ok(page.seo.name && page.seo.description && page.seo.serviceType, `${label} keeps its search data`);
-    assert.ok(page.closing.title.endsWith("?") && page.closing.text, `${label} has a closing call to action`);
+    assert.ok(page.closing.accent.endsWith("?") && page.closing.title && page.closing.text, `${label} has a closing call to action`);
     for (const link of [...page.relatedLinks, ...page.relatedArticles]) {
       assert.match(link.href, /^(\/|https:\/\/)/, `${label}: ${link.title} has a real link`);
     }

@@ -5,6 +5,7 @@ const page: ServicePageData = {
     slug: "web-development",
     path: "/services/web-development",
     title: "Web Development",
+    titleParts: ["Web", "Development"],
     eyebrow: "Building digital experiences",
     summary: "We design and build fast, mobile-friendly websites and web apps that explain what you do and turn visitors into enquiries. Every site is search-friendly from day one and easy for your team to update.",
     cardText: "Your website is your digital storefront. We build fast, secure, and user-friendly sites optimized for conversions.",
@@ -37,8 +38,9 @@ const page: ServicePageData = {
     deliverables: [
         {
             title: "UX design & research",
+            heading: ["UX Design", "& Research"],
+            image: "/web6.svg",
             text: "Research and wireframes so visitors find what they need fast.",
-            icon: "layout",
             items: [
                 "User Research & Needs Development",
                 "Information Architecture",
@@ -49,8 +51,9 @@ const page: ServicePageData = {
         },
         {
             title: "Responsive development",
+            heading: ["Responsive", "Development"],
+            image: "/web1.svg",
             text: "Pixel-perfect sites and apps that work on every device.",
-            icon: "smartphone",
             items: [
                 "Custom Frontend Development (HTML, CSS3, JavaScript)",
                 "Cross-Platform App Development",
@@ -61,8 +64,9 @@ const page: ServicePageData = {
         },
         {
             title: "Technical SEO",
+            heading: ["Technical SEO", "Optimization"],
+            image: "/web4.svg",
             text: "Search-friendly from the ground up, not fixed after launch.",
-            icon: "search",
             items: [
                 "Core Web Vitals Optimization",
                 "Schema Markup Implementation",
@@ -74,8 +78,9 @@ const page: ServicePageData = {
         },
         {
             title: "Performance",
+            heading: ["Performance", "Optimization"],
+            image: "/web5.svg",
             text: "Fast pages through lean code, compressed images and caching.",
-            icon: "gauge",
             items: [
                 "Code Optimization & Minification",
                 "Image Compression & Lazy Loading",
@@ -181,7 +186,8 @@ const page: ServicePageData = {
         }
     ],
     closing: {
-        title: "Ready to transform your digital presence?",
+        title: "Ready to transform",
+        accent: "your digital presence?",
         text: "Let’s discuss how our web development expertise can help you achieve your business goals with a website that stands out from the competition."
     },
     seo: {

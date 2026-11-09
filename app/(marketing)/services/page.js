@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import HowWeWork from "@/components/marketing/HowWeWork";
-import ServiceCards from "@/components/marketing/services/ServiceCards";
+import ServiceRows from "@/components/marketing/services/ServiceRows";
 import ButtonLink from "@/components/marketing/ui/ButtonLink";
 import CtaBand from "@/components/marketing/ui/CtaBand";
 import PageHero from "@/components/marketing/ui/PageHero";
@@ -48,12 +48,10 @@ export default function Services() {
       />
 
       <PageSection labelledBy="services-list" bordered={false}>
-        <SectionIntro id="services-list" eyebrow="Our Services" title="Pick A Service">
+        <SectionIntro id="services-list" eyebrow="Our Services" title="Six Services," accent="One Team">
           Not sure which you need? Ask for a free plan and we will suggest the right mix.
         </SectionIntro>
-        <div className="mt-8">
-          <ServiceCards />
-        </div>
+        <ServiceRows />
 
         {/* Agency OS and the templates used to be listed here; they are products now. */}
         <p className="mx-auto mb-0 mt-12 max-w-2xl text-center text-base leading-relaxed text-gray-400">
