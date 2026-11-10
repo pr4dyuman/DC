@@ -1,0 +1,100 @@
+{
+    "about": "Fixes from doc/search-data-review-2026-11.md (sections 1 and 3). Each `set` changes a field only while it still holds `from`; each group of `edits` is applied to the post's content only if every find in the group matches.",
+    "posts": [
+        {
+            "slug": "best-seo-agency-in-jaipur-choose-an-ethical-partner",
+            "set": {
+                "metaTitle": {
+                    "from": "Best SEO Agency in Jaipur - Choose an Ethical Partner",
+                    "to": "Best SEO Agency in Jaipur: How to Choose an Ethical Partner"
+                },
+                "metaDescription": {
+                    "from": "Looking for the best SEO agency in Jaipur? Discover how to choose an ethical partner, optimize for local search, and expand your organic rankings safely.",
+                    "to": "How to choose an SEO agency in Jaipur: what ethical, white-hat SEO includes, red flags to avoid and questions to ask before you sign."
+                }
+            },
+            "edits": [
+                {
+                    "why": "Garbled heading",
+                    "group": [
+                        {
+                            "find": "The Jaipur SEO Agency Evaluation Scorecard: A a structured sequence Vetting Framework",
+                            "replace": "Jaipur SEO Agency Scorecard: What to Check Before You Sign"
+                        }
+                    ]
+                },
+                {
+                    "why": "An article about ethical SEO should not promise a number that is not a real client result",
+                    "group": [
+                        {
+                            "find": "Setting Benchmarks for Sustainable 400% Organic Growth",
+                            "replace": "Setting Benchmarks for Sustainable Organic Growth"
+                        }
+                    ]
+                },
+                {
+                    "why": "Link to /services/seo with the page's main search, keeping the sentence grammatical",
+                    "group": [
+                        {
+                            "find": "compete on a global scale, requiring sophisticated ",
+                            "replace": "compete on a global scale, and need an "
+                        },
+                        {
+                            "find": ">seo services</a> that align with search engine guidelines",
+                            "replace": ">SEO company in Jaipur</a> whose work follows search engine guidelines"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "slug": "technical-seo-vs-on-page-key-implementation-priorities",
+            "set": {
+                "metaTitle": {
+                    "from": "Technical SEO Vs On-Page SEO Key Differences And Implementation Priorities: A Practical Evidence-Led Guide",
+                    "to": "Technical SEO vs On-Page SEO: Differences and Priorities"
+                },
+                "metaDescription": {
+                    "from": "Defining Technical SEO and On-Page SEO Core Boundaries.",
+                    "to": "What technical SEO and on-page SEO each cover, how they differ, and which to fix first on your website, with a simple order of priorities."
+                }
+            }
+        },
+        {
+            "slug": "track-instagram-creator-affiliate-sales",
+            "set": {
+                "metaTitle": {
+                    "from": "How To Track Instagram Creator Affiliate Sales: A Setup And Budget",
+                    "to": "How to Track Instagram Creator Affiliate Sales: Codes & UTMs"
+                }
+            }
+        },
+        {
+            "slug": "build-local-citations-structured-outreach-spreadsheet-template",
+            "set": {
+                "metaTitle": {
+                    "from": "How To Build Local Citations Using An Outreach Spreadsheet Template",
+                    "to": "How to Build Local Citations: Outreach Spreadsheet Template"
+                }
+            }
+        },
+        {
+            "slug": "influencer-collaboration-contracts-usage-rights",
+            "set": {
+                "metaTitle": {
+                    "from": "Drafting Influencer Collaboration Contracts: A Guide To Usage Rights",
+                    "to": "Influencer Collaboration Contracts: Usage Rights Explained"
+                }
+            }
+        },
+        {
+            "slug": "customized-web-application-development-architecture",
+            "set": {
+                "metaTitle": {
+                    "from": "Customized Web Application Development Architecture: A Guide For Growing Businesses",
+                    "to": "Custom Web Application Architecture for Growing Businesses"
+                }
+            }
+        }
+    ]
+}
