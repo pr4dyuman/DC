@@ -179,10 +179,10 @@ const page: ServicePageData = {
     ],
     relatedArticles: [
         {
-            title: "Technical SEO Vs On-Page SEO Priorities",
-            href: "/blog/technical-seo-vs-on-page-key-implementation-priorities",
-            category: "Technical SEO",
-            description: "Learn where the core boundaries sit between technical SEO work and on-page SEO work."
+            title: "Best SEO Agency In Jaipur: Choose An Ethical Partner",
+            href: "/blog/best-seo-agency-in-jaipur-choose-an-ethical-partner",
+            category: "Local SEO",
+            description: "How to choose an ethical, white-hat SEO agency in Jaipur, with a scorecard of what to check before you sign."
         },
         {
             title: "Is AI-Generated Content Good For SEO?",

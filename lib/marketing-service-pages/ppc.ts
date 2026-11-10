@@ -199,10 +199,10 @@ const page: ServicePageData = {
             description: "See what PPC advertising services include, from video-integrated deliverables to platform management."
         },
         {
-            title: "Local Services Ads Vs Google Business Profile For Plumbers",
-            href: "/blog/local-service-ads-vs-google-business-plumber-leads",
-            category: "Local Leads",
-            description: "Compare Local Services Ads and Google Business Profile for emergency repairs and scheduled installations."
+            title: "Conversion Funnel Mapping And Optimization",
+            href: "/blog/conversion-funnel-mapping-and-optimization-to-stop-leaks",
+            category: "Conversion Paths",
+            description: "Map your conversion funnel, track leaks in GA4, analyze behavior, and optimize touchpoints for conversions."
         }
     ],
     closing: {

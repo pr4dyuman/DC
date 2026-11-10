@@ -84,7 +84,7 @@ export default function AgencyOsPage() {
       />
       <ManageCompanySection
         headingLevel="h1"
-        eyebrow="manage your company with Agency OS"
+        eyebrow="agency management software for agencies tired of chasing updates"
         showServiceLink={false}
         showFeatures
       />

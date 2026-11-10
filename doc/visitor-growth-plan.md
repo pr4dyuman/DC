@@ -97,13 +97,15 @@ Also:
 7. **Turn the blog towards Indian business owners.**
    - Publish two posts a month from the list below, each linking to its
      service page.
-   - Fix or unpublish `local-service-ads-vs-google-business-plumber-leads`,
-     which is about the US only.
+   - ~~Fix or unpublish `local-service-ads-vs-google-business-plumber-leads`,
+     which is about the US only.~~ Done 10 November: it now redirects to
+     `/services/ppc`.
    - Fix or unpublish `2026-social-media-marketing-trends-…`, which
      recommends TikTok (banned in India since 2020).
    - Fix the garbled heading in the Jaipur SEO post ("A a structured
      sequence Vetting Framework").
-8. **Measure every month** in Search Console (queries, pages, impressions)
+8. **Measure every month** (the first review, with the starting numbers to
+   compare against, is `doc/search-data-review-2026-11.md`) in Search Console (queries, pages, impressions)
    and Google Analytics. If both are connected through Windsor.ai, which is
    available in this workspace, the next topics can be picked from real
    search data.
