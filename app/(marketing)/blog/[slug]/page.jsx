@@ -221,6 +221,8 @@ const MARKETING_SERVICE_LINKS = [
 ];
 
 const BLOG_SERVICE_LINK_OVERRIDES = {
+  // Read by SEO developers, not agency clients: lead with zSEO.ai.
+  "10-best-seo-data-apis-technical-guide-to-search-geo-data-tiers": ["zseo", "seo"],
   "2026-social-media-marketing-trends-operationalizing-ai-and-creative": [
     "social-media-marketing",
     "zseo",

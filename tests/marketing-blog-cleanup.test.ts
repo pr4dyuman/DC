@@ -17,11 +17,13 @@ import {
 } from "../lib/marketing-blog-cleanup";
 import { isMarketingBlogPlaceholderImage } from "../lib/marketing-blog-utils";
 
-test("retired blog redirects point at service pages, kept posts or zSEO.ai, never at retired pages", () => {
+test("retired blog redirects point at service pages, kept posts, Agency OS or zSEO.ai, never at retired pages", () => {
   for (const [slug, destination] of Object.entries({ ...LEGACY_BLOG_REDIRECTS, ...REMOVED_BLOG_REDIRECTS })) {
-    assert.match(destination, /^(?:\/(?:services|blog)\/|https:\/\/zseo\.ai$)/, slug);
-    // /services/ai-blogger itself redirects to zSEO.ai.
+    assert.match(destination, /^(?:\/(?:services|blog)\/|\/agency-os$|https:\/\/zseo\.ai$)/, slug);
+    // These addresses redirect themselves, so pointing at them makes a chain:
+    // /services/ai-blogger goes to zSEO.ai and /services/manage-company to /agency-os.
     assert.notEqual(destination, "/services/ai-blogger", slug);
+    assert.notEqual(destination, "/services/manage-company", slug);
     const targetSlug = destination.startsWith("/blog/") ? destination.slice("/blog/".length) : "";
     assert.equal(isRemovedMarketingBlogSlug(targetSlug), false, `${slug} -> ${destination}`);
     assert.equal(LEGACY_REDIRECTED_BLOG_SLUGS.has(targetSlug), false, `${slug} -> ${destination}`);

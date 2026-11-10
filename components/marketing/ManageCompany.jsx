@@ -221,7 +221,7 @@ export default function ManageCompanySection({
                             >
                                 {HeadingTag === "h1" ? (
                                     <span className={`${eyebrowClassName} mb-3.5 normal-case tracking-normal`}>{eyebrow}</span>
-                                ) : null}
+                                ) : null}{" "}
                                 Fewer “any update?” messages.
                             </HeadingTag>
                             <svg
@@ -242,8 +242,8 @@ export default function ManageCompanySection({
 
                         <div className="flex flex-col gap-5 lg:max-w-[400px] lg:flex-[1_1_300px]">
                             <p className="m-0 text-base leading-relaxed text-pretty sm:text-lg">
-                                Agency OS gives every client a login to follow their project and pay invoices. You get one
-                                place for tasks, money and your team.
+                                Agency OS is agency management software: every client gets a login to follow their project
+                                and pay invoices, and you get one place for tasks, money and your team.
                             </p>
                             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                                 <Link
