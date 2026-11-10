@@ -6,15 +6,16 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import Image from "next/image";
-import Link from "next/link";
+
+import { TeamSliderHeader } from "./TeamSliderHeader";
 
 const teamMembers = [
-  { name: "Garima khurana", role: "Content Write & Strategist", img: "/garima.webp" },
+  { name: "Garima Khurana", role: "Content Writer & Strategist", img: "/garima.webp" },
   { name: "Akash Rinwa", role: "Production Head", img: "/akash.webp" },
   { name: "Tanya Garg", role: "Finance and HR", img: "/tanya.webp" },
   { name: "Divyank Sharma", role: "CEO", img: "/divyank.webp" },
   { name: "Nidhi Indoria", role: "Graphic Designer", img: "/nidhi.webp" },
-  { name: "Chandan Sharma", role: "Web Design/Developer", img: "/chandan.webp" },
+  { name: "Chandan Sharma", role: "Web Designer & Developer", img: "/chandan.webp" },
   { name: "Aman Vashisth", role: "App Developer", img: "/aman.webp" },
   { name: "Nagendra Indoria", role: "Founder", img: "/nagendra.webp" },
   { name: "Sangam Vashisth", role: "PPC Expert", img: "/sangam.jpeg" }
@@ -92,35 +93,8 @@ export default function TeamSlider() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="bg-black py-12 sm:py-16 lg:py-20">
-      {/* Header */}
-      <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] mb-12 sm:mb-16">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-2.5 h-2.5 bg-[#F5EE30] rounded-sm"></div>
-          <p className="text-white font-bold text-sm sm:text-base uppercase tracking-widest">
-            Meet Our Team
-          </p>
-        </div>
-
-        <div className="flex flex-col lg:flex-row justify-between items-start gap-8">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-white uppercase leading-tight lg:w-2/3">
-            The Minds Behind
-            <span className="block text-[#F5EE30]">Your Success</span>
-          </h2>
-
-          <p className="text-gray-300 text-sm lg:text-base leading-relaxed lg:w-1/3">
-            Our diverse team of experts brings years of experience in digital marketing,{" "}
-            <Link
-              href="/services/web-development"
-              prefetch={false}
-              className="text-[#F5EE30] underline underline-offset-4 hover:text-white"
-            >
-              web development
-            </Link>
-            , and creative strategy to every project.
-          </p>
-        </div>
-      </div>
+    <section ref={sectionRef} aria-labelledby="team-heading" className="bg-black py-14 sm:py-16 lg:py-20">
+      <TeamSliderHeader />
 
       {/* Swiper Slider */}
       <div className="relative mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)]">

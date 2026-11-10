@@ -1,11 +1,12 @@
 import { buildMarketingMetadata } from "@/lib/marketing-seo";
 
 export const metadata = buildMarketingMetadata({
-  title: "Influencer Marketing Services | Digital Corvids",
+  title: "Influencer Marketing Agency in Jaipur | Digital Corvids",
   description:
-    "Plan and manage influencer campaigns with Digital Corvids, including creator discovery, campaign strategy, content coordination, performance tracking, and ROI reporting.",
+    "Influencer marketing in Jaipur: creator discovery and vetting, campaign briefs, content and paid amplification, with tracking of reach, sales and ROI.",
   path: "/services/influencer-marketing",
-  keywords: ["influencer marketing services", "creator campaigns", "influencer agency Jaipur", "brand creator strategy"],
+  image: "/og-image?title=Influencer%20Marketing%20in%20Jaipur",
+  keywords: ["influencer marketing agency in Jaipur", "Jaipur influencers for brand promotion", "micro influencer marketing India", "creator campaigns"],
 });
 
 export default function InfluencerMarketingLayout({ children }) {

@@ -102,6 +102,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         ...(await loadCaseStudies())
             .filter(hasCaseStudyPage)
             .map((study) => staticEntry(`/portfolio/${study.slug}`, "monthly", 0.7)),
+        staticEntry("/products", "monthly", 0.7),
+        staticEntry("/agency-os", "monthly", 0.75),
         staticEntry("/templates", "monthly", 0.8),
         ...getMarketingTemplates().map((template) => staticEntry(template.path, "monthly", 0.7)),
         staticEntry("/services", "monthly", 0.9),
@@ -111,7 +113,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         staticEntry("/services/social-media-marketing", "monthly", 0.8),
         staticEntry("/services/video-production-ad", "monthly", 0.75),
         staticEntry("/services/influencer-marketing", "monthly", 0.75),
-        staticEntry("/services/manage-company", "monthly", 0.75),
         staticEntry("/contact", "monthly", 0.7),
         staticEntry("/privacy", "yearly", 0.3),
         staticEntry("/get-started", "monthly", 0.7),

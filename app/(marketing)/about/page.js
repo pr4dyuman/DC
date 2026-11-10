@@ -1,274 +1,201 @@
-import TeamSlider from '@/components/marketing/TeamSlider';
-import Image from 'next/image';
-import CountUp from '@/components/marketing/CountUp';
+import Image from "next/image";
+
+import CountUp from "@/components/marketing/CountUp";
+import { ToolLogosSlider } from "@/components/marketing/HomeSliders";
+import TeamSlider from "@/components/marketing/TeamSlider";
+import ButtonLink from "@/components/marketing/ui/ButtonLink";
+import CtaBand from "@/components/marketing/ui/CtaBand";
+import PageHero from "@/components/marketing/ui/PageHero";
+import { Eyebrow, PageSection, TwoToneTitle } from "@/components/marketing/ui/PageSection";
+import { getMarketingContactHref } from "@/lib/marketing-contact";
+import { getMarketingBreadcrumbJsonLd, serializeMarketingJsonLd } from "@/lib/marketing-seo";
+
+// Metadata is in ./layout.js.
+const structuredData = [
+  getMarketingBreadcrumbJsonLd([
+    { name: "Home", path: "/" },
+    { name: "About", path: "/about" },
+  ]),
+];
+
+// The figures the homepage also shows, plus two more about the team.
+const stats = [
+  { label: "Happy clients", end: 100, suffix: "+" },
+  { label: "Ad spend managed", end: 50, prefix: "₹", suffix: "L+" },
+  { label: "E-com partners", end: 10, suffix: "+" },
+  { label: "Team members", end: 25, suffix: "+" },
+];
+
+const objectives = [
+  "Our foremost objective is to create job opportunities for young minds in the digital marketing industry. We aim to nurture fresh talent, equipping them with the skills and knowledge needed to thrive in the ever-evolving digital landscape, while building a future-ready workforce.",
+  "We are equally committed to driving digital literacy, particularly in rural areas, by empowering small and medium businesses and young entrepreneurs with the tools they need to succeed in today's digital world.",
+  "We also prioritise cyber security awareness, so businesses can operate safely and securely as they embrace digital growth. Through these efforts, we strive to make a meaningful impact on the economy and foster a digitally secure and inclusive environment.",
+];
+
+const sectionHeading = "mt-5 text-4xl font-bold uppercase leading-[1.02] sm:text-5xl xl:text-6xl";
 
 export default function AboutPage() {
   return (
-    <main className="min-h-screen bg-black text-white overflow-hidden">
+    <main className="bg-black text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
+      />
 
-      {/* Header */}
-      <header className="text-center pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12 lg:pb-16 px-[var(--site-gutter)]">
-        <h1 className="text-4xl md:text-5xl font-bold tracking-wider mb-4">
-          ABOUT US
-        </h1>
-      </header>
-
-      {/* Main Content */}
-      <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] py-8 sm:py-12">
-        {/* Two Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 xl:gap-16 items-start">
-          {/* Left Content */}
-          <div className="space-y-6 flex flex-col justify-center">
-            {/* Section Label */}
-            <div className="flex items-center gap-3">
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: '#F5EE30' }}
-              ></div>
-              <span className="text-xs font-medium tracking-wider text-white">
-                ABOUT DIGITAL CORVIDS
-              </span>
-            </div>
-
-            {/* Main Heading */}
-            <div className="space-y-1">
-              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight text-balance mb-2">
-                DIGITAL MARKETING BUILT FOR
-              </h2>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight text-balance text-gray-500">
-                MEASURABLE GROWTH
-              </h2>
-            </div>
-
-            {/* Description */}
-            <p className="text-gray-300 leading-relaxed text-sm md:text-base lg:text-lg max-w-2xl">
-              At Digital Corvids, we combine creative strategy, technical SEO,
-              performance marketing, social content, websites, and video
-              production to help brands turn attention into measurable business
-              growth. Our work is practical, data-aware, and built around the
-              outcomes each client needs most.
-            </p>
-
-            {/* Experience Box */}
-            <div
-              className="flex flex-col items-center justify-center text-center py-6 px-10 w-fit mx-auto shadow-lg"
-              style={{ backgroundColor: '#F5EE30' }}
-            >
-              <div className="text-3xl sm:text-4xl md:text-5xl font-bold text-black mb-1">
-                <CountUp end={5} suffix="+" />
-              </div>
-              <div className="text-xs sm:text-sm font-bold tracking-wider text-black">
-                YEARS OF EXPERIENCE
-              </div>
-            </div>
-          </div>
-
-          {/* Right Content */}
-          <div className="flex flex-col items-center justify-start space-y-6">
-            {/* Image (slightly smaller with controlled height) */}
-            <div className="w-full max-w-md xl:max-w-lg relative h-[360px] sm:h-[420px] lg:h-[460px]">
-              <Image
-                src="/about.png"
-                alt="Digital Corvids illustration showing a person climbing a ladder next to a large yellow megaphone with floating icons"
-                fill
-                sizes="(min-width: 1280px) 512px, (min-width: 1024px) 448px, (min-width: 640px) 448px, calc(100vw - 48px)"
-                className="object-contain rounded-lg"
-              />
-            </div>
-
-            {/* Description under Image */}
-            <p className="text-gray-300 leading-relaxed max-w-2xl text-sm md:text-base text-center lg:text-left">
-              At Digital Corvids, we provide comprehensive digital marketing
-              solutions, such as innovative and adaptable. Recognizing that
-              every business has unique goals and challenges, we deliver a broad
-              spectrum of services designed to help your brand excel in the
-              ever-evolving digital arena.
-            </p>
-          </div>
-        </div>
-
-        {/* Full Width Section Below */}
-        <div className="mt-10 sm:mt-14 text-left">
-          <p className="text-gray-300 leading-relaxed max-w-3xl text-sm md:text-base">
-            At Digital Corvids, we don&apos;t just deliver solutions — we innovate,
-            adapt, and evolve to meet the ever-shifting demands of the digital
-            world. We are resourceful and strategic, always finding the most
-            effective path forward to unlock new opportunities and drive your
-            success.
+      <PageHero
+        eyebrow="About Digital Corvids"
+        title="About Us"
+        intro={
+          <p className="m-0">
+            A digital marketing agency in Jaipur. We combine creative strategy, technical SEO, performance marketing,
+            social content, websites and video production to help brands turn attention into measurable business growth.
           </p>
+        }
+        actions={
+          <>
+            <ButtonLink href={getMarketingContactHref({ intent: "plan" })} arrow>
+              Get a free marketing plan
+            </ButtonLink>
+            <ButtonLink href="#team" variant="secondary">
+              Meet the team
+            </ButtonLink>
+          </>
+        }
+      />
 
-          {/* Experience Stats Section */}
-          <div className="mt-8 sm:mt-12">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl">
-              <div className="text-center">
-                <div className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-2">
-                  <CountUp end={100} suffix="+" />
-                </div>
-                <div className="text-xs sm:text-sm text-gray-400 tracking-wider font-medium">
-                  HAPPY CLIENTS
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-2">
-                  <CountUp end={50} suffix="L+" />
-                </div>
-                <div className="text-xs sm:text-sm text-gray-400 tracking-wider font-medium">
-                  AD SPENT
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-2">
-                  <CountUp end={10} suffix="+" />
-                </div>
-                <div className="text-xs sm:text-sm text-gray-400 tracking-wider font-medium">
-                  E-COM PARTNER
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-2">
-                  <CountUp end={25} suffix="+" />
-                </div>
-                <div className="text-xs sm:text-sm text-gray-400 tracking-wider font-medium">
-                  TEAM MEMBERS
-                </div>
-              </div>
+      <PageSection labelledBy="about-story" bordered={false}>
+        <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
+          <div>
+            <Eyebrow>Who We Are</Eyebrow>
+            <h2 id="about-story" className={sectionHeading}>
+              <TwoToneTitle title="Digital Marketing Built For" accent="Measurable Growth" />
+            </h2>
+            <div className="mt-6 flex flex-col gap-5 text-base leading-7 text-gray-300 sm:text-lg">
+              <p className="m-0">
+                Our work is practical, data-aware, and built around the outcomes each client needs most. Recognizing that
+                every business has unique goals and challenges, we deliver a broad spectrum of services designed to help
+                your brand excel in the ever-evolving digital arena.
+              </p>
+              <p className="m-0">
+                We don&apos;t just deliver solutions: we innovate, adapt, and evolve to meet the ever-shifting demands of
+                the digital world. We are resourceful and strategic, always finding the most effective path forward to
+                unlock new opportunities and drive your success.
+              </p>
             </div>
+            {/* The yellow experience box from the original page */}
+            <div className="mt-8 inline-flex flex-col items-center justify-center bg-[#F5EE30] px-10 py-6 text-center text-black shadow-lg">
+              <span className="text-4xl font-bold sm:text-5xl">
+                <CountUp end={5} suffix="+" />
+              </span>
+              <span className="mt-1 text-xs font-bold uppercase tracking-wider sm:text-sm">Years of experience</span>
+            </div>
+          </div>
+          <div className="flex justify-center lg:justify-end">
+            <Image
+              src="/about.png"
+              alt="Digital Corvids illustration showing a person climbing a ladder next to a large yellow megaphone with floating icons"
+              width={651}
+              height={668}
+              loading="eager"
+              sizes="(min-width: 1024px) 448px, (min-width: 640px) 384px, 280px"
+              className="h-auto w-72 sm:w-96 lg:w-[28rem]"
+            />
           </div>
         </div>
 
-        {/* Why Us Section */}
-        <div className="mt-16 sm:mt-20 lg:mt-24">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 xl:gap-16 items-center">
-            {/* Left Content - Image */}
-            <div className="flex flex-col items-center justify-center order-2 lg:order-1">
-              <div className="w-full max-w-md xl:max-w-lg relative h-[360px] sm:h-[420px] lg:h-[460px]">
-                <Image
-                  src="/about2.png"
-                  alt="Digital Corvids why us illustration showing a person climbing stairs with trophy and money floating around"
-                  fill
-                  sizes="(min-width: 1280px) 512px, (min-width: 1024px) 448px, (min-width: 640px) 448px, calc(100vw - 48px)"
-                  className="object-contain rounded-lg"
-                />
-              </div>
+        <dl className="m-0 mt-14 grid grid-cols-2 gap-y-10 border-y border-white/10 py-10 sm:mt-16 lg:grid-cols-4">
+          {stats.map((stat) => (
+            <div key={stat.label} className="flex flex-col-reverse items-center text-center">
+              <dt className="mt-3 text-xs font-medium uppercase tracking-wider text-gray-400 sm:text-sm">{stat.label}</dt>
+              <dd className="m-0 text-4xl font-bold text-white sm:text-5xl md:text-6xl">
+                <CountUp end={stat.end} prefix={stat.prefix} suffix={stat.suffix} />
+              </dd>
             </div>
+          ))}
+        </dl>
+      </PageSection>
 
-            {/* Right Content - Text */}
-            <div className="space-y-6 flex flex-col justify-center order-1 lg:order-2">
-              {/* Section Label */}
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: '#F5EE30' }}
-                ></div>
-                <span className="text-xs font-medium tracking-wider text-white">
-                  WHY US
-                </span>
-              </div>
-
-              {/* Main Heading */}
-              <div className="space-y-1">
-                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight text-balance mb-2">
-                  WING TO WING
-                </h2>
-                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight text-balance text-gray-500">
-                  COMMITMENT
-                </h2>
-              </div>
-
-              {/* Description Paragraphs */}
-              <div className="space-y-4">
-                <p className="text-gray-300 leading-relaxed text-sm md:text-base lg:text-lg max-w-2xl">
-                  At Digital Corvids, creativity fuels everything we do. We founded this company because we
-                  love bringing innovative ideas to life, and digital marketing gives us the perfect opportunity
-                  to express our passion for creative work and problem-solving. Whether it&apos;s crafting
-                  compelling content or producing creative ad films, we thrive on creating work that
-                  captivates and engages audiences.
-                </p>
-
-                <p className="text-gray-300 leading-relaxed text-sm md:text-base lg:text-lg max-w-2xl">
-                  Our love for tackling complex challenges, paired with our technical expertise, allows us to
-                  help small and medium businesses grow and evolve. Beyond just business, we see our work
-                  as a way to contribute to something bigger. At our core, we&apos;re creators and problem solvers,
-                  and this company gives us the perfect platform to do what we love while making a
-                  meaningful impact.
-                </p>
-              </div>
+      <PageSection labelledBy="about-why" bordered={false}>
+        <div className="grid items-center gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
+          <div className="order-2 flex justify-center lg:order-1 lg:justify-start">
+            <Image
+              src="/about2.png"
+              alt="Digital Corvids why us illustration showing a person climbing stairs with trophy and money floating around"
+              width={655}
+              height={582}
+              sizes="(min-width: 1024px) 448px, (min-width: 640px) 384px, 280px"
+              className="h-auto w-72 sm:w-96 lg:w-[28rem]"
+            />
+          </div>
+          <div className="order-1 lg:order-2">
+            <Eyebrow>Why Us</Eyebrow>
+            <h2 id="about-why" className={sectionHeading}>
+              <TwoToneTitle title="Wing To Wing" accent="Commitment" />
+            </h2>
+            <div className="mt-6 flex flex-col gap-5 text-base leading-7 text-gray-300 sm:text-lg">
+              <p className="m-0">
+                At Digital Corvids, creativity fuels everything we do. We founded this company because we love bringing
+                innovative ideas to life, and digital marketing gives us the perfect opportunity to express our passion
+                for creative work and problem-solving. Whether it&apos;s crafting compelling content or producing creative
+                ad films, we thrive on creating work that captivates and engages audiences.
+              </p>
+              <p className="m-0">
+                Our love for tackling complex challenges, paired with our technical expertise, allows us to help small and
+                medium businesses grow and evolve. Beyond just business, we see our work as a way to contribute to
+                something bigger. At our core, we&apos;re creators and problem solvers, and this company gives us the
+                perfect platform to do what we love while making a meaningful impact.
+              </p>
             </div>
           </div>
         </div>
+      </PageSection>
 
+      <PageSection labelledBy="about-objectives">
+        <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
+          <div>
+            <Eyebrow>Our Objectives</Eyebrow>
+            <h2 id="about-objectives" className={sectionHeading}>
+              <TwoToneTitle title="The Intelligence Behind Every" accent="Strategy" />
+            </h2>
+            <ol className="m-0 mt-8 flex list-none flex-col gap-7 p-0">
+              {objectives.map((text, index) => (
+                <li key={text} className="grid grid-cols-[3.5rem_1fr] gap-4 border-b border-white/10 pb-7 last:border-b-0 last:pb-0">
+                  <span className="font-suifak text-3xl leading-none text-[#F5EE30] sm:text-4xl">
+                    .{String(index + 1).padStart(2, "0")}
+                  </span>
+                  <p className="m-0 text-base leading-7 text-gray-300">{text}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+          <div className="flex justify-center lg:justify-end">
+            <Image
+              src="/about3.png"
+              alt="Illustration of a strategist ticking off a checklist on a yellow clipboard"
+              width={510}
+              height={684}
+              sizes="(min-width: 1024px) 384px, (min-width: 640px) 320px, 240px"
+              className="h-auto w-60 sm:w-80 lg:w-96"
+            />
+          </div>
+        </div>
+      </PageSection>
+
+      <section aria-labelledby="about-tools" className="border-t border-white/10 bg-black py-14 sm:py-16">
+        <h2
+          id="about-tools"
+          className="m-0 mb-8 text-center font-glacial-bold text-lg uppercase tracking-widest text-gray-400 sm:text-xl"
+        >
+          Tools We Work With
+        </h2>
+        <ToolLogosSlider />
+      </section>
+
+      <div id="team" className="scroll-mt-6 border-t border-white/10">
+        <TeamSlider />
       </div>
 
-      {/* Bottom spacing for mobile */}
-      <div className="pb-8 sm:pb-12"></div>
-      <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] grid grid-cols-1 items-center gap-10 bg-black py-16 text-white lg:grid-cols-2 lg:gap-20">
-        {/* Left Side - Content */}
-        <div>
-          {/* Label */}
-          <div className="flex items-center gap-2 mb-6">
-            <div className="w-2 h-2 bg-[#F5EE30] rounded-full"></div>
-            <span className="text-sm font-semibold text-white tracking-wider">
-              OUR OBJECTIVE
-            </span>
-          </div>
-
-          {/* Headline */}
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold leading-tight text-balance">
-            THE INTELLIGENCE BEHIND EVERY{" "}
-            <span className="text-gray-500">STRATEGY</span>
-          </h2>
-
-          {/* Objectives */}
-          <div className="mt-10 space-y-8">
-            {/* .01 */}
-            <div>
-              <h3 className="text-3xl font-bold text-[#F5EE30]">.01</h3>
-              <p className="text-gray-300 leading-relaxed text-sm md:text-base max-w-2xl">
-                At Digital Corvids, our foremost objective is to create job
-                opportunities for young minds in the digital marketing industry.
-                We aim to nurture fresh talent, equipping them with the skills and
-                knowledge needed to thrive in the ever-evolving digital landscape,
-                while building a future-ready workforce.
-              </p>
-            </div>
-
-            {/* .02 */}
-            <div>
-              <h3 className="text-3xl font-bold text-[#F5EE30]">.02</h3>
-              <p className="text-gray-300 leading-relaxed text-sm md:text-base max-w-2xl">
-                We are equally committed to driving digital literacy, particularly
-                in rural areas, by empowering small and medium businesses and
-                young entrepreneurs with the tools they need to succeed in today&apos;s
-                digital world.
-              </p>
-            </div>
-
-            {/* .03 */}
-            <div>
-              <h3 className="text-3xl font-bold text-[#F5EE30]">.03</h3>
-              <p className="text-gray-300 leading-relaxed text-sm md:text-base max-w-2xl">
-                Additionally, we prioritise promoting cyber security awareness,
-                ensuring businesses can operate safely and securely as they
-                embrace digital growth. Through these efforts, we strive to make a
-                meaningful impact on the economy and foster a digitally secure and
-                inclusive environment.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Side - Image */}
-        <div className="flex justify-center lg:justify-end relative w-[280px] h-[280px] md:w-[380px] md:h-[380px] lg:w-[460px] lg:h-[460px] mx-auto">
-          <Image
-            src="/about3.png"
-            alt="Objective Illustration"
-            fill
-            sizes="(min-width: 1024px) 460px, (min-width: 768px) 380px, 280px"
-            className="object-contain"
-          />
-        </div>
-      </div>
-      <TeamSlider />
+      <CtaBand whatsappPath="/about" />
     </main>
   );
 }

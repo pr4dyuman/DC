@@ -8,14 +8,10 @@ const TestimonialSection = dynamic(() => import("./testomonial"), {
   loading: () => <TestimonialPlaceholder />,
 });
 
+// Nothing shows while testimonials load: the section appears only when there
+// are testimonials, so visitors never see a "loading" line that then vanishes.
 function TestimonialPlaceholder() {
-  return (
-    <section className="bg-black text-white py-20 px-[var(--site-gutter)]">
-      <div className="max-w-[var(--site-content)] mx-auto text-center">
-        <p className="text-gray-400">Loading testimonials...</p>
-      </div>
-    </section>
-  );
+  return null;
 }
 
 export default function LazyTestimonialSection() {

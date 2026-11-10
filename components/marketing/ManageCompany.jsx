@@ -23,7 +23,7 @@ const taskEstimates = [
     { title: "Launch", hours: "2h" },
 ];
 
-// Shown under the section on the Manage Company page only.
+// Shown under the section on the Agency OS page only.
 const agencyOsFeatures = [
     {
         title: "Projects",
@@ -54,8 +54,9 @@ const handArrowPaths = {
 };
 
 // Hand-drawn arrows next to the notes: sideways beside the panels on wide
-// screens, up or down at the panels above and below when they stack.
-function HandArrow({ direction, className = "" }) {
+// screens, up or down at the panels above and below when they stack. Also used
+// by the homepage's client portal notes.
+export function HandArrow({ direction, className = "" }) {
     const vertical = direction === "up" || direction === "down";
 
     return (
@@ -78,7 +79,10 @@ function HandArrow({ direction, className = "" }) {
     );
 }
 
-function ClientPortalPreview() {
+// Also used on the homepage, where it shows clients their own portal.
+// `compactOnPhones` (homepage) leaves out the task list on phones; the
+// progress bar and the invoice still show what the portal does.
+export function ClientPortalPreview({ compactOnPhones = false }) {
     return (
         <figure className="m-0 w-full min-w-0 max-w-[640px] xl:max-w-none">
             <figcaption className="sr-only">
@@ -102,7 +106,9 @@ function ClientPortalPreview() {
                         <div className="w-3/5 rounded-full bg-[#F5EE30]" />
                     </div>
                 </div>
-                <ul className="m-0 flex list-none flex-col border-t border-[#1f1f1f] p-0">
+                <ul
+                    className={`m-0 list-none flex-col border-t border-[#1f1f1f] p-0 ${compactOnPhones ? "hidden sm:flex" : "flex"}`}
+                >
                     {portalTasks.map((task) => (
                         <li
                             key={task.title}
@@ -250,7 +256,7 @@ export default function ManageCompanySection({
                                 </Link>
                                 {showServiceLink ? (
                                     <Link
-                                        href="/services/manage-company"
+                                        href="/agency-os"
                                         prefetch={false}
                                         className="inline-flex min-h-[44px] items-center font-glacial-bold text-base underline decoration-2 underline-offset-[6px] hover:decoration-[3px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0b0b0b]"
                                     >

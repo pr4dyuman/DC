@@ -18,7 +18,7 @@ const subscribe = () => () => { };
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const isHydrated = useSyncExternalStore(subscribe, () => true, () => false);
-    const [theme, setTheme] = useState<Theme>(() => {
+    const [storedTheme, setTheme] = useState<Theme>(() => {
         if (typeof window === "undefined") {
             return "dark";
         }
@@ -26,6 +26,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         const stored = localStorage.getItem("agency-os-theme");
         return stored === "light" || stored === "dark" ? stored : "dark";
     });
+
+    // Until hydration finishes, report the theme the server rendered with, so
+    // the first client render matches the HTML. The saved choice applies right
+    // after.
+    const theme: Theme = isHydrated ? storedTheme : "dark";
 
     useEffect(() => {
         if (!isHydrated) return;
@@ -54,11 +59,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem("agency-os-theme", theme);
     }, [theme, isHydrated]);
 
-    // Prevent flash of wrong theme
-    if (!isHydrated) {
-        return <>{children}</>;
-    }
-
+    // Always render the provider. Rendering a bare fragment before hydration and
+    // the provider after it changed the element type, so React threw away and
+    // rebuilt every page's DOM right after it loaded.
     return (
         <ThemeContext.Provider value={{ theme, setTheme }}>
             {children}

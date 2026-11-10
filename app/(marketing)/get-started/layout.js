@@ -1,11 +1,11 @@
 import { buildMarketingMetadata } from "@/lib/marketing-seo";
 
 export const metadata = buildMarketingMetadata({
-  title: "Get Started With Digital Corvids | Growth Strategy Call",
+  title: "Agency OS 7-Day Free Trial | Digital Corvids",
   description:
-    "Start your Digital Corvids project for SEO, websites, PPC, social media, video production, or influencer campaigns.",
+    "Try Agency OS free for 7 days: projects, tasks, invoices, payroll and a client portal for your agency, plus an AI assistant. No credit card required.",
   path: "/get-started",
-  keywords: ["start digital marketing project", "Digital Corvids get started", "growth strategy call"],
+  keywords: ["Agency OS free trial", "agency management software", "agency project management", "client portal software"],
 });
 
 export default function GetStartedLayout({ children }) {

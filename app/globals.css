@@ -7,7 +7,7 @@
    ========================= */
 @font-face {
   font-family: "Etna";
-  src: url("/fonts/etna.otf") format("opentype");
+  src: url("/fonts/etna.woff2") format("woff2"), url("/fonts/etna.otf") format("opentype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -15,7 +15,7 @@
 
 @font-face {
   font-family: "Glacial Indifference";
-  src: url("/fonts/Glacial.otf") format("opentype");
+  src: url("/fonts/Glacial.woff2") format("woff2"), url("/fonts/Glacial.otf") format("opentype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -23,7 +23,7 @@
 
 @font-face {
   font-family: "Glacial Indifference";
-  src: url("/fonts/Glacial-bold.otf") format("opentype");
+  src: url("/fonts/Glacial-bold.woff2") format("woff2"), url("/fonts/Glacial-bold.otf") format("opentype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -31,7 +31,7 @@
 
 @font-face {
   font-family: "Advent Pro";
-  src: url("/fonts/AdventPro.ttf") format("truetype");
+  src: url("/fonts/AdventPro.woff2") format("woff2"), url("/fonts/AdventPro.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -39,7 +39,7 @@
 
 @font-face {
   font-family: "Architects Daughter";
-  src: url("/fonts/ArchitectsDaughter.ttf") format("truetype");
+  src: url("/fonts/ArchitectsDaughter.woff2") format("woff2"), url("/fonts/ArchitectsDaughter.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -47,7 +47,7 @@
 
 @font-face {
   font-family: "Suifak";
-  src: url("/fonts/Suifak.otf") format("opentype");
+  src: url("/fonts/Suifak.woff2") format("woff2"), url("/fonts/Suifak.otf") format("opentype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -330,19 +330,20 @@ body {
   animation-duration: 28s;
 }
 
+/* The homepage's yellow services band */
 .dc-services-marquee-track {
   animation-duration: 36s;
+}
+
+.dc-service-ticker-item {
+  flex: 0 0 auto;
+  padding-right: 40px;
 }
 
 .dc-partner-item {
   flex: 0 0 29vw;
   min-width: 29vw;
   padding: 0 5px;
-}
-
-.dc-service-ticker-item {
-  flex: 0 0 auto;
-  padding-right: 40px;
 }
 
 @media (min-width: 480px) {

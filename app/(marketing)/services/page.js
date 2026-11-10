@@ -1,161 +1,75 @@
-import Image from 'next/image';
-import Link from 'next/link';
+import Link from "next/link";
+
+import HowWeWork from "@/components/marketing/HowWeWork";
+import ServiceRows from "@/components/marketing/services/ServiceRows";
+import ButtonLink from "@/components/marketing/ui/ButtonLink";
+import CtaBand from "@/components/marketing/ui/CtaBand";
+import PageHero from "@/components/marketing/ui/PageHero";
+import { PageSection, SectionIntro } from "@/components/marketing/ui/PageSection";
+import { getMarketingContactHref } from "@/lib/marketing-contact";
+import { getMarketingBreadcrumbJsonLd, serializeMarketingJsonLd } from "@/lib/marketing-seo";
+
+// Metadata is in ./layout.js. Each card's copy is in lib/marketing-service-pages.
+const structuredData = [
+  getMarketingBreadcrumbJsonLd([
+    { name: "Home", path: "/" },
+    { name: "Services", path: "/services" },
+  ]),
+];
 
 export default function Services() {
-  const servicesData = [
-    {
-      id: "01",
-      title: "Web",
-      titleHighlight: "development",
-      image: "/web3.svg",
-      description:
-        "Your website is your digital storefront. We build fast, secure, and user-friendly sites optimized for conversions.",
-      link: "/services/web-development",
-      tagline: "BUILDING DIGITAL EXPERIENCES",
-      ctaLabel: "Explore Web Development",
-    },
-    {
-      id: "02",
-      title: "Search engine",
-      titleHighlight: "optimization",
-      image: "/web4.svg",
-      description:
-        "SEO is the backbone of organic growth. We optimize your website to rank higher on Google, drive targeted traffic, and turn visitors into loyal customers.",
-      link: "/services/seo",
-      tagline: "RANK HIGHER, GROW FASTER",
-      ctaLabel: "Explore SEO",
-    },
-    {
-      id: "03",
-      title: "Social Media",
-      titleHighlight: "marketing",
-      image: "/smm1.svg",
-      description:
-        "Build a loyal audience and amplify your brand's voice across platforms like Facebook, Instagram, LinkedIn, and Pinterest.",
-      link: "/services/social-media-marketing",
-      tagline: "BUILD COMMUNITY",
-      ctaLabel: "Explore Social Media Marketing",
-    },
-    {
-      id: "04",
-      title: "Video & Ad",
-      titleHighlight: "Production",
-      image: "/vpd1.svg",
-      description:
-        "We craft high-quality, compelling videos that tell your brand's story, drive engagement, and convert viewers into customers.",
-      link: "/services/video-production-ad",
-      tagline: "STORY-LED CONTENT",
-      ctaLabel: "Explore Video Production",
-    },
-    {
-      id: "05",
-      title: "PPC",
-      titleHighlight: "Advertising",
-      image: "/ppc1.svg",
-      description:
-        "Get immediate visibility with targeted ads on Google, Bing, and social media. We craft campaigns that maximize ROI and minimize wasted spend.",
-      link: "/services/ppc",
-      tagline: "IMMEDIATE RESULTS",
-      ctaLabel: "Explore PPC Advertising",
-    },
-    {
-      id: "06",
-      title: "Influencer",
-      titleHighlight: "Marketing",
-      image: "/inf1.svg",
-      description: "Partner with influencers who align with your brand to reach highly engaged audiences.",
-      link: "/services/influencer-marketing",
-      tagline: "CREATORS THAT CONVERT",
-      ctaLabel: "Explore Influencer Marketing",
-    },
-    {
-      id: "07",
-      title: "Manage",
-      titleHighlight: "Company",
-      image: "/dashboard-mockup-service-1200-q92.webp",
-      imageWidth: 1200,
-      imageHeight: 860,
-      imageClassName: "h-auto w-72 sm:w-[26rem] md:w-[34rem] lg:w-[34rem] max-w-full",
-      imageSizes: "(min-width: 1024px) 544px, (min-width: 768px) 544px, (min-width: 640px) 416px, 288px",
-      description: "AI-powered agency management platform. Track projects, manage finances, automate invoicing, and let AI handle the heavy lifting.",
-      link: "/services/manage-company",
-      tagline: "AI-POWERED MANAGEMENT",
-      ctaLabel: "Explore Manage Company",
-    },
-  ];
-
   return (
-    <main className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-[var(--site-frame)] px-[var(--site-gutter)] pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-10 md:pb-12">
-        {/* Header */}
-        <div className="text-center mb-16">
-          <h1 className="text-4xl md:text-5xl font-bold uppercase tracking-wide mb-4">SERVICES</h1>
-          <p className="text-[#F5EE30] font-glacial-bold text-xl md:text-2xl uppercase tracking-wider">WHAT WE DO</p>
-        </div>
+    <main className="bg-black text-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeMarketingJsonLd(structuredData) }}
+      />
 
-        {/* Services Grid - Zigzag Layout */}
-        {servicesData.map((service, index) => {
-          const isEven = index % 2 === 0;
-          const imageWidth = service.imageWidth ?? 420;
-          const imageHeight = service.imageHeight ?? 420;
-          const imageClassName = service.imageClassName ?? "h-auto w-40 sm:w-56 md:w-80 lg:w-auto";
-          const imageSizes = service.imageSizes ?? "(min-width: 1024px) 420px, (min-width: 768px) 320px, (min-width: 640px) 224px, 160px";
+      <PageHero
+        eyebrow="What We Do"
+        title="Services"
+        intro={
+          <p className="m-0">
+            Marketing and websites for small and growing businesses: websites, search, social, ads, video and creator
+            campaigns, planned together so each one makes the others work harder.
+          </p>
+        }
+        actions={
+          <>
+            <ButtonLink href={getMarketingContactHref({ intent: "plan" })} arrow>
+              Get a free marketing plan
+            </ButtonLink>
+            <ButtonLink href="/portfolio" variant="secondary">
+              See our work
+            </ButtonLink>
+          </>
+        }
+        checklist={["Clear goals from day one", "One team for every channel", "Honest, measured reporting", "Reply within 24 hours"]}
+      />
 
-          return (
-            <div key={service.id}>
-              <div className={`flex flex-col lg:flex-row items-center justify-between mb-16 lg:mb-28`}>
-                {/* Image Section */}
-                <div className={`w-full lg:w-1/2 flex justify-center mb-8 lg:mb-0 ${isEven ? 'lg:pr-12 order-1' : 'lg:pl-12 order-1 lg:order-2'
-                  }`}>
-                  <div className="relative">
-                    <Image
-                      src={service.image}
-                      alt={`${service.title} ${service.titleHighlight}`}
-                      width={imageWidth}
-                      height={imageHeight}
-                      priority={index === 0}
-                      sizes={imageSizes}
-                      className={imageClassName}
-                    />
-                  </div>
-                </div>
+      <PageSection labelledBy="services-list" bordered={false}>
+        <SectionIntro id="services-list" eyebrow="Our Services" title="Six Services," accent="One Team">
+          Not sure which you need? Ask for a free plan and we will suggest the right mix.
+        </SectionIntro>
+        <ServiceRows />
 
-                {/* Content Section */}
-                <div className={`w-full lg:w-1/2 ${isEven ? 'lg:pl-12 order-2' : 'lg:pr-12 order-2 lg:order-1'
-                  }`}>
-                  <h3 className={`text-[#F5EE30] text-sm font-semibold mb-3 uppercase tracking-wide text-center ${isEven ? 'lg:text-left' : 'lg:text-right'
-                    }`}>
-                    {service.tagline}
-                  </h3>
-                  <h2 className={`text-3xl md:text-4xl font-extrabold mb-4 text-center uppercase ${isEven ? 'lg:text-left' : 'lg:text-right'
-                    }`}>
-                    {service.title} <span className="text-[#F5EE30]">{service.titleHighlight}</span>
-                  </h2>
-                  <p className={`text-gray-300 mb-6 leading-relaxed text-lg text-center ${isEven ? 'lg:text-left' : 'lg:text-right'
-                    }`}>
-                    {service.description}
-                  </p>
-                  <div className={`text-center ${isEven ? 'lg:text-left' : 'lg:text-right'}`}>
-                    <Link
-                      href={service.link}
-                      prefetch={false}
-                      className="inline-block bg-white text-black font-bold uppercase px-6 py-3 rounded-full hover:bg-[#F5EE30] transition-all w-full sm:w-auto text-center"
-                    >
-                      {service.ctaLabel}
-                    </Link>
-                  </div>
-                </div>
-              </div>
+        {/* Agency OS and the templates used to be listed here; they are products now. */}
+        <p className="mx-auto mb-0 mt-12 max-w-2xl text-center text-base leading-relaxed text-gray-400">
+          Looking for Agency OS, our website templates or zSEO.ai? They are under{" "}
+          <Link
+            href="/products"
+            prefetch={false}
+            className="font-glacial-bold text-[#F5EE30] underline underline-offset-4 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F5EE30]"
+          >
+            Products
+          </Link>
+          .
+        </p>
+      </PageSection>
 
-              {/* Divider - only show on mobile and not after last item */}
-              {index < servicesData.length - 1 && (
-                <div className="h-px bg-white/10 my-10 lg:hidden"></div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <HowWeWork />
+
+      <CtaBand whatsappPath="/services" />
     </main>
   );
 }
-

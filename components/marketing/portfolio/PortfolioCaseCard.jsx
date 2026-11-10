@@ -21,7 +21,7 @@ function Facts({ study }) {
       <dl className="mt-6 grid grid-cols-2 border-y border-white/10">
         {facts.map(([label, value]) => (
           <div key={label} className="border-r border-white/10 py-4 pr-4 last:border-r-0 last:pl-4 last:pr-0">
-            <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">{label}</dt>
+            <dt className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/55">{label}</dt>
             <dd className="mt-2 text-xs font-bold uppercase tracking-[0.12em] text-white/80">{value}</dd>
           </div>
         ))}

@@ -10,6 +10,7 @@ import {
 import { normalizeMarketingCanonicalUrl } from "@/lib/marketing-blog-utils";
 import { hasCaseStudyPage } from "@/lib/marketing-portfolio";
 import { loadCaseStudies } from "@/lib/marketing-portfolio-store";
+import { MARKETING_PRODUCTS } from "@/lib/marketing-products";
 import { getMarketingTemplates } from "@/lib/marketing-templates";
 
 type LlmsBlog = {
@@ -38,17 +39,12 @@ const CORE_PAGES = [
     {
         title: "Services",
         path: "/services",
-        description: "Index of Digital Corvids digital marketing, web, content, and AI services.",
+        description: "Index of Digital Corvids digital marketing and web services.",
     },
     {
         title: "Portfolio",
         path: "/portfolio",
-        description: "Selected client websites and web apps, plus the website templates Digital Corvids designs and sells.",
-    },
-    {
-        title: "Website Templates",
-        path: "/templates",
-        description: "Ready-made HTML and Tailwind CSS website templates with page tours, prices, and customisation options.",
+        description: "Selected client websites and web apps, and examples of how each marketing service is reported.",
     },
     {
         title: "Blog",
@@ -58,12 +54,26 @@ const CORE_PAGES = [
     {
         title: "Contact",
         path: "/contact",
-        description: "Contact details for Digital Corvids in Jaipur, Rajasthan.",
+        description: "Enquiry form and contact details (phone, email, WhatsApp) for Digital Corvids in Jaipur, Rajasthan.",
     },
+];
+
+// Products are things Digital Corvids makes, separate from its marketing services.
+const PRODUCT_PAGES = [
     {
-        title: "Get Started",
+        title: "Products",
+        path: "/products",
+        description: "Overview of the products Digital Corvids makes: Agency OS, website templates and zSEO.ai.",
+    },
+    ...MARKETING_PRODUCTS.map((product) => ({
+        title: product.name,
+        ...(product.external ? { url: product.href } : { path: product.href }),
+        description: product.description,
+    })),
+    {
+        title: "Agency OS Free Trial",
         path: "/get-started",
-        description: "Project intake and signup path for new Digital Corvids clients.",
+        description: "Signup for a 7-day free trial of Agency OS, the agency management platform made by Digital Corvids.",
     },
 ];
 
@@ -97,11 +107,6 @@ const SERVICE_PAGES = [
         title: "Influencer Marketing",
         path: "/services/influencer-marketing",
         description: "Creator discovery, campaign planning, collaboration, amplification, and ROI tracking.",
-    },
-    {
-        title: "Manage Your Company With AI",
-        path: "/services/manage-company",
-        description: "Agency management platform for projects, finance, invoicing, team workflows, and AI assistance.",
     },
 ];
 
@@ -233,6 +238,9 @@ export async function buildMarketingLlmsText({ full = false } = {}) {
         "## Services",
         ...SERVICE_PAGES.map(linkLine),
         "",
+        "## Products",
+        ...PRODUCT_PAGES.map(linkLine),
+        "",
         ...(await renderCaseStudyLines()),
         "## Website Templates",
         ...getMarketingTemplates().map((template) =>
@@ -253,10 +261,10 @@ export async function buildMarketingLlmsText({ full = false } = {}) {
             "## Best Pages By Intent",
             "- For agency background and trust signals: use About Digital Corvids.",
             "- For service discovery: use Services and the individual service pages.",
-            "- For project inquiries: use Contact or Get Started.",
+            "- For project inquiries: use Contact.",
             "- For ready-made website templates to buy or have customised: use Website Templates.",
             "- For AI-assisted SEO planning and content publishing tools: use zSEO.ai (https://zseo.ai).",
-            "- For agency operations software: use Manage Your Company With AI.",
+            "- For agency management software with a client portal: use Agency OS (7-day free trial at Get Started).",
             "",
             "## Public Crawling Notes",
             "- Public marketing pages are intended for indexing.",

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
+import { getMarketingContactHref } from "@/lib/marketing-contact";
 import { getServiceExamples } from "@/lib/marketing-portfolio";
 import { loadAllCaseStudies, loadServiceCaseStudies } from "@/lib/marketing-portfolio-store";
 
@@ -13,7 +14,7 @@ const focusRing =
 
 // Until a service has a published case study, its page shows how we report
 // the work: the service's example, marked as one, with illustrative numbers.
-async function ServiceExample({ services, title }) {
+async function ServiceExample({ services, title, contactService }) {
   const [example] = getServiceExamples(await loadAllCaseStudies(), services);
   if (!example) {
     return null;
@@ -30,11 +31,11 @@ async function ServiceExample({ services, title }) {
           <h2 className="text-3xl font-extrabold uppercase leading-tight md:text-5xl">
             <span className="text-white">{title}</span>
             <br />
-            <span className="text-[#3E3E3E]">How We Report Them</span>
+            <span className="text-[#6b6b6b]">How We Report Them</span>
           </h2>
         </div>
         <Link
-          href="/contact"
+          href={getMarketingContactHref({ service: contactService })}
           prefetch={false}
           className={`inline-flex shrink-0 items-center gap-2 font-glacial-bold text-sm uppercase tracking-widest text-[#F5EE30] transition-colors hover:text-white ${focusRing}`}
         >
@@ -50,11 +51,12 @@ async function ServiceExample({ services, title }) {
 // Published case studies on a service page: results-led work as a spotlight
 // with its charts and visuals, website projects as cards. With nothing
 // published for the service yet, it shows the service's example instead.
-// Case studies are managed in Super Admin.
-export default async function ServiceCaseStudies({ services, title, linkLabel }) {
+// Case studies are managed in Super Admin. `contactService` is the service
+// page's slug, so "Talk to us" opens the contact form with it named.
+export default async function ServiceCaseStudies({ services, title, linkLabel, contactService }) {
   const studies = (await loadServiceCaseStudies(services)).slice(0, 4);
   if (!studies.length) {
-    return <ServiceExample services={services} title={title} />;
+    return <ServiceExample services={services} title={title} contactService={contactService} />;
   }
 
   const spotlights = studies.filter((study) => study.proof.type !== "website").slice(0, 2);
@@ -71,7 +73,7 @@ export default async function ServiceCaseStudies({ services, title, linkLabel })
           <h2 className="text-3xl font-extrabold uppercase leading-tight md:text-5xl">
             <span className="text-white">{title}</span>
             <br />
-            <span className="text-[#3E3E3E]">We Have Delivered</span>
+            <span className="text-[#6b6b6b]">We Have Delivered</span>
           </h2>
         </div>
         <Link

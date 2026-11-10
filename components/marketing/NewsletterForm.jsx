@@ -54,12 +54,12 @@ export default function NewsletterForm() {
       />
       <button
         type="submit"
-        aria-label="Subscribe to the Digital Corvids newsletter"
+        aria-label="Send: subscribe to the Digital Corvids newsletter"
         disabled={status === "loading"}
         suppressHydrationWarning
         className="absolute right-0 bottom-1 inline-flex min-h-8 min-w-16 items-center justify-end gap-1 text-[#D4E647] font-bold hover:text-[#e5f758] transition-colors uppercase text-sm tracking-wider disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#D4E647]"
       >
-        {status === "loading" ? "..." : "SEND"} <span className="text-xs">{"\u2192"}</span>
+        {status === "loading" ? "..." : "SEND"} <span aria-hidden="true" className="text-xs">{"\u2192"}</span>
       </button>
       {message && (
         <p
